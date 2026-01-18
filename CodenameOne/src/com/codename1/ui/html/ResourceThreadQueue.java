@@ -319,6 +319,7 @@ class ResourceThreadQueue {
      *
      * @return a printout of the threads queue
      */
+    @Override
     public String toString() {
         StringBuilder str = new StringBuilder("---- Running ----\n");
         int i = 1;
@@ -430,6 +431,7 @@ class ResourceThreadQueue {
         /**
          * {{@inheritDoc}}
          */
+        @Override
         public void run() {
             DocumentInfo docInfo = cssDocInfo != null ? cssDocInfo : new DocumentInfo(imageUrl, DocumentInfo.TYPE_IMAGE);
             InputStream is = handler.resourceRequested(docInfo);
@@ -439,6 +441,7 @@ class ResourceThreadQueue {
         /**
          * {{@inheritDoc}}
          */
+        @Override
         public void streamReady(InputStream is, DocumentInfo docInfo) {
             try {
                 if (is == null) {
@@ -461,6 +464,7 @@ class ResourceThreadQueue {
 
                 if (!cancelled) {
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             // prevent a redirect or another thread from breaking the UI
                             handleImage(img, imgLabel);

@@ -144,6 +144,7 @@ public final class DefaultCrashReporter implements CrashReport {
         if (Log.getReportingLevel() == Log.REPORTING_DEBUG && frequency > 0) {
             java.util.Timer t = new java.util.Timer();
             t.schedule(new TimerTask() {
+                @Override
                 public void run() {
                     if (!Display.getInstance().isEdt()) {
                         Display.getInstance().callSerially(this);
@@ -161,6 +162,7 @@ public final class DefaultCrashReporter implements CrashReport {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void exception(Throwable t) {
         Preferences.set("$CN1_pendingCrash", true);
         if (promptUser) {

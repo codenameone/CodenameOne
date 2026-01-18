@@ -168,6 +168,7 @@ public class PieChart extends RoundChart {
         drawTitle(canvas, x, y, width, paint);
     }
 
+    @Override
     public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
         return mPieMapper.getSeriesAndPointForScreenCoordinate(screenPoint);
     }

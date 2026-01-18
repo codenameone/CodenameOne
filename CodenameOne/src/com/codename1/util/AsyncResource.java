@@ -91,6 +91,7 @@ public class AsyncResource<V> extends Observable {
         final boolean[] complete = new boolean[1];
         for (final AsyncResource<?> res : resources) {
             res.ready(new SuccessCallback() {
+                @Override
                 public void onSucess(Object arg) {
                     synchronized (complete) {
                         if (complete[0]) {
@@ -108,6 +109,7 @@ public class AsyncResource<V> extends Observable {
                 }
             });
             res.except(new SuccessCallback<Throwable>() {
+                @Override
                 public void onSucess(Throwable ex) {
                     synchronized (complete) {
                         if (complete[0]) {
@@ -180,6 +182,7 @@ public class AsyncResource<V> extends Observable {
         while (!complete[0]) {
             if (isEdt()) {
                 invokeAndBlock(new Runnable() {
+                    @Override
                     public void run() {
                         synchronized (complete) {
                             if (!complete[0]) {
@@ -278,6 +281,7 @@ public class AsyncResource<V> extends Observable {
         }
         final boolean[] complete = new boolean[1];
         Observer observer = new Observer() {
+            @Override
             public void update(Observable obj, Object arg) {
                 if (isDone()) {
                     complete[0] = true;
@@ -295,6 +299,7 @@ public class AsyncResource<V> extends Observable {
             }
             if (isEdt()) {
                 CN.invokeAndBlock(new Runnable() {
+                    @Override
                     public void run() {
                         synchronized (complete) {
                             if (timeout > 0) {
@@ -387,6 +392,7 @@ public class AsyncResource<V> extends Observable {
                 } else {
                     final SuccessCallback<V> oldCallback = successCallback;
                     successCallback = new AsyncCallback<V>(new SuccessCallback<V>() {
+                        @Override
                         public void onSucess(V res) {
                             oldCallback.onSucess(res);
                             callback.onSucess(res);
@@ -438,6 +444,7 @@ public class AsyncResource<V> extends Observable {
                 } else {
                     final SuccessCallback<Throwable> oldErrorCallback = errorCallback;
                     errorCallback = new AsyncCallback<Throwable>(new SuccessCallback<Throwable>() {
+                        @Override
                         public void onSucess(Throwable res) {
                             oldErrorCallback.onSucess(res);
                             callback.onSucess(res);
@@ -590,6 +597,7 @@ public class AsyncResource<V> extends Observable {
             this.cause = cause;
         }
 
+        @Override
         public Throwable getCause() {
             return cause;
         }
@@ -645,6 +653,7 @@ public class AsyncResource<V> extends Observable {
         public void onSucess(final T value) {
             if (edt && !CN.isEdt()) {
                 CN.callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         onSucess(value);
                     }

@@ -329,12 +329,14 @@ public abstract class LocationManager {
             Display.getInstance().invokeAndBlock(this);
         }
 
+        @Override
         public void locationUpdated(Location location) {
             result = location;
             finished = true;
             setLocationListener(null);
         }
 
+        @Override
         public void providerStateChanged(int newState) {
             if (newState == AVAILABLE) {
                 try {
@@ -350,6 +352,7 @@ public abstract class LocationManager {
             setLocationListener(null);
         }
 
+        @Override
         public void run() {
             long start = System.currentTimeMillis();
             while (!finished) {

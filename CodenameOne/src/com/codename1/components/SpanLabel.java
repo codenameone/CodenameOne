@@ -167,6 +167,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      * @return The component used for styling font icons on this SpanLabel.
      * @since 7.0
      */
+    @Override
     public Component getIconStyleComponent() {
         return icon.getIconStyleComponent();
     }
@@ -259,6 +260,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      *
      * @return the uiid
      */
+    @Override
     public String getIconUIID() {
         return icon.getUIID();
     }
@@ -268,6 +270,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      *
      * @param uiid the uiid for the icon
      */
+    @Override
     public void setIconUIID(String uiid) {
         icon.setUIID(uiid);
         updateGap();
@@ -298,6 +301,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      *
      * @return the text
      */
+    @Override
     public String getText() {
         return text.getText();
     }
@@ -307,6 +311,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      *
      * @param t text of the label
      */
+    @Override
     public void setText(String t) {
         t = shouldLocalize ? getUIManager().localize(t, t) : t;
         text.setText(t);
@@ -376,6 +381,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      *
      * @return the icon
      */
+    @Override
     public Image getIcon() {
         return icon.getIcon();
     }
@@ -385,6 +391,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      *
      * @param i the icon
      */
+    @Override
     public void setIcon(Image i) {
         icon.setIcon(i);
         updateGap();
@@ -415,6 +422,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{
                 "text", "icon", "iconPosition", "textUiid", "iconUiid"
@@ -424,6 +432,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
                 String.class, // text
@@ -437,6 +446,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "Image", "String", "String", "String"};
     }
@@ -444,6 +454,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("text")) {
             return getText();
@@ -466,6 +477,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("text")) {
             setText((String) value);
@@ -662,6 +674,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      * @param c    one of the constants from {@link com.codename1.ui.FontImage}
      * @param size the size of the icon in millimeters
      */
+    @Override
     public void setMaterialIcon(char c, float size) {
         icon.setMaterialIcon(c, size);
     }
@@ -672,6 +685,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      * @param c    one of the constants from the font
      * @param size the size of the icon in millimeters
      */
+    @Override
     public void setFontIcon(Font font, char c, float size) {
         icon.setFontIcon(font, c, size);
     }

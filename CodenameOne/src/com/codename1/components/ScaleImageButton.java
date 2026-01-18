@@ -164,6 +164,7 @@ public class ScaleImageButton extends Button {
      *
      * @return the bg image
      */
+    @Override
     public Image getIcon() {
         return getUnselectedStyle().getBgImage();
     }
@@ -173,6 +174,7 @@ public class ScaleImageButton extends Button {
      *
      * @param i the image
      */
+    @Override
     public void setIcon(Image i) {
         setShouldCalcPreferredSize(true);
         getAllStyles().setBgImage(i);
@@ -200,6 +202,7 @@ public class ScaleImageButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"backgroundType"};
     }
@@ -207,6 +210,7 @@ public class ScaleImageButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Byte.class};
     }
@@ -214,6 +218,7 @@ public class ScaleImageButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"Byte"};
     }
@@ -221,6 +226,7 @@ public class ScaleImageButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("backgroundType")) {
             return getBackgroundType();
@@ -231,6 +237,7 @@ public class ScaleImageButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("backgroundType")) {
             setBackgroundType(((Byte) value).byteValue());

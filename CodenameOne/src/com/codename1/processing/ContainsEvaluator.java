@@ -71,6 +71,7 @@ class ContainsEvaluator extends AbstractEvaluator {
      * .codename1.path.impl.StructuredContent, java.lang.String,
      * java.lang.String)
      */
+    @Override
     protected Object evaluateLeftContainsRight(StructuredContent element, String lvalue, String rvalue) {
         String[] lvalues = getLeftValue(element, lvalue);
         // if the rvalue is wrapped with "()", the caller explicitly expects the lvalue to be an array of values,

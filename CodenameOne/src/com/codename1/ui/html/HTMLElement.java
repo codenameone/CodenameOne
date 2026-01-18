@@ -1053,6 +1053,7 @@ public class HTMLElement extends Element {
     }
 
 
+    @Override
     public void addChild(Element childElement) {
         //if (((HTMLElement)childElement).getId()!=TAG_UNSUPPORTED) {
         super.addChild(childElement);
@@ -1081,6 +1082,7 @@ public class HTMLElement extends Element {
      * @param value     The attribute's value
      * @return a positive error code or -1 if attribute is supported and valid
      */
+    @Override
     public int setAttribute(String attribute, String value) {
         if (id == TAG_UNSUPPORTED) {
             return -1; //No error code for this case since tag not supported error is already notified before
@@ -1320,6 +1322,7 @@ public class HTMLElement extends Element {
      *
      * @return the HTMLElement's tag name
      */
+    @Override
     public String getTagName() {
         String name = super.getTagName();
 
@@ -1392,6 +1395,7 @@ public class HTMLElement extends Element {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public String toString() {
         return toString("");
     }
@@ -1407,6 +1411,7 @@ public class HTMLElement extends Element {
         return ATTRIBUTE_NAMES[attrKey.intValue()];
     }
 
+    @Override
     public String getAttribute(String name) {
         Hashtable attributes = getAttributes();
         if (attributes != null) {
@@ -1426,6 +1431,7 @@ public class HTMLElement extends Element {
      * @param spacing Increased by one in each recursion phase to provide with indentation
      * @return the printout of this tag
      */
+    @Override
     public String toString(String spacing) {
         StringBuilder str = new StringBuilder(spacing);
         if (!isTextElement()) {
@@ -1491,6 +1497,7 @@ public class HTMLElement extends Element {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void removeChildAt(int index) { // Overiding is done to clear the associated components vector of the child
         HTMLElement child = (HTMLElement) getChildAt(index);
         child.clearAssociatedComponents();

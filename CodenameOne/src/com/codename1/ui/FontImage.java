@@ -11841,6 +11841,7 @@ public final class FontImage extends Image {
     /**
      * Throws a runtime exception
      */
+    @Override
     public Graphics getGraphics() {
         throw new RuntimeException();
     }
@@ -11850,6 +11851,7 @@ public final class FontImage extends Image {
      *
      * @return the width of the image
      */
+    @Override
     public int getWidth() {
         return width;
     }
@@ -11859,6 +11861,7 @@ public final class FontImage extends Image {
      *
      * @return the height of the image
      */
+    @Override
     public int getHeight() {
         return height;
     }
@@ -11866,6 +11869,7 @@ public final class FontImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         int oldColor = g.getColor();
         int oldAlpha = g.getAlpha();
@@ -11907,6 +11911,7 @@ public final class FontImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         if (w == width && h == height) {
             drawImage(g, nativeGraphics, x, y);
@@ -11977,6 +11982,7 @@ public final class FontImage extends Image {
         return fnt;
     }
 
+    @Override
     void getRGB(int[] rgbData,
                 int offset,
                 int x,
@@ -11986,10 +11992,12 @@ public final class FontImage extends Image {
         throw new RuntimeException("Unsupported Operation");
     }
 
+    @Override
     int[] getRGBImpl() {
         throw new RuntimeException("Unsupported Operation");
     }
 
+    @Override
     Image scaledImpl(int width, int height) {
         FontImage i = createFixed(text, fnt, color, width, height);
         i.backgroundColor = backgroundColor;
@@ -12002,6 +12010,7 @@ public final class FontImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAnimation() {
         return rotationMotion != null;
     }
@@ -12009,6 +12018,7 @@ public final class FontImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (rotationMotion != null) {
             rotated = rotationMotion.getValue();
@@ -12024,6 +12034,7 @@ public final class FontImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isOpaque() {
         return false;
     }
@@ -12031,6 +12042,7 @@ public final class FontImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String getImageName() {
         return text;
     }
@@ -12038,12 +12050,14 @@ public final class FontImage extends Image {
     /**
      * Does nothing
      */
+    @Override
     public void dispose() {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image rotate(int degrees) {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = degrees;

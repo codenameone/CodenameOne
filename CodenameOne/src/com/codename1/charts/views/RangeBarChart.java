@@ -104,6 +104,7 @@ public class RangeBarChart extends BarChart {
      * @param seriesIndex the index of the series currently being drawn
      * @param startIndex the start index of the rendering points
      */
+    @Override
     protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
                                        Paint paint, List<Float> points, int seriesIndex, int startIndex) {
         int seriesNr = mDataset.getSeriesCount();
@@ -141,6 +142,7 @@ public class RangeBarChart extends BarChart {
      *
      * @return the constant value
      */
+    @Override
     protected float getCoeficient() {
         return 0.5f;
     }
@@ -150,6 +152,7 @@ public class RangeBarChart extends BarChart {
      *
      * @return the chart type
      */
+    @Override
     public String getChartType() {
         return TYPE;
     }

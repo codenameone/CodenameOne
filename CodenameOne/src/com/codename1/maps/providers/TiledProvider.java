@@ -84,6 +84,7 @@ public abstract class TiledProvider extends MapProvider {
      * @param zoomLevel to scale to
      * @return a scaled coordinate.
      */
+    @Override
     public Coord scale(int zoomLevel) {
         int divider = (1 << zoomLevel);
         double longitude = (projection().extent().longitudeDifference()) / divider / tileSize().getWidth();
@@ -103,6 +104,7 @@ public abstract class TiledProvider extends MapProvider {
     /**
      * {@inheritDoc}
      */
+    @Override
     public BoundingBox bboxFor(Coord position, int zoomLevel) {
         _zoomLevel = zoomLevel;
         Coord scale = scale(zoomLevel);
@@ -121,6 +123,7 @@ public abstract class TiledProvider extends MapProvider {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Tile tileFor(BoundingBox bbox) {
         String url = url(_zoomLevel, _tileNo.getX(), (1 << _zoomLevel) - _tileNo.getY() - 1);
         return new ProxyHttpTile(tileSize(), bbox, url);

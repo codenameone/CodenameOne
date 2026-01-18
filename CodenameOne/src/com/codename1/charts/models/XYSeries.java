@@ -432,6 +432,7 @@ public class XYSeries {
             super();
         }
 
+        @Override
         public V put(K key, V value) {
             indexList.add(key);
             sorted = false;
@@ -462,6 +463,7 @@ public class XYSeries {
             return maxXDifference;
         }
 
+        @Override
         public void clear() {
             updateMaxXDifference();
             super.clear();
@@ -534,14 +536,17 @@ class XYEntry<K, V> implements Map.Entry<K, V> {
         this.value = value;
     }
 
+    @Override
     public K getKey() {
         return key;
     }
 
+    @Override
     public V getValue() {
         return value;
     }
 
+    @Override
     public V setValue(V object) {
         this.value = object;
         return this.value;

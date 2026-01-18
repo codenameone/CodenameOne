@@ -112,6 +112,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public final void setUIID(String id) {
         super.setUIID(id);
         initStyles(id);
@@ -127,6 +128,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isStickyDrag() {
         return true;
     }
@@ -134,6 +136,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void initComponent() {
         if (infinite) {
             getComponentForm().registerAnimatedInternal(this);
@@ -146,6 +149,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void deinitialize() {
         if (infinite) {
             Form f = getComponentForm();
@@ -158,6 +162,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (infinite) {
             super.animate();
@@ -215,6 +220,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         if (sliderFull != null) {
@@ -328,6 +334,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Style getStyle() {
         if (paintingFull) {
             if (sliderFull == null) {
@@ -344,6 +351,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * Return the size we would generally like for the component
      */
+    @Override
     protected Dimension calcPreferredSize() {
         Style style = getStyle();
         int prefW = 0, prefH = 0;
@@ -386,6 +394,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * Paint the progress indicator
      */
+    @Override
     public void paintComponentBackground(Graphics g) {
         super.paintComponentBackground(g);
         int clipX = g.getClipX();
@@ -461,6 +470,7 @@ public class Slider extends Label implements ActionSource {
      *
      * @return true if the slider is editable
      */
+    @Override
     public boolean isEditable() {
         return editable;
     }
@@ -475,6 +485,7 @@ public class Slider extends Label implements ActionSource {
         setFocusable(editable);
     }
 
+    @Override
     public void pointerPressed(int x, int y) {
         if (Display.getInstance().getImplementation().isScrollWheeling()) {
             return;
@@ -514,6 +525,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerDragged(int x, int y) {
         if (Display.getInstance().getImplementation().isScrollWheeling()) {
             return;
@@ -563,6 +575,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireClicked() {
         setHandlesInput(!handlesInput());
     }
@@ -570,6 +583,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isSelectableInteraction() {
         return editable;
     }
@@ -577,6 +591,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         if (Display.getInstance().getImplementation().isScrollWheeling()) {
             return;
@@ -592,6 +607,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int code) {
         super.keyReleased(code);
         fireActionEventImpl();
@@ -600,6 +616,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int code) {
         if (editable && handlesInput()) {
             int game = Display.getInstance().getGameAction(code);
@@ -704,6 +721,7 @@ public class Slider extends Label implements ActionSource {
      *
      * @param l the listener
      */
+    @Override
     public void addActionListener(ActionListener l) {
         actionListeners.addListener(l);
     }
@@ -713,6 +731,7 @@ public class Slider extends Label implements ActionSource {
      *
      * @param l the listener
      */
+    @Override
     public void removeActionListener(ActionListener l) {
         actionListeners.removeListener(l);
     }
@@ -800,6 +819,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean shouldBlockSideSwipe() {
         return editable && !vertical;
     }

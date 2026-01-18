@@ -920,6 +920,7 @@ class CSSElement extends HTMLElement {
      * @param value     The attribute's value
      * @return a positive error code or -1 if attribute is supported and valid
      */
+    @Override
     public int setAttribute(String attribute, String value) {
         int attrId = -1;
         int i = 0;
@@ -1016,6 +1017,7 @@ class CSSElement extends HTMLElement {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public String getAttributeName(Integer attrKey) {
         return CSS_ATTRIBUTE_ROOTS[attrKey.intValue() - CSS_STYLE_ID_OFFSET];
     }

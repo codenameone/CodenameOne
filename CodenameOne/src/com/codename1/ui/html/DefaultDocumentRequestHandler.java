@@ -66,6 +66,7 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
     /**
      * {@inheritDoc}
      */
+    @Override
     public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
         resourceRequested(docInfo, callback);
     }
@@ -73,6 +74,7 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
     /**
      * {@inheritDoc}
      */
+    @Override
     public InputStream resourceRequested(DocumentInfo docInfo) {
         return null;
     }

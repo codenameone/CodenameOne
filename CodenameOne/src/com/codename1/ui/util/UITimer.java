@@ -127,6 +127,7 @@ public class UITimer {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean animate() {
             testEllapse();
             return false;
@@ -135,12 +136,14 @@ public class UITimer {
         /**
          * {@inheritDoc}
          */
+        @Override
         public void paint(Graphics g) {
         }
 
         /**
          * Invoked when the timer elapses
          */
+        @Override
         public void run() {
             if (internalRunnable != null) {
                 internalRunnable.run();

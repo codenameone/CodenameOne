@@ -26,6 +26,7 @@ class CaptureAudioCloseActionListener implements ActionListener<ActionEvent> {
                 FileSystemStorage.getInstance().delete(builder.getPath());
             }
             CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
+                @Override
                 public void run() {
                     response.actionPerformed(new ActionEvent(null));
                 }

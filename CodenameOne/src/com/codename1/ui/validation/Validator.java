@@ -520,6 +520,7 @@ public class Validator {
         if (showErrorMessageForFocusedComponent) {
             if (!(cmp instanceof InputComponent && ((InputComponent) cmp).isOnTopMode())) {
                 cmp.addFocusListener(new FocusListener() {
+                    @Override
                     public void focusGained(Component cmp) {
                         // special case. Before the form is showing don't show error dialogs
                         Form p = cmp.getComponentForm();
@@ -543,6 +544,7 @@ public class Validator {
                                         xpos -= scr.getScrollX();
                                         ypos -= scr.getScrollY();
                                         scr.addScrollListener(new ScrollListener() {
+                                            @Override
                                             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
                                                 if (message != null) {
                                                     message.dispose();
@@ -565,6 +567,7 @@ public class Validator {
                         }
                     }
 
+                    @Override
                     public void focusLost(Component cmp) {
                     }
                 });
@@ -750,10 +753,12 @@ public class Validator {
             this.cmp = cmp;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             validate(cmp);
         }
 
+        @Override
         public void dataChanged(int type, int index) {
             validate(cmp);
         }

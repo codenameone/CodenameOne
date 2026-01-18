@@ -94,6 +94,7 @@ public class TextComponent extends InputComponent {
                     text.setHeight(getHeight());
                     ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation("FloatingHint", animationSpeed));
                     getAnimationManager().addAnimation(anim, new Runnable() {
+                        @Override
                         public void run() {
                             Component.setSameSize(field);
                             text.remove();
@@ -126,6 +127,7 @@ public class TextComponent extends InputComponent {
                     }
                     ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
                     getAnimationManager().addAnimation(anim, new Runnable() {
+                        @Override
                         public void run() {
                             setHint(getLabel().getText());
                             getLabel().setVisible(false);
@@ -157,6 +159,7 @@ public class TextComponent extends InputComponent {
         }
     }
 
+    @Override
     void constructUI() {
         if (getComponentCount() == 0) {
             if (isOnTopMode() && isFocusAnimation()) {
@@ -196,10 +199,12 @@ public class TextComponent extends InputComponent {
      *
      * @return the editor component
      */
+    @Override
     public Component getEditor() {
         return field;
     }
 
+    @Override
     void refreshForGuiBuilder() {
         if (guiBuilderMode) {
             if (animationLayer != null) {
@@ -256,6 +261,7 @@ public class TextComponent extends InputComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponent onTopMode(boolean onTopMode) {
         return (TextComponent) super.onTopMode(onTopMode);
     }
@@ -264,6 +270,7 @@ public class TextComponent extends InputComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponent action(char icon) {
         super.action(icon);
         return this;
@@ -273,6 +280,7 @@ public class TextComponent extends InputComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponent actionClick(ActionListener c) {
         super.actionClick(c);
         return this;
@@ -282,6 +290,7 @@ public class TextComponent extends InputComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponent errorMessage(String errorMessage) {
         super.errorMessage(errorMessage);
         return this;
@@ -291,6 +300,7 @@ public class TextComponent extends InputComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponent descriptionMessage(String descriptionMessage) {
         super.descriptionMessage(descriptionMessage);
         return this;
@@ -300,6 +310,7 @@ public class TextComponent extends InputComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponent label(String text) {
         super.label(text);
         return this;
@@ -429,6 +440,7 @@ public class TextComponent extends InputComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"text", "label", "hint", "multiline", "columns", "rows", "constraint"};
     }
@@ -436,6 +448,7 @@ public class TextComponent extends InputComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, String.class, Boolean.class, Integer.class, Integer.class, Integer.class};
     }
@@ -443,6 +456,7 @@ public class TextComponent extends InputComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "String", "String", "Boolean", "Integer", "Integer", "Integer"};
     }
@@ -450,6 +464,7 @@ public class TextComponent extends InputComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("text")) {
             return field.getText();
@@ -476,6 +491,7 @@ public class TextComponent extends InputComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("text")) {
             text((String) value);

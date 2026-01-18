@@ -62,6 +62,7 @@ public class RangeCategorySeries extends CategorySeries {
      *
      * @param index the index in the series of the values to remove
      */
+    @Override
     public synchronized void remove(int index) {
         super.remove(index);
         mMaxValues.remove(index);
@@ -70,6 +71,7 @@ public class RangeCategorySeries extends CategorySeries {
     /**
      * Removes all the existing values from the series.
      */
+    @Override
     public synchronized void clear() {
         super.clear();
         mMaxValues.clear();
@@ -100,6 +102,7 @@ public class RangeCategorySeries extends CategorySeries {
      *
      * @return the XY series
      */
+    @Override
     public XYSeries toXYSeries() {
         XYSeries xySeries = new XYSeries(getTitle());
         int length = getItemCount();

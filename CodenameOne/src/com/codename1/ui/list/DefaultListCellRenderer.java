@@ -94,6 +94,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
         if (!showNumbersForce) {
@@ -104,6 +105,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         focusComponent.refreshTheme(merge);
@@ -112,6 +114,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
         if (!alwaysRenderSelection && !Display.getInstance().shouldRenderSelection(list)) {
             isSelected = false;
@@ -171,6 +174,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     /**
      * {@inheritDoc}
      */
+    @Override
     public Style getStyle() {
         if (alwaysRenderSelection && hasFocus()) {
             return getSelectedStyle();
@@ -182,6 +186,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
         return getCellRendererComponent(list, list.getModel(), value, index, isSelected);
     }
@@ -189,6 +194,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getListFocusComponent(List list) {
         return focusComponent;
     }
@@ -197,6 +203,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
      * Overriden to do nothing and remove a performance issue where renderer changes
      * perform needless repaint calls
      */
+    @Override
     public void repaint() {
     }
 
@@ -240,6 +247,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getFocusComponent(Component list) {
         return focusComponent;
     }

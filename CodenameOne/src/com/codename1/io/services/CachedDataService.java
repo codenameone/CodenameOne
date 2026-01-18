@@ -83,6 +83,7 @@ public final class CachedDataService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -99,6 +100,7 @@ public final class CachedDataService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return super.hashCode();
     }
@@ -106,6 +108,7 @@ public final class CachedDataService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void handleException(Exception err) {
         data.setFetching(false);
         super.handleException(err);
@@ -114,6 +117,7 @@ public final class CachedDataService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void handleErrorResponseCode(int code, String message) {
         data.setFetching(false);
         if (code == 304) {
@@ -127,6 +131,7 @@ public final class CachedDataService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void readHeaders(Object connection) throws IOException {
         String last = getHeader(connection, "Last-Modified");
         String etag = getHeader(connection, "ETag");
@@ -139,6 +144,7 @@ public final class CachedDataService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void readResponse(InputStream input) throws IOException {
         if (responseProcessed) {
             return;

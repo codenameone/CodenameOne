@@ -81,6 +81,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         if (iosMode) {
             if (switchMaskImage == null) {
@@ -97,6 +98,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void resetFocusable() {
         setFocusable(true);
     }
@@ -134,6 +136,7 @@ public class OnOffSwitch extends Container implements ActionSource {
             updateButton();
             addComponent(button);
             button.addActionListener(new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     flip();
                 }
@@ -144,6 +147,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isStickyDrag() {
         return true;
     }
@@ -153,6 +157,7 @@ public class OnOffSwitch extends Container implements ActionSource {
      *
      * @param l implementation of the action listener interface
      */
+    @Override
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
@@ -162,6 +167,7 @@ public class OnOffSwitch extends Container implements ActionSource {
      *
      * @param l implementation of the action listener interface
      */
+    @Override
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
@@ -185,7 +191,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         return dispatcher.getListenerCollection();
     }
 
-    private void fireActionEvent() {
+    private void fireOnOffActionEvent() {
         dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed));
         Display d = Display.getInstance();
         if (d.isBuiltinSoundsEnabled()) {
@@ -196,6 +202,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         if (iosMode) {
             int switchButtonPadInt = UIManager.getInstance().getThemeConstant("switchButtonPadInt", 16);
@@ -312,6 +319,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initComponent() {
         super.initComponent();
     }
@@ -319,6 +327,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         super.deinitialize();
     }
@@ -326,6 +335,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
         if (iosMode) {
             super.pointerPressed(x, y);
@@ -336,6 +346,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerDragged(int x, int y) {
         dragged = true;
         deltaX = pressX - x;
@@ -370,6 +381,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         current.start();
         deltaX = position;
         getComponentForm().registerAnimated(new Animation() {
+            @Override
             public boolean animate() {
                 deltaX = current.getValue();
                 if (value) {
@@ -388,6 +400,7 @@ public class OnOffSwitch extends Container implements ActionSource {
                 return false;
             }
 
+            @Override
             public void paint(Graphics g) {
             }
         });
@@ -397,6 +410,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         if (animationLock) {
             return;
@@ -498,7 +512,7 @@ public class OnOffSwitch extends Container implements ActionSource {
             if (button != null) {
                 button.setSelected(value);
             }
-            fireActionEvent();
+            fireOnOffActionEvent();
             if (iosMode) {
                 repaint();
             } else {
@@ -514,6 +528,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{
                 "value", "on", "off"
@@ -526,6 +541,7 @@ public class OnOffSwitch extends Container implements ActionSource {
      *
      * @return the component state or null for undefined state.
      */
+    @Override
     public Object getComponentState() {
         if (value) {
             return Boolean.TRUE;
@@ -539,6 +555,7 @@ public class OnOffSwitch extends Container implements ActionSource {
      *
      * @param state the non-null state
      */
+    @Override
     public void setComponentState(Object state) {
         value = ((Boolean) state).booleanValue();
     }
@@ -546,6 +563,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
                 Boolean.class,
@@ -557,6 +575,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("on")) {
             return on;
@@ -576,6 +595,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("on")) {
             setOn((String) value);

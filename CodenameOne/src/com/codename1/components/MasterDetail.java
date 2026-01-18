@@ -50,6 +50,7 @@ public class MasterDetail {
         parentContainer.addComponent(BorderLayout.WEST, landscapeUI);
 
         final Command masterCommand = new Command(commandTitle, commandIcon) {
+            @Override
             public void actionPerformed(ActionEvent ev) {
                 Dialog dlg = new Dialog();
                 dlg.setLayout(new BorderLayout());
@@ -80,6 +81,7 @@ public class MasterDetail {
             }
         }
         rootForm.addOrientationListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (portraitUI.getParent() != null) {
                     Form f = Display.getInstance().getCurrent();

@@ -545,6 +545,7 @@ public class Form extends Container {
      *
      * @return the animation manager
      */
+    @Override
     public AnimationManager getAnimationManager() {
         return animMananger;
     }
@@ -638,6 +639,7 @@ public class Form extends Container {
             }
             bar.addActionListener(new ActionListener() {
 
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     Component c = findScrollableChild(getContentPane());
                     if (c != null) {
@@ -693,6 +695,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAlwaysTensile() {
         return getContentPane().isAlwaysTensile();
     }
@@ -700,6 +703,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setAlwaysTensile(boolean alwaysTensile) {
         getContentPane().setAlwaysTensile(alwaysTensile);
     }
@@ -754,6 +758,7 @@ public class Form extends Container {
         return titleArea;
     }
 
+    @Override
     public UIManager getUIManager() {
         if (uiManager != null) {
             return uiManager;
@@ -762,6 +767,7 @@ public class Form extends Container {
         }
     }
 
+    @Override
     public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
         refreshTheme(false);
@@ -950,6 +956,7 @@ public class Form extends Container {
      * @return true if the touch is in a region specifically designated as a "drag region"
      * @deprecated this method was replaced by getDragRegionStatus
      */
+    @Override
     public boolean isDragRegion(int x, int y) {
         if (getMenuBar().isDragRegion(x, y)) {
             return true;
@@ -975,6 +982,7 @@ public class Form extends Container {
      * @param y y location for the touch
      * @return one of the DRAG_REGION_* values
      */
+    @Override
     public int getDragRegionStatus(int x, int y) {
         int menuBarDrag = getMenuBar().getDragRegionStatus(x, y);
         if (menuBarDrag != DRAG_REGION_NOT_DRAGGABLE) {
@@ -1011,6 +1019,7 @@ public class Form extends Container {
      *
      * @param g the graphics context
      */
+    @Override
     void paintGlassImpl(Graphics g) {
         if (getParent() != null) {
             super.paintGlassImpl(g);
@@ -1256,6 +1265,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
         LookAndFeel laf = uim.getLookAndFeel();
@@ -1687,6 +1697,7 @@ public class Form extends Container {
     /**
      * Removes all Components from the Content Pane
      */
+    @Override
     public void removeAll() {
         contentPane.removeAll();
     }
@@ -1791,6 +1802,7 @@ public class Form extends Container {
      *
      * @param cmp the added param
      */
+    @Override
     public void addComponent(Component cmp) {
         contentPane.addComponent(cmp);
     }
@@ -1798,6 +1810,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(Object constraints, Component cmp) {
         contentPane.addComponent(constraints, cmp);
     }
@@ -1805,6 +1818,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(int index, Object constraints, Component cmp) {
         contentPane.addComponent(index, constraints, cmp);
     }
@@ -1814,6 +1828,7 @@ public class Form extends Container {
      *
      * @param cmp the added param
      */
+    @Override
     public void addComponent(int index, Component cmp) {
         contentPane.addComponent(index, cmp);
     }
@@ -1821,6 +1836,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void replace(Component current, Component next, Transition t) {
         contentPane.replace(current, next, t);
     }
@@ -1828,6 +1844,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void replaceAndWait(Component current, Component next, Transition t) {
         contentPane.replaceAndWait(current, next, t);
     }
@@ -1837,6 +1854,7 @@ public class Form extends Container {
      *
      * @param cmp the component to be removed
      */
+    @Override
     public void removeComponent(Component cmp) {
         contentPane.removeComponent(cmp);
     }
@@ -1844,6 +1862,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateHierarchy(int duration) {
         contentPane.animateHierarchy(duration);
     }
@@ -1851,6 +1870,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateHierarchyAndWait(int duration) {
         contentPane.animateHierarchyAndWait(duration);
     }
@@ -1858,6 +1878,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateHierarchyFade(int duration, int startingOpacity) {
         contentPane.animateHierarchyFade(duration, startingOpacity);
     }
@@ -1865,6 +1886,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateHierarchyFadeAndWait(int duration,
                                             int startingOpacity) {
         contentPane.animateHierarchyFadeAndWait(duration, startingOpacity);
@@ -1873,6 +1895,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateLayout(int duration) {
         contentPane.animateLayout(duration);
     }
@@ -1880,6 +1903,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateLayoutAndWait(int duration) {
         contentPane.animateLayoutAndWait(duration);
     }
@@ -1887,6 +1911,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateLayoutFade(int duration, int startingOpacity) {
         contentPane.animateLayoutFade(duration, startingOpacity);
     }
@@ -1894,6 +1919,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateLayoutFadeAndWait(int duration, int startingOpacity) {
         contentPane.animateLayoutFadeAndWait(duration, startingOpacity);
     }
@@ -1901,6 +1927,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateUnlayout(int duration, int opacity, Runnable callback) {
         contentPane.animateUnlayout(duration, opacity, callback);
     }
@@ -1908,6 +1935,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void animateUnlayoutAndWait(int duration, int opacity) {
         contentPane.animateUnlayoutAndWait(duration, opacity);
     }
@@ -2034,6 +2062,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (getParent() != null) {
             repaintAnimations();
@@ -2138,6 +2167,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         // when changing the theme when a title/menu bar is not visible the refresh
         // won't apply to them. We need to protect against this occurance.
@@ -2178,6 +2208,7 @@ public class Form extends Container {
      *
      * @param g the form graphics
      */
+    @Override
     public void paintBackground(Graphics g) {
         super.paintBackground(g);
     }
@@ -2395,6 +2426,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     void deinitializeImpl() {
         if (!comboLock) {
             // Some input devices are compound widgets that contain
@@ -2426,6 +2458,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     void initComponentImpl() {
         super.initComponentImpl();
         dragged = null;
@@ -2467,6 +2500,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isSmoothScrolling() {
         return contentPane.isSmoothScrolling();
     }
@@ -2474,6 +2508,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setSmoothScrolling(boolean smoothScrolling) {
         // invoked by the constructor for component
         if (contentPane != null) {
@@ -2484,6 +2519,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getScrollAnimationSpeed() {
         return contentPane.getScrollAnimationSpeed();
     }
@@ -2491,6 +2527,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setScrollAnimationSpeed(int animationSpeed) {
         contentPane.setScrollAnimationSpeed(animationSpeed);
     }
@@ -2709,6 +2746,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     void repaint(Component cmp) {
         if (getParent() != null) {
             super.repaint(cmp);
@@ -2733,6 +2771,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public final Form getComponentForm() {
         if (getParent() != null) {
             return super.getComponentForm();
@@ -2870,6 +2909,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void longKeyPress(int keyCode) {
         if (focused != null) {
             if (focused.getComponentForm() == this) {
@@ -2881,6 +2921,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void longPointerPress(int x, int y) {
         if (longPressListeners != null && longPressListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
@@ -2955,6 +2996,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
         if (menuBar.handlesKeycode(keyCode)) {
@@ -2990,6 +3032,7 @@ public class Form extends Container {
      *
      * @see #getActualLayout() For the actual layout of the form.
      */
+    @Override
     public Layout getLayout() {
         return contentPane.getLayout();
     }
@@ -2997,6 +3040,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setLayout(Layout layout) {
         if (layout instanceof BorderLayout) {
             setScrollable(false);
@@ -3025,6 +3069,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
         if (menuBar.handlesKeycode(keyCode)) {
@@ -3071,6 +3116,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyRepeated(int keyCode) {
         if (focused != null) {
             if (focused.isEnabled()) {
@@ -3178,6 +3224,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
         currentPointerPress = new Object();
         // See https://github.com/codenameone/CodenameOne/issues/2352
@@ -3363,6 +3410,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerDragged(int x, int y) {
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
@@ -3509,6 +3557,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHoverReleased(int[] x, int[] y) {
 
         if (dragged != null) {
@@ -3531,6 +3580,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHoverPressed(int[] x, int[] y) {
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
 
@@ -3553,6 +3603,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHover(int[] x, int[] y) {
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragged != null) {
@@ -3655,6 +3706,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         try {
             Component origPressedCmp = pressedCmp;
@@ -3859,6 +3911,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getComponentIndex(Component cmp) {
         return getContentPane().getComponentIndex(cmp);
     }
@@ -4223,6 +4276,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     boolean moveScrollTowards(int direction, Component c) {
         //if the current focus item is in a scrollable Container
         //try and move it first
@@ -4274,6 +4328,7 @@ public class Form extends Container {
      *
      * @param c the componant to be visible
      */
+    @Override
     public void scrollComponentToVisible(Component c) {
         initFocused();
         Container parent = c.getParent();
@@ -4325,6 +4380,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setRTL(boolean r) {
         super.setRTL(r);
         contentPane.setRTL(r);
@@ -4333,6 +4389,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         if (!inInternalPaint) {
             paintComponentBackground(g);
@@ -4344,6 +4401,7 @@ public class Form extends Container {
         }
     }
 
+    @Override
     void internalPaintImpl(Graphics g, boolean paintIntersects) {
         // workaround for form drawing its background twice on standard paint
         inInternalPaint = true;
@@ -4354,6 +4412,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isScrollable() {
         return getContentPane().isScrollable();
     }
@@ -4361,6 +4420,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
     }
@@ -4376,6 +4436,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setScrollableX(boolean scrollableX) {
         getContentPane().setScrollableX(scrollableX);
     }
@@ -4399,6 +4460,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setVisible(boolean visible) {
         super.setVisible(visible);
         if (mediaComponents != null) {
@@ -4441,6 +4503,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected String paramString() {
         return super.paramString() + ", title = " + title
                 + ", visible = " + isVisible();
@@ -4518,6 +4581,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"titleUIID", "titleAreaUIID"};
     }
@@ -4525,6 +4589,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
                 String.class,
@@ -4535,6 +4600,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "String"};
     }
@@ -4542,6 +4608,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("titleUIID")) {
             if (getTitleComponent() != null) {
@@ -4559,6 +4626,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("titleUIID")) {
             if (getTitleComponent() != null) {
@@ -4696,6 +4764,7 @@ public class Form extends Container {
          *
          * @return True if there is a "next" component in this iterator.
          */
+        @Override
         public boolean hasNext() {
             return getNext() != null;
         }
@@ -4706,6 +4775,7 @@ public class Form extends Container {
          * @return The "next" component in the iterator.
          */
 
+        @Override
         public Component next() {
             Component next = getNext();
             setCurrent(next);
@@ -4718,6 +4788,7 @@ public class Form extends Container {
          * @return
          */
 
+        @Override
         public boolean hasPrevious() {
             return getPrevious() != null;
         }
@@ -4728,6 +4799,7 @@ public class Form extends Container {
          * @return
          */
 
+        @Override
         public Component previous() {
             Component prev = getPrevious();
             setCurrent(prev);
@@ -4740,6 +4812,7 @@ public class Form extends Container {
          * @return
          */
 
+        @Override
         public int nextIndex() {
             Component next = getNext();
             if (next == null) {
@@ -4754,6 +4827,7 @@ public class Form extends Container {
          * @return
          */
 
+        @Override
         public int previousIndex() {
             Component prev = getPrevious();
             if (prev == null) {
@@ -4767,6 +4841,7 @@ public class Form extends Container {
          * component, or the next component (if previous doesn't exist).
          */
 
+        @Override
         public void remove() {
             Component newCurr = getPrevious();
             if (newCurr == null) {
@@ -4787,6 +4862,7 @@ public class Form extends Container {
          * @param e The component to set as the current component.
          */
 
+        @Override
         public void set(Component e) {
             if (currPos >= 0 && currPos < components.size() - 1) {
                 components.set(currPos, e);
@@ -4800,6 +4876,7 @@ public class Form extends Container {
          * @param e The component to add to the iterator.
          */
 
+        @Override
         public void add(Component e) {
             components.add(e);
         }
@@ -4808,12 +4885,14 @@ public class Form extends Container {
 
 
     private static class CurrentlyEditingFilter implements Filter {
+        @Override
         public boolean filter(Component c) {
             return c.isEditing();
         }
     }
 
     private static class TabIteratorComparator implements Comparator<Component> {
+        @Override
         public int compare(Component o1, Component o2) {
             return o1.getTabIndex() < o2.getTabIndex() ? -1 :
                     o2.getTabIndex() < o1.getTabIndex() ? 1 :
@@ -4822,6 +4901,7 @@ public class Form extends Container {
     }
 
     private static class TabIteratorFilter implements Filter {
+        @Override
         public boolean filter(Component c) {
             return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
         }

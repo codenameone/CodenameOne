@@ -65,6 +65,7 @@ public class LinesLayer extends AbstractLayer {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g, Tile screenTile) {
         g.setColor(_lineColor);
         g.setAntiAliased(true);
@@ -124,6 +125,7 @@ public class LinesLayer extends AbstractLayer {
     /**
      * {@inheritDoc}
      */
+    @Override
     public BoundingBox boundingBox() {
         BoundingBox bbox = null;
         for (int i = 0; i < _lineSegments.size(); i++) {

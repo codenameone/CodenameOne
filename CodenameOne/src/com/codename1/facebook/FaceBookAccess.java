@@ -508,6 +508,7 @@ public final class FaceBookAccess {
         final Album album = new Album();
         final Vector err = new Vector();
         addResponseCodeListener(new ActionListener<NetworkEvent>() {
+            @Override
             public void actionPerformed(NetworkEvent evt) {
                 err.addElement(evt);
                 removeResponseCodeListener(this);
@@ -1163,6 +1164,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (!con.isAlive()) {
                 return;
@@ -1182,6 +1184,7 @@ public final class FaceBookAccess {
             this.al = al;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (evt.getSource() instanceof String) {
                 token = (String) evt.getSource();
@@ -1197,6 +1200,7 @@ public final class FaceBookAccess {
             this.al = al;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (evt.getSource() instanceof String) {
                 token = (String) evt.getSource();
@@ -1219,6 +1223,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             if (!con.isAlive()) {
                 return;
@@ -1238,6 +1243,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             if (!con.isAlive()) {
                 return;
@@ -1258,6 +1264,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
             Hashtable t = (Hashtable) v.elementAt(0);
@@ -1278,6 +1285,7 @@ public final class FaceBookAccess {
             this.user = user;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             Vector v = (Vector) evt.getMetaData();
             Hashtable t = (Hashtable) v.elementAt(0);
@@ -1292,6 +1300,7 @@ public final class FaceBookAccess {
             this.page = page;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             Vector v = (Vector) evt.getMetaData();
             Hashtable t = (Hashtable) v.elementAt(0);
@@ -1308,6 +1317,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             final Object val = evt.getMetaData();;
             if(val instanceof Vector) {
@@ -1333,6 +1343,7 @@ public final class FaceBookAccess {
             this.post = post;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             final Object val = evt.getMetaData();
             if(val instanceof Vector) {
@@ -1355,6 +1366,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             Vector v = (Vector) evt.getMetaData();
             Hashtable t = (Hashtable) v.elementAt(0);
@@ -1375,6 +1387,7 @@ public final class FaceBookAccess {
             this.photo = photo;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             Vector v = (Vector) evt.getMetaData();
             Hashtable t = (Hashtable) v.elementAt(0);
@@ -1391,6 +1404,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             Vector v = (Vector) evt.getMetaData();
             Hashtable t = (Hashtable) v.elementAt(0);
@@ -1410,6 +1424,7 @@ public final class FaceBookAccess {
             this.album = album;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             Vector v = (Vector) evt.getMetaData();
             Hashtable t = (Hashtable) v.elementAt(0);
@@ -1426,6 +1441,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             if (!con.isAlive()) {
                 return;
@@ -1445,6 +1461,7 @@ public final class FaceBookAccess {
             this.callback = callback;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             if (!con.isAlive()) {
                 return;
@@ -1463,6 +1480,7 @@ public final class FaceBookAccess {
             this.err = err;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent ne) {
             err.addElement(ne);
             removeResponseCodeListener(this);
@@ -1476,6 +1494,7 @@ public final class FaceBookAccess {
             this.err = err;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             err.addElement(evt);
             removeResponseCodeListener(this);
@@ -1489,6 +1508,7 @@ public final class FaceBookAccess {
             this.err = err;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             err.addElement(evt);
             removeResponseCodeListener(this);
@@ -1502,6 +1522,7 @@ public final class FaceBookAccess {
             this.err = err;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             err.addElement(evt);
             removeResponseCodeListener(this);

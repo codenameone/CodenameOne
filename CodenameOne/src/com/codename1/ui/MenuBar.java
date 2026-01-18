@@ -568,6 +568,7 @@ public class MenuBar extends Container implements ActionListener {
     /**
      * Invoked when a softbutton is pressed
      */
+    @Override
     public void actionPerformed(ActionEvent evt) {
         if (evt.isConsumed()) {
             return;
@@ -649,6 +650,7 @@ public class MenuBar extends Container implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setUnselectedStyle(Style style) {
         style.setMargin(Component.TOP, 0, true);
         style.setMargin(Component.BOTTOM, 0, true);
@@ -663,6 +665,7 @@ public class MenuBar extends Container implements ActionListener {
     /**
      * Prevents scaling down of the menu when there is no text on the menu bar
      */
+    @Override
     protected Dimension calcPreferredSize() {
         if (soft.length > 1) {
             Dimension d = super.calcPreferredSize();
@@ -926,6 +929,7 @@ public class MenuBar extends Container implements ActionListener {
                     }
                     Button menu = createTouchCommandButton(new Command("", i) {
 
+                        @Override
                         public void actionPerformed(ActionEvent ev) {
                             showMenu();
                         }
@@ -1323,6 +1327,7 @@ public class MenuBar extends Container implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
         int commandBehavior = getCommandBehavior();
         if (commandBehavior >= Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
@@ -1351,6 +1356,7 @@ public class MenuBar extends Container implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
         int commandBehavior = getCommandBehavior();
         if (commandBehavior >= Display.COMMAND_BEHAVIOR_BUTTON_BAR && keyCode != backSK && keyCode != clearSK && keyCode != backspaceSK) {
@@ -1420,6 +1426,7 @@ public class MenuBar extends Container implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         UIManager manager = parent.getUIManager();
@@ -1722,6 +1729,7 @@ public class MenuBar extends Container implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected int getDragRegionStatus(int x, int y) {
         return DRAG_REGION_NOT_DRAGGABLE;
     }
@@ -1765,6 +1773,7 @@ public class MenuBar extends Container implements ActionListener {
             this.d = d;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             d.dispose();
         }

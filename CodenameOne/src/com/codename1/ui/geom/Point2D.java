@@ -82,6 +82,7 @@ public class Point2D {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return x + ", " + y;
     }

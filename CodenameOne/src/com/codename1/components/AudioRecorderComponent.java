@@ -91,6 +91,7 @@ public class AudioRecorderComponent extends Container implements ActionSource {
     public AudioRecorderComponent(final MediaRecorderBuilder builder) {
         super(new BorderLayout());
         CN.callSerially(new Runnable() {
+            @Override
             public void run() {
                 try {
                     media = MediaManager.createMediaRecorder(builder);
@@ -261,6 +262,7 @@ public class AudioRecorderComponent extends Container implements ActionSource {
 
                 Button cancel = new Button("Cancel");
                 cancel.addActionListener(new ActionListener() {
+                    @Override
                     public void actionPerformed(ActionEvent e) {
                         closeHandled[0] = true;
                         sheet.back();
@@ -438,6 +440,7 @@ public class AudioRecorderComponent extends Container implements ActionSource {
      *
      * @param l The listener
      */
+    @Override
     public void addActionListener(ActionListener l) {
         actionListeners.addListener(l);
     }
@@ -447,6 +450,7 @@ public class AudioRecorderComponent extends Container implements ActionSource {
      *
      * @param l The listener.
      */
+    @Override
     public void removeActionListener(ActionListener l) {
         actionListeners.removeListener(l);
     }

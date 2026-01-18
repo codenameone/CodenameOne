@@ -48,6 +48,7 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
         super(c);
     }
 
+    @Override
     public ComponentWrapper[] getComponents() {
         Container c = (Container) getComponent();
         ComponentWrapper[] cws = new ComponentWrapper[c.getComponentCount()];
@@ -56,18 +57,22 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
         return cws;
     }
 
+    @Override
     public int getComponentCount() {
         return ((Container) getComponent()).getComponentCount();
     }
 
+    @Override
     public Object getLayout() {
         return ((Container) getComponent()).getLayout();
     }
 
+    @Override
     public boolean isLeftToRight() {
         return !((Container) getComponent()).isRTL();
     }
 
+    @Override
     public void paintDebugCell(int x, int y, int width, int height) {
         // TODO: this can probably be done using glasspane
 		/*Graphics2D g = (Graphics2D) c.getGraphics();
@@ -79,11 +84,13 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
 		g.drawRect(x, y, width - 1, height - 1);*/
     }
 
+    @Override
     public int getComponentType(boolean disregardScrollPane) {
         return TYPE_CONTAINER;
     }
 
     // Removed for 2.3 because the parent.isValid() in MigLayout will catch this instead.
+    @Override
     public int getLayoutHashCode() {
         return 0;
     }

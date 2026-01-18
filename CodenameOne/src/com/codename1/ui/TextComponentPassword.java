@@ -74,6 +74,7 @@ public class TextComponentPassword extends TextComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponentPassword labelAndHint(String text) {
         return (TextComponentPassword) super.labelAndHint(text);
     }
@@ -82,6 +83,7 @@ public class TextComponentPassword extends TextComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponentPassword hint(String hint) {
         return (TextComponentPassword) super.hint(hint);
     }
@@ -90,6 +92,7 @@ public class TextComponentPassword extends TextComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public TextComponentPassword hint(Image hint) {
         return (TextComponentPassword) super.hint(hint);
     }

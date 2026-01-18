@@ -75,6 +75,7 @@ public final class TestUtils {
         }
         if (Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
                 public void run() {
                     try {
                         Thread.sleep(millis);
@@ -368,6 +369,7 @@ public final class TestUtils {
         Form f = Display.getInstance().getCurrent();
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     executeToolbarCommandAtOffset(offset);
                 }
@@ -427,6 +429,7 @@ public final class TestUtils {
         }
         if (Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
                 public void run() {
                     waitForFormTitleImpl(title, timeout);
                 }
@@ -483,6 +486,7 @@ public final class TestUtils {
         }
         if (Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
                 public void run() {
                     waitForFormNameImpl(name, timeout);
                 }
@@ -526,6 +530,7 @@ public final class TestUtils {
         }
         if (Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
                 public void run() {
                     waitForUnnamedFormImpl(timeout);
                 }

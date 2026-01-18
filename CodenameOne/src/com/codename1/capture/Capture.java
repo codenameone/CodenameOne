@@ -251,6 +251,7 @@ public class Capture {
         private int targetWidth = -1;
         private int targetHeight = -1;
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (evt == null) {
                 url = null;
@@ -263,6 +264,7 @@ public class Capture {
             }
         }
 
+        @Override
         public void run() {
             while (!completed) {
                 synchronized (this) {

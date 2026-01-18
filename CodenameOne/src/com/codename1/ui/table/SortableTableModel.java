@@ -222,6 +222,7 @@ public class SortableTableModel extends AbstractTableModel {
             this.column = column;
         }
 
+        @Override
         public int compare(Object o1, Object o2) {
             int i1 = (Integer) o1;
             int i2 = (Integer) o2;

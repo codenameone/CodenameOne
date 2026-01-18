@@ -170,6 +170,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      *
      * @return an iterator
      */
+    @Override
     public Iterator<Map.Entry<T1, T2>> iterator() {
         internalGet();
         return value.entrySet().iterator();

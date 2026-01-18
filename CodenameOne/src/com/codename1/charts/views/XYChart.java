@@ -99,6 +99,7 @@ public abstract class XYChart extends AbstractChart {
      * @param height the height of the view to draw to
      * @param paint the paint
      */
+    @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
         paint.setAntiAlias(mRenderer.isAntialiasing());
         int legendSize = getLegendSize(mRenderer, height / 5, mRenderer.getAxisTitleTextSize());
@@ -944,6 +945,7 @@ public abstract class XYChart extends AbstractChart {
     }
 
 
+    @Override
     public SeriesSelection getSeriesAndPointForScreenCoordinate(final Point screenPoint) {
         if (clickableAreas != null)
             for (int seriesIndex = clickableAreas.size() - 1; seriesIndex >= 0; seriesIndex--) {

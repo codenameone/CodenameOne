@@ -257,6 +257,7 @@ public class Location {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "altitude = " + altitude
                 + "\nlatitude" + latitude
@@ -276,6 +277,7 @@ public class Location {
     public Comparator<Location> createDistanceCompartor() {
         return new Comparator<Location>() {
 
+            @Override
             public int compare(Location o1, Location o2) {
                 double d1 = Location.this.getDistanceTo(o1);
                 double d2 = Location.this.getDistanceTo(o2);

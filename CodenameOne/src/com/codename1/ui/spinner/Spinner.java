@@ -190,6 +190,7 @@ class Spinner extends List {
      */
     public static Spinner create(double min, double max, double currentValue, double step) {
         Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new SpinnerRenderer<Object>() {
+            @Override
             public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
                 if (value != null && value instanceof Double) {
                     // round the number in the spinner to two digits
@@ -249,6 +250,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isStickyDrag() {
         return true;
     }
@@ -276,6 +278,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initComponent() {
         getComponentForm().registerAnimated(this);
         boolean n = UIManager.getInstance().isThemeConstant("spinnerFocusBool", false);
@@ -285,6 +288,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         getComponentForm().deregisterAnimated(this);
     }
@@ -292,6 +296,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcScrollSize() {
         return super.calcPreferredSize();
     }
@@ -299,6 +304,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         int boxWidth = 0;
         int verticalPadding = getStyle().getVerticalPadding();
@@ -347,6 +353,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int code) {
         int game = Display.getInstance().getGameAction(code);
         if (game > 0) {
@@ -398,6 +405,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int code) {
         int game = Display.getInstance().getGameAction(code);
         if (game > 0) {
@@ -560,6 +568,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         super.paint(g);
         if (spinnerHandle != null) {
@@ -596,6 +605,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         boolean val = super.animate();
         if (lastKeyInteraction != -1) {
@@ -613,6 +623,7 @@ class Spinner extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean shouldRenderSelection() {
         if (!isIgnoreFocusComponentWhenUnfocused()) {
             return true;
@@ -620,6 +631,7 @@ class Spinner extends List {
         return super.shouldRenderSelection();
     }
 
+    @Override
     public void repaint() {
         if (getParent() instanceof BaseSpinner) {
             getParent().repaint();

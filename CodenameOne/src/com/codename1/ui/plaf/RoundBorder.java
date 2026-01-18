@@ -504,6 +504,7 @@ public final class RoundBorder extends Border {
 
         // update the cache with a more refined version and repaint
         Display.getInstance().callSeriallyOnIdle(new Runnable() {
+            @Override
             public void run() {
                 if (w == c.getWidth() && h == c.getHeight()) {
                     Image target = createTargetImage(c, w, h, false);

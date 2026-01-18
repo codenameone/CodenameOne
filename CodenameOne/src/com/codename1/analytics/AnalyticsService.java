@@ -235,6 +235,7 @@ public class AnalyticsService {
             final String fPage = page;
             final String fReferer = referer;
             ActionListener onComplete = new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     visitPage(fPage, fReferer);
                 }
@@ -253,6 +254,7 @@ public class AnalyticsService {
             req.addArgument("av", version);
             req.addArgument("cd", page);
             ActionListener onComplete = new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     if (req == lastRequest) {
                         lastRequest = null;
@@ -291,6 +293,7 @@ public class AnalyticsService {
                 r.setReadTimeout(readTimeout);
             }
             ActionListener onComplete = new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     if (r == lastRequest) {
                         lastRequest = null;

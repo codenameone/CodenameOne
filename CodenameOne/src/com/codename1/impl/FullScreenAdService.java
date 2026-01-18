@@ -138,6 +138,7 @@ public abstract class FullScreenAdService {
         Runnable onTransitionAndExit = new Runnable() {
             private long lastTime = System.currentTimeMillis();
 
+            @Override
             public void run() {
                 long t = System.currentTimeMillis();
                 if (t - lastTime > timeForNext) {
@@ -155,6 +156,7 @@ public abstract class FullScreenAdService {
         Timer t = new Timer();
         int tm = Math.max(5000, timeForNext - 600);
         t.schedule(new TimerTask() {
+            @Override
             public void run() {
                 if (!hasPendingAd()) {
                     ConnectionRequest r = createAdRequest();
@@ -268,6 +270,7 @@ public abstract class FullScreenAdService {
             }
             addComponent(BorderLayout.CENTER, ad);
             Command open = new Command("Open") {
+                @Override
                 public void actionPerformed(ActionEvent ev) {
                     synchronized (LOCK) {
                         blocked = false;
@@ -277,6 +280,7 @@ public abstract class FullScreenAdService {
                     // move to the next screen so the ad will be shown and so we 
                     // can return to the next screen and not this screen
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             // prevent a potential race condition with the locking
                             if (Display.getInstance().getCurrent() instanceof AdForm) {
@@ -289,6 +293,7 @@ public abstract class FullScreenAdService {
                 }
             };
             Command skip = new Command("Skip") {
+                @Override
                 public void actionPerformed(ActionEvent ev) {
                     synchronized (LOCK) {
                         blocked = false;
@@ -312,13 +317,16 @@ public abstract class FullScreenAdService {
             registerAnimated(this);
         }
 
+        @Override
         protected void onShow() {
             shown = System.currentTimeMillis();
         }
 
+        @Override
         public void show() {
             super.showBack();
             Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
                 public void run() {
                     try {
                         synchronized (LOCK) {
@@ -334,6 +342,7 @@ public abstract class FullScreenAdService {
             clearPendingAd();
         }
 
+        @Override
         public boolean animate() {
             if (shown > -1 && System.currentTimeMillis() - shown >= adDisplayTime) {
                 blocked = false;
@@ -349,6 +358,7 @@ public abstract class FullScreenAdService {
             this.callback = callback;
         }
 
+        @Override
         public void run() {
             // prevent a potential race condition with the locking
             if (Display.getInstance().getCurrent() instanceof AdForm) {

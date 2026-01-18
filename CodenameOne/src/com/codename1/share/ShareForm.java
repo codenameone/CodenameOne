@@ -132,6 +132,7 @@ class ShareForm extends Form {
             return result;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             contacts.showBack();
         }

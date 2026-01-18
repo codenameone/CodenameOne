@@ -115,6 +115,7 @@ public class SliderBridge extends Slider {
             /**
              * {@inheritDoc}
              */
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 // PMD Fix (CollapsibleIfStatements): Collapse the nested source checks into one conditional.
                 if (sources != null && !sourceVec.contains(evt.getSource()) || !(evt instanceof NetworkEvent)) {

@@ -106,6 +106,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int charWidth(char ch) {
         int i = charsets.indexOf(ch);
         if (i < 0) {
@@ -117,6 +118,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getHeight() {
         return imageHeight;
     }
@@ -170,6 +172,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     void drawChar(Graphics g, char character, int x, int y) {
         int clipX = g.getClipX();
         int clipY = g.getClipY();
@@ -194,6 +197,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addContrast(byte value) {
         int[] imageArray = getImageArray();
         int ilen = imageArray.length;
@@ -215,6 +219,7 @@ class CustomFont extends Font {
      * @param x   the x coordinate to draw the string
      * @param y   the y coordinate to draw the string
      */
+    @Override
     void drawString(Graphics g, String str, int x, int y) {
         if (Display.getInstance().isBidiAlgorithm()) {
             int slen = str.length();
@@ -261,6 +266,7 @@ class CustomFont extends Font {
      * @param x      the x coordinate to draw the chars
      * @param y      the y coordinate to draw the chars
      */
+    @Override
     void drawChars(Graphics g, char[] data, int offset, int length, int x, int y) {
         if (Display.getInstance().isBidiAlgorithm()) {
             for (int i = offset; i < length; i++) {
@@ -303,6 +309,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String getCharset() {
         return charsets;
     }
@@ -310,6 +317,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int charsWidth(char[] ch, int offset, int length) {
         int retVal = 0;
         for (int i = 0; i < length; i++) {
@@ -322,6 +330,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int substringWidth(String str, int offset, int len) {
         return charsWidth(str.toCharArray(), offset, len);
     }
@@ -329,6 +338,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int stringWidth(String str) {
         if (str == null || str.length() == 0)
             return 0;
@@ -338,6 +348,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getFace() {
         return 0;
     }
@@ -345,6 +356,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSize() {
         return 0;
     }
@@ -352,6 +364,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getStyle() {
         return 0;
     }
@@ -359,6 +372,7 @@ class CustomFont extends Font {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (o == this) {
             return true;

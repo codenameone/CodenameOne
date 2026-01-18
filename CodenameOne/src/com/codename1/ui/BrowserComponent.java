@@ -154,6 +154,7 @@ public class BrowserComponent extends Container {
         setLayout(new BorderLayout());
         addComponent(BorderLayout.CENTER, placeholder);
         CN.callSerially(new Runnable() {
+            @Override
             public void run() {
                 PeerComponent c = Display.impl.createBrowserComponent(BrowserComponent.this);
                 if (c == null) {
@@ -173,6 +174,7 @@ public class BrowserComponent extends Container {
             }
         });
         onReady(new Runnable() {
+            @Override
             public void run() {
                 Style s = internal.getUnselectedStyle();
                 s.setPadding(0, 0, 0, 0);
@@ -564,6 +566,7 @@ public class BrowserComponent extends Container {
     public void postMessage(final String message, final String targetOrigin) {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     postMessage(message, targetOrigin);
                 }
@@ -578,6 +581,7 @@ public class BrowserComponent extends Container {
     private void installMessageListener() {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     installMessageListener();
                 }
@@ -600,6 +604,7 @@ public class BrowserComponent extends Container {
     private void uninstallMessageListener() {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     uninstallMessageListener();
                 }
@@ -669,6 +674,7 @@ public class BrowserComponent extends Container {
     private void onReady(final Runnable r) {
         if (!CN.isEdt()) {
             CN.callSerially(new Runnable() {
+                @Override
                 public void run() {
                     onReady(r);
                 }
@@ -698,6 +704,7 @@ public class BrowserComponent extends Container {
     public void waitForReady() {
         while (!ready) {
             Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
                 public void run() {
                     synchronized (readyLock) {
                         Util.wait(readyLock, 1000);
@@ -723,6 +730,7 @@ public class BrowserComponent extends Container {
             onReady.onSucess(this);
         } else {
             ActionListener l = new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     removeWebEventListener(onStart, this);
                     onReady.onSucess(BrowserComponent.this);
@@ -761,6 +769,7 @@ public class BrowserComponent extends Container {
             final LoadWrapper w = new LoadWrapper();
             if (timeout > 0) {
                 w.timer = CN.setTimeout(timeout, new Runnable() {
+                    @Override
                     public void run() {
                         w.timer = null;
                         if (w.l != null) {
@@ -775,6 +784,7 @@ public class BrowserComponent extends Container {
                 });
             }
             w.l = new ActionListener<ActionEvent>() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     w.l = null;
                     if (w.timer != null) {
@@ -811,6 +821,7 @@ public class BrowserComponent extends Container {
         if (internal == null) {
 
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     setProperty(key, value);
                 }
@@ -853,6 +864,7 @@ public class BrowserComponent extends Container {
         if (internal == null) {
             tmpUrl = url;
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     setURL(url);
                 }
@@ -891,6 +903,7 @@ public class BrowserComponent extends Container {
         if (internal == null) {
             tmpUrl = url;
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     setURL(url, headers);
                 }
@@ -917,6 +930,7 @@ public class BrowserComponent extends Container {
     public void setURLHierarchy(final String url) throws IOException {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     try {
                         setURLHierarchy(url);
@@ -936,6 +950,7 @@ public class BrowserComponent extends Container {
     public void reload() {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     reload();
                 }
@@ -975,6 +990,7 @@ public class BrowserComponent extends Container {
     public void back() {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     back();
                 }
@@ -990,6 +1006,7 @@ public class BrowserComponent extends Container {
     public void forward() {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     forward();
                 }
@@ -1005,6 +1022,7 @@ public class BrowserComponent extends Container {
     public void clearHistory() {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     clearHistory();
                 }
@@ -1035,6 +1053,7 @@ public class BrowserComponent extends Container {
         pinchToZoom = e;
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     setPinchToZoomEnabled(e);
                 }
@@ -1062,6 +1081,7 @@ public class BrowserComponent extends Container {
         nativeScrolling = b;
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     setNativeScrollingEnabled(b);
                 }
@@ -1080,6 +1100,7 @@ public class BrowserComponent extends Container {
     public void setPage(final String html, final String baseUrl) {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     setPage(html, baseUrl);
                 }
@@ -1142,6 +1163,7 @@ public class BrowserComponent extends Container {
     public void stop() {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     stop();
                 }
@@ -1157,6 +1179,7 @@ public class BrowserComponent extends Container {
     public void destroy() {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     destroy();
                 }
@@ -1193,6 +1216,7 @@ public class BrowserComponent extends Container {
     public void execute(final String javaScript) {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     execute(javaScript);
                 }
@@ -1354,6 +1378,7 @@ public class BrowserComponent extends Container {
         if (callback != null && timeout > 0) {
             UITimer.timer(timeout, false, new Runnable() {
 
+                @Override
                 public void run() {
                     if (returnValueCallbacks().contains(callback)) {
                         Object key = null;
@@ -1565,6 +1590,7 @@ public class BrowserComponent extends Container {
     public void exposeInJavaScript(final Object o, final String name) {
         if (internal == null) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     exposeInJavaScript(o, name);
                 }
@@ -1771,6 +1797,7 @@ public class BrowserComponent extends Container {
          *
          * @return The javascript literal expression.
          */
+        @Override
         public String toString() {
             return expression;
         }
@@ -1785,6 +1812,7 @@ public class BrowserComponent extends Container {
             this.errorMessage = errorMessage;
         }
 
+        @Override
         public void run() {
             if (callback instanceof Callback) {
                 ((Callback) callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);
@@ -1801,6 +1829,7 @@ public class BrowserComponent extends Container {
             this.res = res;
         }
 
+        @Override
         public void run() {
             Util.wait(res, 1000);
         }
@@ -1815,6 +1844,7 @@ public class BrowserComponent extends Container {
             this.res = res;
         }
 
+        @Override
         public void onSucess(JSRef value) {
             synchronized (res) {
                 res.complete = true;
@@ -1823,6 +1853,7 @@ public class BrowserComponent extends Container {
             }
         }
 
+        @Override
         public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
             synchronized (res) {
                 res.complete = true;
@@ -1833,6 +1864,7 @@ public class BrowserComponent extends Container {
     }
 
     private static class ShortSleepRunnable implements Runnable {
+        @Override
         public void run() {
             Util.sleep(50);
         }
@@ -1850,6 +1882,7 @@ public class BrowserComponent extends Container {
             this.type = type;
         }
 
+        @Override
         public void run() {
             callback.onSucess(new JSRef(value, type));
         }
@@ -1857,6 +1890,7 @@ public class BrowserComponent extends Container {
     }
 
     private static class AlwaysTrueShouldNavigateCallback implements BrowserNavigationCallback {
+        @Override
         public boolean shouldNavigate(String url) {
             return true;
         }
@@ -1993,6 +2027,7 @@ public class BrowserComponent extends Container {
             sb.append("callback.onSuccess(JSON.stringify(outmap))})()");
             execute(timeout, sb.toString(), new SuccessCallback<JSRef>() {
 
+                @Override
                 public void onSucess(JSRef value) {
                     JSONParser p = new JSONParser();
                     try {

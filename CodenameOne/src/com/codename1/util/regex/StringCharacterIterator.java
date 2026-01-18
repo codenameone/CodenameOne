@@ -39,6 +39,7 @@ public final class StringCharacterIterator implements CharacterIterator {
     /**
      * @return a substring
      */
+    @Override
     public String substring(int beginIndex, int endIndex) {
         return src.substring(beginIndex, endIndex);
     }
@@ -46,6 +47,7 @@ public final class StringCharacterIterator implements CharacterIterator {
     /**
      * @return a substring
      */
+    @Override
     public String substring(int beginIndex) {
         return src.substring(beginIndex);
     }
@@ -53,6 +55,7 @@ public final class StringCharacterIterator implements CharacterIterator {
     /**
      * @return a character at the specified position.
      */
+    @Override
     public char charAt(int pos) {
         return src.charAt(pos);
     }
@@ -60,6 +63,7 @@ public final class StringCharacterIterator implements CharacterIterator {
     /**
      * @return <tt>true</tt> iff if the specified index is after the end of the character stream
      */
+    @Override
     public boolean isEnd(int pos) {
         return (pos >= src.length());
     }

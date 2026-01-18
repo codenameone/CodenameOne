@@ -116,11 +116,13 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void initComponent() {
         if (service != null) {
             service.initialize(this);
             service.addResponseListener(new ActionListener() {
 
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     String a = (String) evt.getSource();
                     setAd(a);
@@ -138,6 +140,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         if (refreshAd) {
             getComponentForm().deregisterAnimated(this);
@@ -152,6 +155,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         Form parent = getComponentForm();
         if (parent == null || !parent.isVisible()) {
@@ -169,6 +173,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int code) {
         if (Display.getInstance().getGameAction(code) == Display.GAME_FIRE) {
             launchAd();
@@ -179,6 +184,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         if (!isDragActivated()) {
             launchAd();
@@ -250,12 +256,14 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void titleUpdated(HTMLComponent htmlC, String title) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
         if (status == STATUS_COMPLETED) {
             // loop the component and prevent entries within it from receiving focus 
@@ -284,6 +292,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String fieldSubmitted(HTMLComponent htmlC, TextArea ta, String actionURL, String id, String value, int type, String errorMsg) {
         return value;
     }
@@ -291,6 +300,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String getAutoComplete(HTMLComponent htmlC, String actionURL, String id) {
         return "";
     }
@@ -298,6 +308,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getLinkProperties(HTMLComponent htmlC, String url) {
         return LINK_REGULAR;
     }
@@ -305,6 +316,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean linkClicked(HTMLComponent htmlC, String url) {
         //this is relevant when the Ad is in Full Screen mode
         launchAd();
@@ -315,30 +327,35 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void actionPerformed(ActionEvent evt, HTMLComponent htmlC, HTMLElement element) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void focusGained(Component cmp, HTMLComponent htmlC, HTMLElement element) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void focusLost(Component cmp, HTMLComponent htmlC, HTMLElement element) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void dataChanged(int type, int index, HTMLComponent htmlC, TextField textField, HTMLElement element) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
         return true;
     }
@@ -346,12 +363,14 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void selectionChanged(int oldSelected, int newSelected, HTMLComponent htmlC, com.codename1.ui.List list, HTMLElement element) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setHeight(int height) {
         float percent = ((float) height / (float) Display.getInstance().getDisplayHeight());
         percent *= 100;
@@ -492,6 +511,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"appId", "updateDuration", "age", "gender", "category", "location", "keywords"};
     }
@@ -499,6 +519,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         Class c = new String[0].getClass();
         return new Class[]{String.class, Integer.class, String.class, String.class, String.class, String.class, c};
@@ -507,6 +528,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "int", "String", "String", "String", "String", "String[]"};
     }
@@ -514,6 +536,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("appId")) {
             return getAppID();
@@ -542,6 +565,7 @@ public class Ads extends Container implements HTMLCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("appId")) {
             setAppID((String) value);
@@ -576,6 +600,7 @@ public class Ads extends Container implements HTMLCallback {
 
     private static class MyAsyncDocumentRequestHandlerImpl extends AsyncDocumentRequestHandlerImpl {
 
+        @Override
         protected ConnectionRequest createConnectionRequest(DocumentInfo docInfo, IOCallback callback, Object[] response) {
             ConnectionRequest req = super.createConnectionRequest(docInfo, callback, response);
             req.setFailSilently(true);
@@ -585,6 +610,7 @@ public class Ads extends Container implements HTMLCallback {
 
         private static class NetworkEventActionListener implements ActionListener<NetworkEvent> {
 
+            @Override
             public void actionPerformed(NetworkEvent evt) {
                 //do nothing, just make sure the html won't throw an error
             }

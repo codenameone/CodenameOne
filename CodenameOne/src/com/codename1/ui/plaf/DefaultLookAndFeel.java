@@ -141,6 +141,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void bind(Component cmp) {
         if (tickWhenFocused && cmp instanceof Label) {
             cmp.addFocusListener(this);
@@ -338,6 +339,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      *
      * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
+    @Override
     public void drawButton(Graphics g, Button b) {
         drawComponent(g, b, b.getIconFromState(), null, 0);
     }
@@ -345,6 +347,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drawCheckBox(Graphics g, Button cb) {
         if (chkBoxImages != null) {
             Image x;
@@ -417,10 +420,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      *
      * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
+    @Override
     public void drawLabel(Graphics g, Label l) {
         drawComponent(g, l, l.getMaskedIcon(), null, 0);
     }
 
+    @Override
     public Span calculateLabelSpan(TextSelection sel, Label l) {
         Image icon = l.getMaskedIcon();
         int preserveSpaceForState = 0;
@@ -612,6 +617,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drawRadioButton(Graphics g, Button rb) {
         if (rButtonImages != null) {
             Image x;
@@ -663,6 +669,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drawComboBox(Graphics g, List cb) {
         int border = 2;
         Style style = cb.getStyle();
@@ -775,6 +782,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drawList(Graphics g, List l) {
     }
 
@@ -878,6 +886,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drawTextArea(Graphics g, TextArea ta) {
         setFG(g, ta);
         int alpha = g.concatenateAlpha(ta.getStyle().getFgAlpha());
@@ -961,6 +970,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getButtonPreferredSize(Button b) {
         threeImageCache[0] = b.getMaskedIcon();
         threeImageCache[1] = b.getRolloverIcon();
@@ -971,6 +981,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getCheckBoxPreferredSize(Button cb) {
         if (cb.isToggle()) {
             return getButtonPreferredSize(cb);
@@ -997,6 +1008,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getLabelPreferredSize(Label l) {
         oneImageCache[0] = l.getMaskedIcon();
         return getPreferredSize(l, oneImageCache, null);
@@ -1091,6 +1103,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getListPreferredSize(List l) {
         Dimension d = getListPreferredSizeImpl(l);
         Style style = l.getStyle();
@@ -1193,6 +1206,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getRadioButtonPreferredSize(Button rb) {
         if (rb.isToggle()) {
             return getButtonPreferredSize(rb);
@@ -1223,6 +1237,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getTextAreaSize(TextArea ta, boolean pref) {
         int prefW = 0;
         int prefH = 0;
@@ -1803,6 +1818,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getComboBoxPreferredSize(List cb) {
         Dimension d = getListPreferredSize(cb);
         Image comboBoxImage = ((ComboBox) cb).getComboBoxImage() != null ? ((ComboBox) cb).getComboBoxImage() : comboImage;
@@ -1858,6 +1874,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return displayText;
     }
 
+    @Override
     public Spans calculateTextFieldSpan(TextSelection sel, TextArea ta) {
         //setFG(g, ta);
         Span out = sel.newSpan(ta);
@@ -1971,6 +1988,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drawTextField(Graphics g, TextArea ta) {
         setFG(g, ta);
         int alpha = g.concatenateAlpha(ta.getStyle().getFgAlpha());
@@ -2156,6 +2174,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getTextFieldPreferredSize(TextArea ta) {
         return getTextAreaSize(ta, true);
     }
@@ -2163,6 +2182,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drawTextFieldCursor(Graphics g, TextArea ta) {
         Style style = ta.getStyle();
         Font f = style.getFont();
@@ -2219,6 +2239,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drawPullToRefresh(Graphics g, final Component cmp, boolean taskExecuted) {
         final Form parentForm = cmp.getComponentForm();
         final int scrollY = cmp.getScrollY();
@@ -2247,6 +2268,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     }
                 }
 
+                @Override
                 public boolean animate() {
                     counter++;
 
@@ -2264,6 +2286,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     // Placing the repaint inside a callSerially() because repaint directly
                     // inside animate causes painting artifacts in many instances
                     CN.callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY() - getPullToRefreshHeight(), cmp.getWidth(),
                                     getPullToRefreshHeight());
@@ -2274,6 +2297,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     return false;
                 }
 
+                @Override
                 public void paint(Graphics g) {
                 }
             });
@@ -2303,6 +2327,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getPullToRefreshHeight() {
         if (pull == null) {
             BorderLayout bl = new BorderLayout();
@@ -2356,6 +2381,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void focusGained(Component cmp) {
         if (cmp instanceof Label) {
             Label l = (Label) cmp;
@@ -2368,6 +2394,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void focusLost(Component cmp) {
         if (cmp instanceof Label) {
             Label l = (Label) cmp;
@@ -2380,6 +2407,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean b) {
         chkBoxImages = null;
         comboImage = null;

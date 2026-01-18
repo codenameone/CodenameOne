@@ -45,6 +45,7 @@ public final class EasyThread {
 
     private EasyThread(String name) {
         t = Display.getInstance().startThread(new Runnable() {
+            @Override
             public void run() {
                 Object current = null;
                 Object resultCallback = null;
@@ -274,6 +275,7 @@ public final class EasyThread {
             this.flag = flag;
         }
 
+        @Override
         public void run() {
             synchronized (flag) {
                 if (!flag[0]) {
@@ -292,6 +294,7 @@ public final class EasyThread {
             this.flag = flag;
         }
 
+        @Override
         public void run() {
             try {
                 r.run();
@@ -311,6 +314,7 @@ public final class EasyThread {
             this.flag = flag;
         }
 
+        @Override
         public void run() {
             synchronized (flag) {
                 if (!flag[0]) {
@@ -329,6 +333,7 @@ public final class EasyThread {
             this.r = r;
         }
 
+        @Override
         public void run(SuccessCallback<T> onSuccess) {
             sc.onSucess(r.run());
         }
@@ -343,6 +348,7 @@ public final class EasyThread {
             this.result = result;
         }
 
+        @Override
         public void onSucess(T value) {
             synchronized (flag) {
                 result[0] = value;

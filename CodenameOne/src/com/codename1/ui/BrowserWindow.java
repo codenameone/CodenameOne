@@ -248,6 +248,7 @@ public class BrowserWindow {
 
             });
             setBackCommand(new Command("") {
+                @Override
                 public void actionPerformed(ActionEvent e) {
                     if (closed) {
                         return;

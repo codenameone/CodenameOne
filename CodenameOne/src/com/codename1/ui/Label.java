@@ -340,6 +340,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @return The component to use for styling the material icon.
      * @since 7.0
      */
+    @Override
     public Component getIconStyleComponent() {
         if (iconStyleComponent != null) {
             return iconStyleComponent;
@@ -365,6 +366,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @param c    one of the constants from {@link com.codename1.ui.FontImage}
      * @param size the size of the icon in millimeters
      */
+    @Override
     public void setMaterialIcon(char c, float size) {
         FontImage.setMaterialIcon(this, c, size);
         materialIconSize = size;
@@ -377,6 +379,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @param c    one of the constants from the font
      * @param size the size of the icon in millimeters
      */
+    @Override
     public void setFontIcon(Font font, char c, float size) {
         FontImage.setFontIcon(this, font, c, size);
         fontIconSize = size;
@@ -467,6 +470,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getBaselineResizeBehavior() {
         switch (valign) {
             case TOP:
@@ -554,6 +558,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     void initComponentImpl() {
         super.initComponentImpl();
         UIManager manager = getUIManager();
@@ -584,6 +589,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
         Form f = getComponentForm();
@@ -602,6 +608,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      *
      * @return the label text
      */
+    @Override
     public String getText() {
         return text;
     }
@@ -611,6 +618,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      *
      * @param text the string that the label presents.
      */
+    @Override
     public void setText(String text) {
         widthAtLastCheck = -1;
         this.text = text;
@@ -620,6 +628,7 @@ public class Label extends Component implements IconHolder, TextHolder {
         repaint();
     }
 
+    @Override
     void checkAnimation() {
         super.checkAnimation();
         if (icon != null && icon.isAnimation()) {
@@ -785,6 +794,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      *
      * @param gap the gap in pixels
      */
+    @Override
     public void setGap(int gap) {
         this.gap = gap;
     }
@@ -792,6 +802,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected String paramString() {
         return super.paramString() + ", text = " + getText() + ", gap = " + gap;
     }
@@ -799,6 +810,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         if (legacyRenderer || (badgeText != null && badgeText.length() > 0)) {
             initAutoResize();
@@ -930,6 +942,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
     }
@@ -1029,6 +1042,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     void tryDeregisterAnimated() {
         if (tickerEnabled || tickerRunning) {
             return;
@@ -1087,6 +1101,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (!isVisibleOnForm()) {
             return false;
@@ -1155,6 +1170,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"maskName"};
     }
@@ -1162,6 +1178,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class};
     }
@@ -1169,6 +1186,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String"};
     }
@@ -1176,6 +1194,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("maskName")) {
             return getMaskName();
@@ -1186,6 +1205,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("maskName")) {
             setMaskName((String) value);
@@ -1215,6 +1235,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getBindablePropertyNames() {
         return new String[]{"text"};
     }
@@ -1222,6 +1243,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getBindablePropertyTypes() {
         return new Class[]{String.class};
     }
@@ -1230,6 +1252,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      * @deprecated uses the deprecated BindTarget interface
      */
+    @Override
     public void bindProperty(String prop, BindTarget target) {
         if (prop.equals("text")) {
             if (textBindListeners == null) {
@@ -1245,6 +1268,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      * @deprecated uses the deprecated BindTarget interface
      */
+    @Override
     public void unbindProperty(String prop, BindTarget target) {
         if (prop.equals("text")) {
             if (textBindListeners == null) {
@@ -1262,6 +1286,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getBoundPropertyValue(String prop) {
         if (prop.equals("text")) {
             return getText();
@@ -1272,6 +1297,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setBoundPropertyValue(String prop, Object value) {
         if (prop.equals("text")) {
             setText((String) value);
@@ -1466,6 +1492,7 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
     }
 
+    @Override
     public TextSelectionSupport getTextSelectionSupport() {
         if (textSelectionSupport == null) {
             textSelectionSupport = new TextSelectionSupport() {
@@ -1562,6 +1589,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @param uiid The uiid to use for the material icon style.
      * @since 7.0
      */
+    @Override
     public void setIconUIID(String uiid) {
         if (iconStyleComponent == null || !uiid.equals(iconStyleComponent.getUIID())) {
             iconStyleComponent = new Component();

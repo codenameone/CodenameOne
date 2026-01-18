@@ -154,6 +154,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
         Boolean v = getUIManager().isThemeConstant("radioOppositeSideBool");
@@ -182,10 +183,12 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "Radio Button " + getText();
     }
 
+    @Override
     int getAvaliableSpaceForText() {
         if (isToggle()) {
             return super.getAvaliableSpaceForText();
@@ -206,6 +209,7 @@ public class RadioButton extends Button {
      *
      * @return true if the radio button is selected
      */
+    @Override
     public boolean isSelected() {
         return selected;
     }
@@ -253,6 +257,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void released(int x, int y) {
         // prevent the radio button from being "turned off" unless unselectAllowed
         if (!isSelected() || unselectAllowed) {
@@ -264,6 +269,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         if (isToggle()) {
             getUIManager().getLookAndFeel().drawButton(g, this);
@@ -275,6 +281,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getRadioButtonPreferredSize(this);
     }
@@ -300,6 +307,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     void fireActionEvent() {
         if (group != null) {
             group.setSelected(this);
@@ -307,6 +315,7 @@ public class RadioButton extends Button {
         super.fireActionEvent();
     }
 
+    @Override
     void initComponentImpl() {
         super.initComponentImpl();
         initNamedGroup();
@@ -351,6 +360,7 @@ public class RadioButton extends Button {
      *
      * @return the oppositeSide
      */
+    @Override
     public boolean isOppositeSide() {
         return oppositeSide;
     }
@@ -367,6 +377,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getBindablePropertyNames() {
         return new String[]{"selected"};
     }
@@ -374,6 +385,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getBindablePropertyTypes() {
         return new Class[]{Boolean.class};
     }
@@ -382,6 +394,7 @@ public class RadioButton extends Button {
      * {@inheritDoc}
      * @deprecated uses the deprecated BindTarget interface
      */
+    @Override
     public void bindProperty(String prop, BindTarget target) {
         if (prop.equals("selected")) {
             if (bindListeners == null) {
@@ -397,6 +410,7 @@ public class RadioButton extends Button {
      * {@inheritDoc}
      * @deprecated uses the deprecated BindTarget interface
      */
+    @Override
     public void unbindProperty(String prop, BindTarget target) {
         if (prop.equals("selected")) {
             if (bindListeners == null) {
@@ -414,6 +428,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getBoundPropertyValue(String prop) {
         if (prop.equals("selected")) {
             if (isSelected()) {
@@ -427,6 +442,7 @@ public class RadioButton extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setBoundPropertyValue(String prop, Object value) {
         if (prop.equals("selected")) {
             setSelected(value != null && ((Boolean) value).booleanValue());

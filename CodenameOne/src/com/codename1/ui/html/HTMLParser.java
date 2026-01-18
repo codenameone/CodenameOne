@@ -77,6 +77,7 @@ public class HTMLParser extends XMLParser {
      * @param is      The reader containing the XML
      * @throws IOException if an I/O error in the stream is encountered
      */
+    @Override
     protected void parseTagContent(Element element, Reader is) throws IOException {
         if ((HTMLComponent.SUPPORT_CSS) && (htmlC.loadCSS) && (((HTMLElement) element).getTagId() == HTMLElement.TAG_STYLE)) { // We aren't strict and don't require text/css in a style tag // && "text/css".equals(element.getAttributeById(Element.ATTR_TYPE)))) {
             CSSElement addTo = CSSParser.getInstance().parseCSSSegment(is, null, htmlC, null);
@@ -93,6 +94,7 @@ public class HTMLParser extends XMLParser {
      * @param name The HTMLElement's name
      * @return a new instance of the names HTMLElement
      */
+    @Override
     protected Element createNewElement(String name) {
         HTMLElement elem = new HTMLElement(name);
         return elem;
@@ -104,6 +106,7 @@ public class HTMLParser extends XMLParser {
      * @param text The HTMLElement's text
      * @return a new instance of the HTMLElement
      */
+    @Override
     protected Element createNewTextElement(String text) {
         HTMLElement elem = new HTMLElement(text, true);
         return elem;
@@ -115,6 +118,7 @@ public class HTMLParser extends XMLParser {
      * @param charEntity The char entity to convert
      * @return A string containing a single char, or the original char entity string (with &amp; and ;) if the char entity couldn't be resolved
      */
+    @Override
     protected String convertCharEntity(String charEntity) {
         try {
             return HTMLUtils.convertCharEntity(charEntity, true, null);
@@ -150,6 +154,7 @@ public class HTMLParser extends XMLParser {
      * @param tagName The tag name to check
      * @return true if that tag is defined as an empty tag, false otherwise
      */
+    @Override
     protected boolean isEmptyTag(String tagName) {
         int i = 0;
         boolean found = false;
@@ -176,6 +181,7 @@ public class HTMLParser extends XMLParser {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     protected String getSupportedStandardName() {
         return "XHTML-MP 1.0";
     }
@@ -185,6 +191,7 @@ public class HTMLParser extends XMLParser {
      *
      * @return true if the tag is a supported XHTML Mobile Profile 1.0 tag, false otherwise
      */
+    @Override
     protected boolean isSupported(Element element) {
         return (((HTMLElement) element).getTagId() != HTMLElement.TAG_UNSUPPORTED);
     }
@@ -196,6 +203,7 @@ public class HTMLParser extends XMLParser {
      *
      * @return false if this is the SCRIPT tag, true otherwise
      */
+    @Override
     protected boolean shouldEvaluate(Element element) {
         return ((((HTMLElement) element).getTagId() != HTMLElement.TAG_UNSUPPORTED) || (!element.getTagName().equalsIgnoreCase("script")));
     }

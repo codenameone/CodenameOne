@@ -164,6 +164,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
     }
@@ -171,6 +172,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Layout getLayout() {
         return contentPane.getLayout();
     }
@@ -178,6 +180,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setLayout(Layout layout) {
         contentPane.setLayout(layout);
     }
@@ -199,6 +202,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(Component cmp) {
         contentPane.addComponent(cmp);
     }
@@ -206,6 +210,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(Object constraints, Component cmp) {
         contentPane.addComponent(constraints, cmp);
     }
@@ -213,6 +218,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(int index, Object constraints, Component cmp) {
         contentPane.addComponent(index, constraints, cmp);
     }
@@ -220,6 +226,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(int index, Component cmp) {
         contentPane.addComponent(index, cmp);
     }
@@ -227,6 +234,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeAll() {
         contentPane.removeAll();
     }
@@ -234,6 +242,7 @@ public class InteractionDialog extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeComponent(Component cmp) {
         contentPane.removeComponent(cmp);
     }
@@ -498,6 +507,7 @@ public class InteractionDialog extends Container {
 
                 if (animateShow) {
                     p.animateUnlayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400), 255, new Runnable() {
+                        @Override
                         public void run() {
                             if (p.getParent() != null) {
                                 Container pp = getLayeredPane(f);

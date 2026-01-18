@@ -228,10 +228,12 @@ public final class InfiniteScrollAdapter {
         public EdgeMarker() {
         }
 
+        @Override
         public Dimension calcPreferredSize() {
             return new Dimension(1, 1);
         }
 
+        @Override
         public void paint(Graphics g) {
             if (getParent() != null && isInClippingRegion(g)) {
                 reachedEnd();

@@ -100,10 +100,12 @@ public class URL {
         return u.toASCIIString();
     }
 
+    @Override
     public boolean equals(java.lang.Object o) {
         return o instanceof URL && u.equals(((URL) o).u);
     }
 
+    @Override
     public synchronized int hashCode() {
         return u.hashCode();
     }
@@ -112,6 +114,7 @@ public class URL {
         return equals(u);
     }
 
+    @Override
     public java.lang.String toString() {
         return u.toASCIIString();
     }

@@ -79,6 +79,8 @@ public final class Graphics {
         impl = Display.impl;
     }
 
+    // PMD thinks we need to override finalize. Ugh.
+    @SuppressWarnings("PMD.MissingOverride")
     protected void finalize() {
         if (nativeGraphics != null) {
             impl.disposeGraphics(nativeGraphics);

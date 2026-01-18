@@ -85,6 +85,7 @@ public class Geofence {
     public static Comparator<Geofence> createDistanceComparator(final Geofence refRegion) {
         return new Comparator<Geofence>() {
 
+            @Override
             public int compare(Geofence o1, Geofence o2) {
                 double d1 = refRegion.getDistanceTo(o1);
                 double d2 = refRegion.getDistanceTo(o2);
@@ -102,6 +103,7 @@ public class Geofence {
     public static Comparator<Geofence> createDistanceComparator(final Location refPoint) {
         return new Comparator<Geofence>() {
 
+            @Override
             public int compare(Geofence o1, Geofence o2) {
                 double d1 = Math.max(0, refPoint.getDistanceTo(o1.getLoc()) - o1.getRadius());
                 double d2 = Math.max(0, refPoint.getDistanceTo(o2.getLoc()) - o2.getRadius());

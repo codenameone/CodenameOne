@@ -198,6 +198,7 @@ public class Receipt implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getVersion() {
         return 1;
     }
@@ -205,6 +206,7 @@ public class Receipt implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void externalize(DataOutputStream out) throws IOException {
         Map m = new HashMap();
         m.put("sku", getSku());
@@ -224,6 +226,7 @@ public class Receipt implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void internalize(int version, DataInputStream in) throws IOException {
         Map m = (Map) Util.readObject(in);
         setSku((String) m.get("sku"));
@@ -242,6 +245,7 @@ public class Receipt implements Externalizable {
      *
      * @return
      */
+    @Override
     public String getObjectId() {
         return "com.codename1.payment.Receipt";
     }

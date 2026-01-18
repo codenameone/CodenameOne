@@ -294,6 +294,7 @@ public class UiBinding {
                 implements PropertyChangeListener, ActionListener<ActionEvent> {
             private boolean lock;
 
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (super.isAutoCommit()) {
                     if (lock) {
@@ -305,6 +306,7 @@ public class UiBinding {
                 }
             }
 
+            @Override
             public void propertyChanged(PropertyBase p) {
                 if (super.isAutoCommit()) {
                     if (lock) {

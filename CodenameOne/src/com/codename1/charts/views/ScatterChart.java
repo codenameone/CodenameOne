@@ -59,6 +59,7 @@ public class ScatterChart extends XYChart {
     }
 
     // TODO: javadoc
+    @Override
     protected void setDatasetRenderer(XYMultipleSeriesDataset dataset,
                                       XYMultipleSeriesRenderer renderer) {
         super.setDatasetRenderer(dataset, renderer);
@@ -187,6 +188,7 @@ public class ScatterChart extends XYChart {
      * @param seriesIndex the series index
      * @return the legend shape width
      */
+    @Override
     public int getLegendShapeWidth(int seriesIndex) {
         return SHAPE_WIDTH;
     }
@@ -201,6 +203,7 @@ public class ScatterChart extends XYChart {
      * @param seriesIndex the series index
      * @param paint the paint to be used for drawing
      */
+    @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
         if (renderer instanceof  XYSeriesRenderer &&
@@ -339,6 +342,7 @@ public class ScatterChart extends XYChart {
      *
      * @return the chart type
      */
+    @Override
     public String getChartType() {
         return TYPE;
     }

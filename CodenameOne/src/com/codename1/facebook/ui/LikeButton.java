@@ -68,6 +68,7 @@ public class LikeButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void actionPerformed(ActionEvent evt) {
         if (!FaceBookAccess.getInstance().isAuthenticated()) {
             FaceBookAccess.setClientId(appId);
@@ -107,6 +108,7 @@ public class LikeButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"appId", "redirectURI", "clientSecret", "postId", "permissions"};
     }
@@ -114,6 +116,7 @@ public class LikeButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, String.class, String.class, new String[0].getClass()};
     }
@@ -121,6 +124,7 @@ public class LikeButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "String", "String", "String", "String[]"};
     }
@@ -128,6 +132,7 @@ public class LikeButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("appId")) {
             return getAppId();
@@ -150,6 +155,7 @@ public class LikeButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("appId")) {
             setAppId((String) value);
