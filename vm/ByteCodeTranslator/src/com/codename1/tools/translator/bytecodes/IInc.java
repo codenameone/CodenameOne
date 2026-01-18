@@ -39,6 +39,10 @@ public class IInc extends Instruction {
         this.num = num;
     }
 
+    public int getVar() {
+        return var;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
         if(getMethod() != null && getMethod().isBarebone()) {
