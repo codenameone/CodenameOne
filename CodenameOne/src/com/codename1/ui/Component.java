@@ -2320,8 +2320,8 @@ public class Component implements Animation, StyleListener, Editable {
      * @return True if native shadow rendering should be used for elevation.
      */
     private boolean useNativeShadowRendering() {
-        if (!Display.impl.isDrawShadowSupported()) return false;
-        if (Boolean.TRUE.equals(getClientProperty("Component.nativeShadowRendering"))) return true;
+        if (!Display.impl.isDrawShadowSupported()) { return false; }
+        if (Boolean.TRUE.equals(getClientProperty("Component.nativeShadowRendering"))) { return true; }
         return "true".equals(CN.getProperty("Component.nativeShadowRendering", "false"));
     }
 
@@ -2410,7 +2410,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return
      */
     boolean hasElevation() {
-        if (_hasElevation) return true;
+        if (_hasElevation) { return true; }
         Style s = getStyle();
         if (s.getElevation() > 0) {
             _hasElevation = true;
@@ -2567,7 +2567,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (elevation <= 0) {
             return;
         }
-        if (getWidth() == 0 || getHeight() == 0) return;
+        if (getWidth() == 0 || getHeight() == 0) { return; }
         synchronized (this) {
             if (cachedShadowImage != null) {
                 if (cachedShadowWidth != getWidth() || cachedShadowHeight != getHeight() || cachedShadowElevation != elevation) {
@@ -2589,7 +2589,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
 
         final Image fimg = this.toImage();
-        if (fimg == null) return;
+        if (fimg == null) { return; }
         if (paintinShadowInBackground_) {
             // We are already painting the shadow in a background thread, so don't do it twice.
             // Just be patient.
@@ -2858,7 +2858,9 @@ public class Component implements Animation, StyleListener, Editable {
         if (isScrollable()) {
             if (refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode() &&
                     (draggedMotionY == null || getClientProperty("$pullToRelease") != null)) {
+            {
                 paintPullToRefresh(g);
+            }
             }
             int scrollX = getScrollX();
             int scrollY = getScrollY();
@@ -2939,7 +2941,9 @@ public class Component implements Animation, StyleListener, Editable {
                 && getClientProperty("$pullToRelease") != null
                 && "update".equals(getClientProperty("$pullToRelease"))) {
 
+        {
             putClientProperty("$pullToRelease", "updating");
+        }
             draggedMotionY = null;
             //execute the task
             Display.getInstance().callSerially(new Runnable() {
@@ -3981,7 +3985,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     private Container findSurfaceInternal() {
         Container parent = getParent();
-        if (parent == null) return null;
+        if (parent == null) { return null; }
         if (parent.isSurface()) {
             return parent;
         }
@@ -4346,7 +4350,9 @@ public class Component implements Animation, StyleListener, Editable {
                 (sourceStyle.getBorder() != null && sourceStyle.getBorder().isEmptyBorder()) ||
                 (destStyle.getBorder() != null && destStyle.getBorder().isEmptyBorder()) ||
                 sourceStyle.getBgImage() != null || destStyle.getBgImage() != null) {
+        {
             ap.original = sourceStyle.getBgPainter();
+        }
             ap.dest = destStyle.getBgPainter();
             ap.originalStyle = sourceStyle;
             ap.destStyle = destStyle;
@@ -4537,8 +4543,8 @@ public class Component implements Animation, StyleListener, Editable {
                         // won't work. We need to explicitly revalidate or repaint here.
                         if (requiresRevalidate) {
                             Container parent = getParent();
-                            if (parent != null) parent.revalidate();
-                            else repaint();
+                            if (parent != null) parent.revalidate() { ; }
+                            else { repaint(); }
                         } else {
                             repaint();
                         }
@@ -4651,7 +4657,9 @@ public class Component implements Animation, StyleListener, Editable {
         }
         if (getClientProperty("$pullToRelease") != null
                 && !"updating".equals(getClientProperty("$pullToRelease"))) {
+        {
             putClientProperty("$pullToRelease", null);
+        }
         }
     }
 
@@ -4758,8 +4766,9 @@ public class Component implements Animation, StyleListener, Editable {
             boolean pinchXY = pinch(x, y); // ensure that both pinch(scale) and pinch(x,y) are called
             if (pinch((float) scale) || pinchXY) {
                 inPinch = true;
-                if (pinchBlocksDragAndDrop)
+                if (pinchBlocksDragAndDrop) {
                     dragActivated = false;
+                }
                 return;
             }
         } else {
@@ -5002,7 +5011,9 @@ public class Component implements Animation, StyleListener, Editable {
         if (refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode() &&
                 pullY < getHeight() / 4 &&
                 scrollableYFlag() && getScrollY() == 0) {
+        {
             int mm = Display.INSTANCE.convertToPixels(1);
+        }
             if (mm < y - pullY) {
                 p.clearComponentsAwaitingRelease();
                 Container c = p.getLayeredPane(InfiniteProgress.class, true);
@@ -5172,7 +5183,9 @@ public class Component implements Animation, StyleListener, Editable {
                 if (!view.contains(draggedx - scrollParent.getAbsoluteX(), draggedy - scrollParent.getAbsoluteY(), getWidth(), getHeight())) {
                     if ((scrollParent.isScrollableY() && scrollParent.getScrollY() + (draggedy + getHeight()) < scrollParent.getScrollDimension().getHeight()) ||
                             (scrollParent.isScrollableX() && scrollParent.getScrollX() + (draggedx + getWidth()) < scrollParent.getScrollDimension().getWidth())) {
+                    {
                         int yposition = draggedy - scrollParent.getAbsoluteY() - 40;
+                    }
                         if (yposition < 0) {
                             yposition = 0;
                         }
@@ -6384,7 +6397,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     void deregisterAnimatedInternal() {
-        if (!internalRegisteredAnimated) return;
+        if (!internalRegisteredAnimated) { return; }
         Form f = getComponentForm();
         if (f != null) {
             f.deregisterAnimatedInternal(this);
@@ -6451,7 +6464,9 @@ public class Component implements Animation, StyleListener, Editable {
             if (!draggedMotionY.isFinished()
                     && draggedMotionY.isDecayMotion()
                     && draggedMotionY.countAvailableVelocitySamplingPoints() > 1) {
+            {
                 final Motion origDraggedMotionY = draggedMotionY;
+            }
                 if (dragVal < 0) {
                     // Once past 0, decay motion is too slow.  We need to hit it with heavy friction.
                     draggedMotionY = Motion.createFrictionMotion(
@@ -6589,7 +6604,9 @@ public class Component implements Animation, StyleListener, Editable {
         if (!animateBackground && (destScrollY == -1 || destScrollY == scrollY) &&
                 m == null && draggedMotionY == null &&
                 draggedMotionX == null && !dragActivated) {
+        {
             tryDeregisterAnimated();
+        }
         }
 
         return animateBackground;
@@ -6842,7 +6859,7 @@ public class Component implements Animation, StyleListener, Editable {
             cmp._parentSurface = null;
         }
         Container parent = getParent();
-        if (parent == null) return;
+        if (parent == null) { return; }
         if (parent.isSurface()) {
             // Let's keep a reference to the surface so that we can remove it later.
             parent.addElevatedComponent(cmp);
@@ -7030,11 +7047,15 @@ public class Component implements Animation, StyleListener, Editable {
 
             if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >
                     getScrollDimension().getHeight() + ivk) {
+            {
                 setScrollY(getScrollDimension().getHeight() - getHeight() + ivk);
+            }
             }
             if (isScrollableX() && getScrollX() > 0 && getScrollX() + getWidth() >
                     getScrollDimension().getWidth()) {
+            {
                 setScrollX(getScrollDimension().getWidth() - getWidth());
+            }
             }
             if (!isScrollableY() && getScrollY() > 0) {
                 setScrollY(0);
@@ -7104,7 +7125,9 @@ public class Component implements Animation, StyleListener, Editable {
                 (Style.FONT.equals(propertyName) ||
                         Style.MARGIN.equals(propertyName) ||
                         Style.PADDING.equals(propertyName))) {
+        {
             setShouldCalcPreferredSize(true);
+        }
             Container parent = getParent();
             if (parent != null && parent.getComponentForm() != null) {
                 if (isRevalidateOnStyleChange()) {

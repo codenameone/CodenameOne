@@ -42,7 +42,7 @@ class Geometry {
         if (n < 0) {
             throw new IllegalArgumentException("factorial does not support negative numbers");
         }
-        if (n == 0) return 1;
+        if (n == 0) { return 1; }
         return n * factorial(n - 1);
     }
 
@@ -428,13 +428,13 @@ class Geometry {
          */
         public void addToPath(GeneralPath p, boolean join) {
             if (n() == 2) {
-                if (!join) p.moveTo(x[0], y[0]);
+                if (!join) p.moveTo(x[0], y[0]) { ; }
                 p.quadTo(x[1], y[1], x[2], y[2]);
             } else if (n() == 3) {
-                if (!join) p.moveTo(x[0], y[0]);
+                if (!join) p.moveTo(x[0], y[0]) { ; }
                 p.curveTo(x[1], y[1], x[2], y[2], x[3], y[3]);
             } else if (n() == 1) {
-                if (join) p.moveTo(x[0], y[0]);
+                if (join) p.moveTo(x[0], y[0]) { ; }
                 p.lineTo(x[1], y[1]);
             }
         }
@@ -596,7 +596,7 @@ class Geometry {
          * @return True if curves are equal within epsilon margin of error.
          */
         public boolean equals(BezierCurve c, double epsilon) {
-            if (c.n() != n()) return false;
+            if (c.n() != n()) { return false; }
             int len = x.length;
             for (int i = 0; i < len; i++) {
                 if (Math.abs(x[i] - c.x[i]) > epsilon) {

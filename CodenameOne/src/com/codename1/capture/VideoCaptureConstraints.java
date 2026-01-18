@@ -376,7 +376,7 @@ public class VideoCaptureConstraints {
      */
     public boolean isSizeSupported() {
         build();
-        if (preferredWidth == 0 && preferredHeight == 0) return true;
+        if (preferredWidth == 0 && preferredHeight == 0) { return true; }
         return (width == preferredWidth && height == preferredHeight);
     }
 
@@ -479,7 +479,7 @@ public class VideoCaptureConstraints {
      * @return
      */
     private VideoCaptureConstraints build() {
-        if (compiled) return this;
+        if (compiled) { return this; }
         if (compiler == null) {
             this.height = 0;
             this.width = 0;

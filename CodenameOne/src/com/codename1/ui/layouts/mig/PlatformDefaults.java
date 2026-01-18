@@ -397,8 +397,9 @@ public final class PlatformDefaults {
      */
     public static void setLogicalPixelBase(int base) {
         if (LP_BASE != base) {
-            if (base < BASE_FONT_SIZE || base > BASE_REAL_PIXEL)
+            if (base < BASE_FONT_SIZE || base > BASE_REAL_PIXEL) {
                 throw new IllegalArgumentException("Unrecognized base: " + base);
+            }
 
             LP_BASE = base;
             incModeCount();
@@ -456,11 +457,13 @@ public final class PlatformDefaults {
      * @param y The value that will be transformed to pixels. If <code>null</code> the current value will not change.
      */
     public static void setGridCellGap(UnitValue x, UnitValue y) {
-        if (x != null)
+        if (x != null) {
             DEF_HGAP = new BoundSize(x, x, null, null);
+        }
 
-        if (y != null)
+        if (y != null) {
             DEF_VGAP = new BoundSize(y, y, null, null);
+        }
 
         incModeCount();
     }
@@ -517,10 +520,12 @@ public final class PlatformDefaults {
     public static void setUnitValue(String[] unitStrings, UnitValue x, UnitValue y) {
         for (String unitString : unitStrings) {
             String s = unitString.toLowerCase().trim();
-            if (x != null)
+            if (x != null) {
                 HOR_DEFS.put(s, x);
-            if (y != null)
+            }
+            if (y != null) {
                 VER_DEFS.put(s, y);
+            }
         }
         incModeCount();
     }
@@ -663,17 +668,21 @@ public final class PlatformDefaults {
      * @param right  The right inset. May be <code>null</code>.
      */
     public static void setDialogInsets(UnitValue top, UnitValue left, UnitValue bottom, UnitValue right) {
-        if (top != null)
+        if (top != null) {
             DIALOG_INS[0] = top;
+        }
 
-        if (left != null)
+        if (left != null) {
             DIALOG_INS[1] = left;
+        }
 
-        if (bottom != null)
+        if (bottom != null) {
             DIALOG_INS[2] = bottom;
+        }
 
-        if (right != null)
+        if (right != null) {
             DIALOG_INS[3] = right;
+        }
 
         incModeCount();
     }
@@ -697,17 +706,21 @@ public final class PlatformDefaults {
      * @param right  The right inset. May be <code>null</code>.
      */
     public static void setPanelInsets(UnitValue top, UnitValue left, UnitValue bottom, UnitValue right) {
-        if (top != null)
+        if (top != null) {
             PANEL_INS[0] = top;
+        }
 
-        if (left != null)
+        if (left != null) {
             PANEL_INS[1] = left;
+        }
 
-        if (bottom != null)
+        if (bottom != null) {
             PANEL_INS[2] = bottom;
+        }
 
-        if (right != null)
+        if (right != null) {
             PANEL_INS[3] = right;
+        }
 
         incModeCount();
     }
@@ -733,11 +746,13 @@ public final class PlatformDefaults {
      * @return The default gap between two components or <code>null</code> if there should be no gap.
      */
     static BoundSize getDefaultComponentGap(ComponentWrapper comp, ComponentWrapper adjacentComp, int adjacentSide, String tag, boolean isLTR) {
-        if (GAP_PROVIDER != null)
+        if (GAP_PROVIDER != null) {
             return GAP_PROVIDER.getDefaultGap(comp, adjacentComp, adjacentSide, tag, isLTR);
+        }
 
-        if (adjacentComp == null)
+        if (adjacentComp == null) {
             return null;
+        }
 
 //		if (adjacentComp == null || adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.TOP)
 //			return null;
@@ -797,8 +812,9 @@ public final class PlatformDefaults {
      * @see UnitValue#LPX
      */
     public static void setDefaultHorizontalUnit(int unit) {
-        if (unit < UnitValue.PIXEL || unit > UnitValue.LABEL_ALIGN)
+        if (unit < UnitValue.PIXEL || unit > UnitValue.LABEL_ALIGN) {
             throw new IllegalArgumentException("Illegal Unit: " + unit);
+        }
 
         if (DEF_H_UNIT != unit) {
             DEF_H_UNIT = unit;
@@ -825,8 +841,9 @@ public final class PlatformDefaults {
      * @see UnitValue#LPY
      */
     public static void setDefaultVerticalUnit(int unit) {
-        if (unit < UnitValue.PIXEL || unit > UnitValue.LABEL_ALIGN)
+        if (unit < UnitValue.PIXEL || unit > UnitValue.LABEL_ALIGN) {
             throw new IllegalArgumentException("Illegal Unit: " + unit);
+        }
 
         if (DEF_V_UNIT != unit) {
             DEF_V_UNIT = unit;

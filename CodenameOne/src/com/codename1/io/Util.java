@@ -232,7 +232,7 @@ public class Util {
      * @since 8.0
      */
     public static String readToString(File file, String charset) throws IOException {
-        if (charset == null) charset = "UTF-8";
+        if (charset == null) { charset = "UTF-8"; }
         if (!file.exists()) {
             throw new IOException("Failed to read file " + file + " because it does not exist.");
         }
@@ -273,7 +273,7 @@ public class Util {
      * @since 8.0
      */
     public static void writeStringToFile(File file, String contents, String charset) throws IOException {
-        if (charset == null) charset = "UTF-8";
+        if (charset == null) { charset = "UTF-8"; }
         OutputStream output = null;
         try {
             output = FileSystemStorage.getInstance().openOutputStream(file.getAbsolutePath());
@@ -995,7 +995,9 @@ public class Util {
             if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') ||
                     (ch == '-' || ch == '_' || ch == '.' || ch == '~' || ch == '!'
                             || ch == '*' || ch == '\'' || ch == '(' || ch == ')' || ignoreCharsWhenEncoding.indexOf(ch) > -1) || (doNotEncode != null && doNotEncode.indexOf(ch) > -1)) {
+            {
                 sbuf.append(ch);
+            }
             } else if (ch == ' ') {
                 sbuf.append(spaceChar);
             } else {
@@ -2093,7 +2095,9 @@ public class Util {
             if (c2 == '!'
                     || ((c2 == 'h' && (c3 == 't' && c4 == 'm' && c5 == 'l' || c3 == 'e' && c4 == 'a' && c5 == 'd') || (c2 == 'b' && c3 == 'o' && c4 == 'd' && c5 == 'y')))
                     || ((c2 == 'H' && (c3 == 'T' && c4 == 'M' && c5 == 'L' || c3 == 'E' && c4 == 'A' && c5 == 'D') || (c2 == 'B' && c3 == 'O' && c4 == 'D' && c5 == 'Y')))) {
+            {
                 return "text/html";
+            }
             }
 
             if (c2 == '?' && c3 == 'x' && c4 == 'm' && c5 == 'l' && c6 == ' ') {

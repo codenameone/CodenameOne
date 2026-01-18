@@ -253,7 +253,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      * @since 6.0
      */
     public void setShowMeridiem(boolean showMeridiem) {
-        if (time == null) return;
+        if (time == null) { return; }
         time.setShowMeridiem(showMeridiem);
     }
 
@@ -268,7 +268,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      * @since 6.0
      */
     public void setHourRange(int min, int max) {
-        if (time == null) return;
+        if (time == null) { return; }
         if (min >= 0 && max > min && isShowMeridiem()) {
             time.setShowMeridiem(false);
         }
@@ -285,7 +285,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      * @since 6.0
      */
     public int getMinHour() {
-        if (time == null) return -1;
+        if (time == null) { return -1; }
         return time.getMinHour();
     }
 
@@ -298,7 +298,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      * @since 6.0
      */
     public int getMaxHour() {
-        if (time == null) return -1;
+        if (time == null) { return -1; }
         return time.getMaxHour();
     }
 

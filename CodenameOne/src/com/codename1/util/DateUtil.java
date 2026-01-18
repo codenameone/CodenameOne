@@ -68,7 +68,7 @@ public class DateUtil {
      */
     public static Date min(Date... dates) {
         int len = dates.length;
-        if (len == 0) return null;
+        if (len == 0) { return null; }
         Date out = null;
         for (int i = 0; i < len; i++) {
             if (dates[i] == null) {
@@ -90,8 +90,8 @@ public class DateUtil {
      * @since 6.0
      */
     public static int compare(Date d1, Date d2) {
-        if (d1 == null) return d2 == null ? 0 : -1;
-        if (d2 == null) return 1;
+        if (d1 == null) { return d2 == null ? 0 : -1; }
+        if (d2 == null) { return 1; }
         if (d1.getTime() < d2.getTime()) {
             return -1;
         } else if (d1.getTime() > d2.getTime()) {
@@ -168,7 +168,7 @@ public class DateUtil {
      */
     public static Date max(Date... dates) {
         int len = dates.length;
-        if (len == 0) return null;
+        if (len == 0) { return null; }
         Date out = null;
         for (int i = 0; i < len; i++) {
             if (dates[i] == null) {

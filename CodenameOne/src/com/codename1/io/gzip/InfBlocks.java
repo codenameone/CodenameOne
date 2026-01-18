@@ -291,15 +291,16 @@ final class InfBlocks {
                     r = Z_OK;
 
                     t = left;
-                    if (t > n) t = n;
-                    if (t > m) t = m;
+                    if (t > n) { t = n; }
+                    if (t > m) { t = m; }
                     System.arraycopy(z.nextIn, p, window, q, t);
                     p += t;
                     n -= t;
                     q += t;
                     m -= t;
-                    if ((left -= t) != 0)
+                    if ((left -= t) != 0) {
                         break;
+                    }
                     mode = last != 0 ? DRY : TYPE;
                     break;
                 case TABLE:
@@ -471,7 +472,9 @@ final class InfBlocks {
                             t = table;
                             if (i + j > 258 + (t & 0x1f) + ((t >> 5) & 0x1f) ||
                                     (c == 16 && i < 1)) {
+                            {
                                 blens = null;
+                            }
                                 mode = BAD;
                                 z.msg = "invalid bit length repeat";
                                 r = Z_DATA_ERROR;
@@ -489,7 +492,7 @@ final class InfBlocks {
                             do {
                                 blens[i++] = c;
                             }
-                            while (--j != 0);
+                            while (--j != 0) { ; }
                             index = i;
                         }
                     }
@@ -624,8 +627,8 @@ final class InfBlocks {
 
         // compute number of bytes to copy as far as end of window
         n = (q <= write ? write : end) - q;
-        if (n > z.availOut) n = z.availOut;
-        if (n != 0 && r == Z_BUF_ERROR) r = Z_OK;
+        if (n > z.availOut) { n = z.availOut; }
+        if (n != 0 && r == Z_BUF_ERROR) { r = Z_OK; }
 
         // update counters
         z.availOut -= n;
@@ -645,13 +648,14 @@ final class InfBlocks {
         if (q == end) {
             // wrap pointers
             q = 0;
-            if (write == end)
+            if (write == end) {
                 write = 0;
+            }
 
             // compute bytes to copy
             n = write - q;
-            if (n > z.availOut) n = z.availOut;
-            if (n != 0 && r == Z_BUF_ERROR) r = Z_OK;
+            if (n > z.availOut) { n = z.availOut; }
+            if (n != 0 && r == Z_BUF_ERROR) { r = Z_OK; }
 
             // update counters
             z.availOut -= n;

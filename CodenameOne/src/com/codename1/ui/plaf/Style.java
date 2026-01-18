@@ -714,7 +714,7 @@ public class Style {
      * @since 8.0
      */
     public int getIconGap() {
-        if (iconGap < 0) return -1;
+        if (iconGap < 0) { return -1; }
         return CN.convertToPixels(iconGap, iconGapUnit);
     }
 
@@ -1543,7 +1543,9 @@ public class Style {
                 padding[Component.BOTTOM] != bottom ||
                 padding[Component.LEFT] != left ||
                 padding[Component.RIGHT] != right) {
+        {
             padding[Component.TOP] = top;
+        }
             padding[Component.BOTTOM] = bottom;
             padding[Component.LEFT] = left;
             padding[Component.RIGHT] = right;
@@ -1607,7 +1609,9 @@ public class Style {
                 margin[Component.BOTTOM] != bottom ||
                 margin[Component.LEFT] != left ||
                 margin[Component.RIGHT] != right) {
+        {
             margin[Component.TOP] = top;
+        }
             margin[Component.BOTTOM] = bottom;
             margin[Component.LEFT] = left;
             margin[Component.RIGHT] = right;
@@ -2651,7 +2655,9 @@ public class Style {
         }
         if (this.font == null && font != null ||
                 (this.font != null && !this.font.equals(font))) {
+        {
             this.font = font;
+        }
             if (!override) {
                 modifiedFlag |= FONT_MODIFIED;
             }
@@ -2870,7 +2876,9 @@ public class Style {
         }
         if ((this.border == null && border != null) ||
                 (this.border != null && !this.border.equals(border))) {
+        {
             this.border = border;
+        }
             if (!override) {
                 modifiedFlag |= BORDER_MODIFIED;
             }
@@ -3135,7 +3143,9 @@ public class Style {
         }
         if (!Objects.deepEquals(this.backgroundGradient,
                 other.backgroundGradient)) {
+        {
             return false;
+        }
         }
         if (!Objects.equals(this.border, other.border)) {
             return false;

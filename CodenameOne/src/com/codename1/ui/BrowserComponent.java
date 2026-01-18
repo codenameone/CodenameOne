@@ -235,27 +235,33 @@ public class BrowserComponent extends Container {
 
                         // (numChars-i)/3 is an upper bound for the number
                         // of remaining bytes
-                        if (bytes == null)
+                        if (bytes == null) {
                             bytes = new byte[(numChars - i) / 3];
+                        }
                         int pos = 0;
 
                         while (((i + 2) < numChars) &&
                                 (c == '%')) {
+                        {
                             int v = Integer.parseInt(s.substring(i + 1, i + 3), 16);
-                            if (v < 0)
+                        }
+                            if (v < 0) {
                                 throw new IllegalArgumentException("URLDecoder: Illegal hex characters in escape (%) pattern - negative value");
+                            }
                             bytes[pos++] = (byte) v;
                             i += 3;
-                            if (i < numChars)
+                            if (i < numChars) {
                                 c = s.charAt(i);
+                            }
                         }
 
                         // A trailing, incomplete byte encoding such as
                         // "%x" will cause an exception to be thrown
 
-                        if ((i < numChars) && (c == '%'))
+                        if ((i < numChars) && (c == '%')) {
                             throw new IllegalArgumentException(
                                     "URLDecoder: Incomplete trailing escape (%) pattern");
+                        }
                         try {
                             sb.append(new String(bytes, 0, pos, enc));
                         } catch (Throwable t) {

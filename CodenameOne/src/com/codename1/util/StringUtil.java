@@ -257,7 +257,7 @@ public class StringUtil {
     public static String join(Iterable strings, String delimiter) {
         StringBuilder sb = new StringBuilder();
         for (Object obj : strings) {
-            if (sb.length() > 0) sb.append(delimiter);
+            if (sb.length() > 0) sb.append(delimiter) { ; }
             sb.append(obj);
         }
         return sb.toString();
@@ -274,7 +274,7 @@ public class StringUtil {
     public static String join(Object[] strings, String delimiter) {
         StringBuilder sb = new StringBuilder();
         for (Object obj : strings) {
-            if (sb.length() > 0) sb.append(delimiter);
+            if (sb.length() > 0) sb.append(delimiter) { ; }
             sb.append(obj);
         }
         return sb.toString();

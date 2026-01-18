@@ -246,7 +246,7 @@ final class TMultiplication {
     }
 
     static void multArraysPAP(int[] aDigits, int aLen, int[] bDigits, int bLen, int[] resDigits) {
-        if (aLen == 0 || bLen == 0) return;
+        if (aLen == 0 || bLen == 0) { return; }
 
         if (aLen == 1) {
             resDigits[bLen] = multiplyByInt(resDigits, bDigits, bLen, aDigits[0]);

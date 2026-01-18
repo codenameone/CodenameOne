@@ -548,8 +548,8 @@ public class Oauth2 {
 
                     @Override
                     public final boolean equals(Object o) {
-                        if (!(o instanceof TokenRequest)) return false;
-                        if (!super.equals(o)) return false;
+                        if (!(o instanceof TokenRequest)) { return false; }
+                        if (!super.equals(o)) { return false; }
 
                         TokenRequest that = (TokenRequest) o;
                         return callbackCalled == that.callbackCalled;

@@ -149,11 +149,13 @@ public class BigInteger {
 
     @Override
     public boolean equals(Object val) {
-        if (val == this)
+        if (val == this) {
             return true;
+        }
 
-        if (!(val instanceof BigInteger))
+        if (!(val instanceof BigInteger)) {
             return false;
+        }
         BigInteger biggie = (BigInteger) val;
         return peer.equals(biggie.peer);
     }

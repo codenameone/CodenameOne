@@ -1850,7 +1850,7 @@ public class Container extends Component implements Iterable<Component> {
      * @param cmp
      */
     void addElevatedComponent(Component cmp) {
-        if (elevatedComponents == null) elevatedComponents = new HashSet<Component>();
+        if (elevatedComponents == null) elevatedComponents = new HashSet<Component>() { ; }
         elevatedComponents.add(cmp);
     }
 
@@ -1860,7 +1860,7 @@ public class Container extends Component implements Iterable<Component> {
      * @param cmp
      */
     void removeElevatedComponent(Component cmp) {
-        if (elevatedComponents == null) return;
+        if (elevatedComponents == null) { return; }
         elevatedComponents.remove(cmp);
     }
 
@@ -1898,8 +1898,9 @@ public class Container extends Component implements Iterable<Component> {
         g.translate(-absX, -absY);
 
         if (elevatedComponents != null && !elevatedComponents.isEmpty()) {
-            if (_tmpRenderingElevatedComponents == null)
+            if (_tmpRenderingElevatedComponents == null) {
                 _tmpRenderingElevatedComponents = new ArrayList<Component>(elevatedComponents);
+            }
             else {
                 _tmpRenderingElevatedComponents.clear();
                 _tmpRenderingElevatedComponents.addAll(elevatedComponents);
@@ -1912,12 +1913,12 @@ public class Container extends Component implements Iterable<Component> {
                 int clipW = g.getClipWidth();
                 int shadowX = relativeX + child.calculateShadowOffsetX();
                 int shadowW = child.calculateShadowWidth();
-                if (shadowX + shadowW <= clipX || shadowX >= clipX + clipW) continue;
+                if (shadowX + shadowW <= clipX || shadowX >= clipX + clipW) { continue; }
                 int clipY = g.getClipY();
                 int clipH = g.getClipHeight();
                 int shadowY = relativeY + child.calculateShadowOffsetY();
                 int shadowH = child.calculateShadowHeight();
-                if (shadowY + shadowH <= clipY || shadowY >= clipY + clipH) continue;
+                if (shadowY + shadowH <= clipY || shadowY >= clipY + clipH) { continue; }
 
 
                 if (!useIntersection || Rectangle.intersects(child.getAbsoluteX() + child.getScrollX() + child.calculateShadowOffsetX(),
@@ -1926,14 +1927,18 @@ public class Container extends Component implements Iterable<Component> {
                         child.calculateShadowHeight(),
                         intersectionX, intersectionY, intersectionWidth, intersectionHeight)
                 ) {
+                {
                     if (!useIntersection) {
                         child.renderedElevation = child.getStyle().getElevation();
+                }
                         child.renderedElevationComponentIndex = nextElevationComponentIndex++;
                     }
                     if (!useIntersection || elevationThreshold < 0 ||
                             (above && (elevationThreshold < child.renderedElevation || elevationThreshold == child.renderedElevation && elevationComponentIndexThreshold < child.renderedElevationComponentIndex)) ||
                             (!above && (elevationThreshold > child.renderedElevation || elevationThreshold == child.renderedElevation && elevationComponentIndexThreshold > child.renderedElevationComponentIndex))) {
+                    {
                         g.translate(absX, absY);
+                    }
                         child.paintShadows(impl.getComponentScreenGraphics(this, g), child.getRelativeX(this), child.getRelativeY(this));
                         g.translate(-absX, -absY);
                         int tx = child.getParent().getRelativeX(this) + child.getScrollX();
@@ -1956,7 +1961,7 @@ public class Container extends Component implements Iterable<Component> {
                 paintOnTopLoop:
                 while (cnt != this && cnt != null) {
                     Layout cntLayout = cnt.getLayout();
-                    if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
+                    if (!foundOverlap && cntLayout.isOverlapSupported()) { foundOverlap = true; }
                     if (foundOverlap) {
                         int currCmpIndex = cnt.getComponentIndex(currCmp);
                         if (currCmpIndex >= 0) {
@@ -1971,14 +1976,18 @@ public class Container extends Component implements Iterable<Component> {
                                 if (!useIntersection || Rectangle.intersects(cntChild.getAbsoluteX() + cntChild.getScrollX(), cntChild.getAbsoluteY() + cntChild.getScrollY(), cntChild.getWidth(), cntChild.getHeight(),
                                         intersectionX, intersectionY, intersectionWidth, intersectionHeight)
                                 ) {
+                                {
                                     if (!useIntersection) {
                                         cntChild.renderedElevation = child.renderedElevation;
+                                }
                                         cntChild.renderedElevationComponentIndex = nextElevationComponentIndex++;
                                     }
                                     if (!useIntersection || elevationThreshold < 0 ||
                                             (above && (elevationThreshold < cntChild.renderedElevation || elevationThreshold == cntChild.renderedElevation && elevationComponentIndexThreshold < cntChild.renderedElevationComponentIndex)) ||
                                             (!above && (elevationThreshold > cntChild.renderedElevation || elevationThreshold == cntChild.renderedElevation && elevationComponentIndexThreshold > cntChild.renderedElevationComponentIndex))) {
+                                    {
                                         int tx = cntChild.getParent().getRelativeX(this) + cntChild.getParent().getScrollX();
+                                    }
                                         int ty = cntChild.getParent().getRelativeY(this) + cntChild.getParent().getScrollY();
                                         g.translate(tx, ty);
 
@@ -2022,7 +2031,7 @@ public class Container extends Component implements Iterable<Component> {
                 paintOnTopLoop:
                 while (cnt != this && cnt != null) {
                     Layout cntLayout = cnt.getLayout();
-                    if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
+                    if (!foundOverlap && cntLayout.isOverlapSupported()) { foundOverlap = true; }
                     if (foundOverlap) {
                         int currCmpIndex = cnt.getComponentIndex(currCmp);
                         if (currCmpIndex >= 0) {
@@ -2161,13 +2170,15 @@ public class Container extends Component implements Iterable<Component> {
 
             for (int i = startIndex; i < endIndex; i++) {
                 Component cmp2 = components.get(i);
-                if (cmp2.renderedElevation != elevation) continue;
+                if (cmp2.renderedElevation != elevation) { continue; }
                 if (Rectangle.intersects(x, y, w, h,
                         cmp2.getAbsoluteX() + cmp2.getScrollX(),
                         cmp2.getAbsoluteY() + cmp2.getScrollY(),
                         cmp2.getBounds().getSize().getWidth(),
                         cmp2.getBounds().getSize().getHeight())) {
+                {
                     cmp2.paintInternal(g, false);
+                }
                 }
             }
         }
@@ -2529,7 +2540,9 @@ public class Container extends Component implements Iterable<Component> {
         int count = getComponentCount();
         for (int i = 0; i <
                 count; i++) {
+        {
             Component c = getComponentAt(i);
+        }
             if (c.equals(cmp)) {
                 return i;
             }
@@ -2573,11 +2586,13 @@ public class Container extends Component implements Iterable<Component> {
                     Form f = getComponentForm();
                     if (f != null && f.getInvisibleAreaUnderVKB() == 0 &&
                             f.findFirstFocusable() == c) {
+                    {
                         // support this use case only if the component doesn't explicitly declare visible bounds
                         if (r == c.getBounds() && !Display.getInstance().isTouchScreenDevice()) {
                             scrollRectToVisible(new Rectangle(0, 0,
                                     c.getX() + Math.min(c.getWidth(), getWidth()),
                                     c.getY() + Math.min(c.getHeight(), getHeight())), this);
+                    }
                             return;
                         }
                     }
@@ -2712,8 +2727,10 @@ public class Container extends Component implements Iterable<Component> {
                     next.getAbsoluteY(),
                     next.getWidth(),
                     next.getHeight()))) {
+            {
                 //scrollComponentToVisible(next);
                 return true;
+            }
             } else {
                 if (!scrollOutOfBounds) {
                     scrollRectToVisible(x, y, w, h, this);
@@ -3235,7 +3252,9 @@ public class Container extends Component implements Iterable<Component> {
             int size = getComponentCount();
             for (int iter = 0; iter <
                     size; iter++) {
+            {
                 getComponentAt(iter).setCellRenderer(cellRenderer);
+            }
             }
         }
     }

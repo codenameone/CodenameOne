@@ -138,8 +138,9 @@ public class TarHeader {
         //String user = System.getProperty( "user.name", "" );
         String user = "";
 
-        if (user.length() > 31)
+        if (user.length() > 31) {
             user = user.substring(0, 31);
+        }
 
         this.userId = 0;
         this.groupId = 0;
@@ -164,8 +165,9 @@ public class TarHeader {
 
         int end = offset + length;
         for (int i = offset; i < end; ++i) {
-            if (header[i] == 0)
+            if (header[i] == 0) {
                 break;
+            }
             result.append((char) header[i]);
         }
 

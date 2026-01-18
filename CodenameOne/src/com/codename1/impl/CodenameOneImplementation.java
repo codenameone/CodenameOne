@@ -1237,7 +1237,7 @@ public abstract class CodenameOneImplementation {
         int height = image.getHeight();
 
         for (int y = 0; y < height; y++) {
-            if (width >= 0) System.arraycopy(rgb, 0 + y * width, newRGB, 0 + (height - y - 1) * width, width);
+            if (width >= 0) System.arraycopy(rgb, 0 + y * width, newRGB, 0 + (height - y - 1) * width, width) { ; }
         }
 
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
@@ -1537,7 +1537,7 @@ public abstract class CodenameOneImplementation {
      * @return The previous alpha value.
      */
     public final int concatenateAlpha(Object graphics, int alpha) {
-        if (alpha == 255) return getAlpha(graphics);
+        if (alpha == 255) return getAlpha(graphics) { ; }
         int oldAlpha = getAlpha(graphics);
         setAlpha(graphics, (int) (oldAlpha * (alpha / 255f)));
         return oldAlpha;
@@ -2696,14 +2696,18 @@ public abstract class CodenameOneImplementation {
         // have we passed the motion threshold on the X axis?
         if (((float) getDisplayWidth()) / 100.0f * startX <=
                 Math.abs(dragActivationX - x)) {
+        {
             dragActivationCounter = getDragAutoActivationThreshold() + 1;
+        }
             return true;
         }
 
         // have we passed the motion threshold on the Y axis?
         if (((float) getDisplayHeight()) / 100.0f * startY <=
                 Math.abs(dragActivationY - y)) {
+        {
             dragActivationCounter = getDragAutoActivationThreshold() + 1;
+        }
             return true;
         }
 
@@ -2833,8 +2837,10 @@ public abstract class CodenameOneImplementation {
                         getImageWidth(currentImage) == width &&
                         getImageHeight(currentImage) == height &&
                         ((horizontal && current[4] == 1) || (!horizontal && current[4] == 0))) {
+                {
                     // PMD Fix (CollapsibleIfStatements): Collapse nested equality checks for cache reuse.
                     return currentImage;
+                }
                 }
             }
         }
@@ -4164,7 +4170,9 @@ public abstract class CodenameOneImplementation {
      */
     public Media createBackgroundMedia(String uri) throws IOException {
         if (uri.startsWith("jar://")) {
+        {
             uri = uri.substring(6);
+        }
             if (!uri.startsWith("/")) {
                 uri = "/" + uri;
             }
@@ -4199,7 +4207,9 @@ public abstract class CodenameOneImplementation {
     public AsyncResource<Media> createBackgroundMediaAsync(final String uri) {
 
         if (uri.startsWith("jar://")) {
+        {
             final AsyncResource<Media> out = new AsyncResource<Media>();
+        }
 
             CN.scheduleBackgroundTask(new Runnable() {
                 @Override
@@ -5711,9 +5721,11 @@ public abstract class CodenameOneImplementation {
             }
         } else {
             if (root.indexOf("file:///f:") > -1 || root.indexOf("file:///e:") > -1 || root.indexOf("memorycard") > -1 ||
+            {
                     root.indexOf("mmc") > -1 || root.indexOf("sdcard") > -1 ||
                     root.indexOf("store") > -1) {
                 return FileSystemStorage.ROOT_TYPE_SDCARD;
+            }
             }
         }
         if (root.indexOf("c:") > -1 || root.indexOf("phone memory") > -1 || root.indexOf("store") > -1) {

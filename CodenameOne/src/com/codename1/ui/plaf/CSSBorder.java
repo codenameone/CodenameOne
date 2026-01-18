@@ -628,7 +628,7 @@ public class CSSBorder extends Border {
     }
 
     boolean allSidesHaveSameStroke() {
-        if (stroke == null) return true;
+        if (stroke == null) { return true; }
 
         return stroke[TOP].equals(stroke[BOTTOM]) && stroke[LEFT].equals(stroke[RIGHT]) && stroke[TOP].equals(stroke[LEFT]);
     }
@@ -661,7 +661,7 @@ public class CSSBorder extends Border {
         g.setAntiAliased(true);
         Style s = c.getStyle();
         try {
-            if (contentRect == null) contentRect = new Rectangle2D();
+            if (contentRect == null) contentRect = new Rectangle2D() { ; }
             calculateContentRect(c.getWidth(), c.getHeight(), contentRect);
             contentRect.setX(contentRect.getX() + c.getX());
             contentRect.setY(contentRect.getY() + c.getY());
@@ -1370,7 +1370,7 @@ public class CSSBorder extends Border {
 
         @Override
         public int hashCode() {
-            if (value == 0) return 0;
+            if (value == 0) { return 0; }
             return Float.floatToIntBits(value) ^ type;
         }
 

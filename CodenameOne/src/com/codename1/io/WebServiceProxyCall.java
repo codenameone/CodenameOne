@@ -353,7 +353,7 @@ public class WebServiceProxyCall {
         protected void readResponse(InputStream input) throws IOException {
             DataInputStream dis = new DataInputStream(input);
 
-            if (def == null) return;
+            if (def == null) { return; }
             switch (def.returnType) {
                 case TYPE_VOID:
                     return;

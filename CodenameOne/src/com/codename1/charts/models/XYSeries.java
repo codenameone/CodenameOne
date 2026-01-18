@@ -455,8 +455,10 @@ public class XYSeries {
 
             if (Math.abs((Double) indexList.get(indexList.size() - 1)
                     - (Double) indexList.get(indexList.size() - 2)) > maxXDifference)
+            {
                 maxXDifference = Math.abs((Double) indexList.get(indexList.size() - 1)
                         - (Double) indexList.get(indexList.size() - 2));
+            }
         }
 
         public double getMaxXDifference() {

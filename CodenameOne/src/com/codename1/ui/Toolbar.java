@@ -151,7 +151,9 @@ public class Toolbar extends Container {
         sideMenu = new ToolbarSideMenu();
         if (centeredDefault
                 && UIManager.getInstance().getComponentStyle("Title").getAlignment() == CENTER) {
+        {
             setTitleCentered(true);
+        }
         }
     }
 
@@ -961,13 +963,17 @@ public class Toolbar extends Container {
         if (cmp != null) {
             if (cmp == permanentRightSideMenuContainer || cmp == this
                     || cmp == rightSidemenuSouthComponent) {
+            {
                 return true;
+            }
             }
             while (cmp.getParent() != null) {
                 cmp = cmp.getParent();
                 if (cmp == permanentRightSideMenuContainer || cmp == this
                         || cmp == rightSidemenuSouthComponent) {
+                {
                     return true;
+                }
                 }
             }
         }
@@ -2330,7 +2336,7 @@ public class Toolbar extends Container {
 
                     @Override
                     public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                        if (entered || contentPane.isTensileMotionInProgress()) return;
+                        if (entered || contentPane.isTensileMotionInProgress()) { return; }
 
                         // When the content pane is resized, it may trigger a scroll event --
                         // we need to make sure that *that* scroll event doesn't trigger

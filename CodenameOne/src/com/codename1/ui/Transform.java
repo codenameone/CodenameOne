@@ -327,7 +327,7 @@ public class Transform {
      * @return True if the transform is the identity.
      */
     public boolean isIdentity() {
-        if (type == TYPE_IDENTITY) return true;
+        if (type == TYPE_IDENTITY) { return true; }
         if (this.equals(IDENTITY())) {
             setIdentity();
             return true;

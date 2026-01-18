@@ -102,8 +102,9 @@ public class InflaterInputStream extends FilterInputStream {
         int n = 0;
         inflater.setOutput(b, off, len);
         while (!eof) {
-            if (inflater.availIn == 0)
+            if (inflater.availIn == 0) {
                 fill();
+            }
             int err = inflater.inflate(JZlib.Z_NO_FLUSH);
             n += inflater.nextOutIndex - off;
             off = inflater.nextOutIndex;
@@ -113,13 +114,15 @@ public class InflaterInputStream extends FilterInputStream {
                 case JZlib.Z_STREAM_END:
                 case JZlib.Z_NEED_DICT:
                     eof = true;
-                    if (err == JZlib.Z_NEED_DICT)
+                    if (err == JZlib.Z_NEED_DICT) {
                         return -1;
+                    }
                     break;
                 default:
             }
-            if (inflater.availOut == 0)
+            if (inflater.availOut == 0) {
                 break;
+            }
         }
         return n;
     }
@@ -166,10 +169,12 @@ public class InflaterInputStream extends FilterInputStream {
     @Override
     public void close() throws IOException {
         if (!closed) {
-            if (myinflater)
+            if (myinflater) {
                 inflater.end();
-            if (close_in)
+            }
+            if (close_in) {
                 in.close();
+            }
             closed = true;
         }
     }
@@ -182,7 +187,9 @@ public class InflaterInputStream extends FilterInputStream {
         if (len == -1) {
             if (inflater.istate.wrap == 0 &&
                     !inflater.finished()) {
+            {
                 buf[0] = 0;
+            }
                 len = 1;
             } else if (inflater.istate.was != -1) {  // in reading trailer
                 throw new IOException("footer is not found");
@@ -216,8 +223,9 @@ public class InflaterInputStream extends FilterInputStream {
     }
 
     public byte[] getAvailIn() {
-        if (inflater.availIn <= 0)
+        if (inflater.availIn <= 0) {
             return null;
+        }
         byte[] tmp = new byte[inflater.availIn];
         System.arraycopy(inflater.nextIn, inflater.nextInIndex,
                 tmp, 0, inflater.availIn);
@@ -238,14 +246,16 @@ public class InflaterInputStream extends FilterInputStream {
         byte[] b1 = new byte[1];
         do {
             int i = in.read(b1);
-            if (i <= 0)
+            if (i <= 0) {
                 throw new IOException("no input");
+            }
             inflater.setInput(b1);
             int err = inflater.inflate(JZlib.Z_NO_FLUSH);
-            if (err != 0/*Z_OK*/)
+            if (err != 0/*Z_OK*/) {
                 throw new IOException(inflater.msg);
+            }
         }
-        while (inflater.istate.inParsingHeader());
+        while (inflater.istate.inParsingHeader()) { ; }
     }
 
     public Inflater getInflater() {

@@ -122,8 +122,8 @@ public class GoogleConnect extends Login {
 
         @Override
         public final boolean equals(Object o) {
-            if (!(o instanceof ValidateTokenConnectionRequest)) return false;
-            if (!super.equals(o)) return false;
+            if (!(o instanceof ValidateTokenConnectionRequest)) { return false; }
+            if (!super.equals(o)) { return false; }
 
             ValidateTokenConnectionRequest that = (ValidateTokenConnectionRequest) o;
             return Arrays.equals(retval, that.retval);

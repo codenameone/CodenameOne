@@ -155,13 +155,15 @@ public final class LinkHandler {
         int[] bounds = new int[]{x, y, width, height, x + width, y + height};
 
         HashMap<String, int[]> values = new HashMap<String, int[]>(4);
-        if (temporary)
+        if (temporary) {
             values.put(key, bounds);
+        }
         VALUES_TEMP.add(values);
 
         values = new HashMap<String, int[]>(4);
-        if (!temporary)
+        if (!temporary) {
             values.put(key, bounds);
+        }
         VALUES.add(values);
 
         return true;
@@ -180,8 +182,9 @@ public final class LinkHandler {
     public synchronized static boolean clearBounds(Object layout, String key) {
         for (int i = LAYOUTS.size() - 1; i >= 0; i--) {
             Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));
-            if (l == layout)
+            if (l == layout) {
                 return VALUES.get(i).remove(key) != null;
+            }
         }
         return false;
     }

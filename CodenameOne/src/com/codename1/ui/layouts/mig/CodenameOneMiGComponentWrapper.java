@@ -157,8 +157,9 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
             case PlatformDefaults.BASE_SCALE_FACTOR:
 
                 Float s = isHor ? PlatformDefaults.getHorizontalScaleFactor() : PlatformDefaults.getVerticalScaleFactor();
-                if (s == null)
+                if (s == null) {
                     s = Float.valueOf(1.0f);
+                }
                 return s * (isHor ? getHorizontalScreenDPI() : getVerticalScreenDPI()) / (float) PlatformDefaults.getDefaultDPI();
 
             default:
@@ -321,8 +322,9 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
 
     @Override
     public int getComponentType(boolean disregardScrollPane) {
-        if (compType == TYPE_UNSET)
+        if (compType == TYPE_UNSET) {
             compType = checkType(disregardScrollPane);
+        }
 
         return compType;
     }
@@ -332,12 +334,14 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         Dimension d = c.getPreferredSize();
         int hash = (d.getWidth() << 10) + (d.getHeight() << 15);
 
-        if (c.isVisible())
+        if (c.isVisible()) {
             hash += 1324511;
+        }
 
         String id = getLinkId();
-        if (id != null)
+        if (id != null) {
             hash += id.hashCode();
+        }
 
         return hash;
     }
@@ -382,8 +386,9 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
 
     @Override
     public final boolean equals(Object o) {
-        if (!(o instanceof ComponentWrapper))
+        if (!(o instanceof ComponentWrapper)) {
             return false;
+        }
 
         return c.equals(((ComponentWrapper) o).getComponent());
     }

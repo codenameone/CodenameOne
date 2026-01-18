@@ -118,8 +118,8 @@ class ShareForm extends Form {
 
         @Override
         public final boolean equals(Object o) {
-            if (!(o instanceof BackCommand)) return false;
-            if (!super.equals(o)) return false;
+            if (!(o instanceof BackCommand)) { return false; }
+            if (!super.equals(o)) { return false; }
 
             BackCommand that = (BackCommand) o;
             return (contacts == null ? that.contacts == null : contacts.equals(that.contacts));

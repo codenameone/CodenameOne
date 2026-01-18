@@ -271,15 +271,19 @@ public class DateFormat extends Format {
      */
     @Override
     public boolean equals(Object obj) {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null)
+        }
+        if (obj == null) {
             return false;
-        if (getClass() != obj.getClass())
+        }
+        if (getClass() != obj.getClass()) {
             return false;
+        }
         DateFormat other = (DateFormat) obj;
-        if (dateStyle != other.dateStyle)
+        if (dateStyle != other.dateStyle) {
             return false;
+        }
         return timeStyle == other.timeStyle;
     }
 

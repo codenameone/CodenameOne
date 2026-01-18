@@ -984,7 +984,9 @@ public final class Result {
         // if the last element of expression is a glob, handle it here
         if ((tokens.size() > 1)
                 && SELECT_GLOB.equals(tokens.get(tokens.size() - 2))) {
+        {
             return obj.getDescendants(key);
+        }
         }
         // if the last element of expression is an attribute, handle it here
         if (key.startsWith("@")) {
@@ -1035,7 +1037,9 @@ public final class Result {
             final String tok1 = (String) tokens.get(i);
             if (tok1.length() == 1
                     && ResultTokenizer.isDelimiter(tok1.charAt(0))) {
+            {
                 continue;
+            }
             }
             if (tok1.length() == 2) {
                 if (tok1.equals(SELECT_GLOB)) {

@@ -79,14 +79,16 @@ public class GZIPHeader {
     }
 
     public void setOS(int os) {
-        if ((0 <= os && os <= 13) || os == 255)
+        if ((0 <= os && os <= 13) || os == 255) {
             this.os = os;
-        else
+        }
+        else {
             throw new IllegalArgumentException("os: " + os);
+        }
     }
 
     public String getName() {
-        if (name == null) return "";
+        if (name == null) { return ""; }
         try {
             return new String(name, "ISO-8859-1");
         } catch (UnsupportedEncodingException e) {
@@ -103,7 +105,7 @@ public class GZIPHeader {
     }
 
     public String getComment() {
-        if (comment == null) return "";
+        if (comment == null) { return ""; }
         try {
             return new String(comment, "ISO-8859-1");
         } catch (UnsupportedEncodingException e) {

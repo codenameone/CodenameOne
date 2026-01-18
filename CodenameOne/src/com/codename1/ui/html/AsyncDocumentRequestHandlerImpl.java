@@ -50,7 +50,9 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
     public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
         String url = docInfo.getUrl();
         if (url.startsWith("jar://") || url.startsWith("res://") || url.startsWith("local://")) {
+        {
             super.resourceRequestedAsync(docInfo, callback);
+        }
             return;
         }
         visitingURL(url);
@@ -68,7 +70,9 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
     private InputStream resourceRequested(final DocumentInfo docInfo, final IOCallback callback) {
         try {
             if (docInfo.getUrl().startsWith("file://")) {
+            {
                 String url = docInfo.getUrl();
+            }
 
                 // trim anchors
                 int hash = url.indexOf('#');
@@ -170,8 +174,8 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
 
         @Override
         public final boolean equals(Object o) {
-            if (!(o instanceof AsyncDocumentConnectionRequest)) return false;
-            if (!super.equals(o)) return false;
+            if (!(o instanceof AsyncDocumentConnectionRequest)) { return false; }
+            if (!super.equals(o)) { return false; }
 
             AsyncDocumentConnectionRequest that = (AsyncDocumentConnectionRequest) o;
             return (docInfo == null ? that.docInfo == null : docInfo.equals(that.docInfo)) && (callback == null ? that.callback == null : callback.equals(that.callback)) && Arrays.equals(response, that.response);

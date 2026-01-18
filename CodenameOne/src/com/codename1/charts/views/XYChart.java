@@ -128,8 +128,10 @@ public abstract class XYChart extends AbstractChart {
                 mRenderer.getTextTypeface()))
                 || paint.getTypeface().getFace() != mRenderer.getTextTypefaceName()
                 || paint.getTypeface().getStyle() != mRenderer.getTextTypefaceStyle()) {
+        {
             if (mRenderer.getTextTypeface() != null) {
                 paint.setTypeface(mRenderer.getTextTypeface());
+        }
             } else {
                 paint.setTypeface(Font.createSystemFont(mRenderer.getTextTypefaceName(),
                         mRenderer.getTextTypefaceStyle(), Font.SIZE_SMALL));
@@ -623,9 +625,11 @@ public abstract class XYChart extends AbstractChart {
             for (int k = 0; k < points.size(); k += 2) {
                 if (k == 2 && (Math.abs(points.get(2) - points.get(0)) > renderer.getDisplayChartValuesDistance()
                         || Math.abs(points.get(3) - points.get(1)) > renderer.getDisplayChartValuesDistance())) { // PMD Fix: CollapsibleIfStatements combined nested checks
+                {
                     // first point
                     drawText(canvas, getLabel(renderer.getChartValuesFormat(), series.getY(startIndex)),
                             points.get(0), points.get(1) - renderer.getChartValuesSpacing(), paint, 0);
+                }
                     // second point
                     drawText(canvas,
                             getLabel(renderer.getChartValuesFormat(), series.getY(startIndex + 1)),
@@ -688,7 +692,7 @@ public abstract class XYChart extends AbstractChart {
      * @param inverse if the inverse transform needs to be applied
      */
     private void transform(Canvas canvas, float angle, boolean inverse) {
-        if (mCenter == null) return;
+        if (mCenter == null) { return; }
         if (inverse) {
             canvas.scale(1 / mScale, mScale);
             canvas.translate(mTranslate, -mTranslate);
@@ -904,7 +908,9 @@ public abstract class XYChart extends AbstractChart {
         double realMaxY = mRenderer.getYAxisMax(scale);
         if (!mRenderer.isMinXSet(scale) || !mRenderer.isMaxXSet(scale) || !mRenderer.isMinYSet(scale)
                 || !mRenderer.isMaxYSet(scale)) {
+        {
             double[] calcRange = getCalcRange(scale);
+        }
             if (calcRange != null) {
                 realMinX = calcRange[0];
                 realMaxX = calcRange[1];
@@ -929,7 +935,9 @@ public abstract class XYChart extends AbstractChart {
         double realMaxY = mRenderer.getYAxisMax(scale);
         if (!mRenderer.isMinXSet(scale) || !mRenderer.isMaxXSet(scale) || !mRenderer.isMinYSet(scale)
                 || !mRenderer.isMaxYSet(scale)) {
+        {
             double[] calcRange = getCalcRange(scale);
+        }
             realMinX = calcRange[0];
             realMaxX = calcRange[1];
             realMinY = calcRange[2];
@@ -947,13 +955,14 @@ public abstract class XYChart extends AbstractChart {
 
     @Override
     public SeriesSelection getSeriesAndPointForScreenCoordinate(final Point screenPoint) {
-        if (clickableAreas != null)
+        if (clickableAreas != null) {
             for (int seriesIndex = clickableAreas.size() - 1; seriesIndex >= 0; seriesIndex--) {
                 // series 0 is drawn first. Then series 1 is drawn on top, and series 2
                 // on top of that.
                 // we want to know what the user clicked on, so traverse them in the
                 // order they appear on the screen.
                 int pointIndex = 0;
+        }
                 if (clickableAreas.get(seriesIndex) != null) {
                     Rectangle2D rectangle;
                     for (ClickableArea area : clickableAreas.get(seriesIndex)) {

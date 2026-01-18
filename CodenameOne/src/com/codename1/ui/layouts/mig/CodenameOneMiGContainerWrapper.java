@@ -52,8 +52,9 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
     public ComponentWrapper[] getComponents() {
         Container c = (Container) getComponent();
         ComponentWrapper[] cws = new ComponentWrapper[c.getComponentCount()];
-        for (int i = 0; i < cws.length; i++)
+        for (int i = 0; i < cws.length; i++) {
             cws[i] = new CodenameOneMiGComponentWrapper(c.getComponentAt(i));
+        }
         return cws;
     }
 

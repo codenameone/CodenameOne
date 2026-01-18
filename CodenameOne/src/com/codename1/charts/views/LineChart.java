@@ -117,7 +117,9 @@ public class LineChart extends XYChart {
 
                 if (fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE
                         || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW) {
+                {
                     List<Float> fillPoints = new ArrayList<Float>();
+                }
                     if (range == null) {
                         fillPoints.addAll(points);
                     } else {
@@ -133,7 +135,9 @@ public class LineChart extends XYChart {
                             && fillPoints.get(1) < referencePoint
                             || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW
                             && fillPoints.get(1) > referencePoint) {
+                    {
                         boundsPoints.add(fillPoints.get(0));
+                    }
                         boundsPoints.add(fillPoints.get(1));
                         add = true;
                     }
@@ -144,14 +148,18 @@ public class LineChart extends XYChart {
 
                         if (prevValue < referencePoint && value > referencePoint || prevValue > referencePoint
                                 && value < referencePoint) {
+                        {
                             float prevX = fillPoints.get(i - 3);
+                        }
                             float x = fillPoints.get(i - 1);
                             boundsPoints.add(prevX + (x - prevX) * (referencePoint - prevValue)
                                     / (value - prevValue));
                             boundsPoints.add(referencePoint);
                             if (fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE && value > referencePoint
                                     || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW && value < referencePoint) {
+                            {
                                 i += 2;
+                            }
                                 add = false;
                             } else {
                                 boundsPoints.add(x);
@@ -162,7 +170,9 @@ public class LineChart extends XYChart {
                             if (add || fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE
                                     && value < referencePoint || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW
                                     && value > referencePoint) {
+                            {
                                 boundsPoints.add(fillPoints.get(i - 1));
+                            }
                                 boundsPoints.add(value);
                             }
                         }
@@ -213,7 +223,7 @@ public class LineChart extends XYChart {
         }
 
         int length = endIndex - startIndex;
-        if (length < 2) return;
+        if (length < 2) { return; }
 
         // Logic from original:
         // 1. fillPoints.set(0, fillPoints.get(0) + 1);
@@ -224,7 +234,7 @@ public class LineChart extends XYChart {
 
         float startX = points.get(startIndex) + 1;
         float startY = points.get(startIndex + 1);
-        if (startY < 0) startY = 0;
+        if (startY < 0) { startY = 0; }
 
         // Since we need to form segments (p1, p2) for calculateDrawPoints
 
@@ -236,7 +246,7 @@ public class LineChart extends XYChart {
             p1y = startY;
             p2x = points.get(startIndex + 2);
             p2y = points.get(startIndex + 3);
-            if (p2y < 0) p2y = 0;
+            if (p2y < 0) { p2y = 0; }
 
             tempDrawPoints = calculateDrawPoints(p1x, p1y, p2x, p2y, height, width);
             path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
@@ -245,11 +255,11 @@ public class LineChart extends XYChart {
             for (int i = 4; i < length; i += 2) {
                 p1x = points.get(startIndex + i - 2);
                 p1y = points.get(startIndex + i - 1);
-                if (p1y < 0) p1y = 0;
+                if (p1y < 0) { p1y = 0; }
 
                 p2x = points.get(startIndex + i);
                 p2y = points.get(startIndex + i + 1);
-                if (p2y < 0) p2y = 0;
+                if (p2y < 0) { p2y = 0; }
 
                 tempDrawPoints = calculateDrawPoints(p1x, p1y, p2x, p2y, height, width);
                 path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
@@ -266,12 +276,12 @@ public class LineChart extends XYChart {
         float lastX = points.get(endIndex - 2);
         float nextX = lastX;
         float nextY = referencePoint;
-        if (nextY < 0) nextY = 0;
+        if (nextY < 0) { nextY = 0; }
 
         // We need previous point (p1) to calculate draw points segment.
         p1x = points.get(endIndex - 2); // original X
         p1y = points.get(endIndex - 1); // original Y
-        if (p1y < 0) p1y = 0;
+        if (p1y < 0) { p1y = 0; }
 
         tempDrawPoints = calculateDrawPoints(p1x, p1y, nextX, nextY, height, width);
         path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
@@ -283,7 +293,7 @@ public class LineChart extends XYChart {
 
         nextX = startX; // This is StartX (modified +1)
         nextY = referencePoint;
-        if (nextY < 0) nextY = 0;
+        if (nextY < 0) { nextY = 0; }
 
         tempDrawPoints = calculateDrawPoints(p1x, p1y, nextX, nextY, height, width);
         path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);

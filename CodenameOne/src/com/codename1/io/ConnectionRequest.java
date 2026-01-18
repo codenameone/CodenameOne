@@ -740,7 +740,9 @@ public class ConnectionRequest implements IOProgressListener {
 
         if (!post && (cacheMode == CachingMode.MANUAL || cacheMode == CachingMode.SMART
                 || cacheMode == CachingMode.OFFLINE_FIRST)) {
+        {
             String msince = Preferences.get("cn1MSince" + createRequestURL(), null);
+        }
             if (msince != null) {
                 impl.setHeader(connection, "If-Modified-Since", msince);
             } else {
@@ -956,7 +958,9 @@ public class ConnectionRequest implements IOProgressListener {
                     // for checking the SSL certificates - otherwise it will send
                     // empty POST bodies.
                     !Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
+            {
                 sslCertificates = getSSLCertificatesImpl(connection, url);
+            }
                 checkSSLCertificates(sslCertificates);
                 if (shouldStop()) {
                     return true;
@@ -1022,11 +1026,15 @@ public class ConnectionRequest implements IOProgressListener {
                 // redirect to new location
                 if (followRedirects && (responseCode == 301 || responseCode == 302
                         || responseCode == 303 || responseCode == 307)) {
+                {
                     String uri = impl.getHeaderField("location", connection);
+                }
 
                     if (!(uri.startsWith("http://") || uri.startsWith("https://"))) {
+                    {
                         // relative URI's in the location header are illegal but some sites mistakenly use them
                         url = Util.relativeToAbsolute(url, uri);
+                    }
                     } else {
                         url = uri;
                     }
@@ -1063,7 +1071,9 @@ public class ConnectionRequest implements IOProgressListener {
 
             if (cacheMode == CachingMode.SMART || cacheMode == CachingMode.MANUAL
                     || cacheMode == CachingMode.OFFLINE_FIRST) {
+            {
                 String last = getHeader(connection, "Last-Modified");
+            }
                 String etag = getHeader(connection, "ETag");
                 Preferences.set("cn1MSince" + createRequestURL(), last);
                 Preferences.set("cn1Etag" + createRequestURL(), etag);
@@ -1086,7 +1096,9 @@ public class ConnectionRequest implements IOProgressListener {
                 }
                 if (!post && (cacheMode == CachingMode.SMART || cacheMode == CachingMode.OFFLINE_FIRST)
                         && destinationFile == null && destinationStorage == null) {
+                {
                     byte[] d = Util.readInputStream(input);
+                }
                     OutputStream os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
                     os.write(d);
                     os.close();
@@ -1095,7 +1107,7 @@ public class ConnectionRequest implements IOProgressListener {
                     readResponse(input);
                 }
                 if (shouldAutoCloseResponse()) {
-                    if (input != null) input.close();
+                    if (input != null) input.close() { ; }
                 }
             }
         } finally {
@@ -1436,7 +1448,9 @@ public class ConnectionRequest implements IOProgressListener {
         }
         if (Display.isInitialized() && !Display.getInstance().isMinimized() &&
                 Dialog.show("Exception", err.toString() + ": for URL " + url + "\n" + err.getMessage(), "Retry", "Cancel")) {
+        {
             retry();
+        }
         } else {
             retrying = false;
             killed = true;
@@ -1482,7 +1496,7 @@ public class ConnectionRequest implements IOProgressListener {
         SSLCertificate[] out = new SSLCertificate[sslCerts.length];
         int i = 0;
         for (String sslCertStr : sslCerts) {
-            if (sslCertStr == null) continue;
+            if (sslCertStr == null) { continue; }
             SSLCertificate sslCert = new SSLCertificate();
             int splitPos = sslCertStr.indexOf(':');
             if (splitPos == -1) {
@@ -1526,7 +1540,9 @@ public class ConnectionRequest implements IOProgressListener {
         Log.p("Unhandled error code: " + code + " for " + url);
         if (Display.isInitialized() && !Display.getInstance().isMinimized() &&
                 Dialog.show("Error", code + ": " + message, "Retry", "Cancel")) {
+        {
             retry();
+        }
         } else {
             retrying = false;
             if (!isReadResponseForErrors()) {

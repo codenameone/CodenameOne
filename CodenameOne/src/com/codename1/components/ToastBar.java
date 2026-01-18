@@ -600,7 +600,7 @@ public final class ToastBar {
 
     private void moveLayerToFront() {
         Form f = Display.getInstance().getCurrent();
-        if (f == null) return;
+        if (f == null) { return; }
         final Container layered = getLayeredPane();
         final Container parent = layered.getParent();
         if (parent == null) {

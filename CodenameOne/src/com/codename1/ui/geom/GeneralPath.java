@@ -262,17 +262,17 @@ public final class GeneralPath implements Shape {
      * @see #createFromPool()
      */
     public static synchronized void recycle(GeneralPath p) {
-        if (pathPool().size() >= MAX_POOL_SIZE || p == null) return;
+        if (pathPool().size() >= MAX_POOL_SIZE || p == null) { return; }
         pathPool.add(p);
     }
 
     private static synchronized void recycle(Rectangle r) {
-        if (rectPool.size() >= MAX_POOL_SIZE || r == null) return;
+        if (rectPool.size() >= MAX_POOL_SIZE || r == null) { return; }
         rectPool.add(r);
     }
 
     private static synchronized void recycle(float[] a) {
-        if (floatPool().size() >= MAX_POOL_SIZE || a == null) return;
+        if (floatPool().size() >= MAX_POOL_SIZE || a == null) { return; }
         floatPool.add(a);
     }
 
@@ -519,7 +519,7 @@ public final class GeneralPath implements Shape {
                 recycle(p);
             }
         }
-        if (shape == this) return true;
+        if (shape == this) { return true; }
         if (shape instanceof Rectangle) {
             Rectangle r = (Rectangle) shape;
             Rectangle tmpRect = createRectFromPool();
@@ -1054,7 +1054,9 @@ public final class GeneralPath implements Shape {
                     if (types[typeSize - 1] != PathIterator.SEG_CLOSE
                             && points[pointSize - 2] == coords[0]
                             && points[pointSize - 1] == coords[1]) {
+                    {
                         break;
+                    }
                     }
                     // NO BREAK;
                 case PathIterator.SEG_LINETO:
@@ -2448,7 +2450,9 @@ public final class GeneralPath implements Shape {
                     (x > x1 && x > x2) ||
                     (y > y1 && y > y2) ||
                     (isZero(x1 - x2))) {
+            {
                 return 0;
+            }
             }
 
             // DOWN
@@ -2485,7 +2489,9 @@ public final class GeneralPath implements Shape {
                     (x > x1 && x > cx && x > x2) ||
                     (y > y1 && y > cy && y > y2) ||
                     (x1 == cx && cx == x2)) {
+            {
                 return 0;
+            }
             }
 
             // DOWN
@@ -2516,7 +2522,9 @@ public final class GeneralPath implements Shape {
                     (x > x1 && x > cx1 && x > cx2 && x > x2) ||
                     (y > y1 && y > cy1 && y > cy2 && y > y2) ||
                     (x1 == cx1 && cx1 == cx2 && cx2 == x2)) {
+            {
                 return 0;
+            }
             }
 
             // DOWN
@@ -2699,7 +2707,9 @@ public final class GeneralPath implements Shape {
             if ((rx2 < x1 && rx2 < x2) ||
                     (rx1 > x1 && rx1 > x2) ||
                     (ry1 > y1 && ry1 > y2)) {
+            {
                 return 0;
+            }
             }
 
             // DOWN
@@ -2767,7 +2777,9 @@ public final class GeneralPath implements Shape {
             if ((rx2 < x1 && rx2 < cx && rx2 < x2) ||
                     (rx1 > x1 && rx1 > cx && rx1 > x2) ||
                     (ry1 > y1 && ry1 > cy && ry1 > y2)) {
+            {
                 return 0;
+            }
             }
 
             // DOWN ---------------------------------------------------------------
@@ -2837,7 +2849,9 @@ public final class GeneralPath implements Shape {
             if ((rx2 < x1 && rx2 < cx1 && rx2 < cx2 && rx2 < x2) ||
                     (rx1 > x1 && rx1 > cx1 && rx1 > cx2 && rx1 > x2) ||
                     (ry1 > y1 && ry1 > cy1 && ry1 > cy2 && ry1 > y2)) {
+            {
                 return 0;
+            }
             }
 
             // DOWN

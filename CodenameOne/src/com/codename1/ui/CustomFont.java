@@ -340,8 +340,9 @@ class CustomFont extends Font {
      */
     @Override
     public int stringWidth(String str) {
-        if (str == null || str.length() == 0)
+        if (str == null || str.length() == 0) {
             return 0;
+        }
         return substringWidth(str, 0, str.length());
     }
 

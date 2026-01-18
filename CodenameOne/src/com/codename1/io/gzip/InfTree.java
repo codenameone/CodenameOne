@@ -282,14 +282,15 @@ final class InfTree {
 
         // Find minimum and maximum length, bound *m by those
         l = m[0];
-        for (j = 1; j <= BMAX; j++)
-            if (c[j] != 0) break;
+        for (j = 1; j <= BMAX; j++) {
+            if (c[j] != 0) { break; }
+        }
         k = j;                        // minimum code length
         if (l < j) {
             l = j;
         }
         for (i = BMAX; i != 0; i--) {
-            if (c[i] != 0) break;
+            if (c[i] != 0) { break; }
         }
         g = i;                        // maximum code length
         if (l > i) {
@@ -327,7 +328,7 @@ final class InfTree {
             }
             p++;
         }
-        while (++i < n);
+        while (++i < n) { ; }
         n = x[g];                     // set n to length of v
 
         // Generate the Huffman codes and for each, make the table entries
@@ -357,8 +358,9 @@ final class InfTree {
                         xp = k;
                         if (j < z) {
                             while (++j < z) {        // try smaller tables up to z bits
-                                if ((f <<= 1) <= c[++xp])
+                                if ((f <<= 1) <= c[++xp]) {
                                     break;              // enough codes to use up j bits
+                                }
                                 f -= c[xp];           // else deduct codes from patterns
                             }
                         }

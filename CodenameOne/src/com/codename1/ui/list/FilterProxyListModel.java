@@ -188,10 +188,13 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
 
         // Insertion sort on smallest arrays
         if (length < 7) {
-            for (int i = low; i < high; i++)
+            for (int i = low; i < high; i++) {
                 for (int j = i; j > low &&
                         compareObj(dest[j - 1], dest[j], ascending) > 0; j--)
+                {
                     swap(dest, j, j - 1);
+                }
+            }
             return;
         }
 
@@ -213,10 +216,12 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
 
         // Merge sorted halves (now in src) into dest
         for (int i = destLow, p = low, q = mid; i < destHigh; i++) {
-            if (q >= high || p < mid && compareObj(src[p], src[q], ascending) <= 0)
+            if (q >= high || p < mid && compareObj(src[p], src[q], ascending) <= 0) {
                 dest[i] = src[p++];
-            else
+            }
+            else {
                 dest[i] = src[q++];
+            }
         }
     }
 

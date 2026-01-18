@@ -132,7 +132,7 @@ public class Property<T, K> extends PropertyBase<T, K> {
      */
     @Override
     public int hashCode() {
-        if (value == null) return 0;
+        if (value == null) { return 0; }
         return value.hashCode();
     }
 

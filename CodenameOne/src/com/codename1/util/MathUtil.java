@@ -544,7 +544,9 @@ public abstract class MathUtil {
         /* +-NaN return x+y */
         if (ix > 0x7ff00000 || ((ix == 0x7ff00000) && (lx != 0))
                 || iy > 0x7ff00000 || ((iy == 0x7ff00000) && (ly != 0))) {
+        {
             return x + y;
+        }
         }
 
         /* determine if y is an odd int when x < 0
@@ -942,7 +944,9 @@ public abstract class MathUtil {
         if (ix >= 0x44100000) {  /* if |x| >= 2^66 */
             if (ix > 0x7ff00000
                     || (ix == 0x7ff00000 && ((int) (Double.doubleToLongBits(x) & LO_MASK) != 0))) {
+            {
                 return x + x;   /* NaN */
+            }
             }
             if (hx > 0) {
                 return atanhi[3] + atanlo[3];
@@ -1032,7 +1036,9 @@ public abstract class MathUtil {
 
         if (((ix | ((lx | -lx) >> 31)) > 0x7ff00000)
                 || ((iy | ((ly | -ly) >> 31)) > 0x7ff00000)) /* x or y is NaN */ {
+        {
             return x + y;
+        }
         }
         if ((hx - 0x3ff00000 | lx) == 0) {
             return ieee754Atan(y);   /* x=1.0 */
@@ -1343,10 +1349,12 @@ public abstract class MathUtil {
      * @since 1.4
      */
     public static int compare(float f1, float f2) {
-        if (f1 < f2)
+        if (f1 < f2) {
             return -1;           // Neither val is NaN, thisVal is smaller
-        if (f1 > f2)
+        }
+        if (f1 > f2) {
             return 1;            // Neither val is NaN, thisVal is larger
+        }
 
         // Cannot use floatToRawIntBits because of possibility of NaNs.
         int thisBits = Float.floatToIntBits(f1);
@@ -1376,10 +1384,12 @@ public abstract class MathUtil {
      * @since 1.4
      */
     public static int compare(double d1, double d2) {
-        if (d1 < d2)
+        if (d1 < d2) {
             return -1;           // Neither val is NaN, thisVal is smaller
-        if (d1 > d2)
+        }
+        if (d1 > d2) {
             return 1;            // Neither val is NaN, thisVal is larger
+        }
 
         // Cannot use doubleToRawLongBits because of possibility of NaNs.
         long thisBits = Double.doubleToLongBits(d1);

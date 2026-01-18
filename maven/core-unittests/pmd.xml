@@ -7,5 +7,6 @@
     <rule ref="rulesets/java/quickstart.xml">
         <exclude name="UselessParentheses"/>
         <exclude name="ReturnEmptyCollectionRatherThanNull"/>
+        <exclude name="LooseCoupling"/>
     </rule>
 </ruleset>

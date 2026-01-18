@@ -919,14 +919,18 @@ public class ImageViewer extends Component {
      * @param panPositionY A float value between 0 and 1 to set the image y position
      */
     public void setZoom(float zoom, float panPositionX, float panPositionY) {
-        if (panPositionX > 1)
+        if (panPositionX > 1) {
             panPositionX = 1;
-        if (panPositionX < 0)
+        }
+        if (panPositionX < 0) {
             panPositionX = 0;
-        if (panPositionY > 1)
+        }
+        if (panPositionY > 1) {
             panPositionY = 1;
-        if (panPositionY < 0)
+        }
+        if (panPositionY < 0) {
             panPositionY = 0;
+        }
         this.panPositionX = panPositionX;
         this.panPositionY = panPositionY;
         if (animateZoom) {

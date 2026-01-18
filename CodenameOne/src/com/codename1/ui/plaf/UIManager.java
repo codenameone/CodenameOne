@@ -413,12 +413,12 @@ public class UIManager {
         if (id == null || id.length() == 0) {
             return null;
         }
-        if (themeProps == null) return null;
+        if (themeProps == null) { return null; }
         String iconUIID = id + "Icon";
         // Check the derive property of this icon style to make sure it points to id.
         // (The icon style must derive the main style).
         String baseStyle = (String) themeProps.get(iconUIID + ".derive");
-        if (!id.equals(baseStyle)) return null;
+        if (!id.equals(baseStyle)) { return null; }
         return iconUIID;
 
     }
@@ -1872,8 +1872,8 @@ public class UIManager {
             themeProps.remove(id + Style.FONT);
         }
 
-        if (selected) selectedStyles.remove(id);
-        else this.styles.remove(id);
+        if (selected) selectedStyles.remove(id) { ; }
+        else { this.styles.remove(id); }
 
         return getComponentStyleImpl(originalId, selected, prefix);
 
@@ -2049,8 +2049,10 @@ public class UIManager {
                 if (id.indexOf("Form") > -1) {
                     if ((im.getWidth() != Display.getInstance().getDisplayWidth() ||
                             im.getHeight() != Display.getInstance().getDisplayHeight()) && style.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED && accessible) {
+                    {
                         im.scale(Display.getInstance().getDisplayWidth(),
                                 Display.getInstance().getDisplayHeight());
+                    }
                     }
                 }
                 style.setBgImage(im);

@@ -45,15 +45,18 @@ public class Octal {
 
         int end = offset + length;
         for (int i = offset; i < end; ++i) {
-            if (header[i] == 0)
+            if (header[i] == 0) {
                 break;
+            }
 
             if (header[i] == (byte) ' ' || header[i] == '0') {
-                if (stillPadding)
+                if (stillPadding) {
                     continue;
+                }
 
-                if (header[i] == (byte) ' ')
+                if (header[i] == (byte) ' ') {
                     break;
+                }
             }
 
             stillPadding = false;

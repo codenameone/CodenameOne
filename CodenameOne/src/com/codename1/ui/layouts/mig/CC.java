@@ -79,8 +79,9 @@ public final class CC {
             final ArrayList<String> targets = new ArrayList<String>(2);
 
             if (pos != null) {
-                for (int i = 0; i < pos.length; i++)
+                for (int i = 0; i < pos.length; i++) {
                     addLinkTargetIDs(targets, pos[i]);
+                }
             }
 
             linkTargets = targets.size() == 0 ? EMPTY_ARR : targets.toArray(new String[targets.size()]);
@@ -96,8 +97,9 @@ public final class CC {
             } else {
                 for (int i = uv.getSubUnitCount() - 1; i >= 0; i--) {
                     UnitValue subUv = uv.getSubUnitValue(i);
-                    if (subUv.isLinkedDeep())
+                    if (subUv.isLinkedDeep()) {
                         addLinkTargetIDs(targets, subUv);
+                    }
                 }
             }
         }
@@ -186,11 +188,13 @@ public final class CC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new ComponentConstraint().noGrid().gap().fill()</code>.
      */
     public CC gapX(String before, String after) {
-        if (before != null)
+        if (before != null) {
             hor.setGapBefore(ConstraintParser.parseBoundSize(before, true, true));
+        }
 
-        if (after != null)
+        if (after != null) {
             hor.setGapAfter(ConstraintParser.parseBoundSize(after, true, true));
+        }
 
         return this;
     }
@@ -470,11 +474,13 @@ public final class CC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new ComponentConstraint().noGrid().gap().fill()</code>.
      */
     public CC gapY(String before, String after) {
-        if (before != null)
+        if (before != null) {
             ver.setGapBefore(ConstraintParser.parseBoundSize(before, true, false));
+        }
 
-        if (after != null)
+        if (after != null) {
             ver.setGapAfter(ConstraintParser.parseBoundSize(after, true, false));
+        }
 
         return this;
     }
@@ -1240,8 +1246,9 @@ public final class CC {
 
     private CC corrPos(String uv, int ix) {
         UnitValue[] b = getPos();
-        if (b == null)
+        if (b == null) {
             b = new UnitValue[4];
+        }
 
         b[ix] = ConstraintParser.parseUnitValue(uv, (ix % 2 == 0));
         setPos(b);
@@ -1262,8 +1269,9 @@ public final class CC {
      */
     public CC pos(String x, String y) {
         UnitValue[] b = getPos();
-        if (b == null)
+        if (b == null) {
             b = new UnitValue[4];
+        }
 
         b[0] = ConstraintParser.parseUnitValue(x, true);
         b[1] = ConstraintParser.parseUnitValue(y, false);
@@ -1496,8 +1504,9 @@ public final class CC {
      * @param y The y-position or <code>-1</code> to disable cell positioning.
      */
     public void setCellY(int y) {
-        if (y < 0)
+        if (y < 0) {
             cellX = -1;
+        }
         cellY = y < 0 ? 0 : y;
     }
 
@@ -1522,8 +1531,9 @@ public final class CC {
      * @param side -1 or 0-3.
      */
     public void setDockSide(int side) {
-        if (side < -1 || side > 3)
+        if (side < -1 || side > 3) {
             throw new IllegalArgumentException("Illegal dock side: " + side);
+        }
         dock = side;
     }
 
@@ -1604,8 +1614,9 @@ public final class CC {
      *             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
      */
     public void setHideMode(int mode) {
-        if (mode < -1 || mode > 3)
+        if (mode < -1 || mode > 3) {
             throw new IllegalArgumentException("Wrong hideMode: " + mode);
+        }
 
         hideMode = mode;
     }

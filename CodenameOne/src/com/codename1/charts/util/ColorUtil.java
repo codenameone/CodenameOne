@@ -120,10 +120,12 @@ public class ColorUtil {
             super();
 
             int a = ((argb >>> 24) & 0xff);
-            if (0 == a)
+            if (0 == a) {
                 this.alpha = 255;
-            else
+            }
+            else {
                 this.alpha = a;
+            }
 
             this.red = (argb >>> 16) & 0xff;
             this.green = (argb >>> 8) & 0xff;
@@ -171,14 +173,18 @@ public class ColorUtil {
 
         @Override
         public boolean equals(Object that) {
-            if (this == that)
+            if (this == that) {
                 return true;
-            else if (null == that)
+            }
+            else if (null == that) {
                 return false;
-            else if (that instanceof IColor)
+            }
+            else if (that instanceof IColor) {
                 return (this.hashCode() == that.hashCode());
-            else
+            }
+            else {
                 return false;
+            }
         }
 
         @Override
