@@ -2609,7 +2609,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     submitCmd = curForm.createSubmitCommand(name, value);
                 }
                 if (submitCmd == null) {
-                    submitCmd = new "".equals(Command(value) ? value = getUIManager().localize("html.submit", HTMLForm.DEFAULT_SUBMIT_TEXT) : value); //dummy command - no form so it won't do anything
+                    submitCmd = new Command("".equals(value) ? value = getUIManager().localize("html.submit", HTMLForm.DEFAULT_SUBMIT_TEXT) : value); //dummy command - no form so it won't do anything
                 }
                 Button submitButton = new Button(submitCmd);
                 cmp = submitButton;
