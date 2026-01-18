@@ -439,6 +439,7 @@ class HTMLForm {
             this.isSubmit = isSubmit;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             super.actionPerformed(evt);
             if (isSubmit) {
@@ -448,10 +449,12 @@ class HTMLForm {
             }
         }
 
+        @Override
         public String getCommandName() {
             return value;
         }
 
+        @Override
         public void setCommandName(String name) {
             this.value = name;
         }
@@ -459,6 +462,7 @@ class HTMLForm {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean equals(Object o) {
             if (this == o) {
                 return true;
@@ -491,6 +495,7 @@ class HTMLForm {
         /**
          * {@inheritDoc}
          */
+        @Override
         public int hashCode() {
             int result = super.hashCode();
             result = 31 * result + (htmlForm != null ? htmlForm.hashCode() : 0);

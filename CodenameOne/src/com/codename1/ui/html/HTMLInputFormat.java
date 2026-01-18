@@ -319,6 +319,7 @@ final class HTMLInputFormat {
      *
      * @return a printout of a user-friendly string describing the format
      */
+    @Override
     public String toString() {
         StringBuilder str = new StringBuilder();
         String followedBy = "";
@@ -444,6 +445,7 @@ final class HTMLInputFormat {
          *
          * @return a printout of a user-friendly string describing this constraint
          */
+        @Override
         public String toString() {
             StringBuilder str = new StringBuilder();
             if (count == COUNT_EXACTLY_ONE) {
@@ -494,6 +496,7 @@ final class HTMLInputFormat {
             super(ta.getText());
         }
 
+        @Override
         protected void showSymbolDialog() { // Block symbols dialog
         }
     }

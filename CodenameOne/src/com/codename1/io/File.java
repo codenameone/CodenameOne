@@ -458,14 +458,17 @@ public class File {
      * @param o
      * @return
      */
+    @Override
     public boolean equals(java.lang.Object o) {
         return o instanceof File && ((File) o).path.equals(path);
     }
 
+    @Override
     public int hashCode() {
         return path.hashCode();
     }
 
+    @Override
     public java.lang.String toString() {
         return path;
     }

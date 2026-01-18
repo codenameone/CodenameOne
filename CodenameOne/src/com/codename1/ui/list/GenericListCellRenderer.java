@@ -278,6 +278,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
         Component cmp;
         Component[] entries;
@@ -396,6 +397,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
         return getCellRendererComponent(list, list.getModel(), value, index, isSelected);
     }
@@ -535,6 +537,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getListFocusComponent(List list) {
         return focusComponent;
     }
@@ -542,6 +545,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getFocusComponent(Component list) {
         return focusComponent;
     }
@@ -637,6 +641,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean animate() {
             boolean hasAnimations = false;
             if (parentList != null) {
@@ -701,12 +706,14 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         /**
          * {@inheritDoc}
          */
+        @Override
         public void paint(Graphics g) {
         }
 
         /**
          * {@inheritDoc}
          */
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (evt.getComponent() instanceof Button) {
                 lastClickedComponent = (Button) evt.getComponent();

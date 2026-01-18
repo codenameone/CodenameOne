@@ -135,10 +135,12 @@ public class ShareButton extends Button implements ActionListener {
      *
      * @param evt
      */
+    @Override
     public void actionPerformed(ActionEvent evt) {
         // postpone the share button action to the next EDT cycle to allow action listeners on the button to 
         // process first
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 if (Display.getInstance().isNativeShareSupported()) {
                     Display.getInstance().share(textToShare, imageToShare, imageMimeType, new Rectangle(
@@ -175,6 +177,7 @@ public class ShareButton extends Button implements ActionListener {
                 dialog.placeButtonCommands(new Command[]{new Command("Cancel")});
                 l.addActionListener(new ActionListener() {
 
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         dialog.dispose();
                     }
@@ -187,6 +190,7 @@ public class ShareButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"textToShare"};
     }
@@ -194,6 +198,7 @@ public class ShareButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class};
     }
@@ -201,6 +206,7 @@ public class ShareButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("textToShare".equals(name)) {
             return getTextToShare();
@@ -211,6 +217,7 @@ public class ShareButton extends Button implements ActionListener {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("textToShare".equals(name)) {
             setTextToShare((String) value);

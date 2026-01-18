@@ -153,6 +153,7 @@ public class CombinedXYChart extends XYChart {
      * @param seriesIndex the series index
      * @return the legend shape width
      */
+    @Override
     public int getLegendShapeWidth(int seriesIndex) {
         XYChart chart = getXYChart(seriesIndex);
         return chart.getLegendShapeWidth(getChartSeriesIndex(seriesIndex));
@@ -168,6 +169,7 @@ public class CombinedXYChart extends XYChart {
      * @param seriesIndex the series index
      * @param paint the paint to be used for drawing
      */
+    @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
         XYChart chart = getXYChart(seriesIndex);
@@ -179,6 +181,7 @@ public class CombinedXYChart extends XYChart {
      *
      * @return the chart type
      */
+    @Override
     public String getChartType() {
         return "Combined";
     }

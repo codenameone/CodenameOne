@@ -500,6 +500,7 @@ public abstract class Purchase {
                 final Receipt receipt = pending.get(0);
                 receiptStore.submitReceipt(pending.get(0), new SuccessCallback<Boolean>() {
 
+                    @Override
                     public void onSucess(Boolean submitSucceeded) {
                         if (submitSucceeded) {
                             removePendingPurchase(receipt.getTransactionId());
@@ -518,6 +519,7 @@ public abstract class Purchase {
             } else {
                 loadReceipts(ifOlderThanMs, new SuccessCallback<Boolean>() {
 
+                    @Override
                     public void onSucess(Boolean fetchSucceeded) {
                         syncInProgress = false;
                         fireSynchronizeReceiptsCallbacks(fetchSucceeded);
@@ -537,6 +539,7 @@ public abstract class Purchase {
     private void postReceipt(Receipt r) {
         addPendingPurchase(r);
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 synchronizeReceipts();
             }
@@ -589,6 +592,7 @@ public abstract class Purchase {
 
         SuccessCallback<Receipt[]> onSuccess = new SuccessCallback<Receipt[]>() {
 
+            @Override
             public void onSucess(Receipt[] value) {
                 if (value != null) {
                     setReceipts(Arrays.asList(value));
@@ -814,6 +818,7 @@ public abstract class Purchase {
             this.complete = complete;
         }
 
+        @Override
         public void run() {
 
                 while (!complete[0]) {
@@ -843,6 +848,7 @@ public abstract class Purchase {
             this.success = success;
         }
 
+        @Override
         public void onSucess(Boolean value) {
             complete[0] = true;
             success[0] = value;

@@ -113,6 +113,7 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getItemAt(int index) {
         if (realValues) {
             return Double.valueOf(min + step * index);
@@ -124,6 +125,7 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSize() {
         return (int) ((max - min) / step) + maxOffset;
     }
@@ -132,6 +134,7 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSelectedIndex() {
         return (int) ((currentValue - min) / step);
     }
@@ -140,6 +143,7 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setSelectedIndex(int index) {
         if (setSelectedIndexReentrantLock) {
             return;
@@ -160,6 +164,7 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addDataChangedListener(DataChangedListener l) {
         dataListener.addListener(l);
     }
@@ -167,6 +172,7 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeDataChangedListener(DataChangedListener l) {
         dataListener.removeListener(l);
     }
@@ -174,6 +180,7 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
@@ -181,6 +188,7 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);
     }
@@ -188,12 +196,14 @@ class SpinnerNumberModel implements ListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addItem(Object item) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeItem(int index) {
     }
 

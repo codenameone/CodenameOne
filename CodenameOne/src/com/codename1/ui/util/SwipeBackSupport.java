@@ -82,6 +82,7 @@ public class SwipeBackSupport {
      */
     protected void bind(final Form currentForm, final LazyValue<Form> destination) {
         pointerDragged = new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (sideSwipePotential) {
                     final int x = evt.getX();
@@ -107,6 +108,7 @@ public class SwipeBackSupport {
             }
         };
         pointerReleased = new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (dragActivated) {
                     int destNumberX = Display.getInstance().getDisplayWidth();
@@ -119,6 +121,7 @@ public class SwipeBackSupport {
                     final int destNumber = destNumberX;
                     final int increments = incrementsX;
                     Display.getInstance().getCurrent().registerAnimated(new Animation() {
+                        @Override
                         public boolean animate() {
                             currentX += increments;
                             if (currentX > 0 && currentX >= destNumber || currentX < 0 && currentX <= destNumber) {
@@ -140,6 +143,7 @@ public class SwipeBackSupport {
                             return true;
                         }
 
+                        @Override
                         public void paint(Graphics g) {
                         }
                     });
@@ -147,6 +151,7 @@ public class SwipeBackSupport {
             }
         };
         pointerPressed = new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 sideSwipePotential = false;
                 int displayWidth = Display.getInstance().getDisplayWidth();
@@ -181,6 +186,7 @@ public class SwipeBackSupport {
             blank.show();
             currentForm.setTransitionOutAnimator(originalTransition);
             ((CommonTransitions) t).setMotion(new LazyValue<Motion>() {
+                @Override
                 public Motion get(Object... args) {
                     return new ManualMotion(((Integer) args[0]).intValue(), ((Integer) args[1]).intValue(), ((Integer) args[2]).intValue());
                 }
@@ -198,6 +204,7 @@ public class SwipeBackSupport {
             this.t = t;
         }
 
+        @Override
         public void paint(Graphics g, Rectangle rect) {
             t.animate();
             t.paint(g);
@@ -205,6 +212,7 @@ public class SwipeBackSupport {
     }
 
     private static class SendPointerReleaseToOtherForm extends Form {
+        @Override
         protected boolean shouldSendPointerReleaseToOtherForm() {
             return true;
         }
@@ -215,6 +223,7 @@ public class SwipeBackSupport {
             super(sourceValue, destinationValue, duration);
         }
 
+        @Override
         public int getValue() {
             int destinationValue = getDestinationValue();
             int sourceValue = getSourceValue();
@@ -229,6 +238,7 @@ public class SwipeBackSupport {
             }
         }
 
+        @Override
         public boolean isFinished() {
             return false;
         }

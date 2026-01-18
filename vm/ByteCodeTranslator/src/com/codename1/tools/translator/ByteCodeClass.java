@@ -967,6 +967,8 @@ public class ByteCodeClass {
                     m.appendMethodC(b);
                 }
             }
+            List<BytecodeMethod> bm = new ArrayList<BytecodeMethod>(methods);
+            appendInheritedInterfaceMethods(b, bm);
         } else {
             for(BytecodeMethod m : methods) {
                 m.appendMethodC(b);
@@ -1447,6 +1449,10 @@ public class ByteCodeClass {
         }
         
         appendMethodsToHeader(b);
+        if(isInterface) {
+            List<BytecodeMethod> bm = new ArrayList<BytecodeMethod>(methods);
+            appendInheritedInterfaceMethodHeaders(b, bm);
+        }
         
         if(!isInterface) {
             // append super stub
@@ -1623,6 +1629,64 @@ public class ByteCodeClass {
         }
     }*/
 
+    private void appendInheritedInterfaceMethods(StringBuilder b, List<BytecodeMethod> bm) {
+        if(baseInterfacesObject == null) {
+            return;
+        }
+        for(ByteCodeClass baseInterface : baseInterfacesObject) {
+            appendInheritedInterfaceMethods(b, bm, baseInterface);
+        }
+    }
+
+    private void appendInheritedInterfaceMethods(StringBuilder b, List<BytecodeMethod> bm, ByteCodeClass baseInterface) {
+        if(baseInterface == null) {
+            return;
+        }
+        for(BytecodeMethod m : baseInterface.methods) {
+            if(m.isStatic() || m.isPrivate()) {
+                continue;
+            }
+            if(!bm.contains(m)) {
+                m.appendInterfaceMethodC(b, clsName);
+                bm.add(m);
+            }
+        }
+        if(baseInterface.baseInterfacesObject != null) {
+            for(ByteCodeClass parentInterface : baseInterface.baseInterfacesObject) {
+                appendInheritedInterfaceMethods(b, bm, parentInterface);
+            }
+        }
+    }
+
+    private void appendInheritedInterfaceMethodHeaders(StringBuilder b, List<BytecodeMethod> bm) {
+        if(baseInterfacesObject == null) {
+            return;
+        }
+        for(ByteCodeClass baseInterface : baseInterfacesObject) {
+            appendInheritedInterfaceMethodHeaders(b, bm, baseInterface);
+        }
+    }
+
+    private void appendInheritedInterfaceMethodHeaders(StringBuilder b, List<BytecodeMethod> bm, ByteCodeClass baseInterface) {
+        if(baseInterface == null) {
+            return;
+        }
+        for(BytecodeMethod m : baseInterface.methods) {
+            if(m.isStatic() || m.isPrivate()) {
+                continue;
+            }
+            if(!bm.contains(m)) {
+                m.appendMethodHeader(b, clsName);
+                bm.add(m);
+            }
+        }
+        if(baseInterface.baseInterfacesObject != null) {
+            for(ByteCodeClass parentInterface : baseInterface.baseInterfacesObject) {
+                appendInheritedInterfaceMethodHeaders(b, bm, parentInterface);
+            }
+        }
+    }
+
     
     /**
      * @param baseClass the baseClass to set
@@ -1716,7 +1780,8 @@ public class ByteCodeClass {
                         bm.setForceVirtual(true);
                     }
                 } else {
-                    if(replace || (isInterface && isInterfaceInHierarchy(virtualMethods.get(offset).getClsName()))) {
+                    if(replace || (isInterface && (isInterfaceInHierarchy(virtualMethods.get(offset).getClsName()) ||
+                            "java_lang_Object".equals(virtualMethods.get(offset).getClsName())))) {
                         virtualMethods.set(offset, bm);
                         if(isInterface) {
                             bm.setForceVirtual(true);

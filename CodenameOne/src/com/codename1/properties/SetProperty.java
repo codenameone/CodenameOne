@@ -77,6 +77,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @return the number of elements
      */
+    @Override
     public int size() {
         internalGet();
         return value.size();
@@ -88,6 +89,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      * @param t the collection of elements to set
      * @return the parent object for chaining
      */
+    @Override
     public K set(Collection<T> t) {
         value.clear();
         value.addAll(t);
@@ -101,6 +103,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @param v the new value
      */
+    @Override
     public K add(T v) {
         if (value.add(v)) {
             firePropertyChanged();
@@ -114,6 +117,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @param v the new value
      */
+    @Override
     public K addAll(Collection<? extends T> v) {
         if (value.addAll(v)) {
             firePropertyChanged();
@@ -127,6 +131,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @param v the item to remove
      */
+    @Override
     public K remove(T v) {
         if (value.remove(v)) {
             firePropertyChanged();
@@ -140,6 +145,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @param v the item to remove
      */
+    @Override
     public K remove(int v) {
         for (T o : value) {
             if (v == 0) {
@@ -155,6 +161,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @param the item to remove
      */
+    @Override
     public K removeAll(Collection<? extends T> v) {
         if (value.removeAll(v)) {
             firePropertyChanged();
@@ -193,6 +200,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @return an iterator
      */
+    @Override
     public Iterator<T> iterator() {
         internalGet();
         return value.iterator();
@@ -203,6 +211,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @return a list
      */
+    @Override
     public List<T> asList() {
         internalGet();
         return new ArrayList<T>(value);
@@ -214,6 +223,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      *
      * @return a list
      */
+    @Override
     public List<Object> asExplodedList() {
         return asExplodedList(value);
     }
@@ -221,6 +231,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
     /**
      * Remove all the elements from the set and fires a change event if the set wasn't empty
      */
+    @Override
     public void clear() {
         if (value.size() > 0) {
             value.clear();
@@ -235,6 +246,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      * @param element the element
      * @return true if the given element is contained in the set property
      */
+    @Override
     public boolean contains(T element) {
         return value.contains(element);
     }

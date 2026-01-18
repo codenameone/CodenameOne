@@ -67,6 +67,7 @@ public class FacebookShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -90,6 +91,7 @@ public class FacebookShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (token != null ? token.hashCode() : 0);
@@ -99,6 +101,7 @@ public class FacebookShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void actionPerformed(ActionEvent evt) {
         if (!FaceBookAccess.getInstance().isAuthenticated()) {
             FaceBookAccess.getInstance().showAuthentication(this);
@@ -117,18 +120,21 @@ public class FacebookShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void share(String text, final String image, final String mime) {
         final ShareForm[] f = new ShareForm[1];
         if (image == null) {
             f[0] = new ShareForm(getOriginal(), "Post on My Wall", null, text,
                     new ActionListener() {
 
+                        @Override
                         public void actionPerformed(ActionEvent evt) {
                             try {
                                 InfiniteProgress inf = new InfiniteProgress();
                                 final Dialog progress = inf.showInifiniteBlocking();
                                 FaceBookAccess.getInstance().addResponseCodeListener(new ActionListener() {
 
+                                    @Override
                                     public void actionPerformed(ActionEvent evt) {
                                         FaceBookAccess.getInstance().removeResponseCodeListener(this);
                                         progress.dispose();
@@ -138,6 +144,7 @@ public class FacebookShare extends ShareService {
                                 });
                                 FaceBookAccess.getInstance().postOnWall("me", f[0].getMessage(), new ActionListener() {
 
+                                    @Override
                                     public void actionPerformed(ActionEvent evt) {
                                         progress.dispose();
                                         finish();
@@ -155,12 +162,14 @@ public class FacebookShare extends ShareService {
             f[0] = new ShareForm(getOriginal(), "Post on My Wall", null, text, image,
                     new ActionListener() {
 
+                        @Override
                         public void actionPerformed(ActionEvent evt) {
 
                             InfiniteProgress inf = new InfiniteProgress();
                             final Dialog progress = inf.showInifiniteBlocking();
                             FaceBookAccess.getInstance().addResponseCodeListener(new ActionListener() {
 
+                                @Override
                                 public void actionPerformed(ActionEvent evt) {
                                     FaceBookAccess.getInstance().removeResponseCodeListener(this);
                                     progress.dispose();
@@ -171,6 +180,7 @@ public class FacebookShare extends ShareService {
 
                             MultipartRequest req = new MultipartRequest();
                             req.addResponseListener(new ActionListener() {
+                                @Override
                                 public void actionPerformed(ActionEvent evt) {
                                     progress.dispose();
                                     finish();
@@ -198,6 +208,7 @@ public class FacebookShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void share(String toShare) {
         share(toShare, null, null);
     }
@@ -205,6 +216,7 @@ public class FacebookShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean canShareImage() {
         return true;
     }

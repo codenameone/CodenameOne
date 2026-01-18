@@ -51,6 +51,7 @@ public class GenericSpinner extends BaseSpinner {
         render.setUIID("SpinnerRenderer");
     }
 
+    @Override
     void initSpinner() {
         if (spin == null) {
             if (model.length == 1) {
@@ -228,6 +229,7 @@ public class GenericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"model", "renderer", "items", "columns"};
     }
@@ -235,6 +237,7 @@ public class GenericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{ListModel.class, ListCellRenderer.class, com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), Integer.class};
     }
@@ -242,6 +245,7 @@ public class GenericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"ListModel", "ListCellRenderer", "String[]", "int"};
     }
@@ -249,6 +253,7 @@ public class GenericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("items".equals(name)) {
             ListModel m = getModel();
@@ -277,6 +282,7 @@ public class GenericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("items".equals(name)) {
             setModel(new DefaultListModel((Object[]) value));
@@ -365,6 +371,7 @@ public class GenericSpinner extends BaseSpinner {
      *
      * @return the component state or null for undefined state.
      */
+    @Override
     public Object getComponentState() {
         if (getColumns() == 1) {
             return getValue();
@@ -383,6 +390,7 @@ public class GenericSpinner extends BaseSpinner {
      *
      * @param state the non-null state
      */
+    @Override
     public void setComponentState(Object state) {
         if (getColumns() == 1) {
             setValue(state);

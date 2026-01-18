@@ -160,6 +160,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem", "durationMode"};
     }
@@ -167,6 +168,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class, Boolean.class};
     }
@@ -174,6 +176,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("durationMode".equals(name)) {
             if (durationMode) {
@@ -208,6 +211,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("currentHour".equals(name)) {
             setCurrentHour(Integer.parseInt(value.toString()));

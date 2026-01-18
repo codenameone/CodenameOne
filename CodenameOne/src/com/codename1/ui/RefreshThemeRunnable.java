@@ -7,6 +7,7 @@ class RefreshThemeRunnable implements Runnable {
         this.cmp = cmp;
     }
 
+    @Override
     public void run() {
         cmp.refreshTheme(false);
     }

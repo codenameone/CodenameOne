@@ -41,6 +41,7 @@ class RemoteControlCallback {
 
     static void play() {
         CN.callSerially(new Runnable() {
+            @Override
             public void run() {
                 l().play();
             }

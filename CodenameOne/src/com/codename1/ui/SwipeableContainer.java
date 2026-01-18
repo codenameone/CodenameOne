@@ -107,6 +107,7 @@ public class SwipeableContainer extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         waitForRelease = false;
         Form form = this.getComponentForm();
@@ -121,6 +122,7 @@ public class SwipeableContainer extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initComponent() {
         super.initComponent();
         Form form = this.getComponentForm();
@@ -353,6 +355,7 @@ public class SwipeableContainer extends Container {
             }
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (getComponentCount() == 0 || !swipeActivated || animate()) {
                 return;

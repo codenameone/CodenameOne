@@ -77,6 +77,7 @@ class TextEvaluator extends AbstractEvaluator {
      * com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(com.codename1
      * .path.impl.StructuredContent, java.lang.String, java.lang.String)
      */
+    @Override
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
         String[] v = getLeftValue(element, lvalue);
@@ -106,6 +107,7 @@ class TextEvaluator extends AbstractEvaluator {
      * .codename1.path.impl.StructuredContent, java.lang.String,
      * java.lang.String)
      */
+    @Override
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
         String[] v = getLeftValue(element, lvalue);
@@ -135,6 +137,7 @@ class TextEvaluator extends AbstractEvaluator {
      * .codename1.path.impl.StructuredContent, java.lang.String,
      * java.lang.String)
      */
+    @Override
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
         String[] v = getLeftValue(element, lvalue);
@@ -163,6 +166,7 @@ class TextEvaluator extends AbstractEvaluator {
      * com.codename1.processing.AbstractEvaluator#evaluateSingle(java.util.List
      * , java.lang.String)
      */
+    @Override
     protected Object evaluateSingle(StructuredContent element, String expr) {
         Result result = Result.fromContent(element.getChild(0));
         String v = result.getAsString(expr);

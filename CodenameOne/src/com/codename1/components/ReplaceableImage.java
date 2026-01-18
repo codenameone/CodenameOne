@@ -56,6 +56,7 @@ public final class ReplaceableImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public byte[] getImageData() {
         replaced = false;
         return data;
@@ -76,6 +77,7 @@ public final class ReplaceableImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         return replaced;
     }
@@ -83,6 +85,7 @@ public final class ReplaceableImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAnimation() {
         return true;
     }
@@ -90,6 +93,7 @@ public final class ReplaceableImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isOpaque() {
         return opaque;
     }

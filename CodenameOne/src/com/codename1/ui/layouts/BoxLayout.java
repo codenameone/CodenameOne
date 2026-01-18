@@ -295,6 +295,7 @@ public class BoxLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void layoutContainer(Container parent) {
         Style ps = parent.getStyle();
         int width = parent.getLayoutWidth() - parent.getSideGap() - ps.getHorizontalPadding();
@@ -478,6 +479,7 @@ public class BoxLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getPreferredSize(Container parent) {
         int width = 0;
         int height = 0;
@@ -515,6 +517,7 @@ public class BoxLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         if (axis == X_AXIS) {
             return "BoxLayout X";
@@ -525,6 +528,7 @@ public class BoxLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         return super.equals(o) && axis == ((BoxLayout) o).axis;
     }

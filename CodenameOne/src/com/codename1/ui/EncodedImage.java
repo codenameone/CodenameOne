@@ -336,6 +336,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getImage() {
         return getInternalImpl().getImage();
     }
@@ -393,6 +394,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isLocked() {
         return locked > 0;
     }
@@ -400,6 +402,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void asyncLock(final Image internal) {
         if (locked <= 0) {
             locked = 1;
@@ -411,6 +414,7 @@ public class EncodedImage extends Image {
             }
             hardCache = internal;
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                @Override
                 public void run() {
                     try {
                         byte[] b = getImageData();
@@ -421,6 +425,7 @@ public class EncodedImage extends Image {
                         CodenameOneImplementation impl = Display.impl;
                         impl.setImageName(i.getImage(), getImageName());
                         Display.getInstance().callSerially(new Runnable() {
+                            @Override
                             public void run() {
                                 if (locked > 0) {
                                     hardCache = i;
@@ -442,6 +447,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void lock() {
         if (locked < 1) {
             locked = 1;
@@ -456,6 +462,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void unlock() {
         locked--;
         if (locked < 1) {
@@ -472,6 +479,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
         return getInternalImpl().subImage(x, y, width, height, processAlpha);
     }
@@ -479,6 +487,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image rotate(int degrees) {
         return getInternalImpl().rotate(degrees);
     }
@@ -486,6 +495,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image modifyAlpha(byte alpha) {
         return getInternalImpl().modifyAlpha(alpha);
     }
@@ -493,6 +503,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image modifyAlpha(byte alpha, int removeColor) {
         return getInternalImpl().modifyAlpha(alpha, removeColor);
     }
@@ -500,6 +511,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Graphics getGraphics() {
         return null;
     }
@@ -507,6 +519,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getWidth() {
         if (width > -1) {
             return width;
@@ -518,6 +531,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getHeight() {
         if (height > -1) {
             return height;
@@ -529,6 +543,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         Display.impl.drawingEncodedImage(this);
         Image internal = getInternalImpl();
@@ -542,6 +557,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         Display.impl.drawingEncodedImage(this);
         getInternalImpl().drawImage(g, nativeGraphics, x, y, w, h);
@@ -550,6 +566,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     void getRGB(int[] rgbData,
                 int offset,
                 int x,
@@ -562,6 +579,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void toRGB(RGBImage image,
                       int destX,
                       int destY,
@@ -575,6 +593,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image scaledWidth(int width) {
         return getInternalImpl().scaledWidth(width);
     }
@@ -582,6 +601,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image scaledHeight(int height) {
         return getInternalImpl().scaledHeight(height);
     }
@@ -589,6 +609,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image scaledSmallerRatio(int width, int height) {
         return getInternalImpl().scaledSmallerRatio(width, height);
     }
@@ -649,6 +670,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image scaled(int width, int height) {
         // J2ME/RIM don't support image IO and Windows Phone doesn't support PNG which prevents
         // scaling translucent images properly
@@ -662,6 +684,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void scale(int width, int height) {
         getInternalImpl().scale(width, height);
     }
@@ -669,6 +692,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAnimation() {
         return false;
     }
@@ -676,6 +700,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isOpaque() {
         if (opaqueChecked) {
             return opaque;

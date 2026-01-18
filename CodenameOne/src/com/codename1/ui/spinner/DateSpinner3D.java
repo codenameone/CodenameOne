@@ -491,6 +491,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"startYear", "endYear", "currentYear", "currentDay", "currentMonth", "monthDayYear", "numericMonths"};
     }
@@ -498,6 +499,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class};
     }
@@ -505,6 +507,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("startYear".equals(name)) {
             return Integer.valueOf(startYear);
@@ -533,6 +536,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("startYear".equals(name)) {
             setStartYear(Integer.parseInt(value.toString()));

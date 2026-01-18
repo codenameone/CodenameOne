@@ -264,6 +264,7 @@ public class CharArrayReader extends Reader {
      * @return the number of characters actually skipped.
      * @throws IOException if this reader is closed.
      */
+    @Override
     public long skip(long n) throws IOException {
         synchronized (lock) {
             if (isClosed()) {

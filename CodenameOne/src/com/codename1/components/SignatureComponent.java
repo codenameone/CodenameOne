@@ -153,6 +153,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
         lead.setText(localize("SignatureComponent.LeadText", "Press to sign"));
         lead.setUIID("SignatureButton");
         lead.addActionListener(new ActionListener<ActionEvent>() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 final Dialog dialog = new Dialog(localize("SignatureComponent.DialogTitle", "Sign Here"));
                 final SignatureDialogBody sigBody = new SignatureDialogBody() {
@@ -165,6 +166,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
                 signaturePanel.clear();
 
                 sigBody.addActionListener(new ActionListener<ActionEvent>() {
+                    @Override
                     public void actionPerformed(ActionEvent sigDoneEvent) {
                         dialog.dispose();
                         setSignatureImage(sigBody.getValue());
@@ -208,6 +210,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
      *
      * @param l
      */
+    @Override
     public void addActionListener(ActionListener<ActionEvent> l) {
         eventDispatcher.addListener(l);
     }
@@ -217,6 +220,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
      *
      * @param l
      */
+    @Override
     public void removeActionListener(ActionListener<ActionEvent> l) {
         eventDispatcher.removeListener(l);
     }
@@ -225,6 +229,8 @@ public class SignatureComponent extends Container implements ActionSource<Action
      * Fires an event to all listeners to notify them that the signature image has
      * been changed.
      */
+    // PMD stupidly thinks this method overrides a package private method
+    @SuppressWarnings("PMD.MissingOverride")
     protected void fireActionEvent() {
         eventDispatcher.fireActionEvent(new ActionEvent(this));
     }
@@ -347,6 +353,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
                     super.getUIManager().getThemeConstant("sigButtonCancelUIID", "Button"));
 
             doneButton.addActionListener(new ActionListener<ActionEvent>() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     value = signaturePanel.getImage();
                     if (value == null) {
@@ -364,6 +371,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
             });
 
             resetButton.addActionListener(new ActionListener<ActionEvent>() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     signaturePanel.clear();
                     onSignatureReset();
@@ -372,6 +380,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
             });
 
             cancelButton.addActionListener(new ActionListener<ActionEvent>() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     removeComponent(signaturePanel);
                     onCancel();

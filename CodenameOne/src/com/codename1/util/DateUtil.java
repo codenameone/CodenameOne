@@ -124,6 +124,7 @@ public class DateUtil {
      */
     public static Comparator<Date> compareByDateField(final long field) {
         return new Comparator<Date>() {
+            @Override
             public int compare(Date object1, Date object2) {
 
                 if (field == DateUtil.YEAR) {

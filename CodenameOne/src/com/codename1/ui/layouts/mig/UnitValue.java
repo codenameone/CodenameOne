@@ -605,6 +605,7 @@ public final class UnitValue {
         return isHor;
     }
 
+    @Override
     public String toString() {
         return getClass().getName() + ". Value=" + value + ", unit=" + unit + ", unitString: " + unitStr + ", oper=" + oper + ", isHor: " + isHor;
     }
@@ -619,6 +620,7 @@ public final class UnitValue {
         return LayoutUtil.getCCString(this);
     }
 
+    @Override
     public int hashCode() {
         int result = 17;
         result = 31 * result + Float.floatToIntBits(value);

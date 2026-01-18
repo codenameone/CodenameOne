@@ -1632,6 +1632,7 @@ final class Deflate {
         return pending != 0 ? Z_OK : Z_STREAM_END;
     }
 
+    @Override
     public Object clone() {
         Deflate dest = new Deflate(strm);
 

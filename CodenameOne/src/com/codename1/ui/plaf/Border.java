@@ -1086,6 +1086,7 @@ public class Border {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public boolean equals(Object obj) {
         if (obj != null && obj.getClass() == getClass()) {
             Border b = (Border) obj;
@@ -1128,6 +1129,7 @@ public class Border {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int hash = 7;
         hash = 31 * hash + type;

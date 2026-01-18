@@ -121,6 +121,7 @@ public class BoundingBox {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "SW: " + _southWest + " NE: " + _northEast;
     }
@@ -157,6 +158,7 @@ public class BoundingBox {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object other) {
         if (!(other instanceof BoundingBox)) {
             return false;
@@ -168,6 +170,7 @@ public class BoundingBox {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int hash = 5;
         hash = 29 * hash + this._southWest.hashCode();

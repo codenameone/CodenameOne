@@ -104,6 +104,7 @@ public abstract class CollectionProperty<T, K> extends PropertyBase<T, K> implem
      *
      * @return an iterator
      */
+    @Override
     public abstract Iterator<T> iterator();
 
     /**

@@ -98,6 +98,7 @@ public class GlassTutorial implements Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g, Rectangle rect) {
         if (internal == null) {
             internal = new Label(" ");
@@ -154,6 +155,7 @@ public class GlassTutorial implements Painter {
     }
 
     private static class DisposableDialog extends Dialog {
+        @Override
         public void keyReleased(int i) {
             dispose();
         }

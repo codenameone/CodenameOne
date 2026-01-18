@@ -161,10 +161,12 @@ public float floatValue()
         return peer.scale();
     }
 
+    @Override
     public String toString() {
         return peer.toString();
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -178,6 +180,7 @@ public float floatValue()
         return peer.equals(other.peer);
     }
 
+    @Override
     public int hashCode() {
         return peer.hashCode();
     }

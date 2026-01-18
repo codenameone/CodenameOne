@@ -305,6 +305,7 @@ public class BufferedInputStream extends InputStream {
      *                     invoking its {@link #close()} method,
      *                     or an I/O error occurs.
      */
+    @Override
     public synchronized int read() throws IOException {
         if (stopped) {
             return -1;
@@ -430,6 +431,7 @@ public class BufferedInputStream extends InputStream {
      *                     invoking its {@link #close()} method,
      *                     or an I/O error occurs.
      */
+    @Override
     public synchronized int read(byte[] b, int off, int len)
             throws IOException {
         if (stopped) {
@@ -500,6 +502,7 @@ public class BufferedInputStream extends InputStream {
      *                     invoking its {@link #close()} method, or an
      *                     I/O error occurs.
      */
+    @Override
     public synchronized long skip(long n) throws IOException {
         if (disableBuffering) {
             long v = getInIfOpen().skip(n);
@@ -552,6 +555,7 @@ public class BufferedInputStream extends InputStream {
      *                     invoking its close() method,
      *                     or an I/O error occurs.
      */
+    @Override
     public synchronized int available() throws IOException {
         if (disableBuffering) {
             return in.available();
@@ -566,6 +570,7 @@ public class BufferedInputStream extends InputStream {
      * @param readlimit the maximum limit of bytes that can be read before
      *                  the mark position becomes invalid.
      */
+    @Override
     public synchronized void mark(int readlimit) {
         marklimit = readlimit;
         markpos = pos;
@@ -586,6 +591,7 @@ public class BufferedInputStream extends InputStream {
      *                     has been closed by invoking its {@link #close()}
      *                     method, or an I/O error occurs.
      */
+    @Override
     public synchronized void reset() throws IOException {
         getBufIfOpen(); // Cause exception if closed
         if (markpos < 0) {
@@ -605,6 +611,7 @@ public class BufferedInputStream extends InputStream {
      * @see java.io.InputStream#mark(int)
      * @see java.io.InputStream#reset()
      */
+    @Override
     public boolean markSupported() {
         return in.markSupported();
     }
@@ -630,6 +637,7 @@ public class BufferedInputStream extends InputStream {
      *
      * @throws IOException if an I/O error occurs.
      */
+    @Override
     public void close() throws IOException {
         if (closed) {
             Util.getImplementation().logStreamDoubleClose(name, true);
@@ -682,6 +690,7 @@ public class BufferedInputStream extends InputStream {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int read(byte[] b) throws IOException {
         return read(b, 0, b.length);
     }

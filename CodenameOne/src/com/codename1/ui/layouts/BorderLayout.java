@@ -371,6 +371,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addLayoutComponent(Object name, Component comp, Container c) {
         // helper check for a common mistake...
         if (name == null) {
@@ -433,6 +434,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeLayoutComponent(Component comp) {
         if (comp == portraitCenter) {
             portraitCenter = null;
@@ -455,6 +457,7 @@ public class BorderLayout extends Layout {
      * @param comp the component whose constraint is queried
      * @return one of the constraints defined in this class
      */
+    @Override
     public Object getComponentConstraint(Component comp) {
         if (comp == portraitCenter) {
             return CENTER;
@@ -477,6 +480,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void layoutContainer(Container target) {
         Style s = target.getStyle();
         int top = s.getPaddingTop();
@@ -667,6 +671,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getPreferredSize(Container parent) {
         dim.setWidth(0);
         dim.setHeight(0);
@@ -799,6 +804,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "BorderLayout";
     }
@@ -836,6 +842,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (super.equals(o) && centerBehavior == ((BorderLayout) o).centerBehavior) {
             if (landscapeSwap == ((BorderLayout) o).landscapeSwap) {
@@ -924,6 +931,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isConstraintTracking() {
         return true;
     }
@@ -931,6 +939,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean obscuresPotential(Container parent) {
         return getCenter() != null;
     }

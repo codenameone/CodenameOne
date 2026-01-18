@@ -132,6 +132,7 @@ public final class AnimationManager {
         an.setNotifyLock(lock);
         addAnimation(an);
         Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
             public void run() {
                 while (an.isInProgress() && anims.contains(an)) {
                     Util.wait(lock, 50);
@@ -190,6 +191,7 @@ public final class AnimationManager {
         content.addScrollListener(new ScrollListener() {
             boolean recursion = false;
 
+            @Override
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
                 if (recursion) {
                     return;

@@ -77,6 +77,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
         int[] arr = new int[width * height];
         int alen = arr.length;
@@ -93,6 +94,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image scaled(int width, int height) {
         int srcWidth = getWidth();
         int srcHeight = getHeight();
@@ -112,6 +114,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void scale(int width, int height) {
         int srcWidth = getWidth();
         int srcHeight = getHeight();
@@ -132,6 +135,7 @@ public class RGBImage extends Image {
     /**
      * Unsupported in the current version, this method will be implemented in a future release
      */
+    @Override
     public Image rotate(int degrees) {
         throw new RuntimeException("The rotate method is not supported by RGB images at the moment");
     }
@@ -139,6 +143,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image modifyAlpha(byte alpha) {
         int[] arr = new int[rgb.length];
         System.arraycopy(rgb, 0, arr, 0, rgb.length);
@@ -155,6 +160,7 @@ public class RGBImage extends Image {
     /**
      * This method is unsupported in this image type
      */
+    @Override
     public Graphics getGraphics() {
         throw new RuntimeException("RGBImage objects can't be modified via graphics");
     }
@@ -166,6 +172,7 @@ public class RGBImage extends Image {
      *
      * @return ARGB int array
      */
+    @Override
     public int[] getRGB() {
         return rgb;
     }
@@ -173,6 +180,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     void getRGB(int[] rgbData,
                 int offset,
                 int x,
@@ -190,6 +198,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         g.drawRGB(rgb, 0, x, y, width, height, !opaque);
     }
@@ -198,6 +207,7 @@ public class RGBImage extends Image {
      * Indicates if an image should be treated as opaque, this can improve support
      * for fast drawing of RGB images without alpha support.
      */
+    @Override
     public boolean isOpaque() {
         return opaque;
     }
@@ -205,6 +215,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setOpaque(boolean opaque) {
         this.opaque = opaque;
     }
@@ -212,6 +223,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getWidth() {
         return width;
     }
@@ -219,6 +231,7 @@ public class RGBImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getHeight() {
         return height;
     }

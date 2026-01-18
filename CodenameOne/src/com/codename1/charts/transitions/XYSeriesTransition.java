@@ -119,6 +119,7 @@ public class XYSeriesTransition extends SeriesTransition {
      *
      * @param progress The progress position in the motion. (0-100).
      */
+    @Override
     protected void update(int progress) {
         double dProgress = progress;
         if (endVals == null || startVals == null) return;

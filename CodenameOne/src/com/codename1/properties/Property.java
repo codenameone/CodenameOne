@@ -81,6 +81,7 @@ public class Property<T, K> extends PropertyBase<T, K> {
      *
      * @return the property value
      */
+    @Override
     public T get() {
         internalGet();
         return value;

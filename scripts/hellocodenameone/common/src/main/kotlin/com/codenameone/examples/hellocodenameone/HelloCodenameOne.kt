@@ -13,6 +13,7 @@ open class HelloCodenameOne : Lifecycle() {
         check(!Display.getInstance().isJailbrokenDevice()) {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }
+        DefaultMethodDemo.validate()
         Cn1ssDeviceRunner.addTest(KotlinUiTest())
         TestReporting.setInstance(Cn1ssDeviceRunnerReporter())
     }

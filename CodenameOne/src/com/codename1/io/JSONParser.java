@@ -711,6 +711,7 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void startBlock(String blockName) {
         if (parseStack.size() == 0) {
             parseStack.add(state);
@@ -734,6 +735,7 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void endBlock(String blockName) {
         parseStack.remove(parseStack.size() - 1);
     }
@@ -785,6 +787,7 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void startArray(String arrayName) {
         java.util.List<Object> currentVector;
         Map newOne;
@@ -811,6 +814,7 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void endArray(String arrayName) {
         parseStack.remove(parseStack.size() - 1);
     }
@@ -818,6 +822,7 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void stringToken(String tok) {
         if (isStackHash()) {
             if (currentKey == null) {
@@ -836,6 +841,7 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void numericToken(double tok) {
         if (isStackHash()) {
             getStackHash().put(currentKey, Double.valueOf(tok));
@@ -848,6 +854,7 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void longToken(long tok) {
         if (isStackHash()) {
             getStackHash().put(currentKey, Long.valueOf(tok));
@@ -860,6 +867,7 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void booleanToken(boolean tok) {
         if (isStackHash()) {
             getStackHash().put(currentKey, tok);
@@ -872,12 +880,14 @@ public class JSONParser implements JSONParseCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyValue(String key, String value) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAlive() {
         return true;
     }

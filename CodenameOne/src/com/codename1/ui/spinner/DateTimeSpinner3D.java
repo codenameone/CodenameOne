@@ -305,6 +305,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem",
                 "currentDate", "startDate", "endDate", "markToday", "includeYear"};
@@ -313,6 +314,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class,
                 Date.class, Date.class, Date.class, Boolean.class, Boolean.class};
@@ -321,6 +323,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("currentDate".equals(name)) {
             return currentDate;
@@ -343,6 +346,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("currentDate".equals(name)) {
             setCurrentDate((Date) value);

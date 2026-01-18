@@ -103,6 +103,7 @@ public class Coord {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "{'longitude':" + getLongitude() + ", 'latitude':" +
                 getLatitude() + "}";
@@ -132,6 +133,7 @@ public class Coord {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object other) {
         if (!(other instanceof Coord)) {
             return false;
@@ -143,6 +145,7 @@ public class Coord {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int hash = 5;
         hash = 17 * hash + (int) (Double.doubleToLongBits(this.longitude) ^ (Double.doubleToLongBits(this.longitude) >>> 32));

@@ -327,6 +327,7 @@ public class Rectangle implements Shape {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "x = " + x + " y = " + y + " size = " + size;
     }
@@ -369,6 +370,7 @@ public class Rectangle implements Shape {
      * @return true if the point (rX, rY) is inside this Rectangle;
      * false otherwise.
      */
+    @Override
     public boolean contains(int rX, int rY) {
         return x <= rX && y <= rY && x + size.getWidth() >= rX &&
                 y + size.getHeight() >= rY;
@@ -453,6 +455,7 @@ public class Rectangle implements Shape {
      * @param r rectangle to intersect with this rectangle
      * @return the intersection
      */
+    @Override
     public Rectangle intersection(Rectangle r) {
         return intersection(r.x, r.y, r.size.getWidth(), r.size.getHeight());
     }
@@ -493,6 +496,7 @@ public class Rectangle implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public PathIterator getPathIterator(Transform m) {
         if (path == null) {
             path = new GeneralPath();
@@ -512,6 +516,7 @@ public class Rectangle implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public PathIterator getPathIterator() {
         return getPathIterator(null);
     }
@@ -519,6 +524,7 @@ public class Rectangle implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public Rectangle getBounds() {
         return this;
     }
@@ -536,6 +542,7 @@ public class Rectangle implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public float[] getBounds2D() {
         return new float[]{getX(), getY(), getWidth(), getHeight()};
     }
@@ -543,6 +550,7 @@ public class Rectangle implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public boolean isRectangle() {
         return true;
     }

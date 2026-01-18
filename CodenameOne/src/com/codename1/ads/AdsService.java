@@ -108,6 +108,7 @@ public abstract class AdsService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void readResponse(InputStream input) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buffer = new byte[256];
@@ -135,6 +136,7 @@ public abstract class AdsService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void handleErrorResponseCode(int code, String message) {
         //do nothing, ads failure should not interfere with application flow
         System.err.println("error=" + code + " " + message);
@@ -143,6 +145,7 @@ public abstract class AdsService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void handleRuntimeException(RuntimeException err) {
         //do nothing, ads failure should not interfere with application flow
         err.printStackTrace();
@@ -151,6 +154,7 @@ public abstract class AdsService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void handleException(Exception err) {
         //do nothing, ads failure should not interfere with application flow
         err.printStackTrace();

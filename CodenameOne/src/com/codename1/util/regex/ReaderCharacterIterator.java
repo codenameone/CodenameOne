@@ -54,6 +54,7 @@ public final class ReaderCharacterIterator implements CharacterIterator {
     /**
      * @return a substring
      */
+    @Override
     public String substring(int beginIndex, int endIndex) {
         try {
             ensure(endIndex);
@@ -66,6 +67,7 @@ public final class ReaderCharacterIterator implements CharacterIterator {
     /**
      * @return a substring
      */
+    @Override
     public String substring(int beginIndex) {
         try {
             readAll();
@@ -78,6 +80,7 @@ public final class ReaderCharacterIterator implements CharacterIterator {
     /**
      * @return a character at the specified position.
      */
+    @Override
     public char charAt(int pos) {
         try {
             ensure(pos);
@@ -90,6 +93,7 @@ public final class ReaderCharacterIterator implements CharacterIterator {
     /**
      * @return <tt>true</tt> iff if the specified index is after the end of the character stream
      */
+    @Override
     public boolean isEnd(int pos) {
         if (buff.length() > pos) {
             return false;

@@ -49,6 +49,7 @@ public class FileTree extends Tree {
         setUIIDFinal("FileTree");
     }
 
+    @Override
     protected String childToDisplayLabel(Object child) {
         String s = child.toString();
         if ("/".equals(s)) {

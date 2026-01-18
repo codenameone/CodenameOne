@@ -109,6 +109,7 @@ public class BubbleChart extends XYChart {
      * @param seriesIndex the series index
      * @return the legend shape width
      */
+    @Override
     public int getLegendShapeWidth(int seriesIndex) {
         return SHAPE_WIDTH;
     }
@@ -123,6 +124,7 @@ public class BubbleChart extends XYChart {
      * @param seriesIndex the series index
      * @param paint the paint to be used for drawing
      */
+    @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
         paint.setStyle(Style.FILL);
@@ -147,6 +149,7 @@ public class BubbleChart extends XYChart {
      *
      * @return the chart type
      */
+    @Override
     public String getChartType() {
         return TYPE;
     }

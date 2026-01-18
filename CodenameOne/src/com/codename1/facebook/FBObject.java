@@ -96,6 +96,7 @@ public class FBObject {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object obj) {
         if (this == obj) {
             return true;
@@ -113,6 +114,7 @@ public class FBObject {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return id != null ? id.hashCode() : 0;
     }

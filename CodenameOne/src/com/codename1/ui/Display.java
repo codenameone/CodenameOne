@@ -863,6 +863,7 @@ public final class Display extends CN1Constants {
             backgroundTasks.add(r);
             if (backgroundThread == null) {
                 backgroundThread = new CodenameOneThread(new Runnable() {
+                    @Override
                     public void run() {
                         // using while true to avoid double lock optimization with synchronized block
                         while (true) {
@@ -1288,6 +1289,7 @@ public final class Display extends CN1Constants {
     public void onEditingComplete(final Component c, final String text) {
         if (!isEdt() && codenameOneRunning) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     onEditingComplete(c, text);
                 }
@@ -5193,6 +5195,7 @@ public final class Display extends CN1Constants {
 
         Timer t = new Timer();
         t.schedule(new TimerTask() {
+            @Override
             public void run() {
                 executeTimeoutRunnable(r);
             }
@@ -5217,6 +5220,7 @@ public final class Display extends CN1Constants {
     public Timer setInterval(int period, @Async.Schedule final Runnable r) {
         Timer t = new Timer();
         t.schedule(new TimerTask() {
+            @Override
             public void run() {
                 executeTimeoutRunnable(r);
             }
@@ -5248,6 +5252,7 @@ public final class Display extends CN1Constants {
         private Throwable cause;
         private EdtException parent;
 
+        @Override
         public Throwable getCause() {
             return cause;
         }
@@ -5317,6 +5322,7 @@ public final class Display extends CN1Constants {
         }
 
 
+        @Override
         public void run() {
             if (exceptionWrapper != null) {
                 try {

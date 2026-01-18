@@ -82,6 +82,7 @@ public class Point {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return x + ", " + y;
     }

@@ -98,6 +98,7 @@ class HTMLLink extends Button implements ActionListener {
      *
      * @param focused true to apply focused style, false to remove
      */
+    @Override
     public void setFocus(boolean focused) {
         if (parentLink != null) {
             parentLink.setChildrenFocused(focused);
@@ -168,6 +169,7 @@ class HTMLLink extends Button implements ActionListener {
     /**
      * Triggered when the link is pressed and then it requests the link (or goes to an anchor within the page)
      */
+    @Override
     public void actionPerformed(ActionEvent evt) {
         if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) && (isMap) && (evt.getX() != -1)) { // process mp1 is checked in assigning ismap as well, but this check here should obfuscate out this method override
             processLink(htmlC, link + "?" + (evt.getX() - getAbsoluteX()) + "," + (evt.getY() - getAbsoluteY()));

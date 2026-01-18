@@ -93,6 +93,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -125,6 +126,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + limit;
@@ -140,6 +142,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void readResponse(InputStream input) throws IOException {
         results = new Vector();
         XMLParser p = getXmlParser();
@@ -209,6 +212,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             private String lastTag;
             private Hashtable current;
 
+            @Override
             protected boolean startTag(String tag) {
                 if ("item".equalsIgnoreCase(tag) || "entry".equalsIgnoreCase(tag)) {
                     if (startOffset > 0) {
@@ -223,6 +227,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
                 return true;
             }
 
+            @Override
             protected void attribute(String tag, String attributeName, String value) {
                 if (current != null) {
                     if ("media:thumbnail".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
@@ -235,6 +240,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
                 }
             }
 
+            @Override
             protected void textElement(String text) {
                 if (lastTag != null && current != null) {
                     // make "ATOM" seem like RSS
@@ -250,6 +256,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
                 }
             }
 
+            @Override
             protected void endTag(String tag) {
                 if ("item".equalsIgnoreCase(tag) || "entry".equalsIgnoreCase(tag)) {
                     if (startOffset > 0) {
@@ -284,6 +291,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
         return Dialog.show("Parsing Error", description, "Continue", "Cancel");
     }

@@ -62,6 +62,7 @@ class HTMLTable extends Table {
      * @param editable true if the cell is editable
      * @return cell component instance
      */
+    @Override
     protected Component createCell(Object value, int row, int column, boolean editable) {
         Component cmp = null;
         if (value instanceof Component) {
@@ -88,6 +89,7 @@ class HTMLTable extends Table {
      * @param column the table column
      * @return the table constraint
      */
+    @Override
     protected Constraint createCellConstraint(Object value, int row, int column) {
         CellConstraint cConstraint = ((HTMLTableModel) getModel()).getConstraint(value);
         if (cConstraint == null) { // Can be null for cells that were "spanned over"
@@ -107,6 +109,7 @@ class HTMLTable extends Table {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     protected boolean shouldDrawInnerBorderAfterRow(int row) {
         if (innerBorderGroups) {
             return ((HTMLTableModel) getModel()).isSegmentEnd(row);
@@ -120,6 +123,7 @@ class HTMLTable extends Table {
      *
      * @param innerBorder The inner border mode, one of the INNER_BORDER_* constants
      */
+    @Override
     public void setInnerBorderMode(int innerBorder) {
         if (innerBorder == INNER_BORDERS_GROUPS) {
             innerBorderGroups = true;

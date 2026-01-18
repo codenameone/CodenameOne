@@ -57,8 +57,10 @@ public class TestRunnerComponent extends Container {
         super(new BorderLayout());
         Button btn = new Button("Run Tests");
         btn.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 CN.callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         runTests();
                     }
@@ -131,6 +133,7 @@ public class TestRunnerComponent extends Container {
                 runTest(test, statusLabel);
             } else {
                 CN.invokeAndBlock(new Runnable() {
+                    @Override
                     public void run() {
                         runTest(test, statusLabel);
                     }
@@ -154,11 +157,13 @@ public class TestRunnerComponent extends Container {
             this.t = t;
         }
 
+        @Override
         public void run() {
             statusLabel.setText(test + ": Failed");
             $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();
 
             statusLabel.addActionListener(new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent ev) {
                     ToastBar.showInfoMessage(t.getMessage());
                     Log.e(t);
@@ -176,6 +181,7 @@ public class TestRunnerComponent extends Container {
             this.test = test;
         }
 
+        @Override
         public void run() {
             statusLabel.setText(test + ": Failed");
             $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();
@@ -191,6 +197,7 @@ public class TestRunnerComponent extends Container {
             this.test = test;
         }
 
+        @Override
         public void run() {
             statusLabel.setText(test + ": Passed");
             $(statusLabel).selectAllStyles().setBgColor(0x00ff00).revalidate();

@@ -321,6 +321,7 @@ public class ImageDownloadService extends ConnectionRequest {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
+                @Override
                 public void run() {
                     createImageToFileSystem(url, targetList, targetModel, targetOffset,
                             targetKey, destFile, toScale, priority, placeholderImage, maintainAspectRatio);
@@ -478,6 +479,7 @@ public class ImageDownloadService extends ConnectionRequest {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
+                @Override
                 public void run() {
                     createImageToStorage(url, targetList, targetModel, targetOffset,
                             targetKey, cacheId, keep, scale, priority, placeholderImage, maintainAspectRatio);
@@ -568,6 +570,7 @@ public class ImageDownloadService extends ConnectionRequest {
         if (Display.getInstance().isEdt()) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
+                @Override
                 public void run() {
                     createImageToStorage(url, l, cacheId, keep, toScale,
                             priority, placeholder, maintainAspectRatio);
@@ -584,6 +587,7 @@ public class ImageDownloadService extends ConnectionRequest {
             final Image i = im;
             Display.getInstance().callSerially(new Runnable() {
 
+                @Override
                 public void run() {
                     l.setIcon(i);
                     Form f = l.getComponentForm();
@@ -756,6 +760,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void handleException(Exception err) {
         if (onErrorListeners != null) {
             NetworkEvent ne = new NetworkEvent(this, err);
@@ -766,6 +771,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void handleErrorResponseCode(int code, String message) {
         if (onErrorListeners != null) {
             NetworkEvent ne = new NetworkEvent(this, code, message);
@@ -776,6 +782,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void postResponse() {
         // trigger an exception in case of an invalid image
         result.getWidth();
@@ -791,6 +798,7 @@ public class ImageDownloadService extends ConnectionRequest {
             if (parentLabel.getComponentForm() != null) {
                 Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
                     public void run() {
                         if (isDownloadToStyles()) {
                             parentLabel.getUnselectedStyle().setBgImage(i);
@@ -812,6 +820,7 @@ public class ImageDownloadService extends ConnectionRequest {
             } else {
                 Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
                     public void run() {
                         if (isDownloadToStyles()) {
                             parentLabel.getUnselectedStyle().setBgImage(i);
@@ -853,6 +862,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void readResponse(InputStream input) throws IOException {
         int imageScaleWidth = -1, imageScaleHeight = -1;
         if (fastScale) {
@@ -929,6 +939,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         return (o instanceof ImageDownloadService) && ((ImageDownloadService) o).cacheId != null &&
                 ((ImageDownloadService) o).cacheId.equals(cacheId);
@@ -937,6 +948,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return cacheId != null ? cacheId.hashCode() : 0;
     }

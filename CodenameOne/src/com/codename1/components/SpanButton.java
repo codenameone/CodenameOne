@@ -205,6 +205,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      * @return The component used for styling font icons on this SpanLabel.
      * @since 7.0
      */
+    @Override
     public Component getIconStyleComponent() {
         return actualButton.getIconStyleComponent();
     }
@@ -232,6 +233,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @return the uiid
      */
+    @Override
     public String getIconUIID() {
         return actualButton.getUIID();
     }
@@ -241,6 +243,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @param uiid the uiid for the icon
      */
+    @Override
     public void setIconUIID(String uiid) {
         actualButton.setUIID(uiid);
         updateGap();
@@ -258,6 +261,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @return the text
      */
+    @Override
     public String getText() {
         return text.getText();
     }
@@ -267,6 +271,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @param t text of the button
      */
+    @Override
     public void setText(String t) {
         if (shouldLocalize) {
             text.setText(getUIManager().localize(t, t));
@@ -280,6 +285,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @return the icon
      */
+    @Override
     public Image getIcon() {
         return actualButton.getIcon();
     }
@@ -289,6 +295,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @param i the icon
      */
+    @Override
     public void setIcon(Image i) {
         actualButton.setIcon(i);
         updateGap();
@@ -300,6 +307,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      * @param l
      * @since 7.0
      */
+    @Override
     public void addLongPressListener(ActionListener l) {
         actualButton.addLongPressListener(l);
     }
@@ -310,6 +318,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      * @param l
      * @since 7.0
      */
+    @Override
     public void removeLongPressListener(ActionListener l) {
         actualButton.removeLongPressListener(l);
     }
@@ -319,6 +328,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @param l the listener
      */
+    @Override
     public void addActionListener(ActionListener<ActionEvent> l) {
         actualButton.addActionListener(l);
     }
@@ -328,6 +338,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @param l the listener
      */
+    @Override
     public void removeActionListener(ActionListener<ActionEvent> l) {
         actualButton.removeActionListener(l);
     }
@@ -374,6 +385,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{
                 "text", "icon", "iconPosition", "textUiid", "iconUiid"
@@ -383,6 +395,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
                 String.class, // text
@@ -396,6 +409,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "Image", "String", "String", "String"};
     }
@@ -403,6 +417,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("text".equals(name)) {
             return getText();
@@ -425,6 +440,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("text".equals(name)) {
             setText((String) value);
@@ -476,6 +492,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @return the pressed icon
      */
+    @Override
     public Image getPressedIcon() {
         return actualButton.getPressedIcon();
     }
@@ -485,6 +502,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @param i the icon
      */
+    @Override
     public void setPressedIcon(Image i) {
         actualButton.setPressedIcon(i);
     }
@@ -494,6 +512,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @return the pressed icon
      */
+    @Override
     public Image getRolloverIcon() {
         return actualButton.getRolloverIcon();
     }
@@ -503,6 +522,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @param i the icon
      */
+    @Override
     public void setRolloverIcon(Image i) {
         actualButton.setRolloverIcon(i);
     }
@@ -512,6 +532,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @return the pressed icon
      */
+    @Override
     public Image getDisabledIcon() {
         return actualButton.getDisabledIcon();
     }
@@ -521,6 +542,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      *
      * @param i the icon
      */
+    @Override
     public void setDisabledIcon(Image i) {
         actualButton.setDisabledIcon(i);
     }
@@ -668,6 +690,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      * @param c    one of the constants from {@link com.codename1.ui.FontImage}
      * @param size the size of the icon in millimeters
      */
+    @Override
     public void setMaterialIcon(char c, float size) {
         actualButton.setMaterialIcon(c, size);
     }
@@ -678,6 +701,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      * @param c    one of the constants from the font
      * @param size the size of the icon in millimeters
      */
+    @Override
     public void setFontIcon(Font font, char c, float size) {
         actualButton.setFontIcon(font, c, size);
     }

@@ -79,6 +79,7 @@ public class AutoCompleteTextComponent extends TextComponent {
                         text.setHeight(getHeight());
                         ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation("FloatingHint", animationSpeed));
                         getAnimationManager().addAnimation(anim, new Runnable() {
+                            @Override
                             public void run() {
                                 Component.setSameSize(field);
                                 text.remove();
@@ -111,6 +112,7 @@ public class AutoCompleteTextComponent extends TextComponent {
                         }
                         ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
                         getAnimationManager().addAnimation(anim, new Runnable() {
+                            @Override
                             public void run() {
                                 setHint(getLabel().getText());
                                 getLabel().setVisible(false);
@@ -141,6 +143,7 @@ public class AutoCompleteTextComponent extends TextComponent {
         return field;
     }
 
+    @Override
     void constructUI() {
         if (getComponentCount() == 0) {
             if (isOnTopMode() && isFocusAnimation()) {
@@ -178,6 +181,7 @@ public class AutoCompleteTextComponent extends TextComponent {
         return field;
     }
 
+    @Override
     void refreshForGuiBuilder() {
         if (guiBuilderMode) {
             if (animationLayer != null) {
@@ -197,6 +201,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      *
      * @return true if the text should be on top
      */
+    @Override
     public boolean isFocusAnimation() {
         if (focusAnimation != null) {
             return focusAnimation.booleanValue();
@@ -217,6 +222,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent focusAnimation(boolean focusAnimation) {
         this.focusAnimation = Boolean.valueOf(focusAnimation);
         refreshForGuiBuilder();
@@ -230,6 +236,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent text(String text) {
         field.setText(text);
         refreshForGuiBuilder();
@@ -239,6 +246,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /**
      * Overridden for covariant return type {@inheritDoc}
      */
+    @Override
     public AutoCompleteTextComponent onTopMode(boolean onTopMode) {
         return (AutoCompleteTextComponent) super.onTopMode(onTopMode);
     }
@@ -247,6 +255,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public AutoCompleteTextComponent descriptionMessage(String descriptionMessage) {
         super.descriptionMessage(descriptionMessage);
         return this;
@@ -255,6 +264,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /**
      * Overridden for covariant return type {@inheritDoc}
      */
+    @Override
     public AutoCompleteTextComponent errorMessage(String errorMessage) {
         super.errorMessage(errorMessage);
         return this;
@@ -264,6 +274,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * Overridden for covariant return type      * {@inheritDoc}
      * }
      */
+    @Override
     public AutoCompleteTextComponent label(String text) {
         super.label(text);
         return this;
@@ -276,6 +287,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent labelAndHint(String text) {
         super.label(text);
         hint(text);
@@ -289,6 +301,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent hint(String hint) {
         field.setHint(hint);
         refreshForGuiBuilder();
@@ -302,6 +315,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent hint(Image hint) {
         field.setHintIcon(hint);
         refreshForGuiBuilder();
@@ -315,6 +329,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent multiline(boolean multiline) {
         field.setSingleLineTextArea(!multiline);
         refreshForGuiBuilder();
@@ -329,6 +344,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent columns(int columns) {
         field.setColumns(columns);
         refreshForGuiBuilder();
@@ -343,6 +359,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent rows(int rows) {
         field.setRows(rows);
         refreshForGuiBuilder();
@@ -359,6 +376,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
+    @Override
     public AutoCompleteTextComponent constraint(int constraint) {
         field.setConstraint(constraint);
         return this;
@@ -376,6 +394,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"text", "label", "hint", "multiline", "columns", "rows", "constraint"};
     }
@@ -383,6 +402,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, String.class, Boolean.class, Integer.class, Integer.class, Integer.class};
     }
@@ -390,6 +410,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "String", "String", "Boolean", "Integer", "Integer", "Integer"};
     }
@@ -397,6 +418,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("text".equals(name)) {
             return field.getText();
@@ -423,6 +445,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("text".equals(name)) {
             text((String) value);

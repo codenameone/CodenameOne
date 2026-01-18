@@ -379,6 +379,7 @@ public class DateFormatSymbols implements Cloneable {
         eras = newEras;
     }
 
+    @Override
     public Object clone() {
         DateFormatSymbols dfs = new DateFormatSymbols();
         // TODO: do a deep clone

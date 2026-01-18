@@ -134,6 +134,7 @@ public final class StorageImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public byte[] getImageData() {
         if (data != null) {
             return data;

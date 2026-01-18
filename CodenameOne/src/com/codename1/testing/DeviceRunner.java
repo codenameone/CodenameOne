@@ -120,6 +120,7 @@ public abstract class DeviceRunner {
                 class RunTestImpl implements Runnable {
                     boolean result;
 
+                    @Override
                     public void run() {
                         try {
                             t.prepare();

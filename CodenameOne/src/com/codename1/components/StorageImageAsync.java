@@ -65,6 +65,7 @@ public final class StorageImageAsync extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void resetCache() {
         super.resetCache();
     }
@@ -72,6 +73,7 @@ public final class StorageImageAsync extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Image getInternal() {
         if (imageData == null) {
             if (!queued) {
@@ -86,6 +88,7 @@ public final class StorageImageAsync extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public byte[] getImageData() {
         if (imageData != null) {
             return imageData;
@@ -96,12 +99,14 @@ public final class StorageImageAsync extends EncodedImage {
             }
             queued = true;
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                @Override
                 public void run() {
                     try {
                         final byte[] imageDataLocal = (byte[]) Storage.getInstance().readObject(fileName);
 
                         // we need to change the image on the EDT to avoid potential race conditions
                         Display.getInstance().callSerially(new Runnable() {
+                            @Override
                             public void run() {
                                 imageData = imageDataLocal;
                                 resetCache();
@@ -122,6 +127,7 @@ public final class StorageImageAsync extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (changePending) {
             if (imageCreated) {
@@ -135,6 +141,7 @@ public final class StorageImageAsync extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAnimation() {
         return true;
     }

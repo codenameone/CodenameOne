@@ -41,6 +41,7 @@ public class Insets {
         return top * bottom * left * right + top + bottom + left + right;
     }
 
+    @Override
     public Object clone() {
         return new Insets(top, left, bottom, right);
     }

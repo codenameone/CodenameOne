@@ -79,6 +79,7 @@ public class DefaultTableModel extends AbstractTableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getRowCount() {
         return data.size();
     }
@@ -86,6 +87,7 @@ public class DefaultTableModel extends AbstractTableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getColumnCount() {
         return columnNames.length;
     }
@@ -93,6 +95,7 @@ public class DefaultTableModel extends AbstractTableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String getColumnName(int i) {
         return columnNames[i];
     }
@@ -100,6 +103,7 @@ public class DefaultTableModel extends AbstractTableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isCellEditable(int row, int column) {
         return editable;
     }
@@ -107,6 +111,7 @@ public class DefaultTableModel extends AbstractTableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getValueAt(int row, int column) {
         try {
             return data.get(row)[column];
@@ -120,6 +125,7 @@ public class DefaultTableModel extends AbstractTableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setValueAt(int row, int column, Object o) {
         data.get(row)[column] = o;
         dispatcher.fireDataChangeEvent(column, row);
@@ -128,6 +134,7 @@ public class DefaultTableModel extends AbstractTableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addDataChangeListener(DataChangedListener d) {
         dispatcher.addListener(d);
     }
@@ -135,6 +142,7 @@ public class DefaultTableModel extends AbstractTableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeDataChangeListener(DataChangedListener d) {
         dispatcher.removeListener(d);
     }

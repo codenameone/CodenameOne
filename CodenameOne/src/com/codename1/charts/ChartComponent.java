@@ -963,6 +963,7 @@ public class ChartComponent extends Component {
 
         }
 
+        @Override
         public void start() {
             Form f = ChartComponent.this.getComponentForm();
             if (f != null) {
@@ -980,6 +981,7 @@ public class ChartComponent extends Component {
             }
         }
 
+        @Override
         public boolean animate() {
 
             if (finished) {
@@ -996,6 +998,7 @@ public class ChartComponent extends Component {
             return true;
         }
 
+        @Override
         public void paint(Graphics g) {
             Rectangle newBounds = new Rectangle(newViewPort.getBounds());
             Rectangle currentBounds = new Rectangle(currentViewPort.getBounds());
@@ -1049,6 +1052,7 @@ public class ChartComponent extends Component {
             this.motion = Motion.createLinearMotion(0, 100, duration);
         }
 
+        @Override
         public void start() {
             Form f = ChartComponent.this.getComponentForm();
             if (f != null) {
@@ -1066,6 +1070,7 @@ public class ChartComponent extends Component {
             }
         }
 
+        @Override
         public boolean animate() {
 
             if (finished) {
@@ -1083,6 +1088,7 @@ public class ChartComponent extends Component {
             return true;
         }
 
+        @Override
         public void paint(Graphics g) {
             if (chart instanceof XYChart) {
                 XYChart xyChart = (XYChart) chart;

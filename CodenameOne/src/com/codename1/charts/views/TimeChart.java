@@ -170,6 +170,7 @@ public class TimeChart extends LineChart {
      *
      * @return the chart type
      */
+    @Override
     public String getChartType() {
         return TYPE;
     }

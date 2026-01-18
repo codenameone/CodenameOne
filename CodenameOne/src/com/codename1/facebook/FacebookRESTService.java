@@ -110,6 +110,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         return createRequestURL();
     }
 
+    @Override
     protected void readResponse(InputStream input) throws IOException {
         //BufferedInputStream i = new BufferedInputStream(new InputStreamReader(input, ));
         BufferedInputStream i;
@@ -127,6 +128,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         }
     }
 
+    @Override
     public void startBlock(String block) {
         if ("paging".equals(block)) {
             return;
@@ -138,6 +140,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
             }
             node = new Vector() {
 
+                @Override
                 public synchronized void addElement(Object obj) {
                     if (responseDestination != null) {
                         if (responseOffset == -1) {
@@ -172,6 +175,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         currentData = data;
     }
 
+    @Override
     public void startArray(String block) {
         if ("paging".equals(block)) {
             return;
@@ -184,6 +188,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
             if (stack.size() == 0) {
                 node = new Vector() {
 
+                    @Override
                     public synchronized void addElement(Object obj) {
                         if (responseDestination != null) {
                             responseDestination.addItem(obj);
@@ -205,6 +210,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         stack.addElement(items);
     }
 
+    @Override
     public void endArray(String block) {
         if ("paging".equals(block)) {
             return;
@@ -218,6 +224,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         }
     }
 
+    @Override
     public void endBlock(String block) {
         if ("paging".equals(block)) {
             return;
@@ -232,12 +239,15 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
     }
 
+    @Override
     public void stringToken(String tok) {
     }
 
+    @Override
     public void numericToken(double tok) {
     }
 
+    @Override
     public void keyValue(String key, String value) {
         if (key == null) {
             return;
@@ -261,10 +271,12 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         responseDestination = des;
     }
 
+    @Override
     public boolean isAlive() {
         return !isKilled();
     }
 
+    @Override
     protected int getYield() {
         return -1;
     }
@@ -272,15 +284,18 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     /**
      * {@inheritDoc}
      */
+    @Override
     public void longToken(long tok) {
     }
 
+    @Override
     public void booleanToken(boolean tok) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -310,6 +325,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (connectionType != null ? connectionType.hashCode() : 0);

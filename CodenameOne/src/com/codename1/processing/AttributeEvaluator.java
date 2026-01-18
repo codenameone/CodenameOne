@@ -66,6 +66,7 @@ class AttributeEvaluator extends AbstractEvaluator {
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateSingle(com.codename1.path.impl.StructuredContent, java.lang.String)
      */
+    @Override
     protected Object evaluateSingle(StructuredContent element, String expr) {
         if (element.getAttribute(expr) != null) {
             return element;
@@ -77,6 +78,7 @@ class AttributeEvaluator extends AbstractEvaluator {
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(com.codename1.path.impl.StructuredContent, java.lang.String, java.lang.String)
      */
+    @Override
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
@@ -102,6 +104,7 @@ class AttributeEvaluator extends AbstractEvaluator {
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftGreaterRight(com.codename1.path.impl.StructuredContent, java.lang.String, java.lang.String)
      */
+    @Override
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
@@ -127,6 +130,7 @@ class AttributeEvaluator extends AbstractEvaluator {
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftEqualsRight(com.codename1.path.impl.StructuredContent, java.lang.String, java.lang.String)
      */
+    @Override
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);

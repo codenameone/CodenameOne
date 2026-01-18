@@ -2598,6 +2598,7 @@ public class Component implements Animation, StyleListener, Editable {
         paintinShadowInBackground_ = true;
 
         Runnable createImageTask = new Runnable() {
+            @Override
             public void run() {
                 // We paint shadow in a background thread to avoid jank on the EDT.  It is possible that this
                 // will cause problems on some platforms.  If that is the case, we can hedge and move it onto
@@ -2692,6 +2693,7 @@ public class Component implements Animation, StyleListener, Editable {
                     }
 
                     CN.callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             Container surface = findSurface();
                             if (surface != null) {
@@ -2942,6 +2944,7 @@ public class Component implements Animation, StyleListener, Editable {
             //execute the task
             Display.getInstance().callSerially(new Runnable() {
 
+                @Override
                 public void run() {
                     refreshTask.run();
                     //once the task has finished scroll to 0
@@ -3308,6 +3311,7 @@ public class Component implements Animation, StyleListener, Editable {
      *
      * @param g the component graphics
      */
+    @Override
     public void paint(Graphics g) {
     }
 
@@ -5027,6 +5031,7 @@ public class Component implements Animation, StyleListener, Editable {
                     refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
                     c.add(refreshLabel);
                     p.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+                        @Override
                         public void actionPerformed(ActionEvent evt) {
                             pointerReleaseMaterialPullToRefresh();
                             p.removePointerReleasedListener(this);
@@ -5107,6 +5112,7 @@ public class Component implements Animation, StyleListener, Editable {
             if (dragCallbacks < 2) {
                 dragCallbacks++;
                 Display.getInstance().callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         if (dragActivated) {
                             lead.pointerDragged(oldx, oldy, currentPointerPress);
@@ -6237,6 +6243,7 @@ public class Component implements Animation, StyleListener, Editable {
      *
      * @return a string representation of this component
      */
+    @Override
     public String toString() {
         String className = getClass().getName();
         className = className.substring(className.lastIndexOf('.') + 1);
@@ -6411,6 +6418,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (!visible) {
             return false;
@@ -6946,6 +6954,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #getEditingDelegate()
      * @see #setEditingDelegate(com.codename1.ui.Editable)
      */
+    @Override
     public void startEditingAsync() {
         // Empty implementation overridden by subclass
         if (editingDelegate != null) {
@@ -6963,6 +6972,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #getEditingDelegate()
      * @see #setEditingDelegate(com.codename1.ui.Editable)
      */
+    @Override
     public void stopEditing(Runnable onFinish) {
         if (editingDelegate != null) {
             editingDelegate.stopEditing(onFinish);
@@ -6979,6 +6989,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #getEditingDelegate()
      * @see #setEditingDelegate(com.codename1.ui.Editable)
      */
+    @Override
     public boolean isEditing() {
         if (editingDelegate != null) {
             return editingDelegate.isEditing();
@@ -6997,6 +7008,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #startEditingAsync()
      * @see #stopEditing(java.lang.Runnable)
      */
+    @Override
     public boolean isEditable() {
         if (editingDelegate != null) {
             return editingDelegate.isEditable();
@@ -7083,6 +7095,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @param propertyName the property name that was changed
      * @param source       The changed Style object
      */
+    @Override
     public void styleChanged(String propertyName, Style source) {
         //changing the Font, Padding, Margin may casue the size of the Component to Change
         //therefore we turn on the shouldCalcPreferredSize flag
@@ -8041,6 +8054,7 @@ public class Component implements Animation, StyleListener, Editable {
         Painter original;
         Painter dest;
 
+        @Override
         public void paint(Graphics g, Rectangle rect) {
             int oAlpha = g.getAlpha();
             if (alpha == 0) {
@@ -8114,6 +8128,7 @@ public class Component implements Animation, StyleListener, Editable {
             previousTint = previous;
         }
 
+        @Override
         public void paint(Graphics g, Rectangle rect) {
             if (painter != null) {
                 if (previousTint != null) {
@@ -8276,6 +8291,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
 
+        @Override
         public boolean animate() {
             if (wMotion.isFinished() && hMotion.isFinished()) {
                 getComponentForm().deregisterAnimated(this);
@@ -8288,6 +8304,7 @@ public class Component implements Animation, StyleListener, Editable {
             return false;
         }
 
+        @Override
         public void paint(Graphics g) {
         }
     }

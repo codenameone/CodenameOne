@@ -254,6 +254,7 @@ public class TextSelection {
                         if (scrollX != selectionRoot.getScrollX()) {
                             selectionRoot.repaint();
                             CN.callSerially(new Runnable() {
+                                @Override
                                 public void run() {
                                     Form f = selectionRoot.getComponentForm();
                                     if (f != null) {
@@ -270,6 +271,7 @@ public class TextSelection {
                         if (scrollX != selectionRoot.getScrollX()) {
                             selectionRoot.repaint();
                             CN.callSerially(new Runnable() {
+                                @Override
                                 public void run() {
                                     Form f = selectionRoot.getComponentForm();
                                     if (f != null) {
@@ -286,6 +288,7 @@ public class TextSelection {
                         if (scrollY != selectionRoot.getScrollY()) {
                             selectionRoot.repaint();
                             CN.callSerially(new Runnable() {
+                                @Override
                                 public void run() {
                                     Form f = selectionRoot.getComponentForm();
                                     if (f != null) {
@@ -302,6 +305,7 @@ public class TextSelection {
                         if (scrollY != selectionRoot.getScrollY()) {
                             selectionRoot.repaint();
                             CN.callSerially(new Runnable() {
+                                @Override
                                 public void run() {
                                     Form f = selectionRoot.getComponentForm();
                                     if (f != null) {
@@ -827,6 +831,7 @@ public class TextSelection {
             return pos;
         }
 
+        @Override
         public String toString() {
             return "Char{pos:" + pos + ", bounds:" + bounds + "}";
         }
@@ -892,6 +897,7 @@ public class TextSelection {
             return chars.iterator();
         }
 
+        @Override
         public String toString() {
             return "Span{" + chars + "; Bounds: " + getBounds() + "}";
         }
@@ -1396,6 +1402,7 @@ public class TextSelection {
             selectAll.addActionListener(this);
         }
 
+        @Override
         public void actionPerformed(ActionEvent e) {
             if (e.getSource() == selectAll) {
                 selectAll();

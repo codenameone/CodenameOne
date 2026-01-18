@@ -164,6 +164,7 @@ public class RSSReader extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initComponent() {
         super.initComponent();
         if (designMode) {
@@ -304,6 +305,7 @@ public class RSSReader extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"limit", "url", "blockList", "progressTitle", "displayProgressPercentage", "target"};
     }
@@ -311,6 +313,7 @@ public class RSSReader extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, String.class, Boolean.class, String.class, Boolean.class, Container.class};
     }
@@ -318,6 +321,7 @@ public class RSSReader extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("limit".equals(name)) {
             return Integer.valueOf(limit); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
@@ -356,6 +360,7 @@ public class RSSReader extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("limit".equals(name)) {
             limit = ((Integer) value).intValue();
@@ -461,6 +466,7 @@ public class RSSReader extends List {
             this.url = url;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             Display.getInstance().execute(url);
         }
@@ -474,6 +480,7 @@ public class RSSReader extends List {
             this.sourceForm = sourceForm;
         }
 
+        @Override
         public void actionPerformed(ActionEvent ev) {
             sourceForm.showBack();
         }
@@ -481,6 +488,7 @@ public class RSSReader extends List {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean equals(Object o) {
             if (this == o) {
                 return true;
@@ -497,6 +505,7 @@ public class RSSReader extends List {
         /**
          * {@inheritDoc}
          */
+        @Override
         public int hashCode() {
             return super.hashCode();
         }
@@ -512,6 +521,7 @@ public class RSSReader extends List {
             }
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (evt instanceof NetworkEvent) {
                 waitingForResponseLock = false;

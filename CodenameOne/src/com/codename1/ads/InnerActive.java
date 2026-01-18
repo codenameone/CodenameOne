@@ -81,6 +81,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
     /**
      * initialize the ads service
      */
+    @Override
     public void initService(Ads ads) {
         this.os = Display.getInstance().getPlatformName();
         if ("and".equals(os)) {
@@ -159,6 +160,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -191,6 +193,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + po;
@@ -203,6 +206,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void readResponse(InputStream input) throws IOException {
         StringBuffer buf = new StringBuffer();
         byte[] buffer = new byte[256];

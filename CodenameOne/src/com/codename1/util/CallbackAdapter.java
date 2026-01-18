@@ -33,6 +33,7 @@ public class CallbackAdapter<T> implements Callback<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void onSucess(T value) {
 
     }
@@ -40,6 +41,7 @@ public class CallbackAdapter<T> implements Callback<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
 
     }

@@ -37,12 +37,14 @@ public abstract class AbstractTest implements UnitTest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void prepare() {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void cleanup() {
     }
 
@@ -50,6 +52,7 @@ public abstract class AbstractTest implements UnitTest {
      * Defaults to two minutes.<br>
      * {@inheritDoc}
      */
+    @Override
     public int getTimeoutMillis() {
         return 120000;
     }
@@ -59,6 +62,7 @@ public abstract class AbstractTest implements UnitTest {
      * <p>
      * {@inheritDoc}
      */
+    @Override
     public boolean shouldExecuteOnEDT() {
         return false;
     }

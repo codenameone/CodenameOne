@@ -89,6 +89,7 @@ public class WebBrowser extends Container {
                 BrowserComponent b = new BrowserComponent();
                 b.addWebEventListener("onStart", new ActionListener() {
 
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         onStart((String) evt.getSource());
                     }
@@ -96,12 +97,14 @@ public class WebBrowser extends Container {
 
                 b.addWebEventListener("onLoad", new ActionListener() {
 
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         onLoad((String) evt.getSource());
                     }
                 });
                 b.addWebEventListener("onError", new ActionListener() {
 
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         onError((String) evt.getSource(), evt.getKeyEvent());
                     }
@@ -118,10 +121,12 @@ public class WebBrowser extends Container {
         isNative = false;
         HTMLComponent h = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {
 
+            @Override
             protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo,
                                                                 final IOCallback callback, final Object[] response) {
                 return new ConnectionRequest() {
 
+                    @Override
                     protected void buildRequestBody(OutputStream os) throws IOException {
                         // PMD Fix (CollapsibleIfStatements): Merge the post and parameter checks into a single conditional.
                         if (isPost() && docInfo.getParams() != null) {
@@ -139,6 +144,7 @@ public class WebBrowser extends Container {
                         }
                     }
 
+                    @Override
                     protected void handleIOException(IOException err) {
                         if (callback == null) {
                             response[0] = err;
@@ -146,10 +152,12 @@ public class WebBrowser extends Container {
                         super.handleIOException(err);
                     }
 
+                    @Override
                     protected boolean shouldAutoCloseResponse() {
                         return callback != null;
                     }
 
+                    @Override
                     protected void readResponse(InputStream input) throws IOException {
                         if (callback != null) {
                             callback.streamReady(input, docInfo);
@@ -161,10 +169,12 @@ public class WebBrowser extends Container {
                         }
                     }
 
+                    @Override
                     protected void handleErrorResponseCode(int code, String message) {
                         onError(message, code);
                     }
 
+                    @Override
                     protected void handleException(Exception err) {
                         System.out.println("Error occured");
                         Log.e(err);
@@ -173,6 +183,7 @@ public class WebBrowser extends Container {
                         }
                     }
 
+                    @Override
                     public boolean onRedirect(String url) {
                         onStart(url);
                         if (((HTMLComponent) internal).getPageStatus() == HTMLCallback.STATUS_CANCELLED) {
@@ -189,6 +200,7 @@ public class WebBrowser extends Container {
         h.setIgnoreCSS(true);
         h.setHTMLCallback(new DefaultHTMLCallback() {
 
+            @Override
             public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
                 Form f = htmlC.getComponentForm();
                 if (f != null) {
@@ -400,6 +412,7 @@ public class WebBrowser extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"url", "html"};
     }
@@ -407,6 +420,7 @@ public class WebBrowser extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class};
     }
@@ -414,6 +428,7 @@ public class WebBrowser extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "String"};
     }
@@ -421,6 +436,7 @@ public class WebBrowser extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("url".equals(name)) {
             return getURL();
@@ -434,6 +450,7 @@ public class WebBrowser extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("url".equals(name)) {
             setURL((String) value);
@@ -456,6 +473,7 @@ public class WebBrowser extends Container {
             this.f = f;
         }
 
+        @Override
         public void paint(Graphics g, Rectangle rect) {
             int x = f.getWidth() / 2 - progress.getPreferredW() / 2;
             int y = f.getHeight() / 2 - progress.getPreferredH() / 2;
@@ -466,10 +484,12 @@ public class WebBrowser extends Container {
             progress.paintComponent(g, true);
         }
 
+        @Override
         public boolean animate() {
             return true;
         }
 
+        @Override
         public void paint(Graphics g) {
             paint(g, null);
         }

@@ -101,6 +101,7 @@ public class Dimension2D {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "width = " + width + " height = " + height;
     }

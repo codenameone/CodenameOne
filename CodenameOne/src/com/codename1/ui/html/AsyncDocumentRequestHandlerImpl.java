@@ -46,6 +46,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
     /**
      * {@inheritDoc}
      */
+    @Override
     public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
         String url = docInfo.getUrl();
         if (url.startsWith("jar://") || url.startsWith("res://") || url.startsWith("local://")) {
@@ -59,6 +60,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
     /**
      * {@inheritDoc}
      */
+    @Override
     public InputStream resourceRequested(DocumentInfo docInfo) {
         return null;
     }
@@ -131,6 +133,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
             this.response = response;
         }
 
+        @Override
         protected void buildRequestBody(OutputStream os) throws IOException {
             if (isPost()) {
                 if (docInfo.getParams() != null) {
@@ -140,6 +143,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
             }
         }
 
+        @Override
         protected void handleIOException(IOException err) {
             if (callback == null) {
                 response[0] = err;
@@ -147,10 +151,12 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
             super.handleIOException(err);
         }
 
+        @Override
         protected boolean shouldAutoCloseResponse() {
             return callback != null;
         }
 
+        @Override
         protected void readResponse(InputStream input) throws IOException {
             if (callback != null) {
                 callback.streamReady(input, docInfo);

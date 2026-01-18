@@ -73,6 +73,7 @@ public class CoordinateLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void layoutContainer(Container parent) {
         if (width < 0) {
             return;
@@ -98,6 +99,7 @@ public class CoordinateLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getPreferredSize(Container parent) {
         Dimension retVal = new Dimension();
         int numOfcomponents = parent.getComponentCount();
@@ -113,6 +115,7 @@ public class CoordinateLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isOverlapSupported() {
         return true;
     }

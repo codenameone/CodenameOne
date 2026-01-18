@@ -168,6 +168,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      *
      * @param al the action listener
      */
+    @Override
     public void addActionListener(ActionListener al) {
         emblem.addActionListener(al);
     }
@@ -177,6 +178,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      *
      * @param al the action listener
      */
+    @Override
     public void removeActionListener(ActionListener al) {
         emblem.removeActionListener(al);
     }
@@ -226,6 +228,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      *
      * @param l
      */
+    @Override
     public void addPointerReleasedListener(ActionListener l) {
         emblem.addPointerReleasedListener(l);
     }
@@ -235,6 +238,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      *
      * @param l
      */
+    @Override
     public void removePointerReleasedListener(ActionListener l) {
         emblem.removePointerReleasedListener(l);
     }
@@ -661,6 +665,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      *
      * @return the image instance
      */
+    @Override
     public Image getIcon() {
         return icon.getIcon();
     }
@@ -670,6 +675,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      *
      * @param i the icon
      */
+    @Override
     public void setIcon(Image i) {
         icon.setIcon(i);
         updateGap();
@@ -771,6 +777,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      *
      * @return the UIID
      */
+    @Override
     public String getIconUIID() {
         return icon.getUIID();
     }
@@ -780,6 +787,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      *
      * @param t UIID to set
      */
+    @Override
     public void setIconUIID(String t) {
         icon.setUIID(t);
     }
@@ -946,6 +954,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{
                 "line1", "line2", "line3", "line4", "name1", "name2", "name3", "name4",
@@ -959,6 +968,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
                 String.class,// line1
@@ -994,6 +1004,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("line1".equals(name)) {
             return getTextLine1();
@@ -1097,6 +1108,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("line1".equals(name)) {
             setTextLine1((String) value);

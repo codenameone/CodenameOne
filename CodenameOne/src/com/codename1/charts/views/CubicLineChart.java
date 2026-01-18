@@ -129,6 +129,7 @@ public class CubicLineChart extends LineChart {
      * @param seriesIndex the series index
      * @param startIndex the start index of the rendering points
      */
+    @Override
     protected void drawPoints(Canvas canvas, Paint paint, List<Float> pointsList,
                               XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
         if (isRenderPoints(seriesRenderer)) {
@@ -161,6 +162,7 @@ public class CubicLineChart extends LineChart {
      *
      * @return the chart type
      */
+    @Override
     public String getChartType() {
         return TYPE;
     }

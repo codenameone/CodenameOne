@@ -81,6 +81,7 @@ public final class URLImage extends EncodedImage {
      * Will fail if the downloaded image has a different size from the placeholder image
      */
     public static final ImageAdapter RESIZE_FAIL = new ImageAdapter() {
+        @Override
         public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
             if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
                 throw new RuntimeException("Invalid image size");
@@ -88,6 +89,7 @@ public final class URLImage extends EncodedImage {
             return downloadedImage;
         }
 
+        @Override
         public boolean isAsyncAdapter() {
             return false;
         }
@@ -101,6 +103,7 @@ public final class URLImage extends EncodedImage {
      * Scales the image to match the size of the new image exactly
      */
     public static final ImageAdapter RESIZE_SCALE = new ImageAdapter() {
+        @Override
         public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
             if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
                 return downloadedImage.scaledEncoded(placeholderImage.getWidth(), placeholderImage.getHeight());
@@ -108,6 +111,7 @@ public final class URLImage extends EncodedImage {
             return downloadedImage;
         }
 
+        @Override
         public boolean isAsyncAdapter() {
             return false;
         }
@@ -343,6 +347,7 @@ public final class URLImage extends EncodedImage {
 
     private void loadImageFromLocalUrl(final String targetKey, final boolean useFileSystemStorage) {
         imageLoader.run(new Runnable() {
+            @Override
             public void run() {
                 try {
                     InputStream input;
@@ -360,6 +365,7 @@ public final class URLImage extends EncodedImage {
                         Util.copy(input, output);
                     }
                     runAndWait(new Runnable() {
+                        @Override
                         public void run() {
                             try {
                                 Image value = url.startsWith("image:") ? Resources.getGlobalResources().getImage(url) :
@@ -417,10 +423,13 @@ public final class URLImage extends EncodedImage {
                     if (url.startsWith("http://") || url.startsWith("https://")) {
                         Util.downloadImageToStorage(url, storageFile + IMAGE_SUFFIX,
                                 new SuccessCallback<Image>() {
+                                    @Override
                                     public void onSucess(final Image value) {
                                         imageLoader.run(new Runnable() {
+                                            @Override
                                             public void run() {
                                                 runAndWait(new Runnable() {
+                                                    @Override
                                                     public void run() {
                                                         DownloadCompleted onComplete = new DownloadCompleted();
                                                         onComplete.setSourceImage(value);
@@ -443,10 +452,13 @@ public final class URLImage extends EncodedImage {
                         // Load image from http
                         Util.downloadImageToStorage(url, storageFile,
                                 new SuccessCallback<Image>() {
+                                    @Override
                                     public void onSucess(final Image value) {
                                         imageLoader.run(new Runnable() {
+                                            @Override
                                             public void run() {
                                                 runAndWait(new Runnable() {
+                                                    @Override
                                                     public void run() {
                                                         DownloadCompleted onComplete = new DownloadCompleted();
                                                         onComplete.setSourceImage(value);
@@ -482,10 +494,13 @@ public final class URLImage extends EncodedImage {
                         Util.downloadImageToFileSystem(url, fileSystemFile + IMAGE_SUFFIX,
                                 new SuccessCallback<Image>() {
 
+                                    @Override
                                     public void onSucess(final Image value) {
                                         imageLoader.run(new Runnable() {
+                                            @Override
                                             public void run() {
                                                 runAndWait(new Runnable() {
+                                                    @Override
                                                     public void run() {
                                                         DownloadCompleted onComplete = new DownloadCompleted();
                                                         onComplete.setSourceImage(value);
@@ -508,10 +523,13 @@ public final class URLImage extends EncodedImage {
                         Util.downloadImageToFileSystem(url, fileSystemFile,
                                 new SuccessCallback<Image>() {
 
+                                    @Override
                                     public void onSucess(final Image value) {
                                         imageLoader.run(new Runnable() {
+                                            @Override
                                             public void run() {
                                                 runAndWait(new Runnable() {
+                                                    @Override
                                                     public void run() {
                                                         DownloadCompleted onComplete = new DownloadCompleted();
                                                         onComplete.setSourceImage(value);
@@ -542,6 +560,7 @@ public final class URLImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Image getInternal() {
         if (imageData == null) {
             fetch();
@@ -562,6 +581,7 @@ public final class URLImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public byte[] getImageData() {
         if (imageData != null) {
             return imageData;
@@ -572,6 +592,7 @@ public final class URLImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (repaintImage) {
             repaintImage = false;
@@ -601,6 +622,7 @@ public final class URLImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAnimation() {
         return repaintImage || imageData == null;
     }
@@ -640,6 +662,7 @@ public final class URLImage extends EncodedImage {
     }
 
     static class ScaleToFill implements ImageAdapter {
+        @Override
         public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
             if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
                 Image tmp = downloadedImage.getInternal().scaledLargerRatio(placeholderImage.getWidth(), placeholderImage.getHeight());
@@ -669,6 +692,7 @@ public final class URLImage extends EncodedImage {
             return i;
         }
 
+        @Override
         public boolean isAsyncAdapter() {
             return false;
         }
@@ -690,6 +714,7 @@ public final class URLImage extends EncodedImage {
             this.resizeRule = resize;
             this.placeholderImage = placeholder;
             Util.downloadImageToCache(url, new SuccessCallback<Image>() {
+                @Override
                 public void onSucess(Image downloadedImage) {
                     switch (resizeRule) {
                         case FLAG_RESIZE_FAIL: {
@@ -736,6 +761,7 @@ public final class URLImage extends EncodedImage {
                 }
 
             }, new FailureCallback<Image>() {
+                @Override
                 public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
                     throw new RuntimeException("Failed to download image " + CachedImage.this.url + " from cache");
                 }
@@ -770,10 +796,12 @@ public final class URLImage extends EncodedImage {
         private EncodedImage adaptedIns;
         private Image sourceImage;
 
+        @Override
         public void run() {
             adaptedIns = adapter.adaptImage(adapt, placeholder);
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (adapter != null) {
                 try {

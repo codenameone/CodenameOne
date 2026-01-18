@@ -455,6 +455,7 @@ public class Push {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean equals(Object o) {
             if (this == o) {
                 return true;
@@ -471,6 +472,7 @@ public class Push {
         /**
          * {@inheritDoc}
          */
+        @Override
         public int hashCode() {
             return super.hashCode();
         }

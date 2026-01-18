@@ -187,6 +187,7 @@ public class InfiniteProgress extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initComponent() {
         super.initComponent();
         if (animation == null) {
@@ -201,6 +202,7 @@ public class InfiniteProgress extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         Form f = getComponentForm();
         if (f == null) {
@@ -217,6 +219,7 @@ public class InfiniteProgress extends Component {
      *
      * @return true if it animated and should be repainted.
      */
+    @Override
     public boolean animate() {
         return animate(false);
     }
@@ -259,6 +262,7 @@ public class InfiniteProgress extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         if (materialDesignMode) {
             int size = getMaterialDesignSize();
@@ -292,6 +296,7 @@ public class InfiniteProgress extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         if (this.getComponentForm() != null && Display.getInstance().getCurrent() != this.getComponentForm()) {
             return;
@@ -377,6 +382,7 @@ public class InfiniteProgress extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"animation"};
     }
@@ -384,6 +390,7 @@ public class InfiniteProgress extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Image.class};
     }
@@ -391,6 +398,7 @@ public class InfiniteProgress extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("animation".equals(name)) {
             return animation;
@@ -401,6 +409,7 @@ public class InfiniteProgress extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("animation".equals(name)) {
             this.animation = (Image) value;

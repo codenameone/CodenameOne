@@ -226,6 +226,7 @@ public class PropertyBase<T, K> {
      *
      * @return a formatted representation of the property for debugging
      */
+    @Override
     public String toString() {
         T o = get();
         if (o == null) {

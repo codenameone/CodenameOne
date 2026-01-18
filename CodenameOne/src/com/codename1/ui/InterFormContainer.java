@@ -161,6 +161,7 @@ public class InterFormContainer extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         if (!isVisible()) {
             return;

@@ -903,6 +903,7 @@ def main() -> None:
             "LiteralsFirstInComparisons",
             "LocalVariableNamingConventions",
             "MethodNamingConventions",
+            "MissingOverride"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

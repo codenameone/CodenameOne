@@ -100,6 +100,7 @@ public class NavigationCommand extends Command {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -123,6 +124,7 @@ public class NavigationCommand extends Command {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (nextForm != null ? nextForm.hashCode() : 0);

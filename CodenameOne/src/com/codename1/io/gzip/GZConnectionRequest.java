@@ -48,6 +48,7 @@ public class GZConnectionRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -71,6 +72,7 @@ public class GZConnectionRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (isGzipped ? 1 : 0);
@@ -80,6 +82,7 @@ public class GZConnectionRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void readHeaders(Object connection) throws IOException {
         super.readHeaders(connection);
 
@@ -93,6 +96,7 @@ public class GZConnectionRequest extends ConnectionRequest {
     /**
      * Overridden to convert the input stream you should now override readUnzipedResponse()
      */
+    @Override
     protected final void readResponse(InputStream input) throws IOException {
         if (isGzipped) {
             readUnzipedResponse(new GZIPInputStream(input));

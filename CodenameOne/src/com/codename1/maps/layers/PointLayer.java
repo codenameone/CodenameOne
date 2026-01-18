@@ -56,6 +56,7 @@ public class PointLayer extends Coord implements Layer {
      *
      * @return the Point name
      */
+    @Override
     public String getName() {
         return name;
     }
@@ -90,6 +91,7 @@ public class PointLayer extends Coord implements Layer {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -116,6 +118,7 @@ public class PointLayer extends Coord implements Layer {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (name != null ? name.hashCode() : 0);
@@ -126,6 +129,7 @@ public class PointLayer extends Coord implements Layer {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g, Tile tile) {
         Point pos = tile.pointPosition(this);
         int width = 6;
@@ -150,6 +154,7 @@ public class PointLayer extends Coord implements Layer {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return super.toString() + " " + name;
     }
@@ -157,6 +162,7 @@ public class PointLayer extends Coord implements Layer {
     /**
      * {@inheritDoc}
      */
+    @Override
     public BoundingBox boundingBox() {
         return null;
     }
