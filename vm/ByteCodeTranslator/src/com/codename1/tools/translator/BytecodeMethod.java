@@ -139,6 +139,17 @@ public class BytecodeMethod implements SignatureSet {
         if(maxLocals > argSlots) {
             return false;
         }
+        int maxLocalIndexUsed = -1;
+        for (Instruction i : instructions) {
+            if (i instanceof VarOp) {
+                maxLocalIndexUsed = Math.max(maxLocalIndexUsed, ((VarOp)i).getIndex());
+            } else if (i instanceof IInc) {
+                maxLocalIndexUsed = Math.max(maxLocalIndexUsed, ((IInc)i).getVar());
+            }
+        }
+        if (maxLocalIndexUsed >= argSlots) {
+            return false;
+        }
         for(Instruction i : instructions) {
             if(i instanceof LabelInstruction || i instanceof LineNumber || i instanceof IInc ||
                     i instanceof Jump || i instanceof CustomJump || i instanceof LocalVariable) {
@@ -191,12 +202,8 @@ public class BytecodeMethod implements SignatureSet {
                     case Opcodes.LMUL:
                     case Opcodes.FMUL:
                     case Opcodes.DMUL:
-                    case Opcodes.IDIV:
-                    case Opcodes.LDIV:
                     case Opcodes.FDIV:
                     case Opcodes.DDIV:
-                    case Opcodes.IREM:
-                    case Opcodes.LREM:
                     case Opcodes.FREM:
                     case Opcodes.DREM:
                     case Opcodes.INEG:
