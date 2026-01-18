@@ -27,6 +27,20 @@ public class BytecodeTranslatorRegressionTest extends BaseTest {
         String combine(String left, String right);
     }
 
+    private interface BaseNamer {
+        String name(String input);
+
+        default String decorateName(String input) {
+            return "{" + name(input) + "}";
+        }
+    }
+
+    private interface ChildNamer extends BaseNamer {
+        default String shoutName(String input) {
+            return decorateName(input).toUpperCase();
+        }
+    }
+
     private static final class Prefixer {
         private final String prefix;
 
@@ -70,6 +84,17 @@ public class BytecodeTranslatorRegressionTest extends BaseTest {
                 String expected = "<pre-alpha>-suffix|<other-AHPLA>-suffix";
                 if (!expected.equals(sample)) {
                     fail("Unexpected output: " + sample);
+                    return;
+                }
+                ChildNamer childNamer = value -> "child-" + value;
+                String inheritedDefault = childNamer.decorateName("delta");
+                String inheritedChain = childNamer.shoutName("delta");
+                if (!"{child-delta}".equals(inheritedDefault)) {
+                    fail("Unexpected inherited default method: " + inheritedDefault);
+                    return;
+                }
+                if (!"{CHILD-DELTA}".equals(inheritedChain)) {
+                    fail("Unexpected chained default method: " + inheritedChain);
                     return;
                 }
                 if (builder.length() == 0) {
