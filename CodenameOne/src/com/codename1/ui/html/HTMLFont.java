@@ -113,11 +113,11 @@ class HTMLFont {
                         int num = Integer.parseInt(str);
                         size = num;
                     } catch (NumberFormatException nfe) {
-                        if (str.equalsIgnoreCase("bold")) {
+                        if ("bold".equalsIgnoreCase(str)) {
                             bold = true;
-                        } else if (str.equalsIgnoreCase("italic")) {
+                        } else if ("italic".equalsIgnoreCase(str)) {
                             italic = true;
-                        } else if (str.equalsIgnoreCase("plain")) {
+                        } else if ("plain".equalsIgnoreCase(str)) {
                             // do nothing, but don't save as a family
                         } else if (SPECIAL_FONT_TAGS.contains(str)) {
                             HTMLComponent.fonts.put(str, this);

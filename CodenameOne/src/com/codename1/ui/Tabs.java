@@ -1362,21 +1362,21 @@ public class Tabs extends Container {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("titles")) {
+        if ("titles".equals(name)) {
             String[] t = new String[getTabCount()];
             for (int iter = 0; iter < t.length; iter++) {
                 t[iter] = getTabTitle(iter);
             }
             return t;
         }
-        if (name.equals("icons")) {
+        if ("icons".equals(name)) {
             Image[] t = new Image[getTabCount()];
             for (int iter = 0; iter < t.length; iter++) {
                 t[iter] = getTabIcon(iter);
             }
             return t;
         }
-        if (name.equals("selectedIcons")) {
+        if ("selectedIcons".equals(name)) {
             Image[] t = new Image[getTabCount()];
             for (int iter = 0; iter < t.length; iter++) {
                 t[iter] = getTabSelectedIcon(iter);
@@ -1390,14 +1390,14 @@ public class Tabs extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("titles")) {
+        if ("titles".equals(name)) {
             String[] t = (String[]) value;
             for (int iter = 0; iter < Math.min(getTabCount(), t.length); iter++) {
                 setTabTitle(t[iter], getTabIcon(iter), iter);
             }
             return null;
         }
-        if (name.equals("icons")) {
+        if ("icons".equals(name)) {
             Image[] t = (Image[]) value;
             if (t == null) {
                 for (int iter = 0; iter < getTabCount(); iter++) {
@@ -1410,7 +1410,7 @@ public class Tabs extends Container {
             }
             return null;
         }
-        if (name.equals("selectedIcons")) {
+        if ("selectedIcons".equals(name)) {
             Image[] t = (Image[]) value;
             for (int iter = 0; iter < Math.min(getTabCount(), t.length); iter++) {
                 setTabSelectedIcon(iter, t[iter]);

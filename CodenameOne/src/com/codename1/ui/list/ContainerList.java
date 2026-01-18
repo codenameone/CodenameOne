@@ -311,7 +311,7 @@ public class ContainerList extends Container {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("ListItems")) {
+        if ("ListItems".equals(name)) {
             Object[] obj = new Object[model.getSize()];
             int olen = obj.length;
             for (int iter = 0; iter < olen; iter++) {
@@ -319,7 +319,7 @@ public class ContainerList extends Container {
             }
             return obj;
         }
-        if (name.equals("Renderer")) {
+        if ("Renderer".equals(name)) {
             return getRenderer();
         }
         return null;
@@ -329,11 +329,11 @@ public class ContainerList extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("ListItems")) {
+        if ("ListItems".equals(name)) {
             setModel(new DefaultListModel((Object[]) value));
             return null;
         }
-        if (name.equals("Renderer")) {
+        if ("Renderer".equals(name)) {
             setRenderer((CellRenderer) value);
             return null;
         }

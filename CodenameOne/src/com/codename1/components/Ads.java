@@ -515,25 +515,25 @@ public class Ads extends Container implements HTMLCallback {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("appId")) {
+        if ("appId".equals(name)) {
             return getAppID();
         }
-        if (name.equals("updateDuration")) {
+        if ("updateDuration".equals(name)) {
             return Integer.valueOf(getUpdateDuration()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
-        if (name.equals("age")) {
+        if ("age".equals(name)) {
             return getAge();
         }
-        if (name.equals("gender")) {
+        if ("gender".equals(name)) {
             return getGender();
         }
-        if (name.equals("category")) {
+        if ("category".equals(name)) {
             return getCategory();
         }
-        if (name.equals("location")) {
+        if ("location".equals(name)) {
             return getLocation();
         }
-        if (name.equals("keywords")) {
+        if ("keywords".equals(name)) {
             return getKeywords();
         }
         return null;
@@ -543,31 +543,31 @@ public class Ads extends Container implements HTMLCallback {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("appId")) {
+        if ("appId".equals(name)) {
             setAppID((String) value);
             return null;
         }
-        if (name.equals("updateDuration")) {
+        if ("updateDuration".equals(name)) {
             setUpdateDuration(((Integer) value).intValue());
             return null;
         }
-        if (name.equals("age")) {
+        if ("age".equals(name)) {
             setAge((String) value);
             return null;
         }
-        if (name.equals("gender")) {
+        if ("gender".equals(name)) {
             setGender((String) value);
             return null;
         }
-        if (name.equals("category")) {
+        if ("category".equals(name)) {
             setCategory((String) value);
             return null;
         }
-        if (name.equals("location")) {
+        if ("location".equals(name)) {
             setLocation((String) value);
             return null;
         }
-        if (name.equals("keywords")) {
+        if ("keywords".equals(name)) {
             setKeywords((String[]) value);
             return null;
         }

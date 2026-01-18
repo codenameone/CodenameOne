@@ -399,7 +399,7 @@ final class Inflate {
                             return e.r;
                         }
 
-                        if (z.msg != null && z.msg.equals("incorrect data check")) {
+                        if (z.msg != null && "incorrect data check".equals(z.msg)) {
                             this.mode = BAD;
                             this.marker = 5;       // can't try inflateSync
                             break;
@@ -412,7 +412,7 @@ final class Inflate {
                         }
                         z.msg = null;
                     } else {
-                        if (z.msg != null && z.msg.equals("incorrect data check")) {
+                        if (z.msg != null && "incorrect data check".equals(z.msg)) {
                             this.mode = BAD;
                             this.marker = 5;       // can't try inflateSync
                             break;

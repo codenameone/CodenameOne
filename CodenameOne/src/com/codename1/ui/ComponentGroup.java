@@ -254,19 +254,19 @@ public class ComponentGroup extends Container {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("elementUIID")) {
+        if ("elementUIID".equals(name)) {
             return getElementUIID();
         }
-        if (name.equals("horizontal")) {
+        if ("horizontal".equals(name)) {
             if (isHorizontal()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("groupFlag")) {
+        if ("groupFlag".equals(name)) {
             return groupFlag;
         }
-        if (name.equals("forceGroup")) {
+        if ("forceGroup".equals(name)) {
             return forceGroup ? Boolean.TRUE : Boolean.FALSE;
         }
         return null;
@@ -276,19 +276,19 @@ public class ComponentGroup extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("elementUIID")) {
+        if ("elementUIID".equals(name)) {
             setElementUIID((String) value);
             return null;
         }
-        if (name.equals("horizontal")) {
+        if ("horizontal".equals(name)) {
             setHorizontal(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("groupFlag")) {
+        if ("groupFlag".equals(name)) {
             setGroupFlag(groupFlag);
             return null;
         }
-        if (name.equals("forceGroup")) {
+        if ("forceGroup".equals(name)) {
             forceGroup = ((Boolean) value).booleanValue();
             return null;
         }

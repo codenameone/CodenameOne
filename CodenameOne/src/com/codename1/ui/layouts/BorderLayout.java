@@ -713,19 +713,19 @@ public class BorderLayout extends Layout {
      */
     private Component getComponentAtIgnoreLandscape(String constraint) {
         if (constraint != null) {
-            if (constraint.equals(NORTH)) {
+            if (NORTH.equals(constraint)) {
                 return portraitNorth;
             }
-            if (constraint.equals(SOUTH)) {
+            if (SOUTH.equals(constraint)) {
                 return portraitSouth;
             }
-            if (constraint.equals(EAST)) {
+            if (EAST.equals(constraint)) {
                 return portraitEast;
             }
-            if (constraint.equals(WEST)) {
+            if (WEST.equals(constraint)) {
                 return portraitWest;
             }
-            if (constraint.equals(CENTER)) {
+            if (CENTER.equals(constraint)) {
                 return portraitCenter;
             }
         }

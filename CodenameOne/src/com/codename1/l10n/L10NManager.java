@@ -149,7 +149,7 @@ public class L10NManager {
             if (part.length() == 0) {
                 continue;
             }
-            if (part.equalsIgnoreCase("de")) {
+            if ("de".equalsIgnoreCase(part)) {
                 continue;
             }
             String firstChar = part.substring(0, 1);

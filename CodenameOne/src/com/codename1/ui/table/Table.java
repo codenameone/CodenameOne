@@ -865,7 +865,7 @@ public class Table extends Container {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("data")) {
+        if ("data".equals(name)) {
             String[][] result = new String[((DefaultTableModel) model).data.size()][];
             for (int iter = 0; iter < result.length; iter++) {
                 Object[] o = ((DefaultTableModel) model).data.get(iter);
@@ -884,7 +884,7 @@ public class Table extends Container {
             }
             return result;
         }
-        if (name.equals("header")) {
+        if ("header".equals(name)) {
             return ((DefaultTableModel) model).columnNames;
         }
         return null;
@@ -894,11 +894,11 @@ public class Table extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("data")) {
+        if ("data".equals(name)) {
             setModel(new DefaultTableModel(((DefaultTableModel) model).columnNames, (Object[][]) value));
             return null;
         }
-        if (name.equals("header")) {
+        if ("header".equals(name)) {
             setModel(new DefaultTableModel((String[]) value, ((DefaultTableModel) model).data, ((DefaultTableModel) model).editable));
             return null;
         }

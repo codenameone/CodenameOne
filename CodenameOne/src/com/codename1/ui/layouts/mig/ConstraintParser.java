@@ -74,12 +74,12 @@ public final class ConstraintParser {
 
             int len = part.length();
             if (len == 3 || len == 11) {   // Optimization
-                if (part.equals("ltr") || part.equals("rtl") || part.equals("lefttoright") || part.equals("righttoleft")) {
+                if ("ltr".equals(part) || "rtl".equals(part) || "lefttoright".equals(part) || "righttoleft".equals(part)) {
                     lc.setLeftToRight(part.charAt(0) == 'l' ? Boolean.TRUE : Boolean.FALSE);
                     parts[i] = null;    // So we will not try to interpret it again
                 }
 
-                if (part.equals("ttb") || part.equals("btt") || part.equals("toptobottom") || part.equals("bottomtotop")) {
+                if ("ttb".equals(part) || "btt".equals(part) || "toptobottom".equals(part) || "bottomtotop".equals(part)) {
                     lc.setTopToBottom(part.charAt(0) == 't');
                     parts[i] = null;    // So we will not try to interpret it again
                 }
@@ -169,35 +169,35 @@ public final class ConstraintParser {
                 }
 
                 if (c == 'n') {
-                    if (part.equals("nogrid")) {
+                    if ("nogrid".equals(part)) {
                         lc.setNoGrid(true);
                         continue;
                     }
 
-                    if (part.equals("nocache")) {
+                    if ("nocache".equals(part)) {
                         lc.setNoCache(true);
                         continue;
                     }
 
-                    if (part.equals("novisualpadding")) {
+                    if ("novisualpadding".equals(part)) {
                         lc.setVisualPadding(false);
                         continue;
                     }
                 }
 
                 if (c == 'f') {
-                    if (part.equals("fill") || part.equals("fillx") || part.equals("filly")) {
+                    if ("fill".equals(part) || "fillx".equals(part) || "filly".equals(part)) {
                         lc.setFillX(part.length() == 4 || part.charAt(4) == 'x');
                         lc.setFillY(part.length() == 4 || part.charAt(4) == 'y');
                         continue;
                     }
 
-                    if (part.equals("flowy")) {
+                    if ("flowy".equals(part)) {
                         lc.setFlowX(false);
                         continue;
                     }
 
-                    if (part.equals("flowx")) {
+                    if ("flowx".equals(part)) {
                         lc.setFlowX(true); // This is the default but added for consistency
                         continue;
                     }
@@ -252,7 +252,7 @@ public final class ConstraintParser {
                         continue;
                     }
 
-                    if (part.startsWith("pack ") || part.equals("pack")) {
+                    if (part.startsWith("pack ") || "pack".equals(part)) {
                         String ps = part.substring(4).trim();
                         String[] packs = toTrimmedTokens(ps.length() > 0 ? ps : "pref pref", ' ');
                         lc.setPackWidth(parseBoundSize(packs[0], false, true));
@@ -386,13 +386,13 @@ public final class ConstraintParser {
                     continue;
                 }
 
-                if (part.equals("fill")) {
+                if ("fill".equals(part)) {
                     dimConstraint.setFill(true);
 //					 dimConstraint.setAlign(null);   // Can not have both fill and alignment (changed for 3.5 since it can have "growy 0")
                     continue;
                 }
 
-                if (part.equals("nogrid")) {
+                if ("nogrid".equals(part)) {
                     dimConstraint.setNoGrid(true);
                     continue;
                 }
@@ -505,12 +505,12 @@ public final class ConstraintParser {
                 char c = part.charAt(0);
 
                 if (c == 'n') {
-                    if (part.equals("north")) {
+                    if ("north".equals(part)) {
                         cc.setDockSide(0);
                         continue;
                     }
 
-                    if (part.equals("newline")) {
+                    if ("newline".equals(part)) {
                         cc.setNewline(true);
                         continue;
                     }
@@ -522,7 +522,7 @@ public final class ConstraintParser {
                     }
                 }
 
-                if (c == 'f' && (part.equals("flowy") || part.equals("flowx"))) {
+                if (c == 'f' && ("flowy".equals(part) || "flowx".equals(part))) {
                     cc.setFlowX(part.charAt(4) == 'x' ? Boolean.TRUE : Boolean.FALSE);
                     continue;
                 }
@@ -542,7 +542,7 @@ public final class ConstraintParser {
                         continue;
                     }
 
-                    if (part.equals("south")) {
+                    if ("south".equals(part)) {
                         cc.setDockSide(2);
                         continue;
                     }
@@ -797,7 +797,7 @@ public final class ConstraintParser {
                 }
 
                 if (c == 'w' || c == 'h') {
-                    if (part.equals("wrap")) {
+                    if ("wrap".equals(part)) {
                         cc.setWrap(true);
                         continue;
                     }
@@ -837,7 +837,7 @@ public final class ConstraintParser {
                         }
                     }
 
-                    if (part.equals("west")) {
+                    if ("west".equals(part)) {
                         cc.setDockSide(1);
                         continue;
                     }
@@ -859,12 +859,12 @@ public final class ConstraintParser {
                 }
 
                 if (c == 'e') {
-                    if (part.equals("east")) {
+                    if ("east".equals(part)) {
                         cc.setDockSide(3);
                         continue;
                     }
 
-                    if (part.equals("external")) {
+                    if ("external".equals(part)) {
                         cc.setExternal(true);
                         continue;
                     }
@@ -880,24 +880,24 @@ public final class ConstraintParser {
                 }
 
                 if (c == 'd') {
-                    if (part.equals("dock north")) {
+                    if ("dock north".equals(part)) {
                         cc.setDockSide(0);
                         continue;
                     }
-                    if (part.equals("dock west")) {
+                    if ("dock west".equals(part)) {
                         cc.setDockSide(1);
                         continue;
                     }
-                    if (part.equals("dock south")) {
+                    if ("dock south".equals(part)) {
                         cc.setDockSide(2);
                         continue;
                     }
-                    if (part.equals("dock east")) {
+                    if ("dock east".equals(part)) {
                         cc.setDockSide(3);
                         continue;
                     }
 
-                    if (part.equals("dock center")) {
+                    if ("dock center".equals(part)) {
                         cc.getHorizontal().setGrow(Float.valueOf(100f));
                         cc.getVertical().setGrow(Float.valueOf(100f));
                         cc.setPushX(Float.valueOf(100f));
@@ -953,7 +953,7 @@ public final class ConstraintParser {
      * @throws IllegalArgumentException if the parsing could not be done.
      */
     public static UnitValue[] parseInsets(String s, boolean acceptPanel) {
-        if (s.length() == 0 || s.equals("dialog") || s.equals("panel")) {
+        if (s.length() == 0 || "dialog".equals(s) || "panel".equals(s)) {
             if (!acceptPanel) {
                 throw new IllegalArgumentException("Insets now allowed: " + s + "\n");
             }
@@ -1081,7 +1081,7 @@ public final class ConstraintParser {
      * "null", "n" or <code>null</code>.
      */
     public static BoundSize parseBoundSize(String s, boolean isGap, boolean isHor) {
-        if (s.length() == 0 || s.equals("null") || s.equals("n")) {
+        if (s.length() == 0 || "null".equals(s) || "n".equals(s)) {
             return null;
         }
 
@@ -1175,11 +1175,11 @@ public final class ConstraintParser {
             s = s.substring(1, s.length() - 1);
         }
 
-        if (c0 == 'n' && (s.equals("null") || s.equals("n"))) {
+        if (c0 == 'n' && ("null".equals(s) || "n".equals(s))) {
             return null;
         }
 
-        if (c0 == 'i' && s.equals("inf")) {
+        if (c0 == 'i' && "inf".equals(s)) {
             return UnitValue.INF;
         }
 

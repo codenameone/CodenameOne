@@ -73,13 +73,13 @@ final class HTMLInputFormat {
         for (int i = 0; i < formatString.length(); i++) {
             char c = formatString.charAt(i);
             if (c == '*') {
-                if (!count.equals("")) {
+                if (!"".equals(count)) {
                     throw new IllegalArgumentException("Malformed format string. The wildcard * can't appear after any other count indicator.");
                 } else {
                     count += c;
                 }
             } else if ((c >= '0') && (c <= '9')) {
-                if (count.equals("*")) {
+                if ("*".equals(count)) {
                     throw new IllegalArgumentException("Malformed format string. Count indicators cannot appear after the wildcard *");
                 } else {
                     count += c;
@@ -232,7 +232,7 @@ final class HTMLInputFormat {
         }
         int i = 0;
         Enumeration e = formatConstraints.elements();
-        if (!str.equals("")) {
+        if (!"".equals(str)) {
             char c = str.charAt(i);
             while (e.hasMoreElements()) {
                 FormatConstraint constraint = (FormatConstraint) e.nextElement();
@@ -425,9 +425,9 @@ final class HTMLInputFormat {
          * @param countStr A string representing the constraint count
          */
         FormatConstraint(int type, String countStr) {
-            if (countStr.equals("*")) {
+            if ("*".equals(countStr)) {
                 count = COUNT_NO_LIMIT;
-            } else if (countStr.equals("")) {
+            } else if ("".equals(countStr)) {
                 count = COUNT_EXACTLY_ONE;
             } else {
                 try {

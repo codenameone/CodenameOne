@@ -687,7 +687,7 @@ public class SideMenuBar extends MenuBar {
                 if (p == null) {
                     //has left menu
                     hasSideMenus[0] = true;
-                } else if (p.equals(COMMAND_PLACEMENT_VALUE_RIGHT)) {
+                } else if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(p)) {
                     //has right menu
                     hasSideMenus[1] = true;
                 }
@@ -1231,7 +1231,7 @@ public class SideMenuBar extends MenuBar {
                 }
                 super.pointerReleased(x, y);
                 boolean isRTLValue = isRTL();
-                if (placement.equals(COMMAND_PLACEMENT_VALUE_RIGHT)) {
+                if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
                     isRTLValue = !isRTLValue;
                 }
                 int displayWidth = Display.getInstance().getDisplayWidth();

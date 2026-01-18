@@ -404,19 +404,19 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("text")) {
+        if ("text".equals(name)) {
             return getText();
         }
-        if (name.equals("icon")) {
+        if ("icon".equals(name)) {
             return getIcon();
         }
-        if (name.equals("iconPosition")) {
+        if ("iconPosition".equals(name)) {
             return getIconPosition();
         }
-        if (name.equals("textUiid")) {
+        if ("textUiid".equals(name)) {
             return getTextUIID();
         }
-        if (name.equals("iconUiid")) {
+        if ("iconUiid".equals(name)) {
             return getIconUIID();
         }
         return null;
@@ -426,23 +426,23 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("text")) {
+        if ("text".equals(name)) {
             setText((String) value);
             return null;
         }
-        if (name.equals("icon")) {
+        if ("icon".equals(name)) {
             setIcon((Image) value);
             return null;
         }
-        if (name.equals("iconPosition")) {
+        if ("iconPosition".equals(name)) {
             setIconPosition((String) value);
             return null;
         }
-        if (name.equals("textUiid")) {
+        if ("textUiid".equals(name)) {
             setTextUIID((String) value);
             return null;
         }
-        if (name.equals("iconUiid")) {
+        if ("iconUiid".equals(name)) {
             setIconUIID((String) value);
             return null;
         }

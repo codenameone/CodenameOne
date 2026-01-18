@@ -215,7 +215,7 @@ public class Tree extends Container {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("data")) {
+        if ("data".equals(name)) {
             return ((StringArrayTreeModel) model).arr;
         }
         return null;
@@ -225,7 +225,7 @@ public class Tree extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("data")) {
+        if ("data".equals(name)) {
             setModel(new StringArrayTreeModel((String[][]) value));
             return null;
         }
@@ -305,7 +305,7 @@ public class Tree extends Container {
      */
     protected boolean isExpanded(Component node) {
         Object e = node.getClientProperty(KEY_EXPANDED);
-        return e != null && e.equals("true");
+        return e != null && "true".equals(e);
     }
 
     private Container expandPathNode(boolean animate, Container parent, Object node) {
@@ -856,7 +856,7 @@ public class Tree extends Container {
                 c = lead;
             }
             Object e = c.getClientProperty(KEY_EXPANDED);
-            if (e != null && e.equals("true")) {
+            if (e != null && "true".equals(e)) {
                 collapseNode(c);
             } else {
                 expandNode(isInitialized(), c);

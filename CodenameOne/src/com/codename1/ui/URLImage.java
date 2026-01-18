@@ -338,7 +338,7 @@ public final class URLImage extends EncodedImage {
     }
 
     private boolean platformSupportsImageLoadingOffEdt() {
-        return CN.isSimulator() || !CN.getPlatformName().equals("ios");
+        return CN.isSimulator() || !"ios".equals(CN.getPlatformName());
     }
 
     private void loadImageFromLocalUrl(final String targetKey, final boolean useFileSystemStorage) {

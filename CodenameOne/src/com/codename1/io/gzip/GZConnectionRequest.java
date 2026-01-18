@@ -84,9 +84,9 @@ public class GZConnectionRequest extends ConnectionRequest {
         super.readHeaders(connection);
 
         // ios does gzip seamlessly so this class will just break
-        if (!Display.getInstance().getProperty("os.gzip", "false").equals("true")) {
+        if (!"true".equals(Display.getInstance().getProperty("os.gzip", "false"))) {
             String c = getHeader(connection, "Content-Encoding");
-            isGzipped = c != null && c.equalsIgnoreCase("gzip");
+            isGzipped = c != null && "gzip".equalsIgnoreCase(c);
         }
     }
 
