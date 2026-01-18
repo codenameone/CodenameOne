@@ -129,6 +129,11 @@ class ParserTest {
         String implCode = impl.generateCCode(classes);
         assertTrue(implCode.contains("&com_example_Greeter_greet___R_java_lang_String"),
                 "Implementing class should point vtable slot to the interface default method implementation");
+        assertTrue(implCode.contains("com_example_GreeterImpl_greet___R_java_lang_String"),
+                "Implementing class should emit a concrete stub for default interface methods");
+        String implHeader = impl.generateCHeader();
+        assertTrue(implHeader.contains("com_example_GreeterImpl_greet___R_java_lang_String"),
+                "Implementing class header should declare the default interface stub");
     }
 
     @Test

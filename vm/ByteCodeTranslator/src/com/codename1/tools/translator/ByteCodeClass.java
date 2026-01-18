@@ -977,9 +977,12 @@ public class ByteCodeClass {
                 }
             }
         }
-        if(baseClassObject != null) {
+        if(!isInterface) {
             List<BytecodeMethod> bm = new ArrayList<BytecodeMethod>(methods);
-            appendSuperStub(b, bm, baseClassObject);
+            if(baseClassObject != null) {
+                appendSuperStub(b, bm, baseClassObject);
+            }
+            appendDefaultInterfaceStubs(b, bm);
         }
         int offset = 0;
         if(clsName.equals("java_lang_Class")) {
@@ -1198,6 +1201,50 @@ public class ByteCodeClass {
         }
         BytecodeMethod.setAcceptStaticOnEquals(false);
     }
+
+    private boolean hasMethodInBaseClass(BytecodeMethod method) {
+        if(baseClassObject == null) {
+            return false;
+        }
+        if(baseClassObject.methods.contains(method)) {
+            return true;
+        }
+        return baseClassObject.hasMethodInBaseClass(method);
+    }
+
+    private void appendDefaultInterfaceStubs(StringBuilder b, List<BytecodeMethod> bm) {
+        if(baseInterfacesObject == null) {
+            return;
+        }
+        BytecodeMethod.setAcceptStaticOnEquals(true);
+        for(ByteCodeClass baseInterface : baseInterfacesObject) {
+            appendDefaultInterfaceStubs(b, bm, baseInterface);
+        }
+        BytecodeMethod.setAcceptStaticOnEquals(false);
+    }
+
+    private void appendDefaultInterfaceStubs(StringBuilder b, List<BytecodeMethod> bm, ByteCodeClass baseInterface) {
+        if(baseInterface == null) {
+            return;
+        }
+        if(baseClassObject != null && baseClassObject.doesImplement(baseInterface)) {
+            return;
+        }
+        for(BytecodeMethod m : baseInterface.methods) {
+            if(m.isAbstract() || m.isStatic() || m.isPrivate()) {
+                continue;
+            }
+            if(!bm.contains(m) && !hasMethodInBaseClass(m)) {
+                m.appendSuperCall(b, clsName);
+                bm.add(m);
+            }
+        }
+        if(baseInterface.baseInterfacesObject != null) {
+            for(ByteCodeClass parentInterface : baseInterface.baseInterfacesObject) {
+                appendDefaultInterfaceStubs(b, bm, parentInterface);
+            }
+        }
+    }
     
     private void appendSuperStubHeader(StringBuilder b, List<BytecodeMethod> bm, ByteCodeClass base) {
         BytecodeMethod.setAcceptStaticOnEquals(true);
@@ -1212,6 +1259,40 @@ public class ByteCodeClass {
             appendSuperStubHeader(b, bm, base.baseClassObject);
         }
         BytecodeMethod.setAcceptStaticOnEquals(false);
+    }
+
+    private void appendDefaultInterfaceStubHeaders(StringBuilder b, List<BytecodeMethod> bm) {
+        if(baseInterfacesObject == null) {
+            return;
+        }
+        BytecodeMethod.setAcceptStaticOnEquals(true);
+        for(ByteCodeClass baseInterface : baseInterfacesObject) {
+            appendDefaultInterfaceStubHeaders(b, bm, baseInterface);
+        }
+        BytecodeMethod.setAcceptStaticOnEquals(false);
+    }
+
+    private void appendDefaultInterfaceStubHeaders(StringBuilder b, List<BytecodeMethod> bm, ByteCodeClass baseInterface) {
+        if(baseInterface == null) {
+            return;
+        }
+        if(baseClassObject != null && baseClassObject.doesImplement(baseInterface)) {
+            return;
+        }
+        for(BytecodeMethod m : baseInterface.methods) {
+            if(m.isAbstract() || m.isStatic() || m.isPrivate()) {
+                continue;
+            }
+            if(!bm.contains(m) && !hasMethodInBaseClass(m)) {
+                m.appendMethodHeader(b, clsName);
+                bm.add(m);
+            }
+        }
+        if(baseInterface.baseInterfacesObject != null) {
+            for(ByteCodeClass parentInterface : baseInterface.baseInterfacesObject) {
+                appendDefaultInterfaceStubHeaders(b, bm, parentInterface);
+            }
+        }
     }
     
     private void buildInstanceFieldList(List<ByteCodeField> fieldList) {
@@ -1363,10 +1444,13 @@ public class ByteCodeClass {
         
         appendMethodsToHeader(b);
         
-        if(baseClassObject != null) {
+        if(!isInterface) {
             // append super stub
             List<BytecodeMethod> bm = new ArrayList<BytecodeMethod>(methods);
-            appendSuperStubHeader(b, bm, baseClassObject);
+            if(baseClassObject != null) {
+                appendSuperStubHeader(b, bm, baseClassObject);
+            }
+            appendDefaultInterfaceStubHeaders(b, bm);
         }
         
         for(BytecodeMethod m : virtualMethodList) {
