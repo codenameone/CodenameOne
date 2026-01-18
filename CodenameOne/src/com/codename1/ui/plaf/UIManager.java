@@ -2117,7 +2117,7 @@ public class UIManager {
             if (resourceBundle != null) {
                 String v = (String) resourceBundle.get("@rtl");
                 if (v != null) {
-                    "true".equalsIgnoreCase(getLookAndFeel().setRTL(v));
+                    getLookAndFeel().setRTL("true".equalsIgnoreCase(v));
 
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);
@@ -2153,7 +2153,7 @@ public class UIManager {
             if (bundle != null) {
                 String v = bundle.get("@rtl");
                 if (v != null) {
-                    "true".equalsIgnoreCase(getLookAndFeel().setRTL(v));
+                    getLookAndFeel().setRTL("true".equalsIgnoreCase(v));
 
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);
