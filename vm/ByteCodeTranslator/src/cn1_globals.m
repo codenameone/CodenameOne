@@ -964,6 +964,10 @@ JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_
     return alloc > CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD && totalAllocations > CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD;
 }
 
+JAVA_INT java_lang_System_identityHashCode___java_lang_Object_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    return (JAVA_INT)__cn1Arg1;
+}
+
 extern int mallocWhileSuspended;
 extern BOOL isAppSuspended;
 
