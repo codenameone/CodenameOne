@@ -1780,7 +1780,8 @@ public class ByteCodeClass {
                         bm.setForceVirtual(true);
                     }
                 } else {
-                    if(replace || (isInterface && isInterfaceInHierarchy(virtualMethods.get(offset).getClsName()))) {
+                    if(replace || (isInterface && (isInterfaceInHierarchy(virtualMethods.get(offset).getClsName()) ||
+                            "java_lang_Object".equals(virtualMethods.get(offset).getClsName())))) {
                         virtualMethods.set(offset, bm);
                         if(isInterface) {
                             bm.setForceVirtual(true);
