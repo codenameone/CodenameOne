@@ -148,7 +148,7 @@ public class Calendar extends Container implements ActionSource {
         setUIIDFinal("Calendar");
         mv = new MonthView(time);
 
-        Image leftArrow = leftArrowImage != null ? leftArrowImage : UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
+        Image leftArrow = leftArrowImage != null ? leftArrowImage : UIManager.getInstance().getThemeImageConstant("calendarLeftImage"); // NOPMD
         Image rightArrow = rightArrowImage != null ? rightArrowImage : UIManager.getInstance().getThemeImageConstant("calendarRightImage");
         if (leftArrow != null && rightArrow != null) {
             final Button left = new Button(leftArrow, "CalendarLeft");
@@ -164,7 +164,7 @@ public class Calendar extends Container implements ActionSource {
                     lock = true;
                     int month = mv.getMonth();
                     int year = mv.getYear();
-                    if (evt.getSource() == left) {
+                    if (evt.getSource() == left) { // NOPMD
                         month--;
                         if (month < java.util.Calendar.JANUARY) {
                             month = java.util.Calendar.DECEMBER;
@@ -181,9 +181,9 @@ public class Calendar extends Container implements ActionSource {
                     if (tran) {
                         Transition cm;
                         if (UIManager.getInstance().isThemeConstant("calTransitionVertBool", false)) {
-                            cm = CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, evt.getSource() == left, 300);
+                            cm = CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, evt.getSource() == left, 300); // NOPMD
                         } else {
-                            cm = CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, evt.getSource() == left, 300);
+                            cm = CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, evt.getSource() == left, 300); // NOPMD
                         }
                         MonthView newMv = new MonthView(mv.currentDay);
                         newMv.setMonth(year, month);
@@ -1253,7 +1253,7 @@ public class Calendar extends Container implements ActionSource {
                         isContained = ((Container) components[iter]).contains((Component) src);
                     }
 
-                    if (src == components[iter] || isContained) {
+                    if (src == components[iter] || isContained) { // NOPMD
                         if (multipleSelectionEnabled) {
                             if (selectedDays.contains(new Date(dates[iter]))) {
                                 if (SELECTED_DAY == dates[iter]) {

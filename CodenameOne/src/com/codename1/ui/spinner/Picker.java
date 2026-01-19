@@ -890,7 +890,7 @@ public class Picker extends Button {
      * @return
      */
     private boolean ignoreActionEvent(ActionEvent evt) {
-        return evt.getX() == -99 && evt.getY() == -99;
+        return evt.getX() == -99 && evt.getY() == -99; // NOPMD
     }
 
     @Override
@@ -902,8 +902,8 @@ public class Picker extends Button {
     public void stopEditing(Runnable onFinish) {
         stopEditingCallback = onFinish;
         Form f = this.getComponentForm();
-        if (f != null) {
-            if (f.getCurrentInputDevice() == currentInput) {
+        if (f != null) { // NOPMD
+            if (f.getCurrentInputDevice() == currentInput) { // NOPMD
                 try {
                     f.setCurrentInputDevice(null);
                 } catch (Throwable t) {
@@ -916,7 +916,7 @@ public class Picker extends Button {
     @Override
     public boolean isEditing() {
         Form f = this.getComponentForm();
-        boolean out = currentInput != null && f != null && f.getCurrentInputDevice() == currentInput;
+        boolean out = currentInput != null && f != null && f.getCurrentInputDevice() == currentInput; // NOPMD
 
         return out;
     }

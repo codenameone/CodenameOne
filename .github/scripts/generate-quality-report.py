@@ -899,6 +899,7 @@ def main() -> None:
     if pmd:
         forbidden_pmd_rules = {
             "ClassWithOnlyPrivateConstructorsShouldBeFinal",
+            "CompareObjectsWithEquals",
             "FormalParameterNamingConventions",
             "LiteralsFirstInComparisons",
             "LocalVariableNamingConventions",

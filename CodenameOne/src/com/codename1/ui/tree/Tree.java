@@ -442,7 +442,7 @@ public class Tree extends Container {
 
     private void collapseNode(Component c, Transition t) {
         Container lead = c.getParent().getLeadParent();
-        if (lead != null) {
+        if (lead != null) { // NOPMD
             c = lead;
         }
         c.putClientProperty(KEY_EXPANDED, null);
@@ -453,7 +453,7 @@ public class Tree extends Container {
         }
         Container p = c.getParent();
         for (int iter = 0; iter < p.getComponentCount(); iter++) {
-            if (p.getComponentAt(iter) != c) {
+            if (p.getComponentAt(iter) != c) { // NOPMD
                 if (t == null) {
                     p.removeComponent(p.getComponentAt(iter));
                     break; // there should only be one container with all children

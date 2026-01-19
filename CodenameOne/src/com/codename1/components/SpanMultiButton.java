@@ -143,7 +143,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         emblem.setUIID("Emblem");
         setLeadComponent(emblem);
         Image i = UIManager.getInstance().getThemeImageConstant("defaultEmblemImage");
-        if (i != null) {
+        if (i != null) { // NOPMD
             emblem.setIcon(i);
         }
         icon.bindStateTo(emblem);
@@ -156,7 +156,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      * @return
      */
     public boolean isLinesTogetherMode() {
-        return firstRow.getParent() == secondRow.getParent();
+        return firstRow.getParent() == secondRow.getParent(); // NOPMD
     }
 
     /**

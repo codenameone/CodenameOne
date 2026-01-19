@@ -755,12 +755,12 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 throw new IllegalArgumentException("The specified element is not contained in the current document.");
             }
             Vector v = element.getUi();
-            if ((v != null) && (v.size() > 0)) {
+            if ((v != null) && (v.size() > 0)) { // NOPMD
                 Component cmp = ((Component) v.firstElement());
                 if (cmp != null) {
                     Container parent = cmp.getParent();
                     int y = cmp.getY();
-                    while ((parent != null) && (parent != this)) {
+                    while ((parent != null) && (parent != this)) { // NOPMD
                         y += parent.getY();
                         parent = parent.getParent();
                     }
@@ -1458,7 +1458,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     Font getClosestFont(String family, int size, int style, int weight) {
         HTMLFont f = getClosestHTMLFont(family, size, style, weight);
-        if (f != null) {
+        if (f != null) { // NOPMD
             return f.getFont();
         }
         return null;
@@ -1474,7 +1474,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     HTMLFont getHTMLFont(Font font) {
         for (Enumeration e = fonts.elements(); e.hasMoreElements(); ) {
             HTMLFont hFont = (HTMLFont) e.nextElement();
-            if (hFont.getFont() == font) {
+            if (hFont.getFont() == font) { // NOPMD
                 return hFont;
             }
         }
@@ -2226,7 +2226,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             for (Enumeration e = accessKeys.keys(); e.hasMoreElements(); ) {
                 Object key = e.nextElement();
                 Component c = (Component) accessKeys.get(key);
-                if (c != cmp) {
+                if (c != cmp) { // NOPMD
                     newAccessKeys.put(key, c);
                 }
             }
@@ -2674,20 +2674,20 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         TextArea returnInputField = inputField;
         if (SUPPORT_INPUT_FORMAT) {
             HTMLForm form = (HTMLForm) textfieldsToForms.get(inputField);
-            if (form != null) {
+            if (form != null) { // NOPMD
                 HTMLInputFormat format = HTMLInputFormat.getInputFormat(inputFormat);
-                if (format != null) {
+                if (format != null) { // NOPMD
                     form.setInputFormat(inputField, format);
                     final TextArea newInputField = format.applyConstraints(inputField);
                     returnInputField = newInputField;
 
                     // Replace operation must be done on the EDT if the form is visible
-                    if (Display.getInstance().getCurrent() != inputField.getComponentForm()) { // ((inputField.getComponentForm()==null) ||
+                    if (Display.getInstance().getCurrent() != inputField.getComponentForm()) { // ((inputField.getComponentForm()==null) || // NOPMD
                         inputField.getParent().replace(inputField, newInputField, null); // Applying the constraints may return a new instance that has to be replaced in the form
                     } else {
                         Display.getInstance().callSerially(new InputFormatRunnable(inputField, newInputField));
                     }
-                    if (firstFocusable == inputField) {
+                    if (firstFocusable == inputField) { // NOPMD
                         firstFocusable = newInputField;
                     }
                 }

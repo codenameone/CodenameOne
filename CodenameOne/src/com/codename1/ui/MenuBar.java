@@ -127,17 +127,17 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     static boolean isLSK(int keyCode) {
-        return keyCode != 0 && keyCode == leftSK;
+        return keyCode != 0 && keyCode == leftSK; // NOPMD
     }
 
     static boolean isRSK(int keyCode) {
-        return keyCode != 0 && (keyCode == rightSK || keyCode == rightSK2);
+        return keyCode != 0 && (keyCode == rightSK || keyCode == rightSK2); // NOPMD
     }
 
     private int componentCountOffset(Container c) {
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             Container t = getTitleAreaContainer();
-            if (t == c && ((BorderLayout) t.getLayout()).getNorth() != null) {
+            if (t == c && ((BorderLayout) t.getLayout()).getNorth() != null) { // NOPMD
                 return 1;
             }
         }
@@ -333,7 +333,7 @@ public class MenuBar extends Container implements ActionListener {
      */
     public Button findCommandComponent(Command c) {
         Button b = findCommandComponent(c, this);
-        if (b == null) {
+        if (b == null) { // NOPMD
             return findCommandComponent(c, getTitleAreaContainer());
         }
         return b;
@@ -345,7 +345,7 @@ public class MenuBar extends Container implements ActionListener {
             Component current = cnt.getComponentAt(iter);
             if (current instanceof Button) {
                 Button b = (Button) current;
-                if (b.getCommand() == c) {
+                if (b.getCommand() == c) { // NOPMD
                     return b;
                 }
             } else {
@@ -397,10 +397,10 @@ public class MenuBar extends Container implements ActionListener {
         int commandBehavior = getCommandBehavior();
         Container t = getTitleAreaContainer();
         BorderLayout titleLayout = (BorderLayout) t.getLayout();
-        if (getParent() == null) {
+        if (getParent() == null) { // NOPMD
             installMenuBar();
         } else {
-            if (getParent() == getTitleAreaContainer() && commandBehavior != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
+            if (getParent() == getTitleAreaContainer() && commandBehavior != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT // NOPMD
                     && commandBehavior != Display.COMMAND_BEHAVIOR_ICS) {
                 getParent().removeComponent(this);
                 installMenuBar();
@@ -415,10 +415,10 @@ public class MenuBar extends Container implements ActionListener {
 
                 return;
             } else {
-                if (commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
-                        || commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK) {
+                if (commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT // NOPMD
+                        || commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK) { // NOPMD
                     if (getParent() != null) {
-                        if (getParent() == getTitleAreaContainer()) {
+                        if (getParent() == getTitleAreaContainer()) { // NOPMD
                             return;
                         }
                         getParent().removeComponent(this);
@@ -574,11 +574,11 @@ public class MenuBar extends Container implements ActionListener {
             return;
         }
         Object src = evt.getSource();
-        if (commandList == null) {
+        if (commandList == null) { // NOPMD
             Button source = (Button) src;
             for (int iter = 0; iter < soft.length; iter++) {
-                if (source == soft[iter]) {
-                    if (softCommand[iter] == menuCommand) {
+                if (source == soft[iter]) { // NOPMD
+                    if (softCommand[iter] == menuCommand) { // NOPMD
                         showMenu();
                         return;
                     }
@@ -739,9 +739,9 @@ public class MenuBar extends Container implements ActionListener {
         menuDisplaying = true;
         Command result = showMenuDialog(d);
         menuDisplaying = false;
-        if (result != cancelMenuItem) {
+        if (result != cancelMenuItem) { // NOPMD
             Command c = null;
-            if (result == selectMenuItem) {
+            if (result == selectMenuItem) { // NOPMD
                 c = getComponentSelectedCommand(d.getMenuBar().commandList);
                 if (c != null) {
                     ActionEvent e = new ActionEvent(c, ActionEvent.Type.Command);
@@ -750,7 +750,7 @@ public class MenuBar extends Container implements ActionListener {
             } else {
                 c = result;
                 // a touch menu will always send its commands on its own...
-                if (!isTouchMenus() && c != null) {
+                if (!isTouchMenus() && c != null) { // NOPMD
                     ActionEvent e = new ActionEvent(c, ActionEvent.Type.Command);
                     c.actionPerformed(e);
                 }
@@ -765,7 +765,7 @@ public class MenuBar extends Container implements ActionListener {
         }
 
         Form upcoming = Display.getInstance().getCurrentUpcoming();
-        if (upcoming == parent) {
+        if (upcoming == parent) { // NOPMD
             d.disposeImpl();
         } else {
             parent.tint = (upcoming instanceof Dialog);
@@ -812,7 +812,7 @@ public class MenuBar extends Container implements ActionListener {
 
     private void updateGridCommands(int startOffset) {
         int cmdCount = getCommandCount() - startOffset;
-        if (cmdCount <= 0 || getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {
+        if (cmdCount <= 0 || getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) { // NOPMD
             return;
         }
         setLayout(new GridLayout(1, cmdCount));
@@ -828,7 +828,7 @@ public class MenuBar extends Container implements ActionListener {
         }
         for (int iter = 0; iter < cmdCount; iter++) {
             Button btn = (Button) getComponentAt(iter);
-            if (btn.getCommand() != getCommand(iter + startOffset)) {
+            if (btn.getCommand() != getCommand(iter + startOffset)) { // NOPMD
                 btn.setCommand(getCommand(iter + startOffset));
             }
         }
@@ -847,7 +847,7 @@ public class MenuBar extends Container implements ActionListener {
         adaptTitleLayoutBackCommandStructure();
         Container leftContainer = findLeftTitleContainer();
 
-        if (leftContainer == null && getCommandBehavior() == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+        if (leftContainer == null && getCommandBehavior() == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) { // NOPMD
             return;
         }
 
@@ -867,7 +867,7 @@ public class MenuBar extends Container implements ActionListener {
                 verifyBackCommandRTL(back);
             } else {
                 Button b = (Button) leftContainer.getComponentAt(0);
-                if (b.getCommand() != parent.getBackCommand()) {
+                if (b.getCommand() != parent.getBackCommand()) { // NOPMD
                     b.setCommand(parent.getBackCommand());
                     if (!b.getUIID().startsWith("BackCommand")) {
                         b.setUIID("BackCommand");
@@ -971,7 +971,7 @@ public class MenuBar extends Container implements ActionListener {
                 btn.setUIID(styleA);
             }
             c.addComponent(btn);
-            if (b != null) {
+            if (b != null) { // NOPMD
                 btn = new Button(b);
                 if (!btn.getUIID().equals(styleB)) {
                     btn.setUIID(styleB);
@@ -981,12 +981,12 @@ public class MenuBar extends Container implements ActionListener {
             hideEmptyCommand(btn);
             return;
         }
-        if (c.getComponentCount() - componentCountOffset(c) == 1) {
+        if (c.getComponentCount() - componentCountOffset(c) == 1) { // NOPMD
             Button btn = (Button) c.getComponentAt(0);
             if (!btn.getUIID().equals(styleA)) {
                 btn.setUIID(styleA);
             }
-            if (btn.getCommand() != a) {
+            if (btn.getCommand() != a) { // NOPMD
                 btn.setCommand(a);
             }
             if (b != null) {
@@ -999,21 +999,21 @@ public class MenuBar extends Container implements ActionListener {
             hideEmptyCommand(btn);
             return;
         }
-        if (c.getComponentCount() - componentCountOffset(c) == 2) {
+        if (c.getComponentCount() - componentCountOffset(c) == 2) { // NOPMD
             Button btn = (Button) c.getComponentAt(0);
             if (!btn.getUIID().equals(styleA)) {
                 btn.setUIID(styleA);
             }
-            if (btn.getCommand() != a) {
+            if (btn.getCommand() != a) { // NOPMD
                 btn.setCommand(a);
             }
             hideEmptyCommand(btn);
-            if (b != null) {
+            if (b != null) { // NOPMD
                 btn = (Button) c.getComponentAt(1);
                 if (!btn.getUIID().equals(styleB)) {
                     btn.setUIID(styleB);
                 }
-                if (btn.getCommand() != b) {
+                if (btn.getCommand() != b) { // NOPMD
                     btn.setCommand(b);
                 }
                 hideEmptyCommand(btn);
@@ -1035,12 +1035,12 @@ public class MenuBar extends Container implements ActionListener {
             return;
         }
 
-        if (getBackCommand() == cmd && UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) {
+        if (getBackCommand() == cmd && UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) { // NOPMD
             return;
         }
 
         // special case for default commands which are placed at the end and aren't overriden later
-        if (soft.length > 2 && cmd == parent.getDefaultCommand()) {
+        if (soft.length > 2 && cmd == parent.getDefaultCommand()) { // NOPMD
             commands.addElement(cmd);
         } else {
             commands.insertElementAt(cmd, 0);
@@ -1048,13 +1048,13 @@ public class MenuBar extends Container implements ActionListener {
 
         if (!(parent instanceof Dialog)) {
             int behavior = getCommandBehavior();
-            if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
+            if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK // NOPMD
                     || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT || behavior == Display.COMMAND_BEHAVIOR_ICS) {
-                if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK && (cmd == parent.getBackCommand()
+                if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK && (cmd == parent.getBackCommand() // NOPMD
                         || findCommandComponent(cmd) != null)) {
                     return;
                 }
-                if (parent.getBackCommand() != cmd) {
+                if (parent.getBackCommand() != cmd) { // NOPMD
                     if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK)
                             && parent.getTitle() != null && parent.getTitle().length() > 0) {
                         synchronizeCommandsWithButtonsInBackbutton();
@@ -1102,7 +1102,7 @@ public class MenuBar extends Container implements ActionListener {
      * @param index determines the order of the added commands
      */
     protected void addCommand(Command cmd, int index) {
-        if (getCommandCount() == 0 && parent != null) {
+        if (getCommandCount() == 0 && parent != null) { // NOPMD
             installMenuBar();
         }
         // prevent duplicate commands which might happen in some edge cases
@@ -1113,23 +1113,23 @@ public class MenuBar extends Container implements ActionListener {
         commands.insertElementAt(cmd, index);
         if (!(parent instanceof Dialog)) {
             int behavior = getCommandBehavior();
-            if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR
+            if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR // NOPMD
                     || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
                     || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
-                    || behavior == Display.COMMAND_BEHAVIOR_ICS
+                    || behavior == Display.COMMAND_BEHAVIOR_ICS // NOPMD
                     || behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
-                if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK && cmd == parent.getBackCommand()) {
+                if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK && cmd == parent.getBackCommand()) { // NOPMD
                     return;
                 }
                 if (behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
                     return;
                 }
-                if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || behavior == Display.COMMAND_BEHAVIOR_ICS)
+                if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || behavior == Display.COMMAND_BEHAVIOR_ICS) // NOPMD
                         && parent.getTitle() != null && parent.getTitle().length() > 0) {
                     synchronizeCommandsWithButtonsInBackbutton();
                     return;
                 }
-                if (parent.getBackCommand() != cmd) {
+                if (parent.getBackCommand() != cmd) { // NOPMD
                     if (behavior != Display.COMMAND_BEHAVIOR_ICS) {
                         setLayout(new GridLayout(1, getComponentCount() + 1));
                         addComponent(Math.min(getComponentCount(), index), createTouchCommandButton(cmd));

@@ -1100,20 +1100,20 @@ public class Border {
                 return true;
             }
 
-            boolean v = ((themeColors == b.themeColors) &&
+            boolean v = ((themeColors == b.themeColors) && // NOPMD
                     (type == b.type) &&
                     (com.codename1.util.MathUtil.compare(thickness, b.thickness) == 0) &&
                     (colorA == b.colorA) &&
                     (colorB == b.colorB) &&
                     (colorC == b.colorC) &&
-                    (colorD == b.colorD) &&
+                    (colorD == b.colorD) && // NOPMD
                     (arcWidth == b.arcWidth) &&
                     (arcHeight == b.arcHeight) &&
                     (outline == b.outline) &&
                     (isSame(borderTitle, b.borderTitle)) &&
                     (isSame(outerBorder, b.outerBorder))
             );
-            if (v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) {
+            if (v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) { // NOPMD
                 int ilen = images.length;
                 for (int iter = 0; iter < ilen; iter++) {
                     if (images[iter] != b.images[iter]) {

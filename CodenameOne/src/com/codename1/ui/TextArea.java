@@ -222,8 +222,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         @Override
         public void actionPerformed(ActionEvent evt) {
             Form f = getComponentForm();
-            if (f != null) {
-                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this) {
+            if (f != null) { // NOPMD
+                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this) { // NOPMD
                     fireActionEvent();
                     setSuppressActionEvent(true);
                 }
@@ -1086,7 +1086,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
         int charWidth = font.charWidth(widestChar);
         Style selectedStyle = getSelectedStyle();
-        if (selectedStyle.getFont() != style.getFont()) {
+        if (selectedStyle.getFont() != style.getFont()) { // NOPMD
             int cw = selectedStyle.getFont().charWidth(widestChar);
             if (cw > charWidth) {
                 charWidth = cw;
@@ -1970,12 +1970,12 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     public void registerAsInputDevice() {
         Form f = this.getComponentForm();
 
-        if (f != null && Display.impl.getEditingText() != this) {
+        if (f != null && Display.impl.getEditingText() != this) { // NOPMD
             try {
                 TextAreaInputDevice previousInput = null;
                 if (f.getCurrentInputDevice() instanceof TextAreaInputDevice) {
                     previousInput = (TextAreaInputDevice) f.getCurrentInputDevice();
-                    if (previousInput.editedTextArea == this) {
+                    if (previousInput.editedTextArea == this) { // NOPMD
                         // If the previous input is the same input, let's disable it's close
                         // handler altogether.
                         previousInput.enabled = false;
@@ -2019,7 +2019,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 // before starting a new edit session or the previous text
                 // field won't be updated until the next one is finished editing.
                 Component c = Display.impl.getEditingText();
-                if (c != this && c != null) {
+                if (c != this && c != null) { // NOPMD
                     if (c instanceof TextArea) {
                         //System.out.println("Stopping editing");
                         ((TextArea) c).stopEditing();

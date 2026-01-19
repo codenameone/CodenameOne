@@ -176,7 +176,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     @Override
     public void setUIID(String id) {
         super.setUIID(id);
-        if (id != null && id.length() > 0) {
+        if (id != null && id.length() > 0) { // NOPMD
             String iconUIID = getUIManager().getIconUIIDFor(id);
             if (iconUIID != null) {
                 setIconUIID(iconUIID);
@@ -186,7 +186,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
 
     @Override
     protected void initLaf(UIManager uim) {
-        if (uim == getUIManager() && isInitialized()) {
+        if (uim == getUIManager() && isInitialized()) { // NOPMD
             return;
         }
         super.initLaf(uim);

@@ -529,7 +529,7 @@ public class RSSReader extends List {
                 Vector v = (Vector) e.getMetaData();
                 RSSService s = (RSSService) e.getConnectionRequest();
 
-                if (existingData != null) {
+                if (existingData != null) { // NOPMD
                     existingData.removeElement(MORE);
                     for (int iter = 0; iter < v.size(); iter++) {
                         Hashtable h = (Hashtable) v.elementAt(iter);
@@ -548,7 +548,7 @@ public class RSSReader extends List {
                 for (int iter = 0; iter < existingData.size(); iter++) {
                     Hashtable h = (Hashtable) existingData.elementAt(iter);
                     Object icn = h.get("icon");
-                    if (icn != null && icn == iconPlaceholder) {
+                    if (icn != null && icn == iconPlaceholder) { // NOPMD
                         downloadImage(h, iter);
                     }
                 }

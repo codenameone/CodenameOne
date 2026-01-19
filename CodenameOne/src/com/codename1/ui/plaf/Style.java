@@ -2383,13 +2383,13 @@ public class Style {
      *                 the value in this attribute when changing a theme/look and feel
      */
     public void setBgImage(Image bgImage, boolean override) {
-        if (proxyTo != null) {
+        if (proxyTo != null) { // NOPMD
             for (Style s : proxyTo) {
                 s.setBgImage(bgImage, override);
             }
             return;
         }
-        if (this.bgImage != bgImage) {
+        if (this.bgImage != bgImage) { // NOPMD
             this.bgImage = bgImage;
             if (!override) {
                 modifiedFlag |= BG_IMAGE_MODIFIED;

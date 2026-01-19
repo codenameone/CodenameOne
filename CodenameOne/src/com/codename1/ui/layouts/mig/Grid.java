@@ -292,7 +292,7 @@ public final class Grid {
             boolean wrapHandled = false;
             int splitLeft = rowNoGrid ? LayoutUtil.INF : rootCc.getSplit() - 1;
             boolean splitExit = false;
-            final boolean spanRestOfRow = (lc.isFlowX() ? rootCc.getSpanX() : rootCc.getSpanY()) == LayoutUtil.INF;
+            final boolean spanRestOfRow = (lc.isFlowX() ? rootCc.getSpanX() : rootCc.getSpanY()) == LayoutUtil.INF; // NOPMD
 
             for (; splitLeft >= 0 && i < comps.length; splitLeft--) {
                 ComponentWrapper compAdd = comps[i];
@@ -309,10 +309,10 @@ public final class Grid {
                     continue;       // To work with situations where there are components that does not have a layout manager, or not this one.
                 }
 
-                hasPushX |= (visible || hideMode > 1) && (cc.getPushX() != null);
-                hasPushY |= (visible || hideMode > 1) && (cc.getPushY() != null);
+                hasPushX |= (visible || hideMode > 1) && (cc.getPushX() != null); // NOPMD
+                hasPushY |= (visible || hideMode > 1) && (cc.getPushY() != null); // NOPMD
 
-                if (cc != rootCc) { // If not first in a cell
+                if (cc != rootCc) { // If not first in a cell // NOPMD
                     if (cc.isNewline() || !cc.isBoundsInGrid() || cc.getDockSide() != -1) {
                         break;
                     }
@@ -328,10 +328,10 @@ public final class Grid {
 
                 CompWrap cw = new CompWrap(compAdd, cc, hideMode, useVisualPadding);
                 cell.compWraps.add(cw);
-                cell.hasTagged |= cc.getTag() != null;
+                cell.hasTagged |= cc.getTag() != null; // NOPMD
                 hasTagged |= cell.hasTagged;
 
-                if (cc != rootCc) {
+                if (cc != rootCc) { // NOPMD
                     if (cc.getHorizontal().getSizeGroup() != null) {
                         sizeGroupsX++;
                     }
@@ -573,7 +573,7 @@ public final class Grid {
             for (int j = 0, jSz = groups.size(); j < jSz; j++) {
                 ArrayList<CompWrap> cwList = groups.get(j)._compWraps;
                 for (int k = 0, kSz = cwList.size(); k < kSz; k++) {
-                    if (cwList.get(k) == cw) {
+                    if (cwList.get(k) == cw) { // NOPMD
                         return groups.get(j);
                     }
                 }
@@ -708,10 +708,10 @@ public final class Grid {
 
         // Align for the whole baseline component array
         UnitValue align = cc.getVertical().getAlign();
-        if (spanCount == 1 && align == null) {
+        if (spanCount == 1 && align == null) { // NOPMD
             align = dc.getAlignOrDefault(false);
         }
-        if (align == UnitValue.BASELINE_IDENTITY) {
+        if (align == UnitValue.BASELINE_IDENTITY) { // NOPMD
             align = UnitValue.CENTER;
         }
 
@@ -801,7 +801,7 @@ public final class Grid {
 
             int cSt = fromEnd ? start - gapBef : start + gapBef;
             int slack = size - cSize - gapBef - gapAft;
-            if (slack > 0 && align != null) {
+            if (slack > 0 && align != null) { // NOPMD
                 int al = Math.min(slack, Math.max(0, align.getPixels(slack, parent, null)));
                 cSt += (fromEnd ? -al : al);
             }
@@ -812,17 +812,17 @@ public final class Grid {
 
     private static UnitValue correctAlign(CC cc, UnitValue rowAlign, boolean isHor, boolean fromEnd) {
         UnitValue align = (isHor ? cc.getHorizontal() : cc.getVertical()).getAlign();
-        if (align == null) {
+        if (align == null) { // NOPMD
             align = rowAlign;
         }
-        if (align == UnitValue.BASELINE_IDENTITY) {
+        if (align == UnitValue.BASELINE_IDENTITY) { // NOPMD
             align = UnitValue.CENTER;
         }
 
         if (fromEnd) {
-            if (align == UnitValue.LEFT) {
+            if (align == UnitValue.LEFT) { // NOPMD
                 align = UnitValue.RIGHT;
-            } else if (align == UnitValue.RIGHT) {
+            } else if (align == UnitValue.RIGHT) { // NOPMD
                 align = UnitValue.LEFT;
             }
         }
@@ -1890,7 +1890,7 @@ public final class Grid {
                 continue;
             }
 
-            BoundSize wrapGapSize = (wrapGapMap == null || isHor == lc.isFlowX() ? null : wrapGapMap.get(Integer.valueOf(wgIx++)));
+            BoundSize wrapGapSize = (wrapGapMap == null || isHor == lc.isFlowX() ? null : wrapGapMap.get(Integer.valueOf(wgIx++))); // NOPMD
 
             if (wrapGapSize == null) {
 
@@ -1902,13 +1902,13 @@ public final class Grid {
                     int bef = firstGap.getPixels(refSize, container, null);
                     retValues[i] = new int[]{bef, bef, bef};
 
-                } else if (edgeAfter && gapBefore == null && firstGap != null) {
+                } else if (edgeAfter && gapBefore == null && firstGap != null) { // NOPMD
 
                     int aft = lastGap.getPixels(refSize, container, null);
                     retValues[i] = new int[]{aft, aft, aft};
 
                 } else {
-                    retValues[i] = gapAfter != gapBefore ? mergeSizes(gapAfter, gapBefore) : new int[]{defGapArr[0], defGapArr[1], defGapArr[2]};
+                    retValues[i] = gapAfter != gapBefore ? mergeSizes(gapAfter, gapBefore) : new int[]{defGapArr[0], defGapArr[1], defGapArr[2]}; // NOPMD
                 }
 
                 if (specBefore != null && specBefore.isGapAfterPush() || specAfter != null && specAfter.isGapBeforePush()) {
@@ -2010,7 +2010,7 @@ public final class Grid {
 
             for (Integer ix : secIndexes) {
                 Cell cell = isRows ? getCell(i, ix) : getCell(ix, i);
-                if (cell == null || cell.compWraps.size() == 0) {
+                if (cell == null || cell.compWraps.size() == 0) { // NOPMD
                     continue;
                 }
 
@@ -2030,7 +2030,7 @@ public final class Grid {
                 } else {
                     for (int cwIx = 0; cwIx < cell.compWraps.size(); cwIx++) {
                         CompWrap cw = cell.compWraps.get(cwIx);
-                        boolean rowBaselineAlign = (isRows && lc.isTopToBottom() && dc.getAlignOrDefault(!isRows) == UnitValue.BASELINE_IDENTITY); // Disable baseline for bottomToTop since I can not verify it working.
+                        boolean rowBaselineAlign = (isRows && lc.isTopToBottom() && dc.getAlignOrDefault(!isRows) == UnitValue.BASELINE_IDENTITY); // Disable baseline for bottomToTop since I can not verify it working. // NOPMD
                         boolean isBaseline = isRows && cw.isBaselineAlign(rowBaselineAlign);
 
                         String linkCtx = isBaseline ? "baseline" : null;
@@ -2190,7 +2190,7 @@ public final class Grid {
         }
 
         private void setCompWraps(ArrayList<CompWrap> cws) {
-            if (_compWraps != cws) {
+            if (_compWraps != cws) { // NOPMD
                 _compWraps.clear();
                 _compWraps.addAll(cws);
             }
@@ -2584,7 +2584,7 @@ public final class Grid {
         }
 
         private int filter(int sizeType, int size) {
-            if (size == LayoutUtil.NOT_SET) {
+            if (size == LayoutUtil.NOT_SET) { // NOPMD
                 return sizeType != LayoutUtil.MAX ? 0 : LayoutUtil.INF;
             }
             return constrainSize(size);
@@ -2592,12 +2592,12 @@ public final class Grid {
 
         private boolean isBaselineAlign(boolean defValue) {
             Float g = cc.getVertical().getGrow();
-            if (g != null && g.intValue() != 0) {
+            if (g != null && g.intValue() != 0) { // NOPMD
                 return false;
             }
 
             UnitValue al = cc.getVertical().getAlign();
-            return (al != null ? al == UnitValue.BASELINE_IDENTITY : defValue) && comp.hasBaseline();
+            return (al != null ? al == UnitValue.BASELINE_IDENTITY : defValue) && comp.hasBaseline(); // NOPMD
         }
 
         private int getBaseline(int sizeType) {

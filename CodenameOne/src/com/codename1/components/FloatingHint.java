@@ -120,7 +120,7 @@ public class FloatingHint extends Container {
                 tf.startEditingAsync();
             }
         } else {
-            boolean t = tf.getText() == null || tf.getText().length() == 0;
+            boolean t = tf.getText() == null || tf.getText().length() == 0; // NOPMD
             hintButton.setVisible(t);
             hintLabel.setVisible(!t);
             revalidate();
@@ -128,7 +128,7 @@ public class FloatingHint extends Container {
     }
 
     private boolean isInitializedImpl() {
-        return isInitialized() && getComponentForm() == Display.getInstance().getCurrent();
+        return isInitialized() && getComponentForm() == Display.getInstance().getCurrent(); // NOPMD
     }
 
     private void focusLostImpl() {

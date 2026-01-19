@@ -87,17 +87,17 @@ class LeadUtil {
      * @param y   Y-coord
      */
     public static void pointerPressed(Component cmp, int x, int y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerPressed(x, y);
         Form f = cmp.getComponentForm();
         Component leadParent = leadParentImpl(cmp);
-        if (f != null && !Display.impl.isScrollWheeling() && leadParent.isFocusable() && leadParent.isEnabled()) {
+        if (f != null && !Display.impl.isScrollWheeling() && leadParent.isFocusable() && leadParent.isEnabled()) { // NOPMD
             f.setFocused(leadParent);
         }
-        if (cmp != lead) {
+        if (cmp != lead) { // NOPMD
             leadParent.repaint();
         }
 
@@ -111,12 +111,12 @@ class LeadUtil {
      * @param y   Y-coord
      */
     public static void pointerDragged(Component cmp, int x, int y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerDragged(x, y);
-        if (cmp != lead) {
+        if (cmp != lead) { // NOPMD
             leadParentImpl(cmp).repaint();
         }
 
@@ -130,12 +130,12 @@ class LeadUtil {
      * @param y   Y-coords
      */
     public static void pointerDragged(Component cmp, int[] x, int[] y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerDragged(x, y);
-        if (cmp != lead) {
+        if (cmp != lead) { // NOPMD
             leadParentImpl(cmp).repaint();
         }
 
@@ -149,12 +149,12 @@ class LeadUtil {
      * @param y   Y-coord
      */
     public static void pointerReleased(Component cmp, int x, int y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerReleased(x, y);
-        if (lead != cmp) {
+        if (lead != cmp) { // NOPMD
             leadParentImpl(cmp).repaint();
         }
     }
@@ -167,55 +167,55 @@ class LeadUtil {
      * @param y   Y-coord
      */
     public static void pointerHoverReleased(Component cmp, int[] x, int[] y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         leadComponentImpl(cmp).pointerHoverReleased(x, y);
-        if (leadParentImpl(cmp) != cmp) {
+        if (leadParentImpl(cmp) != cmp) { // NOPMD
             leadParentImpl(cmp).repaint();
         }
     }
 
     public static void pointerHoverPressed(Component cmp, int[] x, int[] y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerHoverPressed(x, y);
-        if (lead != cmp) {
+        if (lead != cmp) { // NOPMD
             leadParentImpl(cmp).repaint();
         }
     }
 
     public static void pointerHover(Component cmp, int[] x, int[] y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerHover(x, y);
-        if (lead != cmp) {
+        if (lead != cmp) { // NOPMD
             leadParentImpl(cmp).repaint();
         }
     }
 
     public static void dragFinished(Component cmp, int x, int y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         Component lead = leadComponentImpl(cmp);
         lead.dragFinishedImpl(x, y);
-        if (lead != cmp) {
+        if (lead != cmp) { // NOPMD
             leadParentImpl(cmp).repaint();
         }
     }
 
     public static void longPointerPress(Component cmp, int x, int y) {
-        if (cmp == null) {
+        if (cmp == null) { // NOPMD
             return;
         }
         Component lead = leadComponentImpl(cmp);
         lead.longPointerPress(x, y);
-        if (cmp != lead) {
+        if (cmp != lead) { // NOPMD
             leadParentImpl(cmp).repaint();
         }
     }

@@ -2313,11 +2313,11 @@ public class ConnectionRequest implements IOProgressListener {
      */
     @Override
     public boolean equals(Object o) {
-        if (o != null && o.getClass() == getClass()) {
+        if (o != null && o.getClass() == getClass()) { // NOPMD
             ConnectionRequest r = (ConnectionRequest) o;
 
             // interned string comparison
-            if (r.url == url) {
+            if (r.url == url) { // NOPMD
                 if (requestArguments != null) {
                     if (r.requestArguments != null && requestArguments.size() == r.requestArguments.size()) {
                         Iterator entries = requestArguments.entrySet().iterator();

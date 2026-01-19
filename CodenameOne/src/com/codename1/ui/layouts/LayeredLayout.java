@@ -383,7 +383,7 @@ public class LayeredLayout extends Layout {
      */
     private LayeredLayoutConstraint installConstraint(LayeredLayoutConstraint constraint, Component cmp) {
 
-        if (constraint.outer() != this || (constraint.cmp != null && constraint.cmp != cmp)) {
+        if (constraint.outer() != this || (constraint.cmp != null && constraint.cmp != cmp)) { // NOPMD
             LayeredLayoutConstraint tmp = createConstraint();
             constraint.copyTo(tmp);
             constraint = tmp;
@@ -2407,7 +2407,7 @@ public class LayeredLayout extends Layout {
              */
             private Inset fixDependencies(Container parent) {
                 Container refParent;
-                if (referenceComponent != null && (refParent = referenceComponent.getParent()) != parent) {
+                if (referenceComponent != null && (refParent = referenceComponent.getParent()) != parent) { // NOPMD
                     // The reference component is not in this parent
                     String name = referenceComponent.getName();
                     boolean found = false;
@@ -3242,7 +3242,7 @@ public class LayeredLayout extends Layout {
              * @return Self for chaining.
              */
             public Inset changeReference(Container parent, Component newRef, float pos) {
-                if (newRef != null) {
+                if (newRef != null) { // NOPMD
                     LayeredLayoutConstraint refCnst = getOrCreateConstraint(newRef);
                     if (cmp != null && refCnst.dependsOn(cmp)) {
                         throw new IllegalArgumentException("Attempted to set a reference that would produce a circular dependency in LayeredLayout");
@@ -3252,7 +3252,7 @@ public class LayeredLayout extends Layout {
                 //    // This could potentially affect the opposite inset if it is a percentage
                 //    referenceComponent(newRef).referencePosition(pos);
                 //} else {
-                if (newRef != referenceComponent || com.codename1.util.MathUtil.compare(pos, referencePosition) != 0) {
+                if (newRef != referenceComponent || com.codename1.util.MathUtil.compare(pos, referencePosition) != 0) { // NOPMD
                     // This may potentially affect both this inset
                     // and the opposite inset if it is either flexible or
                     // percent.

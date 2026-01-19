@@ -172,7 +172,7 @@ public class Geofence {
     public boolean equals(Object o) {
         if (o instanceof Geofence) {
             Geofence g = (Geofence) o;
-            return eq(id, g.id) && g.radius == radius && eq(loc, g.loc) && g.expiration == expiration;
+            return eq(id, g.id) && g.radius == radius && eq(loc, g.loc) && g.expiration == expiration; // NOPMD
         }
         return false;
     }
@@ -185,10 +185,10 @@ public class Geofence {
     }
 
     private boolean eq(Location l1, Location l2) {
-        if (l1 != null && l2 != null) {
+        if (l1 != null && l2 != null) { // NOPMD
             return l1.equalsLatLng(l2);
         }
-        return l1 == l2; // both null
+        return l1 == l2; // both null // NOPMD
     }
 
     @Override

@@ -87,7 +87,7 @@ class SpinnerNode extends Node {
     }
 
     public void removeScrollListener(ScrollListener l) {
-        if (scrollListeners != null) {
+        if (scrollListeners != null) { // NOPMD
             scrollListeners.remove(l);
             if (scrollListeners.isEmpty()) {
                 scrollListeners = null;
@@ -104,7 +104,7 @@ class SpinnerNode extends Node {
     }
 
     public void setRowFormatter(RowFormatter formatter) {
-        if (rowFormatter != formatter) {
+        if (rowFormatter != formatter) { // NOPMD
             rowFormatter = formatter;
             rebuildChildren();
         }

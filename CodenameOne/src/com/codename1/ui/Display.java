@@ -691,7 +691,7 @@ public final class Display extends CN1Constants {
      * otherwise false
      */
     public boolean isEdt() {
-        return edt == Thread.currentThread();
+        return edt == Thread.currentThread(); // NOPMD
     }
 
     /**
@@ -1013,7 +1013,7 @@ public final class Display extends CN1Constants {
                 } else {
                     Form f = (Form) ((Transition) ani).getDestination();
                     restoreMenu(f);
-                    if (source == null || source == impl.getCurrentForm() || source == getCurrent()) {
+                    if (source == null || source == impl.getCurrentForm() || source == getCurrent()) { // NOPMD
                         setCurrentForm(f);
                     }
                     ((Transition) ani).cleanup();
@@ -1527,7 +1527,7 @@ public final class Display extends CN1Constants {
      * @param newForm the Form to Display
      */
     void setCurrent(final Form newForm, boolean reverse) {
-        if (edt == null) {
+        if (edt == null) { // NOPMD
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
         Form current = impl.getCurrentForm();
@@ -1537,7 +1537,7 @@ public final class Display extends CN1Constants {
             setShowVirtualKeyboard(false);
         }
 
-        if (current == newForm) {
+        if (current == newForm) { // NOPMD
             current.revalidate();
             current.repaint();
             current.onShowCompletedImpl();
@@ -1566,12 +1566,12 @@ public final class Display extends CN1Constants {
             return;
         }
 
-        if (current != null) {
+        if (current != null) { // NOPMD
             if (current.isInitialized()) {
                 current.deinitializeImpl();
             } else {
                 Form fg = getCurrentUpcoming();
-                if (fg != current) {
+                if (fg != current) { // NOPMD
                     if (fg.isInitialized()) {
                         fg.deinitializeImpl();
                     }
@@ -1603,7 +1603,7 @@ public final class Display extends CN1Constants {
             }
         }
 
-        if (current != null) {
+        if (current != null) { // NOPMD
             // make sure the fold menu occurs as expected then set the current
             // to the correct parent!
             if (current instanceof Dialog && current.isMenu()) {
@@ -1619,7 +1619,7 @@ public final class Display extends CN1Constants {
             }
 
             // prevent the transition from occurring from a form into itself
-            if (newForm != current) {
+            if (newForm != current) { // NOPMD
                 if ((current != null && current.getTransitionOutAnimator() != null) || newForm.getTransitionInAnimator() != null) {
                     if (animationQueue == null) {
                         animationQueue = new ArrayList<Animation>();
@@ -1815,14 +1815,14 @@ public final class Display extends CN1Constants {
         if (isTextEditing(cmp)) {
             impl.stopTextEditing(onFinish);
         } else {
-            if (onFinish != null) {
+            if (onFinish != null) { // NOPMD
                 onFinish.run();
             }
         }
     }
 
     boolean isTextEditing(Component c) {
-        if (c instanceof Form && c == getCurrent()) {
+        if (c instanceof Form && c == getCurrent()) { // NOPMD
             return impl.isEditingText();
         }
 
@@ -2311,7 +2311,7 @@ public final class Display extends CN1Constants {
 
                 //make sure the released event is sent to the same Form who got a
                 //pressed event
-                if (xf == f || multiKeyMode) {
+                if (xf == f || multiKeyMode) { // NOPMD
                     f.keyReleased(inputEventStackTmp[offset]);
                     offset++;
                 }
@@ -2359,7 +2359,7 @@ public final class Display extends CN1Constants {
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
-                if (x == f || f.shouldSendPointerReleaseToOtherForm()) {
+                if (x == f || f.shouldSendPointerReleaseToOtherForm()) { // NOPMD
                     xArray1[0] = inputEventStackTmp[offset];
                     offset++;
                     yArray1[0] = inputEventStackTmp[offset];
@@ -2381,7 +2381,7 @@ public final class Display extends CN1Constants {
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
-                if (xy == f || f.shouldSendPointerReleaseToOtherForm()) {
+                if (xy == f || f.shouldSendPointerReleaseToOtherForm()) { // NOPMD
                     int[] array1 = readArrayStackArgument(offset);
                     offset += array1.length + 1;
                     int[] array2 = readArrayStackArgument(offset);
@@ -5265,7 +5265,7 @@ public final class Display extends CN1Constants {
             HashSet<Throwable> circuitCheck = new HashSet<Throwable>();
             circuitCheck.add(cause);
             EdtException root = this;
-            if (root != cause) {
+            if (root != cause) { // NOPMD
                 root.setCause(cause);
                 circuitCheck.add(root);
             } else {

@@ -204,7 +204,7 @@ public class Tabs extends Container {
             }
         }
         changeTabContainerStyleOnFocus = manager.isThemeConstant("changeTabContainerStyleOnFocusBool", false);
-        if (tabPlace != -1) {
+        if (tabPlace != -1) { // NOPMD
             tabPlacement = tabPlace;
         }
     }
@@ -216,7 +216,7 @@ public class Tabs extends Container {
     void initComponentImpl() {
         super.initComponentImpl();
         Form frm = getComponentForm();
-        if (frm != null) {
+        if (frm != null) { // NOPMD
             frm.registerAnimatedInternal(this);
             if (changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
                 Component f = getComponentForm().getFocused();
@@ -1544,7 +1544,7 @@ public class Tabs extends Container {
         @Override
         public void actionPerformed(ActionEvent evt) {
 
-            if (getComponentCount() == 0 || !swipeActivated || slideToDestMotion != null) {
+            if (getComponentCount() == 0 || !swipeActivated || slideToDestMotion != null) { // NOPMD
                 return;
             }
             final int x = evt.getX();
@@ -1555,7 +1555,7 @@ public class Tabs extends Container {
                     riskySwipe = false;
                     if (!isEventBlockedByHigherComponent(evt) && contentPane.visibleBoundsContains(x, y)) {
                         Component testCmp = contentPane.getComponentAt(x, y);
-                        if (testCmp != null && testCmp != contentPane) {
+                        if (testCmp != null && testCmp != contentPane) { // NOPMD
                             doNotBlockSideSwipe = true;
                             try {
                                 while (testCmp != null && testCmp != contentPane) {

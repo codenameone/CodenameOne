@@ -86,7 +86,7 @@ final public class Inflater extends ZStream {
     public Inflater(int w, boolean nowrap) throws GZIPException {
         super();
         int ret = init(w, nowrap);
-        if (ret != Z_OK)
+        if (ret != Z_OK) // NOPMD
             throw new GZIPException(ret + ": " + msg);
     }
 
@@ -100,11 +100,11 @@ final public class Inflater extends ZStream {
 
     public int init(int w, JZlib.WrapperType wrapperType) {
         boolean nowrap = false;
-        if (wrapperType == JZlib.W_NONE) {
+        if (wrapperType == JZlib.W_NONE) { // NOPMD
             nowrap = true;
-        } else if (wrapperType == JZlib.W_GZIP) {
+        } else if (wrapperType == JZlib.W_GZIP) { // NOPMD
             w += 16;
-        } else if (wrapperType == JZlib.W_ANY) {
+        } else if (wrapperType == JZlib.W_ANY) { // NOPMD
             w |= Inflate.INFLATE_ANY;
         }
         return init(w, nowrap);

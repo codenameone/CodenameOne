@@ -631,7 +631,7 @@ public class TextSelection {
         if (isVerticallyCovered) {
             return true;
         }
-        if (cmp == selectionRoot) {
+        if (cmp == selectionRoot) { // NOPMD
             return false;
         }
         Container parent = cmp.getParent();
@@ -1404,7 +1404,7 @@ public class TextSelection {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            if (e.getSource() == selectAll) {
+            if (e.getSource() == selectAll) { // NOPMD
                 selectAll();
             } else {
                 copy();

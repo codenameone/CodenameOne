@@ -410,12 +410,12 @@ public class SwipeableContainer extends Container {
                     }
                     Component top = topWrapper.getComponentAt(0);
                     top.dragInitiated();
-                    if (top instanceof Container && top.getLeadComponent() == null) {
+                    if (top instanceof Container && top.getLeadComponent() == null) { // NOPMD
                         dragInitiatedRecursive((Container) top);
                     }
 
-                    if (initialX != -1) {
-                        if (getPreviouslyOpened() != null && getPreviouslyOpened() != SwipeableContainer.this && getPreviouslyOpened().isOpen()) {
+                    if (initialX != -1) { // NOPMD
+                        if (getPreviouslyOpened() != null && getPreviouslyOpened() != SwipeableContainer.this && getPreviouslyOpened().isOpen()) { // NOPMD
                             getPreviouslyOpened().close();
                         }
                         int diff = x - initialX;

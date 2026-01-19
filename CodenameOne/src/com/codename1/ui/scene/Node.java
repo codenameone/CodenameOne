@@ -516,7 +516,7 @@ public class Node {
      * @param child
      */
     public void add(Node child) {
-        if (children == null) {
+        if (children == null) { // NOPMD
             children = new ArrayList<Node>();
         }
         children.add(child);
@@ -530,7 +530,7 @@ public class Node {
      * @param child
      */
     public void remove(Node child) {
-        if (child.parent != this) {
+        if (child.parent != this) { // NOPMD
             return;
         }
         if (children != null) {

@@ -425,7 +425,7 @@ public class Preferences {
      */
     public static boolean get(String pref, boolean def) {
         Boolean t = (Boolean) get().get(pref);
-        if (t == null) {
+        if (t == null) { // NOPMD
             return def;
         }
         return t.booleanValue();
@@ -440,7 +440,7 @@ public class Preferences {
      */
     private static void fireChange(final String pref, final Object priorValue, final Object value) {
         //noinspection EqualsReplaceableByObjectsCall,ObjectEquality
-        boolean valueChanged = (priorValue != value) && ((priorValue == null) || !priorValue.equals(value));
+        boolean valueChanged = (priorValue != value) && ((priorValue == null) || !priorValue.equals(value)); // NOPMD
         if (valueChanged) {
             ArrayList<PreferenceListener> listenerList = listenerMap.get(pref);
             if (listenerList != null) {

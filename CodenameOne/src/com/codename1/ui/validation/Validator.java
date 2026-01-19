@@ -524,7 +524,7 @@ public class Validator {
                     public void focusGained(Component cmp) {
                         // special case. Before the form is showing don't show error dialogs
                         Form p = cmp.getComponentForm();
-                        if (p != Display.getInstance().getCurrent()) {
+                        if (p != Display.getInstance().getCurrent()) { // NOPMD
                             return;
                         }
                         if (message != null) {

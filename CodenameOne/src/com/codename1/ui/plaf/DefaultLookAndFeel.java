@@ -2254,7 +2254,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             }
         }
 
-        if (pull.getComponentAt(0) != updating && cmpToDraw != pull.getComponentAt(0)) {
+        if (pull.getComponentAt(0) != updating && cmpToDraw != pull.getComponentAt(0)) { // NOPMD
 
             parentForm.registerAnimated(new Animation() {
 
@@ -2272,7 +2272,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 public boolean animate() {
                     counter++;
 
-                    if (pull.getComponentAt(0) == releaseToRefresh) {
+                    if (pull.getComponentAt(0) == releaseToRefresh) { // NOPMD
                         ((Label) releaseToRefresh).setIcon(i.rotate(180 - (180 / 6) * counter));
                     } else {
                         ((Label) pullDown).setIcon(i.rotate(180 * counter / 6));
@@ -2303,13 +2303,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             });
 
         }
-        if (pull.getComponentAt(0) != cmpToDraw
+        if (pull.getComponentAt(0) != cmpToDraw // NOPMD
                 && cmpToDraw instanceof Label
                 && (pull.getComponentAt(0) instanceof Label)) {
             ((Label) cmpToDraw).setIcon(((Label) pull.getComponentAt(0)).getIcon());
         }
         Component current = pull.getComponentAt(0);
-        if (current != cmpToDraw) {
+        if (current != cmpToDraw) { // NOPMD
             pull.replace(current, cmpToDraw, null);
         }
 

@@ -122,7 +122,7 @@ public class TestRunnerComponent extends Container {
         resultsPane.add(new Label("Running " + tests.size() + " tests"));
         for (final AbstractTest test : tests) {
             final Button statusLabel = new Button(test + ": Running...");
-            if (f != CN.getCurrentForm()) {
+            if (f != CN.getCurrentForm()) { // NOPMD
 
                 f.showBack();
             }
@@ -141,7 +141,7 @@ public class TestRunnerComponent extends Container {
             }
             resultsPane.revalidate();
         }
-        if (f != CN.getCurrentForm()) {
+        if (f != CN.getCurrentForm()) { // NOPMD
             f.showBack();
         }
     }

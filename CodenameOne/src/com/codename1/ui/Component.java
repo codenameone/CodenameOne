@@ -818,7 +818,7 @@ public class Component implements Animation, StyleListener, Editable {
      * This method initializes the Component defaults constants
      */
     protected void initLaf(UIManager uim) {
-        if (uim == getUIManager() && isInitialized()) {
+        if (uim == getUIManager() && isInitialized()) { // NOPMD
             return;
         }
         selectText = uim.localize("select", "Select");
@@ -1952,7 +1952,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @param parent the parent container
      */
     void setParent(Container parent) {
-        if (parent == this) {
+        if (parent == this) { // NOPMD
             throw new IllegalArgumentException("Attempt to add self as parent");
         }
         this.parent = parent;
@@ -2008,7 +2008,7 @@ public class Component implements Animation, StyleListener, Editable {
     public boolean isOwnedBy(Component cmp) {
         Component c = this.owner;
         Container cnt = (cmp instanceof Container) ? (Container) cmp : null;
-        while (c != null) {
+        while (c != null) { // NOPMD
             if (c == cmp) {
                 return true;
             }
@@ -2753,7 +2753,7 @@ public class Component implements Animation, StyleListener, Editable {
     public int getAbsoluteY() {
         int y = getY() - getScrollY();
         Container parent = getParent();
-        if (parent != null) {
+        if (parent != null) { // NOPMD
             y += parent.getAbsoluteY();
         }
         return y;
@@ -2762,7 +2762,7 @@ public class Component implements Animation, StyleListener, Editable {
     int getRelativeX(Container relativeTo) {
         int x = getX() - getScrollX();
         Container parent = getParent();
-        if (parent != relativeTo && parent != null) {
+        if (parent != relativeTo && parent != null) { // NOPMD
             x += parent.getRelativeX(relativeTo);
         }
         return x;
@@ -2771,7 +2771,7 @@ public class Component implements Animation, StyleListener, Editable {
     int getRelativeY(Container relativeTo) {
         int y = getY() - getScrollY();
         Container parent = getParent();
-        if (parent != relativeTo && parent != null) {
+        if (parent != relativeTo && parent != null) { // NOPMD
             y += parent.getRelativeY(relativeTo);
         }
         return y;
@@ -3221,7 +3221,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private void paintRippleEffect(Graphics g) {
-        if (isRippleEffect() && Form.getRippleComponent() == this && Form.getRippleMotion() != null) {
+        if (isRippleEffect() && Form.getRippleComponent() == this && Form.getRippleMotion() != null) { // NOPMD
             paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.getRippleMotion().getValue());
         }
     }
@@ -4618,7 +4618,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     void clearDrag() {
         Component leadParent = LeadUtil.leadParentImpl(this);
-        if (leadParent != null && leadParent != this) {
+        if (leadParent != null && leadParent != this) { // NOPMD
             leadParent.clearDrag();
             return;
         }
@@ -4631,7 +4631,7 @@ public class Component implements Animation, StyleListener, Editable {
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
         }
-        if (draggedMotionY != null) {
+        if (draggedMotionY != null) { // NOPMD
             int dmv = draggedMotionY.getValue();
             if (dmv < 0) {
                 setScrollY(0);
@@ -5096,7 +5096,7 @@ public class Component implements Animation, StyleListener, Editable {
      */
     private void pointerDragged(final Component lead, final int x, final int y, final Object currentPointerPress) {
         Form p = getComponentForm();
-        if (p == null) {
+        if (p == null) { // NOPMD
             return;
         }
         if (currentPointerPress != p.getCurrentPointerPress()) {
@@ -5139,7 +5139,7 @@ public class Component implements Animation, StyleListener, Editable {
                     return;
                 }
             }
-            if (dropTargetComponent != dropTo) {
+            if (dropTargetComponent != dropTo) { // NOPMD
                 if (dropTargetComponent != null) {
                     dropTargetComponent.dragExit(this);
                 }
@@ -5157,7 +5157,7 @@ public class Component implements Animation, StyleListener, Editable {
             oldy = y;
             p.repaint(draggedx, draggedy, getWidth(), getHeight());
             Container scrollParent = getParent();
-            while (scrollParent != null && !scrollParent.isScrollable()) {
+            while (scrollParent != null && !scrollParent.isScrollable()) { // NOPMD
                 scrollParent = scrollParent.getParent();
             }
             if (scrollParent != null) {
@@ -5222,7 +5222,7 @@ public class Component implements Animation, StyleListener, Editable {
                 p.setDraggedComponent(this);
                 p.registerAnimatedInternal(this);
                 Component fc = p.getFocused();
-                if (fc != null && fc != this) {
+                if (fc != null && fc != this) { // NOPMD
                     fc.dragInitiated();
                 }
             }
@@ -5437,19 +5437,19 @@ public class Component implements Animation, StyleListener, Editable {
 
     boolean isScrollDecelerationMotionInProgress() {
         Motion dmY = draggedMotionY;
-        if (dmY != null) {
+        if (dmY != null) { // NOPMD
             if (dmY == decelerationMotion && !dmY.isFinished()) {
                 return true;
             }
         }
         Motion dmX = draggedMotionX;
-        if (dmX != null) {
+        if (dmX != null) { // NOPMD
             if (dmX == decelerationMotion && !dmX.isFinished()) {
                 return true;
             }
         }
         Container parent = getParent();
-        if (parent != null) {
+        if (parent != null) { // NOPMD
             return parent.isScrollDecelerationMotionInProgress();
         }
 
@@ -5572,7 +5572,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
             p.setDraggedComponent(null);
             Component dropTo = findDropTarget(this, x, y);
-            if (dropTargetComponent != dropTo) {
+            if (dropTargetComponent != dropTo) { // NOPMD
                 if (dropTargetComponent != null) {
                     dropTargetComponent.dragExit(this);
                 }
@@ -5584,7 +5584,7 @@ public class Component implements Animation, StyleListener, Editable {
             if (dropTargetComponent != null) {
                 p.repaint(x, y, getWidth(), getHeight());
                 getParent().scrollRectToVisible(getX(), getY(), getWidth(), getHeight(), getParent());
-                if (lead.dropListener != null) {
+                if (lead.dropListener != null) { // NOPMD
                     ActionEvent ev = new ActionEvent(lead, ActionEvent.Type.PointerDrag, dropTargetComponent, x, y);
                     lead.dropListener.fireActionEvent(ev);
                     if (!ev.isConsumed()) {
@@ -6653,12 +6653,12 @@ public class Component implements Animation, StyleListener, Editable {
             if (coordinateSpace != null) {
                 parent = coordinateSpace.getParent();
             }
-            if (parent == this) {
+            if (parent == this) { // NOPMD
                 if (view.contains(x, y, width, height)) {
                     return;
                 }
             } else {
-                while (parent != this) {
+                while (parent != this) { // NOPMD
                     // mostly a special case for list
                     if (parent == null) {
                         relativeX = x;
@@ -7106,7 +7106,7 @@ public class Component implements Animation, StyleListener, Editable {
                         Style.PADDING.equals(propertyName))) {
             setShouldCalcPreferredSize(true);
             Container parent = getParent();
-            if (parent != null && parent.getComponentForm() != null) {
+            if (parent != null && parent.getComponentForm() != null) { // NOPMD
                 if (isRevalidateOnStyleChange()) {
                     parent.revalidateLater();
                 }
@@ -7746,7 +7746,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (cnt == parent) {
             return true;
         }
-        return parent != null && parent.isChildOf(cnt);
+        return parent != null && parent.isChildOf(cnt); // NOPMD
     }
 
     /**

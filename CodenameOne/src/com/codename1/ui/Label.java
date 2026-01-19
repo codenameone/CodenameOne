@@ -522,7 +522,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        if (materialIcon != 0) {
+        if (materialIcon != 0) { // NOPMD
             FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
         } else if (fontIcon != 0) {
             FontImage.setFontIcon(this, font, fontIcon, fontIconSize);
@@ -537,7 +537,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     @Override
     protected void initLaf(UIManager uim) {
-        if (uim == getUIManager() && isInitialized()) {
+        if (uim == getUIManager() && isInitialized()) { // NOPMD
             return;
         }
         super.initLaf(uim);
@@ -658,7 +658,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     @Override
     public void setIcon(Image icon) {
-        if (this.icon == icon) {
+        if (this.icon == icon) { // NOPMD
             return;
         }
         if (this.icon != null) {

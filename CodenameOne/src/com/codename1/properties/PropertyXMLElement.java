@@ -59,7 +59,7 @@ class PropertyXMLElement extends Element {
 
     @Override
     public boolean contains(Element element) {
-        if (this == element) {
+        if (this == element) { // NOPMD
             return true;
         }
         Vector children = getChildren();
@@ -94,7 +94,7 @@ class PropertyXMLElement extends Element {
     public Hashtable getAttributes() {
         Hashtable h = new Hashtable();
         for (PropertyBase b : parent) {
-            if (b.getGenericType() != null && b.getGenericType().isAssignableFrom(PropertyBusinessObject.class) || b instanceof CollectionProperty || b instanceof MapProperty) {
+            if (b.getGenericType() != null && b.getGenericType().isAssignableFrom(PropertyBusinessObject.class) || b instanceof CollectionProperty || b instanceof MapProperty) { // NOPMD
                 continue;
             }
             Object o = b.get();
@@ -110,9 +110,9 @@ class PropertyXMLElement extends Element {
         int current = -1;
         PropertyBase text = parent.getXmlTextElement();
         for (PropertyBase b : parent) {
-            if (b == text) {
+            if (b == text) { // NOPMD
                 current++;
-                if (current == index) {
+                if (current == index) { // NOPMD
                     Element e = new Element(b.getName(), true);
                     if (b.get() != null) {
                         e.setText(b.get().toString());

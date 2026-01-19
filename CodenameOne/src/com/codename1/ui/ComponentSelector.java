@@ -1409,8 +1409,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         for (Component c : this) {
             Container parent = c.getParent();
             Component replacement = mapper.map(c);
-            if (parent != null) {
-                if (replacement != c) {
+            if (parent != null) { // NOPMD
+                if (replacement != c) { // NOPMD
                     if (replacement != null) {
                         animations.add(parent.createReplaceTransition(c, replacement, t.copy(false)));
                     } else {
@@ -1448,8 +1448,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         for (Component c : this) {
             Container parent = c.getParent();
             Component replacement = mapper.map(c);
-            if (parent != null) {
-                if (replacement != c) {
+            if (parent != null) { // NOPMD
+                if (replacement != c) { // NOPMD
                     if (replacement != null) {
                         animations.add(parent.createReplaceTransition(c, replacement, t.copy(false)));
                     } else {

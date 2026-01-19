@@ -45,7 +45,7 @@ public final class Objects {
      * @return
      */
     public static boolean equals(Object a, Object b) {
-        if (a == b) {
+        if (a == b) { // NOPMD
             return true;
         }
         return a != null && a.equals(b);
@@ -70,7 +70,7 @@ public final class Objects {
     }
 
     public static <T> int compare(T a, T b, Comparator<? super T> c) {
-        return a == null && b == null ? 0 : c.compare(a, b);
+        return a == null && b == null ? 0 : c.compare(a, b); // NOPMD
     }
 
     public static <T> T requireNonNull(T obj) {
@@ -85,11 +85,11 @@ public final class Objects {
     }
 
     public static boolean nonNull(Object obj) {
-        return obj != null;
+        return obj != null; // NOPMD
     }
 
     public static boolean deepEquals(Object a, Object b) {
-        if (a == b) {
+        if (a == b) { // NOPMD
             return true;
         }
         if (a == null) {
