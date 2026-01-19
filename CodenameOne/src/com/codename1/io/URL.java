@@ -262,8 +262,8 @@ public class URL {
 
     public class HttpURLConnection extends URLConnection {
         private final String url;
-        private Object connection;
         private final CodenameOneImplementation impl;
+        private Object connection;
         private String requestMethod = "GET";
 
         HttpURLConnection(String url) {

@@ -61,8 +61,8 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public static String EVENTS = "events";
     public static String NOTES = "notes";
     private final Hashtable entry = new Hashtable();
-    private Hashtable currentData = entry;
     private final Vector stack = new Vector();
+    private Hashtable currentData = entry;
     private String connectionType = "";
     private DefaultListModel responseDestination;
     private int responseOffset = -1;

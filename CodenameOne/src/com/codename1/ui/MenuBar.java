@@ -86,6 +86,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
+    private final Vector commands = new Vector();
     private boolean minimizeOnBack = true;
     private Command selectCommand;
     private Command defaultCommand;
@@ -102,7 +103,6 @@ public class MenuBar extends Container implements ActionListener {
      */
     private Command clearCommand;
     private Command menuCommand;
-    private final Vector commands = new Vector();
     private Button[] soft;
     private Command[] softCommand;
     private Button left;

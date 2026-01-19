@@ -384,17 +384,17 @@ final class TElementary {
      * @param op2 any number
      */
     static void completeInPlaceAdd(TBigInteger op1, TBigInteger op2) {
-        if (op1.sign == 0)
+        if (op1.sign == 0) {
             System.arraycopy(op2.digits, 0, op1.digits, 0, op2.numberLength);
-        else if (op2.sign == 0)
+        } else if (op2.sign == 0) {
             return;
-        else if (op1.sign == op2.sign)
+        } else if (op1.sign == op2.sign) {
             add(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);
-        else {
+        } else {
             int sign = unsignedArraysCompare(op1.digits, op2.digits, op1.numberLength, op2.numberLength);
-            if (sign > 0)
+            if (sign > 0) {
                 subtract(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);
-            else {
+            } else {
                 inverseSubtract(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);
                 op1.sign = -op1.sign;
             }
@@ -410,12 +410,11 @@ final class TElementary {
      * then b
      */
     private static int unsignedArraysCompare(int[] a, int[] b, int aSize, int bSize) {
-        if (aSize > bSize)
+        if (aSize > bSize) {
             return 1;
-        else if (aSize < bSize)
+        } else if (aSize < bSize) {
             return -1;
-
-        else {
+        } else {
             int i;
             for (i = aSize - 1; i >= 0 && a[i] == b[i]; i--) {
                 // do nothing

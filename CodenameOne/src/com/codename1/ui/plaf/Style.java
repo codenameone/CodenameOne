@@ -457,14 +457,6 @@ public class Style {
     private long modifiedFlag;
     private EventDispatcher listeners;
 
-    Object getNativeOSCache() {
-        return nativeOSCache;
-    }
-
-    void setNativeOSCache(Object nativeOSCache) {
-        this.nativeOSCache = nativeOSCache;
-    }
-
     /**
      * Each component when it draw itself uses this Object
      * to determine in what colors it should use.
@@ -580,6 +572,14 @@ public class Style {
         Style s = new Style();
         s.proxyTo = styles;
         return s;
+    }
+
+    Object getNativeOSCache() {
+        return nativeOSCache;
+    }
+
+    void setNativeOSCache(Object nativeOSCache) {
+        this.nativeOSCache = nativeOSCache;
     }
 
     /**
@@ -714,7 +714,9 @@ public class Style {
      * @since 8.0
      */
     public int getIconGap() {
-        if (iconGap < 0) return -1;
+        if (iconGap < 0) {
+            return -1;
+        }
         return CN.convertToPixels(iconGap, iconGapUnit);
     }
 
@@ -2257,12 +2259,12 @@ public class Style {
                     return Math.round(v * Font.getDefaultFont().getHeight());
                 case UNIT_TYPE_VH:
                     return Math.round(v / 100f * CN.getDisplayHeight());
-            case UNIT_TYPE_VW:
-                return Math.round(v / 100f * CN.getDisplayWidth());
-            case UNIT_TYPE_VMIN:
-                return Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
-            case UNIT_TYPE_VMAX:
-                return Math.round(v / 100f * Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                case UNIT_TYPE_VW:
+                    return Math.round(v / 100f * CN.getDisplayWidth());
+                case UNIT_TYPE_VMIN:
+                    return Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                case UNIT_TYPE_VMAX:
+                    return Math.round(v / 100f * Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()));
                 case UNIT_TYPE_DIPS:
                     return Display.getInstance().convertToPixels(v);
                 case UNIT_TYPE_SCREEN_PERCENTAGE:

@@ -50,12 +50,12 @@ import com.codename1.ui.layouts.FlowLayout;
  * @author Shai Almog
  */
 public final class InfiniteScrollAdapter {
-    private Container infiniteContainer;
-    private Runnable fetchMore;
     private final Component ip;
-    private int componentLimit = -1;
     private final InfiniteProgress progress;
     private final Component endMarker = new EdgeMarker();
+    private Container infiniteContainer;
+    private Runnable fetchMore;
+    private int componentLimit = -1;
 
     private InfiniteScrollAdapter() {
         progress = new InfiniteProgress();

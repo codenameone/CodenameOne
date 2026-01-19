@@ -45,14 +45,14 @@ public class SwipeableContainer extends Container {
     private final Container bottomLeftWrapper;
     private final Container bottomRightWrapper;
     private final Container topWrapper;
+    private final SwipeListener press;
+    private final SwipeListener drag;
+    private final SwipeListener release;
     private boolean open = false;
     private boolean openedToRight = false;
     private boolean openedToLeft = false;
     private Motion openCloseMotion;
     private boolean swipeActivated = true;
-    private final SwipeListener press;
-    private final SwipeListener drag;
-    private final SwipeListener release;
     private int initialX = -1;
     private int initialY = -1;
     private int topX = -1;

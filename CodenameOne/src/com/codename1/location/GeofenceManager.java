@@ -598,7 +598,8 @@ public final class GeofenceManager implements Iterable<Geofence> {
     }
 
     private void removeAll(List l, Object o) {
-        while (l.remove(o)) ;
+        while (l.remove(o)) {
+        }
     }
 
     private void onEntered(String id) {

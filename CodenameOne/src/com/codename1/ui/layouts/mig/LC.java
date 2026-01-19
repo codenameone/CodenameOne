@@ -282,8 +282,9 @@ public final class LC {
      *             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
      */
     public void setHideMode(int mode) {
-        if (mode < 0 || mode > 3)
+        if (mode < 0 || mode > 3) {
             throw new IllegalArgumentException("Wrong hideMode: " + mode);
+        }
 
         this.hideMode = mode;
     }
@@ -911,11 +912,13 @@ public final class LC {
      * @see #alignY(String)
      */
     public LC align(String ax, String ay) {
-        if (ax != null)
+        if (ax != null) {
             alignX(ax);
+        }
 
-        if (ay != null)
+        if (ay != null) {
             alignY(ay);
+        }
 
         return this;
     }
@@ -966,11 +969,13 @@ public final class LC {
      * @see #gridGapY(String)
      */
     public LC gridGap(String gapx, String gapy) {
-        if (gapx != null)
+        if (gapx != null) {
             gridGapX(gapx);
+        }
 
-        if (gapy != null)
+        if (gapy != null) {
             gridGapY(gapy);
+        }
 
         return this;
     }

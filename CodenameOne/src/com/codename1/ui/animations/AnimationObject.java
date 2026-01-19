@@ -198,7 +198,7 @@ public final class AnimationObject {
                 }
             }
             long time = 0;
-            if(motionX != null) {
+            if (motionX != null) {
                 time = motionX.getCurrentMotionTime();
             }
             int frameCount = Math.max(1, frames.length);
@@ -325,7 +325,7 @@ public final class AnimationObject {
     }
 
     int getX() {
-        if(motionX == null) {
+        if (motionX == null) {
             return 0;
         }
         return motionX.getValue();
@@ -335,7 +335,7 @@ public final class AnimationObject {
      * @return the motionY
      */
     int getY() {
-        if(motionY == null) {
+        if (motionY == null) {
             return 0;
         }
         return motionY.getValue();

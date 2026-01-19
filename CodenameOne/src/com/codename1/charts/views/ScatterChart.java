@@ -35,13 +35,21 @@ import java.util.List;
  * place it on a form.
  */
 public class ScatterChart extends XYChart {
-    /** The constant to identify this chart type. */
+    /**
+     * The constant to identify this chart type.
+     */
     public static final String TYPE = "Scatter";
-    /** The default point shape size. */
+    /**
+     * The default point shape size.
+     */
     private static final float SIZE = 3;
-    /** The legend shape width. */
+    /**
+     * The legend shape width.
+     */
     private static final int SHAPE_WIDTH = 10;
-    /** The point shape size. */
+    /**
+     * The point shape size.
+     */
     private float size = SIZE;
 
     ScatterChart() {
@@ -50,7 +58,7 @@ public class ScatterChart extends XYChart {
     /**
      * Builds a new scatter chart instance.
      *
-     * @param dataset the multiple series dataset
+     * @param dataset  the multiple series dataset
      * @param renderer the multiple series renderer
      */
     public ScatterChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
@@ -69,13 +77,13 @@ public class ScatterChart extends XYChart {
     /**
      * The graphical representation of a series.
      *
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas         the canvas to paint to
+     * @param paint          the paint to be used for drawing
+     * @param points         the array of points to be used for drawing the series
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the minimum value of the y axis
-     * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the minimum value of the y axis
+     * @param seriesIndex    the index of the series currently being drawn
+     * @param startIndex     the start index of the rendering points
      */
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points,
@@ -196,17 +204,17 @@ public class ScatterChart extends XYChart {
     /**
      * The graphical representation of the legend shape.
      *
-     * @param canvas the canvas to paint to
-     * @param renderer the series renderer
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param canvas      the canvas to paint to
+     * @param renderer    the series renderer
+     * @param x           the x value of the point the shape should be drawn at
+     * @param y           the y value of the point the shape should be drawn at
      * @param seriesIndex the series index
-     * @param paint the paint to be used for drawing
+     * @param paint       the paint to be used for drawing
      */
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
-        if (renderer instanceof  XYSeriesRenderer &&
+        if (renderer instanceof XYSeriesRenderer &&
                 ((XYSeriesRenderer) renderer).isFillPoints()) {
             paint.setStyle(Style.FILL);
         } else {
@@ -264,9 +272,9 @@ public class ScatterChart extends XYChart {
      * The graphical representation of an X point shape.
      *
      * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param paint  the paint to be used for drawing
+     * @param x      the x value of the point the shape should be drawn at
+     * @param y      the y value of the point the shape should be drawn at
      */
     private void drawX(Canvas canvas, Paint paint, float x, float y) {
         canvas.drawLine(x - size, y - size, x + size, y + size, paint);
@@ -277,9 +285,9 @@ public class ScatterChart extends XYChart {
      * The graphical representation of a circle point shape.
      *
      * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param paint  the paint to be used for drawing
+     * @param x      the x value of the point the shape should be drawn at
+     * @param y      the y value of the point the shape should be drawn at
      */
     private void drawCircle(Canvas canvas, Paint paint, float x, float y) {
         canvas.drawCircle(x, y, size, paint);
@@ -289,10 +297,10 @@ public class ScatterChart extends XYChart {
      * The graphical representation of a triangle point shape.
      *
      * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param path the triangle path
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param paint  the paint to be used for drawing
+     * @param path   the triangle path
+     * @param x      the x value of the point the shape should be drawn at
+     * @param y      the y value of the point the shape should be drawn at
      */
     private void drawTriangle(Canvas canvas, Paint paint, float[] path, float x, float y) {
         path[0] = x;
@@ -308,9 +316,9 @@ public class ScatterChart extends XYChart {
      * The graphical representation of a square point shape.
      *
      * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param paint  the paint to be used for drawing
+     * @param x      the x value of the point the shape should be drawn at
+     * @param y      the y value of the point the shape should be drawn at
      */
     private void drawSquare(Canvas canvas, Paint paint, float x, float y) {
         canvas.drawRect(x - size, y - size, x + size, y + size, paint);
@@ -320,10 +328,10 @@ public class ScatterChart extends XYChart {
      * The graphical representation of a diamond point shape.
      *
      * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param path the diamond path
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param paint  the paint to be used for drawing
+     * @param path   the diamond path
+     * @param x      the x value of the point the shape should be drawn at
+     * @param y      the y value of the point the shape should be drawn at
      */
     private void drawDiamond(Canvas canvas, Paint paint, float[] path, float x, float y) {
         path[0] = x;

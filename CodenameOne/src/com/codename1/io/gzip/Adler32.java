@@ -57,10 +57,18 @@ final public class Adler32 implements Checksum {
         sum2 %= basel; // MOD(sum2);
         sum1 += (adler2 & 0xffffL) + basel - 1;
         sum2 += ((adler1 >> 16) & 0xffffL) + ((adler2 >> 16) & 0xffffL) + basel - rem;
-        if (sum1 >= basel) sum1 -= basel;
-        if (sum1 >= basel) sum1 -= basel;
-        if (sum2 >= (basel << 1)) sum2 -= (basel << 1);
-        if (sum2 >= basel) sum2 -= basel;
+        if (sum1 >= basel) {
+            sum1 -= basel;
+        }
+        if (sum1 >= basel) {
+            sum1 -= basel;
+        }
+        if (sum2 >= (basel << 1)) {
+            sum2 -= (basel << 1);
+        }
+        if (sum2 >= basel) {
+            sum2 -= basel;
+        }
         return sum1 | (sum2 << 16);
     }
 

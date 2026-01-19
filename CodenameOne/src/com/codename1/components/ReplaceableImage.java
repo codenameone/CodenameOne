@@ -33,9 +33,9 @@ import com.codename1.ui.EncodedImage;
  * @author Shai Almog
  */
 public final class ReplaceableImage extends EncodedImage {
+    private final boolean opaque;
     private boolean replaced;
     private byte[] data;
-    private final boolean opaque;
 
     private ReplaceableImage(EncodedImage placeholder) {
         super(placeholder.getWidth(), placeholder.getHeight());

@@ -152,6 +152,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private final EventDispatcher dispatcher = new EventDispatcher();
     private final EventDispatcher changeDispatcher = new EventDispatcher();
+    private final int valign = CENTER;
     private boolean value;
     private Image thumbOnImage;
     private Image thumbOffImage;
@@ -259,7 +260,6 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             animationLock = false;
         }
     };
-    private final int valign = CENTER;
 
     /**
      * Default constructor

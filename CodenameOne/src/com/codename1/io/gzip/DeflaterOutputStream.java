@@ -94,8 +94,9 @@ public class DeflaterOutputStream extends FilterOutputStream {
             deflater.setInput(b, off, len, true);
             while (deflater.availIn > 0) {
                 int err = deflate(flush);
-                if (err == JZlib.Z_STREAM_END)
+                if (err == JZlib.Z_STREAM_END) {
                     break;
+                }
             }
         }
     }
@@ -113,8 +114,9 @@ public class DeflaterOutputStream extends FilterOutputStream {
             if (mydeflater) {
                 deflater.end();
             }
-            if (close_out)
+            if (close_out) {
                 out.close();
+            }
             closed = true;
         }
     }
@@ -146,10 +148,12 @@ public class DeflaterOutputStream extends FilterOutputStream {
         if (syncFlush && !deflater.finished()) {
             while (true) {
                 int err = deflate(JZlib.Z_SYNC_FLUSH);
-                if (deflater.nextOutIndex < buffer.length)
+                if (deflater.nextOutIndex < buffer.length) {
                     break;
-                if (err == JZlib.Z_STREAM_END)
+                }
+                if (err == JZlib.Z_STREAM_END) {
                     break;
+                }
             }
         }
         out.flush();

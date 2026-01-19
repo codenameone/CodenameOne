@@ -122,8 +122,9 @@ public final class LayoutUtil {
      * @param b  <code>true</code> means design time on.
      */
     public static void setDesignTime(ContainerWrapper cw, boolean b) {
-        if (DT_MAP == null)
+        if (DT_MAP == null) {
             DT_MAP = new HashMap<Object, Boolean>();
+        }
 
         DT_MAP.put((cw != null ? cw.getComponent() : null), b);
     }
@@ -137,11 +138,13 @@ public final class LayoutUtil {
      * @return If design time is set for <code>cw</code>.
      */
     public static boolean isDesignTime(ContainerWrapper cw) {
-        if (DT_MAP == null)
+        if (DT_MAP == null) {
             return HAS_BEANS;
+        }
 
-        if (cw != null && !DT_MAP.containsKey(cw.getComponent()))
+        if (cw != null && !DT_MAP.containsKey(cw.getComponent())) {
             cw = null;
+        }
 
         Boolean b = DT_MAP.get(cw != null ? cw.getComponent() : null);
         return b != null && b;
@@ -179,8 +182,9 @@ public final class LayoutUtil {
      */
     static void putCCString(Object con, String s) {
         if (s != null && con != null && isDesignTime(null)) {
-            if (CR_MAP == null)
+            if (CR_MAP == null) {
                 CR_MAP = new HashMap<Object, String>(64);
+            }
 
             CR_MAP.put(con, s);
         }
@@ -224,8 +228,9 @@ public final class LayoutUtil {
             if (sizes[i] != null) {
                 float len = sizes[i][startSizeType] != NOT_SET ? sizes[i][startSizeType] : 0;
                 int newSizeBounded = getBrokenBoundary(len, sizes[i][MIN], sizes[i][MAX]);
-                if (newSizeBounded != NOT_SET)
+                if (newSizeBounded != NOT_SET) {
                     len = newSizeBounded;
+                }
 
                 usedLength += len;
                 lengths[i] = len;
@@ -240,8 +245,9 @@ public final class LayoutUtil {
             TreeSet<Integer> prioList = new TreeSet<Integer>();
             for (int i = 0; i < sizes.length; i++) {
                 ResizeConstraint resC = (ResizeConstraint) getIndexSafe(resConstr, i);
-                if (resC != null)
+                if (resC != null) {
                     prioList.add(Integer.valueOf(isGrow ? resC.growPrio : resC.shrinkPrio));
+                }
             }
             Integer[] prioIntegers = prioList.toArray(new Integer[prioList.size()]);
 
@@ -253,7 +259,9 @@ public final class LayoutUtil {
                     Float[] resizeWeight = new Float[sizes.length];
                     for (int i = 0; i < sizes.length; i++) {
                         if (sizes[i] == null)   // if no min/pref/max size at all do not grow or shrink.
+                        {
                             continue;
+                        }
 
                         ResizeConstraint resC = (ResizeConstraint) getIndexSafe(resConstr, i);
                         if (resC != null) {
@@ -265,8 +273,9 @@ public final class LayoutUtil {
                                 } else {
                                     resizeWeight[i] = resC.shrink;
                                 }
-                                if (resizeWeight[i] != null)
+                                if (resizeWeight[i] != null) {
                                     totWeight += resizeWeight[i];
+                                }
                             }
                         }
                     }
@@ -324,22 +333,25 @@ public final class LayoutUtil {
      */
     private static int getBrokenBoundary(float sz, int lower, int upper) {
         if (lower != NOT_SET) {
-            if (sz < lower)
+            if (sz < lower) {
                 return lower;
+            }
         } else if (sz < 0f) {
             return 0;
         }
 
-        if (upper != NOT_SET && sz > upper)
+        if (upper != NOT_SET && sz > upper) {
             return upper;
+        }
 
         return NOT_SET;
     }
 
     static int sum(int[] terms, int start, int len) {
         int s = 0;
-        for (int i = start, iSz = start + len; i < iSz; i++)
+        for (int i = start, iSz = start + len; i < iSz; i++) {
             s += terms[i];
+        }
         return s;
     }
 
@@ -348,14 +360,16 @@ public final class LayoutUtil {
     }
 
     public static int getSizeSafe(int[] sizes, int sizeType) {
-        if (sizes == null || sizes[sizeType] == NOT_SET)
+        if (sizes == null || sizes[sizeType] == NOT_SET) {
             return sizeType == MAX ? LayoutUtil.INF : 0;
+        }
         return sizes[sizeType];
     }
 
     static BoundSize derive(BoundSize bs, UnitValue min, UnitValue pref, UnitValue max) {
-        if (bs == null || bs.isUnset())
+        if (bs == null || bs.isUnset()) {
             return new BoundSize(min, pref, max, null);
+        }
 
         return new BoundSize(
                 min != null ? min : bs.getMin(),
@@ -374,8 +388,9 @@ public final class LayoutUtil {
      * @return If left-to-right orientation is currently used.
      */
     public static boolean isLeftToRight(LC lc, ContainerWrapper container) {
-        if (lc != null && lc.getLeftToRight() != null)
+        if (lc != null && lc.getLeftToRight() != null) {
             return lc.getLeftToRight();
+        }
 
         return container == null || container.isLeftToRight();
     }

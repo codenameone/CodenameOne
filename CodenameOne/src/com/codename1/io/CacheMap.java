@@ -42,10 +42,9 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class CacheMap {
-    private int cacheSize = 10;
     private final Hashtable memoryCache = new Hashtable();
     private final Hashtable weakCache = new Hashtable();
-
+    private int cacheSize = 10;
     private int storageCacheSize = 0;
     private Vector storageCacheContentVec;
     private String cachePrefix = "";

@@ -231,6 +231,14 @@ public class Component implements Animation, StyleListener, Editable {
     public static final int BASELINE = 5;
     private static final Rectangle tmpRect = new Rectangle();
     /**
+     * A flag to toggle between lightweight elevation shadow generation and heavyweight generation.  The lightweight
+     * does the work entirely in CN1 and it cuts corners.  In simulator, it turns out that the heavyweight implementation
+     * is too slow to be useful.  This may not be the case on other platforms, but, for now, we'll leave this flag on.
+     * Later on, after evaluation, this flag will likely be removed, and the best strategy will be decided upon.
+     */
+    private static final boolean useLightweightElevationShadow = true;
+    static int restoreDragPercentage = -1;
+    /**
      * A flag to dictate whether style changes should trigger a revalidate() call
      * on the component's parent.  Eventually we would like to phase this to be {@literal false}
      * but for now, we'll leave it as {@literal true}.
@@ -238,7 +246,6 @@ public class Component implements Animation, StyleListener, Editable {
      * Users can disable this with {@code CN.setProperty("Component.revalidateOnStyleChange", "false")}.
      */
     private static boolean revalidateOnStyleChange = true;
-    static int restoreDragPercentage = -1;
     private static byte defaultDragTransparency = 55;
     private static boolean disableSmoothScrolling = false;
     private static boolean paintLockEnableChecked;
@@ -315,13 +322,6 @@ public class Component implements Animation, StyleListener, Editable {
     private Component nextFocusRight;
     private Component nextFocusLeft;
     private String name;
-    /**
-     * A flag to toggle between lightweight elevation shadow generation and heavyweight generation.  The lightweight
-     * does the work entirely in CN1 and it cuts corners.  In simulator, it turns out that the heavyweight implementation
-     * is too slow to be useful.  This may not be the case on other platforms, but, for now, we'll leave this flag on.
-     * Later on, after evaluation, this flag will likely be removed, and the best strategy will be decided upon.
-     */
-    private static final boolean useLightweightElevationShadow = true;
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
      * a specific component without making it focusable.
@@ -534,12 +534,12 @@ public class Component implements Animation, StyleListener, Editable {
         return Display.getInstance().getImplementation().isSetCursorSupported();
     }
 
-    static void setRevalidateOnStyleChange(boolean val) {
-        revalidateOnStyleChange = val;
-    }
-
     static boolean isRevalidateOnStyleChange() {
         return revalidateOnStyleChange;
+    }
+
+    static void setRevalidateOnStyleChange(boolean val) {
+        revalidateOnStyleChange = val;
     }
 
     /**
@@ -1722,6 +1722,7 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * This method is the implementation of setUIID and is defined
      * as final to allow invocation from constructors.
+     *
      * @param id UIID unique identifier for component type
      */
     protected final void setUIIDFinal(String id) {
@@ -2320,8 +2321,12 @@ public class Component implements Animation, StyleListener, Editable {
      * @return True if native shadow rendering should be used for elevation.
      */
     private boolean useNativeShadowRendering() {
-        if (!Display.impl.isDrawShadowSupported()) return false;
-        if (Boolean.TRUE.equals(getClientProperty("Component.nativeShadowRendering"))) return true;
+        if (!Display.impl.isDrawShadowSupported()) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(getClientProperty("Component.nativeShadowRendering"))) {
+            return true;
+        }
         return "true".equals(CN.getProperty("Component.nativeShadowRendering", "false"));
     }
 
@@ -2410,7 +2415,9 @@ public class Component implements Animation, StyleListener, Editable {
      * @return
      */
     boolean hasElevation() {
-        if (_hasElevation) return true;
+        if (_hasElevation) {
+            return true;
+        }
         Style s = getStyle();
         if (s.getElevation() > 0) {
             _hasElevation = true;
@@ -2567,7 +2574,9 @@ public class Component implements Animation, StyleListener, Editable {
         if (elevation <= 0) {
             return;
         }
-        if (getWidth() == 0 || getHeight() == 0) return;
+        if (getWidth() == 0 || getHeight() == 0) {
+            return;
+        }
         synchronized (this) {
             if (cachedShadowImage != null) {
                 if (cachedShadowWidth != getWidth() || cachedShadowHeight != getHeight() || cachedShadowElevation != elevation) {
@@ -2589,7 +2598,9 @@ public class Component implements Animation, StyleListener, Editable {
         }
 
         final Image fimg = this.toImage();
-        if (fimg == null) return;
+        if (fimg == null) {
+            return;
+        }
         if (paintinShadowInBackground_) {
             // We are already painting the shadow in a background thread, so don't do it twice.
             // Just be patient.
@@ -3981,7 +3992,9 @@ public class Component implements Animation, StyleListener, Editable {
 
     private Container findSurfaceInternal() {
         Container parent = getParent();
-        if (parent == null) return null;
+        if (parent == null) {
+            return null;
+        }
         if (parent.isSurface()) {
             return parent;
         }
@@ -4537,8 +4550,11 @@ public class Component implements Animation, StyleListener, Editable {
                         // won't work. We need to explicitly revalidate or repaint here.
                         if (requiresRevalidate) {
                             Container parent = getParent();
-                            if (parent != null) parent.revalidate();
-                            else repaint();
+                            if (parent != null) {
+                                parent.revalidate();
+                            } else {
+                                repaint();
+                            }
                         } else {
                             repaint();
                         }
@@ -4758,8 +4774,9 @@ public class Component implements Animation, StyleListener, Editable {
             boolean pinchXY = pinch(x, y); // ensure that both pinch(scale) and pinch(x,y) are called
             if (pinch((float) scale) || pinchXY) {
                 inPinch = true;
-                if (pinchBlocksDragAndDrop)
+                if (pinchBlocksDragAndDrop) {
                     dragActivated = false;
+                }
                 return;
             }
         } else {
@@ -6384,7 +6401,9 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     void deregisterAnimatedInternal() {
-        if (!internalRegisteredAnimated) return;
+        if (!internalRegisteredAnimated) {
+            return;
+        }
         Form f = getComponentForm();
         if (f != null) {
             f.deregisterAnimatedInternal(this);
@@ -6842,7 +6861,9 @@ public class Component implements Animation, StyleListener, Editable {
             cmp._parentSurface = null;
         }
         Container parent = getParent();
-        if (parent == null) return;
+        if (parent == null) {
+            return;
+        }
         if (parent.isSurface()) {
             // Let's keep a reference to the surface so that we can remove it later.
             parent.addElevatedComponent(cmp);
@@ -8059,14 +8080,14 @@ public class Component implements Animation, StyleListener, Editable {
             int oAlpha = g.getAlpha();
             if (alpha == 0) {
                 unSelectedStyle = originalStyle;
-                if(original != null) {
+                if (original != null) {
                     original.paint(g, rect);
                 }
                 return;
             }
             if (alpha == 255) {
                 unSelectedStyle = destStyle;
-                if(dest != null) {
+                if (dest != null) {
                     dest.paint(g, rect);
                 }
                 unSelectedStyle = originalStyle;
@@ -8075,7 +8096,7 @@ public class Component implements Animation, StyleListener, Editable {
             int opa = unSelectedStyle.getBgTransparency() & 0xff;
             unSelectedStyle.setBgTransparency(255 - alpha);
             g.setAlpha(255 - alpha);
-            if(original != null) {
+            if (original != null) {
                 original.paint(g, rect);
             }
             unSelectedStyle.setBgTransparency(opa);
@@ -8083,7 +8104,7 @@ public class Component implements Animation, StyleListener, Editable {
             opa = unSelectedStyle.getBgTransparency() & 0xff;
             g.setAlpha(alpha);
             unSelectedStyle.setBgTransparency(alpha);
-            if(dest != null) {
+            if (dest != null) {
                 dest.paint(g, rect);
             }
             unSelectedStyle.setBgTransparency(opa);

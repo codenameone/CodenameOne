@@ -22,33 +22,49 @@ import com.codename1.ui.Stroke;
  * A descriptor for the stroke style.
  */
 public class BasicStroke {
-    /** The solid line style. */
+    /**
+     * The solid line style.
+     */
     public static final BasicStroke SOLID = new BasicStroke(Stroke.CAP_BUTT, Stroke.JOIN_MITER, 4, null, 0);
-    /** The dashed line style. */
+    /**
+     * The dashed line style.
+     */
     public static final BasicStroke DASHED = new BasicStroke(Stroke.CAP_ROUND, Stroke.JOIN_BEVEL, 10, new float[]{
             10, 10}, 1);
-    /** The dot line style. */
+    /**
+     * The dot line style.
+     */
     public static final BasicStroke DOTTED = new BasicStroke(Stroke.CAP_ROUND, Stroke.JOIN_BEVEL, 5, new float[]{
             2, 10}, 1);
-    /** The stroke cap. */
+    /**
+     * The stroke cap.
+     */
     private final int mCap;
-    /** The stroke join. */
+    /**
+     * The stroke join.
+     */
     private final int mJoin;
-    /** The stroke miter. */
+    /**
+     * The stroke miter.
+     */
     private final float mMiter;
-    /** The path effect intervals. */
+    /**
+     * The path effect intervals.
+     */
     private final float[] mIntervals;
-    /** The path effect phase. */
+    /**
+     * The path effect phase.
+     */
     private final float mPhase;
 
     /**
      * Build a new basic stroke style.
      *
-     * @param cap the stroke cap
-     * @param join the stroke join
-     * @param miter the stroke miter
+     * @param cap       the stroke cap
+     * @param join      the stroke join
+     * @param miter     the stroke miter
      * @param intervals the path effect intervals
-     * @param phase the path effect phase
+     * @param phase     the path effect phase
      */
     public BasicStroke(int cap, int join, float miter, float[] intervals, float phase) {
         mCap = cap;

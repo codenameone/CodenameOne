@@ -40,7 +40,8 @@ public class Base64 {
 
     /**
      * Decodes an array of bytes containing a Base64 ascii string into binary data
-     * @param in the array
+     *
+     * @param in  the array
      * @param len the length of the array
      * @return the decoded array
      */
@@ -138,6 +139,7 @@ public class Base64 {
 
     /**
      * Encodes the given array as a base64 string
+     *
      * @param in the array to encode
      * @return the String containing the array
      */
@@ -182,6 +184,7 @@ public class Base64 {
 
     /**
      * Encodes the given array as a base64 string without breaking lines
+     *
      * @param in the array to encode
      * @return the String containing the array
      */

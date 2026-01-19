@@ -157,8 +157,8 @@ public class CSSBorder extends Border {
      */
     public static final byte UNIT_EM = 4;
     private static final Map<String, Decorator> decorators = new HashMap<String, Decorator>();
-    private static Context context;
     private static final Map<String, Byte> STYLE_MAP = createStyleMap();
+    private static Context context;
 
     static {
         decorators.put("background-color", new Decorator() {
@@ -229,13 +229,13 @@ public class CSSBorder extends Border {
         });
     }
 
+    private final Resources res;
     private Color backgroundColor;
     private BackgroundImage[] backgroundImages;
     private BorderImage borderImage;
     private BorderStroke[] stroke;
     private BoxShadow boxShadow;
     private BorderRadius borderRadius;
-    private final Resources res;
     private Rectangle2D contentRect;
 
     /**
@@ -376,6 +376,18 @@ public class CSSBorder extends Border {
         g.setAlpha(c == null ? 0 : c.alpha);
     }
 
+    private static float floatPx(ScalarUnit u) {
+        return u == null ? 0 : u.floatPx();
+    }
+
+    private static float floatPx(ScalarUnit u, Component c, Rectangle2D contentRect, boolean horizontal) {
+        return u == null ? 0 : u.floatPx(c, contentRect, horizontal);
+    }
+
+    private static void setContext(Context ctx) {
+        context = ctx;
+    }
+
     @Override
     public boolean equals(Object obj) {
         return obj == this;
@@ -455,14 +467,6 @@ public class CSSBorder extends Border {
         }
 
         return sb.toString();
-    }
-
-    private static float floatPx(ScalarUnit u) {
-        return u == null ? 0 : u.floatPx();
-    }
-
-    private static float floatPx(ScalarUnit u, Component c, Rectangle2D contentRect, boolean horizontal) {
-        return u == null ? 0 : u.floatPx(c, contentRect, horizontal);
     }
 
     private boolean hasBorderRadius() {
@@ -628,7 +632,9 @@ public class CSSBorder extends Border {
     }
 
     boolean allSidesHaveSameStroke() {
-        if (stroke == null) return true;
+        if (stroke == null) {
+            return true;
+        }
 
         return stroke[TOP].equals(stroke[BOTTOM]) && stroke[LEFT].equals(stroke[RIGHT]) && stroke[TOP].equals(stroke[LEFT]);
     }
@@ -639,10 +645,6 @@ public class CSSBorder extends Border {
     @Override
     public boolean isBackgroundPainter() {
         return true;
-    }
-
-    private static void setContext(Context ctx) {
-        context = ctx;
     }
 
     /**
@@ -661,7 +663,9 @@ public class CSSBorder extends Border {
         g.setAntiAliased(true);
         Style s = c.getStyle();
         try {
-            if (contentRect == null) contentRect = new Rectangle2D();
+            if (contentRect == null) {
+                contentRect = new Rectangle2D();
+            }
             calculateContentRect(c.getWidth(), c.getHeight(), contentRect);
             contentRect.setX(contentRect.getX() + c.getX());
             contentRect.setY(contentRect.getY() + c.getY());
@@ -1370,7 +1374,9 @@ public class CSSBorder extends Border {
 
         @Override
         public int hashCode() {
-            if (value == 0) return 0;
+            if (value == 0) {
+                return 0;
+            }
             return Float.floatToIntBits(value) ^ type;
         }
 
@@ -2039,11 +2045,11 @@ public class CSSBorder extends Border {
     }
 
     private static class BorderImage {
+        final Resources res;
         Image image;
         double[] slices;
         Border internal;
         String imageName;
-        final Resources res;
 
         BorderImage(Resources res, String imageName, double... slces) {
             this.res = res;

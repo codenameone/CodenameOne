@@ -36,13 +36,13 @@ import com.codename1.ui.util.EventDispatcher;
  * @deprecated use Picker instead
  */
 class SpinnerNumberModel implements ListModel {
-    boolean realValues;
     private final EventDispatcher dataListener = new EventDispatcher();
     private final EventDispatcher selectionListener = new EventDispatcher();
     private final double min;
     private final double max;
-    private double currentValue;
     private final double step;
+    boolean realValues;
+    private double currentValue;
     /**
      * The old DateSpinner relies on behavior that was broken in this commit:
      * https://github.com/codenameone/CodenameOne/commit/cfac9a6a1bb15027b48a9b822e2f21eb2835d38e#diff-d12531ab4b0dd8bf1233a09f3c5e2b2b5634bff3c3cd2f357ad0a001e5f19bbf

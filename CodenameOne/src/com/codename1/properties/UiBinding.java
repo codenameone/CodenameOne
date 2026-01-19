@@ -680,7 +680,7 @@ public class UiBinding {
             if (cmp instanceof CheckBox) {
                 ((CheckBox) cmp).setSelected((Boolean) toComponentType.convert(value));
             } else {
-                if(cmp instanceof RadioButton) {
+                if (cmp instanceof RadioButton) {
                     ((RadioButton) cmp).setSelected((Boolean) toComponentType.convert(value));
                 }
             }
@@ -839,14 +839,14 @@ public class UiBinding {
      * such as adding/removing rows
      */
     public static class BoundTableModel extends AbstractTableModel {
-        private List<? extends PropertyBusinessObject> objects;
-        private CollectionProperty objectProperty;
         private final PropertyBusinessObject prototype;
         private final Set<String> exclude = new HashSet<String>();
-        private List<String> included;
-        private PropertyBase[] columnOrder;
         private final Set<String> uneditable = new HashSet<String>();
         private final EventDispatcher listeners = new EventDispatcher();
+        private List<? extends PropertyBusinessObject> objects;
+        private CollectionProperty objectProperty;
+        private List<String> included;
+        private PropertyBase[] columnOrder;
 
         /**
          * Creates a table model with the business objects

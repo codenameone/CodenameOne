@@ -270,7 +270,7 @@ public class Capture {
                 synchronized (this) {
                     try {
                         // we need to recheck the condition within the synchronized block (double locking)
-                        if(!completed) {
+                        if (!completed) {
                             this.wait();
                         }
                     } catch (InterruptedException ex) {

@@ -57,13 +57,10 @@ import java.util.Vector;
  */
 public class ShareButton extends Button implements ActionListener {
 
-    private String textToShare;
-
-    private String imageToShare;
-
-    private String imageMimeType;
-
     private final Vector shareServices = new Vector();
+    private String textToShare;
+    private String imageToShare;
+    private String imageMimeType;
 
     /**
      * Default constructor

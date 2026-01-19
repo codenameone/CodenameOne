@@ -51,10 +51,10 @@ public abstract class LocationManager {
     public static final int AVAILABLE = 0;
     public static final int OUT_OF_SERVICE = 1;
     public static final int TEMPORARILY_UNAVAILABLE = 2;
-    private static LocationListener listener;
     private static final Object LISTENER_LOCK = new Object();
-    private LocationRequest request;
+    private static LocationListener listener;
     private static Class backgroundlistener;
+    private LocationRequest request;
     private int status = TEMPORARILY_UNAVAILABLE;
 
     /**

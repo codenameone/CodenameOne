@@ -41,10 +41,10 @@ import java.util.Collections;
  * @author Shai Almog
  */
 public class DefaultTableModel extends AbstractTableModel {
+    private final EventDispatcher dispatcher = new EventDispatcher();
     ArrayList<Object[]> data = new ArrayList<Object[]>();
     String[] columnNames;
     boolean editable;
-    private final EventDispatcher dispatcher = new EventDispatcher();
 
     /**
      * Constructs a new table with a 2 dimensional array for row/column data

@@ -129,6 +129,7 @@ public class BorderLayout extends Layout {
      * Overlay on top of the other layout components
      */
     public static final String OVERLAY = "Overlay";
+    private final Dimension dim = new Dimension(0, 0);
     private boolean scaleEdges = true;
     private Component portraitNorth;
     private Component portraitSouth;
@@ -141,7 +142,6 @@ public class BorderLayout extends Layout {
      * Defines the behavior of the center component to one of the constants defined in this class
      */
     private int centerBehavior;
-    private final Dimension dim = new Dimension(0, 0);
 
     /**
      * Creates a new instance of BorderLayout

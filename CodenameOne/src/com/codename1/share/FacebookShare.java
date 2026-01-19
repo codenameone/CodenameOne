@@ -27,7 +27,6 @@ import com.codename1.facebook.FaceBookAccess;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.MultipartRequest;
-import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Image;

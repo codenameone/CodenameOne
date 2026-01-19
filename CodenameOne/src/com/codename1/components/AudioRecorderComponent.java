@@ -69,18 +69,18 @@ import static com.codename1.ui.ComponentSelector.$;
  * @since 7.0
  */
 public class AudioRecorderComponent extends Container implements ActionSource {
-    private Media media;
     private final Button record;
     private final Button pause;
     private final Button done;
     private final Label recordingInProgress;
     private final Label recordingOff;
     private final EventDispatcher actionListeners = new EventDispatcher();
+    private final Label recordingTime;
+    private Media media;
     private RecorderState state;
     private double recordAlpha = 1.0;
     private long recordingLength;
     private long lastRecordingStartTime;
-    private final Label recordingTime;
     private int counter = 0;
 
     /**

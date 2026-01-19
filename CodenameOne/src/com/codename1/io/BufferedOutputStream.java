@@ -33,6 +33,8 @@ import java.io.OutputStream;
 public class BufferedOutputStream extends OutputStream {
     private static int streamCount = 0;
     private static int defaultBufferSize = 8192;
+    private final OutputStream out;
+    private final String name;
     /**
      * The internal buffer where data is stored.
      */
@@ -46,11 +48,9 @@ public class BufferedOutputStream extends OutputStream {
     protected int count;
     private Object connection;
     private boolean closed;
-    private final OutputStream out;
     private long lastActivityTime;
     private int totalBytesWritten;
     private IOProgressListener progressListener;
-    private final String name;
 
     /**
      * Creates a new buffered output stream to write data to the

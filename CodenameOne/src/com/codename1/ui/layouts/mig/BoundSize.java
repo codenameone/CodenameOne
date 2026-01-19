@@ -150,10 +150,12 @@ public class BoundSize {
      * @return The size, constrained within min and max.
      */
     public int constrain(int size, float refValue, ContainerWrapper parent) {
-        if (max != null)
+        if (max != null) {
             size = Math.min(size, max.getPixels(refValue, parent, parent));
-        if (min != null)
+        }
+        if (min != null) {
             size = Math.max(size, min.getPixels(refValue, parent, parent));
+        }
         return size;
     }
 
@@ -201,31 +203,37 @@ public class BoundSize {
      */
     String getConstraintString() {
         String cs = LayoutUtil.getCCString(this);
-        if (cs != null)
+        if (cs != null) {
             return cs;
+        }
 
-        if (min == pref && pref == max)
+        if (min == pref && pref == max) {
             return min != null ? (min.getConstraintString() + "!") : "null";
+        }
 
         StringBuilder sb = new StringBuilder(16);
 
-        if (min != null)
+        if (min != null) {
             sb.append(min.getConstraintString()).append(':');
+        }
 
         if (pref != null) {
-            if (min == null && max != null)
+            if (min == null && max != null) {
                 sb.append(":");
+            }
             sb.append(pref.getConstraintString());
         } else if (min != null) {
             sb.append('n');
         }
 
-        if (max != null)
+        if (max != null) {
             sb.append(sb.length() == 0 ? "::" : ":").append(max.getConstraintString());
+        }
 
         if (gapPush) {
-            if (sb.length() > 0)
+            if (sb.length() > 0) {
                 sb.append(':');
+            }
             sb.append("push");
         }
 
@@ -233,8 +241,9 @@ public class BoundSize {
     }
 
     void checkNotLinked() {
-        if (isLinked())
+        if (isLinked()) {
             throw new IllegalArgumentException("Size may not contain links");
+        }
     }
 
     boolean isLinked() {

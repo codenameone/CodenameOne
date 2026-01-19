@@ -31,24 +31,42 @@ import java.util.TreeMap;
  * scatter... charts.
  */
 public class XYSeries {
-    /** A map to contain values for X and Y axes and index for each bundle */
+    /**
+     * A map to contain values for X and Y axes and index for each bundle
+     */
     private final IndexXYMap<Double, Double> mXY = new IndexXYMap<Double, Double>();
-    /** The scale number for this series. */
+    /**
+     * The scale number for this series.
+     */
     private final int mScaleNumber;
-    /** A map contain a (x,y) value for each String annotation. */
+    /**
+     * A map contain a (x,y) value for each String annotation.
+     */
     private final IndexXYMap<Double, Double> mStringXY = new IndexXYMap<Double, Double>();
-    /** The series title. */
-    private String mTitle;
-    /** The minimum value for the X axis. */
-    private double mMinX = MathHelper.NULL_VALUE;
-    /** The maximum value for the X axis. */
-    private double mMaxX = MathHelper.NULL_VALUE;
-    /** The minimum value for the Y axis. */
-    private double mMinY = MathHelper.NULL_VALUE;
-    /** The maximum value for the Y axis. */
-    private double mMaxY = MathHelper.NULL_VALUE;
-    /** Contains the annotations. */
+    /**
+     * Contains the annotations.
+     */
     private final List<String> mAnnotations = new ArrayList<String>();
+    /**
+     * The series title.
+     */
+    private String mTitle;
+    /**
+     * The minimum value for the X axis.
+     */
+    private double mMinX = MathHelper.NULL_VALUE;
+    /**
+     * The maximum value for the X axis.
+     */
+    private double mMaxX = MathHelper.NULL_VALUE;
+    /**
+     * The minimum value for the Y axis.
+     */
+    private double mMinY = MathHelper.NULL_VALUE;
+    /**
+     * The maximum value for the Y axis.
+     */
+    private double mMaxY = MathHelper.NULL_VALUE;
 
     /**
      * Builds a new XY series.
@@ -62,7 +80,7 @@ public class XYSeries {
     /**
      * Builds a new XY series.
      *
-     * @param title the series title.
+     * @param title       the series title.
      * @param scaleNumber the series scale number
      */
     public XYSeries(String title, int scaleNumber) {
@@ -162,8 +180,8 @@ public class XYSeries {
      * Adds a new value to the series at the specified index.
      *
      * @param index the index to be added the data to
-     * @param x the value for the X axis
-     * @param y the value for the Y axis
+     * @param x     the value for the X axis
+     * @param y     the value for the Y axis
      */
     public void add(int index, double x, double y) {
         while (mXY.get(x) != null) {
@@ -265,7 +283,7 @@ public class XYSeries {
      * Add a String at (x,y) coordinates
      *
      * @param annotation String text
-     * @param index the index to add the annotation to
+     * @param index      the index to add the annotation to
      * @param x
      * @param y
      */
@@ -329,14 +347,14 @@ public class XYSeries {
     /**
      * Returns submap of x and y values according to the given start and end
      *
-     * @param start start x value
-     * @param stop stop x value
+     * @param start             start x value
+     * @param stop              stop x value
      * @param beforeAfterPoints if the points before and after the first and last
-     *          visible ones must be displayed
+     *                          visible ones must be displayed
      * @return a submap of x and y values
      */
     public SortedMap<Double, Double> getRange(double start, double stop,
-                                                           boolean beforeAfterPoints) {
+                                              boolean beforeAfterPoints) {
         if (beforeAfterPoints) {
             // we need to add one point before the start and one point after the end
             // (if there are any)
@@ -454,9 +472,10 @@ public class XYSeries {
             }
 
             if (Math.abs((Double) indexList.get(indexList.size() - 1)
-                    - (Double) indexList.get(indexList.size() - 2)) > maxXDifference)
+                    - (Double) indexList.get(indexList.size() - 2)) > maxXDifference) {
                 maxXDifference = Math.abs((Double) indexList.get(indexList.size() - 1)
                         - (Double) indexList.get(indexList.size() - 2));
+            }
         }
 
         public double getMaxXDifference() {

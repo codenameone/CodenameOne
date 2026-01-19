@@ -17,7 +17,6 @@
 
 package com.codename1.util.regex;
 
-import java.io.PrintStream;
 import java.util.HashMap;
 
 /**

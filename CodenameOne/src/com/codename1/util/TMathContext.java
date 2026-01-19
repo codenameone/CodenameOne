@@ -75,15 +75,15 @@ final class TMathContext {
     private final static char[] chRoundingMode = {'r', 'o', 'u', 'n', 'd',
             'i', 'n', 'g', 'M', 'o', 'd', 'e', '='};
     /**
-     * The number of digits to be used for an operation; results are rounded to
-     * this precision.
-     */
-    private int precision;
-    /**
      * A {@code RoundingMode} object which specifies the algorithm to be used
      * for rounding.
      */
     private final TRoundingMode roundingMode;
+    /**
+     * The number of digits to be used for an operation; results are rounded to
+     * this precision.
+     */
+    private int precision;
 
     /**
      * Constructs a new {@code MathContext} with the specified precision and

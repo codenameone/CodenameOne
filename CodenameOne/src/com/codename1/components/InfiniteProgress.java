@@ -70,10 +70,10 @@ public class InfiniteProgress extends Component {
      * The default color of the current material design progress spinner
      */
     private static int defaultMaterialDesignColor = 0x6200ee;
+    private final WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
     private Image animation;
     private int angle = 0;
     private int tick;
-    private final WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
     private int tintColor = 0x90000000;
     /**
      * Indicates whether this instance of infinite progress works in the material
@@ -97,6 +97,7 @@ public class InfiniteProgress extends Component {
      * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
      */
     private int angleIncrease = 16;
+
     /**
      * Default constructor to define the UIID
      */

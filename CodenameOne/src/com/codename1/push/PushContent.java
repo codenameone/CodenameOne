@@ -124,7 +124,9 @@ public final class PushContent {
 
     private static boolean anyProperties(String... propNames) {
         for (String propName : propNames) {
-            if (p(propName, null) != null) return true;
+            if (p(propName, null) != null) {
+                return true;
+            }
         }
         return false;
     }

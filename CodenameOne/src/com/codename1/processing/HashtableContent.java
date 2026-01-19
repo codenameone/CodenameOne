@@ -27,9 +27,7 @@ import com.codename1.io.JSONParser;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.Reader;
-
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -135,7 +133,7 @@ class MapContent implements StructuredContent {
     public boolean equals(Object o) {
         return o instanceof MapContent &&
                 (root == ((MapContent) o).root ||
-                (root != null && root.equals(((MapContent) o).root)));
+                        (root != null && root.equals(((MapContent) o).root)));
     }
 
     /**

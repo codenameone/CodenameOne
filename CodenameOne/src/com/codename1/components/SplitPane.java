@@ -95,20 +95,31 @@ public class SplitPane extends Container {
      */
     private final Divider divider;
     /**
+     * The minimum allowable inset for the divider.
+     */
+    private final LayeredLayoutConstraint minInset;
+    /**
+     * The maximum allowable inset for the divider.
+     */
+    private final LayeredLayoutConstraint maxInset;
+    /**
+     * The starting preferred inset for the divider.  This will be changed over the life of the
+     * split pane.  Any time the user explicitly drags the divider to a new location, that location
+     * will become the new preferred inset.
+     */
+    private final LayeredLayoutConstraint preferredInset;
+    /**
      * UIID to use for the expand button
      */
     private String expandButtonUIID = "Label";
-
     /**
      * UIID to use for the collapse button
      */
     private String collapseButtonUIID = "Label";
-
     /**
      * UIID to use for the drag handle on the divider
      */
     private String dragHandleUIID = "Label";
-
     /**
      * Material icon for expand button.
      */
@@ -123,7 +134,6 @@ public class SplitPane extends Container {
      * Material icon for drag handle.
      */
     dragHandleMaterialIcon;
-
     /**
      * Icon for expand button.
      */
@@ -136,41 +146,23 @@ public class SplitPane extends Container {
      * Icon or drag handle
      */
     dragHandleIcon;
-
     /**
      * The UIID for the divider.  Default is null so that we can generate the style and border
      * manually.
      */
     private String dividerUIID = null;
-
     /**
      * The preferred divider thickness in millimetres
      */
     private float dividerThicknessMM = 3;
-
     /**
      * Whether to show the expand/collapse buttons.
      */
     private boolean showExpandCollapseButtons = true;
-
     /**
      * Whether to show the drag handle.
      */
     private boolean showDragHandle = true;
-    /**
-     * The minimum allowable inset for the divider.
-     */
-    private final LayeredLayoutConstraint minInset;
-    /**
-     * The maximum allowable inset for the divider.
-     */
-    private final LayeredLayoutConstraint maxInset;
-    /**
-     * The starting preferred inset for the divider.  This will be changed over the life of the
-     * split pane.  Any time the user explicitly drags the divider to a new location, that location
-     * will become the new preferred inset.
-     */
-    private final LayeredLayoutConstraint preferredInset;
     /**
      * Flag to indicate that the split pane is expanded.
      */
@@ -963,7 +955,7 @@ public class SplitPane extends Container {
                     .each(new ComponentClosure() {
                         @Override
                         public void call(Component c) {
-                            if(c instanceof Label) {
+                            if (c instanceof Label) {
                                 if (collapseIcon != null) {
                                     ((Label) c).setIcon(collapseIcon);
                                 } else {
@@ -988,7 +980,7 @@ public class SplitPane extends Container {
                     .each(new ComponentClosure() {
                         @Override
                         public void call(Component c) {
-                            if(c instanceof Label) {
+                            if (c instanceof Label) {
                                 if (expandIcon != null) {
                                     ((Label) c).setIcon(expandIcon);
                                 } else {

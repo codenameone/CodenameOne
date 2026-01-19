@@ -61,29 +61,30 @@ public class XMLParser {
 
     /**
      * The char entities strings supported in XML. When a char entity is found these will be compared against first.
-     *
-     private static final String[] XML_CHAR_ENTITIES = {
-     "lt", // lesser-than
-     "gt", // greater-than
-     "amp", // ampersand
-     "quot", //quotation mark
-     "apos", // apostrophe
-     //"bull", //bullet
-     //"euro" //euro
-     };
-
-     /**
+     * <p>
+     * private static final String[] XML_CHAR_ENTITIES = {
+     * "lt", // lesser-than
+     * "gt", // greater-than
+     * "amp", // ampersand
+     * "quot", //quotation mark
+     * "apos", // apostrophe
+     * //"bull", //bullet
+     * //"euro" //euro
+     * };
+     * <p>
+     * /**
      * The numericals value of char entities strings above.
-     *
-     private static final int[] XML_CHAR_ENTITIES_VALS = {
-     60, // "lt", // lesser-than
-     62, // "gt", // greater-than
-     38, // "amp", // ampersand
-     34, // "quot", //quotation mark
-     39, // "apos", // apostrophe
-     //8226, // "bull", //bullet
-     //8364 // "euro"}; //euro
-     };*/
+     * <p>
+     * private static final int[] XML_CHAR_ENTITIES_VALS = {
+     * 60, // "lt", // lesser-than
+     * 62, // "gt", // greater-than
+     * 38, // "amp", // ampersand
+     * 34, // "quot", //quotation mark
+     * 39, // "apos", // apostrophe
+     * //8226, // "bull", //bullet
+     * //8364 // "euro"}; //euro
+     * };
+     */
     private boolean caseSensitive;
     /**
      * This hashtable contains user defined char entities

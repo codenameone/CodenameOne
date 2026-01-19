@@ -278,6 +278,7 @@ public class CheckBox extends Button {
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated uses the deprecated BindTarget interface
      */
     @Override
@@ -294,6 +295,7 @@ public class CheckBox extends Button {
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated uses the deprecated BindTarget interface
      */
     @Override

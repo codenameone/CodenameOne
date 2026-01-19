@@ -210,6 +210,7 @@ public class Dialog extends Form {
         this();
         setTitle(title);
     }
+
     /**
      * Constructs a Dialog with a title
      *

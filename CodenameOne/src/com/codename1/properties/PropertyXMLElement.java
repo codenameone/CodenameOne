@@ -77,7 +77,9 @@ class PropertyXMLElement extends Element {
     @Override
     public String getAttribute(String name) {
         Object o = parent.get(name);
-        if (o == null) return null;
+        if (o == null) {
+            return null;
+        }
         return o.toString();
     }
 

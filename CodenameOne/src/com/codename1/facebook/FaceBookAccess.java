@@ -56,16 +56,16 @@ import java.util.Vector;
 public final class FaceBookAccess {
 
     private static final String TEMP_STORAGE = "FaceBookAccesstmp";
+    private static final FaceBookAccess instance = new FaceBookAccess();
     private static String clientId = "132970916828080";
     private static String redirectURI = "https://www.codenameone.com/";
     private static String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
     private static String[] permissions = new String[]{"public_profile", "email", "user_friends"};
-    private static final FaceBookAccess instance = new FaceBookAccess();
     private static String token;
     private static String apiVersion = "v2.0";
+    private final Vector responseCodeListeners = new Vector();
     private Slider slider;
     private ConnectionRequest current;
-    private final Vector responseCodeListeners = new Vector();
 
 
     private FaceBookAccess() {
@@ -467,7 +467,7 @@ public final class FaceBookAccess {
      * Gets a Photo from a photoId
      * This is a sync method it will block until a response it returned
      *
-     * @param photoId the photoId
+     * @param photoId  the photoId
      * @param needAuth if this object is public needAuth can be false and no
      *                 authentication will be performed
      * @return the Photo requested
@@ -499,7 +499,7 @@ public final class FaceBookAccess {
      * Gets a Album from a albumId
      * This is a sync method it will block until a response it returned
      *
-     * @param albumId the albumId
+     * @param albumId  the albumId
      * @param needAuth if this object is public needAuth can be false and no
      *                 authentication will be performed
      * @return the Album requested
@@ -1319,11 +1319,12 @@ public final class FaceBookAccess {
 
         @Override
         public void actionPerformed(NetworkEvent evt) {
-            final Object val = evt.getMetaData();;
-            if(val instanceof Vector) {
+            final Object val = evt.getMetaData();
+            ;
+            if (val instanceof Vector) {
                 final Vector v = (Vector) val;
                 final Object o = v.elementAt(0);
-                if(o instanceof Hashtable) {
+                if (o instanceof Hashtable) {
                     final Hashtable t = (Hashtable) o;
                     if (post != null) {
                         post.copy(t);
@@ -1346,10 +1347,10 @@ public final class FaceBookAccess {
         @Override
         public void actionPerformed(NetworkEvent evt) {
             final Object val = evt.getMetaData();
-            if(val instanceof Vector) {
+            if (val instanceof Vector) {
                 final Vector v = (Vector) val;
                 final Object o = v.elementAt(0);
-                if(o instanceof Hashtable) {
+                if (o instanceof Hashtable) {
                     Hashtable t = (Hashtable) o;
                     post.copy(t);
                 }

@@ -226,9 +226,9 @@ public final class Socket {
 
     static class SocketInputStream extends InputStream {
         private final Object impl;
+        private final SocketConnection con;
         private byte[] buffer;
         private int bufferOffset;
-        private final SocketConnection con;
         private boolean closed;
 
         SocketInputStream(Object impl, SocketConnection con) {

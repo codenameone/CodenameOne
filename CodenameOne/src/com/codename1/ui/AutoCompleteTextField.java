@@ -61,14 +61,14 @@ public class AutoCompleteTextField extends TextField {
     public static final int POPUP_POSITION_AUTO = 0;
     public static final int POPUP_POSITION_OVER = 1;
     public static final int POPUP_POSITION_UNDER = 2;
-    boolean pressInBounds;
     private final Container popup;
-    private boolean dontCalcSize = false;
-    private FilterProxyListModel<String> filter;
     private final ActionListener listener = new FormPointerListener();
     private final ActionListener pressListener = new FormPointerPressListener();
-    private ListCellRenderer completionRenderer;
     private final ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
+    boolean pressInBounds;
+    private boolean dontCalcSize = false;
+    private FilterProxyListModel<String> filter;
+    private ListCellRenderer completionRenderer;
     private String pickedText;
     private int minimumLength;
     private int popupPosition = POPUP_POSITION_AUTO;

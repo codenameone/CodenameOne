@@ -26,7 +26,6 @@ import java.util.Date;
 
 /**
  * @author Kamran Zafar
- *
  */
 public class TarEntry {
     protected String file;
@@ -49,7 +48,7 @@ public class TarEntry {
     }
 
     public boolean equals(TarEntry it) {
-        return this.header.name.toString().equals( it.header.name.toString() );
+        return this.header.name.toString().equals(it.header.name.toString());
     }
 
     @Override
@@ -148,12 +147,14 @@ public class TarEntry {
      * @return
      */
     public boolean isDirectory() {
-        if (this.file != null)
+        if (this.file != null) {
             return FileSystemStorage.getInstance().isDirectory(this.file);
+        }
 
         if (this.header != null) {
-            if (this.header.linkFlag == TarHeader.LF_DIR)
+            if (this.header.linkFlag == TarHeader.LF_DIR) {
                 return true;
+            }
 
             return this.header.name.toString().endsWith("/");
         }
@@ -173,8 +174,9 @@ public class TarEntry {
 
         name = name.replace(fileSystem.getFileSystemSeparator(), '/');
 
-        if (name.startsWith("/"))
+        if (name.startsWith("/")) {
             name = name.substring(1);
+        }
 
         header.linkName = new StringBuffer();
 
@@ -235,8 +237,9 @@ public class TarEntry {
         offset = Octal.getLongOctalBytes(this.header.modTime, outbuf, offset, TarHeader.MODTIMELEN);
 
         int csOffset = offset;
-        for (int c = 0; c < TarHeader.CHKSUMLEN; ++c)
+        for (int c = 0; c < TarHeader.CHKSUMLEN; ++c) {
             outbuf[offset++] = (byte) ' ';
+        }
 
         outbuf[offset++] = this.header.linkFlag;
 

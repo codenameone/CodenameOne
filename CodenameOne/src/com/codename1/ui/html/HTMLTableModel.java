@@ -47,6 +47,7 @@ class HTMLTableModel implements TableModel {
     static final int SEGMENT_THEAD = 0;
     static final int SEGMENT_TBODY = 1;
     static final int SEGMENT_TFOOT = 2;
+    private final EventDispatcher dispatcher = new EventDispatcher();
     Vector rows = new Vector();
     Vector headers = new Vector();
     int maxColumn;
@@ -59,7 +60,6 @@ class HTMLTableModel implements TableModel {
     int rowInsretionPos = -1;
     int bodyInsertionPos = 0;
     boolean hasTHead, hasTFoot;
-    private final EventDispatcher dispatcher = new EventDispatcher();
 
     /**
      * Adds the given component as a cell to the end of the current row of the table

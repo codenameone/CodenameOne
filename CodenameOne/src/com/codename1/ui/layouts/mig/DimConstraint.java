@@ -180,11 +180,13 @@ public final class DimConstraint {
     }
 
     public UnitValue getAlignOrDefault(boolean isCols) {
-        if (align != null)
+        if (align != null) {
             return align;
+        }
 
-        if (isCols)
+        if (isCols) {
             return UnitValue.LEADING;
+        }
 
         return fill || !PlatformDefaults.getDefaultRowAlignmentBaseline() ? UnitValue.CENTER : UnitValue.BASELINE_IDENTITY;
     }
@@ -297,8 +299,9 @@ public final class DimConstraint {
      * @param size The new size. May be <code>null</code>.
      */
     public void setSize(BoundSize size) {
-        if (size != null)
+        if (size != null) {
             size.checkNotLinked();
+        }
         this.size = size;
     }
 
@@ -424,11 +427,13 @@ public final class DimConstraint {
      */
     int[] getRowGaps(ContainerWrapper parent, BoundSize defGap, int refSize, boolean before) {
         BoundSize gap = before ? gapBefore : gapAfter;
-        if (gap == null || gap.isUnset())
+        if (gap == null || gap.isUnset()) {
             gap = defGap;
+        }
 
-        if (gap == null || gap.isUnset())
+        if (gap == null || gap.isUnset()) {
             return null;
+        }
 
         int[] ret = new int[3];
         for (int i = LayoutUtil.MIN; i <= LayoutUtil.MAX; i++) {
@@ -456,11 +461,13 @@ public final class DimConstraint {
         BoundSize gap = adjacentSide < 2 ? gapBefore : gapAfter;
 
         boolean hasGap = gap != null && gap.getGapPush();
-        if ((gap == null || gap.isUnset()) && (adjGap == null || adjGap.isUnset()) && comp != null)
+        if ((gap == null || gap.isUnset()) && (adjGap == null || adjGap.isUnset()) && comp != null) {
             gap = PlatformDefaults.getDefaultComponentGap(comp, adjacentComp, adjacentSide + 1, tag, isLTR);
+        }
 
-        if (gap == null)
+        if (gap == null) {
             return hasGap ? new int[]{0, 0, LayoutUtil.NOT_SET} : null;
+        }
 
         int[] ret = new int[3];
         for (int i = LayoutUtil.MIN; i <= LayoutUtil.MAX; i++) {

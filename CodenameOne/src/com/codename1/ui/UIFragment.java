@@ -38,7 +38,6 @@ import com.codename1.xml.XMLParser;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -186,19 +185,15 @@ public final class UIFragment {
 
     // The root element of this template
     private final Element root;
-
-    // The root view of the template
-    private Container view;
-
-    // The factory that creates components from XML elements
-    private ComponentFactory factory = new DefaultComponentFactory();
-
     // Index that stores any component which included an "id" attribute
     private final Map<String, Component> index = new HashMap<String, Component>();
-
     // Parameters for the template.  Any tag with tag name startign with $ will
     // be replaced by a corresponding parameter
     private final Map<String, Component> parameters = new HashMap<String, Component>();
+    // The root view of the template
+    private Container view;
+    // The factory that creates components from XML elements
+    private ComponentFactory factory = new DefaultComponentFactory();
 
     private UIFragment(Element el) {
         this.root = el;

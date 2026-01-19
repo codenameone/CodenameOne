@@ -88,14 +88,12 @@ public class BoxLayout extends Layout {
      * component is glued to the end of the available space
      */
     public static final int Y_AXIS_BOTTOM_LAST = 4;
-
+    private final int axis;
+    private final Dimension dim = new Dimension(0, 0);
     /**
      * @since 7.0
      */
     private int align = Component.TOP;
-
-    private final int axis;
-    private final Dimension dim = new Dimension(0, 0);
 
     /**
      * Creates a new instance of BoxLayout

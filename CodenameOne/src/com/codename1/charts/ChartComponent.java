@@ -500,8 +500,12 @@ public class ChartComponent extends Component {
                 } else {
                     int dx = Math.abs(x[0] - x[1]);
                     int dy = Math.abs(y[0] - y[1]);
-                    if (dx == 0) dx = 1;
-                    if (dy == 0) dy = 1;
+                    if (dx == 0) {
+                        dx = 1;
+                    }
+                    if (dy == 0) {
+                        dy = 1;
+                    }
 
                     double zoomX = (double) zoomDistStartX / dx;
                     double zoomY = (double) zoomDistStartY / dy;

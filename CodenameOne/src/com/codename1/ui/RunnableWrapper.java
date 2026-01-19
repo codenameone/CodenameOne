@@ -69,6 +69,10 @@ class RunnableWrapper implements Runnable {
         }
     }
 
+    static void setMaxThreadCount(int maxThreadCount) {
+        RunnableWrapper.maxThreadCount = maxThreadCount;
+    }
+
     public RuntimeException getErr() {
         return err;
     }
@@ -95,7 +99,7 @@ class RunnableWrapper implements Runnable {
             while (!dlg.isDisposed()) {
                 try {
                     synchronized (Display.lock) {
-                        if(!dlg.isDisposed()) {
+                        if (!dlg.isDisposed()) {
                             Display.lock.wait(40);
                         }
                     }
@@ -123,7 +127,7 @@ class RunnableWrapper implements Runnable {
                     while (!done) {
                         synchronized (Display.lock) {
                             try {
-                                if(!done) {
+                                if (!done) {
                                     Display.lock.wait(10);
                                 }
                             } catch (InterruptedException ex) {
@@ -159,9 +163,5 @@ class RunnableWrapper implements Runnable {
             }
         }
         done = true;
-    }
-
-    static void setMaxThreadCount(int maxThreadCount) {
-        RunnableWrapper.maxThreadCount = maxThreadCount;
     }
 }

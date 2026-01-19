@@ -422,10 +422,10 @@ public class RE {
      * @param matchFlags One or more of the RE match behaviour flags (RE.MATCH_*):
      *
      *                   <pre>
-     *                     MATCH_NORMAL              // Normal (case-sensitive) matching
-     *                     MATCH_CASEINDEPENDENT     // Case folded comparisons
-     *                     MATCH_MULTILINE           // Newline matches as BOL/EOL
-     *                   </pre>
+     *                                       MATCH_NORMAL              // Normal (case-sensitive) matching
+     *                                       MATCH_CASEINDEPENDENT     // Case folded comparisons
+     *                                       MATCH_MULTILINE           // Newline matches as BOL/EOL
+     *                                     </pre>
      * @see RECompiler
      * @see REProgram
      */
@@ -512,10 +512,10 @@ public class RE {
      * @param matchFlags One or more of the RE match behaviour flags (RE.MATCH_*):
      *
      *                   <pre>
-     *                     MATCH_NORMAL              // Normal (case-sensitive) matching
-     *                     MATCH_CASEINDEPENDENT     // Case folded comparisons
-     *                     MATCH_MULTILINE           // Newline matches as BOL/EOL
-     *                   </pre>
+     *                                       MATCH_NORMAL              // Normal (case-sensitive) matching
+     *                                       MATCH_CASEINDEPENDENT     // Case folded comparisons
+     *                                       MATCH_MULTILINE           // Newline matches as BOL/EOL
+     *                                     </pre>
      */
     public void setMatchFlags(int matchFlags) {
         this.matchFlags = matchFlags;

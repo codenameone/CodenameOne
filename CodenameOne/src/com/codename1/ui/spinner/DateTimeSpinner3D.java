@@ -44,17 +44,16 @@ import static com.codename1.ui.CN.convertToPixels;
  * @author Steve Hannah
  */
 class DateTimeSpinner3D extends Container implements InternalPickerWidget {
+    private final Date today = new Date();
+    private final int off;
+    private final Container wrapper = new Container(BoxLayout.x());
     private Spinner3D date;
     private TimeSpinner3D time;
-    private final Date today = new Date();
     private Date currentDate = today;
-
     private Date startDate = new Date(0);
     private Date endDate = new Date(System.currentTimeMillis() + 10000L * 24L * 60L * 60000L);
     private boolean markToday = true;
     private boolean includeYear;
-    private final int off;
-    private final Container wrapper = new Container(BoxLayout.x());
 
     /**
      * Default constructor
@@ -253,7 +252,9 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      * @since 6.0
      */
     public void setShowMeridiem(boolean showMeridiem) {
-        if (time == null) return;
+        if (time == null) {
+            return;
+        }
         time.setShowMeridiem(showMeridiem);
     }
 
@@ -268,7 +269,9 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      * @since 6.0
      */
     public void setHourRange(int min, int max) {
-        if (time == null) return;
+        if (time == null) {
+            return;
+        }
         if (min >= 0 && max > min && isShowMeridiem()) {
             time.setShowMeridiem(false);
         }
@@ -285,7 +288,9 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      * @since 6.0
      */
     public int getMinHour() {
-        if (time == null) return -1;
+        if (time == null) {
+            return -1;
+        }
         return time.getMinHour();
     }
 
@@ -298,7 +303,9 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      * @since 6.0
      */
     public int getMaxHour() {
-        if (time == null) return -1;
+        if (time == null) {
+            return -1;
+        }
         return time.getMaxHour();
     }
 

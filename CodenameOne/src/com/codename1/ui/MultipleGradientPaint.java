@@ -164,6 +164,7 @@ public abstract class MultipleGradientPaint implements Paint {
     public void setTransparency(int transparency) {
         this.transparency = transparency;
     }
+
     /**
      * Cycle methods for gradients.
      */
@@ -183,6 +184,7 @@ public abstract class MultipleGradientPaint implements Paint {
          */
         REPEAT
     }
+
     /**
      * Colors spaces for gradients.
      */

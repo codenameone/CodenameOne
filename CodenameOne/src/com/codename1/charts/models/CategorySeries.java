@@ -22,11 +22,17 @@ import java.util.List;
  * A series for the category charts like the pie ones.
  */
 public class CategorySeries {
-    /** The series title. */
+    /**
+     * The series title.
+     */
     private final String mTitle;
-    /** The series categories. */
+    /**
+     * The series categories.
+     */
     private final List<String> mCategories = new ArrayList<String>();
-    /** The series values. */
+    /**
+     * The series values.
+     */
     private final List<Double> mValues = new ArrayList<Double>();
 
     /**
@@ -60,7 +66,7 @@ public class CategorySeries {
      * Adds a new value to the series.
      *
      * @param category the category
-     * @param value the new value
+     * @param value    the new value
      */
     public synchronized void add(String category, double value) {
         mCategories.add(category);
@@ -70,9 +76,9 @@ public class CategorySeries {
     /**
      * Replaces the value at the specific index in the series.
      *
-     * @param index the index in the series
+     * @param index    the index in the series
      * @param category the category
-     * @param value the new value
+     * @param value    the new value
      */
     public synchronized void set(int index, String category, double value) {
         mCategories.set(index, category);

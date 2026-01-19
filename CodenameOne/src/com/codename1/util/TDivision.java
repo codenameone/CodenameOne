@@ -508,8 +508,9 @@ class TDivision {
 
             while (u.compareTo(v) <= TBigInteger.EQUALS) {
                 TElementary.inplaceSubtract(v, u);
-                if (v.signum() == 0)
+                if (v.signum() == 0) {
                     break;
+                }
                 toShift = v.getLowestSetBit();
                 TBitLevel.inplaceShiftRight(v, toShift);
                 TElementary.inplaceAdd(s, r);

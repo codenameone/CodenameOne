@@ -69,13 +69,15 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     //private final static IdentityHashMap<FontMetrics, Point.Float> FM_MAP = new IdentityHashMap<FontMetrics, Point.Float>(4);
     private final static Font SUBST_FONT = Font.getDefaultFont();
 
-    /** Debug color for component bounds outline.
+    /**
+     * Debug color for component bounds outline.
      */
     //private static final Color DB_COMP_OUTLINE = new Color(0, 0, 200);
     private static boolean maxSet = false;
     private static boolean vp = true;
     private final Component c;
     private int compType = TYPE_UNSET;
+
     public CodenameOneMiGComponentWrapper(Component c) {
         this.c = c;
     }
@@ -90,21 +92,21 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     }
 
     /**
-     * Java 1.4 is not supported anymore.
-     *
-     * @return whether max size was set for legacy mode
-     */
-    public static boolean isMaxSizeSetOn14() {
-        return maxSet;
-    }
-
-    /**
      * @deprecated Java 1.4 is not supported anymore
      */
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static void setMaxSizeSetOn1_4(boolean b) {
         setMaxSizeSetOn14(b);
+    }
+
+    /**
+     * Java 1.4 is not supported anymore.
+     *
+     * @return whether max size was set for legacy mode
+     */
+    public static boolean isMaxSizeSetOn14() {
+        return maxSet;
     }
 
     /**
@@ -157,8 +159,9 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
             case PlatformDefaults.BASE_SCALE_FACTOR:
 
                 Float s = isHor ? PlatformDefaults.getHorizontalScaleFactor() : PlatformDefaults.getVerticalScaleFactor();
-                if (s == null)
+                if (s == null) {
                     s = Float.valueOf(1.0f);
+                }
                 return s * (isHor ? getHorizontalScreenDPI() : getVerticalScreenDPI()) / (float) PlatformDefaults.getDefaultDPI();
 
             default:
@@ -321,8 +324,9 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
 
     @Override
     public int getComponentType(boolean disregardScrollPane) {
-        if (compType == TYPE_UNSET)
+        if (compType == TYPE_UNSET) {
             compType = checkType(disregardScrollPane);
+        }
 
         return compType;
     }
@@ -332,12 +336,14 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         Dimension d = c.getPreferredSize();
         int hash = (d.getWidth() << 10) + (d.getHeight() << 15);
 
-        if (c.isVisible())
+        if (c.isVisible()) {
             hash += 1324511;
+        }
 
         String id = getLinkId();
-        if (id != null)
+        if (id != null) {
             hash += id.hashCode();
+        }
 
         return hash;
     }
@@ -382,8 +388,9 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
 
     @Override
     public final boolean equals(Object o) {
-        if (!(o instanceof ComponentWrapper))
+        if (!(o instanceof ComponentWrapper)) {
             return false;
+        }
 
         return c.equals(((ComponentWrapper) o).getComponent());
     }

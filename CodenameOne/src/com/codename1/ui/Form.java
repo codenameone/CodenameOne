@@ -70,19 +70,33 @@ import java.util.Set;
 public class Form extends Container {
     private static final String Z_INDEX_PROP = "cn1$_zIndex";
     static int activePeerCount;
-    private static Motion rippleMotion;
-    private static Component rippleComponent;
     static int rippleX;
     static int rippleY;
     /**
      * Used by the combo box to block some default Codename One behaviors
      */
     static boolean comboLock;
+    private static Motion rippleMotion;
+    private static Component rippleComponent;
     private final Container contentPane;
     /**
      * Rectangle storing the safe area on the form.
      */
     private final Rectangle safeArea = new Rectangle();
+    private final AnimationManager animMananger = new AnimationManager(this);
+    /**
+     * A queue of containers that are scheduled to be revalidated before the next
+     * paint.  Use {@link Container#revalidateLater() } to add to this queue.  The
+     * queue the queue is flushed in {@link #flushRevalidateQueue() }
+     */
+    private final Set<Container> pendingRevalidateQueue = new HashSet<Container>();
+    /**
+     * A temporary container used in {@link #flushRevalidateQueue() } for the list
+     * of containers that are being revalidated.  This should not be used outside
+     * of {@link #flushRevalidateQueue() }
+     */
+    private final ArrayList<Container> revalidateQueue = new ArrayList<Container>();
+    private final Rectangle pressedCmpAbsBounds = new Rectangle();
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
@@ -117,7 +131,6 @@ public class Form extends Container {
     private TextSelection textSelection;
     private ArrayList<Component> componentsAwaitingRelease;
     private VirtualInputDevice currentInputDevice;
-    private final AnimationManager animMananger = new AnimationManager(this);
     /**
      * Contains a list of components that would like to animate their state
      */
@@ -179,18 +192,6 @@ public class Form extends Container {
      * A text component that will receive focus and start editing immediately as the form is shown
      */
     private TextArea editOnShow;
-    /**
-     * A queue of containers that are scheduled to be revalidated before the next
-     * paint.  Use {@link Container#revalidateLater() } to add to this queue.  The
-     * queue the queue is flushed in {@link #flushRevalidateQueue() }
-     */
-    private final Set<Container> pendingRevalidateQueue = new HashSet<Container>();
-    /**
-     * A temporary container used in {@link #flushRevalidateQueue() } for the list
-     * of containers that are being revalidated.  This should not be used outside
-     * of {@link #flushRevalidateQueue() }
-     */
-    private final ArrayList<Container> revalidateQueue = new ArrayList<Container>();
     private int overrideInvisibleAreaUnderVKB = -1;
     /**
      * A flag indicating if the safe area may be dirty, and needs to be recaculated.
@@ -200,7 +201,6 @@ public class Form extends Container {
     private boolean safeAreaDirty = true;
     private boolean pointerPressedAgainDuringDrag;
     private Component pressedCmp;
-    private final Rectangle pressedCmpAbsBounds = new Rectangle();
     private Object currentPointerPress;
     private boolean inInternalPaint;
 
@@ -256,14 +256,6 @@ public class Form extends Container {
         initGlobalToolbar();
     }
 
-    static Motion getRippleMotion() {
-        return rippleMotion;
-    }
-
-    static void setRippleMotion(Motion m) {
-        rippleMotion = m;
-    }
-
     /**
      * Sets the title after invoking the constructor
      *
@@ -286,11 +278,31 @@ public class Form extends Container {
         setTitle(title);
     }
 
+    static Motion getRippleMotion() {
+        return rippleMotion;
+    }
+
+    static void setRippleMotion(Motion m) {
+        rippleMotion = m;
+    }
+
     static int getInvisibleAreaUnderVKB(Form f) {
         if (f == null) {
             return 0;
         }
         return f.getInvisibleAreaUnderVKB();
+    }
+
+    static Component getRippleComponent() {
+        return rippleComponent;
+    }
+
+    static void setRippleComponent(Component cmp) {
+        rippleComponent = cmp;
+    }
+
+    private static void resetRippleComponent() {
+        rippleComponent = null;
     }
 
     /**
@@ -2070,14 +2082,6 @@ public class Form extends Container {
         return super.animate();
     }
 
-    static Component getRippleComponent() {
-        return rippleComponent;
-    }
-
-    private static void resetRippleComponent() {
-        rippleComponent = null;
-    }
-
     /**
      * Makes sure all animations are repainted so they would be rendered in every
      * frame
@@ -3134,10 +3138,6 @@ public class Form extends Container {
             keyPressed(keyCode);
             keyReleased(keyCode);
         }
-    }
-
-    static void setRippleComponent(Component cmp) {
-        rippleComponent = cmp;
     }
 
     private void initRippleEffect(int x, int y, Component cmp) {

@@ -39,9 +39,9 @@ import java.util.Hashtable;
 public class CodenameOneThread extends Thread {
     private static final Class CODE = CodenameOneThread.class;
     private final int[] stack = new int[500];
-    private int stackPointer;
     private final Runnable r;
     private final Hashtable exceptionStack = new Hashtable();
+    private int stackPointer;
 
     /**
      * Constructor accepting the runnable

@@ -273,8 +273,9 @@ final class TBitLevel {
      */
     static void inplaceShiftRight(TBigInteger val, int count) {
         int sign = val.signum();
-        if (count == 0 || val.signum() == 0)
+        if (count == 0 || val.signum() == 0) {
             return;
+        }
         int intCount = count >> 5; // count of integers
         val.numberLength -= intCount;
         if (!shiftRight(val.digits, val.numberLength, val.digits, intCount, count & 31) && sign < 0) {

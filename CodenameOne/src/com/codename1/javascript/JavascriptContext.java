@@ -26,7 +26,6 @@ import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Display;
-import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.util.Callback;
@@ -70,6 +69,10 @@ import java.util.Random;
 public class JavascriptContext {
 
     /**
+     * Flag to enable/disable logging to a debug log.
+     */
+    public static final boolean DEBUG = false;
+    /**
      * A dummy javascript variable that is used occasionally to workaround some bugs.
      */
     static final String DUMMY_VAR = "ca_weblite_codename1_js_JavascriptContext_DUMMY_VAR";
@@ -84,35 +87,17 @@ public class JavascriptContext {
      */
     static final String LOOKUP_TABLE = "ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE";
     /**
-     * Flag to enable/disable logging to a debug log.
+     * Whenever the objectMap exceeds this size, cleanup will be called whenever retain()
+     * is called.
      */
-    public static final boolean DEBUG = false;
+    private static final int objectMapThresholdSize = 500;
+    private static final double cleanupProbability = 0.1;
     /**
      * Running counter to mark the context ID.  Each javascript context has its
      * own lookup table, and this running counter allows us to generate a unique
      * name for each lookup table.
      */
     private static int contextId = 0;
-    /**
-     * The browser component on which this context operates.
-     *
-     * @see setBrowserComponent()
-     * @see getBrowserComponent()
-     */
-    BrowserComponent browser;
-    /**
-     * The name of the Javascript lookup table that is used to store and
-     * look up Javascript objects that have a JSObject proxy.
-     */
-    String jsLookupTable;
-
-    /**
-     * A running counter for the next object ID that is to be assigned to
-     * the next JSObject.  Each JSObject has an id associated with it which
-     * corresponds with its position in the Javascript lookup table.
-     */
-    long callId = 0;
-    private int callbackId = 0;
     /**
      * Listener that listens for JavascriptEvents.  A Javascript event
      * is packaged by the JavascriptContext class in response to a
@@ -126,11 +111,6 @@ public class JavascriptContext {
      */
     private final BrowserNavigationCallback browserNavigationCallback;
     /**
-     * Stores the previous BrowserNavigationCallback object if one
-     * was registered on the BrowserComponent.
-     */
-    private BrowserNavigationCallback previousNavigationCallback;
-    /**
      * Stores registered JSFunction callbacks which can be called in response
      * to a JavascriptEvent.
      */
@@ -139,13 +119,31 @@ public class JavascriptContext {
      * A map of JSObjects that is used for cleanup when they are no longer needed.
      */
     private final HashMap<Integer, Object> objectMap = new HashMap<Integer, Object>();
-    /**
-     * Whenever the objectMap exceeds this size, cleanup will be called whenever retain()
-     * is called.
-     */
-    private static final int objectMapThresholdSize = 500;
     private final Random cleanupRandomizer = new Random();
-    private static final double cleanupProbability = 0.1;
+    /**
+     * The browser component on which this context operates.
+     *
+     * @see setBrowserComponent()
+     * @see getBrowserComponent()
+     */
+    BrowserComponent browser;
+    /**
+     * The name of the Javascript lookup table that is used to store and
+     * look up Javascript objects that have a JSObject proxy.
+     */
+    String jsLookupTable;
+    /**
+     * A running counter for the next object ID that is to be assigned to
+     * the next JSObject.  Each JSObject has an id associated with it which
+     * corresponds with its position in the Javascript lookup table.
+     */
+    long callId = 0;
+    private int callbackId = 0;
+    /**
+     * Stores the previous BrowserNavigationCallback object if one
+     * was registered on the BrowserComponent.
+     */
+    private BrowserNavigationCallback previousNavigationCallback;
     private JSObject window;
 
     /**

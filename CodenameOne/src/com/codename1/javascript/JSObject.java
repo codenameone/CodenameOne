@@ -220,14 +220,14 @@ public class JSObject {
      */
     private static final String R2 = "ca_weblite_codename1_js_JSObject_R2";
     /**
+     * The Javascript context that this object belongs to.
+     */
+    private final JavascriptContext context;
+    /**
      * The ID of this object.  This is the ID within the Javascript lookup table
      * that stores a reference to the actual Javascript object.
      */
     int objectId = 0;
-    /**
-     * The Javascript context that this object belongs to.
-     */
-    private final JavascriptContext context;
 
     /**
      * Constructor for a JSObject.

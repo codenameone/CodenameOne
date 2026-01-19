@@ -61,9 +61,6 @@ import java.util.Vector;
 public class UIManager {
 
     static volatile UIManager instance;
-    private static class UIManagerHolder {
-        private static final UIManager INSTANCE = new UIManager();
-    }
     /**
      * This member is used by the resource editor
      */
@@ -72,20 +69,20 @@ public class UIManager {
      * This member is used by the resource editor
      */
     static boolean localeAccessible = true;
-    private LookAndFeel current;
     private final HashMap<String, Style> styles = new HashMap<String, Style>();
     private final HashMap<String, Style> selectedStyles = new HashMap<String, Style>();
-    private HashMap<String, Object> themeProps;
     private final HashMap<String, Object> themeConstants = new HashMap<String, Object>();
-    private Style defaultStyle = new Style();
-    private Style defaultSelectedStyle = new Style();
-    private boolean useLargerTextScale;
     /**
      * Useful for caching theme images so they are not loaded twice in case
      * an image reference is used it two places in the theme (e.g. same background
      * to title and menu bar).
      */
     private final HashMap<String, Image> imageCache = new HashMap<String, Image>();
+    private LookAndFeel current;
+    private HashMap<String, Object> themeProps;
+    private Style defaultStyle = new Style();
+    private Style defaultSelectedStyle = new Style();
+    private boolean useLargerTextScale;
     /**
      * The resource bundle allows us to implicitly localize the UI on the fly, once its
      * installed all internal application strings query the resource bundle and extract
@@ -93,9 +90,7 @@ public class UIManager {
      */
     private Hashtable resourceBundle;
     private Map<String, String> bundle;
-
     private boolean wasThemeInstalled;
-
     /**
      * This EventDispatcher holds all listeners who would like to register to
      * Theme refreshed event
@@ -103,7 +98,6 @@ public class UIManager {
     private EventDispatcher themelisteners;
     // Cache used to keep track of parsed styles.
     private Map<String, String> parseCache;
-
     UIManager() {
         // Lazy initialization of instance for js port compatibility.  We will
         // do a double-lazy initialization to try to best prevent regressions
@@ -144,26 +138,6 @@ public class UIManager {
      */
     public static UIManager createInstance() {
         return new UIManager();
-    }
-
-    /**
-     * Enables or disables scaling fonts when larger text is enabled on the device.
-     * This can also be enabled via the {@code useLargerTextScaleBool} theme constant.
-     *
-     * @param useLargerTextScale true to apply {@link Display#getLargerTextScale()} when
-     *                           {@link Display#isLargerTextEnabled()} is true.
-     */
-    public void setUseLargerTextScale(boolean useLargerTextScale) {
-        this.useLargerTextScale = useLargerTextScale;
-    }
-
-    /**
-     * Checks if larger text scaling is enabled.
-     *
-     * @return true if larger text scaling should be applied.
-     */
-    public boolean isUseLargerTextScale() {
-        return useLargerTextScale;
     }
 
     private static Image parseImage(String value) throws IOException {
@@ -300,6 +274,26 @@ public class UIManager {
     }
 
     /**
+     * Checks if larger text scaling is enabled.
+     *
+     * @return true if larger text scaling should be applied.
+     */
+    public boolean isUseLargerTextScale() {
+        return useLargerTextScale;
+    }
+
+    /**
+     * Enables or disables scaling fonts when larger text is enabled on the device.
+     * This can also be enabled via the {@code useLargerTextScaleBool} theme constant.
+     *
+     * @param useLargerTextScale true to apply {@link Display#getLargerTextScale()} when
+     *                           {@link Display#isLargerTextEnabled()} is true.
+     */
+    public void setUseLargerTextScale(boolean useLargerTextScale) {
+        this.useLargerTextScale = useLargerTextScale;
+    }
+
+    /**
      * Indicates if a theme was previously installed since the last reset
      *
      * @return true if setThemeProps was invoked
@@ -413,12 +407,16 @@ public class UIManager {
         if (id == null || id.length() == 0) {
             return null;
         }
-        if (themeProps == null) return null;
+        if (themeProps == null) {
+            return null;
+        }
         String iconUIID = id + "Icon";
         // Check the derive property of this icon style to make sure it points to id.
         // (The icon style must derive the main style).
         String baseStyle = (String) themeProps.get(iconUIID + ".derive");
-        if (!id.equals(baseStyle)) return null;
+        if (!id.equals(baseStyle)) {
+            return null;
+        }
         return iconUIID;
 
     }
@@ -1872,8 +1870,11 @@ public class UIManager {
             themeProps.remove(id + Style.FONT);
         }
 
-        if (selected) selectedStyles.remove(id);
-        else this.styles.remove(id);
+        if (selected) {
+            selectedStyles.remove(id);
+        } else {
+            this.styles.remove(id);
+        }
 
         return getComponentStyleImpl(originalId, selected, prefix);
 
@@ -2253,5 +2254,9 @@ public class UIManager {
             return;
         }
         themelisteners.removeListener(l);
+    }
+
+    private static class UIManagerHolder {
+        private static final UIManager INSTANCE = new UIManager();
     }
 }

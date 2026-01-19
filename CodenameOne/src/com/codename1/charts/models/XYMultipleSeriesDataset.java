@@ -22,7 +22,9 @@ import java.util.List;
  * A series that includes 0 to many XYSeries.
  */
 public class XYMultipleSeriesDataset {
-    /** The included series. */
+    /**
+     * The included series.
+     */
     private final List<XYSeries> mSeries = new ArrayList<XYSeries>();
 
     /**
@@ -37,7 +39,7 @@ public class XYMultipleSeriesDataset {
     /**
      * Adds a new XY series to the list.
      *
-     * @param index the index in the series list
+     * @param index  the index in the series list
      * @param series the XY series to add
      */
     public synchronized void addSeries(int index, XYSeries series) {

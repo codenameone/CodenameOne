@@ -16,10 +16,10 @@ import java.io.OutputStream;
  */
 public class WAVWriter implements AutoCloseable {
     private final File outputFile;
-    private OutputStream out;
     private final int samplingRate;
     private final int channels;
     private final int numBits;
+    private OutputStream out;
     private long dataLength;
 
     /**

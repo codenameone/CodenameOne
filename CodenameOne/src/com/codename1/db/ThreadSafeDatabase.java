@@ -310,7 +310,7 @@ public class ThreadSafeDatabase extends Database {
         public CursorWrapper(Cursor underlyingCursor) {
             this.underlyingCursor = underlyingCursor;
         }
-        
+
         @Override
         public boolean first() throws IOException {
             return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {

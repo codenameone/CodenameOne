@@ -923,7 +923,7 @@ public final class CommonTransitions extends Transition {
 
     private void paintAlpha(Graphics graphics) {
         Component src = getSource();
-        if(src == null) {
+        if (src == null) {
             return;
         }
         int position = this.position;

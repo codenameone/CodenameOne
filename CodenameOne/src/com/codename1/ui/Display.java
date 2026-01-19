@@ -288,13 +288,21 @@ public final class Display extends CN1Constants {
     private static final int MAX_ASYNC_EXCEPTION_DEPTH = 10;
     private static final int[] xArray1 = new int[1];
     private static final int[] yArray1 = new int[1];
-    private int transitionDelay = -1;
-    static CodenameOneImplementation impl;
-    private String selectedVirtualKeyboard = null;
     private static final Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
+    static CodenameOneImplementation impl;
     private final LinkedList<Runnable> runningSerialCallsQueue = new LinkedList<Runnable>();
+    /**
+     * Contains the call serially pending elements
+     */
+    private final ArrayList<Runnable> pendingSerialCalls = new ArrayList<Runnable>();
+    /**
+     * Contains the call serially idle elements
+     */
+    private final ArrayList<Runnable> pendingIdleSerialCalls = new ArrayList<Runnable>();
     boolean codenameOneExited;
     long time;
+    private int transitionDelay = -1;
+    private String selectedVirtualKeyboard = null;
     private CrashReport crashReporter;
     private EventDispatcher errorHandler;
     private boolean inNativeUI;
@@ -343,14 +351,6 @@ public final class Display extends CN1Constants {
      */
     private int framerateLock = 15;
     private boolean codenameOneRunning = false;
-    /**
-     * Contains the call serially pending elements
-     */
-    private final ArrayList<Runnable> pendingSerialCalls = new ArrayList<Runnable>();
-    /**
-     * Contains the call serially idle elements
-     */
-    private final ArrayList<Runnable> pendingIdleSerialCalls = new ArrayList<Runnable>();
     /**
      * This is the instance of the EDT used internally to indicate whether
      * we are executing on the EDT or some arbitrary thread
@@ -1155,7 +1155,7 @@ public final class Display extends CN1Constants {
      * return a blank string when unavailable.
      *
      * @param parentThread the thread in which the exception was thrown
-     * @param t the exception
+     * @param t            the exception
      * @return a stack trace string that might be blank
      */
     public String getStackTrace(Thread parentThread, Throwable t) {
@@ -5182,7 +5182,7 @@ public final class Display extends CN1Constants {
         impl.notifyPushCompletion();
     }
 
-                           /**
+    /**
      * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
      *
      * @param timeout The timeout in milliseconds.

@@ -33,9 +33,9 @@ import com.codename1.ui.Transform;
  */
 public class Rectangle2D implements Shape {
 
+    private final Dimension2D size;
     private double x;
     private double y;
-    private final Dimension2D size;
     private GeneralPath path;
 
     /**

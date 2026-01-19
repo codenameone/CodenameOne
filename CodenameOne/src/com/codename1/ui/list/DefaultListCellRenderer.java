@@ -42,9 +42,9 @@ import java.util.Map;
  */
 public class DefaultListCellRenderer<T> extends Label implements ListCellRenderer<T>, CellRenderer<T> {
     private static boolean showNumbersDefault = true;
+    private final Label focusComponent = new Label();
     private boolean showNumbers;
     private boolean showNumbersForce;
-    private final Label focusComponent = new Label();
     private boolean rightAlignNumbers;
     private boolean alwaysRenderSelection;
 

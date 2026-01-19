@@ -43,10 +43,14 @@ public class CombinedXYChart extends XYChart {
 
     private final XYCombinedChartDef[] chartDefinitions;
 
-    /** The embedded XY charts. */
+    /**
+     * The embedded XY charts.
+     */
     private final XYChart[] mCharts;
 
-    /** The supported charts for being combined. */
+    /**
+     * The supported charts for being combined.
+     */
     private final Class<?>[] xyChartTypes = new Class<?>[]{TimeChart.class, LineChart.class,
             CubicLineChart.class, BarChart.class, BubbleChart.class, ScatterChart.class,
             RangeBarChart.class, RangeStackedBarChart.class};
@@ -54,8 +58,8 @@ public class CombinedXYChart extends XYChart {
     /**
      * Builds a new combined XY chart instance.
      *
-     * @param dataset the multiple series dataset
-     * @param renderer the multiple series renderer
+     * @param dataset          the multiple series dataset
+     * @param renderer         the multiple series renderer
      * @param chartDefinitions the XY chart definitions
      */
     public CombinedXYChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer,
@@ -110,13 +114,13 @@ public class CombinedXYChart extends XYChart {
     /**
      * The graphical representation of a series.
      *
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas         the canvas to paint to
+     * @param paint          the paint to be used for drawing
+     * @param points         the array of points to be used for drawing the series
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the minimum value of the y axis
-     * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the minimum value of the y axis
+     * @param seriesIndex    the index of the series currently being drawn
+     * @param startIndex     the start index of the rendering points
      */
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points,
@@ -162,12 +166,12 @@ public class CombinedXYChart extends XYChart {
     /**
      * The graphical representation of the legend shape.
      *
-     * @param canvas the canvas to paint to
-     * @param renderer the series renderer
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param canvas      the canvas to paint to
+     * @param renderer    the series renderer
+     * @param x           the x value of the point the shape should be drawn at
+     * @param y           the y value of the point the shape should be drawn at
      * @param seriesIndex the series index
-     * @param paint the paint to be used for drawing
+     * @param paint       the paint to be used for drawing
      */
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
@@ -210,15 +214,19 @@ public class CombinedXYChart extends XYChart {
      * Definition of a chart inside a combined XY chart.
      */
     public static class XYCombinedChartDef {
-        /** The chart type. */
+        /**
+         * The chart type.
+         */
         private final String type;
-        /** The series index. */
+        /**
+         * The series index.
+         */
         private final int[] seriesIndex;
 
         /**
          * Constructs a chart definition.
          *
-         * @param type XY chart type
+         * @param type        XY chart type
          * @param seriesIndex corresponding data series indexes
          */
         public XYCombinedChartDef(String type, int... seriesIndex) {

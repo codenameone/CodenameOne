@@ -174,7 +174,7 @@ public class DateSpinner extends BaseSpinner {
      * @return the currentDay
      */
     public int getCurrentDay() {
-        if(day == null || day.getValue() == null) {
+        if (day == null || day.getValue() == null) {
             return 1;
         }
         return ((Integer) day.getValue()).intValue();

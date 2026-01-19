@@ -56,9 +56,6 @@ public abstract class Purchase {
     private static final Object PENDING_PURCHASE_LOCK = new Object();
     private static final Object synchronizationLock = new Object();
     private static final Object receiptsLock = new Object();
-    private ReceiptStore receiptStore;
-    private List<Receipt> receipts;
-    private Date receiptsRefreshTime;
     /**
      * Boolean flag to prevent {@link #synchronizeReceipts(long, com.codename1.util.SuccessCallback) }
      * re-entry.
@@ -69,6 +66,9 @@ public abstract class Purchase {
      */
     private static boolean loadInProgress;
     private static List<SuccessCallback<Boolean>> synchronizeReceiptsCallbacks;
+    private ReceiptStore receiptStore;
+    private List<Receipt> receipts;
+    private Date receiptsRefreshTime;
 
     /**
      * Posts a receipt to be added to the receipt store.
@@ -821,19 +821,19 @@ public abstract class Purchase {
         @Override
         public void run() {
 
-                while (!complete[0]) {
-                    synchronized (complete) {
-                        try {
-                            // need to recheck condition within the synchronized block
-                            if(!complete[0]) {
-                                complete.wait();
-                            }
-                        } catch (InterruptedException ex) {
-                            Thread.currentThread().interrupt();
-                            return;
+            while (!complete[0]) {
+                synchronized (complete) {
+                    try {
+                        // need to recheck condition within the synchronized block
+                        if (!complete[0]) {
+                            complete.wait();
                         }
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        return;
                     }
                 }
+            }
         }
 
     }

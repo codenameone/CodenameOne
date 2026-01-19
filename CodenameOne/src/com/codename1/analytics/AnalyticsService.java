@@ -42,13 +42,12 @@ import com.codename1.ui.events.ActionListener;
  * @author Shai Almog
  */
 public class AnalyticsService {
+    private static final Object INSTANCE_LOCK = new Object();
     private static AnalyticsService instance;
-
     private static boolean appsMode = true;
     private static boolean failSilently = true;
     private static int timeout;
     private static int readTimeout;
-    private static final Object INSTANCE_LOCK = new Object();
     private String agent;
     private String domain;
     private ConnectionRequest lastRequest;

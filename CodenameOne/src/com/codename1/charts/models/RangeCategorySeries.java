@@ -22,7 +22,9 @@ import java.util.List;
  * A series for the range category charts like the range bar.
  */
 public class RangeCategorySeries extends CategorySeries {
-    /** The series values. */
+    /**
+     * The series values.
+     */
     private final List<Double> mMaxValues = new ArrayList<Double>();
 
     /**

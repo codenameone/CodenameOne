@@ -102,8 +102,8 @@ public class Toolbar extends Container {
      * Indicates whether the toolbar should be properly centered by default
      */
     private static boolean centeredDefault = true;
-    private Component titleComponent;
     private final ToolbarSideMenu sideMenu;
+    private Component titleComponent;
     private Vector<Command> overflowCommands;
     private Button menuButton;
     private Command leftSideMenuCommand;
@@ -2297,11 +2297,11 @@ public class Toolbar extends Container {
             final Container actualPane = f.getActualPane();
             int val = hideShowMotion.getValue();
             setY(val);
-                if (!layered) {
-                    actualPane.setY(actualPaneInitialY + val);
-                    actualPane.setHeight(actualPaneInitialH - val);
-                    actualPane.doLayout();
-                }
+            if (!layered) {
+                actualPane.setY(actualPaneInitialY + val);
+                actualPane.setHeight(actualPaneInitialH - val);
+                actualPane.doLayout();
+            }
             f.repaint();
             boolean finished = hideShowMotion.isFinished();
             if (finished) {
@@ -2330,7 +2330,9 @@ public class Toolbar extends Container {
 
                     @Override
                     public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                        if (entered || contentPane.isTensileMotionInProgress()) return;
+                        if (entered || contentPane.isTensileMotionInProgress()) {
+                            return;
+                        }
 
                         // When the content pane is resized, it may trigger a scroll event --
                         // we need to make sure that *that* scroll event doesn't trigger
@@ -2547,6 +2549,20 @@ public class Toolbar extends Container {
          * command to the toolbar
          */
         NEVER
+    }
+
+    private static class CallbackSearchBar extends SearchBar {
+        private final ActionListener<ActionEvent> callback;
+
+        public CallbackSearchBar(Toolbar owner, ActionListener<ActionEvent> callback) {
+            super(owner, owner.searchIconSize);
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSearch(String text) {
+            callback.actionPerformed(new ActionEvent(text));
+        }
     }
 
     class ToolbarSideMenu extends SideMenuBar {
@@ -2777,20 +2793,5 @@ public class Toolbar extends Container {
             Toolbar.this.initTitleBarStatus();
         }
 
-    }
-
-
-    private static class CallbackSearchBar extends SearchBar {
-        private final ActionListener<ActionEvent> callback;
-
-        public CallbackSearchBar(Toolbar owner, ActionListener<ActionEvent> callback) {
-            super(owner, owner.searchIconSize);
-            this.callback = callback;
-        }
-
-        @Override
-        public void onSearch(String text) {
-            callback.actionPerformed(new ActionEvent(text));
-        }
     }
 }

@@ -43,18 +43,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Enumeration;
 import java.util.NoSuchElementException;
 
 /**
@@ -291,7 +290,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         ArrayList al = new ArrayList();
         for (Object o : l) {
             if (o instanceof Map) {
-                PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
+                PropertyBusinessObject po = (PropertyBusinessObject) recursiveType.newInstance();
                 po.getPropertyIndex().populateFromMap((Map<String, Object>) o, recursiveType);
                 al.add(po);
                 continue;
@@ -634,7 +633,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     public void fromXml(Element e) {
         Hashtable atts = e.getAttributes();
         if (atts != null) {
-            for (Enumeration keys = atts.keys(); keys.hasMoreElements();) {
+            for (Enumeration keys = atts.keys(); keys.hasMoreElements(); ) {
                 Object a = keys.nextElement();
                 PropertyBase pb = get((String) a);
                 if (pb != null) {

@@ -35,8 +35,8 @@ package com.codename1.io.tar;
  * 156     1        Link indicator (file type)
  * 157     100      Name of linked file
  * </pre>
- *
- *
+ * <p>
+ * <p>
  * File Types
  *
  * <pre>
@@ -51,9 +51,9 @@ package com.codename1.io.tar;
  * '6'          FIFO
  * '7'          Contigous
  * </pre>
- *
- *
- *
+ * <p>
+ * <p>
+ * <p>
  * Ustar header
  *
  * <pre>
@@ -138,8 +138,9 @@ public class TarHeader {
         //String user = System.getProperty( "user.name", "" );
         String user = "";
 
-        if (user.length() > 31)
+        if (user.length() > 31) {
             user = user.substring(0, 31);
+        }
 
         this.userId = 0;
         this.groupId = 0;
@@ -151,12 +152,9 @@ public class TarHeader {
      * Parse an entry name from a header buffer.
      *
      * @param name
-     * @param header
-     *            The header buffer from which to parse.
-     * @param offset
-     *            The offset into the buffer from which to parse.
-     * @param length
-     *            The number of header bytes to parse.
+     * @param header The header buffer from which to parse.
+     * @param offset The offset into the buffer from which to parse.
+     * @param length The number of header bytes to parse.
      * @return The header's entry name.
      */
     public static StringBuffer parseName(byte[] header, int offset, int length) {
@@ -164,8 +162,9 @@ public class TarHeader {
 
         int end = offset + length;
         for (int i = offset; i < end; ++i) {
-            if (header[i] == 0)
+            if (header[i] == 0) {
                 break;
+            }
             result.append((char) header[i]);
         }
 
@@ -176,12 +175,9 @@ public class TarHeader {
      * Determine the number of bytes in an entry name.
      *
      * @param name
-     * @param header
-     *            The header buffer from which to parse.
-     * @param offset
-     *            The offset into the buffer from which to parse.
-     * @param length
-     *            The number of header bytes to parse.
+     * @param header The header buffer from which to parse.
+     * @param offset The offset into the buffer from which to parse.
+     * @param length The number of header bytes to parse.
      * @return The number of bytes in a header's entry name.
      */
     public static int getNameBytes(StringBuffer name, byte[] buf, int offset, int length) {

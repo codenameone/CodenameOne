@@ -69,8 +69,9 @@ public class GZIPInputStream extends InflaterInputStream {
     }
 
     public long getCRC() throws GZIPException {
-        if (inflater.istate.mode != 12 /*DONE*/)
+        if (inflater.istate.mode != 12 /*DONE*/) {
             throw new GZIPException("checksum is not calculated yet.");
+        }
         return inflater.istate.getGZIPHeader().getCRC();
     }
 
@@ -100,8 +101,9 @@ public class GZIPInputStream extends InflaterInputStream {
         do {
             if (inflater.availIn <= 0) {
                 int i = in.read(b1);
-                if (i <= 0)
+                if (i <= 0) {
                     throw new IOException("no input");
+                }
                 inflater.setInput(b1, 0, 1, true);
             }
 

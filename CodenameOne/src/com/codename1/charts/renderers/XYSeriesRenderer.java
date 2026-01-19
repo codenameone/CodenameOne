@@ -29,38 +29,63 @@ import java.util.List;
  * A renderer for the XY type series.
  */
 public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: UnnecessarySemicolon cleaned extra delimiter
-    /** If the chart points should be filled. */
-    private boolean mFillPoints = false;
-    /** If the chart should be filled outside its line. */
+    /**
+     * If the chart should be filled outside its line.
+     */
     private final List<FillOutsideLine> mFillBelowLine = new ArrayList<FillOutsideLine>();
-    /** The point style. */
+    /**
+     * If the chart points should be filled.
+     */
+    private boolean mFillPoints = false;
+    /**
+     * The point style.
+     */
     private PointStyle mPointStyle = PointStyle.POINT;
-    /** The point stroke width */
+    /**
+     * The point stroke width
+     */
     private float mPointStrokeWidth = 1;
-    /** The chart line width. */
+    /**
+     * The chart line width.
+     */
     private float mLineWidth = 1;
-    /** If the values should be displayed above the chart points. */
+    /**
+     * If the values should be displayed above the chart points.
+     */
     private boolean mDisplayChartValues;
-    /** The minimum distance between displaying chart values. */
+    /**
+     * The minimum distance between displaying chart values.
+     */
     private int mDisplayChartValuesDistance = 100;
-    /** The chart values text size. */
+    /**
+     * The chart values text size.
+     */
     private float mChartValuesTextSize = 10;
-    /** The chart values text alignment. */
+    /**
+     * The chart values text alignment.
+     */
     private int mChartValuesTextAlign = Component.CENTER;
-    /** The chart values spacing from the data point. */
+    /**
+     * The chart values spacing from the data point.
+     */
     private float mChartValuesSpacing = 5f;
-    /** The annotations text size. */
+    /**
+     * The annotations text size.
+     */
     private float mAnnotationsTextSize = 10;
-    /** The annotations text alignment. */
+    /**
+     * The annotations text alignment.
+     */
     private int mAnnotationsTextAlign = Component.CENTER;
-    /** The annotations color. */
+    /**
+     * The annotations color.
+     */
     private int mAnnotationsColor = DefaultRenderer.TEXT_COLOR;
 
     /**
      * Returns if the chart should be filled below the line.
      *
      * @return the fill below line status
-     *
      * @deprecated Use {@link #getFillOutsideLine()} instead.
      */
     @Deprecated
@@ -73,7 +98,6 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
      * line transforms a line chart into an area chart.
      *
      * @param fill the fill below line flag value
-     *
      * @deprecated Use {@link #addFillOutsideLine(FillOutsideLine)} instead.
      */
     @Deprecated
@@ -129,7 +153,6 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
      * Sets the fill below the line color.
      *
      * @param color the fill below line color
-     *
      * @deprecated Use FillOutsideLine.setColor instead
      */
     @Deprecated
@@ -253,9 +276,10 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
      * Sets the chart values title text font size using a Font object instead of a point size.
      * This method is the preferred way to set font size because it allows you to
      * more easily have fonts appear in an appropriate size for the target device.
-     *
+     * <p>
      * Alternatively check out {@link #setChartValuesTextSize(float) } to set the text
      * size in pixels.
+     *
      * @param font
      */
     public void setChartValuesTextFont(Font font) {
@@ -293,7 +317,7 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
      * Sets the chart values spacing from the data point.
      *
      * @param spacing the chart values spacing (in pixels) from the chart data
-     *          point
+     *                point
      */
     public void setChartValuesSpacing(float spacing) {
         mChartValuesSpacing = spacing;
@@ -323,9 +347,10 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
      * Sets the annotations text font size using a Font object instead of a point size.
      * This method is the preferred way to set font size because it allows you to
      * more easily have fonts appear in an appropriate size for the target device.
-     *
+     * <p>
      * Alternatively check out {@link #setAnnotationsTextSize(float) } to set the text
      * size in pixels.
+     *
      * @param font
      */
     public void setAnnotationsTextFont(Font font) {
@@ -372,12 +397,19 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
      * A descriptor for the line fill behavior.
      */
     public static class FillOutsideLine {
-        /** The fill type. */
+        /**
+         * The fill type.
+         */
         private final Type mType;
-        /** The fill color. */
+        /**
+         * The fill color.
+         */
         private int mColor = ColorUtil.argb(125, 0, 0, 200);
-        /** The fill points index range. */
+        /**
+         * The fill points index range.
+         */
         private int[] mFillRange;
+
         /**
          * The line fill behavior.
          *

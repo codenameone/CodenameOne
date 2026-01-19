@@ -35,9 +35,8 @@ import com.codename1.ui.Container;
 public class ActionEvent {
 
     private final Type trigger;
-
-    private boolean consumed;
     private final Object source;
+    private boolean consumed;
     private Object sourceComponent;
     private int keyEvent = -1;
     private int y = -1;
@@ -50,6 +49,7 @@ public class ActionEvent {
      * @since 8.0
      */
     private boolean pointerPressedDuringDrag;
+
     /**
      * Creates a new instance of ActionEvent.  This is unused locally, but provided so existing customer code
      * with still work.

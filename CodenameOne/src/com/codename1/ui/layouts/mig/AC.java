@@ -83,8 +83,9 @@ public final class AC {
      *               with default values.
      */
     public void setConstaints(DimConstraint[] constr) {
-        if (constr == null || constr.length < 1)
+        if (constr == null || constr.length < 1) {
             constr = new DimConstraint[]{new DimConstraint()};
+        }
 
         cList.clear();
         cList.ensureCapacity(constr.length);
@@ -340,8 +341,9 @@ public final class AC {
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
             makeSize(ix);
-            if (bsa != null)
+            if (bsa != null) {
                 cList.get(ix).setGapAfter(bsa);
+            }
         }
         return this;
     }
@@ -373,8 +375,9 @@ public final class AC {
      */
     public AC align(String side, int... indexes) {
         UnitValue al = ConstraintParser.parseAlignKeywords(side, true);
-        if (al == null)
+        if (al == null) {
             al = ConstraintParser.parseAlignKeywords(side, false);
+        }
 
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
@@ -566,8 +569,9 @@ public final class AC {
     private void makeSize(int sz) {
         if (cList.size() <= sz) {
             cList.ensureCapacity(sz);
-            for (int i = cList.size(); i <= sz; i++)
+            for (int i = cList.size(); i <= sz; i++) {
                 cList.add(new DimConstraint());
+            }
         }
     }
 }

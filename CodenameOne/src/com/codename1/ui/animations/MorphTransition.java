@@ -41,8 +41,8 @@ import java.util.Map;
  * @author Shai Almog
  */
 public final class MorphTransition extends Transition {
-    private int duration;
     private final HashMap<String, String> fromTo = new HashMap<String, String>();
+    private int duration;
     private CC[] fromToComponents;
     private Motion animationMotion;
     private boolean finished;
@@ -185,7 +185,7 @@ public final class MorphTransition extends Transition {
                 finished = true;
 
                 // restore forms to orignial states
-                if(fromToComponents != null) {
+                if (fromToComponents != null) {
                     for (CC c : fromToComponents) {
                         if (c == null) {
                             continue;
@@ -205,7 +205,7 @@ public final class MorphTransition extends Transition {
 
                 return true;
             }
-            if(fromToComponents != null) {
+            if (fromToComponents != null) {
                 for (CC c : fromToComponents) {
                     if (c == null) {
                         continue;
@@ -238,7 +238,7 @@ public final class MorphTransition extends Transition {
     public void paint(Graphics g) {
         int oldAlpha = g.getAlpha();
         int alpha = 0;
-        if(animationMotion != null) {
+        if (animationMotion != null) {
             alpha = animationMotion.getValue();
         }
         if (alpha < 255) {
@@ -265,6 +265,7 @@ public final class MorphTransition extends Transition {
         Motion yMotion;
         Motion wMotion;
         Motion hMotion;
+
         public CC(Component source, Component dest, int duration) {
             this.source = source;
             this.dest = dest;

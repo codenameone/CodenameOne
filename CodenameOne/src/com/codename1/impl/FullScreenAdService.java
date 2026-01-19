@@ -258,6 +258,24 @@ public abstract class FullScreenAdService {
         Display.getInstance().callSerially(new UnlockRunnable(callback));
     }
 
+    private static class UnlockRunnable implements Runnable {
+        private final ActionListener callback;
+
+        public UnlockRunnable(ActionListener callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void run() {
+            // prevent a potential race condition with the locking
+            if (Display.getInstance().getCurrent() instanceof AdForm) {
+                Display.getInstance().callSerially(this);
+                return;
+            }
+            callback.actionPerformed(null);
+        }
+    }
+
     class AdForm extends Form {
         boolean blocked = true;
         private long shown = -1;
@@ -277,7 +295,7 @@ public abstract class FullScreenAdService {
                         LOCK.notifyAll();
                     }
 
-                    // move to the next screen so the ad will be shown and so we 
+                    // move to the next screen so the ad will be shown and so we
                     // can return to the next screen and not this screen
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
@@ -348,24 +366,6 @@ public abstract class FullScreenAdService {
                 blocked = false;
             }
             return false;
-        }
-    }
-
-    private static class UnlockRunnable implements Runnable {
-        private final ActionListener callback;
-
-        public UnlockRunnable(ActionListener callback) {
-            this.callback = callback;
-        }
-
-        @Override
-        public void run() {
-            // prevent a potential race condition with the locking
-            if (Display.getInstance().getCurrent() instanceof AdForm) {
-                Display.getInstance().callSerially(this);
-                return;
-            }
-            callback.actionPerformed(null);
         }
     }
 }

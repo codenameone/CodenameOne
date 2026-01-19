@@ -75,13 +75,13 @@ public class Tree extends Container {
     private static final String KEY_PARENT = "TREE_PARENT";
     private static final String KEY_EXPANDED = "TREE_NODE_EXPANDED";
     private static final String KEY_DEPTH = "TREE_DEPTH";
+    private static final int depthIndent = 2;
     private static Image folder;
     private static Image openFolder;
     private static Image nodeImage;
     private final EventDispatcher leafListener = new EventDispatcher();
     private final ActionListener expansionListener = new Handler();
     private TreeModel model;
-    private static final int depthIndent = 2;
     private boolean multilineMode;
 
     /**

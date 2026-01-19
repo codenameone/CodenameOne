@@ -72,6 +72,13 @@ public class Calendar extends Container implements ActionSource {
     private static final String[] MONTHS = new String[]{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     private static final String[] DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     private static final String[] LABELS = {"Su", "M", "Tu", "W", "Th", "F", "Sa"};
+    private final EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher dataChangedListeners = new EventDispatcher();
+    private final EventDispatcher monthChangedListeners = new EventDispatcher();
+    private final long[] dates = new long[42];
+    private final Collection<Date> selectedDays = new ArrayList<Date>();
+    private final Map<String, Collection<Date>> highlightGroup = new HashMap<String, Collection<Date>>();
+    private final ArrayList<ActionListener> dayListeners = new ArrayList<ActionListener>();
     /**
      * When set to true days will be rendered as 2 digits with 0 preceding
      * single digit days
@@ -81,18 +88,11 @@ public class Calendar extends Container implements ActionSource {
     private ComboBox year;
     private MonthView mv;
     private Label dateLabel;
-    private final EventDispatcher dispatcher = new EventDispatcher();
-    private final EventDispatcher dataChangedListeners = new EventDispatcher();
-    private final EventDispatcher monthChangedListeners = new EventDispatcher();
-    private final long[] dates = new long[42];
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
     private long SELECTED_DAY = -1;
-    private final Collection<Date> selectedDays = new ArrayList<Date>();
     private boolean multipleSelectionEnabled = false;
     private String selectedDaysUIID = "CalendarMultipleDay";
-    private final Map<String, Collection<Date>> highlightGroup = new HashMap<String, Collection<Date>>();
-    private final ArrayList<ActionListener> dayListeners = new ArrayList<ActionListener>();
 
     /**
      * Creates a new instance of Calendar set to the given date based on time

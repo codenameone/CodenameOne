@@ -35,15 +35,19 @@ import com.codename1.ui.Component;
  * regular Codename One layouts.
  */
 public class DialChart extends RoundChart {
-    /** The radius of the needle. */
+    /**
+     * The radius of the needle.
+     */
     private static final int NEEDLE_RADIUS = 10;
-    /** The series renderer. */
+    /**
+     * The series renderer.
+     */
     private final DialRenderer mRenderer;
 
     /**
      * Builds a new dial chart instance.
      *
-     * @param dataset the series dataset
+     * @param dataset  the series dataset
      * @param renderer the dial renderer
      */
     public DialChart(CategorySeries dataset, DialRenderer renderer) {
@@ -55,11 +59,11 @@ public class DialChart extends RoundChart {
      * The graphical representation of the dial chart.
      *
      * @param canvas the canvas to paint to
-     * @param x the top left x value of the view to draw to
-     * @param y the top left y value of the view to draw to
-     * @param width the width of the view to draw to
+     * @param x      the top left x value of the view to draw to
+     * @param y      the top left y value of the view to draw to
+     * @param width  the width of the view to draw to
      * @param height the height of the view to draw to
-     * @param paint the paint
+     * @param paint  the paint
      */
     @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
@@ -143,11 +147,11 @@ public class DialChart extends RoundChart {
     /**
      * Returns the angle for a specific chart value.
      *
-     * @param value the chart value
+     * @param value    the chart value
      * @param minAngle the minimum chart angle value
      * @param maxAngle the maximum chart angle value
-     * @param min the minimum chart value
-     * @param max the maximum chart value
+     * @param min      the minimum chart value
+     * @param max      the maximum chart value
      * @return the angle
      */
     private double getAngleForValue(double value, double minAngle, double maxAngle, double min,
@@ -160,18 +164,18 @@ public class DialChart extends RoundChart {
     /**
      * Draws the chart tick lines.
      *
-     * @param canvas the canvas
-     * @param min the minimum chart value
-     * @param max the maximum chart value
-     * @param minAngle the minimum chart angle value
-     * @param maxAngle the maximum chart angle value
-     * @param centerX the center x value
-     * @param centerY the center y value
-     * @param longRadius the long radius
+     * @param canvas      the canvas
+     * @param min         the minimum chart value
+     * @param max         the maximum chart value
+     * @param minAngle    the minimum chart angle value
+     * @param maxAngle    the maximum chart angle value
+     * @param centerX     the center x value
+     * @param centerY     the center y value
+     * @param longRadius  the long radius
      * @param shortRadius the short radius
-     * @param ticks the tick spacing
-     * @param paint the paint settings
-     * @param labels paint the labels
+     * @param ticks       the tick spacing
+     * @param paint       the paint settings
+     * @param labels      paint the labels
      * @return the angle
      */
     private void drawTicks(Canvas canvas, double min, double max, double minAngle, double maxAngle,
@@ -203,13 +207,13 @@ public class DialChart extends RoundChart {
     /**
      * Returns the angle for a specific chart value.
      *
-     * @param canvas the canvas
-     * @param angle the needle angle value
+     * @param canvas  the canvas
+     * @param angle   the needle angle value
      * @param centerX the center x value
      * @param centerY the center y value
-     * @param radius the radius
-     * @param arrow if a needle or an arrow to be painted
-     * @param paint the paint settings
+     * @param radius  the radius
+     * @param arrow   if a needle or an arrow to be painted
+     * @param paint   the paint settings
      * @return the angle
      */
     private void drawNeedle(Canvas canvas, double angle, int centerX, int centerY, double radius,

@@ -48,6 +48,8 @@ public class Motion {
     private static final int COLOR_LINEAR = 5;
     private static final int EXPONENTIAL_DECAY = 6;
     private static boolean slowMotion;
+    private final int[] previousLastReturnedValue = new int[3];
+    private final long[] previousLastReturnedValueTime = new long[3];
     int motionType;
     private int sourceValue;
     private int destinationValue;
@@ -56,11 +58,10 @@ public class Motion {
     private long startTime;
     private double initVelocity, friction;
     private int lastReturnedValue;
-    private final int[] previousLastReturnedValue = new int[3];
-    private final long[] previousLastReturnedValueTime = new long[3];
     private long currentMotionTime = -1;
     private long previousCurrentMotionTime = -1;
     private float p0, p1, p2, p3;
+
     /**
      * Construct a point/destination motion
      *
@@ -79,6 +80,7 @@ public class Motion {
         previousLastReturnedValue[0] = -1;
         previousLastReturnedValueTime[0] = -1;
     }
+
     /**
      * Construct a velocity motion
      *

@@ -178,7 +178,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateLeftLessRight(List, String, String)
      */
     private Object evaluateLeftLessRightInternal(Object element, String lvalue,
-                                          String rvalue) {
+                                                 String rvalue) {
         if (element instanceof List) {
             return evaluateLeftLessRight((List) element, lvalue, rvalue);
         } else {
@@ -199,7 +199,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateLeftGreaterRight(List, String, String)
      */
     private Object evaluateLeftGreaterRightInternal(Object element, String lvalue,
-                                             String rvalue) {
+                                                    String rvalue) {
         if (element instanceof List) {
             return evaluateLeftGreaterRight((List) element, lvalue, rvalue);
         } else {
@@ -220,7 +220,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateLeftEqualsRight(StructuredContent, String, String)
      */
     private Object evaluateLeftEqualsRightInternal(Object element, String lvalue,
-                                            String rvalue) {
+                                                   String rvalue) {
         if (element instanceof List) {
             return evaluateLeftEqualsRight((List) element, lvalue, rvalue);
         } else {
@@ -241,7 +241,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateLeftContainsRight(StructuredContent, String, String)
      */
     private Object evaluateLeftContainsRightInternal(Object element, String lvalue,
-                                              String rvalue) {
+                                                     String rvalue) {
         if (element instanceof List) {
             return evaluateLeftContainsRight((List) element, lvalue, rvalue);
         } else {

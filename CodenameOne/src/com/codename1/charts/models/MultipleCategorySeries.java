@@ -22,13 +22,21 @@ import java.util.List;
  * A series for the multiple category charts like the doughnut.
  */
 public class MultipleCategorySeries {
-    /** The series title. */
+    /**
+     * The series title.
+     */
     private final String mTitle;
-    /** The series local keys. */
+    /**
+     * The series local keys.
+     */
     private final List<String> mCategories = new ArrayList<String>();
-    /** The series name. */
+    /**
+     * The series name.
+     */
     private final List<String[]> mTitles = new ArrayList<String[]>();
-    /** The series values. */
+    /**
+     * The series values.
+     */
     private final List<double[]> mValues = new ArrayList<double[]>();
 
     /**
@@ -54,8 +62,8 @@ public class MultipleCategorySeries {
      * Adds a new value to the series.
      *
      * @param category the category name
-     * @param titles the titles to be used as labels
-     * @param values the new value
+     * @param titles   the titles to be used as labels
+     * @param values   the new value
      */
     public void add(String category, String[] titles, double[] values) {
         mCategories.add(category);

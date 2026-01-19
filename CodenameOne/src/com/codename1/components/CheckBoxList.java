@@ -60,7 +60,7 @@ public class CheckBoxList extends ButtonList {
         super(model, true);
         fireReady();
     }
-    
+
     @Override
     protected Component createButton(Object model) {
         return new CheckBox(String.valueOf(model));

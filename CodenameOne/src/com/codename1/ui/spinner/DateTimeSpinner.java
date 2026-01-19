@@ -31,14 +31,14 @@ import java.util.Date;
  * @deprecated use Picker instead
  */
 public class DateTimeSpinner extends TimeSpinner {
-    private Spinner date;
     private final Date today = new Date();
+    private final int off;
+    private Spinner date;
     private Date currentDate = today;
     private Date startDate = new Date(0);
     private Date endDate = new Date(System.currentTimeMillis() + 10000L * 24L * 60L * 60000L);
     private boolean markToday = true;
     private boolean includeYear;
-    private final int off;
 
     /**
      * Default constructor

@@ -88,27 +88,20 @@ public final class ToastBar {
      * The default timeout for info/error messages
      */
     private static int defaultMessageTimeout = 4000;
-    private static class ToastBarHolder {
-        private static final ToastBar INSTANCE = new ToastBar();
-    }
     /**
      * Keeps track of the currently active status messages.
      */
     private final ArrayList<Status> statuses = new ArrayList<Status>();
     private int position = Component.BOTTOM;
-
     /**
      * The default UIID that to be used for the {@code ToastBar} component.  This is the
      * style of the box that appears at the bottom of the screen.
      */
     private String defaultUIID = "ToastBar";
-
     /**
      * The default UIID that is to be used for the text in the {@code ToastBar}.
      */
     private String defaultMessageUIID = "ToastBarMessage";
-
-
     //FIXME SH Need to style the {@code ToastBar} so that it looks nicer
     private boolean useFormLayeredPane;
     /**
@@ -600,7 +593,9 @@ public final class ToastBar {
 
     private void moveLayerToFront() {
         Form f = Display.getInstance().getCurrent();
-        if (f == null) return;
+        if (f == null) {
+            return;
+        }
         final Container layered = getLayeredPane();
         final Container parent = layered.getParent();
         if (parent == null) {
@@ -699,6 +694,10 @@ public final class ToastBar {
             c.hidden = true;
             c.setVisible(false);
         }
+    }
+
+    private static class ToastBarHolder {
+        private static final ToastBar INSTANCE = new ToastBar();
     }
 
     private static class FlushAnimationCallback implements Runnable {
@@ -1017,12 +1016,12 @@ public final class ToastBar {
      * the top-level form.
      */
     private class ToastBarComponent extends Container {
-        boolean hidden = true;
-        Button leadButton = new Button();
-        private TextArea label;
         private final InfiniteProgress progressLabel;
         private final Slider progressBar;
         private final Label icon;
+        boolean hidden = true;
+        Button leadButton = new Button();
+        private TextArea label;
         private Status currentlyShowing;
 
         public ToastBarComponent() {

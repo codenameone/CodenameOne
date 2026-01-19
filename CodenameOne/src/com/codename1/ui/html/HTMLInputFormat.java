@@ -57,10 +57,9 @@ final class HTMLInputFormat {
                     FormatConstraint.TYPE_LOWERCASE | FormatConstraint.TYPE_ANY,
                     FormatConstraint.TYPE_UPPERCASE | FormatConstraint.TYPE_ANY
             };
-
+    private final Vector formatConstraints = new Vector();
     private int minLength;
     private int maxLength;
-    private final Vector formatConstraints = new Vector();
 
 
     /**

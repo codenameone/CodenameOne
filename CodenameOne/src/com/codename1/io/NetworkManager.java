@@ -91,16 +91,17 @@ public final class NetworkManager {
     private static final NetworkManager INSTANCE = new NetworkManager();
     private static String autoDetectURL = "https://www.google.com/";
     private final Vector pending = new Vector();
+    private final Hashtable threadAssignements = new Hashtable();
     private boolean running;
     private int threadCount = 1;
     private NetworkThread[] networkThreads;
     private EventDispatcher errorListeners;
     private EventDispatcher progressListeners;
     private int timeout = 300000;
-    private final Hashtable threadAssignements = new Hashtable();
     private Hashtable userHeaders;
     private boolean autoDetected;
     private int nextConnectionId = 1;
+
     private NetworkManager() {
     }
 
@@ -326,7 +327,7 @@ public final class NetworkManager {
         running = false;
         if (networkThreads != null) {
             for (NetworkThread n : networkThreads) {
-                if(n != null) {
+                if (n != null) {
                     n.stopped = true;
                 }
             }
@@ -804,7 +805,7 @@ public final class NetworkManager {
         public void join() {
             try {
                 Thread t = threadInstance;
-                if(t != null) {
+                if (t != null) {
                     t.join();
                 }
             } catch (InterruptedException ex) {

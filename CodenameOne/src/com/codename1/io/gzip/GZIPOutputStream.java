@@ -60,8 +60,9 @@ public class GZIPOutputStream extends DeflaterOutputStream {
 
 
     private void check() throws GZIPException {
-        if (deflater.dstate.status != 42 /*INIT_STATUS*/)
+        if (deflater.dstate.status != 42 /*INIT_STATUS*/) {
             throw new GZIPException("header is already written.");
+        }
     }
 
     public void setModifiedTime(long mtime) throws GZIPException {
@@ -85,8 +86,9 @@ public class GZIPOutputStream extends DeflaterOutputStream {
     }
 
     public long getCRC() throws GZIPException {
-        if (deflater.dstate.status != 666 /*FINISH_STATE*/)
+        if (deflater.dstate.status != 666 /*FINISH_STATE*/) {
             throw new GZIPException("checksum is not calculated yet.");
+        }
         return deflater.dstate.getGZIPHeader().getCRC();
     }
 }

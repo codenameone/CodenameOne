@@ -27,7 +27,6 @@ import java.io.InputStream;
 
 /**
  * @author Kamran Zafar
- *
  */
 public class TarInputStream extends BufferedInputStream {
 
@@ -50,7 +49,6 @@ public class TarInputStream extends BufferedInputStream {
 
     /**
      * Not supported
-     *
      */
     @Override
     public synchronized void mark(int readlimit) {
@@ -58,7 +56,6 @@ public class TarInputStream extends BufferedInputStream {
 
     /**
      * Not supported
-     *
      */
     @Override
     public synchronized void reset() throws IOException {
@@ -86,7 +83,6 @@ public class TarInputStream extends BufferedInputStream {
     /**
      * Checks if the bytes being read exceed the entry size and adjusts the byte
      * array length. Updates the byte counters
-     *
      *
      * @see java.io.FilterInputStream#read(byte[], int, int)
      */
@@ -204,7 +200,6 @@ public class TarInputStream extends BufferedInputStream {
     /**
      * Skips 'n' bytes on the InputStream<br>
      * Overrides default implementation of skip
-     *
      */
     @Override
     public long skip(long n) throws IOException {

@@ -24,7 +24,6 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
-import com.codename1.components.SpanLabel;
 import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
@@ -1250,6 +1249,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated uses the deprecated BindTarget interface
      */
     @Override
@@ -1266,6 +1266,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated uses the deprecated BindTarget interface
      */
     @Override

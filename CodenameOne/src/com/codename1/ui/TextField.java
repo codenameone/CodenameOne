@@ -91,12 +91,12 @@ public class TextField extends TextArea {
             // 9
             "WXYZ9",
     };
+    private static final Vector firstUppercaseInputMode = new Vector();
     private static boolean replaceMenuDefault = true;
     private static String clearText = "Clear";
     private static String t9Text = "T9";
     private static Hashtable inputModes;
     private static String[] defaultInputModeOrder = {"Abc", "ABC", "abc", "123"};
-    private static final Vector firstUppercaseInputMode = new Vector();
     private static boolean qwertyAutoDetect = true;
     private static boolean qwertyDevice;
     /**
@@ -109,6 +109,8 @@ public class TextField extends TextArea {
     private static int defaultSymbolDialogKey = '*';
     private static boolean useNativeTextInput = true;
     private static char[] symbolTable = DEFAULT_SYMBOL_TABLE;
+    private final Command DELETE_COMMAND = new CommandHandler(clearText, 1);
+    private final Command T9_COMMAND = new CommandHandler(t9Text, 2);
     private long cursorBlinkTime = System.currentTimeMillis();
     private boolean drawCursor = true;
     private int cursorY = 0;
@@ -144,8 +146,6 @@ public class TextField extends TextArea {
      */
     private boolean leftAndRightEditingTrigger = true;
     private Command selectCommand;
-    private final Command DELETE_COMMAND = new CommandHandler(clearText, 1);
-    private final Command T9_COMMAND = new CommandHandler(t9Text, 2);
 
     /**
      * Default constructor
@@ -177,6 +177,7 @@ public class TextField extends TextArea {
         setUIIDFinal("TextField");
         setSingleLineTextArea(true);
     }
+
     /**
      * Construct text field with a hint
      *

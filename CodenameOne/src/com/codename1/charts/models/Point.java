@@ -20,9 +20,13 @@ package com.codename1.charts.models;
  * A class to encapsulate the definition of a point.
  */
 public final class Point {
-    /** The X axis coordinate value. */
+    /**
+     * The X axis coordinate value.
+     */
     private float mX;
-    /** The Y axis coordinate value. */
+    /**
+     * The Y axis coordinate value.
+     */
     private float mY;
 
     public Point() {

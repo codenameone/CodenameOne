@@ -54,9 +54,6 @@ public class Transform {
      * Constant for transform type.  Transform is a scale transform only.
      */
     public static final int TYPE_SCALE = 2;
-    private static class IdentityHolder {
-        private static final Transform IDENTITY = createIdentity();
-    }
     /**
      * Reference to the native transform.  This should only be used by the implementation.
      */
@@ -72,7 +69,6 @@ public class Transform {
     private float scaleX = 1f, scaleY = 1f, scaleZ = 1f;
     private boolean dirty = true;
     private CodenameOneImplementation impl = null;
-
     /**
      * Private constructor
      *
@@ -327,7 +323,9 @@ public class Transform {
      * @return True if the transform is the identity.
      */
     public boolean isIdentity() {
-        if (type == TYPE_IDENTITY) return true;
+        if (type == TYPE_IDENTITY) {
+            return true;
+        }
         if (this.equals(IDENTITY())) {
             setIdentity();
             return true;
@@ -506,7 +504,6 @@ public class Transform {
         type = TYPE_UNKNOWN;
     }
 
-
     /**
      * Sets the transform to the identity transform.
      */
@@ -640,7 +637,6 @@ public class Transform {
         return makeInverse();
     }
 
-
     private Transform makeInverse() {
         if (type == TYPE_IDENTITY) {
             return makeIdentity();
@@ -770,7 +766,6 @@ public class Transform {
         impl.setTransformOrtho(getNativeTransform(), left, right, bottom, top, near, far);
     }
 
-
     /**
      * Sets the transform to the specified camera's perspective.
      * <p>Note: If {@link #isPerspectiveSupported()} is false, then this will throw a Runtime Exception.</p>
@@ -874,7 +869,6 @@ public class Transform {
 
     }
 
-
     /**
      * Gets the native transform object.  This object is implementation dependent so this
      * method should really only be used by the implementation.
@@ -888,7 +882,6 @@ public class Transform {
         }
         return nativeTransform;
     }
-
 
     /**
      * Creates a copy of the current transform.
@@ -934,6 +927,10 @@ public class Transform {
         hash = 29 * hash + Float.floatToIntBits(this.scaleY);
         hash = 29 * hash + Float.floatToIntBits(this.scaleZ);
         return hash;
+    }
+
+    private static class IdentityHolder {
+        private static final Transform IDENTITY = createIdentity();
     }
 
     public static class NotInvertibleException extends Exception {

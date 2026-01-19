@@ -104,6 +104,7 @@ public class VideoCaptureConstraints {
     private int preferredHeight;
     private int preferredQuality;
     private long preferredMaxFileSize;
+
     /**
      * Creates a new video cosntraint with no constraints specified.
      */
@@ -192,11 +193,7 @@ public class VideoCaptureConstraints {
     public boolean equals(Object obj) {
         if (obj instanceof VideoCaptureConstraints) {
             VideoCaptureConstraints c = (VideoCaptureConstraints) obj;
-            return c.preferredHeight == preferredHeight &&
-                    c.preferredWidth == preferredWidth &&
-                    c.preferredMaxLength == preferredMaxLength &&
-                    c.preferredQuality == preferredQuality &&
-                    c.preferredMaxFileSize == preferredMaxFileSize;
+            return c.preferredHeight == preferredHeight && c.preferredWidth == preferredWidth && c.preferredMaxLength == preferredMaxLength && c.preferredQuality == preferredQuality && c.preferredMaxFileSize == preferredMaxFileSize;
         }
         return false;
     }
@@ -376,7 +373,9 @@ public class VideoCaptureConstraints {
      */
     public boolean isSizeSupported() {
         build();
-        if (preferredWidth == 0 && preferredHeight == 0) return true;
+        if (preferredWidth == 0 && preferredHeight == 0) {
+            return true;
+        }
         return (width == preferredWidth && height == preferredHeight);
     }
 
@@ -479,7 +478,9 @@ public class VideoCaptureConstraints {
      * @return
      */
     private VideoCaptureConstraints build() {
-        if (compiled) return this;
+        if (compiled) {
+            return this;
+        }
         if (compiler == null) {
             this.height = 0;
             this.width = 0;

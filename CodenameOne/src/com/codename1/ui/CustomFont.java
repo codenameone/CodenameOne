@@ -37,6 +37,10 @@ class CustomFont extends Font {
      * Keep five colors in cache by default to allow faster selection colors
      */
     private static final int COLOR_CACHE_SIZE = 5;
+    private final Hashtable colorCache = new Hashtable();
+    private final String charsets;
+    private final int imageWidth;
+    private final int imageHeight;
     // package protected for the resource editor
     Image cache;
     /**
@@ -51,11 +55,7 @@ class CustomFont extends Font {
      * bounds.
      */
     int[] charWidth;
-    private final Hashtable colorCache = new Hashtable();
-    private final String charsets;
     private int color;
-    private final int imageWidth;
-    private final int imageHeight;
     private Object imageArrayRef;
 
 
@@ -137,13 +137,13 @@ class CustomFont extends Font {
             Image i = (Image) newCache;
             cache = i;
             if (colorCache.size() > COLOR_CACHE_SIZE) {
-                    // remove a random cache element
-                    colorCache.remove(colorCache.keys().nextElement());
-                }
-                return true;
-            } else {
-                colorCache.remove(newColorKey);
+                // remove a random cache element
+                colorCache.remove(colorCache.keys().nextElement());
             }
+            return true;
+        } else {
+            colorCache.remove(newColorKey);
+        }
 
         if (colorCache.size() > COLOR_CACHE_SIZE) {
             // remove a random cache element
@@ -340,8 +340,9 @@ class CustomFont extends Font {
      */
     @Override
     public int stringWidth(String str) {
-        if (str == null || str.length() == 0)
+        if (str == null || str.length() == 0) {
             return 0;
+        }
         return substringWidth(str, 0, str.length());
     }
 

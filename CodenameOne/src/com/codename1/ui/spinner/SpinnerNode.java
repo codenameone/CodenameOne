@@ -32,21 +32,21 @@ import java.util.Map;
  * @author shannah
  */
 class SpinnerNode extends Node {
-    ListModel<String> listModel;
-    Node selectedRowOverlay = new Node();
+    private static final int numSides = 14;
     private final Label rowTemplate = new Label("", "Spinner3DRow");
     private final Label overlayTemplate = new Label("", "Spinner3DOverlay");
     private final Style rowStyle;
     private final Style selectedRowStyle;
     private final Style overlayStyle;
     private final Map<Integer, Node> childIndex = new HashMap<Integer, Node>();
+    private final Label renderer = new Label("Testing", "Spinner3DRow");
+    ListModel<String> listModel;
+    Node selectedRowOverlay = new Node();
     private List<ScrollListener> scrollListeners;
     private boolean setSelectedIndexReentrantLock;
     private boolean setScrollYReentrantLock;
     private RowFormatter rowFormatter;
     private double flatScrollPos;
-    private static final int numSides = 14;
-    private final Label renderer = new Label("Testing", "Spinner3DRow");
     private final DataChangedListener listChangedListener = new DataChangedListener() {
         @Override
         public void dataChanged(int type, int index) {
@@ -66,6 +66,7 @@ class SpinnerNode extends Node {
             }
         }
     };
+
     public SpinnerNode() {
         rowStyle = rowTemplate.getUnselectedStyle();
         selectedRowStyle = rowTemplate.getSelectedStyle();

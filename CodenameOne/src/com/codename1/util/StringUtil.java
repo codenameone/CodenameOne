@@ -257,7 +257,9 @@ public class StringUtil {
     public static String join(Iterable strings, String delimiter) {
         StringBuilder sb = new StringBuilder();
         for (Object obj : strings) {
-            if (sb.length() > 0) sb.append(delimiter);
+            if (sb.length() > 0) {
+                sb.append(delimiter);
+            }
             sb.append(obj);
         }
         return sb.toString();
@@ -274,7 +276,9 @@ public class StringUtil {
     public static String join(Object[] strings, String delimiter) {
         StringBuilder sb = new StringBuilder();
         for (Object obj : strings) {
-            if (sb.length() > 0) sb.append(delimiter);
+            if (sb.length() > 0) {
+                sb.append(delimiter);
+            }
             sb.append(obj);
         }
         return sb.toString();
@@ -282,13 +286,14 @@ public class StringUtil {
 
     /**
      * Helper to get bytes from string with UTF-8 encoding
+     *
      * @param s the string
      * @return the bytes
      */
     public static byte[] getBytes(String s) {
         try {
             return s.getBytes("UTF-8");
-        } catch(UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException e) {
             // never happens
             throw new RuntimeException(e.toString());
         }
@@ -296,13 +301,14 @@ public class StringUtil {
 
     /**
      * Helper to get string from bytes with UTF-8 encoding
+     *
      * @param b the bytes
      * @return the string
      */
     public static String newString(byte[] b) {
         try {
             return new String(b, "UTF-8");
-        } catch(UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException e) {
             // never happens
             throw new RuntimeException(e.toString());
         }
@@ -310,7 +316,8 @@ public class StringUtil {
 
     /**
      * Helper to get string from bytes with UTF-8 encoding
-     * @param b the bytes
+     *
+     * @param b      the bytes
      * @param offset the offset
      * @param length the length
      * @return the string
@@ -318,7 +325,7 @@ public class StringUtil {
     public static String newString(byte[] b, int offset, int length) {
         try {
             return new String(b, offset, length, "UTF-8");
-        } catch(UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException e) {
             // never happens
             throw new RuntimeException(e.toString());
         }

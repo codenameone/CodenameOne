@@ -25,81 +25,157 @@ import java.util.List;
  * An abstract renderer to be extended by the multiple series classes.
  */
 public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused text font constant
-    /** A no color constant. */
+    /**
+     * A no color constant.
+     */
     public static final int NO_COLOR = 0;
-    /** The default background color. */
+    /**
+     * The default background color.
+     */
     public static final int BACKGROUND_COLOR = 0x0;
-    /** The default color for text. */
+    /**
+     * The default color for text.
+     */
     public static final int TEXT_COLOR = 0xEAEAEA;
-    /** The chart title. */
-    private String mChartTitle = "";
-    /** The chart title text size. */
-    private float mChartTitleTextSize = 15;
-    /** The typeface name for the texts. */
-    private int mTextTypefaceName = Font.FACE_SYSTEM;
-    /** The typeface style for the texts. */
-    private int mTextTypefaceStyle = Font.STYLE_PLAIN;
-    /** The typeface for the texts */
-    private Font mTextTypeface;
-    /** The chart background color. */
-    private int mBackgroundColor;
-    /** If the background color is applied. */
-    private boolean mApplyBackgroundColor;
-    /** If the axes are visible. */
-    private boolean mShowAxes = true;
-    /** The Y axis color. */
-    private int mYAxisColor = TEXT_COLOR;
-    /** The X axis color. */
-    private int mXAxisColor = TEXT_COLOR;
-    /** If the labels are visible. */
-    private boolean mShowLabels = true;
-    /** If the tick marks are visible. */
-    private boolean mShowTickMarks = true;
-    /** The labels color. */
-    private int mLabelsColor = TEXT_COLOR;
-    /** The labels text size. */
-    private float mLabelsTextSize = 10;
-    /** If the legend is visible. */
-    private boolean mShowLegend = true;
-    /** The legend text size. */
-    private float mLegendTextSize = 12;
-    /** If the legend should size to fit. */
-    private boolean mFitLegend = false;
-    /** If the X axis grid should be displayed. */
-    private boolean mShowGridX = false;
-    /** If the Y axis grid should be displayed. */
-    private boolean mShowGridY = false;
-    /** If the custom text grid should be displayed on the X axis. */
-    private boolean mShowCustomTextGridX = false;
-    /** If the custom text grid should be displayed on the Y axis. */
-    private boolean mShowCustomTextGridY = false;
-    /** The simple renderers that are included in this multiple series renderer. */
+    /**
+     * The simple renderers that are included in this multiple series renderer.
+     */
     private final List<SimpleSeriesRenderer> mRenderers = new ArrayList<SimpleSeriesRenderer>();
-    /** The antialiasing flag. */
+    /**
+     * The chart title.
+     */
+    private String mChartTitle = "";
+    /**
+     * The chart title text size.
+     */
+    private float mChartTitleTextSize = 15;
+    /**
+     * The typeface name for the texts.
+     */
+    private int mTextTypefaceName = Font.FACE_SYSTEM;
+    /**
+     * The typeface style for the texts.
+     */
+    private int mTextTypefaceStyle = Font.STYLE_PLAIN;
+    /**
+     * The typeface for the texts
+     */
+    private Font mTextTypeface;
+    /**
+     * The chart background color.
+     */
+    private int mBackgroundColor;
+    /**
+     * If the background color is applied.
+     */
+    private boolean mApplyBackgroundColor;
+    /**
+     * If the axes are visible.
+     */
+    private boolean mShowAxes = true;
+    /**
+     * The Y axis color.
+     */
+    private int mYAxisColor = TEXT_COLOR;
+    /**
+     * The X axis color.
+     */
+    private int mXAxisColor = TEXT_COLOR;
+    /**
+     * If the labels are visible.
+     */
+    private boolean mShowLabels = true;
+    /**
+     * If the tick marks are visible.
+     */
+    private boolean mShowTickMarks = true;
+    /**
+     * The labels color.
+     */
+    private int mLabelsColor = TEXT_COLOR;
+    /**
+     * The labels text size.
+     */
+    private float mLabelsTextSize = 10;
+    /**
+     * If the legend is visible.
+     */
+    private boolean mShowLegend = true;
+    /**
+     * The legend text size.
+     */
+    private float mLegendTextSize = 12;
+    /**
+     * If the legend should size to fit.
+     */
+    private boolean mFitLegend = false;
+    /**
+     * If the X axis grid should be displayed.
+     */
+    private boolean mShowGridX = false;
+    /**
+     * If the Y axis grid should be displayed.
+     */
+    private boolean mShowGridY = false;
+    /**
+     * If the custom text grid should be displayed on the X axis.
+     */
+    private boolean mShowCustomTextGridX = false;
+    /**
+     * If the custom text grid should be displayed on the Y axis.
+     */
+    private boolean mShowCustomTextGridY = false;
+    /**
+     * The antialiasing flag.
+     */
     private boolean mAntialiasing = true;
-    /** The legend height. */
+    /**
+     * The legend height.
+     */
     private int mLegendHeight = 0;
-    /** The margins size. */
+    /**
+     * The margins size.
+     */
     private int[] mMargins = new int[]{20, 30, 10, 20};
-    /** A value to be used for scaling the chart. */
+    /**
+     * A value to be used for scaling the chart.
+     */
     private float mScale = 1;
-    /** A flag for enabling the pan. */
-    private boolean mPanEnabled = true;
-    /** A flag for enabling the zoom. */
-    private boolean mZoomEnabled = true;
-    /** A flag for enabling the visibility of the zoom buttons. */
-    private boolean mZoomButtonsVisible = false;
-    /** The zoom rate. */
-    private float mZoomRate = 1.5f;
-    /** A flag for enabling the external zoom. */
-    private boolean mExternalZoomEnabled = false;
-    /** The original chart scale. */
+    /**
+     * The original chart scale.
+     */
     private final float mOriginalScale = mScale;
-    /** A flag for enabling the click on elements. */
+    /**
+     * A flag for enabling the pan.
+     */
+    private boolean mPanEnabled = true;
+    /**
+     * A flag for enabling the zoom.
+     */
+    private boolean mZoomEnabled = true;
+    /**
+     * A flag for enabling the visibility of the zoom buttons.
+     */
+    private boolean mZoomButtonsVisible = false;
+    /**
+     * The zoom rate.
+     */
+    private float mZoomRate = 1.5f;
+    /**
+     * A flag for enabling the external zoom.
+     */
+    private boolean mExternalZoomEnabled = false;
+    /**
+     * A flag for enabling the click on elements.
+     */
     private boolean mClickEnabled = false;
-    /** The selectable radius around a clickable point. */
+    /**
+     * The selectable radius around a clickable point.
+     */
     private int selectableBuffer = 15;
-    /** If the chart should display the values (available for pie chart). */
+    /**
+     * If the chart should display the values (available for pie chart).
+     */
     private boolean mDisplayValues;
 
     /**
@@ -107,7 +183,9 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
      * when not enough space.
      */
     private boolean mInScroll;
-    /** The start angle for circular charts such as pie, doughnut, etc. */
+    /**
+     * The start angle for circular charts such as pie, doughnut, etc.
+     */
     private float mStartAngle = 0;
 
     /**
@@ -143,7 +221,6 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
      * instead of this method to allow the text to be sized appropriately for the
      * device resolution.
      *
-     *
      * @param textSize the chart title text size
      */
     public void setChartTitleTextSize(float textSize) {
@@ -154,9 +231,10 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
      * Sets the chart title font size using a Font object instead of a point size.
      * This method is the preferred way to set font size because it allows you to
      * more easily have fonts appear in an appropriate size for the target device.
-     *
+     * <p>
      * Alternatively check out {@link #setChartTitleTextSize(float) } to set the text
      * size in pixels.
+     *
      * @param font
      */
     public void setChartTitleTextFont(Font font) {
@@ -176,7 +254,7 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
     /**
      * Adds a simple renderer to the multiple renderer.
      *
-     * @param index the index in the renderers list
+     * @param index    the index in the renderers list
      * @param renderer the renderer to be added
      */
     public void addSeriesRenderer(int index, SimpleSeriesRenderer renderer) {
@@ -355,7 +433,6 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
      * instead to allow the font size to to be adjusted appropriately for the display
      * resolution.
      *
-     *
      * @param textSize the labels text size
      */
     public void setLabelsTextSize(float textSize) {
@@ -366,9 +443,10 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
      * Sets the label title font size using a Font object instead of a point size.
      * This method is the preferred way to set font size because it allows you to
      * more easily have fonts appear in an appropriate size for the target device.
-     *
+     * <p>
      * Alternatively check out {@link #setLabelsTextSize(float) } to set the text
      * size in pixels.
+     *
      * @param font
      */
     public void setLabelsTextFont(Font font) {
@@ -617,9 +695,10 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
      * Sets the legend text font size using a Font object instead of a point size.
      * This method is the preferred way to set font size because it allows you to
      * more easily have fonts appear in an appropriate size for the target device.
-     *
+     * <p>
      * Alternatively check out {@link #setLegendTextSize(float) } to set the text
      * size in pixels.
+     *
      * @param font
      */
     public void setLegendTextFont(Font font) {
@@ -630,7 +709,7 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
      * Sets the text typeface name and style.
      *
      * @param typefaceName the text typeface name
-     * @param style the text typeface style
+     * @param style        the text typeface style
      */
     public void setTextTypeface(int typefaceName, int style) {
         mTextTypefaceName = typefaceName;
@@ -853,7 +932,7 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
      * Sets the margins, in pixels.
      *
      * @param margins an array containing the margin size values, in this order:
-     *          top, left, bottom, right
+     *                top, left, bottom, right
      */
     public void setMargins(int[] margins) {
         mMargins = margins;

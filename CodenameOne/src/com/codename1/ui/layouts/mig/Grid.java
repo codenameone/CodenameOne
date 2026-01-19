@@ -1613,8 +1613,8 @@ public final class Grid {
 
         // If absolute, use those coordinates instead.
         if (pos != null) {
-                UnitValue stUV = pos[isHor ? 0 : 1];
-                UnitValue endUV = pos[isHor ? 2 : 3];
+            UnitValue stUV = pos[isHor ? 0 : 1];
+            UnitValue endUV = pos[isHor ? 2 : 3];
 
             int minSz = cw.getSize(LayoutUtil.MIN, isHor);
             int maxSz = cw.getSize(LayoutUtil.MAX, isHor);
@@ -2338,8 +2338,8 @@ public final class Grid {
         private final boolean useVisualPadding;
         private final int[] horSizes = new int[3];
         private final int[] verSizes = new int[3];
-        private boolean sizesOk = false;
         private final boolean isAbsolute;
+        private boolean sizesOk = false;
         private int[][] gaps; // [top,left(actually before),bottom,right(actually after)][min,pref,max]
         private int x = LayoutUtil.NOT_SET, y = LayoutUtil.NOT_SET, w = LayoutUtil.NOT_SET, h = LayoutUtil.NOT_SET;
 

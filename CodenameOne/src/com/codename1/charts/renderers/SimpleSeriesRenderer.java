@@ -22,27 +22,49 @@ import com.codename1.charts.util.NumberFormat;
  * A simple series renderer.
  */
 public class SimpleSeriesRenderer {
-    /** The series color. */
+    /**
+     * The series color.
+     */
     private int mColor = 0x0000ff;
-    /** The stroke style. */
+    /**
+     * The stroke style.
+     */
     private BasicStroke mStroke;
-    /** If gradient is enabled. */
+    /**
+     * If gradient is enabled.
+     */
     private boolean mGradientEnabled = false;
-    /** The gradient start value. */
+    /**
+     * The gradient start value.
+     */
     private double mGradientStartValue;
-    /** The gradient start color. */
+    /**
+     * The gradient start color.
+     */
     private int mGradientStartColor;
-    /** The gradient stop value. */
+    /**
+     * The gradient stop value.
+     */
     private double mGradientStopValue;
-    /** The gradient stop color. */
+    /**
+     * The gradient stop color.
+     */
     private int mGradientStopColor;
-    /** If the legend item for this renderer is visible. */
+    /**
+     * If the legend item for this renderer is visible.
+     */
     private boolean mShowLegendItem = true;
-    /** If this is a highlighted slice (pie chart displays slice as exploded). */
+    /**
+     * If this is a highlighted slice (pie chart displays slice as exploded).
+     */
     private boolean mHighlighted;
-    /** If the bounding points to the first and last visible ones should be displayed. */
+    /**
+     * If the bounding points to the first and last visible ones should be displayed.
+     */
     private boolean mDisplayBoundingPoints = true;
-    /** The chart values format. */
+    /**
+     * The chart values format.
+     */
     private NumberFormat mChartValuesFormat;
 
     /**

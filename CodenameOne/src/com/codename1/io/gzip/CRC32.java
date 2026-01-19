@@ -45,10 +45,11 @@ final public class CRC32 implements Checksum {
         for (int n = 0; n < 256; n++) {
             int c = n;
             for (int k = 8; --k >= 0; ) {
-                if ((c & 1) != 0)
+                if ((c & 1) != 0) {
                     c = 0xedb88320 ^ (c >>> 1);
-                else
+                } else {
                     c = c >>> 1;
+                }
             }
             crc_table[n] = c;
         }
@@ -65,8 +66,9 @@ final public class CRC32 implements Checksum {
         long[] odd = new long[GF2_DIM];
 
         // degenerate case (also disallow negative lengths)
-        if (len2 <= 0)
+        if (len2 <= 0) {
             return crc1;
+        }
 
         // put operator for one zero bit in odd
         odd[0] = 0xedb88320L;          // CRC-32 polynomial
@@ -87,18 +89,21 @@ final public class CRC32 implements Checksum {
         do {
             // apply zeros operator for this bit of len2
             gf2MatrixSquare(even, odd);
-            if ((len2 & 1) != 0)
+            if ((len2 & 1) != 0) {
                 crc1 = gf2MatrixTimes(even, crc1);
+            }
             len2 >>= 1;
 
             // if no more bits set, then done
-            if (len2 == 0)
+            if (len2 == 0) {
                 break;
+            }
 
             // another iteration of the loop with odd and even swapped
             gf2MatrixSquare(odd, even);
-            if ((len2 & 1) != 0)
+            if ((len2 & 1) != 0) {
                 crc1 = gf2MatrixTimes(odd, crc1);
+            }
             len2 >>= 1;
 
             // if no more bits set, then done
@@ -113,8 +118,9 @@ final public class CRC32 implements Checksum {
         long sum = 0;
         int index = 0;
         while (vec != 0) {
-            if ((vec & 1) != 0)
+            if ((vec & 1) != 0) {
                 sum ^= mat[index];
+            }
             vec >>= 1;
             index++;
         }
@@ -122,8 +128,9 @@ final public class CRC32 implements Checksum {
     }
 
     static void gf2MatrixSquare(long[] square, long[] mat) {
-        for (int n = 0; n < GF2_DIM; n++)
+        for (int n = 0; n < GF2_DIM; n++) {
             square[n] = gf2MatrixTimes(mat, mat[n]);
+        }
     }
 
     public static int[] getCRC32Table() {
@@ -135,8 +142,9 @@ final public class CRC32 implements Checksum {
     @Override
     public void update(byte[] buf, int index, int len) {
         int c = ~v;
-        while (--len >= 0)
+        while (--len >= 0) {
             c = crc_table[(c ^ buf[index++]) & 0xff] ^ (c >>> 8);
+        }
         v = ~c;
     }
 

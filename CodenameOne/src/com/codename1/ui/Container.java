@@ -77,13 +77,23 @@ import java.util.Vector;
  * @see Component
  */
 public class Container extends Component implements Iterable<Component> {
-    private static boolean enableLayoutOnPaint = true;
     /**
      * Workaround for the behavior of the sidemenu bar on iOS etc. which translates aggressively,
      * this is visible with the table component where the lines slide out of place
      */
     static int sidemenuBarTranslation;
+    private static boolean enableLayoutOnPaint = true;
     private static boolean blockOverdraw;
+    private final java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
+    /**
+     * A queue that keeps track of changes to the children while an animation is in progress.
+     *
+     * @see #getChildrenAsList(boolean)
+     * @see #iterator(boolean)
+     * @see #insertComponentAt(int, java.lang.Object, com.codename1.ui.Component)
+     * @see #removeComponentImpl(com.codename1.ui.Component)
+     */
+    private final java.util.ArrayList<QueuedChange> changeQueue = new java.util.ArrayList<QueuedChange>();
     boolean scrollableX;
     boolean scrollableY;
     /**
@@ -99,16 +109,6 @@ public class Container extends Component implements Iterable<Component> {
     private boolean allowEnableLayoutOnPaint = false;
     private Component leadComponent;
     private Layout layout;
-    private final java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
-    /**
-     * A queue that keeps track of changes to the children while an animation is in progress.
-     *
-     * @see #getChildrenAsList(boolean)
-     * @see #iterator(boolean)
-     * @see #insertComponentAt(int, java.lang.Object, com.codename1.ui.Component)
-     * @see #removeComponentImpl(com.codename1.ui.Component)
-     */
-    private final java.util.ArrayList<QueuedChange> changeQueue = new java.util.ArrayList<QueuedChange>();
     private boolean shouldLayout = true;
     private java.util.Vector cmpTransitions;
     private int scrollIncrement = 20;
@@ -151,14 +151,6 @@ public class Container extends Component implements Iterable<Component> {
         setFocusable(false);
     }
 
-    static void setBlockOverdraw(boolean b) {
-        blockOverdraw = b;
-    }
-
-    static boolean isBlockOverdraw() {
-        return blockOverdraw;
-    }
-
     /**
      * Constructs a new Container with a new layout manager.
      *
@@ -168,12 +160,19 @@ public class Container extends Component implements Iterable<Component> {
         this(layout, "Container");
     }
 
-
     /**
      * Constructs a new Container, with a {@link FlowLayout}.
      */
     public Container() {
         this(new FlowLayout());
+    }
+
+    static boolean isBlockOverdraw() {
+        return blockOverdraw;
+    }
+
+    static void setBlockOverdraw(boolean b) {
+        blockOverdraw = b;
     }
 
     /**
@@ -211,6 +210,10 @@ public class Container extends Component implements Iterable<Component> {
             cnt.addComponent(c);
         }
         return cnt;
+    }
+
+    static void setEnableLayoutOnPaint(boolean val) {
+        enableLayoutOnPaint = val;
     }
 
     /**
@@ -1001,10 +1004,6 @@ public class Container extends Component implements Iterable<Component> {
      */
     public void replaceAndWait(final Component current, final Component next, final Transition t) {
         replaceComponents(current, next, t, true, false, null, 0, 0, true);
-    }
-
-    static void setEnableLayoutOnPaint(boolean val) {
-        enableLayoutOnPaint = val;
     }
 
     /**
@@ -1850,7 +1849,9 @@ public class Container extends Component implements Iterable<Component> {
      * @param cmp
      */
     void addElevatedComponent(Component cmp) {
-        if (elevatedComponents == null) elevatedComponents = new HashSet<Component>();
+        if (elevatedComponents == null) {
+            elevatedComponents = new HashSet<Component>();
+        }
         elevatedComponents.add(cmp);
     }
 
@@ -1860,7 +1861,9 @@ public class Container extends Component implements Iterable<Component> {
      * @param cmp
      */
     void removeElevatedComponent(Component cmp) {
-        if (elevatedComponents == null) return;
+        if (elevatedComponents == null) {
+            return;
+        }
         elevatedComponents.remove(cmp);
     }
 
@@ -1898,9 +1901,9 @@ public class Container extends Component implements Iterable<Component> {
         g.translate(-absX, -absY);
 
         if (elevatedComponents != null && !elevatedComponents.isEmpty()) {
-            if (_tmpRenderingElevatedComponents == null)
+            if (_tmpRenderingElevatedComponents == null) {
                 _tmpRenderingElevatedComponents = new ArrayList<Component>(elevatedComponents);
-            else {
+            } else {
                 _tmpRenderingElevatedComponents.clear();
                 _tmpRenderingElevatedComponents.addAll(elevatedComponents);
             }
@@ -1912,12 +1915,16 @@ public class Container extends Component implements Iterable<Component> {
                 int clipW = g.getClipWidth();
                 int shadowX = relativeX + child.calculateShadowOffsetX();
                 int shadowW = child.calculateShadowWidth();
-                if (shadowX + shadowW <= clipX || shadowX >= clipX + clipW) continue;
+                if (shadowX + shadowW <= clipX || shadowX >= clipX + clipW) {
+                    continue;
+                }
                 int clipY = g.getClipY();
                 int clipH = g.getClipHeight();
                 int shadowY = relativeY + child.calculateShadowOffsetY();
                 int shadowH = child.calculateShadowHeight();
-                if (shadowY + shadowH <= clipY || shadowY >= clipY + clipH) continue;
+                if (shadowY + shadowH <= clipY || shadowY >= clipY + clipH) {
+                    continue;
+                }
 
 
                 if (!useIntersection || Rectangle.intersects(child.getAbsoluteX() + child.getScrollX() + child.calculateShadowOffsetX(),
@@ -1956,7 +1963,9 @@ public class Container extends Component implements Iterable<Component> {
                 paintOnTopLoop:
                 while (cnt != this && cnt != null) {
                     Layout cntLayout = cnt.getLayout();
-                    if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
+                    if (!foundOverlap && cntLayout.isOverlapSupported()) {
+                        foundOverlap = true;
+                    }
                     if (foundOverlap) {
                         int currCmpIndex = cnt.getComponentIndex(currCmp);
                         if (currCmpIndex >= 0) {
@@ -2022,7 +2031,9 @@ public class Container extends Component implements Iterable<Component> {
                 paintOnTopLoop:
                 while (cnt != this && cnt != null) {
                     Layout cntLayout = cnt.getLayout();
-                    if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
+                    if (!foundOverlap && cntLayout.isOverlapSupported()) {
+                        foundOverlap = true;
+                    }
                     if (foundOverlap) {
                         int currCmpIndex = cnt.getComponentIndex(currCmp);
                         if (currCmpIndex >= 0) {
@@ -2161,7 +2172,9 @@ public class Container extends Component implements Iterable<Component> {
 
             for (int i = startIndex; i < endIndex; i++) {
                 Component cmp2 = components.get(i);
-                if (cmp2.renderedElevation != elevation) continue;
+                if (cmp2.renderedElevation != elevation) {
+                    continue;
+                }
                 if (Rectangle.intersects(x, y, w, h,
                         cmp2.getAbsoluteX() + cmp2.getScrollX(),
                         cmp2.getAbsoluteY() + cmp2.getScrollY(),
@@ -4131,8 +4144,8 @@ public class Container extends Component implements Iterable<Component> {
         /**
          * Creates a new queued insertion.
          *
-         * @param index      The index where the component is inserted.
-         * @param cmp        The component that was inserted.
+         * @param index The index where the component is inserted.
+         * @param cmp   The component that was inserted.
          */
         QueuedInsertion(int index, Component cmp) {
             super(TYPE_INSERT, cmp);
@@ -4204,15 +4217,15 @@ public class Container extends Component implements Iterable<Component> {
     }
 
     static class TransitionAnimation extends ComponentAnimation {
-        int growSpeed;
-        int layoutAnimationSpeed;
         private final Transition t;
         private final Container thisContainer;
-        private boolean started = false;
-        private boolean inProgress = true;
         private final Component current;
         private final Component next;
         private final Form parent;
+        int growSpeed;
+        int layoutAnimationSpeed;
+        private boolean started = false;
+        private boolean inProgress = true;
         private boolean destroyed;
 
         TransitionAnimation(Container thisContainer, Component current, Component next, Transition t) {
@@ -4290,14 +4303,14 @@ public class Container extends Component implements Iterable<Component> {
     }
 
     static class MorphAnimation extends ComponentAnimation {
+        private final long startTime;
+        private final Container thisContainer;
+        private final Motion[][] motions;
         Vector animatedComponents;
         Motion[] opacity;
         boolean dontRevalidate;
-        private final long startTime;
         private int duration;
-        private final Container thisContainer;
         private boolean finished = false;
-        private final Motion[][] motions;
         private Component scrollTo;
 
         public MorphAnimation(Container thisContainer, int duration, Motion[][] motions) {

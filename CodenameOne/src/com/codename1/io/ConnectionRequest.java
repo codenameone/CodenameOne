@@ -48,7 +48,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
@@ -202,6 +201,7 @@ public class ConnectionRequest implements IOProgressListener {
     // request
     private boolean contentTypeSetExplicitly;
     private Object _connection;
+
     /**
      * Default constructor
      */
@@ -210,6 +210,7 @@ public class ConnectionRequest implements IOProgressListener {
             silentRetryCount = 1;
         }
     }
+
     /**
      * Construct a connection request to a url
      *
@@ -219,6 +220,7 @@ public class ConnectionRequest implements IOProgressListener {
         this();
         setUrl(url);
     }
+
     /**
      * Construct a connection request to a url
      *
@@ -1095,7 +1097,9 @@ public class ConnectionRequest implements IOProgressListener {
                     readResponse(input);
                 }
                 if (shouldAutoCloseResponse()) {
-                    if (input != null) input.close();
+                    if (input != null) {
+                        input.close();
+                    }
                 }
             }
         } finally {
@@ -1482,7 +1486,9 @@ public class ConnectionRequest implements IOProgressListener {
         SSLCertificate[] out = new SSLCertificate[sslCerts.length];
         int i = 0;
         for (String sslCertStr : sslCerts) {
-            if (sslCertStr == null) continue;
+            if (sslCertStr == null) {
+                continue;
+            }
             SSLCertificate sslCert = new SSLCertificate();
             int splitPos = sslCertStr.indexOf(':');
             if (splitPos == -1) {

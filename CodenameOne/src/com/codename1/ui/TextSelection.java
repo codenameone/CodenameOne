@@ -172,11 +172,11 @@ public class TextSelection {
     private final Spans selectedSpans = new Spans();
     private final EventDispatcher textSelectionListeners = new EventDispatcher();
     private final Rectangle tmpRect = new Rectangle();
-    private SelectionMask selectionMask;
     private final Component root;
     private final boolean ltr = true;
-    private boolean enabled;
     private final TextSelectionTrigger trigger = getDefaultTextSelectionTrigger();
+    private SelectionMask selectionMask;
+    private boolean enabled;
     // The nearest scrollable parent of the component that triggered a text
     // selection event.
     private Component selectionRoot;
@@ -185,10 +185,10 @@ public class TextSelection {
      * The listener that handles all of the pointer events to update the selections.
      */
     private final ActionListener pressListener = new ActionListener() {
-        int startX, startY;
         final Rectangle startSelectedBounds = new Rectangle();
-        boolean inSelectionDrag;
         private final int ONE_MM = CN.convertToPixels(1);
+        int startX, startY;
+        boolean inSelectionDrag;
 
         @Override
         public void actionPerformed(final ActionEvent evt) {
@@ -710,6 +710,7 @@ public class TextSelection {
     public void setIgnoreEvents(boolean ignore) {
         ignoreEvents = ignore;
     }
+
     /**
      * Trigger types for text selection.
      */
@@ -725,6 +726,7 @@ public class TextSelection {
          */
         LongPress
     }
+
     /**
      * An interface that can be returned from any Component's {@link Component#getTextSelectionSupport() } method to provide
      * text selection support on that component.

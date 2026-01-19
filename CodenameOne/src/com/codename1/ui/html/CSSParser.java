@@ -47,11 +47,6 @@ class CSSParser {
      * The default values according to the WCSS specs the default one is "handheld" and "all" (Which is always accepted)
      */
     private static String[] SUPPORTED_MEDIA_TYPES = {"all", "handheld"};
-
-    private static class CSSParserHolder {
-        private static final CSSParser INSTANCE = new CSSParser();
-    }
-
     private CSSParserCallback parserCallback;
 
     /**
@@ -73,11 +68,6 @@ class CSSParser {
         SUPPORTED_MEDIA_TYPES = supportedMediaTypes;
     }
 
-
-    // ***********
-    // CSS Parsing methods from here onward
-    // ***********
-
     /**
      * Checks if the specified character is a white space or not.
      * Exposed to packaage since used by HTMLComponent as well
@@ -89,6 +79,10 @@ class CSSParser {
         return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == '\r'));
     }
 
+
+    // ***********
+    // CSS Parsing methods from here onward
+    // ***********
 
     /**
      * Handles a CSS comment segment
@@ -106,7 +100,7 @@ class CSSParser {
                 c = r.readCharFromReader();
             }
             c = r.readCharFromReader();
-            while (c != (char)-1 && isWhiteSpace(c)) { //skip white spaces
+            while (c != (char) -1 && isWhiteSpace(c)) { //skip white spaces
                 c = r.readCharFromReader();
             }
         } else {
@@ -685,7 +679,6 @@ class CSSParser {
         return error;
     }
 
-
     /**
      * A helper method that handles reporting of CSS errors to the ParserCallback (if available)
      *
@@ -726,6 +719,10 @@ class CSSParser {
 
     public void setCSSParserCallback(CSSParserCallback parserCallback) {
         this.parserCallback = parserCallback;
+    }
+
+    private static class CSSParserHolder {
+        private static final CSSParser INSTANCE = new CSSParser();
     }
 
     /**

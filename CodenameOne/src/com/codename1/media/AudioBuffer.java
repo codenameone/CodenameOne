@@ -33,7 +33,6 @@ import java.util.ArrayList;
  */
 public class AudioBuffer {
     private final Object refLock = new Object();
-    private int refCounter;
     /**
      * Registered callbacks to be notified when the contents of this buffer changes.
      */
@@ -44,6 +43,12 @@ public class AudioBuffer {
     private final float[] buffer;
     private final float[] tmpDownSampleBuffer;
     /**
+     * Used to store pending add/remove calls while inFireFrame is true.  These are all
+     * executed when the callbacks have all finished firing.
+     */
+    private final ArrayList<Runnable> pendingOps = new ArrayList<Runnable>();
+    private int refCounter;
+    /**
      * Internal flag used to indicate that we are currently firing callbacks.  This is used
      * internally to prevent modification of the callbacks array while we are firing callbacks.
      * A call is made to addCallback or removeCallback while this flag is set, then,
@@ -51,11 +56,6 @@ public class AudioBuffer {
      * so we don't get a concurrentModificationException on the callbacks list.
      */
     private boolean inFireFrame = false;
-    /**
-     * Used to store pending add/remove calls while inFireFrame is true.  These are all
-     * executed when the callbacks have all finished firing.
-     */
-    private final ArrayList<Runnable> pendingOps = new ArrayList<Runnable>();
     /**
      * The current size of the buffer.  Every time the buffer contents are changed, this value
      * is set.  This is not to be confused with the maximum buffer size.

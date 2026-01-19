@@ -24,7 +24,6 @@ package com.codename1.ui.plaf;
 
 import com.codename1.io.Log;
 import com.codename1.io.Util;
-import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -1649,7 +1648,9 @@ public class StyleParser {
          * @param values A 4-element array of scalar values.
          */
         public BoxInfo(ScalarValue[] values) {
-            if (values.length != 4) throw new IllegalArgumentException("BoxInfo expected 4-element array");
+            if (values.length != 4) {
+                throw new IllegalArgumentException("BoxInfo expected 4-element array");
+            }
             this.values = values;
         }
 
@@ -2010,11 +2011,15 @@ public class StyleParser {
 
         private void colorToString(StringBuilder sb) {
             String hex = color != null ? Integer.toHexString(color & 0xffffff) : "000000";
-            while (hex.length() < 6) hex = "0" + hex;
+            while (hex.length() < 6) {
+                hex = "0" + hex;
+            }
 
             if (getOpacity() != null) {
                 String opacityStr = Integer.toHexString(getOpacity() & 0xff);
-                while (opacityStr.length() < 2) opacityStr = "0" + opacityStr;
+                while (opacityStr.length() < 2) {
+                    opacityStr = "0" + opacityStr;
+                }
                 hex = opacityStr + hex;
             }
             sb.append(hex).append(" ");
@@ -2146,7 +2151,9 @@ public class StyleParser {
         }
 
         private String lineTypeString() {
-            if ("line".equals(getType())) return "solid";
+            if ("line".equals(getType())) {
+                return "solid";
+            }
             return getType();
         }
 
@@ -2938,7 +2945,9 @@ public class StyleParser {
          * @return
          */
         public String sizeString(String prefix) {
-            if (getSize() == null) return prefix;
+            if (getSize() == null) {
+                return prefix;
+            }
             if (getSizeUnit() == Style.UNIT_TYPE_DIPS) {
                 return prefix + getSize() + unitString();
             } else if (getSizeUnit() == StyleParser.UNIT_INHERIT) {
@@ -2957,7 +2966,9 @@ public class StyleParser {
         public float getSizeInPixels(Style baseStyle) {
             if (getSize() == null || getSizeUnit() == UNIT_INHERIT) {
                 Font f = baseStyle.getFont();
-                if (f == null) f = Font.getDefaultFont();
+                if (f == null) {
+                    f = Font.getDefaultFont();
+                }
 
                 float pixS = f.getPixelSize();
                 if (pixS < 1) {
@@ -2987,12 +2998,16 @@ public class StyleParser {
         }
 
         private String nameString(String prefix) {
-            if (getName() == null) return prefix;
+            if (getName() == null) {
+                return prefix;
+            }
             return prefix + getName();
         }
 
         private String fileString(String prefix) {
-            if (getFile() == null) return prefix;
+            if (getFile() == null) {
+                return prefix;
+            }
             return prefix + getFile();
         }
 

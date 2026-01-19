@@ -36,7 +36,9 @@ import java.util.List;
  * pair for a category.
  */
 public class RangeBarChart extends BarChart {
-    /** The chart type. */
+    /**
+     * The chart type.
+     */
     public static final String TYPE = "RangeBar";
 
     RangeBarChart() {
@@ -49,9 +51,9 @@ public class RangeBarChart extends BarChart {
     /**
      * Builds a new range bar chart instance.
      *
-     * @param dataset the multiple series dataset
+     * @param dataset  the multiple series dataset
      * @param renderer the multiple series renderer
-     * @param type the range bar chart type
+     * @param type     the range bar chart type
      */
     public RangeBarChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer, Type type) {
         super(dataset, renderer, type);
@@ -60,13 +62,13 @@ public class RangeBarChart extends BarChart {
     /**
      * The graphical representation of a series.
      *
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas         the canvas to paint to
+     * @param paint          the paint to be used for drawing
+     * @param points         the array of points to be used for drawing the series
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the minimum value of the y axis
-     * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the minimum value of the y axis
+     * @param seriesIndex    the index of the series currently being drawn
+     * @param startIndex     the start index of the rendering points
      */
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points,
@@ -96,13 +98,13 @@ public class RangeBarChart extends BarChart {
     /**
      * The graphical representation of the series values as text.
      *
-     * @param canvas the canvas to paint to
-     * @param series the series to be painted
-     * @param renderer the series renderer
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas      the canvas to paint to
+     * @param series      the series to be painted
+     * @param renderer    the series renderer
+     * @param paint       the paint to be used for drawing
+     * @param points      the array of points to be used for drawing the series
      * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param startIndex  the start index of the rendering points
      */
     @Override
     protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
