@@ -1803,7 +1803,7 @@ public class Form extends Container {
                 removeComponentFromForm(titleArea);
             }
             //if the Form is already displayed refresh the title
-            if (Display.getInstance().getCurrent() == this) {
+            if (Display.getInstance().getCurrent() == this) { //NOPMD CompareObjectsWithEquals
                 Display.getInstance().refreshNativeTitle();
             }
         }
@@ -2325,7 +2325,7 @@ public class Form extends Container {
         }
 
         if (comboLock) {
-            if (cmd == menuBar.getCancelMenuItem()) {
+            if (cmd == menuBar.getCancelMenuItem()) { //NOPMD CompareObjectsWithEquals
                 actionCommand(cmd);
                 return;
             }
@@ -2335,7 +2335,7 @@ public class Form extends Container {
             }
             return;
         }
-        if (cmd != menuBar.getSelectCommand()) {
+        if (cmd != menuBar.getSelectCommand()) { //NOPMD CompareObjectsWithEquals
             if (commandListener != null) {
                 commandListener.fireActionEvent(ev);
                 if (ev.isConsumed()) {
@@ -2361,13 +2361,13 @@ public class Form extends Container {
         }
 
         if (comboLock) {
-            if (cmd == menuBar.getCancelMenuItem()) {
+            if (cmd == menuBar.getCancelMenuItem()) { //NOPMD CompareObjectsWithEquals
                 actionCommand(cmd);
                 return;
             }
             return;
         }
-        if (cmd != menuBar.getSelectCommand()) {
+        if (cmd != menuBar.getSelectCommand()) { //NOPMD CompareObjectsWithEquals
             if (commandListener != null) {
                 commandListener.fireActionEvent(ev);
                 if (ev.isConsumed()) {
@@ -2713,11 +2713,11 @@ public class Form extends Container {
      */
     void disposeImpl() {
         if (previousForm != null) {
-            boolean clearPrevious = Display.getInstance().getCurrent() == this;
+            boolean clearPrevious = Display.getInstance().getCurrent() == this; //NOPMD CompareObjectsWithEquals
             if (!clearPrevious) {
                 Form f = Display.getInstance().getCurrent();
                 while (f != null) {
-                    if (f.previousForm == this) {
+                    if (f.previousForm == this) { //NOPMD CompareObjectsWithEquals
                         f.previousForm = previousForm;
                         previousForm = null;
                         return;
@@ -2767,7 +2767,7 @@ public class Form extends Container {
         }
 
 
-        if (isVisible() && CN.getCurrentForm() == this) {
+        if (isVisible() && CN.getCurrentForm() == this) { //NOPMD CompareObjectsWithEquals
             Display.getInstance().repaint(cmp);
         }
     }
@@ -2880,7 +2880,7 @@ public class Form extends Container {
      * @param focused the newly focused component or null for no focus
      */
     public void setFocused(Component focused) {
-        if (this.focused == focused && focused != null) {
+        if (this.focused == focused && focused != null) { //NOPMD CompareObjectsWithEquals
             this.focused.repaint();
             return;
         }
@@ -2897,7 +2897,7 @@ public class Form extends Container {
         }
         // a listener might trigger a focus change event essentially
         // invalidating focus so we shouldn't break that
-        if (focused != null && this.focused == focused) {
+        if (focused != null && this.focused == focused) { //NOPMD CompareObjectsWithEquals
             triggerRevalidate = changeFocusState(focused, true) || triggerRevalidate;
             //if we need to revalidate no need to repaint the Component, it will
             //be painted from the Form
@@ -2916,7 +2916,7 @@ public class Form extends Container {
     @Override
     protected void longKeyPress(int keyCode) {
         if (focused != null) {
-            if (focused.getComponentForm() == this) {
+            if (focused.getComponentForm() == this) { //NOPMD CompareObjectsWithEquals
                 focused.longKeyPress(keyCode);
             }
         }
@@ -2935,7 +2935,7 @@ public class Form extends Container {
             }
         }
         if (focused != null && focused.contains(x, y)) {
-            if (focused.getComponentForm() == this) {
+            if (focused.getComponentForm() == this) { //NOPMD CompareObjectsWithEquals
                 LeadUtil.longPointerPress(focused, x, y);
 
             }
@@ -3016,7 +3016,7 @@ public class Form extends Container {
             if (focused.handlesInput()) {
                 return;
             }
-            if (focused.getComponentForm() == this) {
+            if (focused.getComponentForm() == this) { //NOPMD CompareObjectsWithEquals
                 //if the arrow keys have been pressed update the focus.
                 updateFocus(game);
             } else {
@@ -3083,7 +3083,7 @@ public class Form extends Container {
 
         //Component focused = focusManager.getFocused();
         if (focused != null) {
-            if (focused.getComponentForm() == this) {
+            if (focused.getComponentForm() == this) { //NOPMD CompareObjectsWithEquals
                 if (focused.isEnabled()) {
                     focused.keyReleased(keyCode);
                 }
@@ -3380,7 +3380,7 @@ public class Form extends Container {
                 pendingC = LeadUtil.leadParentImpl(pendingC);
             }
             Component pendingCLead = LeadUtil.leadComponentImpl(pendingC);
-            if (atXY != pendingC) {
+            if (atXY != pendingC) { //NOPMD CompareObjectsWithEquals
                 if (pendingCLead instanceof ReleasableComponent) {
                     ReleasableComponent rc = (ReleasableComponent) pendingCLead;
                     int relRadius = rc.getReleaseRadius();
@@ -3458,7 +3458,7 @@ public class Form extends Container {
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
-                    if (cmp == pressedCmp && cmp.isStickyDrag()) {
+                    if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
                         stickyDrag = cmp;
                     }
                 }
@@ -3477,7 +3477,7 @@ public class Form extends Container {
 
             LeadUtil.pointerDragged(cmp, x, y);
 
-            if (cmp == pressedCmp && cmp.isStickyDrag()) {
+            if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
                 stickyDrag = cmp;
             }
         }
@@ -3527,7 +3527,7 @@ public class Form extends Container {
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
-                    if (cmp == pressedCmp && cmp.isStickyDrag()) {
+                    if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
                         stickyDrag = cmp;
                     }
                 }
@@ -3547,7 +3547,7 @@ public class Form extends Container {
             }
             LeadUtil.pointerDragged(cmp, x, y);
 
-            if (cmp == pressedCmp && cmp.isStickyDrag()) {
+            if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
                 stickyDrag = cmp;
             }
         }
@@ -3725,9 +3725,9 @@ public class Form extends Container {
                 if (pendingC != null) {
                     pendingC = LeadUtil.leadParentImpl(pendingC);
                 }
-                if (atXY == pendingC) {
+                if (atXY == pendingC) { //NOPMD CompareObjectsWithEquals
                     componentsAwaitingRelease = null;
-                    if (dragged == pendingC) {
+                    if (dragged == pendingC) { //NOPMD CompareObjectsWithEquals
                         if (pendingC.isDragAndDropInitialized()) {
                             LeadUtil.dragFinished(pendingC, x, y);
                         } else {
@@ -4289,7 +4289,7 @@ public class Form extends Container {
                 parent = current.getParent();
             }
             while (parent != null) {
-                if (parent == this) {
+                if (parent == this) { //NOPMD CompareObjectsWithEquals
                     if (getContentPane().isScrollable()) {
                         getContentPane().moveScrollTowards(direction, c);
                     }
@@ -4334,7 +4334,7 @@ public class Form extends Container {
         Container parent = c.getParent();
         while (parent != null) {
             if (parent.isScrollable()) {
-                if (parent == this) {
+                if (parent == this) { //NOPMD CompareObjectsWithEquals
                     // special case for Form
                     if (getContentPane().isScrollable()) {
                         getContentPane().scrollComponentToVisible(c);

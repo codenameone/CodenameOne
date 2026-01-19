@@ -132,7 +132,7 @@ class MapContent implements StructuredContent {
     @Override
     public boolean equals(Object o) {
         return o instanceof MapContent &&
-                (root == ((MapContent) o).root ||
+                (root == ((MapContent) o).root || //NOPMD CompareObjectsWithEquals
                         (root != null && root.equals(((MapContent) o).root)));
     }
 

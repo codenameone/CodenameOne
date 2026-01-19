@@ -683,7 +683,7 @@ public final class ToastBar {
 
         } else {
             Form f = c.getComponentForm();
-            if (Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()) {
+            if (Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()) { //NOPMD CompareObjectsWithEquals
                 if (this.position == Component.BOTTOM) {
                     c.setY(c.getY() + c.getHeight());
                 }

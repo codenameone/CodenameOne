@@ -119,7 +119,7 @@ public class Property<T, K> extends PropertyBase<T, K> {
         }
         Property other = (Property) obj;
         Object otherval = other.get();
-        if (otherval == value) {
+        if (otherval == value) { //NOPMD CompareObjectsWithEquals
             return true;
         }
         return otherval != null && otherval.equals(value);

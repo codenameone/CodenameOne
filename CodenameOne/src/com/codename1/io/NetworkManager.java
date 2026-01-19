@@ -403,7 +403,7 @@ public final class NetworkManager {
                     }
                     return;
                 }
-                if (e.getConnectionRequest() == request) {
+                if (e.getConnectionRequest() == request) { //NOPMD CompareObjectsWithEquals
                     if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
                         if (request.retrying) {
                             request.retrying = false;
@@ -466,7 +466,7 @@ public final class NetworkManager {
                     removeErrorListener(this);
                     return;
                 }
-                if (e.getConnectionRequest() == request) {
+                if (e.getConnectionRequest() == request) { //NOPMD CompareObjectsWithEquals
                     if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
                         if (request.retrying) {
                             request.retrying = false;
@@ -835,7 +835,7 @@ public final class NetworkManager {
                 if (networkThreads == null) {
                     return false;
                 }
-                if (threadOffset != null && networkThreads[threadOffset.intValue()] != this) {
+                if (threadOffset != null && networkThreads[threadOffset.intValue()] != this) { //NOPMD CompareObjectsWithEquals
                     synchronized (LOCK) {
                         if (pending.size() > 0) {
                             pending.insertElementAt(currentRequest, 1);

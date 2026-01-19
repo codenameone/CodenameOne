@@ -137,7 +137,7 @@ public abstract class AbstractMedia implements AsyncMedia {
         return playAsync(new PlayRequest() {
             @Override
             public void complete(AsyncMedia value) {
-                if (this == pendingPlayRequest) {
+                if (this == pendingPlayRequest) { //NOPMD CompareObjectsWithEquals
                     pendingPlayRequest = null;
                 }
                 super.complete(value);
@@ -145,7 +145,7 @@ public abstract class AbstractMedia implements AsyncMedia {
 
             @Override
             public void error(Throwable t) {
-                if (this == pendingPlayRequest) {
+                if (this == pendingPlayRequest) { //NOPMD CompareObjectsWithEquals
                     pendingPlayRequest = null;
                 }
                 super.error(t);
@@ -180,7 +180,7 @@ public abstract class AbstractMedia implements AsyncMedia {
             return out;
         }
 
-        if (pendingPlayRequest != null && pendingPlayRequest != out) {
+        if (pendingPlayRequest != null && pendingPlayRequest != out) { //NOPMD CompareObjectsWithEquals
             pendingPlayRequest.ready(new PlayAsyncSuccessCallback(out))
                     .except(new PlayAsyncExceptSuccessCallback(out));
             return out;
@@ -240,7 +240,7 @@ public abstract class AbstractMedia implements AsyncMedia {
         return pauseAsync(new PauseRequest() {
             @Override
             public void complete(AsyncMedia value) {
-                if (pendingPauseRequest == this) {
+                if (pendingPauseRequest == this) { //NOPMD CompareObjectsWithEquals
                     pendingPauseRequest = null;
                 }
                 super.complete(value);
@@ -248,7 +248,7 @@ public abstract class AbstractMedia implements AsyncMedia {
 
             @Override
             public void error(Throwable t) {
-                if (pendingPauseRequest == this) {
+                if (pendingPauseRequest == this) { //NOPMD CompareObjectsWithEquals
                     pendingPauseRequest = null;
                 }
                 super.error(t);
@@ -285,7 +285,7 @@ public abstract class AbstractMedia implements AsyncMedia {
             pendingPauseRequest = out;
             return out;
         }
-        if (pendingPauseRequest != null && pendingPauseRequest != out) {
+        if (pendingPauseRequest != null && pendingPauseRequest != out) { //NOPMD CompareObjectsWithEquals
             pendingPauseRequest.ready(new PauseAsyncSuccessCallback(out))
                     .except(new PauseAsyncExceptSuccessCallback(out));
             return out;

@@ -785,7 +785,7 @@ public class ImageViewer extends Component {
      * @param image the image to set
      */
     public final void setImage(Image image) {
-        if (this.image != image) {
+        if (this.image != image) { //NOPMD CompareObjectsWithEquals
             panPositionX = 0.5f;
             panPositionY = 0.5f;
             zoom = MIN_ZOOM;
@@ -1151,10 +1151,10 @@ public class ImageViewer extends Component {
                         setImage(replaceImage);
                         Image left = getImageLeft();
                         Image right = getImageRight();
-                        if (left != replaceImage) {
+                        if (left != replaceImage) { //NOPMD CompareObjectsWithEquals
                             left.unlock();
                         }
-                        if (right != replaceImage) {
+                        if (right != replaceImage) { //NOPMD CompareObjectsWithEquals
                             right.unlock();
                         }
                         selectLock = true;

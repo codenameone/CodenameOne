@@ -498,7 +498,7 @@ public class GridBagLayout extends Layout {
         for (Map.Entry<Component, GridBagConstraints> entry : comptable.entrySet()) {
             Component comp = entry.getKey();
             GridBagConstraints cons = entry.getValue();
-            if ((comp.getParent() == parent) && comp.isVisible()) {
+            if ((comp.getParent() == parent) && comp.isVisible()) { //NOPMD CompareObjectsWithEquals
                 components[i++] = comp;
             }
             if ((cons.gridx != GridBagConstraints.RELATIVE)
@@ -514,7 +514,7 @@ public class GridBagLayout extends Layout {
         int componentsNumber = 0;
         for (Map.Entry<Component, GridBagConstraints> entry : comptable.entrySet()) {
             Component comp = entry.getKey();
-            if ((comp.getParent() == parent) && comp.isVisible()) {
+            if ((comp.getParent() == parent) && comp.isVisible()) { //NOPMD CompareObjectsWithEquals
                 componentsNumber++;
             }
         }

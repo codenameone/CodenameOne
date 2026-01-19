@@ -89,7 +89,7 @@ public class TextModeLayout extends Layout {
      */
     @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
-        if (actual == table) {
+        if (actual == table) { //NOPMD CompareObjectsWithEquals
             // forcing default constraint to still be aligned top
             if (!(value instanceof TableLayout.Constraint)) {
                 value = createConstraint();
@@ -151,7 +151,7 @@ public class TextModeLayout extends Layout {
      */
     @Override
     public void layoutContainer(Container parent) {
-        if (autoGrouping && actual != table && lastComponentCount != parent.getComponentCount()) {
+        if (autoGrouping && actual != table && lastComponentCount != parent.getComponentCount()) { //NOPMD CompareObjectsWithEquals
             lastComponentCount = parent.getComponentCount();
             ArrayList<Component> tc = new ArrayList<Component>();
             for (Component c : parent) {

@@ -123,7 +123,7 @@ public class InterFormContainer extends Container {
      */
     @Override
     protected void initComponent() {
-        if (content.getParent() != this) {
+        if (content.getParent() != this) { //NOPMD CompareObjectsWithEquals
             content.remove();
             add(CENTER, content);
         }
@@ -141,7 +141,7 @@ public class InterFormContainer extends Container {
     public InterFormContainer findPeer(Component root) {
         if (root.getClass() == InterFormContainer.class) {
             InterFormContainer cnt = (InterFormContainer) root;
-            if (cnt.content == content) {
+            if (cnt.content == content) { //NOPMD CompareObjectsWithEquals
                 return cnt;
             }
         }
@@ -166,7 +166,7 @@ public class InterFormContainer extends Container {
         if (!isVisible()) {
             return;
         }
-        if (content.getParent() != this) {
+        if (content.getParent() != this) { //NOPMD CompareObjectsWithEquals
             if (isInitialized() && !content.isInitialized()) {
                 if (content.getParent() != null) {
                     content.remove();

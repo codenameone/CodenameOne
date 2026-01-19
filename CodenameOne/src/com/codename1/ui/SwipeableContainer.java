@@ -415,7 +415,7 @@ public class SwipeableContainer extends Container {
                     }
 
                     if (initialX != -1) {
-                        if (getPreviouslyOpened() != null && getPreviouslyOpened() != SwipeableContainer.this && getPreviouslyOpened().isOpen()) {
+                        if (getPreviouslyOpened() != null && getPreviouslyOpened() != SwipeableContainer.this && getPreviouslyOpened().isOpen()) { //NOPMD CompareObjectsWithEquals
                             getPreviouslyOpened().close();
                         }
                         int diff = x - initialX;

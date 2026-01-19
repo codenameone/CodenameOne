@@ -498,7 +498,7 @@ public class Oauth2 {
 
     private void handleURL(String url, WebBrowser web, final ActionListener<ActionEvent> al, final Form frm, final Form backToForm, final Dialog progress) {
         if ((url.startsWith(redirectURI))) {
-            if (progress != null && Display.getInstance().getCurrent() == progress) {
+            if (progress != null && Display.getInstance().getCurrent() == progress) { //NOPMD CompareObjectsWithEquals
                 progress.dispose();
             }
 
@@ -643,7 +643,7 @@ public class Oauth2 {
                 }
             }
         } else {
-            if (frm != null && Display.getInstance().getCurrent() != frm) {
+            if (frm != null && Display.getInstance().getCurrent() != frm) { //NOPMD CompareObjectsWithEquals
                 progress.dispose();
                 frm.show();
             }
@@ -724,7 +724,7 @@ public class Oauth2 {
 
         @Override
         public void actionPerformed(ActionEvent ev) {
-            if (Display.getInstance().getCurrent() == progress) {
+            if (Display.getInstance().getCurrent() == progress) { //NOPMD CompareObjectsWithEquals
                 progress.dispose();
             }
             old.showBack();

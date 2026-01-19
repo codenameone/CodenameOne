@@ -93,7 +93,7 @@ public class TooltipManager {
      * @param cmp the component
      */
     protected void prepareTooltip(final String tip, final Component cmp) {
-        if (currentComponent == cmp) {
+        if (currentComponent == cmp) { //NOPMD CompareObjectsWithEquals
             return;
         }
         clearTooltip();

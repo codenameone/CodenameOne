@@ -289,7 +289,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
      * @param img The image to set as the signature image.
      */
     public void setSignatureImage(Image img) {
-        if (img != signatureImage) {
+        if (img != signatureImage) { //NOPMD CompareObjectsWithEquals
             signatureImage = img;
             lead.setText("");
             if (img != null) {

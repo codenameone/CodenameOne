@@ -1565,7 +1565,7 @@ public class HTMLElement extends Element {
         if (parent != null) {
             for (Element e : parent) {
                 HTMLElement elem = (HTMLElement) e;
-                if (elem == this) {
+                if (elem == this) { //NOPMD CompareObjectsWithEquals
                     return true;
                 }
                 if (!elem.isTextElement()) {

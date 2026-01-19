@@ -536,7 +536,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     @Override
     protected void initLaf(UIManager uim) {
-        if (uim == getUIManager() && isInitialized()) {
+        if (uim == getUIManager() && isInitialized()) { //NOPMD CompareObjectsWithEquals
             return;
         }
         super.initLaf(uim);
@@ -657,7 +657,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     @Override
     public void setIcon(Image icon) {
-        if (this.icon == icon) {
+        if (this.icon == icon) { //NOPMD CompareObjectsWithEquals
             return;
         }
         if (this.icon != null) {

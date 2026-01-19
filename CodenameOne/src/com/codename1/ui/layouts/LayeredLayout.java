@@ -383,7 +383,7 @@ public class LayeredLayout extends Layout {
      */
     private LayeredLayoutConstraint installConstraint(LayeredLayoutConstraint constraint, Component cmp) {
 
-        if (constraint.outer() != this || (constraint.cmp != null && constraint.cmp != cmp)) {
+        if (constraint.outer() != this || (constraint.cmp != null && constraint.cmp != cmp)) { //NOPMD CompareObjectsWithEquals
             LayeredLayoutConstraint tmp = createConstraint();
             constraint.copyTo(tmp);
             constraint = tmp;
@@ -2407,7 +2407,7 @@ public class LayeredLayout extends Layout {
              */
             private Inset fixDependencies(Container parent) {
                 Container refParent;
-                if (referenceComponent != null && (refParent = referenceComponent.getParent()) != parent) {
+                if (referenceComponent != null && (refParent = referenceComponent.getParent()) != parent) { //NOPMD CompareObjectsWithEquals
                     // The reference component is not in this parent
                     String name = referenceComponent.getName();
                     boolean found = false;
@@ -3252,7 +3252,7 @@ public class LayeredLayout extends Layout {
                 //    // This could potentially affect the opposite inset if it is a percentage
                 //    referenceComponent(newRef).referencePosition(pos);
                 //} else {
-                if (newRef != referenceComponent || com.codename1.util.MathUtil.compare(pos, referencePosition) != 0) {
+                if (newRef != referenceComponent || com.codename1.util.MathUtil.compare(pos, referencePosition) != 0) { //NOPMD CompareObjectsWithEquals
                     // This may potentially affect both this inset
                     // and the opposite inset if it is either flexible or
                     // percent.

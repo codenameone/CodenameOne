@@ -530,7 +530,7 @@ public class Node {
      * @param child
      */
     public void remove(Node child) {
-        if (child.parent != this) {
+        if (child.parent != this) { //NOPMD CompareObjectsWithEquals
             return;
         }
         if (children != null) {

@@ -484,7 +484,7 @@ public class Element implements Iterable<Element> {
      * @return true if this element contains the specified element, false otherwise
      */
     public boolean contains(Element element) {
-        if (this == element) {
+        if (this == element) { //NOPMD CompareObjectsWithEquals
             return true;
         }
         if (children != null) {
@@ -624,7 +624,7 @@ public class Element implements Iterable<Element> {
         int result = -1;
         if (children != null) {
             for (int i = 0; i < children.size(); i++) {
-                if (child == children.get(i)) {
+                if (child == children.get(i)) { //NOPMD CompareObjectsWithEquals
                     result = i;
                     break;
                 }

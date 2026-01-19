@@ -547,7 +547,7 @@ public final class MigLayout extends Layout {
             return null;
         }
 
-        if (cacheParentW == null || cacheParentW.getComponent() != parent) {
+        if (cacheParentW == null || cacheParentW.getComponent() != parent) { //NOPMD CompareObjectsWithEquals
             cacheParentW = new CodenameOneMiGContainerWrapper(parent);
         }
 

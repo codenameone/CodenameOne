@@ -903,7 +903,7 @@ public class Picker extends Button {
         stopEditingCallback = onFinish;
         Form f = this.getComponentForm();
         if (f != null) {
-            if (f.getCurrentInputDevice() == currentInput) {
+            if (f.getCurrentInputDevice() == currentInput) { //NOPMD CompareObjectsWithEquals
                 try {
                     f.setCurrentInputDevice(null);
                 } catch (Throwable t) {
@@ -916,7 +916,7 @@ public class Picker extends Button {
     @Override
     public boolean isEditing() {
         Form f = this.getComponentForm();
-        boolean out = currentInput != null && f != null && f.getCurrentInputDevice() == currentInput;
+        boolean out = currentInput != null && f != null && f.getCurrentInputDevice() == currentInput; //NOPMD CompareObjectsWithEquals
 
         return out;
     }

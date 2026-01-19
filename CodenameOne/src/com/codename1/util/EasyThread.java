@@ -209,7 +209,7 @@ public final class EasyThread {
      * @return true if we are currently within this easy thread
      */
     public boolean isThisIt() {
-        return t == Thread.currentThread();
+        return t == Thread.currentThread(); //NOPMD CompareObjectsWithEquals
     }
 
     /**

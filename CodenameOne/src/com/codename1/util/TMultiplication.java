@@ -260,7 +260,7 @@ final class TMultiplication {
     }
 
     static void multPAP(int[] a, int[] b, int[] t, int aLen, int bLen) {
-        if (a == b && aLen == bLen) {
+        if (a == b && aLen == bLen) { //NOPMD CompareObjectsWithEquals
             square(a, aLen, t);
             return;
         }

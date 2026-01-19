@@ -152,7 +152,7 @@ public class Sheet extends Container {
                 return;
             }
             Component cmp = f.getComponentAt(evt.getX(), evt.getY());
-            if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) {
+            if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) { //NOPMD CompareObjectsWithEquals
                 // do nothing.
             } else {
                 evt.consume();
@@ -473,7 +473,7 @@ public class Sheet extends Container {
                 public void call(Component c) {
                     if (c instanceof Sheet) {
                         Sheet s = (Sheet) c;
-                        if (s.isAncestorSheetOf(Sheet.this) || s == Sheet.this) {
+                        if (s.isAncestorSheetOf(Sheet.this) || s == Sheet.this) { //NOPMD CompareObjectsWithEquals
                             // If the sheet is an ancestor of
                             // ours then we don't need to fire a close event
                             // yet.  We fire it when it is closed
@@ -488,7 +488,7 @@ public class Sheet extends Container {
                         // so their close events should also be fired in this case.
                         Sheet sp = s.getParentSheet();
                         while (sp != null) {
-                            if (sp == Sheet.this) {
+                            if (sp == Sheet.this) { //NOPMD CompareObjectsWithEquals
                                 break;
                             }
                             if (!sp.isAncestorSheetOf(Sheet.this)) {
@@ -835,7 +835,7 @@ public class Sheet extends Container {
      */
     public boolean isAncestorSheetOf(Sheet sheet) {
         sheet = sheet.getParentSheet();
-        if (sheet == this) {
+        if (sheet == this) { //NOPMD CompareObjectsWithEquals
             return true;
         } else if (sheet == null) {
             return false;

@@ -573,7 +573,7 @@ public class MapComponent extends Container {
             zoomToLayers();
         }
         super.keyPressed(keyCode);
-        if (_center != oldCenter || _zoom != oldZoom) {
+        if (_center != oldCenter || _zoom != oldZoom) { //NOPMD CompareObjectsWithEquals
             _needTiles = true;
         }
         super.repaint();
@@ -727,7 +727,7 @@ public class MapComponent extends Container {
         int length = _layers.size();
         int no;
         for (no = 0; no < length; no++) {
-            if (((LayerWithZoomLevels) _layers.elementAt(no)).layer == layer) {
+            if (((LayerWithZoomLevels) _layers.elementAt(no)).layer == layer) { //NOPMD CompareObjectsWithEquals
                 break;
             }
         }

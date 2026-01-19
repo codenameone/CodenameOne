@@ -125,7 +125,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     @Override
     protected void initLaf(UIManager uim) {
-        if (uim == getUIManager() && isInitialized()) {
+        if (uim == getUIManager() && isInitialized()) { //NOPMD CompareObjectsWithEquals
             return;
         }
         super.initLaf(uim);
@@ -326,7 +326,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      * @return -1 for unaligned otherwise one of Component.LEFT/RIGHT/CENTER
      */
     public int getTextBlockAlign() {
-        if (text.getParent() == this) {
+        if (text.getParent() == this) { //NOPMD CompareObjectsWithEquals
             return -1;
         }
         return ((FlowLayout) text.getParent().getLayout()).getAlign();
@@ -348,7 +348,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
                 wrapText(align);
                 return;
             default:
-                if (text.getParent() != this) {
+                if (text.getParent() != this) { //NOPMD CompareObjectsWithEquals
                     removeComponent(text.getParent());
                     text.getParent().removeAll();
                     addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
@@ -358,7 +358,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     private void wrapText(int alignment) {
         Container parent = text.getParent();
-        if (parent == this) {
+        if (parent == this) { //NOPMD CompareObjectsWithEquals
             parent.removeComponent(text);
             parent = new Container(new FlowLayout(alignment, CENTER));
             parent.getAllStyles().stripMarginAndPadding();

@@ -818,7 +818,7 @@ public class Component implements Animation, StyleListener, Editable {
      * This method initializes the Component defaults constants
      */
     protected void initLaf(UIManager uim) {
-        if (uim == getUIManager() && isInitialized()) {
+        if (uim == getUIManager() && isInitialized()) { //NOPMD CompareObjectsWithEquals
             return;
         }
         selectText = uim.localize("select", "Select");
@@ -1953,7 +1953,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @param parent the parent container
      */
     void setParent(Container parent) {
-        if (parent == this) {
+        if (parent == this) { //NOPMD CompareObjectsWithEquals
             throw new IllegalArgumentException("Attempt to add self as parent");
         }
         this.parent = parent;
@@ -2010,7 +2010,7 @@ public class Component implements Animation, StyleListener, Editable {
         Component c = this.owner;
         Container cnt = (cmp instanceof Container) ? (Container) cmp : null;
         while (c != null) {
-            if (c == cmp) {
+            if (c == cmp) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
             if (cnt != null) {
@@ -2773,7 +2773,7 @@ public class Component implements Animation, StyleListener, Editable {
     int getRelativeX(Container relativeTo) {
         int x = getX() - getScrollX();
         Container parent = getParent();
-        if (parent != relativeTo && parent != null) {
+        if (parent != relativeTo && parent != null) { //NOPMD CompareObjectsWithEquals
             x += parent.getRelativeX(relativeTo);
         }
         return x;
@@ -2782,7 +2782,7 @@ public class Component implements Animation, StyleListener, Editable {
     int getRelativeY(Container relativeTo) {
         int y = getY() - getScrollY();
         Container parent = getParent();
-        if (parent != relativeTo && parent != null) {
+        if (parent != relativeTo && parent != null) { //NOPMD CompareObjectsWithEquals
             y += parent.getRelativeY(relativeTo);
         }
         return y;
@@ -3232,7 +3232,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private void paintRippleEffect(Graphics g) {
-        if (isRippleEffect() && Form.getRippleComponent() == this && Form.getRippleMotion() != null) {
+        if (isRippleEffect() && Form.getRippleComponent() == this && Form.getRippleMotion() != null) { //NOPMD CompareObjectsWithEquals
             paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.getRippleMotion().getValue());
         }
     }
@@ -4634,7 +4634,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     void clearDrag() {
         Component leadParent = LeadUtil.leadParentImpl(this);
-        if (leadParent != null && leadParent != this) {
+        if (leadParent != null && leadParent != this) { //NOPMD CompareObjectsWithEquals
             leadParent.clearDrag();
             return;
         }
@@ -5116,7 +5116,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (p == null) {
             return;
         }
-        if (currentPointerPress != p.getCurrentPointerPress()) {
+        if (currentPointerPress != p.getCurrentPointerPress()) { //NOPMD CompareObjectsWithEquals
             return;
         }
 
@@ -5156,7 +5156,7 @@ public class Component implements Animation, StyleListener, Editable {
                     return;
                 }
             }
-            if (dropTargetComponent != dropTo) {
+            if (dropTargetComponent != dropTo) { //NOPMD CompareObjectsWithEquals
                 if (dropTargetComponent != null) {
                     dropTargetComponent.dragExit(this);
                 }
@@ -5239,7 +5239,7 @@ public class Component implements Animation, StyleListener, Editable {
                 p.setDraggedComponent(this);
                 p.registerAnimatedInternal(this);
                 Component fc = p.getFocused();
-                if (fc != null && fc != this) {
+                if (fc != null && fc != this) { //NOPMD CompareObjectsWithEquals
                     fc.dragInitiated();
                 }
             }
@@ -5455,13 +5455,13 @@ public class Component implements Animation, StyleListener, Editable {
     boolean isScrollDecelerationMotionInProgress() {
         Motion dmY = draggedMotionY;
         if (dmY != null) {
-            if (dmY == decelerationMotion && !dmY.isFinished()) {
+            if (dmY == decelerationMotion && !dmY.isFinished()) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
         }
         Motion dmX = draggedMotionX;
         if (dmX != null) {
-            if (dmX == decelerationMotion && !dmX.isFinished()) {
+            if (dmX == decelerationMotion && !dmX.isFinished()) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
         }
@@ -5589,7 +5589,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
             p.setDraggedComponent(null);
             Component dropTo = findDropTarget(this, x, y);
-            if (dropTargetComponent != dropTo) {
+            if (dropTargetComponent != dropTo) { //NOPMD CompareObjectsWithEquals
                 if (dropTargetComponent != null) {
                     dropTargetComponent.dragExit(this);
                 }
@@ -6672,12 +6672,12 @@ public class Component implements Animation, StyleListener, Editable {
             if (coordinateSpace != null) {
                 parent = coordinateSpace.getParent();
             }
-            if (parent == this) {
+            if (parent == this) { //NOPMD CompareObjectsWithEquals
                 if (view.contains(x, y, width, height)) {
                     return;
                 }
             } else {
-                while (parent != this) {
+                while (parent != this) { //NOPMD CompareObjectsWithEquals
                     // mostly a special case for list
                     if (parent == null) {
                         relativeX = x;
@@ -7121,7 +7121,7 @@ public class Component implements Animation, StyleListener, Editable {
         //changing the Font, Padding, Margin may casue the size of the Component to Change
         //therefore we turn on the shouldCalcPreferredSize flag
         if ((!shouldCalcPreferredSize &&
-                source == getStyle()) &&
+                source == getStyle()) && //NOPMD CompareObjectsWithEquals
                 (Style.FONT.equals(propertyName) ||
                         Style.MARGIN.equals(propertyName) ||
                         Style.PADDING.equals(propertyName))) {
@@ -7764,7 +7764,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return false if the container isn't one of our parent containers
      */
     public boolean isChildOf(Container cnt) {
-        if (cnt == parent) {
+        if (cnt == parent) { //NOPMD CompareObjectsWithEquals
             return true;
         }
         return parent != null && parent.isChildOf(cnt);

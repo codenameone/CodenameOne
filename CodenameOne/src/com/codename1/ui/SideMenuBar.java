@@ -343,7 +343,7 @@ public class SideMenuBar extends MenuBar {
                         return;
                     }
                     if (parent.getCommandCount() == 1) {
-                        if (parent.getCommand(0) == parent.getBackCommand()) {
+                        if (parent.getCommand(0) == parent.getBackCommand()) { //NOPMD CompareObjectsWithEquals
                             return;
                         }
                     }
@@ -391,7 +391,7 @@ public class SideMenuBar extends MenuBar {
                 return DRAG_REGION_NOT_DRAGGABLE;
             }
             if (parent.getCommandCount() == 1) {
-                if (parent.getCommand(0) == parent.getBackCommand()) {
+                if (parent.getCommand(0) == parent.getBackCommand()) { //NOPMD CompareObjectsWithEquals
                     return DRAG_REGION_NOT_DRAGGABLE;
                 }
             }
@@ -641,7 +641,7 @@ public class SideMenuBar extends MenuBar {
                 removeCommandComponent((Container) c, cmd);
                 continue;
             }
-            if (c instanceof Button && ((Button) c).getCommand() == cmd) {
+            if (c instanceof Button && ((Button) c).getCommand() == cmd) { //NOPMD CompareObjectsWithEquals
                 Container cc = c.getParent();
                 if (cc != null) {
                     cc.removeComponent(c);
@@ -687,7 +687,7 @@ public class SideMenuBar extends MenuBar {
                 return;
             }
             if (parent.getCommandCount() == 1) {
-                if (parent.getCommand(0) == parent.getBackCommand()) {
+                if (parent.getCommand(0) == parent.getBackCommand()) { //NOPMD CompareObjectsWithEquals
                     return;
                 }
             }
@@ -726,7 +726,7 @@ public class SideMenuBar extends MenuBar {
         if (transitionRunning) {
             return;
         }
-        if (Display.getInstance().getCurrent() == menu) {
+        if (Display.getInstance().getCurrent() == menu) { //NOPMD CompareObjectsWithEquals
             parent.showBack();
         }
     }
@@ -742,7 +742,7 @@ public class SideMenuBar extends MenuBar {
      * Opens the menu if it is currently closed
      */
     void openMenu(String direction, int time, int dest, boolean transition) {
-        if (Display.getInstance().getCurrent() == parent) {
+        if (Display.getInstance().getCurrent() == parent) { //NOPMD CompareObjectsWithEquals
             menu = createMenu(direction);
             //replace transtions to perform the Form shift
             out = parent.getTransitionOutAnimator();
@@ -766,7 +766,7 @@ public class SideMenuBar extends MenuBar {
      * @deprecated this code references functionality that is no longer supported and currently always returns false
      */
     public boolean isMenuOpen() {
-        return Display.getInstance().getCurrent() == menu;
+        return Display.getInstance().getCurrent() == menu; //NOPMD CompareObjectsWithEquals
     }
 
     private void addOpenButton(Command cmd, boolean checkCommands) {
@@ -1065,7 +1065,7 @@ public class SideMenuBar extends MenuBar {
                 initTitleBarStatus();
             } else {
                 // special case: hide back button that doesn't have text, icon or a side component entry
-                if (parent.getBackCommand() == c && (c.getCommandName() == null || c.getCommandName().length() == 0) &&
+                if (parent.getBackCommand() == c && (c.getCommandName() == null || c.getCommandName().length() == 0) && //NOPMD CompareObjectsWithEquals
                         c.getIcon() == null) {
                     continue;
                 }
@@ -1184,7 +1184,7 @@ public class SideMenuBar extends MenuBar {
 
                             @Override
                             public void run() {
-                                while (Display.getInstance().getCurrent() != parent) {
+                                while (Display.getInstance().getCurrent() != parent) { //NOPMD CompareObjectsWithEquals
                                     try {
                                         Thread.sleep(40);
                                     } catch (InterruptedException ex) {
@@ -1910,7 +1910,7 @@ public class SideMenuBar extends MenuBar {
                 }
 
                 synchronized (LOCK) {
-                    while (Display.getInstance().getCurrent() != parent) {
+                    while (Display.getInstance().getCurrent() != parent) { //NOPMD CompareObjectsWithEquals
                         try {
                             LOCK.wait(40);
                         } catch (InterruptedException ex) {

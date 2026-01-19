@@ -830,7 +830,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     public boolean equals(Object o) {
         if (o instanceof PropertyIndex) {
             PropertyIndex other = (PropertyIndex) o;
-            if (parent == other.parent) {
+            if (parent == other.parent) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
             if (parent.getClass() != other.parent.getClass()) {

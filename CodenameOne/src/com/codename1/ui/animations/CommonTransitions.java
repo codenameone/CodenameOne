@@ -1190,7 +1190,7 @@ public final class CommonTransitions extends Transition {
                 return;
             }
             if (!(getSource() instanceof Dialog && getDestination() instanceof Dialog
-                    && cmp == getDestination())) {
+                    && cmp == getDestination())) { //NOPMD CompareObjectsWithEquals
                 Painter p = cmp.getStyle().getBgPainter();
                 cmp.getStyle().setBgPainter(null);
                 g.translate(x, y);

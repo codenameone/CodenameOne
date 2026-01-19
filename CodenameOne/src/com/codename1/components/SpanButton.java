@@ -186,7 +186,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
 
     @Override
     protected void initLaf(UIManager uim) {
-        if (uim == getUIManager() && isInitialized()) {
+        if (uim == getUIManager() && isInitialized()) { //NOPMD CompareObjectsWithEquals
             return;
         }
         super.initLaf(uim);

@@ -217,7 +217,7 @@ public class Tabs extends Container {
             frm.registerAnimatedInternal(this);
             if (changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
                 Component f = getComponentForm().getFocused();
-                if (f != null && f.getParent() == tabsContainer) {
+                if (f != null && f.getParent() == tabsContainer) { //NOPMD CompareObjectsWithEquals
                     initTabsContainerStyle();
                     tabsContainer.setUnselectedStyle(originalTabsContainerSelected);
                     tabsContainer.repaint();
@@ -1552,10 +1552,10 @@ public class Tabs extends Container {
                     riskySwipe = false;
                     if (!isEventBlockedByHigherComponent(evt) && contentPane.visibleBoundsContains(x, y)) {
                         Component testCmp = contentPane.getComponentAt(x, y);
-                        if (testCmp != null && testCmp != contentPane) {
+                        if (testCmp != null && testCmp != contentPane) { //NOPMD CompareObjectsWithEquals
                             doNotBlockSideSwipe = true;
                             try {
-                                while (testCmp != null && testCmp != contentPane) {
+                                while (testCmp != null && testCmp != contentPane) { //NOPMD CompareObjectsWithEquals
                                     if (testCmp.shouldBlockSideSwipe()) {
                                         lastX = -1;
                                         lastY = -1;

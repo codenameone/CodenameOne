@@ -760,7 +760,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 if (cmp != null) {
                     Container parent = cmp.getParent();
                     int y = cmp.getY();
-                    while ((parent != null) && (parent != this)) {
+                    while ((parent != null) && (parent != this)) { //NOPMD CompareObjectsWithEquals
                         y += parent.getY();
                         parent = parent.getParent();
                     }
@@ -1474,7 +1474,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     HTMLFont getHTMLFont(Font font) {
         for (Enumeration e = fonts.elements(); e.hasMoreElements(); ) {
             HTMLFont hFont = (HTMLFont) e.nextElement();
-            if (hFont.getFont() == font) {
+            if (hFont.getFont() == font) { //NOPMD CompareObjectsWithEquals
                 return hFont;
             }
         }
@@ -2226,7 +2226,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             for (Enumeration e = accessKeys.keys(); e.hasMoreElements(); ) {
                 Object key = e.nextElement();
                 Component c = (Component) accessKeys.get(key);
-                if (c != cmp) {
+                if (c != cmp) { //NOPMD CompareObjectsWithEquals
                     newAccessKeys.put(key, c);
                 }
             }
@@ -2682,12 +2682,12 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     returnInputField = newInputField;
 
                     // Replace operation must be done on the EDT if the form is visible
-                    if (Display.getInstance().getCurrent() != inputField.getComponentForm()) { // ((inputField.getComponentForm()==null) ||
+                    if (Display.getInstance().getCurrent() != inputField.getComponentForm()) { // ((inputField.getComponentForm()==null) || //NOPMD CompareObjectsWithEquals
                         inputField.getParent().replace(inputField, newInputField, null); // Applying the constraints may return a new instance that has to be replaced in the form
                     } else {
                         Display.getInstance().callSerially(new InputFormatRunnable(inputField, newInputField));
                     }
-                    if (firstFocusable == inputField) {
+                    if (firstFocusable == inputField) { //NOPMD CompareObjectsWithEquals
                         firstFocusable = newInputField;
                     }
                 }

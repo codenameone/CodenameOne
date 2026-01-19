@@ -139,7 +139,7 @@ public class Progress extends Dialog implements ActionListener<NetworkEvent> {
      */
     @Override
     public void actionPerformed(NetworkEvent ev) {
-        if (ev.getConnectionRequest() == request) {
+        if (ev.getConnectionRequest() == request) { //NOPMD CompareObjectsWithEquals
             if (disposeOnCompletion && ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
                 dispose();
                 return;
