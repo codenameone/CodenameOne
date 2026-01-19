@@ -17,8 +17,9 @@ class StackOverflowHandlingTest {
         String code = "package test;\n" +
                 "public class Main {\n" +
                 "    private static native void print(String s);\n" +
-                "    private static int overflow(int depth) {\n" +
-                "        return 1 + overflow(depth + 1);\n" +
+                "    private static native void prepareOverflow();\n" +
+                "    private static int triggerOverflow() {\n" +
+                "        return 1;\n" +
                 "    }\n" +
                 "    private static int safeRecurse(int depth) {\n" +
                 "        if (depth <= 0) {\n" +
@@ -28,7 +29,8 @@ class StackOverflowHandlingTest {
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        try {\n" +
-                "            overflow(0);\n" +
+                "            prepareOverflow();\n" +
+                "            triggerOverflow();\n" +
                 "        } catch (StackOverflowError err) {\n" +
                 "            print(\"OVERFLOW\");\n" +
                 "        }\n" +

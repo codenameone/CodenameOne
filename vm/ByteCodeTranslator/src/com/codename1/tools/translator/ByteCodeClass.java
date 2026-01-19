@@ -343,6 +343,7 @@ public class ByteCodeClass {
         dependsClassesInterfaces.clear();
         exportsClassesInterfaces.clear();
         dependsClassesInterfaces.add("java_lang_NullPointerException");
+        dependsClassesInterfaces.add("java_lang_StackOverflowError");
         setBaseClass(baseClass);
         if (isAnnotation) {
             dependsClassesInterfaces.add("java_lang_annotation_Annotation");

@@ -538,6 +538,10 @@ public class CompilerHelper {
                 "    }\n" +
                 "    printf(\"\\n\");\n" +
                 "}\n";
+            content +=
+                "void test_Main_prepareOverflow__(CODENAME_ONE_THREAD_STATE) {\n" +
+                "    threadStateData->callStackOffset = CN1_MAX_STACK_CALL_DEPTH - 1;\n" +
+                "}\n";
 
             java.nio.file.Files.write(stubs, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
