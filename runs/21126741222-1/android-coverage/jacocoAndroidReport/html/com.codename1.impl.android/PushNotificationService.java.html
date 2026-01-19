@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushNotificationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">PushNotificationService.java</span></div><h1>PushNotificationService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
+import android.os.IBinder;
+import com.codename1.push.PushCallback;
+import com.codename1.ui.Display;
+
+/**
+ * This class implements a push notification fallback service for applications that require
+ * push notification support but don't have Android Market installed
+ *
+ * @author Shai Almog
+ */
+<span class="nc" id="L44">public abstract class PushNotificationService extends Service implements PushCallback {</span>
+
+<span class="nc" id="L46">    private java.util.Map&lt;String,String&gt; properties = new java.util.HashMap&lt;String,String&gt;();</span>
+    
+    @Override
+    public IBinder onBind(Intent intent) {
+<span class="nc" id="L50">        return null;</span>
+    }
+    
+    @Override
+    public void onCreate() {
+<span class="nc" id="L55">    }</span>
+    
+    private String getProperty(String propertyName, String defaultValue) {
+<span class="nc" id="L58">        String val = properties.get(propertyName);</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (val == null) {</span>
+<span class="nc" id="L60">            return defaultValue;</span>
+        }
+<span class="nc" id="L62">        return val;</span>
+    }
+    
+    public void setProperty(String propertyName, String val) {
+<span class="nc" id="L66">        properties.put(propertyName, val);</span>
+        
+<span class="nc" id="L68">    }</span>
+    
+    public static void startServiceIfRequired(Class service, Context ctx) {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if(!AndroidImplementation.hasAndroidMarket(ctx)) {</span>
+<span class="nc" id="L72">            SharedPreferences sh = ctx.getSharedPreferences(&quot;C2DMNeeded&quot;, Context.MODE_PRIVATE);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if(sh.getBoolean(&quot;C2DMNeeded&quot;, false)) {</span>
+<span class="nc" id="L74">                Intent i = new Intent();</span>
+<span class="nc" id="L75">                i.setAction(service.getClass().getName());</span>
+<span class="nc" id="L76">                ctx.startService(i);</span>
+            }
+        }
+<span class="nc" id="L79">    }</span>
+    
+    public static void forceStartService(String service, Context ctx) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if(!AndroidImplementation.hasAndroidMarket(ctx)) {</span>
+<span class="nc" id="L83">            SharedPreferences sh = ctx.getSharedPreferences(&quot;C2DMNeeded&quot;, Context.MODE_PRIVATE);</span>
+<span class="nc" id="L84">            Editor editor = sh.edit();</span>
+<span class="nc" id="L85">            editor.putBoolean(&quot;C2DMNeeded&quot;, true);</span>
+<span class="nc" id="L86">            editor.commit();</span>
+<span class="nc" id="L87">            Intent i = new Intent();</span>
+<span class="nc" id="L88">            i.setAction(service);</span>
+<span class="nc" id="L89">            ctx.startService(i);</span>
+        }
+<span class="nc" id="L91">    }</span>
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+<span class="nc" id="L95">        AndroidImplementation.registerPolling();</span>
+<span class="nc" id="L96">        return START_STICKY;</span>
+    }
+
+    @Override
+    public void onDestroy() {
+<span class="nc" id="L101">        AndroidImplementation.stopPollingLoop();</span>
+<span class="nc" id="L102">    }</span>
+    
+    public abstract PushCallback getPushCallbackInstance();
+    public abstract Class getStubClass();
+
+
+    @Override
+    public void push(final String value) {
+<span class="nc" id="L110">        final PushCallback callback = getPushCallbackInstance();</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if(callback != null) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            final boolean delayPushCompletion = &quot;true&quot;.equals(Display.getInstance().getProperty(&quot;delayPushCompletion&quot;, &quot;false&quot;)) ||</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                    &quot;true&quot;.equals(Display.getInstance().getProperty(&quot;android.delayPushCompletion&quot;, &quot;false&quot;));</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if (delayPushCompletion) {</span>
+<span class="nc" id="L115">                AndroidImplementation.acquirePushWakeLock(30000);</span>
+            }
+<span class="nc" id="L117">            Display.getInstance().callSerially(new Runnable() {</span>
+                public void run() {
+                    try {
+<span class="nc" id="L120">                        callback.push(value);</span>
+                    } finally {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                        if (!delayPushCompletion) {</span>
+<span class="nc" id="L123">                            Display.getInstance().notifyPushCompletion();</span>
+                        }
+                    }
+<span class="nc" id="L126">                }</span>
+            });
+<span class="nc" id="L128">        } else {</span>
+<span class="nc" id="L129">            NotificationManager nm = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);</span>
+<span class="nc" id="L130">            Intent newIntent = new Intent(this, getStubClass());</span>
+<span class="nc" id="L131">            PendingIntent contentIntent = AndroidImplementation.createPendingIntent(this, 0, newIntent);</span>
+
+
+
+<span class="nc" id="L135">            Notification.Builder builder = new Notification.Builder(this)</span>
+<span class="nc" id="L136">                    .setContentIntent(contentIntent)</span>
+<span class="nc" id="L137">                    .setSmallIcon(android.R.drawable.stat_notify_sync)</span>
+<span class="nc" id="L138">                    .setTicker(value)</span>
+<span class="nc" id="L139">                    .setAutoCancel(true)</span>
+<span class="nc" id="L140">                    .setWhen(System.currentTimeMillis())</span>
+<span class="nc" id="L141">                    .setContentTitle(value)</span>
+
+<span class="nc" id="L143">                    .setDefaults(Notification.DEFAULT_ALL);</span>
+
+
+
+
+            // The following section is commented out so that builds against SDKs below 26
+            // won't fail.
+            /*&lt;SDK26&gt;
+            if(android.os.Build.VERSION.SDK_INT &gt;= 21){
+                builder.setCategory(&quot;Notification&quot;);
+            }
+            if (android.os.Build.VERSION.SDK_INT &gt;= 26) {
+                NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+                String id = getProperty(&quot;android.NotificationChannel.id&quot;, &quot;cn1-channel&quot;);
+
+                CharSequence name = getProperty(&quot;android.NotificationChannel.name&quot;, &quot;Notifications&quot;);
+
+                String description = getProperty(&quot;android.NotificationChannel.description&quot;, &quot;Remote notifications&quot;);
+
+                int importance = Integer.parseInt(getProperty(&quot;android.NotificationChannel.importance&quot;, &quot;&quot;+NotificationManager.IMPORTANCE_HIGH));
+
+                android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name,importance);
+
+                mChannel.setDescription(description);
+
+                mChannel.enableLights(Boolean.parseBoolean(getProperty(&quot;android.NotificationChannel.enableLights&quot;, &quot;true&quot;)));
+
+                mChannel.setLightColor(Integer.parseInt(getProperty(&quot;android.NotificationChannel.lightColor&quot;, &quot;&quot;+android.graphics.Color.RED)));
+
+                mChannel.enableVibration(Boolean.parseBoolean(getProperty(&quot;android.NotificationChannel.enableVibration&quot;, &quot;false&quot;)));
+                String vibrationPatternStr = getProperty(&quot;android.NotificationChannel.vibrationPattern&quot;, null);
+                if (vibrationPatternStr != null) {
+                    String[] parts = vibrationPatternStr.split(&quot;,&quot;);
+                    int len = parts.length;
+                    long[] pattern = new long[len];
+                    for (int i=0; i&lt;len; i++) {
+                        pattern[i] = Long.parseLong(parts[i].trim());
+                    }
+                    mChannel.setVibrationPattern(pattern);
+                }
+
+
+
+                mNotificationManager.createNotificationChannel(mChannel);
+                System.out.println(&quot;Setting push channel to &quot;+id);
+                builder.setChannelId(id);
+            }
+            &lt;/SDK26&gt;*/
+
+<span class="nc" id="L193">            Notification notif = builder.build();</span>
+<span class="nc" id="L194">            int notifId = getNotifyId();//(int)System.currentTimeMillis();</span>
+
+            //notif.extras.putInt(&quot;notificationId&quot;, notifId);
+<span class="nc" id="L197">            nm.notify(notifId, notif);</span>
+        }
+<span class="nc" id="L199">    }</span>
+
+    static int getNotifyId() {
+<span class="nc" id="L202">        return 1;</span>
+    }
+
+    static void cancelNotification(Context context) {
+<span class="nc" id="L206">        NotificationManager nm = (NotificationManager) context.getSystemService(Activity.NOTIFICATION_SERVICE);</span>
+<span class="nc" id="L207">        nm.cancel(getNotifyId());</span>
+<span class="nc" id="L208">    }</span>
+
+    @Override
+    public void registeredForPush(String deviceId) {
+<span class="nc" id="L212">    }</span>
+
+    @Override
+    public void pushRegistrationError(String error, int errorCode) {
+<span class="nc" id="L216">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
