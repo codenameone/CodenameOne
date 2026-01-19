@@ -1856,6 +1856,7 @@ JAVA_OBJECT java_lang_String_format___java_lang_String_java_lang_Object_1ARRAY_R
 
 // Additional Stubs for Linking
 
+#if !defined(CN1_GLOBALS_IMPLEMENTED)
 struct clazz class_array1__JAVA_BOOLEAN = {0};
 struct clazz class_array1__JAVA_CHAR = {0};
 struct clazz class_array1__JAVA_BYTE = {0};
@@ -1998,4 +1999,5 @@ void initConstantPool() {
 pthread_key_t recursionKey;
 int currentGcMarkValue = 0;
 
-#endif
+#endif /* !CN1_GLOBALS_IMPLEMENTED */
+#endif /* __APPLE__ */

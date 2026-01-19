@@ -200,25 +200,25 @@ public class DataInputStream extends FilterInputStream implements java.io.DataIn
                 s++;
             } else if (((a = out[s]) & 0xe0) == 0xc0) {
                 if (count >= utfSize) {
-                    throw new RuntimeException("bad second byte at " + count);
+                    throw new UTFDataFormatException();
                 }
                 int b = in[offset + count++];
                 if ((b & 0xC0) != 0x80) {
-                    throw new RuntimeException("bad second byte at " + (count - 1));
+                    throw new UTFDataFormatException();
                 }
                 out[s++] = (char) (((a & 0x1F) << 6) | (b & 0x3F));
             } else if ((a & 0xf0) == 0xe0) {
                 if (count + 1 >= utfSize) {
-                    throw new RuntimeException("bad third byte at " + (count + 1));
+                    throw new UTFDataFormatException();
                 }
                 int b = in[offset + count++];
                 int c = in[offset + count++];
                 if (((b & 0xC0) != 0x80) || ((c & 0xC0) != 0x80)) {
-                    throw new RuntimeException("bad second or third byte at " + (count - 2));
+                    throw new UTFDataFormatException();
                 }
                 out[s++] = (char) (((a & 0x0F) << 12) | ((b & 0x3F) << 6) | (c & 0x3F));
             } else {
-                throw new RuntimeException("bad byte at " + (count - 1));
+                throw new UTFDataFormatException();
             }
         }
         return new String(out, 0, s);
