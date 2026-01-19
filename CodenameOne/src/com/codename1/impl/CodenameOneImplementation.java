@@ -5725,11 +5725,9 @@ public abstract class CodenameOneImplementation {
             }
         } else {
             if (root.indexOf("file:///f:") > -1 || root.indexOf("file:///e:") > -1 || root.indexOf("memorycard") > -1 ||
-            {
                     root.indexOf("mmc") > -1 || root.indexOf("sdcard") > -1 ||
                     root.indexOf("store") > -1) {
                 return FileSystemStorage.ROOT_TYPE_SDCARD;
-            }
             }
         }
         if (root.indexOf("c:") > -1 || root.indexOf("phone memory") > -1 || root.indexOf("store") > -1) {

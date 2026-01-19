@@ -1016,19 +1016,17 @@ final class Deflate {
             // Find the longest match, discarding those <= prev_length.
             // At this point we have always match_length < MIN_MATCH
 
-            if (hashHead != 0L &&
-                    ((strStart - hashHead) & 0xffff) <= wSize - MIN_LOOKAHEAD
-            ) {
-            {
-                // To simplify the code, we prevent matches with the string
-                // of window index 0 (in particular we have to avoid a match
-                // of the string with itself at the start of the input file).
-                if (strategy != Z_HUFFMAN_ONLY) {
-                    matchLength = longestMatch(hashHead);
+        if (hashHead != 0L &&
+                ((strStart - hashHead) & 0xffff) <= wSize - MIN_LOOKAHEAD
+        ) {
+            // To simplify the code, we prevent matches with the string
+            // of window index 0 (in particular we have to avoid a match
+            // of the string with itself at the start of the input file).
+            if (strategy != Z_HUFFMAN_ONLY) {
+                matchLength = longestMatch(hashHead);
             }
-                }
-                // longest_match() sets match_start
-            }
+            // longest_match() sets match_start
+        }
             if (matchLength >= MIN_MATCH) {
                 //        check_match(strstart, match_start, match_length);
 
@@ -1044,25 +1042,25 @@ final class Deflate {
                 do {
                     strStart++;
 
-                        insH = ((insH << hashShift) ^ (window[(strStart) + (MIN_MATCH - 1)] & 0xff)) & hashMask;
+                    insH = ((insH << hashShift) ^ (window[(strStart) + (MIN_MATCH - 1)] & 0xff)) & hashMask;
 //	    prev[strstart&w_mask]=hashHead=head[ins_h];
-                        hashHead = (head[insH] & 0xffff);
-                        prev[strStart & wMask] = head[insH];
-                        head[insH] = (short) strStart;
+                    hashHead = (head[insH] & 0xffff);
+                    prev[strStart & wMask] = head[insH];
+                    head[insH] = (short) strStart;
 
-                        // strstart never exceeds WSIZE-MAX_MATCH, so there are
-                        // always MIN_MATCH bytes ahead.
+                    // strstart never exceeds WSIZE-MAX_MATCH, so there are
+                    // always MIN_MATCH bytes ahead.
                 } while (--matchLength != 0);
                 strStart++;
             } else {
-                    strStart += matchLength;
-                    matchLength = 0;
-                    insH = window[strStart] & 0xff;
+                strStart += matchLength;
+                matchLength = 0;
+                insH = window[strStart] & 0xff;
 
-                    insH = (((insH) << hashShift) ^ (window[strStart + 1] & 0xff)) & hashMask;
-                    // If lookahead < MIN_MATCH, ins_h is garbage, but it does not
-                    // matter since it will be recomputed at next deflate call.
-                }
+                insH = (((insH) << hashShift) ^ (window[strStart + 1] & 0xff)) & hashMask;
+                // If lookahead < MIN_MATCH, ins_h is garbage, but it does not
+                // matter since it will be recomputed at next deflate call.
+            }
             } else {
                 // No match, output a literal byte
 
@@ -1124,31 +1122,26 @@ final class Deflate {
             prevMatch = matchStart;
             matchLength = MIN_MATCH - 1;
 
-            if (hashHead != 0 && prevLength < maxLazyMatch &&
-                    ((strStart - hashHead) & 0xffff) <= wSize - MIN_LOOKAHEAD
-            ) {
-            {
-                // To simplify the code, we prevent matches with the string
-                // of window index 0 (in particular we have to avoid a match
-                // of the string with itself at the start of the input file).
+        if (hashHead != 0 && prevLength < maxLazyMatch &&
+                ((strStart - hashHead) & 0xffff) <= wSize - MIN_LOOKAHEAD
+        ) {
+            // To simplify the code, we prevent matches with the string
+            // of window index 0 (in particular we have to avoid a match
+            // of the string with itself at the start of the input file).
 
-                if (strategy != Z_HUFFMAN_ONLY) {
-                    matchLength = longestMatch(hashHead);
+            if (strategy != Z_HUFFMAN_ONLY) {
+                matchLength = longestMatch(hashHead);
             }
-                }
-                // longest_match() sets match_start
+            // longest_match() sets match_start
 
-                if (matchLength <= 5 && (strategy == Z_FILTERED ||
-                        (matchLength == MIN_MATCH &&
-                                strStart - matchStart > 4096))) {
-
-                {
-                    // If prev_match is also MIN_MATCH, match_start is garbage
-                    // but we will ignore the current match anyway.
-                    matchLength = MIN_MATCH - 1;
-                }
-                }
+            if (matchLength <= 5 && (strategy == Z_FILTERED ||
+                    (matchLength == MIN_MATCH &&
+                            strStart - matchStart > 4096))) {
+                // If prev_match is also MIN_MATCH, match_start is garbage
+                // but we will ignore the current match anyway.
+                matchLength = MIN_MATCH - 1;
             }
+        }
 
             // If there was a match at the previous step and the current
             // match is not better, output the previous match:
