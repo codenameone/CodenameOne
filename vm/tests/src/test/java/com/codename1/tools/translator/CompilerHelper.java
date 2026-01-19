@@ -350,8 +350,21 @@ public class CompilerHelper {
                 "    }\n" +
                 "}\n" +
                 "\n" +
-                "void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
-                "    (void)obj;\n" +
+                "void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {\n" +
+                "    java_lang_Throwable_fillInStack__(threadStateData, exceptionArg);\n" +
+                "    threadStateData->exception = exceptionArg;\n" +
+                "    threadStateData->tryBlockOffset--;\n" +
+                "    while (threadStateData->tryBlockOffset >= 0) {\n" +
+                "        if (threadStateData->blocks[threadStateData->tryBlockOffset].monitor != 0) {\n" +
+                "            monitorExitBlock(threadStateData, threadStateData->blocks[threadStateData->tryBlockOffset].monitor);\n" +
+                "            continue;\n" +
+                "        } else if (threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {\n" +
+                "            int off = threadStateData->tryBlockOffset;\n" +
+                "            longjmp(threadStateData->blocks[off].destination, 1);\n" +
+                "            return;\n" +
+                "        }\n" +
+                "        threadStateData->tryBlockOffset--;\n" +
+                "    }\n" +
                 "    exit(1);\n" +
                 "}\n" +
                 "\n" +
@@ -368,7 +381,7 @@ public class CompilerHelper {
                 "// This suggests we are in a mode where objects are ints? No, that's likely for old CLDC/C++ target?\n" +
                 "// Or maybe `ExecutorApp` is configured with `none` or `ios` but generated headers use this?\n" +
                 "// Let's try to match the signature from the error message.\n" +
-                "int instanceofFunction(int sourceClass, int destId) { return 0; }\n" +
+                "int instanceofFunction(int sourceClass, int destId) { return 1; }\n" +
                 "\n" +
                 // "struct clazz class__java_lang_Class = {0};\n" +
                 // "struct clazz class__java_lang_String = {0};\n" +
@@ -378,6 +391,7 @@ public class CompilerHelper {
                 "void java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_LONG ms, JAVA_INT ns) {}\n" +
                 "void java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {}\n" +
                 "void java_lang_Object_notify__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {}\n" +
+                "void java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { (void)me; }\n" +
                 "JAVA_OBJECT java_lang_Thread_currentThread___R_java_lang_Thread(CODENAME_ONE_THREAD_STATE) {\n" +
                 "    return JAVA_NULL; // Simplification\n" +
                 "}\n" +
@@ -523,6 +537,10 @@ public class CompilerHelper {
                 "        printf(\"%c\", (char)chars[off+i]);\n" +
                 "    }\n" +
                 "    printf(\"\\n\");\n" +
+                "}\n";
+            content +=
+                "void test_Main_prepareOverflow__(CODENAME_ONE_THREAD_STATE) {\n" +
+                "    threadStateData->callStackOffset = CN1_MAX_STACK_CALL_DEPTH - 1;\n" +
                 "}\n";
 
             java.nio.file.Files.write(stubs, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));

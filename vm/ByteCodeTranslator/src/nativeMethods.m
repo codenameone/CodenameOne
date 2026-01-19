@@ -25,6 +25,7 @@
 #include "java_util_HashMap.h"
 #include "java_util_HashMap_Entry.h"
 #include "java_lang_NullPointerException.h"
+#include "java_lang_StackOverflowError.h"
 #include "java_lang_Class.h"
 #include "java_lang_System.h"
 
@@ -1550,9 +1551,12 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
         THROW_NULL_POINTER_EXCEPTION();
     }
 #endif
+    if(threadStateData->callStackOffset >= CN1_MAX_STACK_CALL_DEPTH - 1) {
+        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        return;
+    }
     memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0, sizeof(struct elementStruct) * (localsStackSize + stackSize));
     threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
-    CODENAME_ONE_ASSERT(threadStateData->callStackOffset < CN1_MAX_STACK_CALL_DEPTH - 1);
     threadStateData->callStackClass[threadStateData->callStackOffset] = classNameId;
     threadStateData->callStackMethod[threadStateData->callStackOffset] = methodNameId;
     threadStateData->callStackOffset++;
