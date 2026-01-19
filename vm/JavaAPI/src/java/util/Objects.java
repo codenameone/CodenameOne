@@ -63,4 +63,15 @@ public final class Objects {
     public static boolean nonNull(Object obj) {
         return obj != null;
     }
+
+    public static int hash(Object... values) {
+        if (values == null) {
+            return 0;
+        }
+        int hashCode = 1;
+        for (Object element : values) {
+            hashCode = 31 * hashCode + element.hashCode();
+        }
+        return hashCode;
+    }
 }
