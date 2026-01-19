@@ -289,6 +289,44 @@ public class ByteCodeClass {
         return false;
     }
 
+    public ByteCodeClass findMethodOwner(String name, String desc) {
+        return findMethodOwner(name, desc, new HashSet<ByteCodeClass>());
+    }
+
+    private ByteCodeClass findMethodOwner(String name, String desc, Set<ByteCodeClass> visited) {
+        if (!visited.add(this)) {
+            return null;
+        }
+        BytecodeMethod declaredMethod = findDeclaredMethod(name, desc);
+        if (declaredMethod != null && !declaredMethod.isAbstract()) {
+            return this;
+        }
+        if (baseClassObject != null) {
+            ByteCodeClass owner = baseClassObject.findMethodOwner(name, desc, visited);
+            if (owner != null) {
+                return owner;
+            }
+        }
+        if (baseInterfacesObject != null) {
+            for (ByteCodeClass iface : baseInterfacesObject) {
+                ByteCodeClass owner = iface.findMethodOwner(name, desc, visited);
+                if (owner != null) {
+                    return owner;
+                }
+            }
+        }
+        return null;
+    }
+
+    private BytecodeMethod findDeclaredMethod(String name, String desc) {
+        for (BytecodeMethod meth : methods) {
+            if (meth.getMethodName().equals(name) && desc.equals(meth.getSignature())) {
+                return meth;
+            }
+        }
+        return null;
+    }
+
     public void unmark() {
         marked = false;
     }

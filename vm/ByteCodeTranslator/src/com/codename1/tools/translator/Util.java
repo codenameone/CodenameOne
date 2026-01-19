@@ -123,6 +123,21 @@ public class Util {
         return arguments;
     }
 
+    public static String resolveInvokeSpecialOwner(String owner, String name, String desc) {
+        if (owner == null) {
+            return owner;
+        }
+        ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+        if (bc == null) {
+            return owner;
+        }
+        ByteCodeClass resolvedOwner = bc.findMethodOwner(name, desc);
+        if (resolvedOwner == null) {
+            return owner;
+        }
+        return resolvedOwner.getOriginalClassName();
+    }
+
     public static char[] getStackInputTypes(Instruction instr) {
         char[] out = instr.getStackInputTypes();
         if (out != null) {

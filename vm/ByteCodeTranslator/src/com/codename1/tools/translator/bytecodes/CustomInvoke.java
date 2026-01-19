@@ -157,6 +157,9 @@ public class CustomInvoke extends Instruction {
             }
             return true;
         }
+        if (origOpcode == Opcodes.INVOKESPECIAL && !name.equals("<init>") && !name.equals("<clinit>")) {
+            owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
+        }
         
         StringBuilder bld = new StringBuilder();
         boolean isVirtualCall = false;
@@ -273,6 +276,9 @@ public class CustomInvoke extends Instruction {
                 b.append("    POP_MANY_AND_PUSH_OBJ(cloneArray(PEEK_OBJ(1)), 1);\n");
             }
             return;
+        }
+        if (origOpcode == Opcodes.INVOKESPECIAL && !name.equals("<init>") && !name.equals("<clinit>")) {
+            owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
         }
         
         StringBuilder bld = new StringBuilder();
