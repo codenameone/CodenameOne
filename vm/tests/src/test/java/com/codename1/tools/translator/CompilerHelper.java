@@ -391,6 +391,7 @@ public class CompilerHelper {
                 "void java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_LONG ms, JAVA_INT ns) {}\n" +
                 "void java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {}\n" +
                 "void java_lang_Object_notify__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {}\n" +
+                "void java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { (void)me; }\n" +
                 "JAVA_OBJECT java_lang_Thread_currentThread___R_java_lang_Thread(CODENAME_ONE_THREAD_STATE) {\n" +
                 "    return JAVA_NULL; // Simplification\n" +
                 "}\n" +
