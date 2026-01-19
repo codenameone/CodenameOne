@@ -198,6 +198,9 @@ class StampedLockIntegrationTest {
         Files.write(lang.resolve("IllegalMonitorStateException.java"), "package java.lang; public class IllegalMonitorStateException extends RuntimeException { public IllegalMonitorStateException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("IllegalArgumentException.java"), "package java.lang; public class IllegalArgumentException extends RuntimeException { public IllegalArgumentException(String s) {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("UnsupportedOperationException.java"), "package java.lang; public class UnsupportedOperationException extends RuntimeException { public UnsupportedOperationException() {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Error.java"), "package java.lang; public class Error extends Throwable { public Error() {} public Error(String s) {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("VirtualMachineError.java"), "package java.lang; public class VirtualMachineError extends Error { public VirtualMachineError() {} public VirtualMachineError(String s) { super(s); } }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("StackOverflowError.java"), "package java.lang; public class StackOverflowError extends VirtualMachineError { public StackOverflowError() {} public StackOverflowError(String s) { super(s); } }".getBytes(StandardCharsets.UTF_8));
 
         // java.io.Serializable
         Files.write(io.resolve("Serializable.java"), "package java.io; public interface Serializable {}".getBytes(StandardCharsets.UTF_8));
