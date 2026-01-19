@@ -42,6 +42,9 @@ class CleanTargetIntegrationTest {
         Files.write(sourceDir.resolve("java/lang/Exception.java"), javaLangExceptionSource().getBytes(StandardCharsets.UTF_8));
         Files.write(sourceDir.resolve("java/lang/RuntimeException.java"), javaLangRuntimeExceptionSource().getBytes(StandardCharsets.UTF_8));
         Files.write(sourceDir.resolve("java/lang/NullPointerException.java"), javaLangNullPointerExceptionSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/Error.java"), javaLangErrorSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/VirtualMachineError.java"), javaLangVirtualMachineErrorSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/StackOverflowError.java"), javaLangStackOverflowErrorSource().getBytes(StandardCharsets.UTF_8));
         Files.write(sourceDir.resolve("native_hello.c"), nativeHelloSource().getBytes(StandardCharsets.UTF_8));
 
         List<String> compileArgs = new java.util.ArrayList<>();
@@ -82,6 +85,9 @@ class CleanTargetIntegrationTest {
         compileArgs.add(sourceDir.resolve("java/lang/Exception.java").toString());
         compileArgs.add(sourceDir.resolve("java/lang/RuntimeException.java").toString());
         compileArgs.add(sourceDir.resolve("java/lang/NullPointerException.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/Error.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/VirtualMachineError.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/StackOverflowError.java").toString());
 
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "HelloWorld.java should compile with " + config);
@@ -423,6 +429,24 @@ class CleanTargetIntegrationTest {
     static String javaLangNullPointerExceptionSource() {
         return "package java.lang;\n" +
                 "public class NullPointerException extends RuntimeException {\n" +
+                "}\n";
+    }
+
+    static String javaLangErrorSource() {
+        return "package java.lang;\n" +
+                "public class Error extends Throwable {\n" +
+                "}\n";
+    }
+
+    static String javaLangVirtualMachineErrorSource() {
+        return "package java.lang;\n" +
+                "public class VirtualMachineError extends Error {\n" +
+                "}\n";
+    }
+
+    static String javaLangStackOverflowErrorSource() {
+        return "package java.lang;\n" +
+                "public class StackOverflowError extends VirtualMachineError {\n" +
                 "}\n";
     }
 

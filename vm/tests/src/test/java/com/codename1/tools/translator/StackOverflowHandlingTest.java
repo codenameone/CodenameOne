@@ -18,6 +18,7 @@ class StackOverflowHandlingTest {
                 "public class Main {\n" +
                 "    private static native void print(String s);\n" +
                 "    private static native void prepareOverflow();\n" +
+                "    private static native void resetOverflow();\n" +
                 "    private static int triggerOverflow() {\n" +
                 "        return 1;\n" +
                 "    }\n" +
@@ -28,18 +29,20 @@ class StackOverflowHandlingTest {
                 "        return 1 + safeRecurse(depth - 1);\n" +
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
+                "        boolean overflowed = false;\n" +
                 "        try {\n" +
                 "            prepareOverflow();\n" +
                 "            triggerOverflow();\n" +
                 "        } catch (StackOverflowError err) {\n" +
-                "            print(\"OVERFLOW\");\n" +
+                "            overflowed = true;\n" +
+                "            resetOverflow();\n" +
                 "        }\n" +
-                "        if (safeRecurse(10) == 10) {\n" +
-                "            print(\"RECOVER\");\n" +
+                "        if (overflowed && safeRecurse(10) == 10) {\n" +
+                "            print(\"OVERFLOW_RECOVER\");\n" +
                 "        }\n" +
                 "    }\n" +
                 "}";
-        assertTrue(CompilerHelper.compileAndRun(code, "OVERFLOW\nRECOVER"),
+        assertTrue(CompilerHelper.compileAndRun(code, "OVERFLOW_RECOVER"),
                 "Compiled app should catch StackOverflowError and continue execution");
     }
 

@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -108,6 +109,22 @@ class LambdaIntegrationTest {
                 compileArgs.toArray(new String[0])
         );
         assertEquals(0, compileResult, "LambdaApp should compile");
+
+        Files.walk(javaApiDir)
+                .forEach(source -> {
+                    try {
+                        Path destination = classesDir.resolve(javaApiDir.relativize(source));
+                        if (Files.isDirectory(source)) {
+                            if (!Files.exists(destination)) {
+                                Files.createDirectory(destination);
+                            }
+                        } else {
+                            Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
 
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
