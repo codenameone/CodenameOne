@@ -5,7 +5,16 @@
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
     <description>PMD rules for core unit tests.</description>
     <rule ref="rulesets/java/quickstart.xml">
-        <exclude name="UselessParentheses"/>
+        <!--
+        We use these a lot in the code. I don't see the value in removing them
+        -->
+        <exclude name="UselessParentheses" />
+
+        <!-- Excluded since this isn't true for Codename One.
+        Coding to an interface is measurably slower in an AOT
+        environment. We also use many legacy classes at the API
+        level and can't just replace them -->
+        <exclude name="LooseCoupling" />
         <exclude name="ReturnEmptyCollectionRatherThanNull"/>
     </rule>
 </ruleset>

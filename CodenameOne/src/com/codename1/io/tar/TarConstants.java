@@ -22,7 +22,6 @@ package com.codename1.io.tar;
 
 /**
  * @author Kamran Zafar
- *
  */
 public class TarConstants {
     public static final int EOF_BLOCK = 1024;

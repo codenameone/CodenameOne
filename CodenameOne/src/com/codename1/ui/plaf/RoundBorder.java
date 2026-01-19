@@ -729,6 +729,7 @@ public final class RoundBorder extends Border {
 
         public CacheValue() {
         }
+
         public CacheValue(Image img, long modificationTime) {
             this.img = img;
             this.modificationTime = modificationTime;

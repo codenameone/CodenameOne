@@ -48,6 +48,7 @@ public class BigInteger {
     public BigInteger(byte[] bval) throws NumberFormatException {
         peer = new TBigInteger(bval);
     }
+
     BigInteger(TBigInteger peer) {
         this.peer = peer;
     }
@@ -149,11 +150,13 @@ public class BigInteger {
 
     @Override
     public boolean equals(Object val) {
-        if (val == this)
+        if (val == this) {
             return true;
+        }
 
-        if (!(val instanceof BigInteger))
+        if (!(val instanceof BigInteger)) {
             return false;
+        }
         BigInteger biggie = (BigInteger) val;
         return peer.equals(biggie.peer);
     }

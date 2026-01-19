@@ -56,9 +56,9 @@ import static com.codename1.ui.ComponentSelector.$;
  */
 public class SpanButton extends Container implements ActionSource<ActionEvent>, SelectableIconHolder, TextHolder {
 
-    private int gap = Label.getDefaultGap();
     private final Button actualButton;
     private final TextArea text;
+    private int gap = Label.getDefaultGap();
     private boolean shouldLocalize = true;
 
     /**

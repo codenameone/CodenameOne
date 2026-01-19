@@ -71,8 +71,9 @@ final public class Inflater extends ZStream {
     public Inflater(int w, JZlib.WrapperType wrapperType) throws GZIPException {
         super();
         int ret = init(w, wrapperType);
-        if (ret != Z_OK)
+        if (ret != Z_OK) {
             throw new GZIPException(ret + ": " + msg);
+        }
     }
 
     public Inflater(int w) throws GZIPException {
@@ -86,8 +87,9 @@ final public class Inflater extends ZStream {
     public Inflater(int w, boolean nowrap) throws GZIPException {
         super();
         int ret = init(w, nowrap);
-        if (ret != Z_OK)
+        if (ret != Z_OK) {
             throw new GZIPException(ret + ": " + msg);
+        }
     }
 
     public int init() {
@@ -126,37 +128,45 @@ final public class Inflater extends ZStream {
 
     @Override
     public int inflate(int f) {
-        if (istate == null) return Z_STREAM_ERROR;
+        if (istate == null) {
+            return Z_STREAM_ERROR;
+        }
         int ret = istate.inflate(f);
-        if (ret == Z_STREAM_END)
+        if (ret == Z_STREAM_END) {
             finished = true;
+        }
         return ret;
     }
 
     @Override
     public int end() {
         finished = true;
-        if (istate == null) return Z_STREAM_ERROR;
+        if (istate == null) {
+            return Z_STREAM_ERROR;
+        }
         int ret = istate.inflateEnd();
 //    istate = null;
         return ret;
     }
 
     public int sync() {
-        if (istate == null)
+        if (istate == null) {
             return Z_STREAM_ERROR;
+        }
         return istate.inflateSync();
     }
 
     public int syncPoint() {
-        if (istate == null)
+        if (istate == null) {
             return Z_STREAM_ERROR;
+        }
         return istate.inflateSyncPoint();
     }
 
     public int setDictionary(byte[] dictionary, int dictLength) {
-        if (istate == null)
+        if (istate == null) {
             return Z_STREAM_ERROR;
+        }
         return istate.inflateSetDictionary(dictionary, dictLength);
     }
 

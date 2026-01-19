@@ -50,18 +50,26 @@ import java.util.List;
  * form.add(BorderLayout.CENTER, new ChartComponent(chart));
  * form.show();
  * </pre>
- *
+ * <p>
  * The {@link Type} supplied to the constructor controls whether the bars are
  * rendered in their default style, stacked or heaped.
  */
 public class BarChart extends XYChart {
-    /** The constant to identify this chart type. */
+    /**
+     * The constant to identify this chart type.
+     */
     public static final String TYPE = "Bar";
-    /** The legend shape width. */
+    /**
+     * The legend shape width.
+     */
     private static final int SHAPE_WIDTH = 12;
-    /** The chart type. */
+    /**
+     * The chart type.
+     */
     protected Type mType = Type.DEFAULT;
-    /** The previous series Y axis point limits to be used for HEAP type bar charts. */
+    /**
+     * The previous series Y axis point limits to be used for HEAP type bar charts.
+     */
     private List<Float> mPreviousSeriesPoints;
 
     BarChart() {
@@ -74,9 +82,9 @@ public class BarChart extends XYChart {
     /**
      * Builds a new bar chart instance.
      *
-     * @param dataset the multiple series dataset
+     * @param dataset  the multiple series dataset
      * @param renderer the multiple series renderer
-     * @param type the bar chart type
+     * @param type     the bar chart type
      */
     public BarChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer, Type type) {
         super(dataset, renderer);
@@ -108,13 +116,13 @@ public class BarChart extends XYChart {
     /**
      * The graphical representation of a series.
      *
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas         the canvas to paint to
+     * @param paint          the paint to be used for drawing
+     * @param points         the array of points to be used for drawing the series
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the minimum value of the y axis
-     * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the minimum value of the y axis
+     * @param seriesIndex    the index of the series currently being drawn
+     * @param startIndex     the start index of the rendering points
      */
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points,
@@ -144,15 +152,15 @@ public class BarChart extends XYChart {
     /**
      * Draws a bar.
      *
-     * @param canvas the canvas
-     * @param xMin the X axis minimum
-     * @param yMin the Y axis minimum
-     * @param xMax the X axis maximum
-     * @param yMax the Y axis maximum
-     * @param halfDiffX half the size of a bar
-     * @param seriesNr the total number of series
+     * @param canvas      the canvas
+     * @param xMin        the X axis minimum
+     * @param yMin        the Y axis minimum
+     * @param xMax        the X axis maximum
+     * @param yMax        the Y axis maximum
+     * @param halfDiffX   half the size of a bar
+     * @param seriesNr    the total number of series
      * @param seriesIndex the current series index
-     * @param paint the paint
+     * @param paint       the paint
      */
     protected void drawBar(Canvas canvas, float xMin, float yMin, float xMax, float yMax,
                            float halfDiffX, int seriesNr, int seriesIndex, Paint paint) {
@@ -168,14 +176,14 @@ public class BarChart extends XYChart {
     /**
      * Draws a bar.
      *
-     * @param canvas the canvas
-     * @param xMin the X axis minimum
-     * @param yMin the Y axis minimum
-     * @param xMax the X axis maximum
-     * @param yMax the Y axis maximum
-     * @param scale the scale index
+     * @param canvas      the canvas
+     * @param xMin        the X axis minimum
+     * @param yMin        the Y axis minimum
+     * @param xMax        the X axis maximum
+     * @param yMax        the Y axis maximum
+     * @param scale       the scale index
      * @param seriesIndex the current series index
-     * @param paint the paint
+     * @param paint       the paint
      */
     protected void drawBar(Canvas canvas, float xMin, float yMin, float xMax, float yMax, int scale,
                            int seriesIndex, Paint paint) {
@@ -250,13 +258,13 @@ public class BarChart extends XYChart {
     /**
      * The graphical representation of the series values as text.
      *
-     * @param canvas the canvas to paint to
-     * @param series the series to be painted
-     * @param renderer the series renderer
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas      the canvas to paint to
+     * @param series      the series to be painted
+     * @param renderer    the series renderer
+     * @param paint       the paint to be used for drawing
+     * @param points      the array of points to be used for drawing the series
      * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param startIndex  the start index of the rendering points
      */
     @Override
     protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
@@ -297,12 +305,12 @@ public class BarChart extends XYChart {
     /**
      * The graphical representation of the legend shape.
      *
-     * @param canvas the canvas to paint to
-     * @param renderer the series renderer
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param canvas      the canvas to paint to
+     * @param renderer    the series renderer
+     * @param x           the x value of the point the shape should be drawn at
+     * @param y           the y value of the point the shape should be drawn at
      * @param seriesIndex the series index
-     * @param paint the paint to be used for drawing
+     * @param paint       the paint to be used for drawing
      */
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
@@ -315,8 +323,8 @@ public class BarChart extends XYChart {
      * Calculates and returns the half-distance in the graphical representation of
      * 2 consecutive points.
      *
-     * @param points the points
-     * @param length the points length
+     * @param points   the points
+     * @param length   the points length
      * @param seriesNr the series number
      * @return the calculated half-distance value
      */

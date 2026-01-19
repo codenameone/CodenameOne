@@ -68,9 +68,7 @@ public abstract class AbstractMedia implements AsyncMedia {
     protected MediaStateChangeEvent fireMediaStateChange(State newState) {
         MediaStateChangeEvent evt = new MediaStateChangeEvent(this, getState(), newState);
         if (stateChangeListeners.hasListeners()) {
-
             stateChangeListeners.fireActionEvent(evt);
-
         }
         return evt;
     }
@@ -103,7 +101,6 @@ public abstract class AbstractMedia implements AsyncMedia {
         MediaErrorEvent evt = new MediaErrorEvent(this, ex);
         if (errorListeners.hasListeners()) {
             errorListeners.fireActionEvent(evt);
-
         }
         return evt;
     }
@@ -162,7 +159,6 @@ public abstract class AbstractMedia implements AsyncMedia {
             return out;
         }
 
-
         if (pendingPauseRequest != null) {
             pendingPauseRequest.ready(new SuccessCallback<AsyncMedia>() {
                 @Override
@@ -202,7 +198,6 @@ public abstract class AbstractMedia implements AsyncMedia {
 
             @Override
             public void actionPerformed(MediaStateChangeEvent evt) {
-
                 if (!out.isDone()) {
                     if (evt.getNewState() == State.Playing) {
                         stateChangeListeners.removeListener(this);

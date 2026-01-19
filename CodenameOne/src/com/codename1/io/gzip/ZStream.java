@@ -125,32 +125,39 @@ public class ZStream {
     }
 
     public int inflate(int f) {
-        if (istate == null) return Z_STREAM_ERROR;
+        if (istate == null) {
+            return Z_STREAM_ERROR;
+        }
         return istate.inflate(f);
     }
 
     public int inflateEnd() {
-        if (istate == null) return Z_STREAM_ERROR;
+        if (istate == null) {
+            return Z_STREAM_ERROR;
+        }
         int ret = istate.inflateEnd();
 //    istate = null;
         return ret;
     }
 
     public int inflateSync() {
-        if (istate == null)
+        if (istate == null) {
             return Z_STREAM_ERROR;
+        }
         return istate.inflateSync();
     }
 
     public int inflateSyncPoint() {
-        if (istate == null)
+        if (istate == null) {
             return Z_STREAM_ERROR;
+        }
         return istate.inflateSyncPoint();
     }
 
     public int inflateSetDictionary(byte[] dictionary, int dictLength) {
-        if (istate == null)
+        if (istate == null) {
             return Z_STREAM_ERROR;
+        }
         return istate.inflateSetDictionary(dictionary, dictLength);
     }
 
@@ -202,20 +209,25 @@ public class ZStream {
     }
 
     public int deflateEnd() {
-        if (dstate == null) return Z_STREAM_ERROR;
+        if (dstate == null) {
+            return Z_STREAM_ERROR;
+        }
         int ret = dstate.deflateEnd();
         dstate = null;
         return ret;
     }
 
     public int deflateParams(int level, int strategy) {
-        if (dstate == null) return Z_STREAM_ERROR;
+        if (dstate == null) {
+            return Z_STREAM_ERROR;
+        }
         return dstate.deflateParams(level, strategy);
     }
 
     public int deflateSetDictionary(byte[] dictionary, int dictLength) {
-        if (dstate == null)
+        if (dstate == null) {
             return Z_STREAM_ERROR;
+        }
         return dstate.deflateSetDictionary(dictionary, dictLength);
     }
 
@@ -226,8 +238,12 @@ public class ZStream {
     void flushPending() {
         int len = dstate.pending;
 
-        if (len > availOut) len = availOut;
-        if (len == 0) return;
+        if (len > availOut) {
+            len = availOut;
+        }
+        if (len == 0) {
+            return;
+        }
 
         System.arraycopy(dstate.pendingBuf, dstate.pendingOut,
                 nextOut, nextOutIndex, len);
@@ -250,8 +266,12 @@ public class ZStream {
     int readBuf(byte[] buf, int start, int size) {
         int len = availIn;
 
-        if (len > size) len = size;
-        if (len == 0) return 0;
+        if (len > size) {
+            len = size;
+        }
+        if (len == 0) {
+            return 0;
+        }
 
         availIn -= len;
 
@@ -293,7 +313,9 @@ public class ZStream {
     }
 
     public void setInput(byte[] buf, int off, int len, boolean append) {
-        if (len <= 0 && append && nextIn != null) return;
+        if (len <= 0 && append && nextIn != null) {
+            return;
+        }
 
         if (availIn > 0 && append) {
             byte[] tmp = new byte[availIn + len];

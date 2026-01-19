@@ -92,19 +92,19 @@ import java.util.Arrays;
  * @since 6.0
  */
 public abstract class ButtonList extends Container implements DataChangedListener, SelectionListener, ActionListener, ActionSource {
+    private final EventDispatcher actionListeners = new EventDispatcher();
+    private final java.util.List<Runnable> onReady = new ArrayList<Runnable>();
+    private final boolean allowMultipleSelection;
     protected boolean ready;
     private ButtonGroup group;
     private ListModel model;
-    private final EventDispatcher actionListeners = new EventDispatcher();
-    private final java.util.List<Runnable> onReady = new ArrayList<Runnable>();
     private String cellUIID;
     private java.util.List<Decorator> decorators;
-    private final boolean allowMultipleSelection;
 
     /**
      * Creates a new ButtonList.
      *
-     * @param model The options.  Each will be represented by a button.
+     * @param model                  The options.  Each will be represented by a button.
      * @param allowMultipleSelection indicates that multiple selection is allowed or not
      */
     protected ButtonList(ListModel model, boolean allowMultipleSelection) {

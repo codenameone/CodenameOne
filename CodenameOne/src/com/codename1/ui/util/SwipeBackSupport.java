@@ -127,10 +127,10 @@ public class SwipeBackSupport {
                             if (currentX > 0 && currentX >= destNumber || currentX < 0 && currentX <= destNumber) {
                                 currentX = destNumber;
                                 Transition t = null;
-                                if(destinationForm != null) {
+                                if (destinationForm != null) {
                                     t = destinationForm.getTransitionInAnimator();
                                 }
-                                if(destinationForm != null) {
+                                if (destinationForm != null) {
                                     destinationForm.setTransitionInAnimator(CommonTransitions.createEmpty());
                                     destinationForm.show();
                                     destinationForm.setTransitionInAnimator(t);

@@ -54,6 +54,7 @@ import java.util.Vector;
  * @deprecated Use new {@link Switch} class instead as it conforms to the latest platform looks and feels.
  */
 public class OnOffSwitch extends Container implements ActionSource {
+    private final EventDispatcher dispatcher = new EventDispatcher();
     private String on = "ON";
     private String off = "OFF";
     private boolean iosMode;
@@ -67,7 +68,6 @@ public class OnOffSwitch extends Container implements ActionSource {
     private Image switchOffImage;
     private Image switchMaskImage;
     private int deltaX;
-    private final EventDispatcher dispatcher = new EventDispatcher();
     private boolean animationLock;
 
     /**

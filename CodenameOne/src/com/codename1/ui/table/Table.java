@@ -85,9 +85,8 @@ public class Table extends Container {
      * Constant denoting that inner borders should be drawn fully
      */
     public static final int INNER_BORDERS_ALL = 3;
-
-    private TableModel model;
     private final Listener listener = new Listener();
+    private TableModel model;
     private boolean drawBorder = true;
     private boolean collapseBorder = true;
     private boolean drawEmptyCellsBorder = true;

@@ -44,6 +44,52 @@ public final class CC {
 
     // See the getters and setters for information about the properties below.
     private static final String[] EMPTY_ARR = new String[0];
+    private static final CellCall[] INVOKERS = new CellCall[]{
+            new CellCall() {
+                @Override
+                public void cell(CC parent, int val) {
+                    parent.setCellX(val);
+                }
+
+                @Override
+                public void gap(CC parent, String s) {
+                    parent.gapLeft(s);
+                }
+            },
+            new CellCall() {
+                @Override
+                public void cell(CC parent, int val) {
+                    parent.setCellY(val);
+                }
+
+                @Override
+                public void gap(CC parent, String s) {
+                    parent.gapRight(s);
+                }
+            },
+            new CellCall() {
+                @Override
+                public void cell(CC parent, int val) {
+                    parent.setSpanX(val);
+                }
+
+                @Override
+                public void gap(CC parent, String s) {
+                    parent.gapTop(s);
+                }
+            },
+            new CellCall() {
+                @Override
+                public void cell(CC parent, int val) {
+                    parent.setSpanY(val);
+                }
+
+                @Override
+                public void gap(CC parent, String s) {
+                    parent.gapBottom(s);
+                }
+            }
+    };
     private int dock = -1;
     private UnitValue[] pos = null; // [x1, y1, x2, y2]
     private UnitValue[] padding = null;   // top, left, bottom, right
@@ -62,8 +108,6 @@ public final class CC {
     private BoundSize wrap = null;
     private boolean boundsInGrid = true;
     private boolean external = false;
-
-
     // ***** Tmp cache field
     private Float pushX = null, pushY = null;
     private transient String[] linkTargets = null;
@@ -79,14 +123,19 @@ public final class CC {
             final ArrayList<String> targets = new ArrayList<String>(2);
 
             if (pos != null) {
-                for (int i = 0; i < pos.length; i++)
+                for (int i = 0; i < pos.length; i++) {
                     addLinkTargetIDs(targets, pos[i]);
+                }
             }
 
             linkTargets = targets.size() == 0 ? EMPTY_ARR : targets.toArray(new String[targets.size()]);
         }
         return linkTargets;
     }
+
+    // **********************************************************
+    // Chaining constraint setters
+    // **********************************************************
 
     private void addLinkTargetIDs(ArrayList<String> targets, UnitValue uv) {
         if (uv != null) {
@@ -96,16 +145,13 @@ public final class CC {
             } else {
                 for (int i = uv.getSubUnitCount() - 1; i >= 0; i--) {
                     UnitValue subUv = uv.getSubUnitValue(i);
-                    if (subUv.isLinkedDeep())
+                    if (subUv.isLinkedDeep()) {
                         addLinkTargetIDs(targets, subUv);
+                    }
                 }
             }
         }
     }
-
-    // **********************************************************
-    // Chaining constraint setters
-    // **********************************************************
 
     /**
      * Specifies that the component should be put in the end group <code>s</code> and will thus share the same ending
@@ -175,7 +221,6 @@ public final class CC {
         return this;
     }
 
-
     /**
      * The horizontal gap before and/or after the component. The gap is towards cell bounds and/or other component bounds.
      * <p>
@@ -186,11 +231,13 @@ public final class CC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new ComponentConstraint().noGrid().gap().fill()</code>.
      */
     public CC gapX(String before, String after) {
-        if (before != null)
+        if (before != null) {
             hor.setGapBefore(ConstraintParser.parseBoundSize(before, true, true));
+        }
 
-        if (after != null)
+        if (after != null) {
             hor.setGapAfter(ConstraintParser.parseBoundSize(after, true, true));
+        }
 
         return this;
     }
@@ -232,10 +279,10 @@ public final class CC {
      * @since 3.7.2
      */
     public CC growPrio(int... widthHeight) {
-        if(widthHeight.length == 0 || widthHeight.length > 2) {
+        if (widthHeight.length == 0 || widthHeight.length > 2) {
             throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
         }
-        if(widthHeight.length == 2) {
+        if (widthHeight.length == 2) {
             growPrioY(widthHeight[1]);
         }
         growPrioX(widthHeight[0]);
@@ -278,10 +325,10 @@ public final class CC {
      * @since 3.7.2
      */
     public CC grow(float... widthHeight) {
-        if(widthHeight.length == 0 || widthHeight.length > 2) {
+        if (widthHeight.length == 0 || widthHeight.length > 2) {
             throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
         }
-        if(widthHeight.length == 2) {
+        if (widthHeight.length == 2) {
             growY(widthHeight[1]);
         }
         growX(widthHeight[0]);
@@ -311,10 +358,10 @@ public final class CC {
      * @since 3.7.2
      */
     public CC shrinkPrio(int... widthHeight) {
-        if(widthHeight.length == 0 || widthHeight.length > 2) {
+        if (widthHeight.length == 0 || widthHeight.length > 2) {
             throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
         }
-        if(widthHeight.length == 2) {
+        if (widthHeight.length == 2) {
             shrinkPrioY(widthHeight[1]);
         }
         shrinkPrioX(widthHeight[0]);
@@ -344,10 +391,10 @@ public final class CC {
      * @since 3.7.2
      */
     public CC shrink(float... widthHeight) {
-        if(widthHeight.length == 0 || widthHeight.length > 2) {
+        if (widthHeight.length == 0 || widthHeight.length > 2) {
             throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
         }
-        if(widthHeight.length == 2) {
+        if (widthHeight.length == 2) {
             shrinkY(widthHeight[1]);
         }
         shrinkX(widthHeight[0]);
@@ -377,10 +424,10 @@ public final class CC {
      * @since 3.7.2
      */
     public CC endGroup(String... xy) {
-        if(xy.length > 2 || xy.length == 0) {
+        if (xy.length > 2 || xy.length == 0) {
             throw new IllegalArgumentException("Illegal argument count: " + xy.length);
         }
-        if(xy.length == 2) {
+        if (xy.length == 2) {
             endGroupY(xy[1]);
         }
         endGroupX(xy[0]);
@@ -410,10 +457,10 @@ public final class CC {
      * @since 3.7.2
      */
     public CC sizeGroup(String... xy) {
-        if(xy.length > 2 || xy.length == 0) {
+        if (xy.length > 2 || xy.length == 0) {
             throw new IllegalArgumentException("Illegal argument count: " + xy.length);
         }
-        if(xy.length == 2) {
+        if (xy.length == 2) {
             sizeGroupY(xy[1]);
         }
         sizeGroupX(xy[0]);
@@ -470,11 +517,13 @@ public final class CC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new ComponentConstraint().noGrid().gap().fill()</code>.
      */
     public CC gapY(String before, String after) {
-        if (before != null)
+        if (before != null) {
             ver.setGapBefore(ConstraintParser.parseBoundSize(before, true, false));
+        }
 
-        if (after != null)
+        if (after != null) {
             ver.setGapAfter(ConstraintParser.parseBoundSize(after, true, false));
+        }
 
         return this;
     }
@@ -603,58 +652,6 @@ public final class CC {
         return this;
     }
 
-    interface CellCall {
-        void cell(CC parent, int val);
-        void gap(CC parent, String s);
-    }
-
-    private static final CellCall[] INVOKERS = new CellCall[]{
-            new CellCall() {
-                @Override
-                public void cell(CC parent, int val) {
-                    parent.setCellX(val);
-                }
-
-                @Override
-                public void gap(CC parent, String s) {
-                    parent.gapLeft(s);
-                }
-            },
-            new CellCall() {
-                @Override
-                public void cell(CC parent, int val) {
-                    parent.setCellY(val);
-                }
-
-                @Override
-                public void gap(CC parent, String s) {
-                    parent.gapRight(s);
-                }
-            },
-            new CellCall() {
-                @Override
-                public void cell(CC parent, int val) {
-                    parent.setSpanX(val);
-                }
-
-                @Override
-                public void gap(CC parent, String s) {
-                    parent.gapTop(s);
-                }
-            },
-            new CellCall() {
-                @Override
-                public void cell(CC parent, int val) {
-                    parent.setSpanY(val);
-                }
-
-                @Override
-                public void gap(CC parent, String s) {
-                    parent.gapBottom(s);
-                }
-            }
-    };
-
     /**
      * Set the cell(s) that the component should occupy in the grid. Same functionality as {@link #setCellX(int col)} and
      * {@link #setCellY(int row)} together with {@link #setSpanX(int width)} and {@link #setSpanY(int height)}. This method
@@ -671,10 +668,10 @@ public final class CC {
      * @since 3.7.2. Replacing cell(int, int) and cell(int, int, int, int)
      */
     public CC cell(int... colRowWidthHeight) {
-        if(colRowWidthHeight.length > INVOKERS.length) {
+        if (colRowWidthHeight.length > INVOKERS.length) {
             throw new IllegalArgumentException("Illegal argument count: " + colRowWidthHeight.length);
         }
-        for(int iter = 0 ; iter < colRowWidthHeight.length ; iter++) {
+        for (int iter = 0; iter < colRowWidthHeight.length; iter++) {
             INVOKERS[iter].cell(this, colRowWidthHeight[iter]);
         }
         return this;
@@ -717,10 +714,10 @@ public final class CC {
      * @since 3.7.2
      */
     public CC gap(String... args) {
-        if(INVOKERS.length < args.length) {
+        if (INVOKERS.length < args.length) {
             throw new IllegalArgumentException("Illegal argument count: " + args.length);
         }
-        for(int iter = 0 ; iter < args.length ; iter++) {
+        for (int iter = 0; iter < args.length; iter++) {
             INVOKERS[iter].gap(this, args[iter]);
         }
         return this;
@@ -1042,7 +1039,6 @@ public final class CC {
         return this;
     }
 
-
     /**
      * Same functionality as {@link #growX()} and {@link #growY()}.
      * <p>
@@ -1240,8 +1236,9 @@ public final class CC {
 
     private CC corrPos(String uv, int ix) {
         UnitValue[] b = getPos();
-        if (b == null)
+        if (b == null) {
             b = new UnitValue[4];
+        }
 
         b[ix] = ConstraintParser.parseUnitValue(uv, (ix % 2 == 0));
         setPos(b);
@@ -1262,8 +1259,9 @@ public final class CC {
      */
     public CC pos(String x, String y) {
         UnitValue[] b = getPos();
-        if (b == null)
+        if (b == null) {
             b = new UnitValue[4];
+        }
 
         b[0] = ConstraintParser.parseUnitValue(x, true);
         b[1] = ConstraintParser.parseUnitValue(y, false);
@@ -1329,10 +1327,6 @@ public final class CC {
         return this;
     }
 
-    // **********************************************************
-    // Bean properties
-    // **********************************************************
-
     /**
      * Returns the horizontal dimension constraint for this component constraint. It has constraints for the horizontal size
      * and grow/shink priorities and weights.
@@ -1345,6 +1339,10 @@ public final class CC {
     public DimConstraint getHorizontal() {
         return hor;
     }
+
+    // **********************************************************
+    // Bean properties
+    // **********************************************************
 
     /**
      * Sets the horizontal dimension constraint for this component constraint. It has constraints for the horizontal size
@@ -1496,8 +1494,9 @@ public final class CC {
      * @param y The y-position or <code>-1</code> to disable cell positioning.
      */
     public void setCellY(int y) {
-        if (y < 0)
+        if (y < 0) {
             cellX = -1;
+        }
         cellY = y < 0 ? 0 : y;
     }
 
@@ -1522,8 +1521,9 @@ public final class CC {
      * @param side -1 or 0-3.
      */
     public void setDockSide(int side) {
-        if (side < -1 || side > 3)
+        if (side < -1 || side > 3) {
             throw new IllegalArgumentException("Illegal dock side: " + side);
+        }
         dock = side;
     }
 
@@ -1604,8 +1604,9 @@ public final class CC {
      *             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
      */
     public void setHideMode(int mode) {
-        if (mode < -1 || mode > 3)
+        if (mode < -1 || mode > 3) {
             throw new IllegalArgumentException("Wrong hideMode: " + mode);
+        }
 
         hideMode = mode;
     }
@@ -1964,5 +1965,11 @@ public final class CC {
      */
     public void setNewlineGapSize(BoundSize s) {
         newline = s == null ? (newline != null ? DEF_GAP : null) : s;
+    }
+
+    interface CellCall {
+        void cell(CC parent, int val);
+
+        void gap(CC parent, String s);
     }
 }

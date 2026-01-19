@@ -30,88 +30,166 @@ import java.util.Map;
  * Multiple XY series renderer.
  */
 public class XYMultipleSeriesRenderer extends DefaultRenderer {
-    /** The X axis title. */
-    private String mXTitle = "";
-    /** The Y axis title. */
-    private String[] mYTitle;
-    /** The axis title text size. */
-    private float mAxisTitleTextSize = 12;
-    /** The start value in the X axis range. */
-    private double[] mMinX;
-    /** The end value in the X axis range. */
-    private double[] mMaxX;
-    /** The start value in the Y axis range. */
-    private double[] mMinY;
-    /** The end value in the Y axis range. */
-    private double[] mMaxY;
-    /** The approximative number of labels on the x axis. */
-    private int mXLabels = 5;
-    /** The approximative number of labels on the y axis. */
-    private int mYLabels = 5;
-    /** The current orientation of the chart. */
-    private Orientation mOrientation = Orientation.HORIZONTAL;
-    /** The X axis text labels. */
+    /**
+     * The X axis text labels.
+     */
     private final Map<Double, String> mXTextLabels = new HashMap<Double, String>();
-    /** The Y axis text labels. */
+    /**
+     * The Y axis text labels.
+     */
     private final Map<Integer, Map<Double, String>> mYTextLabels = new LinkedHashMap<Integer, Map<Double, String>>();
-    /** A flag for enabling or not the pan on the X axis. */
-    private boolean mPanXEnabled = true;
-    /** A flag for enabling or not the pan on the Y axis. */
-    private boolean mPanYEnabled = true;
-    /** A flag for enabling or not the zoom on the X axis. */
-    private boolean mZoomXEnabled = true;
-    /** A flag for enabling or not the zoom on the Y axis . */
-    private boolean mZoomYEnabled = true;
-    /** The spacing between bars, in bar charts. */
-    private double mBarSpacing = 0;
-    /** The margins colors. */
-    private int mMarginsColor = NO_COLOR;
-    /** The pan limits. */
-    private double[] mPanLimits;
-    /** The zoom limits. */
-    private double[] mZoomLimits;
-    /** The X axis labels rotation angle. */
-    private float mXLabelsAngle;
-    /** The Y axis labels rotation angle. */
-    private float mYLabelsAngle;
-    /** The initial axis range. */
+    /**
+     * The initial axis range.
+     */
     private final Map<Integer, double[]> initialRange = new LinkedHashMap<Integer, double[]>();
-    /** The point size for charts displaying points. */
-    private float mPointSize = 3;
-    /** The grid color. */
-    private int[] mGridColors;
-    /** The number of scales. */
+    /**
+     * The number of scales.
+     */
     private final int scalesCount;
-    /** The X axis labels alignment. */
+    /**
+     * The X axis title.
+     */
+    private String mXTitle = "";
+    /**
+     * The Y axis title.
+     */
+    private String[] mYTitle;
+    /**
+     * The axis title text size.
+     */
+    private float mAxisTitleTextSize = 12;
+    /**
+     * The start value in the X axis range.
+     */
+    private double[] mMinX;
+    /**
+     * The end value in the X axis range.
+     */
+    private double[] mMaxX;
+    /**
+     * The start value in the Y axis range.
+     */
+    private double[] mMinY;
+    /**
+     * The end value in the Y axis range.
+     */
+    private double[] mMaxY;
+    /**
+     * The approximative number of labels on the x axis.
+     */
+    private int mXLabels = 5;
+    /**
+     * The approximative number of labels on the y axis.
+     */
+    private int mYLabels = 5;
+    /**
+     * The current orientation of the chart.
+     */
+    private Orientation mOrientation = Orientation.HORIZONTAL;
+    /**
+     * A flag for enabling or not the pan on the X axis.
+     */
+    private boolean mPanXEnabled = true;
+    /**
+     * A flag for enabling or not the pan on the Y axis.
+     */
+    private boolean mPanYEnabled = true;
+    /**
+     * A flag for enabling or not the zoom on the X axis.
+     */
+    private boolean mZoomXEnabled = true;
+    /**
+     * A flag for enabling or not the zoom on the Y axis .
+     */
+    private boolean mZoomYEnabled = true;
+    /**
+     * The spacing between bars, in bar charts.
+     */
+    private double mBarSpacing = 0;
+    /**
+     * The margins colors.
+     */
+    private int mMarginsColor = NO_COLOR;
+    /**
+     * The pan limits.
+     */
+    private double[] mPanLimits;
+    /**
+     * The zoom limits.
+     */
+    private double[] mZoomLimits;
+    /**
+     * The X axis labels rotation angle.
+     */
+    private float mXLabelsAngle;
+    /**
+     * The Y axis labels rotation angle.
+     */
+    private float mYLabelsAngle;
+    /**
+     * The point size for charts displaying points.
+     */
+    private float mPointSize = 3;
+    /**
+     * The grid color.
+     */
+    private int[] mGridColors;
+    /**
+     * The X axis labels alignment.
+     */
     private int xLabelsAlign = Component.CENTER;
-    /** The Y axis labels alignment. */
+    /**
+     * The Y axis labels alignment.
+     */
     private int[] yLabelsAlign;
-    /** The X text label padding. */
+    /**
+     * The X text label padding.
+     */
     private float mXLabelsPadding = 0;
-    /** The Y text label padding. */
+    /**
+     * The Y text label padding.
+     */
     private float mYLabelsPadding = 0;
-    /** The Y axis labels vertical padding. */
+    /**
+     * The Y axis labels vertical padding.
+     */
     private float mYLabelsVerticalPadding = 2;
-    /** The Y axis alignment. */
+    /**
+     * The Y axis alignment.
+     */
     private int[] yAxisAlign;
-    /** The X axis labels color. */
+    /**
+     * The X axis labels color.
+     */
     private int mXLabelsColor = TEXT_COLOR;
-    /** The Y axis labels color. */
+    /**
+     * The Y axis labels color.
+     */
     private int[] mYLabelsColor = new int[]{TEXT_COLOR};
     /**
      * If X axis value selection algorithm to be used. Only used by the time
      * charts.
      */
     private boolean mXRoundedLabels = true;
-    /** The X label format. */
+    /**
+     * The X label format.
+     */
     private NumberFormat mXLabelFormat;
-    /** The Y label format. */
+    /**
+     * The Y label format.
+     */
     private NumberFormat[] mYLabelFormat;
-    /** A constant value for the bar chart items width. */
+    /**
+     * A constant value for the bar chart items width.
+     */
     private float mBarWidth = -1;
-    /** The zoom in limit permitted in the axis X */
+    /**
+     * The zoom in limit permitted in the axis X
+     */
     private double mZoomInLimitX = 0;
-    /** The zoom in limit permitted in the axis Y */
+    /**
+     * The zoom in limit permitted in the axis Y
+     */
     private double mZoomInLimitY = 0;
 
     public XYMultipleSeriesRenderer() {
@@ -253,9 +331,10 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * Sets the Axis title text font size using a Font object instead of a point size.
      * This method is the preferred way to set font size because it allows you to
      * more easily have fonts appear in an appropriate size for the target device.
-     *
+     * <p>
      * Alternatively check out {@link #setAxisTitleTextSize(float) } to set the text
      * size in pixels.
+     *
      * @param font
      */
     public void setAxisTitleTextFont(Font font) {
@@ -383,7 +462,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Sets the start value of the X axis range.
      *
-     * @param min the X axis range start value
+     * @param min   the X axis range start value
      * @param scale the renderer scale
      */
     public void setXAxisMin(double min, int scale) {
@@ -416,7 +495,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Sets the end value of the X axis range.
      *
-     * @param max the X axis range end value
+     * @param max   the X axis range end value
      * @param scale the renderer scale
      */
     public void setXAxisMax(double max, int scale) {
@@ -449,7 +528,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Sets the start value of the Y axis range.
      *
-     * @param min the Y axis range start value
+     * @param min   the Y axis range start value
      * @param scale the renderer scale
      */
     public void setYAxisMin(double min, int scale) {
@@ -482,7 +561,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Sets the end value of the Y axis range.
      *
-     * @param max the Y axis range end value
+     * @param max   the Y axis range end value
      * @param scale the renderer scale
      */
     public void setYAxisMax(double max, int scale) {
@@ -523,7 +602,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Adds a new text label for the specified X axis value.
      *
-     * @param x the X axis value
+     * @param x    the X axis value
      * @param text the text label
      * @deprecated use addXTextLabel instead
      */
@@ -534,7 +613,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Adds a new text label for the specified X axis value.
      *
-     * @param x the X axis value
+     * @param x    the X axis value
      * @param text the text label
      */
     public synchronized void addXTextLabel(double x, String text) {
@@ -607,7 +686,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Adds a new text label for the specified Y axis value.
      *
-     * @param y the Y axis value
+     * @param y    the Y axis value
      * @param text the text label
      */
     public void addYTextLabel(double y, String text) {
@@ -626,8 +705,8 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Adds a new text label for the specified Y axis value.
      *
-     * @param y the Y axis value
-     * @param text the text label
+     * @param y     the Y axis value
+     * @param text  the text label
      * @param scale the renderer scale
      */
     public synchronized void addYTextLabel(double y, String text, int scale) {
@@ -637,7 +716,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Removes text label for the specified Y axis value.
      *
-     * @param y the Y axis value
+     * @param y     the Y axis value
      * @param scale the renderer scale
      */
     public synchronized void removeYTextLabel(double y, int scale) {
@@ -657,7 +736,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /**
      * Returns the Y axis text label at the specified Y axis value.
      *
-     * @param y the Y axis value
+     * @param y     the Y axis value
      * @param scale the renderer scale
      * @return the Y axis text label
      */
@@ -874,8 +953,8 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
 
     /**
      * Returns the grid color.
-     * @param scale the renderer index
      *
+     * @param scale the renderer index
      * @return the grid color
      */
     public int getGridColor(int scale) {
@@ -1024,7 +1103,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * Sets the axes range values.
      *
      * @param range an array having the values in this order: minX, maxX, minY,
-     *          maxY
+     *              maxY
      */
     public void setRange(double[] range) {
         setRange(range, 0);
@@ -1034,7 +1113,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * Sets the axes range values.
      *
      * @param range an array having the values in this order: minX, maxX, minY,
-     *          maxY
+     *              maxY
      * @param scale the renderer scale
      */
     public void setRange(double[] range, int scale) {
@@ -1071,7 +1150,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * Sets the axes initial range values. This will be used in the zoom fit tool.
      *
      * @param range an array having the values in this order: minX, maxX, minY,
-     *          maxY
+     *              maxY
      */
     public void setInitialRange(double[] range) {
         setInitialRange(range, 0);
@@ -1091,7 +1170,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * Sets the axes initial range values. This will be used in the zoom fit tool.
      *
      * @param range an array having the values in this order: minX, maxX, minY,
-     *          maxY
+     *              maxY
      * @param scale the renderer scale
      */
     public void setInitialRange(double[] range, int scale) {
@@ -1290,7 +1369,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * Sets the number format for Y axis displaying labels.
      *
      * @param format the number format for labels
-     * @param scale the renderer scale
+     * @param scale  the renderer scale
      */
     public void setYLabelFormat(NumberFormat format, int scale) {
         mYLabelFormat[scale] = format;
@@ -1301,7 +1380,6 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * the maximum distance between {@link #getXAxisMin() } and {@link #getXAxisMax() }.
      *
      * @return the maximum zoom in permitted in the axis X
-     *
      * @see #setZoomInLimitX(double)
      */
     public double getZoomInLimitX() {
@@ -1310,13 +1388,13 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
 
     /**
      * Sets the zoom in limit permitted in the axis X.
-     *
+     * <p>
      * This function prevent that the distance between {@link #getXAxisMin()} and
      * {@link #getXAxisMax()} can't be greater or equal than
      * {@link #getZoomInLimitX()}
      *
      * @param zoomInLimitX the maximum distance permitted between
-     * {@link #getXAxisMin()} and {@link #getXAxisMax()}.
+     *                     {@link #getXAxisMin()} and {@link #getXAxisMax()}.
      */
     public void setZoomInLimitX(double zoomInLimitX) {
         this.mZoomInLimitX = zoomInLimitX;
@@ -1332,7 +1410,6 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * the maximum difference between {@link #getYAxisMin() } and {@link #getYAxisMax() }.
      *
      * @return the maximum in zoom permitted in the axis Y
-     *
      * @see #setZoomInLimitY(double)
      */
     public double getZoomInLimitY() {
@@ -1341,13 +1418,13 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
 
     /**
      * Sets zoom in limit permitted in the axis Y.
-     *
+     * <p>
      * This function prevent that the distance between {@link #getYAxisMin()} and
      * {@link #getYAxisMax()} can't be greater or equal than
      * {@link #getZoomInLimitY()}
      *
      * @param zoomInLimitY the maximum distance permitted between
-     * {@link #getYAxisMin()} and {@link #getYAxisMax()}
+     *                     {@link #getYAxisMin()} and {@link #getYAxisMax()}
      */
     public void setZoomInLimitY(double zoomInLimitY) {
         this.mZoomInLimitY = zoomInLimitY;
@@ -1367,7 +1444,9 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      */
     public enum Orientation {
         HORIZONTAL(0), VERTICAL(90);
-        /** The rotate angle. */
+        /**
+         * The rotate angle.
+         */
         private int mAngle = 0;
 
         Orientation(int angle) { // PMD Fix: UnnecessaryModifier removed implicit private keyword

@@ -59,7 +59,9 @@ public class NotConstraint implements Constraint {
     @Override
     public boolean isValid(Object value) {
         for (Constraint c : constraints) {
-            if (c.isValid(value)) return false;
+            if (c.isValid(value)) {
+                return false;
+            }
         }
 
         return true;

@@ -79,8 +79,9 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
      * @param rb a RadioButton to add
      */
     public void add(RadioButton rb) {
-        if (rb == null)
+        if (rb == null) {
             return;
+        }
         if (!buttons.contains(rb)) {
             buttons.add(rb);
             if (rb.isSelected()) {
@@ -96,11 +97,13 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
      * @param rb a RadioButton to remove
      */
     public void remove(RadioButton rb) {
-        if (rb == null)
+        if (rb == null) {
             return;
+        }
         buttons.remove(rb);
-        if (rb.isSelected())
+        if (rb.isSelected()) {
             clearSelection();
+        }
         rb.setButtonGroup(null);
     }
 
@@ -177,8 +180,9 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
      * @param index the index of the radio button to mark as selected
      */
     public void setSelected(int index) {
-        if (index < 0 || index >= getButtonCount())
+        if (index < 0 || index >= getButtonCount()) {
             throw new IllegalArgumentException("Index out of bounds");
+        }
 
         if (selectedIndex == index) {
             return;
@@ -199,8 +203,9 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
      * @return the radio button instance
      */
     public RadioButton getRadioButton(int index) {
-        if (index >= 0 && index < getButtonCount())
+        if (index >= 0 && index < getButtonCount()) {
             return buttons.get(index);
+        }
         return null;
     }
 

@@ -64,7 +64,8 @@ import com.codename1.ui.layouts.LayeredLayout;
  * @author Shai Almog
  */
 public class TextComponent extends InputComponent {
-    private static final int animationSpeed = 100;    private final TextField field = new TextField() {
+    private static final int animationSpeed = 100;
+    private Container animationLayer;    private final TextField field = new TextField() {
         @Override
         void paintHint(Graphics g) {
             if (isFocusAnimation()) {
@@ -140,7 +141,6 @@ public class TextComponent extends InputComponent {
             }
         }
     };
-    private Container animationLayer;
     private Boolean focusAnimation;
     /**
      * Default constructor allows us to create an arbitrary text component
@@ -528,6 +528,8 @@ public class TextComponent extends InputComponent {
     public String getText() {
         return field.getText();
     }
+
+
 
 
 }

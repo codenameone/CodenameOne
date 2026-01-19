@@ -43,7 +43,6 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -129,11 +128,6 @@ public class Resources {
     private static int lastLoadedDPI;
     private static boolean runtimeMultiImages;
     private static boolean failOnMissingTruetype = true;
-    short majorVersion;
-    short minorVersion;
-    int keyOffset;
-    private String[] metaData;
-    private int dpi = -1;
     /**
      * Hashtable containing the mapping between element types and their names in the
      * resource hashtable
@@ -144,6 +138,11 @@ public class Resources {
      * so they can be utilized by a theme when it is loaded
      */
     private final HashMap<String, Object> resources = new HashMap<String, Object>();
+    short majorVersion;
+    short minorVersion;
+    int keyOffset;
+    private String[] metaData;
+    private int dpi = -1;
     private DataInputStream input;
 
     // for internal use by the resource editor, creates an empty resource
@@ -1298,13 +1297,6 @@ public class Resources {
         return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
     }
 
-    static class MediaRule {
-        int matchCount;
-        int bestMatchScore;
-        String rawKey;
-        String translatedKey;
-    }
-
     Hashtable loadTheme(String id, boolean newerVersion) throws IOException {
         Hashtable theme = new Hashtable();
         String densityStr = Display.getInstance().getDensityStr();
@@ -1967,5 +1959,12 @@ public class Resources {
         byte[] data = new byte[width * height];
         input.readFully(data, 0, data.length);
         return Image.createIndexed(width, height, palette, data);
+    }
+
+    static class MediaRule {
+        int matchCount;
+        int bestMatchScore;
+        String rawKey;
+        String translatedKey;
     }
 }

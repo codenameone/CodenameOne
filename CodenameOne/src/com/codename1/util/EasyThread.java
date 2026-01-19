@@ -38,10 +38,10 @@ import java.util.List;
 public final class EasyThread {
     private static final List<ErrorListener> globalErrorListenenrs = new ArrayList<ErrorListener>();
     private final Object LOCK = new Object();
-    private List<ErrorListener> errorListenenrs;
     private final Thread t;
-    private boolean running = true;
     private final ArrayList<Object> queue = new ArrayList<Object>();
+    private List<ErrorListener> errorListenenrs;
+    private boolean running = true;
 
     private EasyThread(String name) {
         t = Display.getInstance().startThread(new Runnable() {

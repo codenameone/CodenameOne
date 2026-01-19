@@ -114,6 +114,7 @@ public class TableLayout extends Layout {
     private static int minimumSizePerColumn = 10;
     private static int defaultColumnWidth = -1;
     private static int defaultRowHeight = -1;
+    private final int columns;
     private int currentRow;
     private int currentColumn;
     private Constraint[] tablePositions;
@@ -122,10 +123,10 @@ public class TableLayout extends Layout {
     private boolean horizontalSpanningExists;
     private boolean verticalSpanningExists;
     private int rows;
-    private final int columns;
     private boolean growHorizontally;
     private boolean truncateHorizontally; //whether we should truncate or shrink the table if the prefered width of all elements exceed the available width. default = false = shrink
     private boolean truncateVertically;
+
     /**
      * A table must declare the amount of rows and columns in advance
      *

@@ -27,7 +27,9 @@ import java.util.List;
  * Utility class for math operations.
  */
 public final class MathHelper {
-    /** A value that is used a null value. */
+    /**
+     * A value that is used a null value.
+     */
     public static final double NULL_VALUE = -Double.MAX_VALUE + 1;
     /**
      * A number formatter to be used to make sure we have a maximum number of
@@ -64,8 +66,8 @@ public final class MathHelper {
      * Computes a reasonable set of labels for a data interval and number of
      * labels.
      *
-     * @param start start value
-     * @param end final value
+     * @param start           start value
+     * @param end             final value
      * @param approxNumLabels desired number of labels
      * @return collection containing the label values
      */
@@ -100,8 +102,8 @@ public final class MathHelper {
     /**
      * Computes a reasonable number of labels for a data range.
      *
-     * @param start start value
-     * @param end final value
+     * @param start           start value
+     * @param end             final value
      * @param approxNumLabels desired number of labels
      * @return double[] array containing {start value, end value, increment}
      */

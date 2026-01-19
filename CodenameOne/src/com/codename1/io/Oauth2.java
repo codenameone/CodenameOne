@@ -60,19 +60,20 @@ public class Oauth2 {
     public static final String TOKEN = "access_token";
     private static String expires;
     private static boolean backToParent = true;
+    private final String clientId;
+    private final String oauth2URL;
     private boolean useRedirectForWeb = false;
     private boolean useBrowserWindow = "true".equals(CN.getProperty("oauth2.useBrowserWindow", "true"));
     private String token;
     private String refreshToken;
     private String identityToken;
-    private final String clientId;
     private String redirectURI;
     private String scope;
     private String clientSecret;
-    private final String oauth2URL;
     private String tokenRequestURL;
     private Hashtable additionalParams;
     private Dialog login;
+
     /**
      * Simple constructor
      *
@@ -83,6 +84,7 @@ public class Oauth2 {
     public Oauth2(String oauth2URL, String clientId, String redirectURI) {
         this(oauth2URL, clientId, redirectURI, null, null, null);
     }
+
     /**
      * Simple constructor
      *
@@ -548,8 +550,12 @@ public class Oauth2 {
 
                     @Override
                     public final boolean equals(Object o) {
-                        if (!(o instanceof TokenRequest)) return false;
-                        if (!super.equals(o)) return false;
+                        if (!(o instanceof TokenRequest)) {
+                            return false;
+                        }
+                        if (!super.equals(o)) {
+                            return false;
+                        }
 
                         TokenRequest that = (TokenRequest) o;
                         return callbackCalled == that.callbackCalled;
@@ -699,7 +705,7 @@ public class Oauth2 {
 
         @Override
         public boolean equals(Object obj) {
-            if(obj instanceof ShowAuthenticationCommand) {
+            if (obj instanceof ShowAuthenticationCommand) {
                 ShowAuthenticationCommand c = (ShowAuthenticationCommand) obj;
                 return super.equals(c) &&
                         Objects.equals(progress, c.progress) &&

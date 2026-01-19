@@ -38,8 +38,6 @@ import com.codename1.ui.layouts.BorderLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 
@@ -88,8 +86,8 @@ public class Log {
     private static boolean crashBound;
     private static Log instance = new Log();
     private static boolean initialized;
-    private int level = DEBUG;
     private final long zeroTime = System.currentTimeMillis();
+    private int level = DEBUG;
     private Writer output;
     private boolean fileWriteEnabled = false;
     private String fileURL = null;
@@ -489,7 +487,7 @@ public class Log {
         logDirty = true;
         text = getThreadAndTimeStamp() + " - " + text;
         CodenameOneImplementation impl = Util.getImplementation();
-        if(impl != null) {
+        if (impl != null) {
             impl.systemOut(text);
         } else {
             System.out.println(text);

@@ -36,9 +36,9 @@ import com.codename1.ui.plaf.UIManager;
  */
 public class Tile {
 
+    private static final Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
     private static Image tileLoadingImage;
     private static String tileLoadingText = "Loading...";
-    private static final Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
     private static boolean paintLoading = false;
     private final Dimension dimension;
     private final BoundingBox bbox;

@@ -36,6 +36,7 @@ import java.io.InputStream;
 public class BufferedInputStream extends InputStream {
     private static int streamCount = 0;
     private static volatile int defaultBufferSize = 8192;
+    private final String name;
     private int actualAvailable = defaultBufferSize;
     private Object connection;
     private InputStream in;
@@ -44,7 +45,6 @@ public class BufferedInputStream extends InputStream {
     private boolean disableBuffering;
     private boolean closed;
     private boolean stopped;
-
     /**
      * The index one greater than the index of the last valid byte in
      * the buffer.
@@ -57,9 +57,7 @@ public class BufferedInputStream extends InputStream {
     private int count;
     private long lastActivityTime;
     private int totalBytesRead;
-
     private boolean printInput;
-    private final String name;
     private int yield = -1;
     private long elapsedSinceLastYield;
     /**

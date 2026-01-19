@@ -170,8 +170,12 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
 
         @Override
         public final boolean equals(Object o) {
-            if (!(o instanceof AsyncDocumentConnectionRequest)) return false;
-            if (!super.equals(o)) return false;
+            if (!(o instanceof AsyncDocumentConnectionRequest)) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
 
             AsyncDocumentConnectionRequest that = (AsyncDocumentConnectionRequest) o;
             return (docInfo == null ? that.docInfo == null : docInfo.equals(that.docInfo)) && (callback == null ? that.callback == null : callback.equals(that.callback)) && Arrays.equals(response, that.response);

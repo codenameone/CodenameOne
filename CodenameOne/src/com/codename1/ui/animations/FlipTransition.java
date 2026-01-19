@@ -45,26 +45,20 @@ public class FlipTransition extends Transition {
     private static final int STATE_MOVE_AWAY = 1;
     private static final int STATE_FLIP = 2;
     private static final int STATE_MOVE_CLOSER = 3;
-
+    private static final boolean firstFinished = false;
+    private static final boolean started = false;
     // Assume supported optimistically
     // will be switched off in paint.
     private boolean perspectiveSupported = true;
-
     private Image sourceBuffer;
     private Image destBuffer;
-
     // 0 is front, 1.0 is back
     private float flipState = 0f;
-
     // 0 is at closest point (fills original bounds).
     // 1 is at farthest point (all of flip will be visible).
     private float zState = 0f;
     private int transitionState = STATE_MOVE_AWAY;
-
     private Motion motion;
-    private static final boolean firstFinished = false;
-    private static final boolean started = false;
-
     private int bgColor = -1;
 
     private float zNear;

@@ -136,9 +136,6 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         return result;
     }
 
-    static class FinishParsing extends RuntimeException {
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -155,7 +152,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         int question = input.read();
         String cType = "UTF-8";
         if (question == '?') {
-            // we are in an XML header, check if the encoding section exists 
+            // we are in an XML header, check if the encoding section exists
             StringBuilder cs = new StringBuilder();
             question = input.read();
             while (question != '>') {
@@ -278,7 +275,6 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         return p;
     }
 
-
     /**
      * The results are presented as a vector of hashtables easily presentable in Codename One
      *
@@ -337,5 +333,8 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
      */
     public void setIconPlaceholder(Image iconPlaceholder) {
         this.iconPlaceholder = iconPlaceholder;
+    }
+
+    static class FinishParsing extends RuntimeException {
     }
 }

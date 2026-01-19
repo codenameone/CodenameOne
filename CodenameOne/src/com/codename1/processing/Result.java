@@ -47,9 +47,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-
 import java.util.Hashtable;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -363,7 +361,9 @@ public final class Result {
         }
         if ("true".equals(s)) {
             return true;
-        } else return "1".equals(s);
+        } else {
+            return "1".equals(s);
+        }
     }
 
     /**

@@ -54,7 +54,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
-import java.io.Writer;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -114,13 +113,14 @@ public class Util {
 
     /**
      * Helper to get a reader from an input stream with UTF-8 encoding
+     *
      * @param in the input stream
      * @return the reader
      */
     public static InputStreamReader getReader(InputStream in) {
         try {
             return new InputStreamReader(in, "UTF-8");
-        } catch(UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException e) {
             // never happens
             throw new RuntimeException(e.toString());
         }
@@ -128,13 +128,14 @@ public class Util {
 
     /**
      * Helper to get a writer from an output stream with UTF-8 encoding
+     *
      * @param out the output stream
      * @return the writer
      */
     public static OutputStreamWriter getWriter(OutputStream out) {
         try {
             return new OutputStreamWriter(out, "UTF-8");
-        } catch(UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException e) {
             // never happens
             throw new RuntimeException(e.toString());
         }
@@ -232,7 +233,9 @@ public class Util {
      * @since 8.0
      */
     public static String readToString(File file, String charset) throws IOException {
-        if (charset == null) charset = "UTF-8";
+        if (charset == null) {
+            charset = "UTF-8";
+        }
         if (!file.exists()) {
             throw new IOException("Failed to read file " + file + " because it does not exist.");
         }
@@ -273,7 +276,9 @@ public class Util {
      * @since 8.0
      */
     public static void writeStringToFile(File file, String contents, String charset) throws IOException {
-        if (charset == null) charset = "UTF-8";
+        if (charset == null) {
+            charset = "UTF-8";
+        }
         OutputStream output = null;
         try {
             output = FileSystemStorage.getInstance().openOutputStream(file.getAbsolutePath());

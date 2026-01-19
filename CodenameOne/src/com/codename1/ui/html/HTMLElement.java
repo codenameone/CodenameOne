@@ -166,7 +166,7 @@ public class HTMLElement extends Element {
     public static final int ATTR_ID = 1;
 
 
-//////////////////////////////////
+    /// ///////////////////////////////
 // Attributes                   //
     public static final int ATTR_STYLE = 2;
     public static final int ATTR_TITLE = 3;
@@ -253,7 +253,7 @@ public class HTMLElement extends Element {
     public static final int COLOR_GRAY = 0x808080;
 
 
-//////////////////////////////////
+    /// ///////////////////////////////
 // Types                        //
     public static final int COLOR_GREEN = 0x008000;
     public static final int COLOR_LIME = 0x00ff00;
@@ -329,7 +329,7 @@ public class HTMLElement extends Element {
     static final int TYPE_VALIGN = 21; // top/middle/bottom
 
 
-//////////////////////////////////
+    /// ///////////////////////////////
 // Colors                       //
     static final int TYPE_NMTOKEN = 22; // top/middle/bottom
     static final int TYPE_DIRECTION = 23; // ltr/rtl

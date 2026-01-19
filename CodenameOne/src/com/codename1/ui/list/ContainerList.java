@@ -57,10 +57,10 @@ import java.util.Vector;
  * Container, InfiniteContainer etc.
  */
 public class ContainerList extends Container {
+    private final EventDispatcher dispatcher = new EventDispatcher();
     private CellRenderer renderer = new DefaultListCellRenderer();
     private ListModel model;
     private Listeners listener;
-    private final EventDispatcher dispatcher = new EventDispatcher();
 
     /**
      * Default constructor

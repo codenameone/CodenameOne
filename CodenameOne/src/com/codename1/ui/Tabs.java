@@ -73,21 +73,20 @@ import com.codename1.ui.util.EventDispatcher;
  */
 public class Tabs extends Container {
     private final Container contentPane = new Container(new TabsLayout());
+    private final Container tabsContainer;
+    private final ButtonGroup radioGroup = new ButtonGroup();
+    private final ActionListener press;
+    private final ActionListener drag;
+    private final ActionListener release;
+    private final TabFocusListener focusListener;
     private boolean eagerSwipeMode;
-
     /**
      * Where the tabs are placed.
      */
     private int tabPlacement;
-    private final Container tabsContainer;
-    private final ButtonGroup radioGroup = new ButtonGroup();
     private Component selectedTab;
     private boolean swipeActivated = true;
     private boolean swipeOnXAxis = true;
-
-    private final ActionListener press;
-    private final ActionListener drag;
-    private final ActionListener release;
     private Motion slideToDestMotion;
     private int initialX = -1;
     private int initialY = -1;
@@ -96,10 +95,8 @@ public class Tabs extends Container {
     private boolean dragStarted = false;
     private int activeComponent = 0;
     private int active = 0;
-
     private EventDispatcher focusListeners;
     private EventDispatcher selectionListener;
-    private final TabFocusListener focusListener;
     private boolean tabsFillRows;
     private boolean tabsGridLayout;
     private int textPosition = -1;

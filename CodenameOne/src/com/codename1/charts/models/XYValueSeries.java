@@ -25,11 +25,17 @@ import java.util.List;
  * charts like bubble.
  */
 public class XYValueSeries extends XYSeries {
-    /** A list to contain the series values. */
+    /**
+     * A list to contain the series values.
+     */
     private final List<Double> mValue = new ArrayList<Double>();
-    /** The minimum value. */
+    /**
+     * The minimum value.
+     */
     private double mMinValue = MathHelper.NULL_VALUE;
-    /** The maximum value. */
+    /**
+     * The maximum value.
+     */
     private double mMaxValue = MathHelper.NULL_VALUE;
 
     /**
@@ -44,8 +50,8 @@ public class XYValueSeries extends XYSeries {
     /**
      * Adds a new value to the series.
      *
-     * @param x the value for the X axis
-     * @param y the value for the Y axis
+     * @param x     the value for the X axis
+     * @param y     the value for the Y axis
      * @param value the value
      */
     public void add(double x, double y, double value) {
@@ -105,7 +111,7 @@ public class XYValueSeries extends XYSeries {
      * Removes all the values from the series.
      */
     @Override
-    public  void clear() {
+    public void clear() {
         super.clear();
         mValue.clear();
         initRange();

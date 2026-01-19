@@ -87,6 +87,7 @@ public class ImageDownloadService extends ConnectionRequest {
     private ListModel targetModel;
     private Image placeholder;
     private boolean maintainAspectRatio = defaultMaintainAspectRatio;
+
     /**
      * Accepts the url to bind to the list renderer, on completion the action listener
      * will be invoked with the image so a list can be updated with the data
@@ -99,6 +100,7 @@ public class ImageDownloadService extends ConnectionRequest {
         addResponseListener(l);
         setDuplicateSupported(true);
     }
+
     /**
      * Constructs an image request that will automatically populate the given list
      * when the response arrives. This assumes the GenericListCellRenderer style of
@@ -134,6 +136,7 @@ public class ImageDownloadService extends ConnectionRequest {
         init(url);
         setDuplicateSupported(true);
     }
+
     /**
      * Accepts the url to bind to the label, on completion the label will be updated
      * and revalidated with the new image.

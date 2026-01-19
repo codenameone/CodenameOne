@@ -35,12 +35,12 @@ import com.codename1.ui.animations.Animation;
  * @author Shai Almog
  */
 public class UITimer {
+    private final Internal i = new Internal();
     private Runnable internalRunnable;
     private Form bound;
     private long lastEllapse;
     private int ms;
     private boolean repeat;
-    private final Internal i = new Internal();
 
     /**
      * This constructor is useful when deriving this class to implement a timer.

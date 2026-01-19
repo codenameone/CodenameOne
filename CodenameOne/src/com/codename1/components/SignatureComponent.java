@@ -330,120 +330,6 @@ public class SignatureComponent extends Container implements ActionSource<Action
     }
 
     /**
-     * Inner class with the actual body of the dialog for drawing the signature.  This dialog
-     * is shown when the user clicks on the main button.
-     *
-     * @author shannah
-     */
-    private class SignatureDialogBody extends Container {
-        private final EventDispatcher eventDispatcher = new EventDispatcher();
-        private Image value;
-
-        public SignatureDialogBody() {
-            setLayout(new BorderLayout());
-            super.addComponent(BorderLayout.CENTER, signaturePanel);
-            Button doneButton = new Button(
-                    localize("SignatureComponent.SaveButtonLabel", "Save"),
-                    super.getUIManager().getThemeConstant("sigButtonOKUIID", "Button"));
-            Button resetButton = new Button(
-                    localize("SignatureComponent.ResetButtonLabel", "Reset"),
-                    super.getUIManager().getThemeConstant("sigButtonResetUIID", "Button"));
-            Button cancelButton = new Button(
-                    localize("SignatureComponent.CancelButtonLabel", "Cancel"),
-                    super.getUIManager().getThemeConstant("sigButtonCancelUIID", "Button"));
-
-            doneButton.addActionListener(new ActionListener<ActionEvent>() {
-                @Override
-                public void actionPerformed(ActionEvent evt) {
-                    value = signaturePanel.getImage();
-                    if (value == null) {
-                        Dialog.show(
-                                localize("SignatureComponent.ErrorDialog.SignatureRequired.Title", "Signature Required"),
-                                localize("SignatureComponent.ErrorDialog.SignatureRequired.Body", "Please draw your signature in the space provided."),
-                                localize("SignatureComponent.ErrorDialog.OK", "OK"),
-                                null
-                        );
-                        return;
-                    }
-                    eventDispatcher.fireActionEvent(new ActionEvent(this));
-                    removeComponent(signaturePanel);
-                }
-            });
-
-            resetButton.addActionListener(new ActionListener<ActionEvent>() {
-                @Override
-                public void actionPerformed(ActionEvent evt) {
-                    signaturePanel.clear();
-                    onSignatureReset();
-                    repaint();
-                }
-            });
-
-            cancelButton.addActionListener(new ActionListener<ActionEvent>() {
-                @Override
-                public void actionPerformed(ActionEvent evt) {
-                    removeComponent(signaturePanel);
-                    onCancel();
-                }
-            });
-
-            super.addComponent(BorderLayout.SOUTH, GridLayout.encloseIn(3, cancelButton, resetButton, doneButton));
-        }
-
-        /**
-         * Called when the cancel button is pressed.  Should be overridden by subclasses to
-         * actually do something (like close the dialog).
-         */
-        protected void onCancel() {
-
-        }
-
-        /**
-         * Adds a listener to be informed when the "done" button is pressed and a new
-         * signature has been saved as an image.
-         *
-         * @param l
-         */
-        public void addActionListener(ActionListener l) {
-            eventDispatcher.addListener(l);
-        }
-
-
-        /**
-         * @param l
-         * @see #addActionListener(com.codename1.ui.events.ActionListener)
-         */
-        public void removeActionListener(ActionListener l) {
-            eventDispatcher.removeListener(l);
-        }
-
-        /**
-         * Overridden to automatically save the image of the current SignaturePanel
-         * when the dialog is disposed.
-         */
-        @Override
-        protected void deinitialize() {
-            if (value == null) {
-                // We want to cache the value when this field is being hidden.
-                value = signaturePanel.getImage();
-            }
-            super.deinitialize();
-        }
-
-        /**
-         * Gets the signature that was drawn, as an Image.
-         *
-         * @return
-         */
-        public Image getValue() {
-            if (value == null) {
-                value = signaturePanel.getImage();
-            }
-            return value;
-        }
-    }
-
-    /**
      * The actual panel for drawing a signature.  This doesn't include any buttons (like done, reset, or cancel),
      * it merely provides the functionality to record the drawing of a signature.
      */
@@ -452,9 +338,9 @@ public class SignatureComponent extends Container implements ActionSource<Action
         private final GeneralPath path = new GeneralPath();
         private final Stroke stroke = new Stroke();
         private final Rectangle signatureRect = new Rectangle();
-        private boolean initialized;
         private final Style signatureBoxStyle;
         private final Style signatureStyle;
+        private boolean initialized;
 
         SignaturePanel() {
             setUIIDFinal("SignaturePanel");
@@ -608,6 +494,120 @@ public class SignatureComponent extends Container implements ActionSource<Action
          */
         public void clear() {
             path.reset();
+        }
+    }
+
+    /**
+     * Inner class with the actual body of the dialog for drawing the signature.  This dialog
+     * is shown when the user clicks on the main button.
+     *
+     * @author shannah
+     */
+    private class SignatureDialogBody extends Container {
+        private final EventDispatcher eventDispatcher = new EventDispatcher();
+        private Image value;
+
+        public SignatureDialogBody() {
+            setLayout(new BorderLayout());
+            super.addComponent(BorderLayout.CENTER, signaturePanel);
+            Button doneButton = new Button(
+                    localize("SignatureComponent.SaveButtonLabel", "Save"),
+                    super.getUIManager().getThemeConstant("sigButtonOKUIID", "Button"));
+            Button resetButton = new Button(
+                    localize("SignatureComponent.ResetButtonLabel", "Reset"),
+                    super.getUIManager().getThemeConstant("sigButtonResetUIID", "Button"));
+            Button cancelButton = new Button(
+                    localize("SignatureComponent.CancelButtonLabel", "Cancel"),
+                    super.getUIManager().getThemeConstant("sigButtonCancelUIID", "Button"));
+
+            doneButton.addActionListener(new ActionListener<ActionEvent>() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    value = signaturePanel.getImage();
+                    if (value == null) {
+                        Dialog.show(
+                                localize("SignatureComponent.ErrorDialog.SignatureRequired.Title", "Signature Required"),
+                                localize("SignatureComponent.ErrorDialog.SignatureRequired.Body", "Please draw your signature in the space provided."),
+                                localize("SignatureComponent.ErrorDialog.OK", "OK"),
+                                null
+                        );
+                        return;
+                    }
+                    eventDispatcher.fireActionEvent(new ActionEvent(this));
+                    removeComponent(signaturePanel);
+                }
+            });
+
+            resetButton.addActionListener(new ActionListener<ActionEvent>() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    signaturePanel.clear();
+                    onSignatureReset();
+                    repaint();
+                }
+            });
+
+            cancelButton.addActionListener(new ActionListener<ActionEvent>() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    removeComponent(signaturePanel);
+                    onCancel();
+                }
+            });
+
+            super.addComponent(BorderLayout.SOUTH, GridLayout.encloseIn(3, cancelButton, resetButton, doneButton));
+        }
+
+        /**
+         * Called when the cancel button is pressed.  Should be overridden by subclasses to
+         * actually do something (like close the dialog).
+         */
+        protected void onCancel() {
+
+        }
+
+        /**
+         * Adds a listener to be informed when the "done" button is pressed and a new
+         * signature has been saved as an image.
+         *
+         * @param l
+         */
+        public void addActionListener(ActionListener l) {
+            eventDispatcher.addListener(l);
+        }
+
+
+        /**
+         * @param l
+         * @see #addActionListener(com.codename1.ui.events.ActionListener)
+         */
+        public void removeActionListener(ActionListener l) {
+            eventDispatcher.removeListener(l);
+        }
+
+        /**
+         * Overridden to automatically save the image of the current SignaturePanel
+         * when the dialog is disposed.
+         */
+        @Override
+        protected void deinitialize() {
+            if (value == null) {
+                // We want to cache the value when this field is being hidden.
+                value = signaturePanel.getImage();
+            }
+            super.deinitialize();
+        }
+
+        /**
+         * Gets the signature that was drawn, as an Image.
+         *
+         * @return
+         */
+        public Image getValue() {
+            if (value == null) {
+                value = signaturePanel.getImage();
+            }
+            return value;
         }
     }
 }

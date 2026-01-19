@@ -37,12 +37,8 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class TestReporting {
-    private static class TestReportingHolder {
-        private static final TestReporting INSTANCE = new TestReporting();
-    }
     private static volatile TestReporting instanceOverride;
     private final Hashtable<String, Boolean> testsExecuted = new Hashtable<String, Boolean>();
-
 
     /**
      * Gets the test reporting instance
@@ -157,5 +153,9 @@ public class TestReporting {
      */
     @SuppressWarnings("DeprecatedIsStillUsed")
     public void testExecutionFinished() {
+    }
+
+    private static class TestReportingHolder {
+        private static final TestReporting INSTANCE = new TestReporting();
     }
 }

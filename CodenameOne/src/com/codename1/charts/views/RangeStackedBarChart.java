@@ -16,7 +16,9 @@
 package com.codename1.charts.views;
 
 public class RangeStackedBarChart extends RangeBarChart {
-    /** The chart type. */
+    /**
+     * The chart type.
+     */
     public static final String TYPE = "RangeStackedBar";
 
     RangeStackedBarChart() {

@@ -40,13 +40,15 @@ import java.util.List;
  * {@link com.codename1.charts.ChartComponent}.
  */
 public class PieChart extends RoundChart {
-    /** Handles returning values when tapping on PieChart. */
+    /**
+     * Handles returning values when tapping on PieChart.
+     */
     private final PieMapper mPieMapper;
 
     /**
      * Builds a new pie chart instance.
      *
-     * @param dataset the series dataset
+     * @param dataset  the series dataset
      * @param renderer the series renderer
      */
     public PieChart(CategorySeries dataset, DefaultRenderer renderer) {
@@ -58,11 +60,11 @@ public class PieChart extends RoundChart {
      * The graphical representation of the pie chart.
      *
      * @param canvas the canvas to paint to
-     * @param x the top left x value of the view to draw to
-     * @param y the top left y value of the view to draw to
-     * @param width the width of the view to draw to
+     * @param x      the top left x value of the view to draw to
+     * @param y      the top left y value of the view to draw to
+     * @param width  the width of the view to draw to
      * @param height the height of the view to draw to
-     * @param paint the paint
+     * @param paint  the paint
      */
     @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
@@ -176,6 +178,7 @@ public class PieChart extends RoundChart {
 
     /**
      * Gets the shape of a pie segment given its point index.
+     *
      * @param pointIndex The point index representing the pie segment.
      * @return A shape of the outline of the segment.
      */

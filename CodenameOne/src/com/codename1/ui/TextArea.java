@@ -133,10 +133,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * text field
      */
     private static final char ENTER_KEY = '\n';
+    private static final boolean hadSuccessfulEdit = false;
     private static int defaultValign = TOP;
     private static int defaultMaxSize = 124;
     private static boolean autoDegradeMaxSize = false;
-    private static final boolean hadSuccessfulEdit = false;
     /**
      * By default text area uses charWidth since its much faster on some devices
      * than string width. However, with some fonts and especially some languages (such
@@ -382,7 +382,9 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     private static int nl(String t) {
-        if (t == null) return 0;
+        if (t == null) {
+            return 0;
+        }
         return t.length();
     }
 
@@ -753,7 +755,9 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     private boolean isTypedKey(int code) {
-        if (true) return code > 0;
+        if (true) {
+            return code > 0;
+        }
 
         return (code >= 48 && code <= 90) // 0-9a-z
                 ||
@@ -1183,8 +1187,9 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                     if (c == ' ' || c == '\n') {
                         spaceIndex = i;
                         // newline has been found. We can end the loop here as the line cannot grow more
-                        if (c == '\n')
+                        if (c == '\n') {
                             break;
+                        }
                     }
                     maxLength++;
                 }
@@ -1220,8 +1225,9 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                     if (c == ' ' || c == '\n') {
                         spaceIndex = i;
                         // newline has been found. We can end the loop here as the line cannot grow more
-                        if (c == '\n')
+                        if (c == '\n') {
                             break;
+                        }
                     }
                     maxLength++;
                 }
@@ -1859,6 +1865,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated uses the deprecated BindTarget interface
      */
     @Override
@@ -1875,6 +1882,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated uses the deprecated BindTarget interface
      */
     @Override

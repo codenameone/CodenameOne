@@ -49,6 +49,7 @@ public final class Graphics {
      * @since 7.0
      */
     public static final int RENDERING_HINT_FAST = 1;
+    private final CodenameOneImplementation impl;
     /**
      * Flag that specifies that native peers are rendered "behind" the this
      * graphics context.  The main difference is that drawPeerComponent() will
@@ -64,7 +65,6 @@ public final class Graphics {
     private int color;
     private Paint paint;
     private Font current = Font.getDefaultFont();
-    private final CodenameOneImplementation impl;
     private Object nativeGraphics;
     private Object[] nativeGraphicsState;
     private float scaleX = 1, scaleY = 1;
@@ -1133,7 +1133,9 @@ public final class Graphics {
      * @since 7.0
      */
     public int concatenateAlpha(int a) {
-        if (a == 255) return getAlpha();
+        if (a == 255) {
+            return getAlpha();
+        }
 
         int oldAlpha = getAlpha();
         setAlpha((int) (oldAlpha * (a / 255f)));

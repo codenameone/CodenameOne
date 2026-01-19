@@ -36,8 +36,8 @@ import java.util.Vector;
  */
 public class LinesLayer extends AbstractLayer {
 
-    protected int _lineColor;
     private final Vector _lineSegments;
+    protected int _lineColor;
 
     /**
      * Constructor with default projection Mercator.

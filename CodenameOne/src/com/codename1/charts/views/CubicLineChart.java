@@ -37,13 +37,17 @@ import java.util.List;
  * follows the provided data points.
  */
 public class CubicLineChart extends LineChart {
-    /** The chart type. */
+    /**
+     * The chart type.
+     */
     public static final String TYPE = "Cubic";
 
     private final float mFirstMultiplier;
 
     private final float mSecondMultiplier;
-    /** A path measure for retrieving the points on the path. */
+    /**
+     * A path measure for retrieving the points on the path.
+     */
     private PathMeasure mPathMeasure;
 
     public CubicLineChart() {
@@ -56,13 +60,13 @@ public class CubicLineChart extends LineChart {
     /**
      * Builds a cubic line chart.
      *
-     * @param dataset the dataset
-     * @param renderer the renderer
+     * @param dataset    the dataset
+     * @param renderer   the renderer
      * @param smoothness smoothness determines how smooth the curve should be,
-     *          range [0->0.5] super smooth, 0.5, means that it might not get
-     *          close to control points if you have random data // less smooth,
-     *          (close to 0) means that it will most likely touch all control //
-     *          points
+     *                   range [0->0.5] super smooth, 0.5, means that it might not get
+     *                   close to control points if you have random data // less smooth,
+     *                   (close to 0) means that it will most likely touch all control //
+     *                   points
      */
     public CubicLineChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer,
                           float smoothness) {
@@ -121,13 +125,13 @@ public class CubicLineChart extends LineChart {
     /**
      * Draws the series points.
      *
-     * @param canvas the canvas
-     * @param paint the paint object
-     * @param pointsList the points to be rendered
+     * @param canvas         the canvas
+     * @param paint          the paint object
+     * @param pointsList     the points to be rendered
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the y axis value in pixels
-     * @param seriesIndex the series index
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the y axis value in pixels
+     * @param seriesIndex    the series index
+     * @param startIndex     the start index of the rendering points
      */
     @Override
     protected void drawPoints(Canvas canvas, Paint paint, List<Float> pointsList,

@@ -253,11 +253,11 @@ public class WebServiceProxyCall {
     }
 
     static class WSConnection extends ConnectionRequest {
-        Object returnValue;
         private final WSDefinition def;
         private final Object[] arguments;
         private final SuccessCallback scall;
         private final FailureCallback fcall;
+        Object returnValue;
 
         public WSConnection(WSDefinition def, Callback call, Object... arguments) {
             this(def, call, call, arguments);
@@ -353,7 +353,9 @@ public class WebServiceProxyCall {
         protected void readResponse(InputStream input) throws IOException {
             DataInputStream dis = new DataInputStream(input);
 
-            if (def == null) return;
+            if (def == null) {
+                return;
+            }
             switch (def.returnType) {
                 case TYPE_VOID:
                     return;

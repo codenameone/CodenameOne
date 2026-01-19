@@ -136,12 +136,32 @@ public class Sheet extends Container {
     private final EventDispatcher backListeners = new EventDispatcher();
     private final Button backButton = new Button(FontImage.MATERIAL_CLOSE);
     private final Container commandsContainer = new Container(BoxLayout.x());
-    private boolean allowClose = true;
     private final Container titleBar = BorderLayout.center(LayeredLayout.encloseIn(
             BorderLayout.center(FlowLayout.encloseCenterMiddle(title)),
             BorderLayout.centerEastWest(null, commandsContainer, backButton)
     ));
     private final Container contentPane = new Container(BoxLayout.y());
+    private final ActionListener formPointerListener = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            Form f = getComponentForm();
+            if (f == null) {
+                return;
+            }
+            if (Display.impl.isScrollWheeling()) {
+                return;
+            }
+            Component cmp = f.getComponentAt(evt.getX(), evt.getY());
+            if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) {
+                // do nothing.
+            } else {
+                evt.consume();
+                hide(DEFAULT_TRANSITION_DURATION);
+            }
+        }
+
+    };
+    private boolean allowClose = true;
     /**
      * The position on the screen where the sheet is displayed on phones.
      * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
@@ -165,26 +185,6 @@ public class Sheet extends Container {
      * These are set the first time the sheet is shown and used as the base for safe area calculations.
      */
     private int[] originalPadding = null;
-    private final ActionListener formPointerListener = new ActionListener() {
-        @Override
-        public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
-            if (f == null) {
-                return;
-            }
-            if (Display.impl.isScrollWheeling()) {
-                return;
-            }
-            Component cmp = f.getComponentAt(evt.getX(), evt.getY());
-            if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) {
-                // do nothing.
-            } else {
-                evt.consume();
-                hide(DEFAULT_TRANSITION_DURATION);
-            }
-        }
-
-    };
     private Form form;
 
     /**

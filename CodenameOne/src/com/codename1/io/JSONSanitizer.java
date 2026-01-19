@@ -133,6 +133,7 @@ final class JSONSanitizer {
      * {@link #sanitizedJson}.
      */
     private int cleaned;
+
     JSONSanitizer(String jsonish) {
         this(jsonish, DEFAULT_NESTING_DEPTH);
     }

@@ -392,6 +392,7 @@ public class RadioButton extends Button {
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated uses the deprecated BindTarget interface
      */
     @Override
@@ -408,6 +409,7 @@ public class RadioButton extends Button {
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated uses the deprecated BindTarget interface
      */
     @Override
