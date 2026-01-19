@@ -1386,7 +1386,7 @@ class CSSEngine {
 
         if ((element.getTagId() == HTMLElement.TAG_LI) || (element.getTagId() == HTMLElement.TAG_UL) || (element.getTagId() == HTMLElement.TAG_OL) || (element.getTagId() == HTMLElement.TAG_DIR) || (element.getTagId() == HTMLElement.TAG_MENU)) { // NOPMD
             int listPos = selector.getAttrVal(CSSElement.CSS_LIST_STYLE_POSITION);
-            if (listPos == LIST_STYLE_POSITION_INSIDE) {
+            if (listPos == LIST_STYLE_POSITION_INSIDE) { // NOPMD
                 // Padding and not margin since background color should affect also the indented space
                 ui.getStyle().setPadding(Component.LEFT, ui.getStyle().getMargin(Component.LEFT) + INDENT_LIST_STYLE_POSITION);
                 Container parent = ui.getParent();
@@ -1406,9 +1406,9 @@ class CSSEngine {
         boolean rightBorder = false; // Used to prevent drawing a border in the middle of two words in the same segment
         boolean hasBorder = false;
         if ((borderUi == ui) && (element.getUi().size() > 1)) { // NOPMD
-            if (element.getUi().firstElement() == borderUi) {
+            if (element.getUi().firstElement() == borderUi) { // NOPMD
                 leftBorder = true;
-            } else if (element.getUi().lastElement() == borderUi) {
+            } else if (element.getUi().lastElement() == borderUi) { // NOPMD
                 rightBorder = true;
             }
         } else {

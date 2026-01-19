@@ -2008,8 +2008,8 @@ public class Component implements Animation, StyleListener, Editable {
     public boolean isOwnedBy(Component cmp) {
         Component c = this.owner;
         Container cnt = (cmp instanceof Container) ? (Container) cmp : null;
-        while (c != null) { // NOPMD
-            if (c == cmp) {
+        while (c != null) {
+            if (c == cmp) { // NOPMD
                 return true;
             }
             if (cnt != null) {
@@ -5099,7 +5099,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (p == null) { // NOPMD
             return;
         }
-        if (currentPointerPress != p.getCurrentPointerPress()) {
+        if (currentPointerPress != p.getCurrentPointerPress()) { // NOPMD
             return;
         }
 
@@ -5438,13 +5438,13 @@ public class Component implements Animation, StyleListener, Editable {
     boolean isScrollDecelerationMotionInProgress() {
         Motion dmY = draggedMotionY;
         if (dmY != null) { // NOPMD
-            if (dmY == decelerationMotion && !dmY.isFinished()) {
+            if (dmY == decelerationMotion && !dmY.isFinished()) { // NOPMD
                 return true;
             }
         }
         Motion dmX = draggedMotionX;
         if (dmX != null) { // NOPMD
-            if (dmX == decelerationMotion && !dmX.isFinished()) {
+            if (dmX == decelerationMotion && !dmX.isFinished()) { // NOPMD
                 return true;
             }
         }
@@ -7100,7 +7100,7 @@ public class Component implements Animation, StyleListener, Editable {
         //changing the Font, Padding, Margin may casue the size of the Component to Change
         //therefore we turn on the shouldCalcPreferredSize flag
         if ((!shouldCalcPreferredSize &&
-                source == getStyle()) &&
+                source == getStyle()) && // NOPMD
                 (Style.FONT.equals(propertyName) ||
                         Style.MARGIN.equals(propertyName) ||
                         Style.PADDING.equals(propertyName))) {
@@ -7743,7 +7743,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return false if the container isn't one of our parent containers
      */
     public boolean isChildOf(Container cnt) {
-        if (cnt == parent) {
+        if (cnt == parent) { // NOPMD
             return true;
         }
         return parent != null && parent.isChildOf(cnt); // NOPMD
