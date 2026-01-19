@@ -219,7 +219,8 @@ public class GridLayout extends Layout {
         boolean landscapeMode = isLandscapeMode();
         autoSizeCols(parent, width, landscapeMode);
 
-        int rows, columns;
+        int rows;
+        int columns;
         if (landscapeMode) {
             rows = landscapeRows;
             columns = landscapeColumns;
@@ -303,7 +304,8 @@ public class GridLayout extends Layout {
 
         boolean landscapeMode = isLandscapeMode();
         autoSizeCols(parent, parent.getWidth(), landscapeMode);
-        int rows, columns;
+        int rows;
+        int columns;
         if (landscapeMode) {
             rows = landscapeRows;
             columns = landscapeColumns;

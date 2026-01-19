@@ -199,7 +199,8 @@ public class ChartComponent extends Component {
     private double zoomDistStart = 0;
     private BBox dragStartBBox;
     private BBox zoomStartBBox;
-    private double zoomDistStartX, zoomDistStartY;
+    private double zoomDistStartX;
+    private double zoomDistStartY;
     private BBox initialZoomBBox;
 
     /**
@@ -1127,9 +1128,13 @@ public class ChartComponent extends Component {
         Point bottomRight;
 
         // Chart coords
-        double minX, maxX, minY, maxY;
+        double minX;
+        double maxX;
+        double minY;
+        double maxY;
 
-        double scaleX, scaleY;
+        double scaleX;
+        double scaleY;
 
         BBox translateScreenCoords(float x, float y) {
             BBox out = new BBox();

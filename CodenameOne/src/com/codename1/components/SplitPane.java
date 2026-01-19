@@ -673,8 +673,12 @@ public class SplitPane extends Container {
         private String preferredInset = "50%";
         private String maxInset = "100%";
 
-        private char expandMaterialIcon, collapseMaterialIcon, dragHandleMaterialIcon;
-        private Image expandIcon, collapseIcon, dragHandleIcon;
+        private char expandMaterialIcon;
+        private char collapseMaterialIcon;
+        private char dragHandleMaterialIcon;
+        private Image expandIcon;
+        private Image collapseIcon;
+        private Image dragHandleIcon;
 
         /**
          * Creates a new Settings with default values.
@@ -939,7 +943,10 @@ public class SplitPane extends Container {
         private final Button btnCollapse;
         private final Button btnExpand;
         private final Label dragHandle;
-        int pressedX, pressedY, draggedX, draggedY;
+        int pressedX;
+        int pressedY;
+        int draggedX;
+        int draggedY;
         LayeredLayoutConstraint pressedConstraint;
         private boolean inDrag;
 

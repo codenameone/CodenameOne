@@ -380,10 +380,15 @@ public abstract class MathUtil {
     }
 
     private static final double ieee754Exp(double x) {
-        double y, c, t;
-        double hi = 0, lo = 0;
+        double y;
+        double c;
+        double t;
+        double hi = 0;
+        double lo = 0;
         int k = 0;
-        int xsb, hx, lx;
+        int xsb;
+        int hx;
+        int lx;
         long yl;
         long xl = Double.doubleToLongBits(x);
 
@@ -447,8 +452,20 @@ public abstract class MathUtil {
     }
 
     private static double ieee754Log(double x) {
-        double hfsq, f, s, z, r, w, t1, t2, dk;
-        int k, hx, lx, i, j;
+        double hfsq;
+        double f;
+        double s;
+        double z;
+        double r;
+        double w;
+        double t1;
+        double t2;
+        double dk;
+        int k;
+        int hx;
+        int lx;
+        int i;
+        int j;
         long xl = Double.doubleToLongBits(x);
 
         hx = (int) (xl >> HI_SHIFT);   /* high word of x */
@@ -520,12 +537,33 @@ public abstract class MathUtil {
     }
 
     private static double ieee754Pow(double x, double y) {
-        double z, ax, zH, zL, pH, pL;
-        double y1, t1, t2, r, s, t, u, v, w;
+        double z;
+        double ax;
+        double zH;
+        double zL;
+        double pH;
+        double pL;
+        double y1;
+        double t1;
+        double t2;
+        double r;
+        double s;
+        double t;
+        double u;
+        double v;
+        double w;
         //int i0,i1;
-        int i, j, k, yisint, n;
-        int hx, hy, ix, iy;
-        int lx, ly;
+        int i;
+        int j;
+        int k;
+        int yisint;
+        int n;
+        int hx;
+        int hy;
+        int ix;
+        int iy;
+        int lx;
+        int ly;
 
         //i0 = (int)((Double.doubleToLongBits(one)) >>> (29+HI_SHIFT))^1;
         //i1 = 1-i0;
@@ -657,7 +695,12 @@ public abstract class MathUtil {
             t1 = Double.longBitsToDouble(Double.doubleToLongBits(t1) & HI_MASK);
             t2 = v - (t1 - u);
         } else {
-            double ss, s2, sH, sL, tH, tL;
+            double ss;
+            double s2;
+            double sH;
+            double sL;
+            double tH;
+            double tL;
             n = 0;
             /* take care subnormal number */
             if (ix < 0x00100000) {
@@ -811,8 +854,16 @@ public abstract class MathUtil {
      * Function needed: sqrt
      */
     private static double ieee754Acos(double x) {
-        double z, p, q, r, w, s, c, df;
-        int hx, ix;
+        double z;
+        double p;
+        double q;
+        double r;
+        double w;
+        double s;
+        double c;
+        double df;
+        int hx;
+        int ix;
         hx = (int) (Double.doubleToLongBits(x) >>> HI_SHIFT);
         ix = hx & 0x7fffffff;
         if (ix >= 0x3ff00000) {  /* |x| >= 1 */
@@ -887,8 +938,15 @@ public abstract class MathUtil {
      *
      */
     private static double ieee754Asin(double x) {
-        double t, w, p, q, c, r, s;
-        int hx, ix;
+        double t;
+        double w;
+        double p;
+        double q;
+        double c;
+        double r;
+        double s;
+        int hx;
+        int ix;
         hx = (int) (Double.doubleToLongBits(x) >>> HI_SHIFT);
         ix = hx & 0x7fffffff;
         if (ix >= 0x3ff00000) {   /* |x|>= 1 */
@@ -934,8 +992,13 @@ public abstract class MathUtil {
     }
 
     private static double ieee754Atan(double x) {
-        double w, s1, s2, z;
-        int ix, hx, id;
+        double w;
+        double s1;
+        double s2;
+        double z;
+        int ix;
+        int hx;
+        int id;
 
         hx = (int) (Double.doubleToLongBits(x) >>> HI_SHIFT);
         ix = hx & 0x7fffffff;
@@ -1017,9 +1080,14 @@ public abstract class MathUtil {
      */
     private static double ieee754Atan2(double x, double y) {
         double z;
-        int k, m;
-        int hx, hy, ix, iy;
-        int lx, ly;
+        int k;
+        int m;
+        int hx;
+        int hy;
+        int ix;
+        int iy;
+        int lx;
+        int ly;
 
         //i0 = (int)((Double.doubleToLongBits(one)) >> (29+HI_SHIFT))^1;
         //i1 = 1-i0;
@@ -1115,7 +1183,9 @@ public abstract class MathUtil {
      * exponentiation or a multiplication.
      */
     public static double scalb(double x, int n) {
-        int k, hx, lx;
+        int k;
+        int hx;
+        int lx;
         hx = (int) (Double.doubleToLongBits(x) >>> HI_SHIFT);
         lx = (int) (Double.doubleToLongBits(x) & LO_MASK);
         k = (hx & 0x7ff00000) >> 20;    /* extract exponent */

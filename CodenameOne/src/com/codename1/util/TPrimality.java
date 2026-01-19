@@ -82,7 +82,8 @@ final class TPrimality {
      */
     static TBigInteger nextProbablePrime(TBigInteger n) {
         // PRE: n >= 0
-        int i, j;
+        int i;
+        int j;
         int certainty;
         int gapSize = 1024; // for searching of the next probable prime number
         int[] modules = new int[primes.length];

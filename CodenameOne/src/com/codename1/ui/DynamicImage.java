@@ -33,7 +33,8 @@ import com.codename1.ui.plaf.Style;
  */
 public abstract class DynamicImage extends Image {
 
-    private int w = 250, h = 250;
+    private int w = 250;
+    private int h = 250;
     private Style style;
 
     /**

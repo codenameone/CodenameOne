@@ -67,12 +67,15 @@ public final class MigLayout extends Layout {
     /**
      * Hold the serializable text representation of the constraints.
      */
-    private Object layoutConstraints = "", colConstraints = "", rowConstraints = "";    // Should never be null!
+    private Object layoutConstraints = "";    // Should never be null!
+    private Object colConstraints = "";
+    private Object rowConstraints = "";
     // ******** Transient part ********
     private ContainerWrapper cacheParentW = null;
     //private javax.swing.Timer debugTimer = null;
     private LC lc = null;
-    private AC colSpecs = null, rowSpecs = null;
+    private AC colSpecs = null;
+    private AC rowSpecs = null;
     private Grid grid = null;
     private int lastModCount = PlatformDefaults.getModCount();
     private int lastHash = -1;

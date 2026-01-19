@@ -97,8 +97,10 @@ public final class CC {
     private Boolean flowX = null;
     private int skip = 0;
     private int split = 1;
-    private int spanX = 1, spanY = 1;
-    private int cellX = -1, cellY = 0; // If cellX is -1 then cellY is also considered -1. cellY is never negative.
+    private int spanX = 1;
+    private int spanY = 1;
+    private int cellX = -1; // If cellX is -1 then cellY is also considered -1. cellY is never negative.
+    private int cellY = 0;
     private String tag = null;
     private String id = null;
     private int hideMode = -1;
@@ -109,7 +111,8 @@ public final class CC {
     private boolean boundsInGrid = true;
     private boolean external = false;
     // ***** Tmp cache field
-    private Float pushX = null, pushY = null;
+    private Float pushX = null;
+    private Float pushY = null;
     private transient String[] linkTargets = null;
 
     /**

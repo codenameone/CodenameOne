@@ -90,7 +90,8 @@ public final class CommonTransitions extends Transition {
     private static final int TYPE_COVER = 7;
     private static final int TYPE_UNCOVER = 8;
     private static boolean defaultLinearMotion = false;
-    private Motion motion, motion2;
+    private Motion motion;
+    private Motion motion2;
     private LazyValue<Motion> lazyMotion;
     private int slideType;
     private int speed;
@@ -102,7 +103,10 @@ public final class CommonTransitions extends Transition {
     private byte pulseState;
     private boolean linearMotion = defaultLinearMotion;
     private boolean motionSetManually;
-    private int originalWidth, originalHeight, originalX, originalY;
+    private int originalWidth;
+    private int originalHeight;
+    private int originalX;
+    private int originalY;
 
 
     /**

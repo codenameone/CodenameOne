@@ -867,7 +867,8 @@ public class ImageDownloadService extends ConnectionRequest {
      */
     @Override
     protected void readResponse(InputStream input) throws IOException {
-        int imageScaleWidth = -1, imageScaleHeight = -1;
+        int imageScaleWidth = -1;
+        int imageScaleHeight = -1;
         if (fastScale) {
             if (toScale != null) {
                 imageScaleWidth = toScale.getWidth();

@@ -29,7 +29,11 @@ package com.codename1.push;
  * @author Steve Hannah
  */
 public class PushAction {
-    private final String id, title, icon, textInputPlaceholder, textInputButtonText;
+    private final String id;
+    private final String title;
+    private final String icon;
+    private final String textInputPlaceholder;
+    private final String textInputButtonText;
 
     /**
      * Creates a new push action

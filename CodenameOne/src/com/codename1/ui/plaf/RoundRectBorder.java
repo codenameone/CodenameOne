@@ -129,7 +129,10 @@ public final class RoundRectBorder extends Border {
      * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
      */
     private boolean bezierCorners;
-    private boolean topLeft = true, topRight = true, bottomLeft = true, bottomRight = true;
+    private boolean topLeft = true;
+    private boolean topRight = true;
+    private boolean bottomLeft = true;
+    private boolean bottomRight = true;
 
     private int arrowPosition = -1;
     private int arrowDirection = -1;

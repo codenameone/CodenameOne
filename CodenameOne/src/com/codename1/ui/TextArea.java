@@ -1126,7 +1126,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         int to = from + minCharactersInRow;
         int textLength = text.length;
         String rowText = null;
-        int i, spaceIndex;
+        int i;
+        int spaceIndex;
 
         // if there is any possibility of a scrollbar we need to reduce the textArea
         // width to accommodate it

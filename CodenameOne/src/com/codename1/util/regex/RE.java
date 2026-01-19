@@ -741,7 +741,9 @@ public class RE {
         int idx = idxStart;
 
         // Loop while node is valid
-        int next, opcode, opdata;
+        int next;
+        int opcode;
+        int opdata;
         int idxNew;
         char[] instruction = program.instruction;
         for (int node = firstNode; node < lastNode; ) {

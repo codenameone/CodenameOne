@@ -307,7 +307,8 @@ abstract class AbstractStringBuilder {
                     - index); // index == count case is no-op
             return;
         } else {
-            int a = count + size, b = (value.length << 1) + 2;
+            int a = count + size;
+            int b = (value.length << 1) + 2;
             newSize = a > b ? a : b;
         }
 
@@ -356,7 +357,8 @@ abstract class AbstractStringBuilder {
         int end = count - 1;
         char frontHigh = value[0];
         char endLow = value[end];
-        boolean allowFrontSur = true, allowEndSur = true;
+        boolean allowFrontSur = true;
+        boolean allowEndSur = true;
         for (int i = 0, mid = count / 2; i < mid; i++, --end) {
             char frontLow = value[i + 1];
             char endHigh = value[end - 1];
@@ -553,7 +555,8 @@ abstract class AbstractStringBuilder {
                 if (!found || subCount + i > count) {
                     return -1; // handles subCount > count || start >= count
                 }
-                int o1 = i, o2 = 0;
+                int o1 = i;
+                int o2 = 0;
                 while (++o2 < subCount && value[++o1] == subString.charAt(o2)) {
                     // Intentionally empty
                 }
@@ -615,7 +618,8 @@ abstract class AbstractStringBuilder {
                     if (!found) {
                         return -1;
                     }
-                    int o1 = i, o2 = 0;
+                    int o1 = i;
+                    int o2 = 0;
                     while (++o2 < subCount
                             && value[++o1] == subString.charAt(o2)) {
                         // Intentionally empty

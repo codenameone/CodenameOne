@@ -147,7 +147,10 @@ public class Base64 {
         int length = in.length * 4 / 3;
         length += length / 76 + 3; // for crlr
         byte[] out = new byte[length];
-        int index = 0, i, crlr = 0, end = in.length - in.length % 3;
+        int index = 0;
+        int i;
+        int crlr = 0;
+        int end = in.length - in.length % 3;
         for (i = 0; i < end; i += 3) {
             out[index++] = map[(in[i] & 0xff) >> 2];
             out[index++] = map[((in[i] & 0x03) << 4)
@@ -193,7 +196,9 @@ public class Base64 {
         int length = in.length * 4 / 3;
         length += length / 76 + 3;
         byte[] out = new byte[length];
-        int index = 0, i, end = in.length - in.length % 3;
+        int index = 0;
+        int i;
+        int end = in.length - in.length % 3;
         for (i = 0; i < end; i += 3) {
             out[index++] = map[(in[i] & 0xff) >> 2];
             out[index++] = map[((in[i] & 0x03) << 4)

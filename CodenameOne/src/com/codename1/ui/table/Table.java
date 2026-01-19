@@ -200,7 +200,8 @@ public class Table extends Container {
     }
 
     private void updateModel() {
-        int selectionRow = -1, selectionColumn = -1;
+        int selectionRow = -1;
+        int selectionColumn = -1;
         Form f = getComponentForm();
         if (f != null) {
             Component c = f.getFocused();

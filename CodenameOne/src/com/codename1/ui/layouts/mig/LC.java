@@ -46,15 +46,20 @@ public final class LC {
 
     private UnitValue[] insets = null;    // Never null elememts but if unset array is null
 
-    private UnitValue alignX = null, alignY = null;
+    private UnitValue alignX = null;
+    private UnitValue alignY = null;
 
-    private BoundSize gridGapX = null, gridGapY = null;
+    private BoundSize gridGapX = null;
+    private BoundSize gridGapY = null;
 
-    private BoundSize width = BoundSize.NULL_SIZE, height = BoundSize.NULL_SIZE;
+    private BoundSize width = BoundSize.NULL_SIZE;
+    private BoundSize height = BoundSize.NULL_SIZE;
 
-    private BoundSize packW = BoundSize.NULL_SIZE, packH = BoundSize.NULL_SIZE;
+    private BoundSize packW = BoundSize.NULL_SIZE;
+    private BoundSize packH = BoundSize.NULL_SIZE;
 
-    private float pwAlign = 0.5f, phAlign = 1.0f;
+    private float pwAlign = 0.5f;
+    private float phAlign = 1.0f;
 
     private int debugMillis = 0;
 
@@ -64,7 +69,8 @@ public final class LC {
 
     private boolean flowX = true;
 
-    private boolean fillX = false, fillY = false;
+    private boolean fillX = false;
+    private boolean fillY = false;
 
     private boolean topToBottom = true;
 

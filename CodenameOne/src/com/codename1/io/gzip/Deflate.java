@@ -860,7 +860,8 @@ final class Deflate {
                       int storedLen, // length of input block
                       boolean eof     // true if this is the last block for a file
     ) {
-        int optLenb, staticLenb;// opt_len and static_len in bytes
+        int optLenb; // opt_len in bytes
+        int staticLenb; // static_len in bytes
         int maxBlIndex = 0;      // index of last bit length code of non zero freq
 
         // Build the Huffman trees unless a stored block is forced
@@ -929,7 +930,8 @@ final class Deflate {
     //    performed for at least two bytes (required for the zip translate_eol
     //    option -- not supported here).
     void fillWindow() {
-        int n, m;
+        int n;
+        int m;
         int p;
         int more;    // Amount of free space at the end of the window.
 

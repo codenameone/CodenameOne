@@ -33,9 +33,13 @@ import com.codename1.ui.Image;
  */
 public class MediaMetaData {
 
-    private String title, subtitle;
-    private int trackNumber, numTracks;
-    private Image displayIcon, albumArt, art;
+    private String title;
+    private String subtitle;
+    private int trackNumber;
+    private int numTracks;
+    private Image displayIcon;
+    private Image albumArt;
+    private Image art;
 
     /**
      * Gets the media title.

@@ -465,7 +465,10 @@ class TDivision {
 
         int m = p.numberLength * 32;
         // PRE: a \in [1, p - 1]
-        TBigInteger u, v, r, s;
+        TBigInteger u;
+        TBigInteger v;
+        TBigInteger r;
+        TBigInteger s;
         u = p.copy(); // make copy to use inplace method
         v = a.copy();
         int max = Math.max(v.numberLength, u.numberLength);
@@ -579,7 +582,11 @@ class TDivision {
      */
     static TBigInteger modInverseHars(TBigInteger a, TBigInteger m) {
         // PRE: (a > 0) and (m > 0)
-        TBigInteger u, v, r, s, temp;
+        TBigInteger u;
+        TBigInteger v;
+        TBigInteger r;
+        TBigInteger s;
+        TBigInteger temp;
         // u = MAX(a,m), v = MIN(a,m)
         if (a.compareTo(m) == TBigInteger.LESS) {
             u = m;

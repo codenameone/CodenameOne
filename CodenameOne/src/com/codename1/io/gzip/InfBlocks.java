@@ -409,7 +409,9 @@ final class InfBlocks {
                         }
 
                         int[] h;
-                        int i, j, c;
+                        int i;
+                        int j;
+                        int c;
 
                         t = bb[0];
 

@@ -52,7 +52,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private Spinner3D month;
     private Spinner3D day;
     private Spinner3D year;
-    private boolean explicitStartYear, explicitEndYear, explicitStartMonth, explicitEndMonth, explicitStartDay, explicitEndDay, explicitCurrentYear;
+    private boolean explicitStartYear;
+    private boolean explicitEndYear;
+    private boolean explicitStartMonth;
+    private boolean explicitEndMonth;
+    private boolean explicitStartDay;
+    private boolean explicitEndDay;
+    private boolean explicitCurrentYear;
     private int startYear = 1970;
     private int endYear = 2100;
     private int startMonth = 1;

@@ -208,7 +208,8 @@ final class Tree {
         int base = statDesc != null ? statDesc.extraBase : 0;
         int maxLength = statDesc != null ? statDesc.maxLength : 0;
         int h;              // heap index
-        int n, m;           // iterate over the tree elements
+        int n;           // iterate over the tree elements
+        int m;
         int bits;           // bit length
         int xbits;          // extra bits
         short f;            // frequency
@@ -293,7 +294,8 @@ final class Tree {
         short[] tree = dynTree;
         short[] stree = statDesc != null ? statDesc.staticTree : null;
         int elems = statDesc != null ? statDesc.elems : 0;
-        int n, m;          // iterate over heap elements
+        int n;          // iterate over heap elements
+        int m;
         int maxCode = -1;   // largest code with non zero frequency
         int node;          // new node being created
 
@@ -371,4 +373,3 @@ final class Tree {
         genCodes(tree, maxCode, s.blCount, s.nextCode);
     }
 }
-

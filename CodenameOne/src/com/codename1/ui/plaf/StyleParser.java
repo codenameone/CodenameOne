@@ -1877,7 +1877,12 @@ public class StyleParser {
         private Boolean rectangle;
 
         // Used for roundrect border
-        private Boolean topOnlyMode, bottomOnlyMode, topLeftMode, topRightMode, bottomLeftMode, bottomRightMode;
+        private Boolean topOnlyMode;
+        private Boolean bottomOnlyMode;
+        private Boolean topLeftMode;
+        private Boolean topRightMode;
+        private Boolean bottomLeftMode;
+        private Boolean bottomRightMode;
         private Float cornerRadius;
 
         /**

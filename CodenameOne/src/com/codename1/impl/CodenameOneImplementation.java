@@ -3679,7 +3679,8 @@ public abstract class CodenameOneImplementation {
         int destIndex = -1;
 
         int ixEnd = ixStart + len;
-        int ix0, ix1;
+        int ix0;
+        int ix1;
 
         ix0 = ix1 = ixStart;
 
@@ -3758,7 +3759,8 @@ public abstract class CodenameOneImplementation {
 
     // PMD Fix (UnnecessaryModifier): Remove redundant final modifier on private helper.
     private int scanBackFirst(char[] chars, int ixStart, int ixEnd) {
-        int ix, ixFound = ixEnd;
+        int ix;
+        int ixFound = ixEnd;
         for (ix = ixStart + 1; ix < ixEnd; ix++) {
             if (isRTL(chars[ix]) || isRTLBreak(chars[ix])) {
                 ixFound = ix;

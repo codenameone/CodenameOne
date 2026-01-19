@@ -66,7 +66,8 @@ public class Slider extends Label implements ActionSource {
     private boolean vertical;
     private boolean editable;
     private int increments = 4;
-    private int previousX = -1, previousY = -1;
+    private int previousX = -1;
+    private int previousY = -1;
     private Style sliderFull;
     private Style sliderFullSelected;
     private boolean paintingFull;
@@ -354,7 +355,8 @@ public class Slider extends Label implements ActionSource {
     @Override
     protected Dimension calcPreferredSize() {
         Style style = getStyle();
-        int prefW = 0, prefH = 0;
+        int prefW = 0;
+        int prefH = 0;
         if (style.getBorder() != null) {
             prefW = Math.max(style.getBorder().getMinimumWidth(), prefW);
             prefH = Math.max(style.getBorder().getMinimumHeight(), prefH);

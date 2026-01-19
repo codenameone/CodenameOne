@@ -400,7 +400,10 @@ public class Component implements Animation, StyleListener, Editable {
      * release event from occurring.
      */
     private boolean dragActivated;
-    private int oldx, oldy, draggedx, draggedy;
+    private int oldx;
+    private int oldy;
+    private int draggedx;
+    private int draggedy;
     private int initialScrollY = -1;
     private int destScrollY = -1;
     private int lastScrollY;
@@ -8116,7 +8119,8 @@ public class Component implements Animation, StyleListener, Editable {
     class BGPainter implements Painter, Animation {
         Image radialCache;
         CodenameOneImplementation impl;
-        private Motion wMotion, hMotion;
+        private Motion wMotion;
+        private Motion hMotion;
         private Form previousTint;
         private Painter painter;
         private Style constantStyle;

@@ -238,7 +238,10 @@ public class LineChart extends XYChart {
 
         // Since we need to form segments (p1, p2) for calculateDrawPoints
 
-        float p1x, p1y, p2x, p2y;
+        float p1x;
+        float p1y;
+        float p2x;
+        float p2y;
         float[] tempDrawPoints;
 
         if (length >= 4) {
