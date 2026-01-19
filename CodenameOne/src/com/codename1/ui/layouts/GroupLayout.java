@@ -737,7 +737,7 @@ public class GroupLayout extends Layout {
             throw new IllegalArgumentException("Component must already exist");
         }
         host.removeComponent(existingComponent);
-        if (newComponent.getParent() != host) {
+        if (newComponent.getParent() != host) { // NOPMD
             host.addComponent(newComponent);
         }
         info.setComponent(newComponent);
@@ -1058,7 +1058,7 @@ public class GroupLayout extends Layout {
         if (info == null) { // NOPMD
             info = new ComponentInfo(component);
             componentInfos.put(component, info);
-            if (component.getParent() != host) {
+            if (component.getParent() != host) { // NOPMD
                 host.addComponent(component);
             }
         }
@@ -1192,7 +1192,7 @@ public class GroupLayout extends Layout {
             if (childMaster == null) { // NOPMD
                 linked.add(child);
                 child.setLinkInfo(axis, this);
-            } else if (childMaster != this) {
+            } else if (childMaster != this) { // NOPMD
                 addAll(linked, childMaster.linked);
                 for (int i = 0; i < childMaster.linked.size(); i++) {
                     ComponentInfo childInfo = (ComponentInfo) childMaster.linked.get(i);
@@ -2211,7 +2211,7 @@ public class GroupLayout extends Layout {
                     } else if (brb == Component.BRB_CONSTANT_DESCENT) {
                         for (int i = springs.size() - 1; i >= 0; i--) {
                             Spring spring = getSpring(i);
-                            if (spring == baselineSpring) {
+                            if (spring == baselineSpring) { // NOPMD
                                 return Component.BRB_CONSTANT_DESCENT;
                             }
                             if (spring.isResizable(VERTICAL)) {

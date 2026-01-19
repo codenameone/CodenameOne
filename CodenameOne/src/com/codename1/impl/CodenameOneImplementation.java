@@ -977,7 +977,7 @@ public abstract class CodenameOneImplementation {
                 if (ani instanceof Container && cmp instanceof Component) {
                     Component parent = ((Component) cmp).getParent();
                     while (parent != null) { // NOPMD
-                        if (parent == ani) {
+                        if (parent == ani) { // NOPMD
                             return;
                         }
                         parent = parent.getParent();

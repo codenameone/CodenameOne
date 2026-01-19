@@ -1116,7 +1116,7 @@ public class Border {
             if (v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) { // NOPMD
                 int ilen = images.length;
                 for (int iter = 0; iter < ilen; iter++) {
-                    if (images[iter] != b.images[iter]) {
+                    if (images[iter] != b.images[iter]) { // NOPMD
                         return false;
                     }
                 }

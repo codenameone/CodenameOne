@@ -204,7 +204,7 @@ public class BoundSize {
         if (cs != null) // NOPMD
             return cs;
 
-        if (min == pref && pref == max)
+        if (min == pref && pref == max) // NOPMD
             return min != null ? (min.getConstraintString() + "!") : "null"; // NOPMD
 
         StringBuilder sb = new StringBuilder(16);

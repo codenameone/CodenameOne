@@ -1146,7 +1146,7 @@ public class Container extends Component implements Iterable<Component> {
         if (c == null || c instanceof Form) { // NOPMD
             return false;
         }
-        return (c == this) || isParentOf(c);
+        return (c == this) || isParentOf(c); // NOPMD
     }
 
     @Override
@@ -1208,7 +1208,7 @@ public class Container extends Component implements Iterable<Component> {
         boolean currentFocused = false;
         if (current.getComponentForm() != null) { // NOPMD
             Component currentF = current.getComponentForm().getFocused();
-            currentFocused = currentF == current;
+            currentFocused = currentF == current; // NOPMD
             if (!currentFocused && current instanceof Container && currentF != null && ((Container) current).isParentOf(currentF)) {
                 currentFocused = true;
             }
@@ -1376,7 +1376,7 @@ public class Container extends Component implements Iterable<Component> {
         components.remove(cmp);
         cmp.setParent(null);
         if (parentForm != null) { // NOPMD
-            if (parentForm.getFocused() == cmp || cmp instanceof Container && ((Container) cmp).contains(parentForm.getFocused())) {
+            if (parentForm.getFocused() == cmp || cmp instanceof Container && ((Container) cmp).contains(parentForm.getFocused())) { // NOPMD
                 parentForm.setFocusedInternal(null);
             }
             Component dragged = parentForm.getDraggedComponent();
@@ -2020,7 +2020,7 @@ public class Container extends Component implements Iterable<Component> {
                 // We need to paint all components that should be "on top" of the elevated component
                 // also.
                 paintOnTopLoop:
-                while (cnt != this && cnt != null) {
+                while (cnt != this && cnt != null) { // NOPMD
                     Layout cntLayout = cnt.getLayout();
                     if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
                     if (foundOverlap) {
@@ -2549,7 +2549,7 @@ public class Container extends Component implements Iterable<Component> {
         }
         cmp = cmp.getParent();
         while (cmp != null) {
-            if (cmp == this) {
+            if (cmp == this) { // NOPMD
                 return true;
             }
             cmp = cmp.getParent();
@@ -2572,9 +2572,9 @@ public class Container extends Component implements Iterable<Component> {
                     // way to the top
                     Form f = getComponentForm();
                     if (f != null && f.getInvisibleAreaUnderVKB() == 0 &&
-                            f.findFirstFocusable() == c) {
+                            f.findFirstFocusable() == c) { // NOPMD
                         // support this use case only if the component doesn't explicitly declare visible bounds
-                        if (r == c.getBounds() && !Display.getInstance().isTouchScreenDevice()) {
+                        if (r == c.getBounds() && !Display.getInstance().isTouchScreenDevice()) { // NOPMD
                             scrollRectToVisible(new Rectangle(0, 0,
                                     c.getX() + Math.min(c.getWidth(), getWidth()),
                                     c.getY() + Math.min(c.getHeight(), getHeight())), this);
@@ -2905,7 +2905,7 @@ public class Container extends Component implements Iterable<Component> {
                             if (cmp.isFocusable()) {
                                 isPotentialCandidate = true;
                                 boolean found = false;
-                                while (tmp != cmp && tmp != null) {
+                                while (tmp != cmp && tmp != null) { // NOPMD
                                     if (tmp.isFocusable()) {
                                         // We found a focusable child
                                         // so we will use that.

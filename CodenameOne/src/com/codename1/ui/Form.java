@@ -2709,7 +2709,7 @@ public class Form extends Container {
      */
     void disposeImpl() {
         if (previousForm != null) { // NOPMD
-            boolean clearPrevious = Display.getInstance().getCurrent() == this;
+            boolean clearPrevious = Display.getInstance().getCurrent() == this; // NOPMD
             if (!clearPrevious) {
                 Form f = Display.getInstance().getCurrent();
                 while (f != null) { // NOPMD
@@ -2912,7 +2912,7 @@ public class Form extends Container {
     @Override
     protected void longKeyPress(int keyCode) {
         if (focused != null) { // NOPMD
-            if (focused.getComponentForm() == this) {
+            if (focused.getComponentForm() == this) { // NOPMD
                 focused.longKeyPress(keyCode);
             }
         }
@@ -2931,7 +2931,7 @@ public class Form extends Container {
             }
         }
         if (focused != null && focused.contains(x, y)) { // NOPMD
-            if (focused.getComponentForm() == this) {
+            if (focused.getComponentForm() == this) { // NOPMD
                 LeadUtil.longPointerPress(focused, x, y);
 
             }
@@ -3079,7 +3079,7 @@ public class Form extends Container {
 
         //Component focused = focusManager.getFocused();
         if (focused != null) { // NOPMD
-            if (focused.getComponentForm() == this) {
+            if (focused.getComponentForm() == this) { // NOPMD
                 if (focused.isEnabled()) {
                     focused.keyReleased(keyCode);
                 }

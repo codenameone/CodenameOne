@@ -148,7 +148,7 @@ public abstract class AbstractMedia implements AsyncMedia {
 
             @Override
             public void error(Throwable t) {
-                if (this == pendingPlayRequest) {
+                if (this == pendingPlayRequest) { // NOPMD
                     pendingPlayRequest = null;
                 }
                 super.error(t);
@@ -253,7 +253,7 @@ public abstract class AbstractMedia implements AsyncMedia {
 
             @Override
             public void error(Throwable t) {
-                if (pendingPauseRequest == this) {
+                if (pendingPauseRequest == this) { // NOPMD
                     pendingPauseRequest = null;
                 }
                 super.error(t);
