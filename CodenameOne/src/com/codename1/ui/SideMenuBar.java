@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
@@ -37,7 +38,6 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
-import com.codename1.compat.java.util.Objects;
 
 import java.util.Vector;
 
@@ -1571,12 +1571,12 @@ public class SideMenuBar extends MenuBar {
 
         private final int speed;
         private final boolean fwd;
+        private final int dest;
+        private final String placement;
         private Motion motion;
         private int position;
         private Image buffer;
-        private final int dest;
         private Image shadow;
-        private final String placement;
         private boolean isRTL;
 
         public MenuTransition(int speed, boolean fwd, int dest, String placement) {

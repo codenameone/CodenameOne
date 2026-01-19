@@ -167,7 +167,9 @@ final class Tree {
 
         for (n = 0; n <= maxCode; n++) {
             int len = tree[n * 2 + 1];
-            if (len == 0) continue;
+            if (len == 0) {
+                continue;
+            }
             // Now reverse the bits
             tree[n * 2] = (short) (biReverse(nextCode[len]++, len));
         }
@@ -212,7 +214,9 @@ final class Tree {
         short f;            // frequency
         int overflow = 0;   // number of elements with bit length too large
 
-        for (bits = 0; bits <= MAX_BITS; bits++) s.blCount[bits] = 0;
+        for (bits = 0; bits <= MAX_BITS; bits++) {
+            s.blCount[bits] = 0;
+        }
 
         // In a first pass, compute the optimal bit lengths (which may
         // overflow in the case of the bit length tree).
@@ -228,22 +232,32 @@ final class Tree {
             tree[n * 2 + 1] = (short) bits;
             // We overwrite tree[n*2+1] which is no longer needed
 
-            if (n > maxCode) continue;  // not a leaf node
+            if (n > maxCode) {
+                continue;  // not a leaf node
+            }
 
             s.blCount[bits]++;
             xbits = 0;
-            if (n >= base) xbits = extra[n - base];
+            if (n >= base) {
+                xbits = extra[n - base];
+            }
             f = tree[n * 2];
             s.optLen += f * (bits + xbits);
-            if (stree != null) s.staticLen += f * (stree[n * 2 + 1] + xbits);
+            if (stree != null) {
+                s.staticLen += f * (stree[n * 2 + 1] + xbits);
+            }
         }
-        if (overflow == 0) return;
+        if (overflow == 0) {
+            return;
+        }
 
         // This happens for example on obj2 and pic of the Calgary corpus
         // Find the first bit length which could increase:
         do {
             bits = maxLength - 1;
-            while (s.blCount[bits] == 0) bits--;
+            while (s.blCount[bits] == 0) {
+                bits--;
+            }
             s.blCount[bits]--;      // move one leaf down the tree
             s.blCount[bits + 1] += 2;   // move one overflow item as its brother
             s.blCount[maxLength]--;
@@ -257,7 +271,9 @@ final class Tree {
             n = s.blCount[bits];
             while (n != 0) {
                 m = s.heap[--h];
-                if (m > maxCode) continue;
+                if (m > maxCode) {
+                    continue;
+                }
                 if (tree[m * 2 + 1] != bits) {
                     s.optLen += ((long) bits - (long) tree[m * 2 + 1]) * (long) tree[m * 2];
                     tree[m * 2 + 1] = (short) bits;
@@ -305,7 +321,9 @@ final class Tree {
             tree[node * 2] = 1;
             s.depth[node] = 0;
             s.optLen--;
-            if (stree != null) s.staticLen -= stree[node * 2 + 1];
+            if (stree != null) {
+                s.staticLen -= stree[node * 2 + 1];
+            }
             // node is 0 or 1 so it does not have extra bits
         }
         this.maxCode = maxCode;
@@ -313,8 +331,9 @@ final class Tree {
         // The elements heap[heap_len/2+1 .. heap_len] are leaves of the tree,
         // establish sub-heaps of increasing lengths:
 
-        for (n = s.heapLen / 2; n >= 1; n--)
+        for (n = s.heapLen / 2; n >= 1; n--) {
             s.pqdownheap(tree, n);
+        }
 
         // Construct the Huffman tree by repeatedly combining the least two
         // frequent nodes.

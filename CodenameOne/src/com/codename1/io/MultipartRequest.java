@@ -22,6 +22,8 @@
  */
 package com.codename1.io;
 
+import com.codename1.util.StringUtil;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,7 +31,6 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
-import com.codename1.util.StringUtil;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;

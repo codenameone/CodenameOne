@@ -208,16 +208,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      */
     private static final String[] ROMAN_NUMERALS_TENS = {"", "X", "XX", "XXX", "XL", "L", "LX", "LXX", "LXXX", "XC"};
     /**
-     * A hashtable containing all defined HTMLFont objects
-     */
-    static Hashtable fonts = new Hashtable();
-    private static int INDENT_OL = -1;//Font.getDefaultFont().stringWidth("8888. "); //Ordered list
-    private static int INDENT_UL = -1;//Font.getDefaultFont().charWidth('W'); //Unordered list
-    /**
-     * The default font to use
-     */
-    private static HTMLFont DEFAULT_FONT = null;//new HTMLFont(null,Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
-    /**
      * Defines the possible values for the type attribute in the input tag, ordered according to the INPUT_* constants
      */
     private static final String[] INPUT_TYPE_STRINGS = {
@@ -228,6 +218,16 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * Vector holding the possible input type strings.
      */
     private static final Vector INPUT_TYPES = new Vector();
+    /**
+     * A hashtable containing all defined HTMLFont objects
+     */
+    static Hashtable fonts = new Hashtable();
+    private static int INDENT_OL = -1;//Font.getDefaultFont().stringWidth("8888. "); //Ordered list
+    private static int INDENT_UL = -1;//Font.getDefaultFont().charWidth('W'); //Unordered list
+    /**
+     * The default font to use
+     */
+    private static HTMLFont DEFAULT_FONT = null;//new HTMLFont(null,Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
 
     /**
      * This static segment sets up the INPUT_TYPES vector with values from INPUT_TYPE_STRINGS.
@@ -239,6 +239,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
+    private final ResourceThreadQueue threadQueue; // A reference to the ResourceThreadQueue that handles asynchronous image download
     /**
      * Inidcates whether this component should load CSS files and consider STYLE tag and attributes when available..
      * Note that CSS requires to create significantlly more containers, as almost every tag needs to be in its own container
@@ -277,7 +278,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     // Refrences to helper classes and delegates
     private DocumentRequestHandler handler; // The HTMLComponent's request handler
     private RedirectThread redirectThread; // A refrence to a redirection thread if exists
-    private final ResourceThreadQueue threadQueue; // A reference to the ResourceThreadQueue that handles asynchronous image download
     private HTMLCallback htmlCallback;
     private HTMLEventsListener eventsListener;
     // Page info and status
@@ -369,18 +369,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     private Vector containers = new Vector();
     private Motion marqueeMotion;
 
-    private static synchronized void initDefaults() {
-        if (INDENT_OL < 0) {
-            INDENT_OL = Font.getDefaultFont().stringWidth("8888. "); //Ordered list
-        }
-        if (INDENT_UL < 0) {
-            INDENT_UL = Font.getDefaultFont().charWidth('W'); //Unordered list
-        }
-        if (DEFAULT_FONT == null) {
-            DEFAULT_FONT = new HTMLFont(null, Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
-        }
-    }
-
     /**
      * Constructs HTMLComponent
      */
@@ -429,6 +417,18 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         parser = new HTMLParser(); //HTMLParser.getHTMLParserInstance();
         parser.setHTMLComponent(this);
 
+    }
+
+    private static synchronized void initDefaults() {
+        if (INDENT_OL < 0) {
+            INDENT_OL = Font.getDefaultFont().stringWidth("8888. "); //Ordered list
+        }
+        if (INDENT_UL < 0) {
+            INDENT_UL = Font.getDefaultFont().charWidth('W'); //Unordered list
+        }
+        if (DEFAULT_FONT == null) {
+            DEFAULT_FONT = new HTMLFont(null, Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
+        }
     }
 
     /**
@@ -1716,7 +1716,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }*/
 
-        if(document == null) {
+        if (document == null) {
             return;
         }
         // Get the HTML root tag and extract the HEAD and BODY (Note that the document tag is ROOT which contains HTML and so on.
@@ -2080,7 +2080,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     private Vector showText(String text, int align) {
         return getWords(text, align, true);
     }
-    
+
     /**
      * Adds the given text to the container as a label or a link.
      * The string given here does not need line breaking as this was calculated before in the calling method.
@@ -3908,7 +3908,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     ///////////////////
     // Methods relevant to CSS2 only (not WCSS)
-    ///////////////////
+
+    /// ////////////////
 
     ResourceThreadQueue getThreadQueue() {
         return threadQueue;

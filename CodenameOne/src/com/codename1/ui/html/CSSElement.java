@@ -337,38 +337,68 @@ class CSSElement extends HTMLElement {
     private final static int LENGTH_SUFFIX_PX = 0;
     private final static int LENGTH_SUFFIX_EM = 1;
     private final static int LENGTH_SUFFIX_EX = 2;
-    private final static String CENTER_STR = "center"; // Since this value is used in multiple CSS properties it is defined as a constant
-    private static final String CSS_NONE = "none"; // Since this value is used in multiple CSS properties it is defined as a constant
+
+    /**
+     * Since this value is used in multiple CSS properties it is defined as a constant
+     */
+    private final static String CENTER_STR = "center";
+
+    /**
+     * Since this value is used in multiple CSS properties it is defined as a constant
+     */
+    private static final String CSS_NONE = "none";
     private static final int[] BG_REPEAT_VALS = {Style.BACKGROUND_IMAGE_TILE_BOTH, Style.BACKGROUND_IMAGE_TILE_HORIZONTAL, Style.BACKGROUND_IMAGE_TILE_VERTICAL, 0};
-    // Horizontal alignment strings and their corresponding values
+
+    /**
+     * Horizontal alignment strings and their corresponding values
+     */
     private static final String[] TEXT_ALIGN_STRINGS = {"left", "right", CENTER_STR};
     private static final int[] TEXT_ALIGN_VALS = {Component.LEFT, Component.RIGHT, Component.CENTER};
-    // Vertical alignment strings and their corresponding values
+
+    /**
+     * Vertical alignment strings and their corresponding values
+     */
     private static final String[] VERTICAL_ALIGN_STRINGS = {"top", "middle", "bottom", "baseline", "sub", "super"};
     private static final int[] VERTICAL_ALIGN_VALS = {Component.TOP, Component.CENTER, Component.BOTTOM, -1, -1, -1};
-    // Border style strings
+
+    /**
+     * Border style strings
+     */
     private static final String[] BORDER_STYLE_STRINGS = {CSS_NONE, "solid", "dotted", "dashed", "double", "groove", "ridge", "inset", "outset"};
-    // Border width strings and their corresponding values
+
+    /**
+     * Border width strings and their corresponding values
+     */
     private static final String[] BORDER_WIDTH_STRINGS = {"thin", "medium", "thick"};
     private static final int[] BORDER_WIDTH_VALS = {1, 3, 5};
+
     /**
      * The default border width (when not specified)
      */
     static final int BORDER_DEFAULT_WIDTH = BORDER_WIDTH_VALS[1]; // medium
-    // Font size strings and their corresponding values
+
+    /**
+     * Font size strings and their corresponding values
+     */
     private static final String[] FONT_SIZE_STRINGS = {"xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large", "smaller", "larger"};
     private static final int[] FONT_SIZE_VALS = {FONT_SIZE_SMALL - 4, FONT_SIZE_SMALL - 2, FONT_SIZE_SMALL, FONT_SIZE_MEDIUM, FONT_SIZE_LARGE, FONT_SIZE_LARGE + 2, FONT_SIZE_LARGE + 4, FONT_SIZE_SMALLER, FONT_SIZE_LARGER};
-    // Font style strings and their corresponding values, note that oblique is translated to italic
+
+    /**
+     * Font style strings and their corresponding values, note that oblique is translated to italic
+     */
     private static final String[] FONT_STYLE_STRINGS = {"normal", "italic", "oblique"};
     private static final int[] FONT_STYLE_VALS = {Font.STYLE_PLAIN, Font.STYLE_ITALIC, Font.STYLE_ITALIC};
+
     // Font weight strings and their corresponding values
     // Note that since we have only two levels of boldness (plain, bold) - bolder always means bold, and lighter always means plain
     private static final String[] FONT_WEIGHT_STRINGS = {"normal", "bold", "bolder", "lighter", "100", "200", "300", "400", "500", "600", "700", "800", "900"};
     private static final int[] FONT_WEIGHT_VALS = {Font.STYLE_PLAIN, Font.STYLE_BOLD, Font.STYLE_BOLD, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_BOLD, Font.STYLE_BOLD, Font.STYLE_BOLD, Font.STYLE_BOLD};
+
     /**
      * Values associated with BG_POS_STRINGS
      */
     private final static int[] BG_POS_PERCENTAGE = {VAL_PERCENTAGE, 50 + VAL_PERCENTAGE, 100 + VAL_PERCENTAGE};
+
     /**
      * The values of each of the allowed strings.
      * When adding an attribute which its value is an allowed string, the attribute value is set according to this array.
@@ -448,10 +478,12 @@ class CSSElement extends HTMLElement {
             null, //CSS_COUNTER_INCREMENT
             null,   //CSS_DIRECTION
     };
+
     /**
      * A constant defining the offset in which the base CSS attribute relating to the TOP appears in the shorthand attribute index
      */
     private static final int CSS_TOP = 0;
+
     /**
      * An array containing the allowed strings for CSS attributes.
      * Note that these strings are allowed in addition for the allowed values according to the attribute types.
@@ -529,10 +561,12 @@ class CSSElement extends HTMLElement {
             null, //CSS_COUNTER_INCREMENT
             {"rtl", "ltr"},   //CSS_DIRECTION
     };
+
     /**
      * A constant defining the offset in which the base CSS attribute relating to the RIGHT appears in the shorthand attribute index
      */
     private static final int CSS_RIGHT = 1;
+
     /**
      * A constant defining the offset in which the base CSS attribute relating to the BOTTOM appears in the shorthand attribute index
      */
@@ -565,12 +599,16 @@ class CSSElement extends HTMLElement {
                     {CSS_LEFT}
             }
     };
-    // The following constants are used in CSS_SHORTHAND_ATTRIBUTE_INDEX when a shorthand attribute translates to a second level of shorthand attributes
-    // For example 'border' which translated to width/style/color. The values of the constants denote their location in the CSS_SHORTHAND_ATTRIBUTE_INDEX map
+
+    /**
+     * The following constants are used in CSS_SHORTHAND_ATTRIBUTE_INDEX when a shorthand attribute translates to a second level of shorthand attributes
+     * For example 'border' which translated to width/style/color. The values of the constants denote their location in the CSS_SHORTHAND_ATTRIBUTE_INDEX map
+     */
     private static final int CSS_SHORTHAND_BACKGROUND_POSITION = 1;
     private static final int CSS_SHORTHAND_BORDER_WIDTH = 2;
     private static final int CSS_SHORTHAND_BORDER_STYLE = 3;
     private static final int CSS_SHORTHAND_BORDER_COLOR = 4;
+
     /**
      * A map of CSS shorthand attributes to their corresponding base attributes (or to other shorthand attributes)
      */

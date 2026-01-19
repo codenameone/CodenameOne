@@ -69,12 +69,11 @@ import com.codename1.ui.plaf.Style;
  * @see BoxLayout see the box layout X which is often a better choice than flow layout.
  */
 public class FlowLayout extends Layout {
+    private final Dimension dim = new Dimension(0, 0);
     private boolean fillRows;
-
     private int orientation = Component.LEFT;
     private int valign = Component.TOP;
     private boolean vAlignByRow;
-    private final Dimension dim = new Dimension(0, 0);
 
     /**
      * Creates a new instance of FlowLayout with left alignment

@@ -33,7 +33,6 @@ import com.codename1.util.Base64;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-
 import java.util.Hashtable;
 import java.util.Vector;
 

@@ -109,7 +109,7 @@ public class AreaSeries {
     /**
      * Returns the value at the specific index and category.
      *
-     * @param index the index
+     * @param index    the index
      * @param category the category
      * @return the value
      */

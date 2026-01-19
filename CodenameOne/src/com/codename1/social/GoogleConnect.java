@@ -45,10 +45,10 @@ import java.util.Hashtable;
  */
 public class GoogleConnect extends Login {
 
-    static Class<?> implClass;
     private static final String tokenURL = "https://www.googleapis.com/oauth2/v3/token";
-    private static GoogleConnect instance;
     private static final Object INSTANCE_LOCK = new Object();
+    static Class<?> implClass;
+    private static GoogleConnect instance;
 
 
     GoogleConnect() {
@@ -122,8 +122,12 @@ public class GoogleConnect extends Login {
 
         @Override
         public final boolean equals(Object o) {
-            if (!(o instanceof ValidateTokenConnectionRequest)) return false;
-            if (!super.equals(o)) return false;
+            if (!(o instanceof ValidateTokenConnectionRequest)) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
 
             ValidateTokenConnectionRequest that = (ValidateTokenConnectionRequest) o;
             return Arrays.equals(retval, that.retval);

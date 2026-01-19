@@ -37,10 +37,10 @@ import com.codename1.ui.Image;
 public final class StorageImageAsync extends EncodedImage {
     private static final Object LOCK = new Object();
     private final String fileName;
+    private final Image placeholderImage;
     private boolean changePending;
     private boolean imageCreated;
     private volatile byte[] imageData;
-    private final Image placeholderImage;
     private volatile boolean queued;
 
     private StorageImageAsync(String fileName, Image placeholderImage) {

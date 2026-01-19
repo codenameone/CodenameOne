@@ -50,9 +50,9 @@ import static com.codename1.ui.ComponentSelector.$;
  */
 public class SpanLabel extends Container implements IconHolder, TextHolder {
     private final Label icon;
-    private int gap;
     private final Container iconWrapper;
     private final TextArea text;
+    private int gap;
     private boolean shouldLocalize = true;
     private int preferredW = -1;
 

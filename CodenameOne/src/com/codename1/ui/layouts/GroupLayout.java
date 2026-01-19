@@ -185,14 +185,19 @@ public class GroupLayout extends Layout {
     private static final int SPECIFIC_SIZE = 3;
     private static final int UNSET = Integer.MIN_VALUE;
     private static final int NO_ALIGNMENT = 0;
+    // Maps from Component to ComponentInfo.  This is used for tracking
+    // information specific to a Component.
+    private final HashMap componentInfos;
+    // Container we're doing layout for.
+    private final Container host;
+    // Used by areParallelSiblings, cached to avoid excessive garbage.
+    private final ArrayList tmpParallelSet;
     // Whether or not we automatically try and create the preferred
     // padding between components.
     private boolean autocreatePadding;
-
     // Whether or not we automatically try and create the preferred
     // padding between containers
     private boolean autocreateContainerPadding;
-
     /**
      * Group responsible for layout along the horizontal axis.  This is NOT
      * the user specified group, use getHorizontalGroup to dig that out.
@@ -203,17 +208,6 @@ public class GroupLayout extends Layout {
      * the user specified group, use getVerticalGroup to dig that out.
      */
     private Group verticalGroup;
-
-    // Maps from Component to ComponentInfo.  This is used for tracking
-    // information specific to a Component.
-    private final HashMap componentInfos;
-
-    // Container we're doing layout for.
-    private final Container host;
-
-    // Used by areParallelSiblings, cached to avoid excessive garbage.
-    private final ArrayList tmpParallelSet;
-
     // Indicates Springs have changed in some way since last change.
     private boolean springsChanged;
 
@@ -2195,7 +2189,7 @@ public class GroupLayout extends Layout {
                     // resizable. Fall through to OTHER.
                 } else {
                     int brb = 0;
-                    if(baselineSpring != null) {
+                    if (baselineSpring != null) {
                         brb = baselineSpring.getBaselineResizeBehavior();
                     }
                     if (brb == Component.BRB_CONSTANT_ASCENT) {

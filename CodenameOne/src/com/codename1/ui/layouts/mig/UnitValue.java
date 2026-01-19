@@ -239,11 +239,13 @@ public final class UnitValue {
     }
 
     private UnitValue(float value, String unitStr, int unit, boolean isHor, int oper, UnitValue sub1, UnitValue sub2, String createString) {
-        if (oper < STATIC || oper > MID)
+        if (oper < STATIC || oper > MID) {
             throw new IllegalArgumentException("Unknown Operation: " + oper);
+        }
 
-        if (oper > STATIC && (sub1 == null || sub2 == null))
+        if (oper > STATIC && (sub1 == null || sub2 == null)) {
             throw new IllegalArgumentException(oper + " Operation may not have null sub-UnitValues.");
+        }
 
         this.value = value;
         this.oper = oper;
@@ -264,8 +266,9 @@ public final class UnitValue {
      * @param conv The converter. Not <code>null</code>.
      */
     public synchronized static void addGlobalUnitConverter(UnitConverter conv) {
-        if (conv == null)
+        if (conv == null) {
             throw new NullPointerException();
+        }
         CONVERTERS.add(conv);
     }
 
@@ -338,8 +341,9 @@ public final class UnitValue {
      * @return The size in pixels.
      */
     public float getPixelsExact(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
-        if (parent == null)
+        if (parent == null) {
             return 1;
+        }
 
         if (oper == STATIC) {
             switch (unit) {
@@ -356,8 +360,9 @@ public final class UnitValue {
                 case PT:
                     float f = SCALE[unit - MM];
                     Float s = isHor ? PlatformDefaults.getHorizontalScaleFactor() : PlatformDefaults.getVerticalScaleFactor();
-                    if (s != null)
+                    if (s != null) {
                         f *= s;
+                    }
 
                     return (isHor ? parent.getHorizontalScreenDPI() : parent.getVerticalScreenDPI()) * value / f;
 
@@ -371,23 +376,27 @@ public final class UnitValue {
                 case ALIGN:
                     Integer st = LinkHandler.getValue(parent.getLayout(), "visual", isHor ? LinkHandler.X : LinkHandler.Y);
                     Integer sz = LinkHandler.getValue(parent.getLayout(), "visual", isHor ? LinkHandler.WIDTH : LinkHandler.HEIGHT);
-                    if (st == null || sz == null)
+                    if (st == null || sz == null) {
                         return 0;
+                    }
                     return value * (Math.max(0, sz.intValue()) - refValue) + st;
 
                 case MIN_SIZE:
-                    if (comp == null)
+                    if (comp == null) {
                         return 0;
+                    }
                     return isHor ? comp.getMinimumWidth(comp.getHeight()) : comp.getMinimumHeight(comp.getWidth());
 
                 case PREF_SIZE:
-                    if (comp == null)
+                    if (comp == null) {
                         return 0;
+                    }
                     return isHor ? comp.getPreferredWidth(comp.getHeight()) : comp.getPreferredHeight(comp.getWidth());
 
                 case MAX_SIZE:
-                    if (comp == null)
+                    if (comp == null) {
                         return 0;
+                    }
                     return isHor ? comp.getMaximumWidth(comp.getHeight()) : comp.getMaximumHeight(comp.getWidth());
 
                 case BUTTON:
@@ -402,20 +411,24 @@ public final class UnitValue {
                 case LINK_XPOS:
                 case LINK_YPOS:
                     Integer v = LinkHandler.getValue(parent.getLayout(), getLinkTargetId(), unit - (unit >= LINK_XPOS ? LINK_XPOS : LINK_X));
-                    if (v == null)
+                    if (v == null) {
                         return 0;
+                    }
 
-                    if (unit == LINK_XPOS)
+                    if (unit == LINK_XPOS) {
                         return parent.getScreenLocationX() + v;
-                    if (unit == LINK_YPOS)
+                    }
+                    if (unit == LINK_YPOS) {
                         return parent.getScreenLocationY() + v;
+                    }
 
                     return v;
 
                 case LOOKUP:
                     float res = lookup(refValue, parent, comp);
-                    if (res != UnitConverter.UNABLE)
+                    if (res != UnitConverter.UNABLE) {
                         return res;
+                    }
 
                 case LABEL_ALIGN:
                     return PlatformDefaults.getLabelAlignPercentage() * refValue;
@@ -453,33 +466,40 @@ public final class UnitValue {
         float res = UnitConverter.UNABLE;
         for (int i = CONVERTERS.size() - 1; i >= 0; i--) {
             res = CONVERTERS.get(i).convertToPixels(value, unitStr, isHor, refValue, parent, comp);
-            if (res != UnitConverter.UNABLE)
+            if (res != UnitConverter.UNABLE) {
                 return res;
+            }
         }
         return PlatformDefaults.convertToPixels(value, unitStr, isHor, refValue, parent, comp);
     }
 
     private int parseUnitString() {
         int len = unitStr.length();
-        if (len == 0)
+        if (len == 0) {
             return isHor ? PlatformDefaults.getDefaultHorizontalUnit() : PlatformDefaults.getDefaultVerticalUnit();
+        }
 
         Integer u = UNIT_MAP.get(unitStr);
         if (u != null) {
-            if (!isHor && (u == BUTTON || u == LABEL_ALIGN))
+            if (!isHor && (u == BUTTON || u == LABEL_ALIGN)) {
                 throw new IllegalArgumentException("Not valid in vertical contexts: '" + unitStr + "'");
+            }
 
             return u;
         }
 
-        if ("lp".equals(unitStr))
+        if ("lp".equals(unitStr)) {
             return isHor ? LPX : LPY;
+        }
 
-        if ("sp".equals(unitStr))
+        if ("sp".equals(unitStr)) {
             return isHor ? SPX : SPY;
+        }
 
         if (lookup(0, null, null) != UnitConverter.UNABLE)    // To test so we can fail fast
+        {
             return LOOKUP;
+        }
 
         // Only link left. E.g. "otherID.width"
 
@@ -488,22 +508,30 @@ public final class UnitValue {
             linkId = unitStr.substring(0, pIx);
             String e = unitStr.substring(pIx + 1);
 
-            if ("x".equals(e))
+            if ("x".equals(e)) {
                 return LINK_X;
-            if ("y".equals(e))
+            }
+            if ("y".equals(e)) {
                 return LINK_Y;
-            if ("w".equals(e) || "width".equals(e))
+            }
+            if ("w".equals(e) || "width".equals(e)) {
                 return LINK_W;
-            if ("h".equals(e) || "height".equals(e))
+            }
+            if ("h".equals(e) || "height".equals(e)) {
                 return LINK_H;
-            if ("x2".equals(e))
+            }
+            if ("x2".equals(e)) {
                 return LINK_X2;
-            if ("y2".equals(e))
+            }
+            if ("y2".equals(e)) {
                 return LINK_Y2;
-            if ("xpos".equals(e))
+            }
+            if ("xpos".equals(e)) {
                 return LINK_XPOS;
-            if ("ypos".equals(e))
+            }
+            if ("ypos".equals(e)) {
                 return LINK_YPOS;
+            }
         }
 
         throw new IllegalArgumentException("Unknown keyword: " + unitStr);
@@ -548,8 +576,9 @@ public final class UnitValue {
     boolean isAbsoluteDeep() {
         if (subUnits != null) {
             for (UnitValue subUnit : subUnits) {
-                if (subUnit.isAbsoluteDeep())
+                if (subUnit.isAbsoluteDeep()) {
                     return true;
+                }
             }
         }
         return isAbsolute();
@@ -562,8 +591,9 @@ public final class UnitValue {
     boolean isLinkedDeep() {
         if (subUnits != null) {
             for (UnitValue subUnit : subUnits) {
-                if (subUnit.isLinkedDeep())
+                if (subUnit.isLinkedDeep()) {
                     return true;
+                }
             }
         }
         return isLinked();

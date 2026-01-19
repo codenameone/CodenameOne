@@ -92,6 +92,8 @@ public class Validator {
      * action performed (editing completion)
      */
     private static boolean validateOnEveryKey = false;
+    private final HashMap<Component, Constraint> constraintList = new HashMap<Component, Constraint>();
+    private final ArrayList<Component> submitButtons = new ArrayList<Component>();
     private InteractionDialog message = new InteractionDialog();
     /**
      * Error message UIID defaults to DialogBody. Allows customizing the look of the message
@@ -115,8 +117,6 @@ public class Validator {
      * 0 indicates the start of the component and 1 indicates its end on the given axis.
      */
     private float validationEmblemPositionY = defaultValidationEmblemPositionY;
-    private final HashMap<Component, Constraint> constraintList = new HashMap<Component, Constraint>();
-    private final ArrayList<Component> submitButtons = new ArrayList<Component>();
     /**
      * Indicates whether an error message should be shown for the focused component
      */

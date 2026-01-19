@@ -33,7 +33,6 @@ package com.codename1.ui.layouts.mig;
  *         Date: 2006-sep-08
  */
 
-import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 
 /**
@@ -52,8 +51,9 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
     public ComponentWrapper[] getComponents() {
         Container c = (Container) getComponent();
         ComponentWrapper[] cws = new ComponentWrapper[c.getComponentCount()];
-        for (int i = 0; i < cws.length; i++)
+        for (int i = 0; i < cws.length; i++) {
             cws[i] = new CodenameOneMiGComponentWrapper(c.getComponentAt(i));
+        }
         return cws;
     }
 

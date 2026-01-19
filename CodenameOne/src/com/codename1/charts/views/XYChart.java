@@ -48,19 +48,33 @@ import java.util.SortedMap;
  * The XY chart rendering class.
  */
 public abstract class XYChart extends AbstractChart {
-    /** The calculated range. */
+    /**
+     * The calculated range.
+     */
     private final HashMap<Integer, double[]> mCalcRange = new HashMap<Integer, double[]>();
-    /** The multiple series dataset. */
+    /**
+     * The multiple series dataset.
+     */
     protected XYMultipleSeriesDataset mDataset;
-    /** The multiple series renderer. */
+    /**
+     * The multiple series renderer.
+     */
     protected XYMultipleSeriesRenderer mRenderer;
-    /** The current scale value. */
+    /**
+     * The current scale value.
+     */
     private float mScale;
-    /** The current translate value. */
+    /**
+     * The current translate value.
+     */
     private float mTranslate;
-    /** The canvas center point. */
+    /**
+     * The canvas center point.
+     */
     private Point mCenter;
-    /** The visible chart area, in screen coordinates. */
+    /**
+     * The visible chart area, in screen coordinates.
+     */
     private Rectangle mScreenR;
     /**
      * The clickable areas for all points. The array index is the series index,
@@ -74,7 +88,7 @@ public abstract class XYChart extends AbstractChart {
     /**
      * Builds a new XY chart instance.
      *
-     * @param dataset the multiple series dataset
+     * @param dataset  the multiple series dataset
      * @param renderer the multiple series renderer
      */
     public XYChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
@@ -93,11 +107,11 @@ public abstract class XYChart extends AbstractChart {
      * The graphical representation of the XY chart.
      *
      * @param canvas the canvas to paint to
-     * @param x the top left x value of the view to draw to
-     * @param y the top left y value of the view to draw to
-     * @param width the width of the view to draw to
+     * @param x      the top left x value of the view to draw to
+     * @param y      the top left y value of the view to draw to
+     * @param width  the width of the view to draw to
      * @param height the height of the view to draw to
-     * @param paint the paint
+     * @param paint  the paint
      */
     @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
@@ -530,15 +544,15 @@ public abstract class XYChart extends AbstractChart {
     /**
      * Draws the series.
      *
-     * @param series the series
-     * @param canvas the canvas
-     * @param paint the paint object
-     * @param pointsList the points to be rendered
+     * @param series         the series
+     * @param canvas         the canvas
+     * @param paint          the paint object
+     * @param pointsList     the points to be rendered
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the y axis value in pixels
-     * @param seriesIndex the series index
-     * @param or the orientation
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the y axis value in pixels
+     * @param seriesIndex    the series index
+     * @param or             the orientation
+     * @param startIndex     the start index of the rendering points
      */
     protected void drawSeries(XYSeries series, Canvas canvas, Paint paint, List<Float> pointsList,
                               XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, Orientation or,
@@ -575,13 +589,13 @@ public abstract class XYChart extends AbstractChart {
     /**
      * Draws the series points.
      *
-     * @param canvas the canvas
-     * @param paint the paint object
-     * @param pointsList the points to be rendered
+     * @param canvas         the canvas
+     * @param paint          the paint object
+     * @param pointsList     the points to be rendered
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the y axis value in pixels
-     * @param seriesIndex the series index
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the y axis value in pixels
+     * @param seriesIndex    the series index
+     * @param startIndex     the start index of the rendering points
      */
     protected void drawPoints(Canvas canvas, Paint paint, List<Float> pointsList,
                               XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
@@ -606,13 +620,13 @@ public abstract class XYChart extends AbstractChart {
     /**
      * The graphical representation of the series values as text.
      *
-     * @param canvas the canvas to paint to
-     * @param series the series to be painted
-     * @param renderer the series renderer
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas      the canvas to paint to
+     * @param series      the series to be painted
+     * @param renderer    the series renderer
+     * @param paint       the paint to be used for drawing
+     * @param points      the array of points to be used for drawing the series
      * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param startIndex  the start index of the rendering points
      */
     protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
                                        Paint paint, List<Float> points, int seriesIndex, int startIndex) {
@@ -658,11 +672,11 @@ public abstract class XYChart extends AbstractChart {
      * The graphical representation of a text, to handle both HORIZONTAL and
      * VERTICAL orientations and extra rotation angles.
      *
-     * @param canvas the canvas to paint to
-     * @param text the text to be rendered
-     * @param x the X axis location of the text
-     * @param y the Y axis location of the text
-     * @param paint the paint to be used for drawing
+     * @param canvas     the canvas to paint to
+     * @param text       the text to be rendered
+     * @param x          the X axis location of the text
+     * @param y          the Y axis location of the text
+     * @param paint      the paint to be used for drawing
      * @param extraAngle the text angle
      */
     protected void drawText(Canvas canvas, String text, float x, float y, Paint paint,
@@ -683,12 +697,14 @@ public abstract class XYChart extends AbstractChart {
      * Transform the canvas such as it can handle both HORIZONTAL and VERTICAL
      * orientations.
      *
-     * @param canvas the canvas to paint to
-     * @param angle the angle of rotation
+     * @param canvas  the canvas to paint to
+     * @param angle   the angle of rotation
      * @param inverse if the inverse transform needs to be applied
      */
     private void transform(Canvas canvas, float angle, boolean inverse) {
-        if (mCenter == null) return;
+        if (mCenter == null) {
+            return;
+        }
         if (inverse) {
             canvas.scale(1 / mScale, mScale);
             canvas.translate(mTranslate, -mTranslate);
@@ -703,16 +719,16 @@ public abstract class XYChart extends AbstractChart {
     /**
      * The graphical representation of the labels on the X axis.
      *
-     * @param xLabels the X labels values
+     * @param xLabels             the X labels values
      * @param xTextLabelLocations the X text label locations
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param left the left value of the labels area
-     * @param top the top value of the labels area
-     * @param bottom the bottom value of the labels area
-     * @param xPixelsPerUnit the amount of pixels per one unit in the chart labels
-     * @param minX the minimum value on the X axis in the chart
-     * @param maxX the maximum value on the X axis in the chart
+     * @param canvas              the canvas to paint to
+     * @param paint               the paint to be used for drawing
+     * @param left                the left value of the labels area
+     * @param top                 the top value of the labels area
+     * @param bottom              the bottom value of the labels area
+     * @param xPixelsPerUnit      the amount of pixels per one unit in the chart labels
+     * @param minX                the minimum value on the X axis in the chart
+     * @param maxX                the maximum value on the X axis in the chart
      */
     protected void drawXLabels(List<Double> xLabels, Double[] xTextLabelLocations, Canvas canvas,
                                Paint paint, int left, int top, int bottom, double xPixelsPerUnit, double minX, double maxX) {
@@ -745,15 +761,15 @@ public abstract class XYChart extends AbstractChart {
     /**
      * The graphical representation of the labels on the Y axis.
      *
-     * @param allYLabels the Y labels values
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
+     * @param allYLabels     the Y labels values
+     * @param canvas         the canvas to paint to
+     * @param paint          the paint to be used for drawing
      * @param maxScaleNumber the maximum scale number
-     * @param left the left value of the labels area
-     * @param right the right value of the labels area
-     * @param bottom the bottom value of the labels area
+     * @param left           the left value of the labels area
+     * @param right          the right value of the labels area
+     * @param bottom         the bottom value of the labels area
      * @param yPixelsPerUnit the amount of pixels per one unit in the chart labels
-     * @param minY the minimum value on the Y axis in the chart
+     * @param minY           the minimum value on the Y axis in the chart
      */
     protected void drawYLabels(Map<Integer, List<Double>> allYLabels, Canvas canvas, Paint paint,
                                int maxScaleNumber, int left, int right, int bottom, double[] yPixelsPerUnit, double[] minY) {
@@ -821,14 +837,14 @@ public abstract class XYChart extends AbstractChart {
      * The graphical representation of the text labels on the X axis.
      *
      * @param xTextLabelLocations the X text label locations
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param left the left value of the labels area
-     * @param top the top value of the labels area
-     * @param bottom the bottom value of the labels area
-     * @param xPixelsPerUnit the amount of pixels per one unit in the chart labels
-     * @param minX the minimum value on the X axis in the chart
-     * @param maxX the maximum value on the X axis in the chart
+     * @param canvas              the canvas to paint to
+     * @param paint               the paint to be used for drawing
+     * @param left                the left value of the labels area
+     * @param top                 the top value of the labels area
+     * @param bottom              the bottom value of the labels area
+     * @param xPixelsPerUnit      the amount of pixels per one unit in the chart labels
+     * @param minX                the minimum value on the X axis in the chart
+     * @param maxX                the maximum value on the X axis in the chart
      */
     protected void drawXTextLabels(Double[] xTextLabelLocations, Canvas canvas, Paint paint,
                                    boolean showLabels, int left, int top, int bottom, double xPixelsPerUnit, double minX,
@@ -947,7 +963,7 @@ public abstract class XYChart extends AbstractChart {
 
     @Override
     public SeriesSelection getSeriesAndPointForScreenCoordinate(final Point screenPoint) {
-        if (clickableAreas != null)
+        if (clickableAreas != null) {
             for (int seriesIndex = clickableAreas.size() - 1; seriesIndex >= 0; seriesIndex--) {
                 // series 0 is drawn first. Then series 1 is drawn on top, and series 2
                 // on top of that.
@@ -967,19 +983,20 @@ public abstract class XYChart extends AbstractChart {
                     }
                 }
             }
+        }
         return super.getSeriesAndPointForScreenCoordinate(screenPoint);
     }
 
     /**
      * The graphical representation of a series.
      *
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas         the canvas to paint to
+     * @param paint          the paint to be used for drawing
+     * @param points         the array of points to be used for drawing the series
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the minimum value of the y axis
-     * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the minimum value of the y axis
+     * @param seriesIndex    the index of the series currently being drawn
+     * @param startIndex     the start index of the rendering points
      */
     public abstract void drawSeries(Canvas canvas, Paint paint, List<Float> points,
                                     XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex);
@@ -987,12 +1004,12 @@ public abstract class XYChart extends AbstractChart {
     /**
      * Returns the clickable areas for all passed points
      *
-     * @param points the array of points
-     * @param values the array of values of each point
-     * @param yAxisValue the minimum value of the y axis
+     * @param points      the array of points
+     * @param values      the array of values of each point
+     * @param yAxisValue  the minimum value of the y axis
      * @param seriesIndex the index of the series to which the points belong
+     * @param startIndex  the start index of the rendering points
      * @return an array of rectangles with the clickable area
-     * @param startIndex the start index of the rendering points
      */
     protected abstract ClickableArea[] clickableAreasForPoints(List<Float> points,
                                                                List<Double> values, float yAxisValue, int seriesIndex, int startIndex);

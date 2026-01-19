@@ -38,8 +38,8 @@ import com.codename1.ui.geom.Rectangle;
  * @author Shai Almog
  */
 public class PeerComponent extends Component {
-    private Object nativePeer;
     private final Rectangle lastPos = new Rectangle(-1, -1, -1, -1);
+    private Object nativePeer;
     private Image peerImage;
 
     /**

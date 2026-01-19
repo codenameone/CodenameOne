@@ -57,16 +57,18 @@ import com.codename1.ui.list.ListCellRenderer;
  * our desire to reduce usage/reliance on this class.
  */
 public abstract class LookAndFeel {
+    private static final int fadeScrollEdgeStartAlpha = 0x999999;
+    private static final int fadeScrollEdgeEndAlpha = 0;
+    private final Image[] menuIcons = new Image[3];
+    private final UIManager manager;
     private Component verticalScroll;
     private Component horizontalScroll;
     private Component verticalScrollThumb;
     private Component horizontalScrollThumb;
-
     /**
      * Right-To-Left. Default false.
      */
     private boolean rtl;
-
     private long tickerSpeed = 50;
     /**
      * Tint color is set when a form is partially covered be it by a menu or by a
@@ -120,7 +122,6 @@ public abstract class LookAndFeel {
      * Indicates the default speed for smooth scrolling
      */
     private int defaultSmoothScrollingSpeed = 150;
-
     private boolean scrollVisible;
     private boolean fadeScrollEdge;
     private boolean fadeScrollBar;
@@ -130,12 +131,8 @@ public abstract class LookAndFeel {
     private Image fadeScrollBottom;
     private Image fadeScrollRight;
     private Image fadeScrollLeft;
-    private static final int fadeScrollEdgeStartAlpha = 0x999999;
-    private static final int fadeScrollEdgeEndAlpha = 0;
     private int textFieldCursorColor;
-
     private boolean backgroundImageDetermineSize;
-
     /**
      * Indicates whether softbuttons should be reversed from their default orientation
      */
@@ -144,44 +141,34 @@ public abstract class LookAndFeel {
      * This renderer is assigned to all Forms Menu's by default.
      */
     private ListCellRenderer menuRenderer;
-    private final Image[] menuIcons = new Image[3];
-
     /**
      * Allows defining a tactile touch device that vibrates when the user presses a component
      * that should respond with tactile feedback on a touch device (e.g. vibrate).
      * Setting this to 0 disables tactile feedback completely
      */
     private int tactileTouchDuration = 0;
-
     /**
      * Indicates whether labels should end with 3 points by default
      */
     private boolean defaultEndsWith3Points = true;
-
     /**
      * Indicates whether tensile drag should be active by default
      */
     private boolean defaultTensileDrag = true;
-
     /**
      * Indicates whether tensile highlight should be active by default
      */
     private boolean defaultTensileHighlight = false;
-
     /**
      * The MenuBar class
      */
     private Class menuBar = MenuBar.class;
-
     private boolean defaultSnapToGrid;
     private boolean defaultAlwaysTensile;
-
     private Image tensileHighlightTopImage;
     private Image tensileHighlightBottomImage;
     private Image tensileGlowTopImage;
     private Image tensileGlowBottomImage;
-
-    private final UIManager manager;
 
     public LookAndFeel(UIManager manager) {
         this.manager = manager;

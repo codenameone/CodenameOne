@@ -35,7 +35,6 @@ import com.codename1.ui.plaf.Style;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -136,10 +135,6 @@ class CSSEngine {
     private static final int DIRECTION_RTL = 0;
     private static final int DIRECTION_LTR = 1;
     private static final int DEFAULT_3D_BORDER_COLOR = 0x9a9a9a; // default color for outset/inset/ridge/groove
-    //int count; //for debugging
-    private static class CSSEngineHolder {
-        private static final CSSEngine INSTANCE = new CSSEngine();
-    }
     private static final Hashtable specialKeys = new Hashtable(); // A hashtable containing all recognized special key strings and their keycodes
     private final Hashtable matchingFonts = new Hashtable(); // A hashtable used as a cache for quick find of matching fonts
 
@@ -548,9 +543,6 @@ class CSSEngine {
         }
     }
 
-    // TODO - This is a problematic implementation since if a text has been converted to UPPERCASE and then due to a child's style attribute it has to change back to none/capitalize - there's no way to restore the original text.
-    // Also it has a problem with FIXED_WIDTH mode since when uppercasing for example, labels will grow in size which will take some of them out of the screen, The correct way is working on the elements and not the text, and reconstruct the labels
-
     /**
      * Sets the font of the component and all its children to the closest font that can be found according to the specified properties
      *
@@ -572,6 +564,9 @@ class CSSEngine {
             setMatchingFont(htmlC, cmp, fontFamily, fontSize, fontStyle, fontWeight, selector);
         }
     }
+
+    // TODO - This is a problematic implementation since if a text has been converted to UPPERCASE and then due to a child's style attribute it has to change back to none/capitalize - there's no way to restore the original text.
+    // Also it has a problem with FIXED_WIDTH mode since when uppercasing for example, labels will grow in size which will take some of them out of the screen, The correct way is working on the elements and not the text, and reconstruct the labels
 
     /**
      * Usually we don't have to set visibility in a recursive manner, i.e. suffices to set a top level container as invisible and all its contents are invisible.
@@ -755,11 +750,6 @@ class CSSEngine {
 
     }
 
-
-    ////////
-    // CSS2 additions - the following are not in the WCSS spec, but rather in the CSS2 spec
-    ///////
-
     /**
      * Replaces a wrapped text with an unwrapped version.
      * This in fact removes all the labels that contains a single word each, and replaces them with one label that contains the whole text.
@@ -782,6 +772,11 @@ class CSSEngine {
         element.setAssociatedComponents(label);
         label.getParent().revalidate();
     }
+
+
+    ////////
+    // CSS2 additions - the following are not in the WCSS spec, but rather in the CSS2 spec
+    ///////
 
     /**
      * Sets this element and all children to have unwrapped text.
@@ -931,11 +926,6 @@ class CSSEngine {
         }
     }
 
-
-    ////////
-    // CSS2 additions end
-    ///////
-
     /**
      * Removes all text decorations from the specified components and its Label descendants
      * This will be used for {text-decoration: none}
@@ -962,6 +952,11 @@ class CSSEngine {
             }
         }
     }
+
+
+    ////////
+    // CSS2 additions end
+    ///////
 
     /**
      * Changes the quotes marking of a certain block
@@ -2020,10 +2015,6 @@ class CSSEngine {
 
     }
 
-    ///////////////////
-    // Methods relevant to CSS2 only (not WCSS)
-    ///////////////////
-
     /**
      * Returns a quote label with the proper client property
      *
@@ -2036,6 +2027,10 @@ class CSSEngine {
         return quoteLabel;
 
     }
+
+    ///////////////////
+    // Methods relevant to CSS2 only (not WCSS)
+    ///////////////////
 
     /**
      * Evaluates a CSS content property expression and returns the matching label component
@@ -2208,6 +2203,11 @@ class CSSEngine {
             }
 
         }
+    }
+
+    //int count; //for debugging
+    private static class CSSEngineHolder {
+        private static final CSSEngine INSTANCE = new CSSEngine();
     }
 
 }

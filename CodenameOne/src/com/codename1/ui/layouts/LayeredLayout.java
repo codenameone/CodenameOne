@@ -2251,12 +2251,12 @@ public class LayeredLayout extends Layout {
          * Encapsulates an inset.
          */
         public class Inset {
-            int delta;
             /**
              * One of
              * {@link Component#TOP}, {@link Component#Bottom}, {@link Component#LEFT}, {@link Component#RIGHT}
              */
             private final int side;
+            int delta;
             /**
              * The component that is used a reference for this inset.
              * {@literal null} for the parent component.
@@ -2769,20 +2769,20 @@ public class LayeredLayout extends Layout {
                     return baseValue;
                 }
 
-                    if (referencePosition != 0) {
-                        switch (side) {
-                            case Component.TOP:
-                            case Component.BOTTOM:
-                                baseValue = (int) (h * referencePosition);
-                                break;
-                            case Component.LEFT:
-                            case Component.RIGHT:
-                                baseValue = (int) (w * referencePosition);
-                                break;
-                            default:
-                                throw new RuntimeException("Illegal side for inset: " + side);
-                        }
+                if (referencePosition != 0) {
+                    switch (side) {
+                        case Component.TOP:
+                        case Component.BOTTOM:
+                            baseValue = (int) (h * referencePosition);
+                            break;
+                        case Component.LEFT:
+                        case Component.RIGHT:
+                            baseValue = (int) (w * referencePosition);
+                            break;
+                        default:
+                            throw new RuntimeException("Illegal side for inset: " + side);
                     }
+                }
                 calculatedBaseValue = baseValue;
                 return baseValue;
             }

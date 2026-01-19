@@ -43,8 +43,8 @@ import java.io.IOException;
  * @deprecated This class should no longer be referenced directly. Use Image.createIndexed instead
  */
 class IndexedImage extends Image {
-    static int[] lineCache;
     private static final Object LINE_CACHE_LOCK = new Object();
+    static int[] lineCache;
     // package protected for access by the resource editor
     byte[] imageDataByte;
     int[] palette;
@@ -306,18 +306,18 @@ class IndexedImage extends Image {
                 lineCache = new int[width * 3];
             }
 
-        // for performance we can calculate the visible drawing area so we don't have to
-        // calculate the whole array
-        int clipY = g.getClipY();
-        int clipBottomY = g.getClipHeight() + clipY;
-        int firstLine = 0;
-        int lastLine = height;
-        if (clipY > y) {
-            firstLine = clipY - y;
-        }
-        if (clipBottomY < y + height) {
-            lastLine = clipBottomY - y;
-        }
+            // for performance we can calculate the visible drawing area so we don't have to
+            // calculate the whole array
+            int clipY = g.getClipY();
+            int clipBottomY = g.getClipHeight() + clipY;
+            int firstLine = 0;
+            int lastLine = height;
+            if (clipY > y) {
+                firstLine = clipY - y;
+            }
+            if (clipBottomY < y + height) {
+                lastLine = clipBottomY - y;
+            }
 
 
             for (int line = firstLine; line < lastLine; line += 3) {

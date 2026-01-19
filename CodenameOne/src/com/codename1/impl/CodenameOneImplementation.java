@@ -100,7 +100,6 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.lang.ref.WeakReference;
-
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -123,13 +122,31 @@ public abstract class CodenameOneImplementation {
      */
     private static final int RTL_RANGE_BEGIN = 0x590;
     private static final int RTL_RANGE_END = 0x7BF;
-    private Object displayLock;
-    private boolean bidi;
     private static boolean pollingThreadRunning;
     private static PushCallback callback;
     private static PurchaseCallback purchaseCallback;
     private static Runnable onCurrentFormChange;
     private static Runnable onExit;
+    /**
+     * Useful since the content of a single element touch event is often recycled
+     * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
+     * touch event should be very efficient
+     */
+    private final int[] xPointerEvent = new int[1];
+    /**
+     * Useful since the content of a single element touch event is often recycled
+     * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
+     * touch event should be very efficient
+     */
+    private final int[] yPointerEvent = new int[1];
+    private final Hashtable builtinSounds = new Hashtable();
+    /**
+     * For use inside paintDirty() so that we don't have to instantiate
+     * a rectangle each time it is called.
+     */
+    private final Rectangle paintDirtyTmpRect = new Rectangle();
+    private Object displayLock;
+    private boolean bidi;
     private Object lightweightClipboard;
     private Hashtable linearGradientCache;
     private Hashtable radialGradientCache;
@@ -147,32 +164,14 @@ public abstract class CodenameOneImplementation {
     private String packageName;
     private Component editingText;
     private String appArg;
-    /**
-     * Useful since the content of a single element touch event is often recycled
-     * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
-     * touch event should be very efficient
-     */
-    private final int[] xPointerEvent = new int[1];
-    /**
-     * Useful since the content of a single element touch event is often recycled
-     * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
-     * touch event should be very efficient
-     */
-    private final int[] yPointerEvent = new int[1];
     private int pointerPressedX;
     private int pointerPressedY;
-    private final Hashtable builtinSounds = new Hashtable();
     private Object storageData;
     private Hashtable cookies;
     private ActionListener logger;
     private int commandBehavior = Display.COMMAND_BEHAVIOR_DEFAULT;
     private boolean useNativeCookieStore = true;
     private boolean initiailized = false;
-    /**
-     * For use inside paintDirty() so that we don't have to instantiate
-     * a rectangle each time it is called.
-     */
-    private final Rectangle paintDirtyTmpRect = new Rectangle();
     private BrowserComponent sharedJavascriptContext;
     private Dimension initialWindowSizeHintPercent;
 
@@ -497,6 +496,15 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Returns the optional desktop window size hint provided by the first form.
+     *
+     * @return the stored hint or {@code null}
+     */
+    public Dimension getInitialWindowSizeHintPercent() {
+        return initialWindowSizeHintPercent;
+    }
+
+    /**
      * Stores an optional window size hint (in percent values) for desktop environments. Implementations
      * that do not support windows may ignore this value.
      *
@@ -505,15 +513,6 @@ public abstract class CodenameOneImplementation {
      */
     public void setInitialWindowSizeHintPercent(Dimension hint) {
         initialWindowSizeHintPercent = hint;
-    }
-
-    /**
-     * Returns the optional desktop window size hint provided by the first form.
-     *
-     * @return the stored hint or {@code null}
-     */
-    public Dimension getInitialWindowSizeHintPercent() {
-        return initialWindowSizeHintPercent;
     }
 
     /**
@@ -575,7 +574,7 @@ public abstract class CodenameOneImplementation {
      */
     public void stopTextEditing(Runnable onFinish) {
         stopTextEditing();
-        if(onFinish != null) {
+        if (onFinish != null) {
             onFinish.run();
         }
     }
@@ -1237,7 +1236,9 @@ public abstract class CodenameOneImplementation {
         int height = image.getHeight();
 
         for (int y = 0; y < height; y++) {
-            if (width >= 0) System.arraycopy(rgb, 0 + y * width, newRGB, 0 + (height - y - 1) * width, width);
+            if (width >= 0) {
+                System.arraycopy(rgb, 0 + y * width, newRGB, 0 + (height - y - 1) * width, width);
+            }
         }
 
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
@@ -1537,7 +1538,9 @@ public abstract class CodenameOneImplementation {
      * @return The previous alpha value.
      */
     public final int concatenateAlpha(Object graphics, int alpha) {
-        if (alpha == 255) return getAlpha(graphics);
+        if (alpha == 255) {
+            return getAlpha(graphics);
+        }
         int oldAlpha = getAlpha(graphics);
         setAlpha(graphics, (int) (oldAlpha * (alpha / 255f)));
         return oldAlpha;
@@ -5632,7 +5635,7 @@ public abstract class CodenameOneImplementation {
      */
     protected void log(String content) {
         ActionListener l = logger;
-        if(l != null) {
+        if (l != null) {
             l.actionPerformed(new ActionEvent(content, ActionEvent.Type.Log));
         }
     }
@@ -8704,7 +8707,7 @@ public abstract class CodenameOneImplementation {
      * return a blank string when unavailable.
      *
      * @param parentThread the thread in which the exception was thrown
-     * @param t the exception
+     * @param t            the exception
      * @return a stack trace string that might be blank
      */
     public String getStackTrace(Thread parentThread, Throwable t) {

@@ -74,7 +74,9 @@ public class AsyncResource<V> extends Observable {
         }
         if (t instanceof AsyncExecutionException) {
             return ((AsyncExecutionException) t).isCancelled();
-        } else return t.getClass() == CancellationException.class;
+        } else {
+            return t.getClass() == CancellationException.class;
+        }
     }
 
     /**

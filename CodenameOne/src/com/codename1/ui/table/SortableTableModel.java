@@ -39,8 +39,8 @@ public class SortableTableModel extends AbstractTableModel {
     private final TableModel model;
     private final boolean asc;
     private final int sortColumn;
-    private int[] sorted;
     private final Comparator cmp;
+    private int[] sorted;
 
     /**
      * Sorts a table based on the given column

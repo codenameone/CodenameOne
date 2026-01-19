@@ -23,8 +23,6 @@
 
 package com.codename1.properties;
 
-import com.codename1.properties.PropertyBusinessObject;
-
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;

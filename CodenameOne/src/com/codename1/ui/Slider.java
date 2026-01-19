@@ -57,14 +57,14 @@ import com.codename1.ui.util.EventDispatcher;
  * @author Shai Almog
  */
 public class Slider extends Label implements ActionSource {
+    private final EventDispatcher listeners = new EventDispatcher();
+    private final EventDispatcher actionListeners = new EventDispatcher();
     private int actionEventValue;
     private int value;
     private int maxValue = 100;
     private int minValue = 0;
     private boolean vertical;
     private boolean editable;
-    private final EventDispatcher listeners = new EventDispatcher();
-    private final EventDispatcher actionListeners = new EventDispatcher();
     private int increments = 4;
     private int previousX = -1, previousY = -1;
     private Style sliderFull;

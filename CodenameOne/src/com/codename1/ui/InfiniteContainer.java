@@ -133,7 +133,7 @@ public abstract class InfiniteContainer extends Container {
         Component[] components;
         try {
             components = fetchComponents(0, amount);
-        } catch(RuntimeException err) {
+        } catch (RuntimeException err) {
             requestingResults = false;
             throw err;
         }

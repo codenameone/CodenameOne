@@ -249,24 +249,24 @@ public abstract class MathUtil {
      */
     private static final double[] bp = {1.0, 1.5,};
     private static final double[] dp_h = {0.0, 5.84962487220764160156e-01,}; /* 0x3FE2B803, 0x40000000 */
-            private static final double[] dp_l = {0.0, 1.35003920212974897128e-08,}; /* 0x3E4CFDEB, 0x43CFD006 */
+    private static final double[] dp_l = {0.0, 1.35003920212974897128e-08,}; /* 0x3E4CFDEB, 0x43CFD006 */
     private static final double/* poly coefs for (3/2)*(log(x)-2s-2/3*s**3 */
-    L1 = 5.99999999999994648725e-01; /* 0x3FE33333, 0x33333303 */
-            private static final double L2 = 4.28571428578550184252e-01; /* 0x3FDB6DB6, 0xDB6FABFF */
-            private static final double L3 = 3.33333329818377432918e-01; /* 0x3FD55555, 0x518F264D */
-            private static final double L4 = 2.72728123808534006489e-01; /* 0x3FD17460, 0xA91D4101 */
-            private static final double L5 = 2.30660745775561754067e-01; /* 0x3FCD864A, 0x93C9DB65 */
-            private static final double L6 = 2.06975017800338417784e-01; /* 0x3FCA7E28, 0x4A454EEF */
-            private static final double lg2 = 6.93147180559945286227e-01; /* 0x3FE62E42, 0xFEFA39EF */
-            private static final double lg2_h = 6.93147182464599609375e-01; /* 0x3FE62E43, 0x00000000 */
-            private static final double lg2_l = -1.90465429995776804525e-09; /* 0xBE205C61, 0x0CA86C39 */
-            private static final double ovt = 8.0085662595372944372e-0017; /* -(1024-log2(ovfl+.5ulp)) */
-            private static final double cp = 9.61796693925975554329e-01; /* 0x3FEEC709, 0xDC3A03FD =2/(3ln2) */
-            private static final double cp_h = 9.61796700954437255859e-01; /* 0x3FEEC709, 0xE0000000 =(float)cp */
-            private static final double cp_l = -7.02846165095275826516e-09; /* 0xBE3E2FE0, 0x145B01F5 =tail of cp_h*/
-            private static final double ivln2 = 1.44269504088896338700e+00; /* 0x3FF71547, 0x652B82FE =1/ln2 */
-            private static final double ivln2_h = 1.44269502162933349609e+00; /* 0x3FF71547, 0x60000000 =24b 1/ln2*/
-            private static final double ivln2_l = 1.92596299112661746887e-08; /* 0x3E54AE0B, 0xF85DDF44 =1/ln2 tail*/
+            L1 = 5.99999999999994648725e-01; /* 0x3FE33333, 0x33333303 */
+    private static final double L2 = 4.28571428578550184252e-01; /* 0x3FDB6DB6, 0xDB6FABFF */
+    private static final double L3 = 3.33333329818377432918e-01; /* 0x3FD55555, 0x518F264D */
+    private static final double L4 = 2.72728123808534006489e-01; /* 0x3FD17460, 0xA91D4101 */
+    private static final double L5 = 2.30660745775561754067e-01; /* 0x3FCD864A, 0x93C9DB65 */
+    private static final double L6 = 2.06975017800338417784e-01; /* 0x3FCA7E28, 0x4A454EEF */
+    private static final double lg2 = 6.93147180559945286227e-01; /* 0x3FE62E42, 0xFEFA39EF */
+    private static final double lg2_h = 6.93147182464599609375e-01; /* 0x3FE62E43, 0x00000000 */
+    private static final double lg2_l = -1.90465429995776804525e-09; /* 0xBE205C61, 0x0CA86C39 */
+    private static final double ovt = 8.0085662595372944372e-0017; /* -(1024-log2(ovfl+.5ulp)) */
+    private static final double cp = 9.61796693925975554329e-01; /* 0x3FEEC709, 0xDC3A03FD =2/(3ln2) */
+    private static final double cp_h = 9.61796700954437255859e-01; /* 0x3FEEC709, 0xE0000000 =(float)cp */
+    private static final double cp_l = -7.02846165095275826516e-09; /* 0xBE3E2FE0, 0x145B01F5 =tail of cp_h*/
+    private static final double ivln2 = 1.44269504088896338700e+00; /* 0x3FF71547, 0x652B82FE =1/ln2 */
+    private static final double ivln2_h = 1.44269502162933349609e+00; /* 0x3FF71547, 0x60000000 =24b 1/ln2*/
+    private static final double ivln2_l = 1.92596299112661746887e-08; /* 0x3E54AE0B, 0xF85DDF44 =1/ln2 tail*/
     /* atan(x)
      * Method
      *   1. Reduce x to positive by atan(x) = -atan(-x).
@@ -1332,27 +1332,29 @@ public abstract class MathUtil {
      *    new Float(f1).compareTo(new Float(f2))
      * </pre>
      *
-     * @param   f1        the first {@code float} to compare.
-     * @param   f2        the second {@code float} to compare.
-     * @return  the value {@code 0} if {@code f1} is
-     *          numerically equal to {@code f2}; a value less than
-     *          {@code 0} if {@code f1} is numerically less than
-     *          {@code f2}; and a value greater than {@code 0}
-     *          if {@code f1} is numerically greater than
-     *          {@code f2}.
+     * @param f1 the first {@code float} to compare.
+     * @param f2 the second {@code float} to compare.
+     * @return the value {@code 0} if {@code f1} is
+     * numerically equal to {@code f2}; a value less than
+     * {@code 0} if {@code f1} is numerically less than
+     * {@code f2}; and a value greater than {@code 0}
+     * if {@code f1} is numerically greater than
+     * {@code f2}.
      * @since 1.4
      */
     public static int compare(float f1, float f2) {
-        if (f1 < f2)
+        if (f1 < f2) {
             return -1;           // Neither val is NaN, thisVal is smaller
-        if (f1 > f2)
+        }
+        if (f1 > f2) {
             return 1;            // Neither val is NaN, thisVal is larger
+        }
 
         // Cannot use floatToRawIntBits because of possibility of NaNs.
         int thisBits = Float.floatToIntBits(f1);
         int anotherBits = Float.floatToIntBits(f2);
 
-        return (thisBits == anotherBits ?  0 : // Values are equal
+        return (thisBits == anotherBits ? 0 : // Values are equal
                 (thisBits < anotherBits ? -1 : // (-0.0, 0.0) or (!NaN, NaN)
                         1));                          // (0.0, -0.0) or (NaN, !NaN)
     }
@@ -1365,27 +1367,29 @@ public abstract class MathUtil {
      *    new Double(d1).compareTo(new Double(d2))
      * </pre>
      *
-     * @param   d1        the first {@code double} to compare
-     * @param   d2        the second {@code double} to compare
-     * @return  the value {@code 0} if {@code d1} is
-     *          numerically equal to {@code d2}; a value less than
-     *          {@code 0} if {@code d1} is numerically less than
-     *          {@code d2}; and a value greater than {@code 0}
-     *          if {@code d1} is numerically greater than
-     *          {@code d2}.
+     * @param d1 the first {@code double} to compare
+     * @param d2 the second {@code double} to compare
+     * @return the value {@code 0} if {@code d1} is
+     * numerically equal to {@code d2}; a value less than
+     * {@code 0} if {@code d1} is numerically less than
+     * {@code d2}; and a value greater than {@code 0}
+     * if {@code d1} is numerically greater than
+     * {@code d2}.
      * @since 1.4
      */
     public static int compare(double d1, double d2) {
-        if (d1 < d2)
+        if (d1 < d2) {
             return -1;           // Neither val is NaN, thisVal is smaller
-        if (d1 > d2)
+        }
+        if (d1 > d2) {
             return 1;            // Neither val is NaN, thisVal is larger
+        }
 
         // Cannot use doubleToRawLongBits because of possibility of NaNs.
         long thisBits = Double.doubleToLongBits(d1);
         long anotherBits = Double.doubleToLongBits(d2);
 
-        return (thisBits == anotherBits ?  0 : // Values are equal
+        return (thisBits == anotherBits ? 0 : // Values are equal
                 (thisBits < anotherBits ? -1 : // (-0.0, 0.0) or (!NaN, NaN)
                         1));                          // (0.0, -0.0) or (NaN, !NaN)
     }

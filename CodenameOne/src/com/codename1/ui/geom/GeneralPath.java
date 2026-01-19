@@ -262,17 +262,23 @@ public final class GeneralPath implements Shape {
      * @see #createFromPool()
      */
     public static synchronized void recycle(GeneralPath p) {
-        if (pathPool().size() >= MAX_POOL_SIZE || p == null) return;
+        if (pathPool().size() >= MAX_POOL_SIZE || p == null) {
+            return;
+        }
         pathPool.add(p);
     }
 
     private static synchronized void recycle(Rectangle r) {
-        if (rectPool.size() >= MAX_POOL_SIZE || r == null) return;
+        if (rectPool.size() >= MAX_POOL_SIZE || r == null) {
+            return;
+        }
         rectPool.add(r);
     }
 
     private static synchronized void recycle(float[] a) {
-        if (floatPool().size() >= MAX_POOL_SIZE || a == null) return;
+        if (floatPool().size() >= MAX_POOL_SIZE || a == null) {
+            return;
+        }
         floatPool.add(a);
     }
 
@@ -519,7 +525,9 @@ public final class GeneralPath implements Shape {
                 recycle(p);
             }
         }
-        if (shape == this) return true;
+        if (shape == this) {
+            return true;
+        }
         if (shape instanceof Rectangle) {
             Rectangle r = (Rectangle) shape;
             Rectangle tmpRect = createRectFromPool();
@@ -1647,11 +1655,11 @@ public final class GeneralPath implements Shape {
 
 
     static class Ellipse {
+        private final EPoint _tmp1 = new EPoint();
         private double a;
         private double b;
         private double cx;
         private double cy;
-        private final EPoint _tmp1 = new EPoint();
 
         static void initWithBounds(Ellipse e, double x, double y, double w, double h) {
             e.cx = x + w / 2;

@@ -81,6 +81,7 @@ final class Inflate {
     static final private int FLAGS = 23;
     static private final byte[] mark = {(byte) 0, (byte) 0, (byte) 0xff, (byte) 0xff};
     private final ZStream z;
+    private final byte[] crcbuf = new byte[4];
     int mode;                            // current inflate mode
     // mode dependent information
     int method;        // if FLAGS, method byte
@@ -100,7 +101,6 @@ final class Inflate {
     GZIPHeader gheader = null;
     private int flags;
     private int need_bytes = -1;
-    private final byte[] crcbuf = new byte[4];
     private java.io.ByteArrayOutputStream tmp_string = null;
 
     Inflate(ZStream z) {
@@ -108,13 +108,15 @@ final class Inflate {
     }
 
     int inflateReset() {
-        if (z == null) return Z_STREAM_ERROR;
+        if (z == null) {
+            return Z_STREAM_ERROR;
+        }
 
         z.totalIn = z.totalOut = 0;
         z.msg = null;
         this.mode = HEAD;
         this.need_bytes = -1;
-        if(this.blocks != null) {
+        if (this.blocks != null) {
             this.blocks.reset();
         }
         return Z_OK;
@@ -138,15 +140,17 @@ final class Inflate {
         } else if ((w & INFLATE_ANY) != 0) {
             wrap = 4;
             w &= ~INFLATE_ANY;
-            if (w < 48)
+            if (w < 48) {
                 w &= 15;
+            }
         } else if ((w & ~31) != 0) { // for example, DEF_WBITS + 32
             wrap = 4;               // zlib and gzip wrapped data should be accepted.
             w &= 15;
         } else {
             wrap = (w >> 4) + 1;
-            if (w < 48)
+            if (w < 48) {
                 w &= 15;
+            }
         }
 
         if (w < 8 || w > 15) {
@@ -172,8 +176,9 @@ final class Inflate {
         int b;
 
         if (z == null || z.nextIn == null) {
-            if (f == Z_FINISH && this.mode == HEAD)
+            if (f == Z_FINISH && this.mode == HEAD) {
                 return Z_OK;
+            }
             return Z_STREAM_ERROR;
         }
 
@@ -202,8 +207,9 @@ final class Inflate {
                         z.adler = new CRC32();
                         checksum(2, this.need);
 
-                        if (gheader == null)
+                        if (gheader == null) {
                             gheader = new GZIPHeader();
+                        }
 
                         this.mode = FLAGS;
                         break;
@@ -273,14 +279,18 @@ final class Inflate {
                     this.mode = DICT4;
                 case DICT4:
 
-                    if (z.availIn == 0) return r;
+                    if (z.availIn == 0) {
+                        return r;
+                    }
                     z.availIn--;
                     z.totalIn++;
                     this.need = ((long) (z.nextIn[z.nextInIndex++] & 0xff) << 24) & 0xff000000L;
                     this.mode = DICT3;
                 case DICT3:
 
-                    if (z.availIn == 0) return r;
+                    if (z.availIn == 0) {
+                        return r;
+                    }
                     r = f;
 
                     z.availIn--;
@@ -289,7 +299,9 @@ final class Inflate {
                     this.mode = DICT2;
                 case DICT2:
 
-                    if (z.availIn == 0) return r;
+                    if (z.availIn == 0) {
+                        return r;
+                    }
                     r = f;
 
                     z.availIn--;
@@ -298,7 +310,9 @@ final class Inflate {
                     this.mode = DICT1;
                 case DICT1:
 
-                    if (z.availIn == 0) return r;
+                    if (z.availIn == 0) {
+                        return r;
+                    }
 
                     z.availIn--;
                     z.totalIn++;
@@ -336,7 +350,9 @@ final class Inflate {
                     this.mode = CHECK4;
                 case CHECK4:
 
-                    if (z.availIn == 0) return r;
+                    if (z.availIn == 0) {
+                        return r;
+                    }
                     r = f;
 
                     z.availIn--;
@@ -345,7 +361,9 @@ final class Inflate {
                     this.mode = CHECK3;
                 case CHECK3:
 
-                    if (z.availIn == 0) return r;
+                    if (z.availIn == 0) {
+                        return r;
+                    }
                     r = f;
 
                     z.availIn--;
@@ -354,7 +372,9 @@ final class Inflate {
                     this.mode = CHECK2;
                 case CHECK2:
 
-                    if (z.availIn == 0) return r;
+                    if (z.availIn == 0) {
+                        return r;
+                    }
                     r = f;
 
                     z.availIn--;
@@ -363,7 +383,9 @@ final class Inflate {
                     this.mode = CHECK1;
                 case CHECK1:
 
-                    if (z.availIn == 0) return r;
+                    if (z.availIn == 0) {
+                        return r;
+                    }
                     r = f;
 
                     z.availIn--;
@@ -609,14 +631,16 @@ final class Inflate {
         long r, w;   // temporaries to save total_in and total_out
 
         // set up
-        if (z == null)
+        if (z == null) {
             return Z_STREAM_ERROR;
+        }
         if (this.mode != BAD) {
             this.mode = BAD;
             this.marker = 0;
         }
-        if ((n = z.availIn) == 0)
+        if ((n = z.availIn) == 0) {
             return Z_BUF_ERROR;
+        }
 
         p = z.nextInIndex;
         // search
@@ -658,8 +682,9 @@ final class Inflate {
     // decompressing, PPP checks that at the end of input packet, inflate is
     // waiting for these length bytes.
     int inflateSyncPoint() {
-        if (z == null || this.blocks == null)
+        if (z == null || this.blocks == null) {
             return Z_STREAM_ERROR;
+        }
         return this.blocks.syncPoint();
     }
 
@@ -701,7 +726,9 @@ final class Inflate {
             z.availIn--;
             z.totalIn++;
             b = z.nextIn[z.nextInIndex];
-            if (b != 0) tmp_string.write(z.nextIn, z.nextInIndex, 1);
+            if (b != 0) {
+                tmp_string.write(z.nextIn, z.nextInIndex, 1);
+            }
             z.adler.update(z.nextIn, z.nextInIndex, 1);
             z.nextInIndex++;
         } while (b != 0);

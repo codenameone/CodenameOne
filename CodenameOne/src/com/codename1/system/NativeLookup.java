@@ -39,11 +39,11 @@ import java.util.HashMap;
  * @author Shai Almog
  */
 public final class NativeLookup {
+    private static final HashMap<Class, Class> interfaceToClassLookup = new HashMap<Class, Class>();
     /**
      * Indicates whether stack traces should be printed when lookup fails
      */
     private static boolean verbose = true;
-    private static final HashMap<Class, Class> interfaceToClassLookup = new HashMap<Class, Class>();
 
     private NativeLookup() {
     }

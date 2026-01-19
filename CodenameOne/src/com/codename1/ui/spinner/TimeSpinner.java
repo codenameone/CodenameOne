@@ -59,13 +59,11 @@ import java.util.ArrayList;
  * @deprecated use Picker instead
  */
 public class TimeSpinner extends BaseSpinner {
+    private final ArrayList<Component> hourComponents = new ArrayList<Component>();
+    private final ArrayList<Component> minuteComponents = new ArrayList<Component>();
     private Spinner hour;
     private Spinner minute;
     private Spinner amPM;
-
-    private final ArrayList<Component> hourComponents = new ArrayList<Component>();
-    private final ArrayList<Component> minuteComponents = new ArrayList<Component>();
-
     private int startHour = 1;
     private int endHour = 13;
     private int minuteStep = 5;

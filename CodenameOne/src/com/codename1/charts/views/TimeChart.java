@@ -41,9 +41,12 @@ import java.util.TimeZone;
  */
 public class TimeChart extends LineChart {
     /**
-     /** The constant to identify this chart type. */
+     * /** The constant to identify this chart type.
+     */
     public static final String TYPE = "Time";
-    /** The number of milliseconds in a day. */
+    /**
+     * The number of milliseconds in a day.
+     */
     public static final long DAY = 24 * 60 * 60 * 1000;
     /**
      * The number of milliseconds in a minute.
@@ -54,9 +57,13 @@ public class TimeChart extends LineChart {
      * TimeZone.getOffset()
      */
     private static final int ERA = 0;
-    /** The date format pattern to be used in formatting the X axis labels. */
+    /**
+     * The date format pattern to be used in formatting the X axis labels.
+     */
     private String mDateFormat;
-    /** The starting point for labels. */
+    /**
+     * The starting point for labels.
+     */
     private Double mStartPoint;
 
     TimeChart() {
@@ -65,7 +72,7 @@ public class TimeChart extends LineChart {
     /**
      * Builds a new time chart instance.
      *
-     * @param dataset the multiple series dataset
+     * @param dataset  the multiple series dataset
      * @param renderer the multiple series renderer
      */
     public TimeChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
@@ -86,7 +93,7 @@ public class TimeChart extends LineChart {
      * Sets the date format pattern to be used for formatting the X axis labels.
      *
      * @param format the date format pattern for the X axis labels. If null, an
-     *          appropriate default format will be used.
+     *               appropriate default format will be used.
      */
     public void setDateFormat(String format) {
         mDateFormat = format;
@@ -95,16 +102,16 @@ public class TimeChart extends LineChart {
     /**
      * The graphical representation of the labels on the X axis.
      *
-     * @param xLabels the X labels values
+     * @param xLabels             the X labels values
      * @param xTextLabelLocations the X text label locations
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param left the left value of the labels area
-     * @param top the top value of the labels area
-     * @param bottom the bottom value of the labels area
-     * @param xPixelsPerUnit the amount of pixels per one unit in the chart labels
-     * @param minX the minimum value on the X axis in the chart
-     * @param maxX the maximum value on the X axis in the chart
+     * @param canvas              the canvas to paint to
+     * @param paint               the paint to be used for drawing
+     * @param left                the left value of the labels area
+     * @param top                 the top value of the labels area
+     * @param bottom              the bottom value of the labels area
+     * @param xPixelsPerUnit      the amount of pixels per one unit in the chart labels
+     * @param minX                the minimum value on the X axis in the chart
+     * @param maxX                the maximum value on the X axis in the chart
      */
     @Override
     protected void drawXLabels(List<Double> xLabels, Double[] xTextLabelLocations, Canvas canvas,
@@ -142,7 +149,7 @@ public class TimeChart extends LineChart {
      * Returns the date format pattern to be used, based on the date range.
      *
      * @param start the start date in milliseconds
-     * @param end the end date in milliseconds
+     * @param end   the end date in milliseconds
      * @return the date format
      */
     private DateFormat getDateFormat(double start, double end) {

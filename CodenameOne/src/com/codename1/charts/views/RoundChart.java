@@ -34,24 +34,36 @@ import com.codename1.ui.Component;
  * {@link PieChart} or {@link DoughnutChart} directly.
  */
 public abstract class RoundChart extends AbstractChart {
-    /** The legend shape width. */
+    /**
+     * The legend shape width.
+     */
     protected static final int SHAPE_WIDTH = 10;
-    /** A no value constant. */
+    /**
+     * A no value constant.
+     */
     protected static final int NO_VALUE = Integer.MAX_VALUE;
-    /** The series dataset. */
+    /**
+     * The series dataset.
+     */
     protected CategorySeries mDataset;
-    /** The series renderer. */
+    /**
+     * The series renderer.
+     */
     protected DefaultRenderer mRenderer;
-    /** The chart center X axis. */
+    /**
+     * The chart center X axis.
+     */
     protected int mCenterX = NO_VALUE;
-    /** The chart center y axis. */
+    /**
+     * The chart center y axis.
+     */
     protected int mCenterY = NO_VALUE;
     protected boolean autoCalculateCenter = true;
 
     /**
      * Round chart.
      *
-     * @param dataset the series dataset
+     * @param dataset  the series dataset
      * @param renderer the series renderer
      */
     public RoundChart(CategorySeries dataset, DefaultRenderer renderer) {
@@ -63,10 +75,10 @@ public abstract class RoundChart extends AbstractChart {
      * The graphical representation of the round chart title.
      *
      * @param canvas the canvas to paint to
-     * @param x the top left x value of the view to draw to
-     * @param y the top left y value of the view to draw to
-     * @param width the width of the view to draw to
-     * @param paint the paint
+     * @param x      the top left x value of the view to draw to
+     * @param y      the top left y value of the view to draw to
+     * @param width  the width of the view to draw to
+     * @param paint  the paint
      */
     public void drawTitle(Canvas canvas, int x, int y, int width, Paint paint) {
         if (mRenderer.isShowLabels()) {
@@ -92,12 +104,12 @@ public abstract class RoundChart extends AbstractChart {
     /**
      * The graphical representation of the legend shape.
      *
-     * @param canvas the canvas to paint to
-     * @param renderer the series renderer
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param canvas      the canvas to paint to
+     * @param renderer    the series renderer
+     * @param x           the x value of the point the shape should be drawn at
+     * @param y           the y value of the point the shape should be drawn at
      * @param seriesIndex the series index
-     * @param paint the paint to be used for drawing
+     * @param paint       the paint to be used for drawing
      */
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,

@@ -163,8 +163,9 @@ final class InfCodes {
                     j = need;
 
                     while (k < (j)) {
-                        if (n != 0) r = Z_OK;
-                        else {
+                        if (n != 0) {
+                            r = Z_OK;
+                        } else {
 
                             s.bitb = b;
                             s.bitk = k;
@@ -222,8 +223,9 @@ final class InfCodes {
                     j = get;
 
                     while (k < (j)) {
-                        if (n != 0) r = Z_OK;
-                        else {
+                        if (n != 0) {
+                            r = Z_OK;
+                        } else {
 
                             s.bitb = b;
                             s.bitk = k;
@@ -251,8 +253,9 @@ final class InfCodes {
                     j = need;
 
                     while (k < (j)) {
-                        if (n != 0) r = Z_OK;
-                        else {
+                        if (n != 0) {
+                            r = Z_OK;
+                        } else {
 
                             s.bitb = b;
                             s.bitk = k;
@@ -300,8 +303,9 @@ final class InfCodes {
                     j = get;
 
                     while (k < (j)) {
-                        if (n != 0) r = Z_OK;
-                        else {
+                        if (n != 0) {
+                            r = Z_OK;
+                        } else {
 
                             s.bitb = b;
                             s.bitk = k;
@@ -360,8 +364,9 @@ final class InfCodes {
                         s.window[q++] = s.window[f++];
                         m--;
 
-                        if (f == s.end)
+                        if (f == s.end) {
                             f = 0;
+                        }
                         len--;
                     }
                     mode = START;
@@ -466,9 +471,9 @@ final class InfCodes {
     // distance pair plus four bytes for overloading the bit buffer.
 
     int inflateFast(int bl, int bd,
-                     int[] tl, int tlIndex,
-                     int[] td, int tdIndex,
-                     InfBlocks s, ZStream z) {
+                    int[] tl, int tlIndex,
+                    int[] td, int tdIndex,
+                    InfBlocks s, ZStream z) {
         int t;                // temporary pointer
         int[] tp;             // temporary pointer
         int tpIndex;         // temporary pointer

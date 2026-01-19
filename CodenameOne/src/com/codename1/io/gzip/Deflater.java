@@ -78,22 +78,25 @@ final public class Deflater extends ZStream {
     public Deflater(int level, int bits, boolean nowrap) throws GZIPException {
         super();
         int ret = init(level, bits, nowrap);
-        if (ret != Z_OK)
+        if (ret != Z_OK) {
             throw new GZIPException(ret + ": " + msg);
+        }
     }
 
     public Deflater(int level, int bits, int memlevel, JZlib.WrapperType wrapperType) throws GZIPException {
         super();
         int ret = init(level, bits, memlevel, wrapperType);
-        if (ret != Z_OK)
+        if (ret != Z_OK) {
             throw new GZIPException(ret + ": " + msg);
+        }
     }
 
     public Deflater(int level, int bits, int memlevel) throws GZIPException {
         super();
         int ret = init(level, bits, memlevel);
-        if (ret != Z_OK)
+        if (ret != Z_OK) {
             throw new GZIPException(ret + ": " + msg);
+        }
     }
 
     public int init(int level) {
@@ -140,15 +143,18 @@ final public class Deflater extends ZStream {
             return Z_STREAM_ERROR;
         }
         int ret = dstate.deflate(flush);
-        if (ret == Z_STREAM_END)
+        if (ret == Z_STREAM_END) {
             finished = true;
+        }
         return ret;
     }
 
     @Override
     public int end() {
         finished = true;
-        if (dstate == null) return Z_STREAM_ERROR;
+        if (dstate == null) {
+            return Z_STREAM_ERROR;
+        }
         int ret = dstate.deflateEnd();
         dstate = null;
         free();
@@ -156,13 +162,16 @@ final public class Deflater extends ZStream {
     }
 
     public int params(int level, int strategy) {
-        if (dstate == null) return Z_STREAM_ERROR;
+        if (dstate == null) {
+            return Z_STREAM_ERROR;
+        }
         return dstate.deflateParams(level, strategy);
     }
 
     public int setDictionary(byte[] dictionary, int dictLength) {
-        if (dstate == null)
+        if (dstate == null) {
             return Z_STREAM_ERROR;
+        }
         return dstate.deflateSetDictionary(dictionary, dictLength);
     }
 

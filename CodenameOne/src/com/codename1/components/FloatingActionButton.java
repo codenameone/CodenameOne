@@ -85,6 +85,7 @@ public class FloatingActionButton extends Button {
     private boolean rectangle;
     private boolean isBadge;
     private float sizeMm = fabDefaultSize;
+
     /**
      * Constructor
      *

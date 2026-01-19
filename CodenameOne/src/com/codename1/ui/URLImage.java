@@ -23,7 +23,6 @@
 
 package com.codename1.ui;
 
-import com.codename1.compat.java.util.Objects;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
@@ -142,6 +141,7 @@ public final class URLImage extends EncodedImage {
     private byte[] imageData;
     private boolean repaintImage;
     private boolean locked;
+
     private URLImage(EncodedImage placeholder, String url, ImageAdapter adapter, String storageFile, String fileSystemFile) {
         super(placeholder.getWidth(), placeholder.getHeight());
         this.placeholder = placeholder;

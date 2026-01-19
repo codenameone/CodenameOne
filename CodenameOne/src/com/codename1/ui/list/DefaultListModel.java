@@ -47,12 +47,10 @@ import java.util.Vector;
 public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
 
 
-    private boolean multiSelectionMode;
     private final java.util.List items;
-
     private final EventDispatcher dataListener = new EventDispatcher();
     private final EventDispatcher selectionListener = new EventDispatcher();
-
+    private boolean multiSelectionMode;
     private int selectedIndex = 0;
     private Set<Integer> selectedIndices;
     private boolean firstSetSelectedIndex = true;

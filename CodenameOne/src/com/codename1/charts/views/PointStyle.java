@@ -22,7 +22,9 @@ public enum PointStyle {
     X("x"), CIRCLE("circle"), TRIANGLE("triangle"), SQUARE("square"), DIAMOND("diamond"), POINT(
             "point");
 
-    /** The point shape name. */
+    /**
+     * The point shape name.
+     */
     private final String mName;
 
     /**

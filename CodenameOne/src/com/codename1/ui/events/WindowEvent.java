@@ -32,39 +32,8 @@ import com.codename1.ui.geom.Rectangle;
  */
 public class WindowEvent extends ActionEvent {
 
-    /**
-     * The type of window change that occurred.
-     */
-    public enum Type {
-        /**
-         * The window became visible.
-         */
-        Shown,
-        /**
-         * The window is no longer visible.
-         */
-        Hidden,
-        /**
-         * The window was minimized/iconified.
-         */
-        Minimized,
-        /**
-         * The window was restored from a minimized/iconified state.
-         */
-        Restored,
-        /**
-         * The window was resized.
-         */
-        Resized,
-        /**
-         * The window was moved.
-         */
-        Moved
-    }
-
     private final Type type;
     private final Rectangle bounds;
-
     /**
      * Creates a new window event instance.
      *
@@ -94,5 +63,35 @@ public class WindowEvent extends ActionEvent {
      */
     public Rectangle getBounds() {
         return bounds;
+    }
+
+    /**
+     * The type of window change that occurred.
+     */
+    public enum Type {
+        /**
+         * The window became visible.
+         */
+        Shown,
+        /**
+         * The window is no longer visible.
+         */
+        Hidden,
+        /**
+         * The window was minimized/iconified.
+         */
+        Minimized,
+        /**
+         * The window was restored from a minimized/iconified state.
+         */
+        Restored,
+        /**
+         * The window was resized.
+         */
+        Resized,
+        /**
+         * The window was moved.
+         */
+        Moved
     }
 }

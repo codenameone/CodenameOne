@@ -86,24 +86,24 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
      */
     public static final String SELECT_ALL_FLAG = "$$SELECTALL$$";
     private static URLImage.ImageAdapter defaultAdapter = URLImage.RESIZE_SCALE;
-    private Button lastClickedComponent;
-    private ArrayList<Image> pendingAnimations;
     private final Label focusComponent = new Label();
     private final Component selected;
     private final Component unselected;
     private final Component[] selectedEntries;
     private final Component[] unselectedEntries;
+    private final Monitor mon = new Monitor();
+    private final boolean firstCharacterRTL;
+    private final HashMap<String, EncodedImage> placeholders = new HashMap<String, EncodedImage>();
+    private Button lastClickedComponent;
+    private ArrayList<Image> pendingAnimations;
     private Component selectedEven;
     private Component unselectedEven;
     private Component[] selectedEntriesEven;
     private Component[] unselectedEntriesEven;
-    private final Monitor mon = new Monitor();
     private Component parentList;
     private boolean selectionListener = true;
-    private final boolean firstCharacterRTL;
     private boolean fisheye;
     private boolean waitingForRegisterAnimation;
-    private final HashMap<String, EncodedImage> placeholders = new HashMap<String, EncodedImage>();
     private URLImage.ImageAdapter adapter = defaultAdapter;
 
     /**
@@ -127,6 +127,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         addSelectedEntriesListener(selectedEntries);
         addSelectedEntriesListener(unselectedEntries);
     }
+
     /**
      * Constructs a generic renderer with the given selected/unselected components for
      * odd/even values allowing a "pinstripe" effect

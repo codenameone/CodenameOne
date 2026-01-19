@@ -84,11 +84,11 @@ class Spinner extends List {
      */
     private static Image spinnerHandle;
     private static int inputSkipDelay = 2000;
-    private long lastKeyInteraction = -1;
     private final TextField quickType = new TextField();
+    private final boolean ios7Mode;
+    private long lastKeyInteraction = -1;
     private boolean monthFirst;
     private int currentInputAlign = LEFT;
-    private final boolean ios7Mode;
 
     /**
      * Creates a new spinner instance with the given spinner model

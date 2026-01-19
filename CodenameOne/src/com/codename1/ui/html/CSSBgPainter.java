@@ -41,10 +41,10 @@ import com.codename1.ui.plaf.Style;
  * @author Ofir Leitner
  */
 class CSSBgPainter implements Painter {
+    private final Component parent;
     int horizPos, vertPos;
     boolean horizIsPercentage, vertIsPercentage;
     boolean fixedX;
-    private final Component parent;
     private Component scrollableParent;
 
     /**

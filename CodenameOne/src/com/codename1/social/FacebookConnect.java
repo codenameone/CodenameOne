@@ -44,9 +44,9 @@ import java.util.Arrays;
  */
 public class FacebookConnect extends Login {
 
+    private static final Object INSTANCE_LOCK = new Object();
     static Class<?> implClass;
     private static FacebookConnect instance;
-    private static final Object INSTANCE_LOCK = new Object();
     private final String[] permissions = new String[]{"public_profile", "email", "user_friends"};
 
     FacebookConnect() {
@@ -276,8 +276,12 @@ public class FacebookConnect extends Login {
 
         @Override
         public final boolean equals(Object o) {
-            if (!(o instanceof ValidateTokenConnectionRequest)) return false;
-            if (!super.equals(o)) return false;
+            if (!(o instanceof ValidateTokenConnectionRequest)) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
 
             ValidateTokenConnectionRequest that = (ValidateTokenConnectionRequest) o;
             return Arrays.equals(retval, that.retval);

@@ -25,7 +25,6 @@ package com.codename1.charts.compat;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.Rectangle2D;
 

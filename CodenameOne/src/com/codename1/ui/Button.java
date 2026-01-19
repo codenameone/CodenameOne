@@ -80,11 +80,11 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      * Indicates whether text on the button should be drawn capitalized by default to match the Android design
      */
     private static boolean capsTextDefault;
+    private final EventDispatcher dispatcher = new EventDispatcher();
     /**
      * Indicates whether text on the button should be drawn capitalized by default to match the Android design
      */
     private Boolean capsText;
-    private final EventDispatcher dispatcher = new EventDispatcher();
     private EventDispatcher stateChangeListeners;
     private int state = STATE_DEFAULT;
     private Image pressedIcon;

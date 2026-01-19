@@ -413,10 +413,10 @@ public class Accordion extends Container {
     class AccordionContent extends Container {
 
         private final Button arrow = new Button();
-        private boolean closed = true;
         private final Component body;
         private final Component header;
         private final Container top;
+        private boolean closed = true;
         private String topUiid = uiidHeader;
 
         public AccordionContent(Component header, final Component body) {

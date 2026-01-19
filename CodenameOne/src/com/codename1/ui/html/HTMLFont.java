@@ -44,7 +44,6 @@ class HTMLFont {
     static final int BIG = 2;
     static final int SMALL = 3;
     private static final char TOKEN = '.';
-    static Vector SPECIAL_FONT_TAGS = new Vector();
     /**
      * The following tags are tags that mainly define the style of their content, and one of the things they can change is the font
      */
@@ -58,6 +57,7 @@ class HTMLFont {
             HTMLElement.TAG_H5, HTMLElement.TAG_H6,
             HTMLElement.TAG_TT
     };
+    static Vector SPECIAL_FONT_TAGS = new Vector();
 
     /**
      * The static segment sets up the SPECIAL_FONT_TAGS vector with values from the SPECIAL_FONT_TAGS_ID array.
@@ -69,6 +69,7 @@ class HTMLFont {
         }
     }
 
+    private final HTMLFont[] counterpartFonts = new HTMLFont[4];
     boolean systemFont;
     Font font;
     String family;
@@ -76,7 +77,6 @@ class HTMLFont {
     int style;
     boolean bold;
     boolean italic;
-    private final HTMLFont[] counterpartFonts = new HTMLFont[4];
 
     /**
      * Constructs the HTMLFont

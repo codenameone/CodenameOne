@@ -1022,7 +1022,7 @@ public class Picker extends Button {
                 // Simulating a drag will trigger tensile drag to push the content
                 // back up to the top.
                 // See https://github.com/codenameone/CodenameOne/issues/2476
-                        if (f.getContentPane().getScrollY() < 0) {
+                if (f.getContentPane().getScrollY() < 0) {
                     f.getContentPane().pointerPressed(100, 100);
                     f.getContentPane().pointerDragged(100, 100);
                     f.getContentPane().pointerReleased(100, 100);

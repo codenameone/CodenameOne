@@ -38,11 +38,17 @@ import java.util.List;
  * to a Codename One form.
  */
 public class LineChart extends XYChart {
-    /** The constant to identify this chart type. */
+    /**
+     * The constant to identify this chart type.
+     */
     public static final String TYPE = "Line";
-    /** The legend shape width. */
+    /**
+     * The legend shape width.
+     */
     private static final int SHAPE_WIDTH = 30;
-    /** The scatter chart to be used to draw the data points. */
+    /**
+     * The scatter chart to be used to draw the data points.
+     */
     private ScatterChart pointsChart;
 
     LineChart() {
@@ -51,7 +57,7 @@ public class LineChart extends XYChart {
     /**
      * Builds a new line chart instance.
      *
-     * @param dataset the multiple series dataset
+     * @param dataset  the multiple series dataset
      * @param renderer the multiple series renderer
      */
     public LineChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
@@ -62,7 +68,7 @@ public class LineChart extends XYChart {
     /**
      * Sets the series and the renderer.
      *
-     * @param dataset the series dataset
+     * @param dataset  the series dataset
      * @param renderer the series renderer
      */
     @Override
@@ -75,13 +81,13 @@ public class LineChart extends XYChart {
     /**
      * The graphical representation of a series.
      *
-     * @param canvas the canvas to paint to
-     * @param paint the paint to be used for drawing
-     * @param points the array of points to be used for drawing the series
+     * @param canvas         the canvas to paint to
+     * @param paint          the paint to be used for drawing
+     * @param points         the array of points to be used for drawing the series
      * @param seriesRenderer the series renderer
-     * @param yAxisValue the minimum value of the y axis
-     * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex the start index of the rendering points
+     * @param yAxisValue     the minimum value of the y axis
+     * @param seriesIndex    the index of the series currently being drawn
+     * @param startIndex     the start index of the rendering points
      */
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points, XYSeriesRenderer renderer,
@@ -213,7 +219,9 @@ public class LineChart extends XYChart {
         }
 
         int length = endIndex - startIndex;
-        if (length < 2) return;
+        if (length < 2) {
+            return;
+        }
 
         // Logic from original:
         // 1. fillPoints.set(0, fillPoints.get(0) + 1);
@@ -224,7 +232,9 @@ public class LineChart extends XYChart {
 
         float startX = points.get(startIndex) + 1;
         float startY = points.get(startIndex + 1);
-        if (startY < 0) startY = 0;
+        if (startY < 0) {
+            startY = 0;
+        }
 
         // Since we need to form segments (p1, p2) for calculateDrawPoints
 
@@ -236,7 +246,9 @@ public class LineChart extends XYChart {
             p1y = startY;
             p2x = points.get(startIndex + 2);
             p2y = points.get(startIndex + 3);
-            if (p2y < 0) p2y = 0;
+            if (p2y < 0) {
+                p2y = 0;
+            }
 
             tempDrawPoints = calculateDrawPoints(p1x, p1y, p2x, p2y, height, width);
             path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
@@ -245,11 +257,15 @@ public class LineChart extends XYChart {
             for (int i = 4; i < length; i += 2) {
                 p1x = points.get(startIndex + i - 2);
                 p1y = points.get(startIndex + i - 1);
-                if (p1y < 0) p1y = 0;
+                if (p1y < 0) {
+                    p1y = 0;
+                }
 
                 p2x = points.get(startIndex + i);
                 p2y = points.get(startIndex + i + 1);
-                if (p2y < 0) p2y = 0;
+                if (p2y < 0) {
+                    p2y = 0;
+                }
 
                 tempDrawPoints = calculateDrawPoints(p1x, p1y, p2x, p2y, height, width);
                 path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
@@ -266,12 +282,16 @@ public class LineChart extends XYChart {
         float lastX = points.get(endIndex - 2);
         float nextX = lastX;
         float nextY = referencePoint;
-        if (nextY < 0) nextY = 0;
+        if (nextY < 0) {
+            nextY = 0;
+        }
 
         // We need previous point (p1) to calculate draw points segment.
         p1x = points.get(endIndex - 2); // original X
         p1y = points.get(endIndex - 1); // original Y
-        if (p1y < 0) p1y = 0;
+        if (p1y < 0) {
+            p1y = 0;
+        }
 
         tempDrawPoints = calculateDrawPoints(p1x, p1y, nextX, nextY, height, width);
         path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
@@ -283,7 +303,9 @@ public class LineChart extends XYChart {
 
         nextX = startX; // This is StartX (modified +1)
         nextY = referencePoint;
-        if (nextY < 0) nextY = 0;
+        if (nextY < 0) {
+            nextY = 0;
+        }
 
         tempDrawPoints = calculateDrawPoints(p1x, p1y, nextX, nextY, height, width);
         path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
@@ -330,12 +352,12 @@ public class LineChart extends XYChart {
     /**
      * The graphical representation of the legend shape.
      *
-     * @param canvas the canvas to paint to
-     * @param renderer the series renderer
-     * @param x the x value of the point the shape should be drawn at
-     * @param y the y value of the point the shape should be drawn at
+     * @param canvas      the canvas to paint to
+     * @param renderer    the series renderer
+     * @param x           the x value of the point the shape should be drawn at
+     * @param y           the y value of the point the shape should be drawn at
      * @param seriesIndex the series index
-     * @param paint the paint to be used for drawing
+     * @param paint       the paint to be used for drawing
      */
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,

@@ -70,9 +70,6 @@ public class Border {
     private static final int TITLE_MARGIN = 10;
     private static final int TITLE_SPACE = 5;
     private static Border defaultBorder = Border.createEtchedRaised(0x020202, 0xBBBBBB);
-    private static class EmptyBorderHolder {
-        private static final Border EMPTY = new Border();
-    }
     // variables are package protected for the benefit of the resource editor!
     int type;
     Image[] images;
@@ -99,7 +96,6 @@ public class Border {
     private Rectangle trackComponent;
     private boolean paintOuterBorderFirst;
     private boolean emptyType;
-
     /**
      * Prevents usage of new operator, use the factory methods in the class or subclass
      * to create new border types.
@@ -2005,7 +2001,6 @@ public class Border {
         return compoundBorders;
     }
 
-
     /**
      * This callback indicates that a component pointing at this border is initialized, this
      * method is useful for image borders whose lock methods are implicitly invoked.
@@ -2072,6 +2067,10 @@ public class Border {
             return images;
         }
         return null;
+    }
+
+    private static class EmptyBorderHolder {
+        private static final Border EMPTY = new Border();
     }
 
 
