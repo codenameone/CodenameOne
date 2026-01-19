@@ -306,12 +306,12 @@ public class Dialog extends Form {
     public static boolean show(String title, String text, int type, Image icon, String okText, String cancelText, long timeout) {
         Command[] cmds;
         Command okCommand = new Command(okText);
-        if (cancelText != null) {
+        if (cancelText != null) { // NOPMD
             cmds = new Command[]{new Command(cancelText), okCommand};
         } else {
             cmds = new Command[]{okCommand};
         }
-        return show(title, text, okCommand, cmds, type, icon, timeout) == okCommand;
+        return show(title, text, okCommand, cmds, type, icon, timeout) == okCommand; // NOPMD
     }
 
     /**
@@ -1491,7 +1491,7 @@ public class Dialog extends Form {
             contentPaneStyle.getBorder().clearImageBorderSpecialTile();
         }
 
-        if (result == backCommand) {
+        if (result == backCommand) { // NOPMD
             return null;
         }
         return result;
@@ -1879,11 +1879,11 @@ public class Dialog extends Form {
      */
     @Override
     void repaint(Component cmp) {
-        if (getParent() != null) {
+        if (getParent() != null) { // NOPMD
             super.repaint(cmp);
             return;
         }
-        if (isVisible() && !disposed && (isMenu() || CN.getCurrentForm() == this)) {
+        if (isVisible() && !disposed && (isMenu() || CN.getCurrentForm() == this)) { // NOPMD
             Display.getInstance().repaint(cmp);
         }
     }

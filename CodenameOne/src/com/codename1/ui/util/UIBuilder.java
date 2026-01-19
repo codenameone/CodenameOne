@@ -551,9 +551,9 @@ public class UIBuilder { //implements Externalizable {
      */
     public Component findByName(String name, Component rootComponent) {
         Component c = (Component) rootComponent.getClientProperty("%" + name + "%");
-        if (c == null) {
+        if (c == null) { // NOPMD
             Container newRoot = getRootAncestor(rootComponent);
-            if (newRoot != null && rootComponent != newRoot) {
+            if (newRoot != null && rootComponent != newRoot) { // NOPMD
                 return findByName(name, newRoot);
             }
         }
@@ -569,9 +569,9 @@ public class UIBuilder { //implements Externalizable {
      */
     public Component findByName(String name, Container rootComponent) {
         Component c = (Component) rootComponent.getClientProperty("%" + name + "%");
-        if (c == null) {
+        if (c == null) { // NOPMD
             Container newRoot = getRootAncestor(rootComponent);
-            if (newRoot != null && rootComponent != newRoot) {
+            if (newRoot != null && rootComponent != newRoot) { // NOPMD
                 return findByName(name, newRoot);
             }
         }
@@ -1990,8 +1990,8 @@ public class UIBuilder { //implements Externalizable {
     }
 
     private boolean isParentOf(Container cnt, Component c) {
-        while (c != null) {
-            if (c == cnt) {
+        while (c != null) { // NOPMD
+            if (c == cnt) { // NOPMD
                 return true;
             }
             c = c.getParent();
@@ -2245,14 +2245,14 @@ public class UIBuilder { //implements Externalizable {
         Command backCommand = currentForm.getBackCommand();
         Form newForm = (Form) createContainer(fetchResourceFile(), currentForm.getName());
         newForm.setSourceCommand(currentForm.getSourceCommand());
-        if (backCommand != null) {
+        if (backCommand != null) { // NOPMD
             setBackCommand(newForm, backCommand);
 
             // trigger listener creation if this is the only command in the form
             getFormListenerInstance(newForm, null);
 
             for (int iter = 0; iter < currentForm.getCommandCount(); iter++) {
-                if (backCommand == currentForm.getCommand(iter)) {
+                if (backCommand == currentForm.getCommand(iter)) { // NOPMD
                     newForm.addCommand(backCommand, newForm.getCommandCount());
                     break;
                 }
@@ -2308,8 +2308,8 @@ public class UIBuilder { //implements Externalizable {
                         initBackContainer(cnt, destContainer.getComponentForm(), getFormNavigationStackForComponent(sourceComponent));
                         t = t.copy(true);
                     } else {
-                        if (sourceCommand != null) {
-                            if (t != null && backCommands != null && backCommands.contains(sourceCommand) || Display.getInstance().getCurrent().getBackCommand() == sourceCommand) {
+                        if (sourceCommand != null) { // NOPMD
+                            if (t != null && backCommands != null && backCommands.contains(sourceCommand) || Display.getInstance().getCurrent().getBackCommand() == sourceCommand) { // NOPMD
                                 isBack = true;
                                 t = t.copy(true);
                             }
@@ -2439,12 +2439,12 @@ public class UIBuilder { //implements Externalizable {
 
     private void showForm(Form f, Command sourceCommand, Component sourceComponent) {
         Form currentForm = Display.getInstance().getCurrent();
-        if (currentForm != null && currentForm instanceof Dialog) {
+        if (currentForm != null && currentForm instanceof Dialog) { // NOPMD
             ((Dialog) Display.getInstance().getCurrent()).dispose();
             currentForm = Display.getInstance().getCurrent();
         }
         Vector formNavigationStack = baseFormNavigationStack;
-        if (sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) {
+        if (sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) { // NOPMD
             exitForm(currentForm);
             if (formNavigationStack != null && formNavigationStack.size() > 0) {
                 String name = f.getName();
@@ -2792,7 +2792,7 @@ public class UIBuilder { //implements Externalizable {
         }
 
         private void waitForForm(Form f) {
-            while (Display.getInstance().getCurrent() != f) {
+            while (Display.getInstance().getCurrent() != f) { // NOPMD
                 try {
                     Thread.sleep(5);
                 } catch (InterruptedException ex) {
@@ -2873,14 +2873,14 @@ public class UIBuilder { //implements Externalizable {
                 if (action.startsWith("!")) {
                     action = action.substring(1);
                     Form currentForm = Display.getInstance().getCurrent();
-                    if (currentForm != null) {
+                    if (currentForm != null) { // NOPMD
                         exitForm(currentForm);
                     }
                     int pos = action.indexOf(';');
                     String firstScreen = action.substring(0, pos);
                     String nextScreen = action.substring(pos + 1);
                     Form f = (Form) createContainer(fetchResourceFile(), firstScreen);
-                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) {
+                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) { // NOPMD
                         onBackNavigation();
                         beforeShow(f);
                         f.showBack();
@@ -2896,11 +2896,11 @@ public class UIBuilder { //implements Externalizable {
                 if (action.startsWith("@")) {
                     action = action.substring(1);
                     Form currentForm = Display.getInstance().getCurrent();
-                    if (currentForm != null) {
+                    if (currentForm != null) { // NOPMD
                         exitForm(currentForm);
                     }
                     Form f = (Form) createContainer(fetchResourceFile(), action);
-                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) {
+                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) { // NOPMD
                         onBackNavigation();
                         beforeShow(f);
                         f.showBack();

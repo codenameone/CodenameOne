@@ -203,7 +203,7 @@ public final class ConstraintParser {
                     }
                 }
 
-                if (c == 'i') {
+                if (c == 'i') { // NOPMD
                     ix = startsWithLenient(part, "insets", 3, true);
                     if (ix > -1) {
                         String insStr = part.substring(ix).trim();
@@ -214,11 +214,11 @@ public final class ConstraintParser {
                     }
                 }
 
-                if (c == 'a') {
+                if (c == 'a') { // NOPMD
                     ix = startsWithLenient(part, new String[]{"aligny", "ay"}, new int[]{6, 2}, true);
                     if (ix > -1) {
                         UnitValue align = parseUnitValueOrAlign(part.substring(ix).trim(), false, null);
-                        if (align == UnitValue.BASELINE_IDENTITY) {
+                        if (align == UnitValue.BASELINE_IDENTITY) { // NOPMD
                             throw new IllegalArgumentException("'baseline' can not be used to align the whole component group.");
                         }
                         lc.setAlignY(align);

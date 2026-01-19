@@ -163,7 +163,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
     }
 
     public final void setModel(ListModel model) {
-        if (model != this.model) {
+        if (model != this.model) { // NOPMD
             if (this.model != null) {
                 this.model.removeDataChangedListener(this);
                 this.model.removeSelectionListener(this);
@@ -210,7 +210,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
      */
     @Override
     public void setLayout(Layout layout) {
-        if (layout != this.getLayout()) {
+        if (layout != this.getLayout()) { // NOPMD
             super.setLayout(layout);
             refresh();
         }

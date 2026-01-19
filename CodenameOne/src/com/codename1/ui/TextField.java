@@ -1171,7 +1171,7 @@ public class TextField extends TextArea {
      * @return true if the String is valid
      */
     public boolean validChar(String c) {
-        if (getConstraint() == TextArea.NUMERIC) {
+        if (getConstraint() == TextArea.NUMERIC) { // NOPMD
             return c.charAt(0) >= '0' && c.charAt(0) <= '9';
         } else if (getConstraint() == TextArea.PHONENUMBER) {
             return (c.charAt(0) >= '0' && c.charAt(0) <= '9') || c.charAt(0) == '+';
@@ -1189,7 +1189,7 @@ public class TextField extends TextArea {
     protected void showSymbolDialog() {
         Command cancel = new Command(getUIManager().localize("cancel", "Cancel"));
         Command r = Dialog.show("", createSymbolTable(), cancel);
-        if (r != null && r != cancel) {
+        if (r != null && r != cancel) { // NOPMD
             insertChars(r.getCommandName());
         }
     }

@@ -99,7 +99,7 @@ public class Property<T, K> extends PropertyBase<T, K> {
             firePropertyChanged();
             internalSet();
         }
-        if (parent == null) {
+        if (parent == null) { // NOPMD
             // allows properties to work even if they aren't registered in the index
             return null;
         }
@@ -119,7 +119,7 @@ public class Property<T, K> extends PropertyBase<T, K> {
         }
         Property other = (Property) obj;
         Object otherval = other.get();
-        if (otherval == value) {
+        if (otherval == value) { // NOPMD
             return true;
         }
         return otherval != null && otherval.equals(value);

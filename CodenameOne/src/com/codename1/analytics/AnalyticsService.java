@@ -256,7 +256,7 @@ public class AnalyticsService {
             ActionListener onComplete = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
-                    if (req == lastRequest) {
+                    if (req == lastRequest) { // NOPMD
                         lastRequest = null;
                     }
                 }
@@ -276,7 +276,7 @@ public class AnalyticsService {
             r.addArgument("guid", "ON");
             r.addArgument("utmac", instance.agent);
             r.addArgument("utmn", Integer.toString((int) (System.currentTimeMillis() % 0x7fffffff)));
-            if (page == null || page.length() == 0) {
+            if (page == null || page.length() == 0) { // NOPMD
                 page = "-";
             }
             r.addArgument("utmp", page);
@@ -295,7 +295,7 @@ public class AnalyticsService {
             ActionListener onComplete = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
-                    if (r == lastRequest) {
+                    if (r == lastRequest) { // NOPMD
                         lastRequest = null;
                     }
                 }

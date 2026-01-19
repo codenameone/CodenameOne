@@ -184,7 +184,7 @@ public final class DefaultCrashReporter implements CrashReport {
             grid.addComponent(send);
             grid.addComponent(dontSend);
             Command result = error.showPacked(BorderLayout.CENTER, true);
-            if (result == dont) {
+            if (result == dont) { // NOPMD
                 if (cb.isSelected()) {
                     Preferences.set("$CN1_crashBlocked", true);
                 }

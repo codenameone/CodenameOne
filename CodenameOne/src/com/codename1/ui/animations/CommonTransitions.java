@@ -1185,12 +1185,12 @@ public final class CommonTransitions extends Transition {
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
         if (cmp instanceof Dialog) {
-            if (transitionType == TYPE_FADE && Display.getInstance().areMutableImagesFast()) {
+            if (transitionType == TYPE_FADE && Display.getInstance().areMutableImagesFast()) { // NOPMD
                 cmp.paintComponent(g, background);
                 return;
             }
             if (!(getSource() instanceof Dialog && getDestination() instanceof Dialog
-                    && cmp == getDestination())) {
+                    && cmp == getDestination())) { // NOPMD
                 Painter p = cmp.getStyle().getBgPainter();
                 cmp.getStyle().setBgPainter(null);
                 g.translate(x, y);

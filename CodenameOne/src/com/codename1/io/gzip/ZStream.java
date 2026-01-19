@@ -109,11 +109,11 @@ public class ZStream {
 
     public int inflateInit(int w, JZlib.WrapperType wrapperType) {
         boolean nowrap = false;
-        if (wrapperType == JZlib.W_NONE) {
+        if (wrapperType == JZlib.W_NONE) { // NOPMD
             nowrap = true;
-        } else if (wrapperType == JZlib.W_GZIP) {
+        } else if (wrapperType == JZlib.W_GZIP) { // NOPMD
             w += 16;
-        } else if (wrapperType == JZlib.W_ANY) {
+        } else if (wrapperType == JZlib.W_ANY) { // NOPMD
             w |= Inflate.INFLATE_ANY;
         }
         return inflateInit(w, nowrap);
@@ -174,11 +174,11 @@ public class ZStream {
         if (bits < 9 || bits > 15) {
             return Z_STREAM_ERROR;
         }
-        if (wrapperType == JZlib.W_NONE) {
+        if (wrapperType == JZlib.W_NONE) { // NOPMD
             bits *= -1;
-        } else if (wrapperType == JZlib.W_GZIP) {
+        } else if (wrapperType == JZlib.W_GZIP) { // NOPMD
             bits += 16;
-        } else if (wrapperType == JZlib.W_ANY) {
+        } else if (wrapperType == JZlib.W_ANY) { // NOPMD
             return Z_STREAM_ERROR;
         }
         return this.deflateInit(level, bits, memlevel);

@@ -169,7 +169,7 @@ public class Sheet extends Container {
         @Override
         public void actionPerformed(ActionEvent evt) {
             Form f = getComponentForm();
-            if (f == null) {
+            if (f == null) { // NOPMD
                 return;
             }
             if (Display.impl.isScrollWheeling()) {
@@ -455,7 +455,7 @@ public class Sheet extends Container {
             });
             return;
         }
-        if (getParent() != null) {
+        if (getParent() != null) { // NOPMD
             remove();
         }
         Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
@@ -473,7 +473,7 @@ public class Sheet extends Container {
                 public void call(Component c) {
                     if (c instanceof Sheet) {
                         Sheet s = (Sheet) c;
-                        if (s.isAncestorSheetOf(Sheet.this) || s == Sheet.this) {
+                        if (s.isAncestorSheetOf(Sheet.this) || s == Sheet.this) { // NOPMD
                             // If the sheet is an ancestor of
                             // ours then we don't need to fire a close event
                             // yet.  We fire it when it is closed
@@ -487,8 +487,8 @@ public class Sheet extends Container {
                         // its parent sheets from being shown again,
                         // so their close events should also be fired in this case.
                         Sheet sp = s.getParentSheet();
-                        while (sp != null) {
-                            if (sp == Sheet.this) {
+                        while (sp != null) { // NOPMD
+                            if (sp == Sheet.this) { // NOPMD
                                 break;
                             }
                             if (!sp.isAncestorSheetOf(Sheet.this)) {
@@ -819,7 +819,7 @@ public class Sheet extends Container {
 
     @Override
     protected void deinitialize() {
-        if (form != null) {
+        if (form != null) { // NOPMD
             form.removePointerPressedListener(formPointerListener);
             form = null;
         }
@@ -835,7 +835,7 @@ public class Sheet extends Container {
      */
     public boolean isAncestorSheetOf(Sheet sheet) {
         sheet = sheet.getParentSheet();
-        if (sheet == this) {
+        if (sheet == this) { // NOPMD
             return true;
         } else if (sheet == null) {
             return false;

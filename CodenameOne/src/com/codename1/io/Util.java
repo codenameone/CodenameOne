@@ -887,7 +887,7 @@ public class Util {
         // hence this method simulates the proper behavior
         if (!charArrayBugTested) {
             charArrayBugTested = true;
-            if (s.toCharArray() == s.toCharArray()) {
+            if (s.toCharArray() == s.toCharArray()) { // NOPMD
                 charArrayBug = true;
             }
         }
@@ -1362,7 +1362,7 @@ public class Util {
     }
 
     /**
-     * Finds the object at the given offset while using the == operator and not the equals method call, it doesn't
+     * Finds the object at the given offset while using the == operator and not the equals method call, it doesn't // NOPMD
      * rely on the ordering of the elements like the Arrays method.
      *
      * @param arr   the array
@@ -1372,7 +1372,7 @@ public class Util {
     public static int indexOf(Object[] arr, Object value) {
         int l = arr.length;
         for (int iter = 0; iter < l; iter++) {
-            if (arr[iter] == value) {
+            if (arr[iter] == value) { // NOPMD
                 return iter;
             }
         }
@@ -2372,7 +2372,7 @@ public class Util {
         NetworkManager.getInstance().addProgressListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
-                if (cr == evt.getConnectionRequest() && fileSize > 0) {
+                if (cr == evt.getConnectionRequest() && fileSize > 0) { // NOPMD
                     // the following casting to long is necessary when the file is bigger than 21MB, otherwise the result of the calculation is wrong
                     if (percentageCallback != null) {
                         CN.callSerially(new Runnable() {

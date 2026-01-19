@@ -484,7 +484,7 @@ public class Element implements Iterable<Element> {
      * @return true if this element contains the specified element, false otherwise
      */
     public boolean contains(Element element) {
-        if (this == element) {
+        if (this == element) { // NOPMD
             return true;
         }
         if (children != null) {
@@ -606,7 +606,7 @@ public class Element implements Iterable<Element> {
      * @param index The child's index
      */
     public void removeChildAt(int index) {
-        if ((index < 0) || (children == null) || (index >= children.size())) {
+        if ((index < 0) || (children == null) || (index >= children.size())) { // NOPMD
             throw new ArrayIndexOutOfBoundsException();
         }
         Element child = children.get(index);
@@ -622,9 +622,9 @@ public class Element implements Iterable<Element> {
      */
     public int getChildIndex(Element child) {
         int result = -1;
-        if (children != null) {
+        if (children != null) { // NOPMD
             for (int i = 0; i < children.size(); i++) {
-                if (child == children.get(i)) {
+                if (child == children.get(i)) { // NOPMD
                     result = i;
                     break;
                 }

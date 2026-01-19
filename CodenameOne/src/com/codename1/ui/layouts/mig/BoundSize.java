@@ -188,7 +188,7 @@ public class BoundSize {
      */
     final int[] getPixelSizes(float refSize, ContainerWrapper parent, ComponentWrapper comp) {
         return new int[]{
-                min != null ? min.getPixels(refSize, parent, comp) : 0,
+                min != null ? min.getPixels(refSize, parent, comp) : 0, // NOPMD
                 pref != null ? pref.getPixels(refSize, parent, comp) : 0,
                 max != null ? max.getPixels(refSize, parent, comp) : LayoutUtil.INF
         };
@@ -201,11 +201,11 @@ public class BoundSize {
      */
     String getConstraintString() {
         String cs = LayoutUtil.getCCString(this);
-        if (cs != null)
+        if (cs != null) // NOPMD
             return cs;
 
         if (min == pref && pref == max)
-            return min != null ? (min.getConstraintString() + "!") : "null";
+            return min != null ? (min.getConstraintString() + "!") : "null"; // NOPMD
 
         StringBuilder sb = new StringBuilder(16);
 

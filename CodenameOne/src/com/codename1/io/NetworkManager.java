@@ -393,7 +393,7 @@ public final class NetworkManager {
 
             @Override
             public void actionPerformed(NetworkEvent e) {
-                if (e.getError() != null) {
+                if (e.getError() != null) { // NOPMD
 
                     removeProgressListener(this);
                     removeErrorListener(this);
@@ -402,8 +402,8 @@ public final class NetworkManager {
                     }
                     return;
                 }
-                if (e.getConnectionRequest() == request) {
-                    if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                if (e.getConnectionRequest() == request) { // NOPMD
+                    if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) { // NOPMD
                         if (request.retrying) {
                             request.retrying = false;
                             return;
@@ -459,14 +459,14 @@ public final class NetworkManager {
 
             @Override
             public void actionPerformed(NetworkEvent e) {
-                if (e.getError() != null) {
+                if (e.getError() != null) { // NOPMD
                     finishedWaiting = true;
                     removeProgressListener(this);
                     removeErrorListener(this);
                     return;
                 }
-                if (e.getConnectionRequest() == request) {
-                    if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                if (e.getConnectionRequest() == request) { // NOPMD
+                    if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) { // NOPMD
                         if (request.retrying) {
                             request.retrying = false;
                             return;
@@ -817,7 +817,7 @@ public final class NetworkManager {
         }
 
         public void interrupt() {
-            if (threadInstance != null) {
+            if (threadInstance != null) { // NOPMD
                 threadInstance.interrupt();
             }
         }
@@ -831,10 +831,10 @@ public final class NetworkManager {
                 String n = currentRequest.getClass().getName();
                 Integer threadOffset = (Integer) threadAssignements.get(n);
                 NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
-                if (networkThreads == null) {
+                if (networkThreads == null) { // NOPMD
                     return false;
                 }
-                if (threadOffset != null && networkThreads[threadOffset.intValue()] != this) {
+                if (threadOffset != null && networkThreads[threadOffset.intValue()] != this) { // NOPMD
                     synchronized (LOCK) {
                         if (pending.size() > 0) {
                             pending.insertElementAt(currentRequest, 1);

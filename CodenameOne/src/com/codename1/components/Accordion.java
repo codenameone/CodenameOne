@@ -427,7 +427,7 @@ public class Accordion extends Container {
             header.setSelectedStyle(header.getUnselectedStyle());
             header.setPressedStyle(header.getUnselectedStyle());
             String t = (String) body.getClientProperty("cn1$setHeaderUIID");
-            if (t != null) {
+            if (t != null) { // NOPMD
                 topUiid = t;
             }
 
@@ -445,7 +445,7 @@ public class Accordion extends Container {
                     if (autoClose) {
                         for (int i = 0; i < Accordion.this.getComponentCount(); i++) {
                             AccordionContent c = (AccordionContent) Accordion.this.getComponentAt(i);
-                            if (c != AccordionContent.this && !c.isClosed()) {
+                            if (c != AccordionContent.this && !c.isClosed()) { // NOPMD
                                 c.openClose(true);
                             }
                         }

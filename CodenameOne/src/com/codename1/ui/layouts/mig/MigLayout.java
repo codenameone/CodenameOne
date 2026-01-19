@@ -533,7 +533,7 @@ public final class MigLayout extends Layout {
      * @since 3.7.3
      */
     private void resetLastInvalidOnParent(Container parent) {
-        while (parent != null) {
+        while (parent != null) { // NOPMD
             Layout layoutManager = parent.getLayout();
             if (layoutManager instanceof MigLayout) {
                 ((MigLayout) layoutManager).lastWasInvalid = false;
@@ -543,11 +543,11 @@ public final class MigLayout extends Layout {
     }
 
     private ContainerWrapper checkParent(Container parent) {
-        if (parent == null) {
+        if (parent == null) { // NOPMD
             return null;
         }
 
-        if (cacheParentW == null || cacheParentW.getComponent() != parent) {
+        if (cacheParentW == null || cacheParentW.getComponent() != parent) { // NOPMD
             cacheParentW = new CodenameOneMiGContainerWrapper(parent);
         }
 

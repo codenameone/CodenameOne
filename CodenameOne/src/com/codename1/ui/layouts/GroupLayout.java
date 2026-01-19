@@ -722,7 +722,7 @@ public class GroupLayout extends Layout {
      *                                  if existingComponent is not being managed by this layout manager
      */
     public void replace(Component existingComponent, Component newComponent) {
-        if (existingComponent == null || newComponent == null) {
+        if (existingComponent == null || newComponent == null) { // NOPMD
             throw new IllegalArgumentException("Components must be non-null");
         }
         // Make sure all the components have been registered, otherwise we may
@@ -733,7 +733,7 @@ public class GroupLayout extends Layout {
         }
         ComponentInfo info = (ComponentInfo) componentInfos.
                 remove(existingComponent);
-        if (info == null) {
+        if (info == null) { // NOPMD
             throw new IllegalArgumentException("Component must already exist");
         }
         host.removeComponent(existingComponent);
@@ -1044,7 +1044,7 @@ public class GroupLayout extends Layout {
     }
 
     private void checkParent(Container parent) {
-        if (parent != host) {
+        if (parent != host) { // NOPMD
             throw new IllegalArgumentException(
                     "GroupLayout can only be used with one Container at a time");
         }
@@ -1055,7 +1055,7 @@ public class GroupLayout extends Layout {
      */
     private ComponentInfo getComponentInfo(Component component) {
         ComponentInfo info = (ComponentInfo) componentInfos.get(component);
-        if (info == null) {
+        if (info == null) { // NOPMD
             info = new ComponentInfo(component);
             componentInfos.put(component, info);
             if (component.getParent() != host) {
@@ -1189,7 +1189,7 @@ public class GroupLayout extends Layout {
 
         public void add(ComponentInfo child) {
             LinkInfo childMaster = child.getLinkInfo(axis, false);
-            if (childMaster == null) {
+            if (childMaster == null) { // NOPMD
                 linked.add(child);
                 child.setLinkInfo(axis, this);
             } else if (childMaster != this) {
@@ -2121,7 +2121,7 @@ public class GroupLayout extends Layout {
                         newLeadingPadding.clear();
                         int nextCounter = indexOfNextNonZeroSpring(counter + 1,
                                 newTrailing.size() == 0);
-                        if (nextCounter == springs.size()) {
+                        if (nextCounter == springs.size()) { // NOPMD
                             addAll(trailing, newTrailing);
                             addAll(trailingPadding, newTrailingPadding);
                         } else {
@@ -2141,13 +2141,13 @@ public class GroupLayout extends Layout {
 
         @Override
         int getBaseline() {
-            if (baselineSpring != null) {
+            if (baselineSpring != null) { // NOPMD
                 int baseline = baselineSpring.getBaseline();
                 if (baseline >= 0) {
                     int size = 0;
                     for (int i = 0, max = springs.size(); i < max; i++) {
                         Spring spring = getSpring(i);
-                        if (spring == baselineSpring) {
+                        if (spring == baselineSpring) { // NOPMD
                             return size + baseline;
                         } else {
                             size += spring.getPreferredSize(VERTICAL);
@@ -2161,14 +2161,14 @@ public class GroupLayout extends Layout {
         @Override
         int getBaselineResizeBehavior() {
             if (isResizable(VERTICAL)) {
-                if (baselineSpring != null && !baselineSpring.isResizable(VERTICAL)) {
+                if (baselineSpring != null && !baselineSpring.isResizable(VERTICAL)) { // NOPMD
                     // Spring to use for baseline isn't resizable. In this case
                     // baseline resize behavior can be determined based on how
                     // preceding springs resize.
                     boolean leadingResizable = false;
                     for (int i = 0, max = springs.size(); i < max; i++) {
                         Spring spring = getSpring(i);
-                        if (spring == baselineSpring) {
+                        if (spring == baselineSpring) { // NOPMD
                             break;
                         } else if (spring.isResizable(VERTICAL)) {
                             leadingResizable = true;
@@ -2178,7 +2178,7 @@ public class GroupLayout extends Layout {
                     boolean trailingResizable = false;
                     for (int i = springs.size() - 1; i >= 0; i--) {
                         Spring spring = getSpring(i);
-                        if (spring == baselineSpring) {
+                        if (spring == baselineSpring) { // NOPMD
                             break;
                         }
                         if (spring.isResizable(VERTICAL)) {
@@ -2195,13 +2195,13 @@ public class GroupLayout extends Layout {
                     // resizable. Fall through to OTHER.
                 } else {
                     int brb = 0;
-                    if(baselineSpring != null) {
+                    if(baselineSpring != null) { // NOPMD
                         brb = baselineSpring.getBaselineResizeBehavior();
                     }
                     if (brb == Component.BRB_CONSTANT_ASCENT) {
                         for (int i = 0, max = springs.size(); i < max; i++) {
                             Spring spring = getSpring(i);
-                            if (spring == baselineSpring) {
+                            if (spring == baselineSpring) { // NOPMD
                                 return Component.BRB_CONSTANT_ASCENT;
                             }
                             if (spring.isResizable(VERTICAL)) {

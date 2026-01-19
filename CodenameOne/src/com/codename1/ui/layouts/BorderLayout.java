@@ -426,7 +426,7 @@ public class BorderLayout extends Layout {
         } else {
             throw new IllegalArgumentException("cannot add to layout: unknown constraint: " + name);
         }
-        if (previous != null && previous != comp) {
+        if (previous != null && previous != comp) { // NOPMD
             c.removeComponent(previous);
         }
     }
@@ -436,17 +436,17 @@ public class BorderLayout extends Layout {
      */
     @Override
     public void removeLayoutComponent(Component comp) {
-        if (comp == portraitCenter) {
+        if (comp == portraitCenter) { // NOPMD
             portraitCenter = null;
-        } else if (comp == portraitNorth) {
+        } else if (comp == portraitNorth) { // NOPMD
             portraitNorth = null;
-        } else if (comp == portraitSouth) {
+        } else if (comp == portraitSouth) { // NOPMD
             portraitSouth = null;
-        } else if (comp == portraitEast) {
+        } else if (comp == portraitEast) { // NOPMD
             portraitEast = null;
-        } else if (comp == portraitWest) {
+        } else if (comp == portraitWest) { // NOPMD
             portraitWest = null;
-        } else if (comp == overlay) {
+        } else if (comp == overlay) { // NOPMD
             overlay = null;
         }
     }
@@ -459,18 +459,18 @@ public class BorderLayout extends Layout {
      */
     @Override
     public Object getComponentConstraint(Component comp) {
-        if (comp == portraitCenter) {
+        if (comp == portraitCenter) { // NOPMD
             return CENTER;
-        } else if (comp == portraitNorth) {
+        } else if (comp == portraitNorth) { // NOPMD
             return NORTH;
-        } else if (comp == portraitSouth) {
+        } else if (comp == portraitSouth) { // NOPMD
             return SOUTH;
-        } else if (comp == portraitEast) {
+        } else if (comp == portraitEast) { // NOPMD
             return EAST;
-        } else if (comp == overlay) {
+        } else if (comp == overlay) { // NOPMD
             return OVERLAY;
         } else {
-            if (comp == portraitWest) {
+            if (comp == portraitWest) { // NOPMD
                 return WEST;
             }
         }
@@ -833,7 +833,7 @@ public class BorderLayout extends Layout {
      * @return the constraint to use when in landscape or null if undefined
      */
     public String getLandscapeSwap(String portraitPosition) {
-        if (landscapeSwap == null) {
+        if (landscapeSwap == null) { // NOPMD
             return null;
         }
         return landscapeSwap.get(portraitPosition);
@@ -844,8 +844,8 @@ public class BorderLayout extends Layout {
      */
     @Override
     public boolean equals(Object o) {
-        if (super.equals(o) && centerBehavior == ((BorderLayout) o).centerBehavior) {
-            if (landscapeSwap == ((BorderLayout) o).landscapeSwap) {
+        if (super.equals(o) && centerBehavior == ((BorderLayout) o).centerBehavior) { // NOPMD
+            if (landscapeSwap == ((BorderLayout) o).landscapeSwap) { // NOPMD
                 return true;
             }
             if (landscapeSwap != null) {

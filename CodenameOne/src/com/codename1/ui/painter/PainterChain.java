@@ -90,22 +90,22 @@ public class PainterChain implements Painter {
      */
     public static void removeGlassPane(Form f, Painter p) {
         Painter existing = f.getGlassPane();
-        if (existing == null) {
+        if (existing == null) { // NOPMD
             return;
         }
-        if (existing == p) {
+        if (existing == p) { // NOPMD
             f.setGlassPane(null);
             return;
         }
         if (existing instanceof PainterChain) {
             PainterChain pc = (PainterChain) existing;
-            if (pc.chain.length == 1) {
+            if (pc.chain.length == 1) { // NOPMD
                 f.setGlassPane(null);
             } else {
                 Vector v = new Vector();
                 int plen = pc.chain.length;
                 for (int iter = 0; iter < plen; iter++) {
-                    if (pc.chain[iter] != p) {
+                    if (pc.chain[iter] != p) { // NOPMD
                         v.addElement(pc.chain[iter]);
                     }
                 }

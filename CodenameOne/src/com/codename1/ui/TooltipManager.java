@@ -73,7 +73,7 @@ public class TooltipManager {
      * Invoked to dispose the current tooltip when the pointer moves
      */
     protected void clearTooltip() {
-        if (currentTooltip != null) {
+        if (currentTooltip != null) { // NOPMD
             currentTooltip.dispose();
             currentTooltip = null;
         }
@@ -93,7 +93,7 @@ public class TooltipManager {
      * @param cmp the component
      */
     protected void prepareTooltip(final String tip, final Component cmp) {
-        if (currentComponent == cmp) {
+        if (currentComponent == cmp) { // NOPMD
             return;
         }
         clearTooltip();

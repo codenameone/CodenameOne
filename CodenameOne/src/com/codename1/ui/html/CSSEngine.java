@@ -1384,7 +1384,7 @@ class CSSEngine {
         String listImg = null;
         Component borderUi = ui;
 
-        if ((element.getTagId() == HTMLElement.TAG_LI) || (element.getTagId() == HTMLElement.TAG_UL) || (element.getTagId() == HTMLElement.TAG_OL) || (element.getTagId() == HTMLElement.TAG_DIR) || (element.getTagId() == HTMLElement.TAG_MENU)) {
+        if ((element.getTagId() == HTMLElement.TAG_LI) || (element.getTagId() == HTMLElement.TAG_UL) || (element.getTagId() == HTMLElement.TAG_OL) || (element.getTagId() == HTMLElement.TAG_DIR) || (element.getTagId() == HTMLElement.TAG_MENU)) { // NOPMD
             int listPos = selector.getAttrVal(CSSElement.CSS_LIST_STYLE_POSITION);
             if (listPos == LIST_STYLE_POSITION_INSIDE) {
                 // Padding and not margin since background color should affect also the indented space
@@ -1405,7 +1405,7 @@ class CSSEngine {
         boolean leftBorder = false; // Used to prevent drawing a border in the middle of two words in the same segment
         boolean rightBorder = false; // Used to prevent drawing a border in the middle of two words in the same segment
         boolean hasBorder = false;
-        if ((borderUi == ui) && (element.getUi().size() > 1)) {
+        if ((borderUi == ui) && (element.getUi().size() > 1)) { // NOPMD
             if (element.getUi().firstElement() == borderUi) {
                 leftBorder = true;
             } else if (element.getUi().lastElement() == borderUi) {

@@ -486,7 +486,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         Dialog.setDefaultBlurBackgroundRadius(rr);
         Form.comboLock = false;
         parentForm.setTintColor(tint);
-        if (result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() ||
+        if (result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() || // NOPMD
                 popupDialog.wasDisposedDueToRotation()) {
             setSelectedIndex(originalSel);
         }

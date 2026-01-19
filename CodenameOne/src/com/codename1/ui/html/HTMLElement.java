@@ -1562,10 +1562,10 @@ public class HTMLElement extends Element {
             return false;
         }
         HTMLElement parent = (HTMLElement) getParent();
-        if (parent != null) {
+        if (parent != null) { // NOPMD
             for (Element e : parent) {
                 HTMLElement elem = (HTMLElement) e;
-                if (elem == this) {
+                if (elem == this) { // NOPMD
                     return true;
                 }
                 if (!elem.isTextElement()) {

@@ -663,7 +663,7 @@ public final class ToastBar {
      */
     public void setVisible(boolean visible) {
         final ToastBarComponent c = getToastBarComponent();
-        if (c == null || c.isVisible() == visible) {
+        if (c == null || c.isVisible() == visible) { // NOPMD
             return;
         }
         if (visible) {
@@ -688,7 +688,7 @@ public final class ToastBar {
 
         } else {
             Form f = c.getComponentForm();
-            if (Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()) {
+            if (Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()) { // NOPMD
                 if (this.position == Component.BOTTOM) {
                     c.setY(c.getY() + c.getHeight());
                 }

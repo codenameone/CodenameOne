@@ -1062,7 +1062,7 @@ public final class TestUtils {
         if (verbose) {
             log("assertNotNull(" + object + ", " + errorMessage + ")");
         }
-        assertBool(object != null, errorMessage);
+        assertBool(object != null, errorMessage); // NOPMD
     }
 
     /**
@@ -1072,7 +1072,7 @@ public final class TestUtils {
         if (verbose) {
             log("assertSame(" + expected + ", " + actual + ")");
         }
-        assertBool(expected == actual);
+        assertBool(expected == actual); // NOPMD
     }
 
     /**
@@ -1084,7 +1084,7 @@ public final class TestUtils {
         if (verbose) {
             log("assertSame(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(expected == actual, errorMessage);
+        assertBool(expected == actual, errorMessage); // NOPMD
     }
 
     /**
@@ -1094,7 +1094,7 @@ public final class TestUtils {
         if (verbose) {
             log("assertNotSame(" + expected + ", " + actual + ")");
         }
-        assertBool(expected != actual);
+        assertBool(expected != actual); // NOPMD
     }
 
     /**
@@ -1106,7 +1106,7 @@ public final class TestUtils {
         if (verbose) {
             log("assertNotSame(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(expected != actual, errorMessage);
+        assertBool(expected != actual, errorMessage); // NOPMD
     }
 
     private static void assertRelativeErrorExceeded(float expected, float actual, double minRelativeError) {

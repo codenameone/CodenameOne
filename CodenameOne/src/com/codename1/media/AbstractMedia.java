@@ -140,7 +140,7 @@ public abstract class AbstractMedia implements AsyncMedia {
         return playAsync(new PlayRequest() {
             @Override
             public void complete(AsyncMedia value) {
-                if (this == pendingPlayRequest) {
+                if (this == pendingPlayRequest) { // NOPMD
                     pendingPlayRequest = null;
                 }
                 super.complete(value);
@@ -163,7 +163,7 @@ public abstract class AbstractMedia implements AsyncMedia {
         }
 
 
-        if (pendingPauseRequest != null) {
+        if (pendingPauseRequest != null) { // NOPMD
             pendingPauseRequest.ready(new SuccessCallback<AsyncMedia>() {
                 @Override
                 public void onSucess(AsyncMedia value) {
@@ -184,7 +184,7 @@ public abstract class AbstractMedia implements AsyncMedia {
             return out;
         }
 
-        if (pendingPlayRequest != null && pendingPlayRequest != out) {
+        if (pendingPlayRequest != null && pendingPlayRequest != out) { // NOPMD
             pendingPlayRequest.ready(new PlayAsyncSuccessCallback(out))
                     .except(new PlayAsyncExceptSuccessCallback(out));
             return out;
@@ -245,7 +245,7 @@ public abstract class AbstractMedia implements AsyncMedia {
         return pauseAsync(new PauseRequest() {
             @Override
             public void complete(AsyncMedia value) {
-                if (pendingPauseRequest == this) {
+                if (pendingPauseRequest == this) { // NOPMD
                     pendingPauseRequest = null;
                 }
                 super.complete(value);
@@ -270,7 +270,7 @@ public abstract class AbstractMedia implements AsyncMedia {
         }
 
 
-        if (pendingPlayRequest != null) {
+        if (pendingPlayRequest != null) { // NOPMD
             pendingPlayRequest.ready(new SuccessCallback<AsyncMedia>() {
                 @Override
                 public void onSucess(AsyncMedia value) {
@@ -290,7 +290,7 @@ public abstract class AbstractMedia implements AsyncMedia {
             pendingPauseRequest = out;
             return out;
         }
-        if (pendingPauseRequest != null && pendingPauseRequest != out) {
+        if (pendingPauseRequest != null && pendingPauseRequest != out) { // NOPMD
             pendingPauseRequest.ready(new PauseAsyncSuccessCallback(out))
                     .except(new PauseAsyncExceptSuccessCallback(out));
             return out;

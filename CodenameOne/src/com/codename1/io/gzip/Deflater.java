@@ -112,11 +112,11 @@ final public class Deflater extends ZStream {
         if (bits < 9 || bits > 15) {
             return Z_STREAM_ERROR;
         }
-        if (wrapperType == JZlib.W_NONE) {
+        if (wrapperType == JZlib.W_NONE) { // NOPMD
             bits *= -1;
-        } else if (wrapperType == JZlib.W_GZIP) {
+        } else if (wrapperType == JZlib.W_GZIP) { // NOPMD
             bits += 16;
-        } else if (wrapperType == JZlib.W_ANY) {
+        } else if (wrapperType == JZlib.W_ANY) { // NOPMD
             return Z_STREAM_ERROR;
         }
         return init(level, bits, memlevel);

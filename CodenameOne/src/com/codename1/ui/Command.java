@@ -273,14 +273,14 @@ public class Command implements ActionListener<ActionEvent> {
         if (!(obj instanceof Command)) {
             return false;
         }
-        if (((Command) obj).command == null) {
-            return obj.getClass() == getClass() && command == null &&
-                    ((Command) obj).icon == icon && ((Command) obj).commandId == commandId &&
+        if (((Command) obj).command == null) { // NOPMD
+            return obj.getClass() == getClass() && command == null && // NOPMD
+                    ((Command) obj).icon == icon && ((Command) obj).commandId == commandId && // NOPMD
                     ((Command) obj).materialIcon == materialIcon && com.codename1.util.MathUtil.compare(((Command) obj).materialIconSize, materialIconSize) == 0 &&
                     (Objects.equals(clientProperties, ((Command) obj).clientProperties));
         } else {
-            return obj.getClass() == getClass() && ((Command) obj).command.equals(command) &&
-                    ((Command) obj).icon == icon && ((Command) obj).commandId == commandId &&
+            return obj.getClass() == getClass() && ((Command) obj).command.equals(command) && // NOPMD
+                    ((Command) obj).icon == icon && ((Command) obj).commandId == commandId && // NOPMD
                     ((Command) obj).materialIcon == materialIcon && com.codename1.util.MathUtil.compare(((Command) obj).materialIconSize, materialIconSize) == 0 &&
                     (Objects.equals(clientProperties, ((Command) obj).clientProperties));
         }
