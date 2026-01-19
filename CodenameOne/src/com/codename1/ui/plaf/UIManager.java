@@ -1707,7 +1707,7 @@ public class UIManager {
             Object value = entry.getValue();
             if (value instanceof Font) {
                 Font scaled = scaleFontForLargerText((Font) value, scale);
-                if (scaled != value) {
+                if (scaled != value) { //NOPMD CompareObjectsWithEquals
                     entry.setValue(scaled);
                 }
             }

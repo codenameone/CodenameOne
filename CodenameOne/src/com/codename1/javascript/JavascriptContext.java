@@ -164,7 +164,7 @@ public class JavascriptContext {
      * @param c The BrowserComponent on which the context runs.
      */
     public final void setBrowserComponent(BrowserComponent c) {
-        if (c != browser) {
+        if (c != browser) { //NOPMD CompareObjectsWithEquals
             if (browser != null) {
                 this.uninstall();
             }

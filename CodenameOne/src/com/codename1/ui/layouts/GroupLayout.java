@@ -731,7 +731,7 @@ public class GroupLayout extends Layout {
             throw new IllegalArgumentException("Component must already exist");
         }
         host.removeComponent(existingComponent);
-        if (newComponent.getParent() != host) {
+        if (newComponent.getParent() != host) { //NOPMD CompareObjectsWithEquals
             host.addComponent(newComponent);
         }
         info.setComponent(newComponent);
@@ -1038,7 +1038,7 @@ public class GroupLayout extends Layout {
     }
 
     private void checkParent(Container parent) {
-        if (parent != host) {
+        if (parent != host) { //NOPMD CompareObjectsWithEquals
             throw new IllegalArgumentException(
                     "GroupLayout can only be used with one Container at a time");
         }
@@ -1052,7 +1052,7 @@ public class GroupLayout extends Layout {
         if (info == null) {
             info = new ComponentInfo(component);
             componentInfos.put(component, info);
-            if (component.getParent() != host) {
+            if (component.getParent() != host) { //NOPMD CompareObjectsWithEquals
                 host.addComponent(component);
             }
         }
@@ -1186,7 +1186,7 @@ public class GroupLayout extends Layout {
             if (childMaster == null) {
                 linked.add(child);
                 child.setLinkInfo(axis, this);
-            } else if (childMaster != this) {
+            } else if (childMaster != this) { //NOPMD CompareObjectsWithEquals
                 addAll(linked, childMaster.linked);
                 for (int i = 0; i < childMaster.linked.size(); i++) {
                     ComponentInfo childInfo = (ComponentInfo) childMaster.linked.get(i);
@@ -2141,7 +2141,7 @@ public class GroupLayout extends Layout {
                     int size = 0;
                     for (int i = 0, max = springs.size(); i < max; i++) {
                         Spring spring = getSpring(i);
-                        if (spring == baselineSpring) {
+                        if (spring == baselineSpring) { //NOPMD CompareObjectsWithEquals
                             return size + baseline;
                         } else {
                             size += spring.getPreferredSize(VERTICAL);
@@ -2162,7 +2162,7 @@ public class GroupLayout extends Layout {
                     boolean leadingResizable = false;
                     for (int i = 0, max = springs.size(); i < max; i++) {
                         Spring spring = getSpring(i);
-                        if (spring == baselineSpring) {
+                        if (spring == baselineSpring) { //NOPMD CompareObjectsWithEquals
                             break;
                         } else if (spring.isResizable(VERTICAL)) {
                             leadingResizable = true;
@@ -2172,7 +2172,7 @@ public class GroupLayout extends Layout {
                     boolean trailingResizable = false;
                     for (int i = springs.size() - 1; i >= 0; i--) {
                         Spring spring = getSpring(i);
-                        if (spring == baselineSpring) {
+                        if (spring == baselineSpring) { //NOPMD CompareObjectsWithEquals
                             break;
                         }
                         if (spring.isResizable(VERTICAL)) {
@@ -2195,7 +2195,7 @@ public class GroupLayout extends Layout {
                     if (brb == Component.BRB_CONSTANT_ASCENT) {
                         for (int i = 0, max = springs.size(); i < max; i++) {
                             Spring spring = getSpring(i);
-                            if (spring == baselineSpring) {
+                            if (spring == baselineSpring) { //NOPMD CompareObjectsWithEquals
                                 return Component.BRB_CONSTANT_ASCENT;
                             }
                             if (spring.isResizable(VERTICAL)) {
@@ -2205,7 +2205,7 @@ public class GroupLayout extends Layout {
                     } else if (brb == Component.BRB_CONSTANT_DESCENT) {
                         for (int i = springs.size() - 1; i >= 0; i--) {
                             Spring spring = getSpring(i);
-                            if (spring == baselineSpring) {
+                            if (spring == baselineSpring) { //NOPMD CompareObjectsWithEquals
                                 return Component.BRB_CONSTANT_DESCENT;
                             }
                             if (spring.isResizable(VERTICAL)) {

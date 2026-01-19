@@ -128,7 +128,7 @@ public class FloatingHint extends Container {
     }
 
     private boolean isInitializedImpl() {
-        return isInitialized() && getComponentForm() == Display.getInstance().getCurrent();
+        return isInitialized() && getComponentForm() == Display.getInstance().getCurrent(); //NOPMD CompareObjectsWithEquals
     }
 
     private void focusLostImpl() {

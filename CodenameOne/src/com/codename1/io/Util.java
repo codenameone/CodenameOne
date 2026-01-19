@@ -892,7 +892,7 @@ public class Util {
         // hence this method simulates the proper behavior
         if (!charArrayBugTested) {
             charArrayBugTested = true;
-            if (s.toCharArray() == s.toCharArray()) {
+            if (s.toCharArray() == s.toCharArray()) { //NOPMD CompareObjectsWithEquals
                 charArrayBug = true;
             }
         }
@@ -1377,7 +1377,7 @@ public class Util {
     public static int indexOf(Object[] arr, Object value) {
         int l = arr.length;
         for (int iter = 0; iter < l; iter++) {
-            if (arr[iter] == value) {
+            if (arr[iter] == value) { //NOPMD CompareObjectsWithEquals
                 return iter;
             }
         }
@@ -2377,7 +2377,7 @@ public class Util {
         NetworkManager.getInstance().addProgressListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
-                if (cr == evt.getConnectionRequest() && fileSize > 0) {
+                if (cr == evt.getConnectionRequest() && fileSize > 0) { //NOPMD CompareObjectsWithEquals
                     // the following casting to long is necessary when the file is bigger than 21MB, otherwise the result of the calculation is wrong
                     if (percentageCallback != null) {
                         CN.callSerially(new Runnable() {

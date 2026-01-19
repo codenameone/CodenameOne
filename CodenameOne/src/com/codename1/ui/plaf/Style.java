@@ -2391,7 +2391,7 @@ public class Style {
             }
             return;
         }
-        if (this.bgImage != bgImage) {
+        if (this.bgImage != bgImage) { //NOPMD CompareObjectsWithEquals
             this.bgImage = bgImage;
             if (!override) {
                 modifiedFlag |= BG_IMAGE_MODIFIED;

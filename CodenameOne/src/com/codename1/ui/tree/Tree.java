@@ -453,7 +453,7 @@ public class Tree extends Container {
         }
         Container p = c.getParent();
         for (int iter = 0; iter < p.getComponentCount(); iter++) {
-            if (p.getComponentAt(iter) != c) {
+            if (p.getComponentAt(iter) != c) { //NOPMD CompareObjectsWithEquals
                 if (t == null) {
                     p.removeComponent(p.getComponentAt(iter));
                     break; // there should only be one container with all children

@@ -548,7 +548,7 @@ public class RSSReader extends List {
                 for (int iter = 0; iter < existingData.size(); iter++) {
                     Hashtable h = (Hashtable) existingData.elementAt(iter);
                     Object icn = h.get("icon");
-                    if (icn != null && icn == iconPlaceholder) {
+                    if (icn != null && icn == iconPlaceholder) { //NOPMD CompareObjectsWithEquals
                         downloadImage(h, iter);
                     }
                 }

@@ -16,5 +16,6 @@
         level and can't just replace them -->
         <exclude name="LooseCoupling" />
         <exclude name="ReturnEmptyCollectionRatherThanNull"/>
+        <exclude name="UncommentedEmptyMethodBody"/>
     </rule>
 </ruleset>

@@ -93,7 +93,7 @@ public class PainterChain implements Painter {
         if (existing == null) {
             return;
         }
-        if (existing == p) {
+        if (existing == p) { //NOPMD CompareObjectsWithEquals
             f.setGlassPane(null);
             return;
         }
@@ -105,7 +105,7 @@ public class PainterChain implements Painter {
                 Vector v = new Vector();
                 int plen = pc.chain.length;
                 for (int iter = 0; iter < plen; iter++) {
-                    if (pc.chain[iter] != p) {
+                    if (pc.chain[iter] != p) { //NOPMD CompareObjectsWithEquals
                         v.addElement(pc.chain[iter]);
                     }
                 }

@@ -218,7 +218,7 @@ public final class ConstraintParser {
                     ix = startsWithLenient(part, new String[]{"aligny", "ay"}, new int[]{6, 2}, true);
                     if (ix > -1) {
                         UnitValue align = parseUnitValueOrAlign(part.substring(ix).trim(), false, null);
-                        if (align == UnitValue.BASELINE_IDENTITY) {
+                        if (align == UnitValue.BASELINE_IDENTITY) { //NOPMD CompareObjectsWithEquals
                             throw new IllegalArgumentException("'baseline' can not be used to align the whole component group.");
                         }
                         lc.setAlignY(align);

@@ -261,7 +261,7 @@ public class BufferedInputStream extends InputStream {
                 }
                 byte[] nbuf = new byte[nsz];
                 System.arraycopy(buffer, 0, nbuf, 0, pos);
-                if (buffer != buf) {
+                if (buffer != buf) { //NOPMD CompareObjectsWithEquals
                     throw new IOException("Stream closed");
                 }
                 buf = nbuf;

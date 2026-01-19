@@ -426,7 +426,7 @@ public class BorderLayout extends Layout {
         } else {
             throw new IllegalArgumentException("cannot add to layout: unknown constraint: " + name);
         }
-        if (previous != null && previous != comp) {
+        if (previous != null && previous != comp) { //NOPMD CompareObjectsWithEquals
             c.removeComponent(previous);
         }
     }
@@ -436,17 +436,17 @@ public class BorderLayout extends Layout {
      */
     @Override
     public void removeLayoutComponent(Component comp) {
-        if (comp == portraitCenter) {
+        if (comp == portraitCenter) { //NOPMD CompareObjectsWithEquals
             portraitCenter = null;
-        } else if (comp == portraitNorth) {
+        } else if (comp == portraitNorth) { //NOPMD CompareObjectsWithEquals
             portraitNorth = null;
-        } else if (comp == portraitSouth) {
+        } else if (comp == portraitSouth) { //NOPMD CompareObjectsWithEquals
             portraitSouth = null;
-        } else if (comp == portraitEast) {
+        } else if (comp == portraitEast) { //NOPMD CompareObjectsWithEquals
             portraitEast = null;
-        } else if (comp == portraitWest) {
+        } else if (comp == portraitWest) { //NOPMD CompareObjectsWithEquals
             portraitWest = null;
-        } else if (comp == overlay) {
+        } else if (comp == overlay) { //NOPMD CompareObjectsWithEquals
             overlay = null;
         }
     }
@@ -459,18 +459,18 @@ public class BorderLayout extends Layout {
      */
     @Override
     public Object getComponentConstraint(Component comp) {
-        if (comp == portraitCenter) {
+        if (comp == portraitCenter) { //NOPMD CompareObjectsWithEquals
             return CENTER;
-        } else if (comp == portraitNorth) {
+        } else if (comp == portraitNorth) { //NOPMD CompareObjectsWithEquals
             return NORTH;
-        } else if (comp == portraitSouth) {
+        } else if (comp == portraitSouth) { //NOPMD CompareObjectsWithEquals
             return SOUTH;
-        } else if (comp == portraitEast) {
+        } else if (comp == portraitEast) { //NOPMD CompareObjectsWithEquals
             return EAST;
-        } else if (comp == overlay) {
+        } else if (comp == overlay) { //NOPMD CompareObjectsWithEquals
             return OVERLAY;
         } else {
-            if (comp == portraitWest) {
+            if (comp == portraitWest) { //NOPMD CompareObjectsWithEquals
                 return WEST;
             }
         }
@@ -845,7 +845,7 @@ public class BorderLayout extends Layout {
     @Override
     public boolean equals(Object o) {
         if (super.equals(o) && centerBehavior == ((BorderLayout) o).centerBehavior) {
-            if (landscapeSwap == ((BorderLayout) o).landscapeSwap) {
+            if (landscapeSwap == ((BorderLayout) o).landscapeSwap) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
             if (landscapeSwap != null) {

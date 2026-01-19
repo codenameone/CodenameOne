@@ -445,7 +445,7 @@ public class Accordion extends Container {
                     if (autoClose) {
                         for (int i = 0; i < Accordion.this.getComponentCount(); i++) {
                             AccordionContent c = (AccordionContent) Accordion.this.getComponentAt(i);
-                            if (c != AccordionContent.this && !c.isClosed()) {
+                            if (c != AccordionContent.this && !c.isClosed()) { //NOPMD CompareObjectsWithEquals
                                 c.openClose(true);
                             }
                         }

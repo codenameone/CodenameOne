@@ -113,7 +113,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
      * @param unselected indicates the unselected value for the renderer
      */
     public GenericListCellRenderer(Component selected, Component unselected) {
-        if (selected == unselected) {
+        if (selected == unselected) { //NOPMD CompareObjectsWithEquals
             throw new IllegalArgumentException("Must use distinct instances for renderer!");
         }
         this.selected = selected;

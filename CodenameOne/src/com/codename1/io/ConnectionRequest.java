@@ -2323,7 +2323,7 @@ public class ConnectionRequest implements IOProgressListener {
             ConnectionRequest r = (ConnectionRequest) o;
 
             // interned string comparison
-            if (r.url == url) {
+            if (r.url == url) { //NOPMD CompareObjectsWithEquals
                 if (requestArguments != null) {
                     if (r.requestArguments != null && requestArguments.size() == r.requestArguments.size()) {
                         Iterator entries = requestArguments.entrySet().iterator();

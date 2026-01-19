@@ -207,7 +207,7 @@ public class BoundSize {
             return cs;
         }
 
-        if (min == pref && pref == max) {
+        if (min == pref && pref == max) { //NOPMD CompareObjectsWithEquals
             return min != null ? (min.getConstraintString() + "!") : "null";
         }
 

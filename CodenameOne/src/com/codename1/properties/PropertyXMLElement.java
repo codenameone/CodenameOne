@@ -59,7 +59,7 @@ class PropertyXMLElement extends Element {
 
     @Override
     public boolean contains(Element element) {
-        if (this == element) {
+        if (this == element) { //NOPMD CompareObjectsWithEquals
             return true;
         }
         Vector children = getChildren();
@@ -112,7 +112,7 @@ class PropertyXMLElement extends Element {
         int current = -1;
         PropertyBase text = parent.getXmlTextElement();
         for (PropertyBase b : parent) {
-            if (b == text) {
+            if (b == text) { //NOPMD CompareObjectsWithEquals
                 current++;
                 if (current == index) {
                     Element e = new Element(b.getName(), true);

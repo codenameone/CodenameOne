@@ -188,7 +188,7 @@ public class Geofence {
         if (l1 != null && l2 != null) {
             return l1.equalsLatLng(l2);
         }
-        return l1 == l2; // both null
+        return l1 == l2; // both null //NOPMD CompareObjectsWithEquals
     }
 
     @Override

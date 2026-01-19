@@ -221,7 +221,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     @Override
     protected void initLaf(UIManager uim) {
-        if (uim == getUIManager() && isInitialized()) {
+        if (uim == getUIManager() && isInitialized()) { //NOPMD CompareObjectsWithEquals
             return;
         }
         super.initLaf(uim);
@@ -496,7 +496,7 @@ public class Container extends Component implements Iterable<Component> {
      * @param lead component that takes over the hierarchy
      */
     public final void setLeadComponent(Component lead) {
-        if (lead == leadComponent) {
+        if (lead == leadComponent) { //NOPMD CompareObjectsWithEquals
             return;
         }
         leadComponent = lead;
@@ -958,7 +958,7 @@ public class Container extends Component implements Iterable<Component> {
             cmp.setPreferredSize(null);
         }
         UIManager manager = getUIManager();
-        boolean refreshLaf = manager != cmp.getUIManager();
+        boolean refreshLaf = manager != cmp.getUIManager(); //NOPMD CompareObjectsWithEquals
         cmp.setParent(this);
         if (refreshLaf) {
             Display.getInstance().callSerially(new RefreshThemeRunnable(cmp));
@@ -1145,7 +1145,7 @@ public class Container extends Component implements Iterable<Component> {
         if (c == null || c instanceof Form) {
             return false;
         }
-        return (c == this) || isParentOf(c);
+        return (c == this) || isParentOf(c); //NOPMD CompareObjectsWithEquals
     }
 
     @Override
@@ -1207,7 +1207,7 @@ public class Container extends Component implements Iterable<Component> {
         boolean currentFocused = false;
         if (current.getComponentForm() != null) {
             Component currentF = current.getComponentForm().getFocused();
-            currentFocused = currentF == current;
+            currentFocused = currentF == current; //NOPMD CompareObjectsWithEquals
             if (!currentFocused && current instanceof Container && currentF != null && ((Container) current).isParentOf(currentF)) {
                 currentFocused = true;
             }
@@ -1270,7 +1270,7 @@ public class Container extends Component implements Iterable<Component> {
         // Normally a container shouldn't be a lead component but this happens
         // in the GUI builder and this block can cause an infinite recursion
         // without the second condition
-        if (leadComponent != null && leadComponent != this) {
+        if (leadComponent != null && leadComponent != this) { //NOPMD CompareObjectsWithEquals
             return leadComponent.isEnabled();
         }
         return super.isEnabled();
@@ -1375,11 +1375,11 @@ public class Container extends Component implements Iterable<Component> {
         components.remove(cmp);
         cmp.setParent(null);
         if (parentForm != null) {
-            if (parentForm.getFocused() == cmp || cmp instanceof Container && ((Container) cmp).contains(parentForm.getFocused())) {
+            if (parentForm.getFocused() == cmp || cmp instanceof Container && ((Container) cmp).contains(parentForm.getFocused())) { //NOPMD CompareObjectsWithEquals
                 parentForm.setFocusedInternal(null);
             }
             Component dragged = parentForm.getDraggedComponent();
-            if (dragged == cmp) {
+            if (dragged == cmp) { //NOPMD CompareObjectsWithEquals
                 parentForm.setDraggedComponent(null);
             }
             if (cmp.isSmoothScrolling()) {
@@ -1552,7 +1552,7 @@ public class Container extends Component implements Iterable<Component> {
         setShouldCalcPreferredSize(true);
         Form root = getComponentForm();
 
-        if (root != null && root != this) {
+        if (root != null && root != this) { //NOPMD CompareObjectsWithEquals
             root.removeFromRevalidateQueue(this);
             if (fromRoot && root.revalidateFromRoot) {
                 root.layoutContainer();
@@ -1961,7 +1961,7 @@ public class Container extends Component implements Iterable<Component> {
                 // We need to paint all components that should be "on top" of the elevated component
                 // also.
                 paintOnTopLoop:
-                while (cnt != this && cnt != null) {
+                while (cnt != this && cnt != null) { //NOPMD CompareObjectsWithEquals
                     Layout cntLayout = cnt.getLayout();
                     if (!foundOverlap && cntLayout.isOverlapSupported()) {
                         foundOverlap = true;
@@ -2029,7 +2029,7 @@ public class Container extends Component implements Iterable<Component> {
                 // We need to paint all components that should be "on top" of the elevated component
                 // also.
                 paintOnTopLoop:
-                while (cnt != this && cnt != null) {
+                while (cnt != this && cnt != null) { //NOPMD CompareObjectsWithEquals
                     Layout cntLayout = cnt.getLayout();
                     if (!foundOverlap && cntLayout.isOverlapSupported()) {
                         foundOverlap = true;
@@ -2156,7 +2156,7 @@ public class Container extends Component implements Iterable<Component> {
 
     void paintIntersecting(Graphics g, Component cmp, int x, int y, int w, int h, boolean above, int elevation) {
 
-        if (layout.isOverlapSupported() && cmp.getParent() == this) {
+        if (layout.isOverlapSupported() && cmp.getParent() == this) { //NOPMD CompareObjectsWithEquals
             int indexOfComponent = components.indexOf(cmp);
 
             int startIndex;
@@ -2562,7 +2562,7 @@ public class Container extends Component implements Iterable<Component> {
         }
         cmp = cmp.getParent();
         while (cmp != null) {
-            if (cmp == this) {
+            if (cmp == this) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
             cmp = cmp.getParent();
@@ -2585,9 +2585,9 @@ public class Container extends Component implements Iterable<Component> {
                     // way to the top
                     Form f = getComponentForm();
                     if (f != null && f.getInvisibleAreaUnderVKB() == 0 &&
-                            f.findFirstFocusable() == c) {
+                            f.findFirstFocusable() == c) { //NOPMD CompareObjectsWithEquals
                         // support this use case only if the component doesn't explicitly declare visible bounds
-                        if (r == c.getBounds() && !Display.getInstance().isTouchScreenDevice()) {
+                        if (r == c.getBounds() && !Display.getInstance().isTouchScreenDevice()) { //NOPMD CompareObjectsWithEquals
                             scrollRectToVisible(new Rectangle(0, 0,
                                     c.getX() + Math.min(c.getWidth(), getWidth()),
                                     c.getY() + Math.min(c.getHeight(), getHeight())), this);
@@ -2697,7 +2697,7 @@ public class Container extends Component implements Iterable<Component> {
             f.setCyclicFocus(cyclic);
             //if the Form doesn't contain a focusable Component simply move the
             //viewport by pixels
-            if (next == null || next == this) {
+            if (next == null || next == this) { //NOPMD CompareObjectsWithEquals
                 scrollRectToVisible(x, y, w, h, this);
                 return false;
             }
@@ -2913,12 +2913,12 @@ public class Container extends Component implements Iterable<Component> {
                                 top = c;
                             }
                         }
-                        if (c != cmp) {
+                        if (c != cmp) { //NOPMD CompareObjectsWithEquals
                             Component tmp = c;
                             if (cmp.isFocusable()) {
                                 isPotentialCandidate = true;
                                 boolean found = false;
-                                while (tmp != cmp && tmp != null) {
+                                while (tmp != cmp && tmp != null) { //NOPMD CompareObjectsWithEquals
                                     if (tmp.isFocusable()) {
                                         // We found a focusable child
                                         // so we will use that.
@@ -2938,7 +2938,7 @@ public class Container extends Component implements Iterable<Component> {
 
                             } else if (cmp.respondsToPointerEvents()) {
                                 isPotentialCandidate = true;
-                                while (tmp != cmp && tmp != null) {
+                                while (tmp != cmp && tmp != null) { //NOPMD CompareObjectsWithEquals
                                     if (tmp.respondsToPointerEvents()) {
                                         // We found a child that also responds to
                                         // pointer events so we will use that.
@@ -2954,7 +2954,7 @@ public class Container extends Component implements Iterable<Component> {
                                 // so all we want to know is if any of the children respond to pointer events
                                 // so we know if it will be eligible to be returned in the case of an overlapping
                                 // layout.
-                                while (tmp != cmp && tmp != null) {
+                                while (tmp != cmp && tmp != null) { //NOPMD CompareObjectsWithEquals
                                     if (tmp.respondsToPointerEvents()) {
                                         isPotentialCandidate = true;
 
@@ -3036,7 +3036,7 @@ public class Container extends Component implements Iterable<Component> {
         leadParent.clearDrag();
         leadParent.setDragActivated(false);
         Component cmp = getComponentAt(x, y);
-        if (cmp == this) {
+        if (cmp == this) { //NOPMD CompareObjectsWithEquals
             super.pointerPressed(x, y);
             return;
         }
@@ -3645,7 +3645,7 @@ public class Container extends Component implements Iterable<Component> {
         int i = getComponentIndex(dragged);
         if (i > -1) {
             Component dest = getComponentAt(x, y);
-            if (dest != dragged) {
+            if (dest != dragged) { //NOPMD CompareObjectsWithEquals
                 int destIndex = getComponentIndex(dest);
                 if (destIndex > -1 && destIndex != i) {
                     setComponentIndex(dragged, destIndex);

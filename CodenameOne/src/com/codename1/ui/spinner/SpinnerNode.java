@@ -105,7 +105,7 @@ class SpinnerNode extends Node {
     }
 
     public void setRowFormatter(RowFormatter formatter) {
-        if (rowFormatter != formatter) {
+        if (rowFormatter != formatter) { //NOPMD CompareObjectsWithEquals
             rowFormatter = formatter;
             rebuildChildren();
         }

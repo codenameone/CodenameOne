@@ -312,7 +312,7 @@ public class Dialog extends Form {
         } else {
             cmds = new Command[]{okCommand};
         }
-        return show(title, text, okCommand, cmds, type, icon, timeout) == okCommand;
+        return show(title, text, okCommand, cmds, type, icon, timeout) == okCommand; //NOPMD CompareObjectsWithEquals
     }
 
     /**
@@ -1492,7 +1492,7 @@ public class Dialog extends Form {
             contentPaneStyle.getBorder().clearImageBorderSpecialTile();
         }
 
-        if (result == backCommand) {
+        if (result == backCommand) { //NOPMD CompareObjectsWithEquals
             return null;
         }
         return result;
@@ -1884,7 +1884,7 @@ public class Dialog extends Form {
             super.repaint(cmp);
             return;
         }
-        if (isVisible() && !disposed && (isMenu() || CN.getCurrentForm() == this)) {
+        if (isVisible() && !disposed && (isMenu() || CN.getCurrentForm() == this)) { //NOPMD CompareObjectsWithEquals
             Display.getInstance().repaint(cmp);
         }
     }

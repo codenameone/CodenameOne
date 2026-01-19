@@ -1190,7 +1190,7 @@ public class TextField extends TextArea {
     protected void showSymbolDialog() {
         Command cancel = new Command(getUIManager().localize("cancel", "Cancel"));
         Command r = Dialog.show("", createSymbolTable(), cancel);
-        if (r != null && r != cancel) {
+        if (r != null && r != cancel) { //NOPMD CompareObjectsWithEquals
             insertChars(r.getCommandName());
         }
     }

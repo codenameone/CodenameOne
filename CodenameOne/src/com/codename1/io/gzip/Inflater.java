@@ -102,11 +102,11 @@ final public class Inflater extends ZStream {
 
     public int init(int w, JZlib.WrapperType wrapperType) {
         boolean nowrap = false;
-        if (wrapperType == JZlib.W_NONE) {
+        if (wrapperType == JZlib.W_NONE) { //NOPMD CompareObjectsWithEquals
             nowrap = true;
-        } else if (wrapperType == JZlib.W_GZIP) {
+        } else if (wrapperType == JZlib.W_GZIP) { //NOPMD CompareObjectsWithEquals
             w += 16;
-        } else if (wrapperType == JZlib.W_ANY) {
+        } else if (wrapperType == JZlib.W_ANY) { //NOPMD CompareObjectsWithEquals
             w |= Inflate.INFLATE_ANY;
         }
         return init(w, nowrap);

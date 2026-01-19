@@ -599,7 +599,7 @@ public class Toolbar extends Container {
         f.removeComponentFromForm(Toolbar.this);
         f.setToolbar(s);
         s.initSearchBar();
-        if (f == Display.INSTANCE.getCurrent()) {
+        if (f == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals
             f.animateLayout(100);
         }
     }
@@ -944,12 +944,12 @@ public class Toolbar extends Container {
 
     boolean isComponentInOnTopSidemenu(Component cmp) {
         if (cmp != null) {
-            if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) {
+            if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
             while (cmp.getParent() != null) {
                 cmp = cmp.getParent();
-                if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) {
+                if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) { //NOPMD CompareObjectsWithEquals
                     return true;
                 }
             }
@@ -959,14 +959,14 @@ public class Toolbar extends Container {
 
     boolean isComponentInOnTopRightSidemenu(Component cmp) {
         if (cmp != null) {
-            if (cmp == permanentRightSideMenuContainer || cmp == this
-                    || cmp == rightSidemenuSouthComponent) {
+            if (cmp == permanentRightSideMenuContainer || cmp == this //NOPMD CompareObjectsWithEquals
+                    || cmp == rightSidemenuSouthComponent) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
             while (cmp.getParent() != null) {
                 cmp = cmp.getParent();
-                if (cmp == permanentRightSideMenuContainer || cmp == this
-                        || cmp == rightSidemenuSouthComponent) {
+                if (cmp == permanentRightSideMenuContainer || cmp == this //NOPMD CompareObjectsWithEquals
+                        || cmp == rightSidemenuSouthComponent) { //NOPMD CompareObjectsWithEquals
                     return true;
                 }
             }
@@ -1955,7 +1955,7 @@ public class Toolbar extends Container {
             Component current = cnt.getComponentAt(iter);
             if (current instanceof Button) {
                 Button b = (Button) current;
-                if (b.getCommand() == c || sideMenu.unwrapCommand(b.getCommand()) == c) {
+                if (b.getCommand() == c || sideMenu.unwrapCommand(b.getCommand()) == c) { //NOPMD CompareObjectsWithEquals
                     return b;
                 }
             } else {
@@ -2059,7 +2059,7 @@ public class Toolbar extends Container {
         int commandCount = cmds.size() - 1;
         while (commandCount > 0) {
             Command c = cmds.get(commandCount);
-            if (c.getClientProperty("Left") != leftValue) {
+            if (c.getClientProperty("Left") != leftValue) { //NOPMD CompareObjectsWithEquals
                 cmds.remove(commandCount);
             }
             commandCount--;
@@ -2258,7 +2258,7 @@ public class Toolbar extends Container {
      */
     public void hideToolbar() {
         showing = false;
-        if (Display.INSTANCE.getCurrent() != getComponentForm()) {
+        if (Display.INSTANCE.getCurrent() != getComponentForm()) { //NOPMD CompareObjectsWithEquals
             setVisible(false);
             setHidden(true);
             return;

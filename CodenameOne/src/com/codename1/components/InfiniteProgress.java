@@ -234,7 +234,7 @@ public class InfiniteProgress extends Component {
      * @since 7.0
      */
     public boolean animate(boolean force) {
-        if (!force && (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm())) { // PMD Fix: CollapsibleIfStatements merged visibility checks
+        if (!force && (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm())) { // PMD Fix: CollapsibleIfStatements merged visibility checks //NOPMD CompareObjectsWithEquals
             return false;
         }
         // reduce repaint thrushing of the UI from the infinite progress
@@ -299,7 +299,7 @@ public class InfiniteProgress extends Component {
      */
     @Override
     public void paint(Graphics g) {
-        if (this.getComponentForm() != null && Display.getInstance().getCurrent() != this.getComponentForm()) {
+        if (this.getComponentForm() != null && Display.getInstance().getCurrent() != this.getComponentForm()) { //NOPMD CompareObjectsWithEquals
             return;
         }
         super.paint(g);

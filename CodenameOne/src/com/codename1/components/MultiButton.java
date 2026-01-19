@@ -128,7 +128,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
      * @return
      */
     public boolean isLinesTogetherMode() {
-        return firstRow.getParent() == secondRow.getParent();
+        return firstRow.getParent() == secondRow.getParent(); //NOPMD CompareObjectsWithEquals
     }
 
     /**

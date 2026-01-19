@@ -255,7 +255,7 @@ public class AnalyticsService {
             ActionListener onComplete = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
-                    if (req == lastRequest) {
+                    if (req == lastRequest) { //NOPMD CompareObjectsWithEquals
                         lastRequest = null;
                     }
                 }
@@ -294,7 +294,7 @@ public class AnalyticsService {
             ActionListener onComplete = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
-                    if (r == lastRequest) {
+                    if (r == lastRequest) { //NOPMD CompareObjectsWithEquals
                         lastRequest = null;
                     }
                 }

@@ -328,7 +328,7 @@ public abstract class ComponentAnimation {
                 return false;
             }
             for (Container existing : containers) {
-                if (cnt == existing || existing.contains(cnt) || cnt.contains(existing)) {
+                if (cnt == existing || existing.contains(cnt) || cnt.contains(existing)) { //NOPMD CompareObjectsWithEquals
                     return false;
                 }
             }

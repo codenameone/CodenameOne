@@ -62,7 +62,7 @@ public final class LinkHandler {
 
         for (int i = LAYOUTS.size() - 1; i >= 0; i--) {
             Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));
-            if (ret == null && l == layout) {
+            if (ret == null && l == layout) { //NOPMD CompareObjectsWithEquals
                 int[] rect = VALUES_TEMP.get(i).get(key);
                 if (cont && rect != null && rect[type] != LayoutUtil.NOT_SET) {
                     ret = Integer.valueOf(rect[type]);
@@ -100,7 +100,7 @@ public final class LinkHandler {
     synchronized static boolean setBounds(Object layout, String key, int x, int y, int width, int height, boolean temporary, boolean incCur) {
         for (int i = LAYOUTS.size() - 1; i >= 0; i--) {
             Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));
-            if (l == layout) {
+            if (l == layout) { //NOPMD CompareObjectsWithEquals
                 HashMap<String, int[]> map = (temporary ? VALUES_TEMP : VALUES).get(i);
                 int[] old = map.get(key);
 
@@ -182,7 +182,7 @@ public final class LinkHandler {
     public synchronized static boolean clearBounds(Object layout, String key) {
         for (int i = LAYOUTS.size() - 1; i >= 0; i--) {
             Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));
-            if (l == layout) {
+            if (l == layout) { //NOPMD CompareObjectsWithEquals
                 return VALUES.get(i).remove(key) != null;
             }
         }
@@ -192,7 +192,7 @@ public final class LinkHandler {
     synchronized static void clearTemporaryBounds(Object layout) {
         for (int i = LAYOUTS.size() - 1; i >= 0; i--) {
             Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));
-            if (l == layout) {
+            if (l == layout) { //NOPMD CompareObjectsWithEquals
                 VALUES_TEMP.get(i).clear();
                 return;
             }

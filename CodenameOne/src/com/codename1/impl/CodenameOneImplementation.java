@@ -693,7 +693,7 @@ public abstract class CodenameOneImplementation {
      * @return whether a component is being edited
      */
     public boolean isEditingText(Component c) {
-        return editingText == c;
+        return editingText == c; //NOPMD CompareObjectsWithEquals
     }
 
     /**
@@ -951,7 +951,7 @@ public abstract class CodenameOneImplementation {
     public void cancelRepaint(Animation cmp) {
         synchronized (displayLock) {
             for (int iter = 0; iter < paintQueueFill; iter++) {
-                if (paintQueue[iter] == cmp) {
+                if (paintQueue[iter] == cmp) { //NOPMD CompareObjectsWithEquals
                     paintQueue[iter] = null;
                     return;
                 }
@@ -969,14 +969,14 @@ public abstract class CodenameOneImplementation {
         synchronized (displayLock) {
             for (int iter = 0; iter < paintQueueFill; iter++) {
                 Animation ani = paintQueue[iter];
-                if (ani == cmp) {
+                if (ani == cmp) { //NOPMD CompareObjectsWithEquals
                     return;
                 }
                 //no need to paint a Component if one of its parent is already in the queue
                 if (ani instanceof Container && cmp instanceof Component) {
                     Component parent = ((Component) cmp).getParent();
                     while (parent != null) {
-                        if (parent == ani) {
+                        if (parent == ani) { //NOPMD CompareObjectsWithEquals
                             return;
                         }
                         parent = parent.getParent();

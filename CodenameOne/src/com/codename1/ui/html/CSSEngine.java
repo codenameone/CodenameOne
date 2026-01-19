@@ -1400,10 +1400,10 @@ class CSSEngine {
         boolean leftBorder = false; // Used to prevent drawing a border in the middle of two words in the same segment
         boolean rightBorder = false; // Used to prevent drawing a border in the middle of two words in the same segment
         boolean hasBorder = false;
-        if ((borderUi == ui) && (element.getUi().size() > 1)) {
-            if (element.getUi().firstElement() == borderUi) {
+        if ((borderUi == ui) && (element.getUi().size() > 1)) { //NOPMD CompareObjectsWithEquals
+            if (element.getUi().firstElement() == borderUi) { //NOPMD CompareObjectsWithEquals
                 leftBorder = true;
-            } else if (element.getUi().lastElement() == borderUi) {
+            } else if (element.getUi().lastElement() == borderUi) { //NOPMD CompareObjectsWithEquals
                 rightBorder = true;
             }
         } else {

@@ -553,7 +553,7 @@ public class UIBuilder { //implements Externalizable {
         Component c = (Component) rootComponent.getClientProperty("%" + name + "%");
         if (c == null) {
             Container newRoot = getRootAncestor(rootComponent);
-            if (newRoot != null && rootComponent != newRoot) {
+            if (newRoot != null && rootComponent != newRoot) { //NOPMD CompareObjectsWithEquals
                 return findByName(name, newRoot);
             }
         }
@@ -571,7 +571,7 @@ public class UIBuilder { //implements Externalizable {
         Component c = (Component) rootComponent.getClientProperty("%" + name + "%");
         if (c == null) {
             Container newRoot = getRootAncestor(rootComponent);
-            if (newRoot != null && rootComponent != newRoot) {
+            if (newRoot != null && rootComponent != newRoot) { //NOPMD CompareObjectsWithEquals
                 return findByName(name, newRoot);
             }
         }
@@ -1991,7 +1991,7 @@ public class UIBuilder { //implements Externalizable {
 
     private boolean isParentOf(Container cnt, Component c) {
         while (c != null) {
-            if (c == cnt) {
+            if (c == cnt) { //NOPMD CompareObjectsWithEquals
                 return true;
             }
             c = c.getParent();
@@ -2252,7 +2252,7 @@ public class UIBuilder { //implements Externalizable {
             getFormListenerInstance(newForm, null);
 
             for (int iter = 0; iter < currentForm.getCommandCount(); iter++) {
-                if (backCommand == currentForm.getCommand(iter)) {
+                if (backCommand == currentForm.getCommand(iter)) { //NOPMD CompareObjectsWithEquals
                     newForm.addCommand(backCommand, newForm.getCommandCount());
                     break;
                 }
@@ -2309,7 +2309,7 @@ public class UIBuilder { //implements Externalizable {
                         t = t.copy(true);
                     } else {
                         if (sourceCommand != null) {
-                            if (t != null && backCommands != null && backCommands.contains(sourceCommand) || Display.getInstance().getCurrent().getBackCommand() == sourceCommand) {
+                            if (t != null && backCommands != null && backCommands.contains(sourceCommand) || Display.getInstance().getCurrent().getBackCommand() == sourceCommand) { //NOPMD CompareObjectsWithEquals
                                 isBack = true;
                                 t = t.copy(true);
                             }
@@ -2444,7 +2444,7 @@ public class UIBuilder { //implements Externalizable {
             currentForm = Display.getInstance().getCurrent();
         }
         Vector formNavigationStack = baseFormNavigationStack;
-        if (sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) {
+        if (sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) { //NOPMD CompareObjectsWithEquals
             exitForm(currentForm);
             if (formNavigationStack != null && formNavigationStack.size() > 0) {
                 String name = f.getName();
@@ -2792,7 +2792,7 @@ public class UIBuilder { //implements Externalizable {
         }
 
         private void waitForForm(Form f) {
-            while (Display.getInstance().getCurrent() != f) {
+            while (Display.getInstance().getCurrent() != f) { //NOPMD CompareObjectsWithEquals
                 try {
                     Thread.sleep(5);
                 } catch (InterruptedException ex) {
@@ -2880,7 +2880,7 @@ public class UIBuilder { //implements Externalizable {
                     String firstScreen = action.substring(0, pos);
                     String nextScreen = action.substring(pos + 1);
                     Form f = (Form) createContainer(fetchResourceFile(), firstScreen);
-                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) {
+                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) { //NOPMD CompareObjectsWithEquals
                         onBackNavigation();
                         beforeShow(f);
                         f.showBack();
@@ -2900,7 +2900,7 @@ public class UIBuilder { //implements Externalizable {
                         exitForm(currentForm);
                     }
                     Form f = (Form) createContainer(fetchResourceFile(), action);
-                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) {
+                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) { //NOPMD CompareObjectsWithEquals
                         onBackNavigation();
                         beforeShow(f);
                         f.showBack();

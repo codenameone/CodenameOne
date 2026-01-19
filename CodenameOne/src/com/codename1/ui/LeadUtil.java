@@ -97,7 +97,7 @@ class LeadUtil {
         if (f != null && !Display.impl.isScrollWheeling() && leadParent.isFocusable() && leadParent.isEnabled()) {
             f.setFocused(leadParent);
         }
-        if (cmp != lead) {
+        if (cmp != lead) { //NOPMD CompareObjectsWithEquals
             leadParent.repaint();
         }
 
@@ -116,7 +116,7 @@ class LeadUtil {
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerDragged(x, y);
-        if (cmp != lead) {
+        if (cmp != lead) { //NOPMD CompareObjectsWithEquals
             leadParentImpl(cmp).repaint();
         }
 
@@ -135,7 +135,7 @@ class LeadUtil {
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerDragged(x, y);
-        if (cmp != lead) {
+        if (cmp != lead) { //NOPMD CompareObjectsWithEquals
             leadParentImpl(cmp).repaint();
         }
 
@@ -154,7 +154,7 @@ class LeadUtil {
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerReleased(x, y);
-        if (lead != cmp) {
+        if (lead != cmp) { //NOPMD CompareObjectsWithEquals
             leadParentImpl(cmp).repaint();
         }
     }
@@ -171,7 +171,7 @@ class LeadUtil {
             return;
         }
         leadComponentImpl(cmp).pointerHoverReleased(x, y);
-        if (leadParentImpl(cmp) != cmp) {
+        if (leadParentImpl(cmp) != cmp) { //NOPMD CompareObjectsWithEquals
             leadParentImpl(cmp).repaint();
         }
     }
@@ -182,7 +182,7 @@ class LeadUtil {
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerHoverPressed(x, y);
-        if (lead != cmp) {
+        if (lead != cmp) { //NOPMD CompareObjectsWithEquals
             leadParentImpl(cmp).repaint();
         }
     }
@@ -193,7 +193,7 @@ class LeadUtil {
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerHover(x, y);
-        if (lead != cmp) {
+        if (lead != cmp) { //NOPMD CompareObjectsWithEquals
             leadParentImpl(cmp).repaint();
         }
     }
@@ -204,7 +204,7 @@ class LeadUtil {
         }
         Component lead = leadComponentImpl(cmp);
         lead.dragFinishedImpl(x, y);
-        if (lead != cmp) {
+        if (lead != cmp) { //NOPMD CompareObjectsWithEquals
             leadParentImpl(cmp).repaint();
         }
     }
@@ -215,7 +215,7 @@ class LeadUtil {
         }
         Component lead = leadComponentImpl(cmp);
         lead.longPointerPress(x, y);
-        if (cmp != lead) {
+        if (cmp != lead) { //NOPMD CompareObjectsWithEquals
             leadParentImpl(cmp).repaint();
         }
     }

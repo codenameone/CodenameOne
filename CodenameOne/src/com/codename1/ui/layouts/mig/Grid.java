@@ -312,7 +312,7 @@ public final class Grid {
                 hasPushX |= (visible || hideMode > 1) && (cc.getPushX() != null);
                 hasPushY |= (visible || hideMode > 1) && (cc.getPushY() != null);
 
-                if (cc != rootCc) { // If not first in a cell
+                if (cc != rootCc) { // If not first in a cell //NOPMD CompareObjectsWithEquals
                     if (cc.isNewline() || !cc.isBoundsInGrid() || cc.getDockSide() != -1) {
                         break;
                     }
@@ -331,7 +331,7 @@ public final class Grid {
                 cell.hasTagged |= cc.getTag() != null;
                 hasTagged |= cell.hasTagged;
 
-                if (cc != rootCc) {
+                if (cc != rootCc) { //NOPMD CompareObjectsWithEquals
                     if (cc.getHorizontal().getSizeGroup() != null) {
                         sizeGroupsX++;
                     }
@@ -573,7 +573,7 @@ public final class Grid {
             for (int j = 0, jSz = groups.size(); j < jSz; j++) {
                 ArrayList<CompWrap> cwList = groups.get(j)._compWraps;
                 for (int k = 0, kSz = cwList.size(); k < kSz; k++) {
-                    if (cwList.get(k) == cw) {
+                    if (cwList.get(k) == cw) { //NOPMD CompareObjectsWithEquals
                         return groups.get(j);
                     }
                 }
@@ -711,7 +711,7 @@ public final class Grid {
         if (spanCount == 1 && align == null) {
             align = dc.getAlignOrDefault(false);
         }
-        if (align == UnitValue.BASELINE_IDENTITY) {
+        if (align == UnitValue.BASELINE_IDENTITY) { //NOPMD CompareObjectsWithEquals
             align = UnitValue.CENTER;
         }
 
@@ -815,14 +815,14 @@ public final class Grid {
         if (align == null) {
             align = rowAlign;
         }
-        if (align == UnitValue.BASELINE_IDENTITY) {
+        if (align == UnitValue.BASELINE_IDENTITY) { //NOPMD CompareObjectsWithEquals
             align = UnitValue.CENTER;
         }
 
         if (fromEnd) {
-            if (align == UnitValue.LEFT) {
+            if (align == UnitValue.LEFT) { //NOPMD CompareObjectsWithEquals
                 align = UnitValue.RIGHT;
-            } else if (align == UnitValue.RIGHT) {
+            } else if (align == UnitValue.RIGHT) { //NOPMD CompareObjectsWithEquals
                 align = UnitValue.LEFT;
             }
         }
@@ -1908,7 +1908,7 @@ public final class Grid {
                     retValues[i] = new int[]{aft, aft, aft};
 
                 } else {
-                    retValues[i] = gapAfter != gapBefore ? mergeSizes(gapAfter, gapBefore) : new int[]{defGapArr[0], defGapArr[1], defGapArr[2]};
+                    retValues[i] = gapAfter != gapBefore ? mergeSizes(gapAfter, gapBefore) : new int[]{defGapArr[0], defGapArr[1], defGapArr[2]}; //NOPMD CompareObjectsWithEquals
                 }
 
                 if (specBefore != null && specBefore.isGapAfterPush() || specAfter != null && specAfter.isGapBeforePush()) {
@@ -2030,7 +2030,7 @@ public final class Grid {
                 } else {
                     for (int cwIx = 0; cwIx < cell.compWraps.size(); cwIx++) {
                         CompWrap cw = cell.compWraps.get(cwIx);
-                        boolean rowBaselineAlign = (isRows && lc.isTopToBottom() && dc.getAlignOrDefault(!isRows) == UnitValue.BASELINE_IDENTITY); // Disable baseline for bottomToTop since I can not verify it working.
+                        boolean rowBaselineAlign = (isRows && lc.isTopToBottom() && dc.getAlignOrDefault(!isRows) == UnitValue.BASELINE_IDENTITY); // Disable baseline for bottomToTop since I can not verify it working. //NOPMD CompareObjectsWithEquals
                         boolean isBaseline = isRows && cw.isBaselineAlign(rowBaselineAlign);
 
                         String linkCtx = isBaseline ? "baseline" : null;
@@ -2190,7 +2190,7 @@ public final class Grid {
         }
 
         private void setCompWraps(ArrayList<CompWrap> cws) {
-            if (_compWraps != cws) {
+            if (_compWraps != cws) { //NOPMD CompareObjectsWithEquals
                 _compWraps.clear();
                 _compWraps.addAll(cws);
             }
@@ -2597,7 +2597,7 @@ public final class Grid {
             }
 
             UnitValue al = cc.getVertical().getAlign();
-            return (al != null ? al == UnitValue.BASELINE_IDENTITY : defValue) && comp.hasBaseline();
+            return (al != null ? al == UnitValue.BASELINE_IDENTITY : defValue) && comp.hasBaseline(); //NOPMD CompareObjectsWithEquals
         }
 
         private int getBaseline(int sizeType) {

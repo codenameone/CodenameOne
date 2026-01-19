@@ -45,7 +45,7 @@ public final class Objects {
      * @return
      */
     public static boolean equals(Object a, Object b) {
-        if (a == b) {
+        if (a == b) { //NOPMD CompareObjectsWithEquals
             return true;
         }
         return a != null && a.equals(b);
@@ -89,7 +89,7 @@ public final class Objects {
     }
 
     public static boolean deepEquals(Object a, Object b) {
-        if (a == b) {
+        if (a == b) { //NOPMD CompareObjectsWithEquals
             return true;
         }
         if (a == null) {
