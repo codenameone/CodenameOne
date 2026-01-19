@@ -235,7 +235,9 @@ final class Tree {
             if (n >= base) { xbits = extra[n - base]; }
             f = tree[n * 2];
             s.optLen += f * (bits + xbits);
-            if (stree != null) s.staticLen += f * (stree[n * 2 + 1] + xbits) { ; }
+            if (stree != null) {
+                s.staticLen += f * (stree[n * 2 + 1] + xbits);
+            }
         }
         if (overflow == 0) { return; }
 
@@ -243,15 +245,16 @@ final class Tree {
         // Find the first bit length which could increase:
         do {
             bits = maxLength - 1;
-            while (s.blCount[bits] == 0) { bits--; }
+            while (s.blCount[bits] == 0) {
+                bits--;
+            }
             s.blCount[bits]--;      // move one leaf down the tree
             s.blCount[bits + 1] += 2;   // move one overflow item as its brother
             s.blCount[maxLength]--;
             // The brother of the overflow item also moves one step up,
             // but this does not affect bl_count[maxLength]
             overflow -= 2;
-        }
-        while (overflow > 0) { ; }
+        } while (overflow > 0);
 
         for (bits = maxLength; bits != 0; bits--) {
             n = s.blCount[bits];
@@ -339,8 +342,7 @@ final class Tree {
             // and insert the new node in the heap
             s.heap[1] = node++;
             s.pqdownheap(tree, 1);
-        }
-        while (s.heapLen >= 2) { ; }
+        } while (s.heapLen >= 2);
 
         s.heap[--s.heapMax] = s.heap[1];
 
@@ -353,4 +355,3 @@ final class Tree {
         genCodes(tree, maxCode, s.blCount, s.nextCode);
     }
 }
-

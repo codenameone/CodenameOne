@@ -1237,7 +1237,9 @@ public abstract class CodenameOneImplementation {
         int height = image.getHeight();
 
         for (int y = 0; y < height; y++) {
-            if (width >= 0) System.arraycopy(rgb, 0 + y * width, newRGB, 0 + (height - y - 1) * width, width) { ; }
+            if (width >= 0) {
+                System.arraycopy(rgb, 0 + y * width, newRGB, 0 + (height - y - 1) * width, width);
+            }
         }
 
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
@@ -1537,7 +1539,9 @@ public abstract class CodenameOneImplementation {
      * @return The previous alpha value.
      */
     public final int concatenateAlpha(Object graphics, int alpha) {
-        if (alpha == 255) return getAlpha(graphics) { ; }
+        if (alpha == 255) {
+            return getAlpha(graphics);
+        }
         int oldAlpha = getAlpha(graphics);
         setAlpha(graphics, (int) (oldAlpha * (alpha / 255f)));
         return oldAlpha;

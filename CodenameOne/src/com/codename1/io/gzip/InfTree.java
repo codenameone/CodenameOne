@@ -327,8 +327,7 @@ final class InfTree {
                 v[x[j]++] = i;
             }
             p++;
-        }
-        while (++i < n) { ; }
+        } while (++i < n);
         n = x[g];                     // set n to length of v
 
         // Generate the Huffman codes and for each, make the table entries

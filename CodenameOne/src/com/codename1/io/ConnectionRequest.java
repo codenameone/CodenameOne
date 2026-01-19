@@ -1096,9 +1096,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
                 if (!post && (cacheMode == CachingMode.SMART || cacheMode == CachingMode.OFFLINE_FIRST)
                         && destinationFile == null && destinationStorage == null) {
-                {
                     byte[] d = Util.readInputStream(input);
-                }
                     OutputStream os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
                     os.write(d);
                     os.close();
@@ -1107,7 +1105,9 @@ public class ConnectionRequest implements IOProgressListener {
                     readResponse(input);
                 }
                 if (shouldAutoCloseResponse()) {
-                    if (input != null) input.close() { ; }
+                    if (input != null) {
+                        input.close();
+                    }
                 }
             }
         } finally {

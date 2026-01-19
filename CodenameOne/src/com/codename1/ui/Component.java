@@ -4541,13 +4541,16 @@ public class Component implements Animation, StyleListener, Editable {
                     if (!Component.isRevalidateOnStyleChange()) {
                         // If revalidation on stylechange is not enabled, then the style animation
                         // won't work. We need to explicitly revalidate or repaint here.
-                        if (requiresRevalidate) {
-                            Container parent = getParent();
-                            if (parent != null) parent.revalidate() { ; }
-                            else { repaint(); }
-                        } else {
-                            repaint();
-                        }
+                            if (requiresRevalidate) {
+                                Container parent = getParent();
+                            if (parent != null) {
+                                parent.revalidate();
+                            } else {
+                                repaint();
+                            }
+                            } else {
+                                repaint();
+                            }
                     }
                 }
             }

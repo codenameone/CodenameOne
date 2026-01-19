@@ -682,8 +682,7 @@ final class Deflate {
                 } // literal or match pair ?
 
                 // Check that the overlay between pending_buf and d_buf+l_buf is ok:
-            }
-            while (lx < lastLit) { ; }
+            } while (lx < lastLit);
         }
 
         sendCode(END_BLOCK, ltree);
@@ -846,7 +845,9 @@ final class Deflate {
         // Build the Huffman trees unless a stored block is forced
         if (level > 0) {
             // Check if the file is ascii or binary
-            if (dataType == Z_UNKNOWN) setDataType() { ; }
+            if (dataType == Z_UNKNOWN) {
+                setDataType();
+            }
 
             // Construct the literal and distance trees
             lDesc.buildTree(this);
@@ -939,8 +940,7 @@ final class Deflate {
                 do {
                     m = (head[--p] & 0xffff);
                     head[p] = (m >= wSize ? (short) (m - wSize) : 0);
-                }
-                while (--n != 0) { ; }
+                } while (--n != 0);
 
                 n = wSize;
                 p = n;
@@ -949,8 +949,7 @@ final class Deflate {
                     prev[p] = (m >= wSize ? (short) (m - wSize) : 0);
                     // If n is not on any hash chain, prev[n] is garbage but
                     // its value will never be used.
-                }
-                while (--n != 0) { ; }
+                } while (--n != 0);
                 more += wSize;
             }
 
@@ -977,8 +976,7 @@ final class Deflate {
             }
             // If the whole input has less than MIN_MATCH bytes, ins_h is garbage,
             // but this is not important since only literal bytes will be emitted.
-        }
-        while (lookahead < MIN_LOOKAHEAD && strm.availIn != 0) { ; }
+        } while (lookahead < MIN_LOOKAHEAD && strm.availIn != 0);
     }
 
     // Compress as much as possible from the input stream, return the current
@@ -1040,13 +1038,11 @@ final class Deflate {
 
                 // Insert new strings in the hash table only if the match length
                 // is not too large. This saves time but degrades compression.
-                if (matchLength <= maxLazyMatch &&
-                        lookahead >= MIN_MATCH) {
-                {
-                    matchLength--; // string at strstart already in hash table
-                }
-                    do {
-                        strStart++;
+            if (matchLength <= maxLazyMatch &&
+                    lookahead >= MIN_MATCH) {
+                matchLength--; // string at strstart already in hash table
+                do {
+                    strStart++;
 
                         insH = ((insH << hashShift) ^ (window[(strStart) + (MIN_MATCH - 1)] & 0xff)) & hashMask;
 //	    prev[strstart&w_mask]=hashHead=head[ins_h];
@@ -1056,10 +1052,9 @@ final class Deflate {
 
                         // strstart never exceeds WSIZE-MAX_MATCH, so there are
                         // always MIN_MATCH bytes ahead.
-                    }
-                    while (--matchLength != 0) { ; }
-                    strStart++;
-                } else {
+                } while (--matchLength != 0);
+                strStart++;
+            } else {
                     strStart += matchLength;
                     matchLength = 0;
                     insH = window[strStart] & 0xff;
@@ -1179,8 +1174,7 @@ final class Deflate {
                         prev[strStart & wMask] = head[insH];
                         head[insH] = (short) strStart;
                     }
-                }
-                while (--prevLength != 0) { ; }
+                } while (--prevLength != 0);
                 matchAvailable = 0;
                 matchLength = MIN_MATCH - 1;
                 strStart++;

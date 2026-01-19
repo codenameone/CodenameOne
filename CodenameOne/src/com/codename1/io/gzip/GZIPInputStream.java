@@ -126,7 +126,8 @@ public class GZIPInputStream extends InflaterInputStream {
                 throw new IOException(inflater.msg);
             }
         }
-        while (inflater.istate.inParsingHeader()) { ; }
+        while (inflater.istate.inParsingHeader()) {
+        }
     }
 
     private int fill(byte[] buf) {
@@ -142,8 +143,7 @@ public class GZIPInputStream extends InflaterInputStream {
                 break;
             }
             n += i;
-        }
-        while (n < len) { ; }
+        } while (n < len);
         return n;
     }
 }

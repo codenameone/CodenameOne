@@ -1133,7 +1133,9 @@ public final class Graphics {
      * @since 7.0
      */
     public int concatenateAlpha(int a) {
-        if (a == 255) return getAlpha() { ; }
+        if (a == 255) {
+            return getAlpha();
+        }
 
         int oldAlpha = getAlpha();
         setAlpha((int) (oldAlpha * (a / 255f)));

@@ -1649,7 +1649,9 @@ public class StyleParser {
          * @param values A 4-element array of scalar values.
          */
         public BoxInfo(ScalarValue[] values) {
-            if (values.length != 4) throw new IllegalArgumentException("BoxInfo expected 4-element array") { ; }
+            if (values.length != 4) {
+                throw new IllegalArgumentException("BoxInfo expected 4-element array");
+            }
             this.values = values;
         }
 
@@ -2957,7 +2959,9 @@ public class StyleParser {
         public float getSizeInPixels(Style baseStyle) {
             if (getSize() == null || getSizeUnit() == UNIT_INHERIT) {
                 Font f = baseStyle.getFont();
-                if (f == null) f = Font.getDefaultFont() { ; }
+                if (f == null) {
+                    f = Font.getDefaultFont();
+                }
 
                 float pixS = f.getPixelSize();
                 if (pixS < 1) {

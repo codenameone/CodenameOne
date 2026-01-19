@@ -712,7 +712,9 @@ final class Inflate {
             z.availIn--;
             z.totalIn++;
             b = z.nextIn[z.nextInIndex];
-            if (b != 0) tmp_string.write(z.nextIn, z.nextInIndex, 1) { ; }
+            if (b != 0) {
+                tmp_string.write(z.nextIn, z.nextInIndex, 1);
+            }
             z.adler.update(z.nextIn, z.nextInIndex, 1);
             z.nextInIndex++;
         } while (b != 0);

@@ -1850,7 +1850,9 @@ public class Container extends Component implements Iterable<Component> {
      * @param cmp
      */
     void addElevatedComponent(Component cmp) {
-        if (elevatedComponents == null) elevatedComponents = new HashSet<Component>() { ; }
+        if (elevatedComponents == null) {
+            elevatedComponents = new HashSet<Component>();
+        }
         elevatedComponents.add(cmp);
     }
 

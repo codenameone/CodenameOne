@@ -591,8 +591,7 @@ final class InfCodes {
                                     if (q - r > 0 && e > (q - r)) {
                                         do {
                                             s.window[q++] = s.window[r++];
-                                        }
-                                        while (--e != 0) { ; }
+                                        } while (--e != 0);
                                     } else {
                                         System.arraycopy(s.window, r, s.window, q, e);
                                         q += e;
@@ -608,8 +607,7 @@ final class InfCodes {
                             if (q - r > 0 && c > (q - r)) {
                                 do {
                                     s.window[q++] = s.window[r++];
-                                }
-                                while (--c != 0) { ; }
+                                } while (--c != 0);
                             } else {
                                 System.arraycopy(s.window, r, s.window, q, c);
                                 q += c;
@@ -640,8 +638,7 @@ final class InfCodes {
 
                             return Z_DATA_ERROR;
                         }
-                    }
-                    while (true) { ; }
+                    } while (true);
                     break;
                 }
 
@@ -692,10 +689,8 @@ final class InfCodes {
 
                     return Z_DATA_ERROR;
                 }
-            }
-            while (true) { ; }
-        }
-        while (m >= 258 && n >= 10) { ; }
+            } while (true);
+        } while (m >= 258 && n >= 10);
 
         // not enough input or output--restore pointers and return
         c = z.availIn - n;

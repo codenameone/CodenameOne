@@ -1872,8 +1872,11 @@ public class UIManager {
             themeProps.remove(id + Style.FONT);
         }
 
-        if (selected) selectedStyles.remove(id) { ; }
-        else { this.styles.remove(id); }
+        if (selected) {
+            selectedStyles.remove(id);
+        } else {
+            this.styles.remove(id);
+        }
 
         return getComponentStyleImpl(originalId, selected, prefix);
 

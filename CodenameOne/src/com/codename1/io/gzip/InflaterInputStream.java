@@ -255,7 +255,8 @@ public class InflaterInputStream extends FilterInputStream {
                 throw new IOException(inflater.msg);
             }
         }
-        while (inflater.istate.inParsingHeader()) { ; }
+        while (inflater.istate.inParsingHeader()) {
+        }
     }
 
     public Inflater getInflater() {

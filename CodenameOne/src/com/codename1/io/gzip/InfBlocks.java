@@ -491,14 +491,12 @@ final class InfBlocks {
                             c = c == 16 ? blens[i - 1] : 0;
                             do {
                                 blens[i++] = c;
-                            }
-                            while (--j != 0) { ; }
+                            } while (--j != 0);
                             index = i;
                         }
                     }
 
                     tb[0] = -1;
-                {
                     bl[0] = 9;         // must be <= 9 for lookahead assumptions
                     bd[0] = 6;         // must be <= 9 for lookahead assumptions
                     t = inftree.inflateTreesDynamic(257 + (t & 0x1f),

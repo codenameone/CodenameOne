@@ -11889,9 +11889,13 @@ public final class FontImage extends Image {
         }
         int w = fnt != null ? fnt.stringWidth(text) : 0;
         int h = fnt != null ? Math.round(fnt.getPixelSize()) : 0;
-        if (h <= 0 && fnt != null) h = fnt.getHeight() { ; }
+        if (h <= 0 && fnt != null) {
+            h = fnt.getHeight();
+        }
         //int paddingPixels = Display.getInstance().convertToPixels(padding, true);
-        if (fgAlpha < 255) g.concatenateAlpha(fgAlpha) { ; }
+        if (fgAlpha < 255) {
+            g.concatenateAlpha(fgAlpha);
+        }
         if (rotated != 0) {
             int tX = g.getTranslateX();
             int tY = g.getTranslateY();

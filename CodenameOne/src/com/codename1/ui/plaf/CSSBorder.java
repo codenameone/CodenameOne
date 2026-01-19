@@ -661,7 +661,9 @@ public class CSSBorder extends Border {
         g.setAntiAliased(true);
         Style s = c.getStyle();
         try {
-            if (contentRect == null) contentRect = new Rectangle2D() { ; }
+            if (contentRect == null) {
+                contentRect = new Rectangle2D();
+            }
             calculateContentRect(c.getWidth(), c.getHeight(), contentRect);
             contentRect.setX(contentRect.getX() + c.getX());
             contentRect.setY(contentRect.getY() + c.getY());

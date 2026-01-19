@@ -428,13 +428,19 @@ class Geometry {
          */
         public void addToPath(GeneralPath p, boolean join) {
             if (n() == 2) {
-                if (!join) p.moveTo(x[0], y[0]) { ; }
+                if (!join) {
+                    p.moveTo(x[0], y[0]);
+                }
                 p.quadTo(x[1], y[1], x[2], y[2]);
             } else if (n() == 3) {
-                if (!join) p.moveTo(x[0], y[0]) { ; }
+                if (!join) {
+                    p.moveTo(x[0], y[0]);
+                }
                 p.curveTo(x[1], y[1], x[2], y[2], x[3], y[3]);
             } else if (n() == 1) {
-                if (join) p.moveTo(x[0], y[0]) { ; }
+                if (join) {
+                    p.moveTo(x[0], y[0]);
+                }
                 p.lineTo(x[1], y[1]);
             }
         }
