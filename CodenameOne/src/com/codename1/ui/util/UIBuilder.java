@@ -271,7 +271,7 @@ public class UIBuilder { //implements Externalizable {
      * want to go back to a form in the middle of the navigation stack.
      */
     protected void popNavigationStack() {
-        if (baseFormNavigationStack != null && baseFormNavigationStack.size() > 0) {
+        if (baseFormNavigationStack != null && !baseFormNavigationStack.isEmpty()) {
             baseFormNavigationStack.removeElementAt(baseFormNavigationStack.size() - 1);
         }
     }
@@ -284,7 +284,7 @@ public class UIBuilder { //implements Externalizable {
      */
     protected void setBackDestination(String formName) {
         if (baseFormNavigationStack != null) {
-            while (baseFormNavigationStack.size() > 0) {
+            while (!baseFormNavigationStack.isEmpty()) {
                 Hashtable h = (Hashtable) baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);
                 if (formName.equalsIgnoreCase((String) h.get(FORM_STATE_KEY_NAME))) {
                     break;
@@ -1733,7 +1733,7 @@ public class UIBuilder { //implements Externalizable {
         } else {
             if (currentListeners instanceof Vector) {
                 ((Vector) currentListeners).removeElement(listener);
-                if (((Vector) currentListeners).size() == 0) {
+                if (((Vector) currentListeners).isEmpty()) {
                     formListeners.remove(componentName);
                 }
             } else {
@@ -2097,7 +2097,7 @@ public class UIBuilder { //implements Externalizable {
      */
     public void back(Component sourceComponent) {
         Vector formNavigationStack = getFormNavigationStackForComponent(sourceComponent);
-        if (formNavigationStack != null && formNavigationStack.size() > 0) {
+        if (formNavigationStack != null && !formNavigationStack.isEmpty()) {
             Hashtable h = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);
             if (h.containsKey(FORM_STATE_KEY_CONTAINER)) {
                 Form currentForm = Display.getInstance().getCurrent();
@@ -2127,7 +2127,7 @@ public class UIBuilder { //implements Externalizable {
      */
     String getPreviousFormName(Form f) {
         Vector formNavigationStack = getFormNavigationStackForComponent(f);
-        if (formNavigationStack != null && formNavigationStack.size() > 0) {
+        if (formNavigationStack != null && !formNavigationStack.isEmpty()) {
             Hashtable h = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);
             return (String) h.get(FORM_STATE_KEY_NAME);
         }
@@ -2170,10 +2170,10 @@ public class UIBuilder { //implements Externalizable {
 
     private void initBackForm(Form f) {
         Vector formNavigationStack = baseFormNavigationStack;
-        if (formNavigationStack != null && formNavigationStack.size() > 0) {
+        if (formNavigationStack != null && !formNavigationStack.isEmpty()) {
             setFormState(f, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));
             formNavigationStack.removeElementAt(formNavigationStack.size() - 1);
-            if (formNavigationStack.size() > 0) {
+            if (!formNavigationStack.isEmpty()) {
                 Hashtable previous = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);
                 String commandAction = (String) previous.get(FORM_STATE_KEY_NAME);
                 Command backCommand = createCommandImpl(getBackCommandText((String) previous.get(FORM_STATE_KEY_TITLE)), null,
@@ -2192,7 +2192,7 @@ public class UIBuilder { //implements Externalizable {
     private void initBackContainer(Container cnt, Form destForm, Vector formNavigationStack) {
         setContainerState(cnt, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));
         formNavigationStack.removeElementAt(formNavigationStack.size() - 1);
-        if (formNavigationStack.size() > 0) {
+        if (!formNavigationStack.isEmpty()) {
             Hashtable previous = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);
             String commandAction = (String) previous.get(FORM_STATE_KEY_NAME);
             Command backCommand = createCommandImpl(getBackCommandText((String) previous.get(FORM_STATE_KEY_TITLE)), null,
@@ -2322,7 +2322,7 @@ public class UIBuilder { //implements Externalizable {
                     if (formNavigationStack != null && !isBack && allowBackTo(commandAction) && !isSameBackDestination((Container) fromCmp, cnt)) {
                         // trigger listener creation if this is the only command in the form
                         getFormListenerInstance(destContainer.getComponentForm(), null);
-                        formNavigationStack.addElement(getContainerState((com.codename1.ui.Container) fromCmp));
+                        formNavigationStack.addElement(getContainerState((Container) fromCmp));
                     }
 
                     beforeShowContainer(cnt);
@@ -2446,10 +2446,10 @@ public class UIBuilder { //implements Externalizable {
         Vector formNavigationStack = baseFormNavigationStack;
         if (sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) { //NOPMD CompareObjectsWithEquals
             exitForm(currentForm);
-            if (formNavigationStack != null && formNavigationStack.size() > 0) {
+            if (formNavigationStack != null && !formNavigationStack.isEmpty()) {
                 String name = f.getName();
                 if (name != null && name.equals(homeForm)) {
-                    if (formNavigationStack.size() > 0) {
+                    if (!formNavigationStack.isEmpty()) {
                         setFormState(f, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));
                     }
                     formNavigationStack.clear();
@@ -2712,7 +2712,7 @@ public class UIBuilder { //implements Externalizable {
      * @return true if there is a state to restore
      */
     /*protected boolean restoreRunningApp() {
-        if(baseFormNavigationStack != null && baseFormNavigationStack.size() > 0) {
+        if(baseFormNavigationStack != null && !baseFormNavigationStack.isEmpty()) {
             Hashtable h = (Hashtable)baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);
             String formName = (String)h.get(FORM_STATE_KEY_NAME);
             if(!h.containsKey(FORM_STATE_KEY_CONTAINER)) {

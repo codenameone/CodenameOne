@@ -52,7 +52,7 @@ public final class EasyThread {
                 while (running) {
                     try {
                         synchronized (LOCK) {
-                            if (queue.size() > 0) {
+                            if (!queue.isEmpty()) {
                                 current = queue.get(0);
                                 if (current instanceof RunnableWithResult) {
                                     resultCallback = queue.get(1);

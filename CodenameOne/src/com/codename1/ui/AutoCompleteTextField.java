@@ -387,7 +387,7 @@ public class AutoCompleteTextField extends TextField {
         if (updateFilter) {
             filter(getText());
         }
-        final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        final List l = new List(getSuggestionModel());
         if (getMinimumElementsShownInPopup() > 0) {
             l.setMinElementHeight(getMinimumElementsShownInPopup());
         }

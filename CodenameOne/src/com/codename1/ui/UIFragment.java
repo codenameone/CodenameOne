@@ -598,7 +598,7 @@ public final class UIFragment {
                     rows = children.size();
                 }
                 if (cols < 0) {
-                    if (children.size() > 0) {
+                    if (!children.isEmpty()) {
                         Element firstRow = (Element) children.get(0);
                         Vector firstRowCols = firstRow.getChildrenByTagName("td");
                         cols = firstRowCols.size();

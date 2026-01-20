@@ -528,7 +528,7 @@ public class CSSBorder extends Border {
         double ty = y;
         x = y = 0;
         if (arrow != null) {
-            int arrowSizePixels = CN.convertToPixels(arrow.size);
+            int arrowSizePixels = convertToPixels(arrow.size);
             switch (arrow.direction) {
                 case CN.TOP:
                     y = arrowSizePixels;
@@ -575,7 +575,7 @@ public class CSSBorder extends Border {
         }
         if (arrow != null) {
             if (arrow.direction == CN.LEFT) {
-                int arrowHeightPixels = CN.convertToPixels(arrow.size);
+                int arrowHeightPixels = convertToPixels(arrow.size);
                 int actualArrowPosition = (int)
                         Math.min(y + height,
                                 Math.max(arrow.position, y + borderRadius.topLeftRadiusY()));
@@ -585,7 +585,7 @@ public class CSSBorder extends Border {
                 out.closePath();
             }
             if (arrow.direction == CN.RIGHT) {
-                int arrowHeightPixels = CN.convertToPixels(arrow.size);
+                int arrowHeightPixels = convertToPixels(arrow.size);
                 int actualArrowPosition = (int)
                         Math.min(y + height,
                                 Math.max(arrow.position, y + borderRadius.topRightRadiusY()));
@@ -595,7 +595,7 @@ public class CSSBorder extends Border {
                 out.closePath();
             }
             if (arrow.direction == CN.BOTTOM) {
-                int arrowHeightPixels = CN.convertToPixels(arrow.size);
+                int arrowHeightPixels = convertToPixels(arrow.size);
                 int actualArrowPosition = (int)
                         Math.min(x + width,
                                 Math.max(arrow.position, x + borderRadius.topLeftRadiusX()));
@@ -605,7 +605,7 @@ public class CSSBorder extends Border {
                 out.closePath();
             }
             if (arrow.direction == CN.TOP) {
-                int arrowHeightPixels = CN.convertToPixels(arrow.size);
+                int arrowHeightPixels = convertToPixels(arrow.size);
                 int actualArrowPosition = (int)
                         Math.min(x + width,
                                 Math.max(arrow.position, x + borderRadius.topLeftRadiusX()));
@@ -2413,7 +2413,7 @@ public class CSSBorder extends Border {
                 int trackY = trackComponent.getY();
                 int trackX = trackComponent.getX();
                 int cabsX = c.getAbsoluteX();
-                int arrowWH = CN.convertToPixels(size);
+                int arrowWH = convertToPixels(size);
                 if (cabsY >= trackY + trackComponent.getHeight()) {
                     // we are below the component
                     direction = CN.TOP;

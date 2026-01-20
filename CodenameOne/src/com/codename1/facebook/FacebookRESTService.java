@@ -123,7 +123,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         InputStreamReader reader = new InputStreamReader(i, "UTF-8");
         JSONParser.parse(reader, this);
         Util.cleanup(reader);
-        if (stack.size() > 0) {
+        if (!stack.isEmpty()) {
             fireResponseListener(new NetworkEvent(this, stack.elementAt(0)));
         }
     }
@@ -134,7 +134,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
             return;
         }
         Object node;
-        if (stack.size() == 0) {
+        if (stack.isEmpty()) {
             if (root == null) {
                 root = "entry";
             }
@@ -185,7 +185,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         if (stack.size() == 1) {
             return;
         } else {
-            if (stack.size() == 0) {
+            if (stack.isEmpty()) {
                 node = new Vector() {
 
                     @Override

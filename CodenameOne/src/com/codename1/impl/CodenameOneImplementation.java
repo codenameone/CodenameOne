@@ -4969,7 +4969,7 @@ public abstract class CodenameOneImplementation {
         String path = getURLPath(url);
 
 
-        if (cookies != null && cookies.size() > 0) {
+        if (cookies != null && !cookies.isEmpty()) {
             String domain = getURLDomain(url);
             Enumeration e = cookies.keys();
             while (e.hasMoreElements()) {
@@ -5823,8 +5823,8 @@ public abstract class CodenameOneImplementation {
         }
         final AudioRecorderComponent cmp = new AudioRecorderComponent(builder);
         final Sheet sheet = new Sheet(null, "Record Audio");
-        sheet.getContentPane().setLayout(new com.codename1.ui.layouts.BorderLayout());
-        sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.CENTER, cmp);
+        sheet.getContentPane().setLayout(new BorderLayout());
+        sheet.getContentPane().add(BorderLayout.CENTER, cmp);
         cmp.addActionListener(new CaptureAudioActionListener(cmp, sheet, response, builder));
         sheet.addCloseListener(new CaptureAudioCloseActionListener(cmp, builder, response));
         sheet.show();

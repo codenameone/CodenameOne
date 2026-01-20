@@ -66,7 +66,7 @@ public final class AnimationManager {
 
     void updateAnimations() {
         uiMutations.clear();
-        if (anims.size() > 0) {
+        if (!anims.isEmpty()) {
             ComponentAnimation c = anims.get(0);
             if (c.isInProgress()) {
                 c.updateAnimationState();
@@ -75,7 +75,7 @@ public final class AnimationManager {
                 anims.remove(c);
             }
         } else {
-            while (postAnimations.size() > 0) {
+            while (!postAnimations.isEmpty()) {
                 postAnimations.get(0).run();
                 postAnimations.remove(0);
             }
@@ -83,7 +83,7 @@ public final class AnimationManager {
     }
 
     void flush() {
-        while (anims.size() > 0) {
+        while (!anims.isEmpty()) {
             anims.get(0).flush();
             anims.remove(0);
         }

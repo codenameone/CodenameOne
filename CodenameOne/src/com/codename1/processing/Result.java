@@ -571,7 +571,7 @@ public final class Result {
      */
     private Object internalGet(final String path) throws IllegalArgumentException {
         List v = internalGetAsArray(path);
-        if (v == null || v.size() == 0) {
+        if (v == null || v.isEmpty()) {
             return null;
         }
         return v.get(0);
@@ -1059,7 +1059,7 @@ public final class Result {
                     } else {
                         children = start.getChildren(tok1);
                     }
-                    if (children.size() > 0) {
+                    if (!children.isEmpty()) {
                         return apply(new SubContent(children, start),
                                 tokens, i + 2);
                     }
@@ -1108,7 +1108,7 @@ public final class Result {
                         return apply((StructuredContent) selected, tokens,
                                 i + 1);
                     } else {
-                        if (selected != null && ((List) selected).size() > 0) {
+                        if (selected != null && !((List) selected).isEmpty()) {
                             List v = new Vector();
                             for (Object o : (List) selected) {
                                 StructuredContent sc = apply((StructuredContent) o, tokens, i + 1);

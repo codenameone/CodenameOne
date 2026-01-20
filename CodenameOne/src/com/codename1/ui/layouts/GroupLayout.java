@@ -2048,7 +2048,7 @@ public class GroupLayout extends Layout {
             while (counter < springs.size()) {
                 Spring spring = getSpring(counter);
                 if (spring instanceof AutopaddingSpring) {
-                    if (newLeadingPadding.size() == 0) {
+                    if (newLeadingPadding.isEmpty()) {
                         AutopaddingSpring padding = (AutopaddingSpring) spring;
                         padding.setSources(newLeading);
                         newLeading.clear();
@@ -2068,7 +2068,7 @@ public class GroupLayout extends Layout {
                     }
                 } else {
                     // Not a padding spring
-                    if (newLeading.size() > 0 && insert) {
+                    if (!newLeading.isEmpty() && insert) {
                         // There's leading ComponentSprings, create an
                         // autopadding spring.
                         AutopaddingSpring padding = new AutopaddingSpring();
@@ -2114,7 +2114,7 @@ public class GroupLayout extends Layout {
                         newLeading.clear();
                         newLeadingPadding.clear();
                         int nextCounter = indexOfNextNonZeroSpring(counter + 1,
-                                newTrailing.size() == 0);
+                                newTrailing.isEmpty());
                         if (nextCounter == springs.size()) {
                             addAll(trailing, newTrailing);
                             addAll(trailingPadding, newTrailingPadding);

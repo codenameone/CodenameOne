@@ -291,7 +291,7 @@ public class Contact {
     public String getPrimaryEmail() {
         if (primaryEmail == null && emails != null) {
             Collection c = emails.values();
-            if (c.size() > 0) {
+            if (!c.isEmpty()) {
                 return (String) c.iterator().next();
             }
         }
@@ -316,7 +316,7 @@ public class Contact {
     public String getPrimaryPhoneNumber() {
         if (primaryPhoneNumber == null && phoneNumbers != null) {
             Collection c = phoneNumbers.values();
-            if (c.size() > 0) {
+            if (!c.isEmpty()) {
                 return (String) c.iterator().next();
             }
         }

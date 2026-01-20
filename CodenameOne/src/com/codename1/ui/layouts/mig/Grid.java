@@ -539,7 +539,7 @@ public final class Grid {
             }
 
             // If we have a gap that was supposed to push but no more components was found to but the "gap before" then compensate.
-            if (sortedList.size() > 0) {
+            if (!sortedList.isEmpty()) {
                 CompWrap cw = sortedList.get(sortedList.size() - 1);
                 if (nextUnrel) {
                     cw.mergeGapSizes(gapUnrel, cell.flowx, false);
@@ -1560,7 +1560,7 @@ public final class Grid {
         int[] curSizes = isHor ? width : height;
 
         Cell absCell = grid.get(null);
-        if (absCell == null || absCell.compWraps.size() == 0) {
+        if (absCell == null || absCell.compWraps.isEmpty()) {
             return;
         }
 
@@ -1793,7 +1793,7 @@ public final class Grid {
         }
 
         // Set/equalize the size groups to same the values.
-        if (sizeGroupMap.size() > 0) {
+        if (!sizeGroupMap.isEmpty()) {
             for (int r = 0; r < rowColBoundSizes.length; r++) {
                 if (allDCs[r].getSizeGroup() != null) {
                     rowColBoundSizes[r] = sizeGroupMap.get(allDCs[r].getSizeGroup());
@@ -2021,7 +2021,7 @@ public final class Grid {
 
             for (Integer ix : secIndexes) {
                 Cell cell = isRows ? getCell(i, ix) : getCell(ix, i);
-                if (cell == null || cell.compWraps.size() == 0) {
+                if (cell == null || cell.compWraps.isEmpty()) {
                     continue;
                 }
 

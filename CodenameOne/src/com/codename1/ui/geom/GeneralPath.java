@@ -571,7 +571,7 @@ public final class GeneralPath implements Shape {
     public void setWindingRule(int rule) {
         if (rule != WIND_EVEN_ODD && rule != WIND_NON_ZERO) {
             // awt.209=Invalid winding rule value
-            throw new java.lang.IllegalArgumentException("Invalid winding rule"); //$NON-NLS-1$
+            throw new IllegalArgumentException("Invalid winding rule"); //$NON-NLS-1$
         }
         dirty = true;
         this.rule = rule;

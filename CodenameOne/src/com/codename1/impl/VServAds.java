@@ -114,7 +114,7 @@ public class VServAds extends FullScreenAdService {
             protected void readResponse(InputStream input) throws IOException {
                 JSONParser parser = new JSONParser();
                 Hashtable h = parser.parse(new InputStreamReader(input, "UTF-8"));
-                if (h.size() == 0) {
+                if (h.isEmpty()) {
                     return;
                 }
                 backgroundColor = Integer.parseInt((String) ((Hashtable) ((Vector) h.get("style")).elementAt(0)).get("background-color"), 16);

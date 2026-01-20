@@ -109,7 +109,7 @@ public class PainterChain implements Painter {
                         v.addElement(pc.chain[iter]);
                     }
                 }
-                if (v.size() == 0) {
+                if (v.isEmpty()) {
                     f.setGlassPane(null);
                     return;
                 }

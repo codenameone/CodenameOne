@@ -127,7 +127,7 @@ final class HTMLInputFormat {
         }
         try {
             HTMLInputFormat format = new HTMLInputFormat(formatString);
-            if (format.formatConstraints.size() == 0) {
+            if (format.formatConstraints.isEmpty()) {
                 return null;
             }
             return format;

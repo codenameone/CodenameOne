@@ -96,12 +96,12 @@ public class Calendar extends Container implements ActionSource {
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
-     * since epoch (the java.util.Date convention)
+     * since epoch (the Date convention)
      *
      * @param time time since epoch
      */
     public Calendar(long time) {
-        this(time, java.util.TimeZone.getDefault());
+        this(time, TimeZone.getDefault());
     }
 
     /**
@@ -113,13 +113,13 @@ public class Calendar extends Container implements ActionSource {
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
-     * since epoch (the java.util.Date convention)
+     * since epoch (the Date convention)
      *
      * @param time time since epoch
      * @param tmz  a reference timezone
      */
     public Calendar(long time, TimeZone tmz) {
-        this(time, java.util.TimeZone.getDefault(), null, null);
+        this(time, TimeZone.getDefault(), null, null);
     }
 
     /**
@@ -130,12 +130,12 @@ public class Calendar extends Container implements ActionSource {
      * @param rightArrowImage an image for calendar right arrow
      */
     public Calendar(Image leftArrowImage, Image rightArrowImage) {
-        this(System.currentTimeMillis(), java.util.TimeZone.getDefault(), leftArrowImage, rightArrowImage);
+        this(System.currentTimeMillis(), TimeZone.getDefault(), leftArrowImage, rightArrowImage);
     }
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
-     * since epoch (the java.util.Date convention)
+     * since epoch (the Date convention)
      *
      * @param time            time since epoch
      * @param tmz             a reference timezone
@@ -226,7 +226,7 @@ public class Calendar extends Container implements ActionSource {
             month.addActionListener(mv);
 
             java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
-            cal.setTime(new java.util.Date(time));
+            cal.setTime(new Date(time));
             month.getStyle().setBgTransparency(0);
             int y = cal.get(java.util.Calendar.YEAR);
             Vector years = new Vector();

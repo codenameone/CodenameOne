@@ -48,7 +48,7 @@ public final class MathHelper {
      * @return an array with the minimum and maximum values
      */
     public static double[] minmax(List<Double> values) {
-        if (values.size() == 0) {
+        if (values.isEmpty()) {
             return new double[2];
         }
         double min = values.get(0);

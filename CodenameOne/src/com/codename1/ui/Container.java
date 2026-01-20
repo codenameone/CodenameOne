@@ -84,7 +84,7 @@ public class Container extends Component implements Iterable<Component> {
     static int sidemenuBarTranslation;
     private static boolean enableLayoutOnPaint = true;
     private static boolean blockOverdraw;
-    private final java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
+    private final ArrayList<Component> components = new ArrayList<Component>();
     /**
      * A queue that keeps track of changes to the children while an animation is in progress.
      *
@@ -93,7 +93,7 @@ public class Container extends Component implements Iterable<Component> {
      * @see #insertComponentAt(int, java.lang.Object, com.codename1.ui.Component)
      * @see #removeComponentImpl(com.codename1.ui.Component)
      */
-    private final java.util.ArrayList<QueuedChange> changeQueue = new java.util.ArrayList<QueuedChange>();
+    private final ArrayList<QueuedChange> changeQueue = new ArrayList<QueuedChange>();
     boolean scrollableX;
     boolean scrollableY;
     /**
@@ -110,7 +110,7 @@ public class Container extends Component implements Iterable<Component> {
     private Component leadComponent;
     private Layout layout;
     private boolean shouldLayout = true;
-    private java.util.Vector cmpTransitions;
+    private Vector cmpTransitions;
     private int scrollIncrement = 20;
     private boolean blockFocus = false;
     private boolean dontRecurseContainer;
@@ -4042,7 +4042,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     public java.util.List<Component> getChildrenAsList(boolean includeQueued) {
         if (includeQueued) {
-            java.util.ArrayList<Component> out = new java.util.ArrayList<Component>();
+            ArrayList<Component> out = new ArrayList<Component>();
             out.addAll(components);
             if (changeQueue != null) {
                 for (QueuedChange change : changeQueue) {
@@ -4065,7 +4065,7 @@ public class Container extends Component implements Iterable<Component> {
             }
             return out;
         } else {
-            java.util.ArrayList<Component> out = new java.util.ArrayList<Component>();
+            ArrayList<Component> out = new ArrayList<Component>();
             out.addAll(components);
             return out;
         }
@@ -4295,7 +4295,7 @@ public class Container extends Component implements Iterable<Component> {
                 current.setLightweightMode(false);
             }
             next.setLightweightMode(false);
-            if (thisContainer.cmpTransitions != null && thisContainer.cmpTransitions.size() == 0 && growSpeed > -1) {
+            if (thisContainer.cmpTransitions != null && thisContainer.cmpTransitions.isEmpty() && growSpeed > -1) {
                 if (growSpeed > 0) {
                     current.growShrink(growSpeed);
                 } else {

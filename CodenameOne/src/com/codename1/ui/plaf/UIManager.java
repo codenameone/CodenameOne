@@ -155,7 +155,7 @@ public class UIManager {
         return image;
     }
 
-    private static com.codename1.ui.Font parseFont(String fontStr) {
+    private static Font parseFont(String fontStr) {
         if (fontStr.startsWith("System")) {
             int face = 0;
             int style = 0;
@@ -200,7 +200,7 @@ public class UIManager {
             }
 
 
-            return com.codename1.ui.Font.createSystemFont(face, style, size);
+            return Font.createSystemFont(face, style, size);
         } else {
             if (fontStr.toLowerCase().startsWith("bitmap")) {
                 try {
@@ -211,12 +211,12 @@ public class UIManager {
 
                     if (nameStr.toLowerCase().startsWith("highcontrast")) {
                         nameStr = nameStr.substring(nameStr.indexOf(";") + 1);
-                        com.codename1.ui.Font f = com.codename1.ui.Font.getBitmapFont(nameStr);
+                        Font f = Font.getBitmapFont(nameStr);
                         f.addContrast((byte) 30);
                         return f;
                     }
 
-                    return com.codename1.ui.Font.getBitmapFont(nameStr);
+                    return Font.getBitmapFont(nameStr);
                 } catch (Exception ex) {
                     // illegal argument exception?
                     Log.e(ex);
@@ -2061,7 +2061,7 @@ public class UIManager {
                 if (font instanceof String) {
                     style.setFont(parseFont((String) font));
                 } else {
-                    style.setFont((com.codename1.ui.Font) font);
+                    style.setFont((Font) font);
                 }
             }
             if (border != null) {

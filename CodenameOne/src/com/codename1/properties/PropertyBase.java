@@ -168,7 +168,7 @@ public class PropertyBase<T, K> {
     public void removeChangeListener(PropertyChangeListener<T, K> pl) {
         if (listeners != null) {
             listeners.remove(pl);
-            if (listeners.size() == 0) {
+            if (listeners.isEmpty()) {
                 listeners = null;
             }
         }

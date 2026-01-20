@@ -131,7 +131,7 @@ public final class CC {
                 }
             }
 
-            linkTargets = targets.size() == 0 ? EMPTY_ARR : targets.toArray(new String[targets.size()]);
+            linkTargets = targets.isEmpty() ? EMPTY_ARR : targets.toArray(new String[targets.size()]);
         }
         return linkTargets;
     }

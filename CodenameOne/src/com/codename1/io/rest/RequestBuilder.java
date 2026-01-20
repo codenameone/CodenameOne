@@ -781,7 +781,7 @@ public class RequestBuilder {
         Connection req = new Connection(parseJson);
         for (Map.Entry<String, String> entry : pathParams.entrySet()) {
             String key = entry.getKey();
-            url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", entry.getValue());
+            url = StringUtil.replaceAll(url, "{" + key + "}", entry.getValue());
         }
         if (contentType != null) {
             req.setContentType(contentType);

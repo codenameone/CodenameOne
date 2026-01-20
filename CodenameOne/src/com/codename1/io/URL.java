@@ -46,7 +46,7 @@ import java.util.Map;
 public class URL {
     private final URI u;
 
-    public URL(java.lang.String url) throws URISyntaxException {
+    public URL(String url) throws URISyntaxException {
         u = new URI(url);
     }
 
@@ -54,19 +54,19 @@ public class URL {
         this.u = u;
     }
 
-    public java.lang.String getQuery() {
+    public String getQuery() {
         return u.getQuery();
     }
 
-    public java.lang.String getPath() {
+    public String getPath() {
         return u.getPath();
     }
 
-    public java.lang.String getUserInfo() {
+    public String getUserInfo() {
         return u.getUserInfo();
     }
 
-    public java.lang.String getAuthority() {
+    public String getAuthority() {
         return u.getAuthority();
     }
 
@@ -81,7 +81,7 @@ public class URL {
         return 80;
     }
 
-    public java.lang.String getProtocol() {
+    public String getProtocol() {
         String s = u.toASCIIString();
         if (s.startsWith("https")) {
             return "https";
@@ -92,16 +92,16 @@ public class URL {
         return "http";
     }
 
-    public java.lang.String getHost() {
+    public String getHost() {
         return u.getHost();
     }
 
-    public java.lang.String getFile() {
+    public String getFile() {
         return u.toASCIIString();
     }
 
     @Override
-    public boolean equals(java.lang.Object o) {
+    public boolean equals(Object o) {
         return o instanceof URL && u.equals(((URL) o).u);
     }
 
@@ -115,26 +115,26 @@ public class URL {
     }
 
     @Override
-    public java.lang.String toString() {
+    public String toString() {
         return u.toASCIIString();
     }
 
-    public java.lang.String toExternalForm() {
+    public String toExternalForm() {
         return u.toASCIIString();
     }
 
-    public java.net.URI toURI() throws java.net.URISyntaxException {
+    public URI toURI() throws URISyntaxException {
         return u;
     }
 
-    public URLConnection openConnection() throws java.io.IOException {
+    public URLConnection openConnection() throws IOException {
         if ("file".equals(getProtocol())) {
             return new FileURLConnection(new File(u));
         }
         return new HttpURLConnection(u.toASCIIString());
     }
 
-    public final java.io.InputStream openStream() throws java.io.IOException {
+    public final InputStream openStream() throws IOException {
         return openConnection().getInputStream();
     }
 
@@ -146,7 +146,7 @@ public class URL {
         boolean doInput = true;
         boolean doOutput;
 
-        public abstract void connect() throws java.io.IOException;
+        public abstract void connect() throws IOException;
 
         public int getConnectTimeout() {
             return connectTimeout;
@@ -174,15 +174,15 @@ public class URL {
             return getContentLength();
         }
 
-        public abstract java.lang.String getContentType();
+        public abstract String getContentType();
 
-        public abstract java.lang.String getHeaderField(java.lang.String s);
+        public abstract String getHeaderField(String s);
 
-        public abstract java.util.Map<java.lang.String, java.util.List<java.lang.String>> getHeaderFields();
+        public abstract Map<String, List<String>> getHeaderFields();
 
-        public abstract java.io.InputStream getInputStream() throws java.io.IOException;
+        public abstract InputStream getInputStream() throws IOException;
 
-        public abstract java.io.OutputStream getOutputStream() throws java.io.IOException;
+        public abstract OutputStream getOutputStream() throws IOException;
 
         /**
          * Sets the request property, replacing existing property with same key, if it already exists.

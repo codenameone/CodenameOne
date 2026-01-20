@@ -41,7 +41,7 @@ import java.util.ArrayList;
  */
 public class File {
     public static final char separatorChar = '/';
-    public static final java.lang.String separator = "/";
+    public static final String separator = "/";
     private final String path;
 
     /**
@@ -59,7 +59,7 @@ public class File {
      *
      * @param path The path of the file.  Relative or absolute.
      */
-    public File(java.lang.String path) {
+    public File(String path) {
         if (!path.startsWith("file:")) {
             this.path = FileSystemStorage.getInstance().getAppHomePath() + path;
         } else {
@@ -73,7 +73,7 @@ public class File {
      * @param dir  The parent directory path.
      * @param file The file name
      */
-    public File(java.lang.String dir, java.lang.String file) {
+    public File(String dir, String file) {
         if (!dir.startsWith("file:")) {
             dir = FileSystemStorage.getInstance().getAppHomePath() + dir;
         }
@@ -90,7 +90,7 @@ public class File {
      * @param parent The parent directory.
      * @param path   The subpath, beginning with the parent directory.
      */
-    public File(File parent, java.lang.String path) {
+    public File(File parent, String path) {
         if (!parent.path.endsWith("/")) {
             this.path = parent.path + "/" + path;
         } else {
@@ -115,9 +115,9 @@ public class File {
      * @param prefix The file name prefix.
      * @param suffix The file name suffix
      * @return The resulting temporary file.
-     * @throws java.io.IOException
+     * @throws IOException
      */
-    public static File createTempFile(java.lang.String prefix, java.lang.String suffix) throws java.io.IOException {
+    public static File createTempFile(String prefix, String suffix) throws IOException {
         String p = FileSystemStorage.getInstance().getAppHomePath() + "/temp/";
         FileSystemStorage.getInstance().mkdir(p);
         return new File(p + prefix + System.currentTimeMillis() + suffix);
@@ -129,7 +129,7 @@ public class File {
      *
      * @return The file name.
      */
-    public java.lang.String getName() {
+    public String getName() {
         return path.substring(path.lastIndexOf('/') + 1);
     }
 
@@ -138,7 +138,7 @@ public class File {
      *
      * @return The parent directory path.
      */
-    public java.lang.String getParent() {
+    public String getParent() {
 
         if ("file://".equals(path) || "file:///".equals(path) || path.length() == 0) {
             return null;
@@ -174,7 +174,7 @@ public class File {
      *
      * @return
      */
-    public java.lang.String getPath() {
+    public String getPath() {
         return path;
     }
 
@@ -194,7 +194,7 @@ public class File {
      *
      * @return
      */
-    public java.lang.String getAbsolutePath() {
+    public String getAbsolutePath() {
         return path;
     }
 
@@ -265,9 +265,9 @@ public class File {
      * Creates this file as a new blank file in the file system.
      *
      * @return True if it succeeds.
-     * @throws java.io.IOException
+     * @throws IOException
      */
-    public boolean createNewFile() throws java.io.IOException {
+    public boolean createNewFile() throws IOException {
         OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
         os.close();
         return exists();
@@ -288,7 +288,7 @@ public class File {
      *
      * @return
      */
-    public java.lang.String[] list() {
+    public String[] list() {
         try {
             String[] result = FileSystemStorage.getInstance().listFiles(path);
             for (int iter = 0; iter < result.length; iter++) {
@@ -312,7 +312,7 @@ public class File {
      * @param filter
      * @return
      */
-    public java.lang.String[] list(FilenameFilter filter) {
+    public String[] list(FilenameFilter filter) {
         String[] arr = list();
         if (arr.length > 0) {
             ArrayList<String> result = new ArrayList<String>();
@@ -459,7 +459,7 @@ public class File {
      * @return
      */
     @Override
-    public boolean equals(java.lang.Object o) {
+    public boolean equals(Object o) {
         return o instanceof File && ((File) o).path.equals(path);
     }
 
@@ -469,7 +469,7 @@ public class File {
     }
 
     @Override
-    public java.lang.String toString() {
+    public String toString() {
         return path;
     }
 

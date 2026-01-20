@@ -1194,7 +1194,7 @@ public class Form extends Container {
             return;
         }
         vec.remove(listener);
-        if (vec.size() == 0) {
+        if (vec.isEmpty()) {
             keyListeners.remove(code);
         }
     }
@@ -1981,7 +1981,7 @@ public class Form extends Container {
      * @return true if the form has media components within it
      */
     public final boolean hasMedia() {
-        return mediaComponents != null && mediaComponents.size() > 0;
+        return mediaComponents != null && !mediaComponents.isEmpty();
     }
 
     /**
@@ -2163,8 +2163,8 @@ public class Form extends Container {
      * @return true is form has animation; otherwise false
      */
     boolean hasAnimations() {
-        return (animatableComponents != null && animatableComponents.size() > 0)
-                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0)
+        return (animatableComponents != null && !animatableComponents.isEmpty())
+                || (internalAnimatableComponents != null && !internalAnimatableComponents.isEmpty())
                 || (animMananger != null && animMananger.isAnimating());
     }
 
@@ -4312,7 +4312,7 @@ public class Form extends Container {
      * negative position, and need to be reset.  This is primarily to solve https://github.com/codenameone/CodenameOne/issues/2476
      */
     void fixNegativeScrolls() {
-        java.util.Set<Component> negativeScrolls = getContentPane().findNegativeScrolls(new java.util.HashSet<Component>());
+        Set<Component> negativeScrolls = getContentPane().findNegativeScrolls(new HashSet<Component>());
         for (Component cmp : negativeScrolls) {
             int x = cmp.getAbsoluteX() + cmp.getWidth() / 2;
             int y = cmp.getAbsoluteY() + cmp.getHeight() / 2;

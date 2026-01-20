@@ -128,7 +128,7 @@ public class EventDispatcher {
      * @param type  the type of the event
      */
     public void fireDataChangeEvent(int index, int type) {
-        if (listeners == null || listeners.size() == 0) {
+        if (listeners == null || listeners.isEmpty()) {
             return;
         }
         boolean isEdt = Display.getInstance().isEdt();
@@ -169,7 +169,7 @@ public class EventDispatcher {
      * @param newValue     the new value for the property
      */
     public void fireBindTargetChange(Component source, String propertyName, Object oldValue, Object newValue) {
-        if (listeners == null || listeners.size() == 0) {
+        if (listeners == null || listeners.isEmpty()) {
             return;
         }
         BindTarget[] array;
@@ -216,7 +216,7 @@ public class EventDispatcher {
      * @param source   the style firing the event
      */
     public void fireStyleChangeEvent(String property, Style source) {
-        if (listeners == null || listeners.size() == 0) {
+        if (listeners == null || listeners.isEmpty()) {
             return;
         }
         // minor optimization for a common use case to avoid allocation costs
@@ -289,7 +289,7 @@ public class EventDispatcher {
      * @param ev the ActionEvent to fire to the listeners
      */
     public void fireActionEvent(ActionEvent ev) {
-        if (listeners == null || listeners.size() == 0) {
+        if (listeners == null || listeners.isEmpty()) {
             return;
         }
 
@@ -329,7 +329,7 @@ public class EventDispatcher {
      * @param newSelection new selection
      */
     public void fireSelectionEvent(int oldSelection, int newSelection) {
-        if (listeners == null || listeners.size() == 0) {
+        if (listeners == null || listeners.isEmpty()) {
             return;
         }
         // minor optimization for a common use case to avoid allocation costs
@@ -365,7 +365,7 @@ public class EventDispatcher {
      * Fires the event safely on the EDT without risk of concurrency errors
      */
     public void fireScrollEvent(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-        if (listeners == null || listeners.size() == 0) {
+        if (listeners == null || listeners.isEmpty()) {
             return;
         }
         // minor optimization for a common use case to avoid allocation costs
@@ -415,7 +415,7 @@ public class EventDispatcher {
      * @param c the Component that gets the focus event
      */
     public void fireFocus(Component c) {
-        if (listeners == null || listeners.size() == 0) {
+        if (listeners == null || listeners.isEmpty()) {
             return;
         }
         // minor optimization for a common use case to avoid allocation costs
@@ -474,7 +474,7 @@ public class EventDispatcher {
      * @return true if the event dispatcher has registered listeners
      */
     public boolean hasListeners() {
-        return listeners != null && listeners.size() > 0;
+        return listeners != null && !listeners.isEmpty();
     }
 
     /**

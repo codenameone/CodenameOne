@@ -148,8 +148,8 @@ class MapContent implements StructuredContent {
             return null;
         }
         List children;
-        if (array instanceof java.util.Vector) {
-            children = new java.util.Vector();
+        if (array instanceof Vector) {
+            children = new Vector();
         } else {
             children = new ArrayList();
         }
@@ -194,7 +194,7 @@ class MapContent implements StructuredContent {
             }
             if (tmp == null) {
                 if (oldList) {
-                    return new java.util.Vector();
+                    return new Vector();
                 } else {
                     return new ArrayList();
                 }
@@ -203,7 +203,7 @@ class MapContent implements StructuredContent {
         }
         if (node == null) {
             if (oldList) {
-                return new java.util.Vector();
+                return new Vector();
             } else {
                 return new ArrayList();
             }

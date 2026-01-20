@@ -304,7 +304,7 @@ public class JSONParser implements JSONParseCallback {
                             continue;
                         case '{':
                             if (lastKey == null) {
-                                if (blocks.size() == 0) {
+                                if (blocks.isEmpty()) {
                                     lastKey = "root";
                                 } else {
                                     lastKey = blocks.peek();
@@ -696,7 +696,7 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private boolean isStackHash() {
-        return parseStack.size() > 0 &&
+        return !parseStack.isEmpty() &&
                 parseStack.get(parseStack.size() - 1) instanceof Map;
     }
 
@@ -713,7 +713,7 @@ public class JSONParser implements JSONParseCallback {
      */
     @Override
     public void startBlock(String blockName) {
-        if (parseStack.size() == 0) {
+        if (parseStack.isEmpty()) {
             parseStack.add(state);
         } else {
             Map newOne;
@@ -798,7 +798,7 @@ public class JSONParser implements JSONParseCallback {
         }
 
         // the root of the JSON is an array, we need to wrap it in an assignment
-        if (parseStack.size() == 0) {
+        if (parseStack.isEmpty()) {
             parseStack.add(state);
             currentKey = "root";
         }

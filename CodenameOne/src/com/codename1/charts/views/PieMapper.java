@@ -89,7 +89,7 @@ public class PieMapper {
         // Minus to correct for coord re-mapping
         double dy = -(screenPoint.getY() - mCenterY);
 
-        double inRads = com.codename1.util.MathUtil.atan2(dy, dx);
+        double inRads = MathUtil.atan2(dy, dx);
 
         // We need to map to coord system when 0 degree is at 3 O'clock, 270 at 12
         // O'clock

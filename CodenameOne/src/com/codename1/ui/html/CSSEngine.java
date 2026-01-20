@@ -351,11 +351,11 @@ class CSSEngine {
         }
 
 
-        if (nextNestedSelectors.size() == 0) {
+        if (nextNestedSelectors.isEmpty()) {
             nextNestedSelectors = null;
         }
 
-        if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) && (nextSiblingSelectors.size() == 0)) {
+        if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) && (nextSiblingSelectors.isEmpty())) {
             nextSiblingSelectors = null;
         }
 
@@ -395,9 +395,9 @@ class CSSEngine {
             if (currentSelector.getNumChildren() == 0) {
                 if ((element.getTagId() != HTMLElement.TAG_A) ||
                         ((currentSelector.getSelectorPseudoClass() & (CSSElement.PC_LINK + CSSElement.PC_VISITED)) == 0) || // not link/visited (but can be active/focus)
-                        ((element.getUi().size() > 0) && !(element.getUi().firstElement() instanceof HTMLLink)) ||
-                        ((element.getUi().size() > 0) && (!((HTMLLink) element.getUi().firstElement()).linkVisited) && ((currentSelector.getSelectorPseudoClass() & CSSElement.PC_LINK) != 0)) ||
-                        ((element.getUi().size() > 0) && ((HTMLLink) element.getUi().firstElement()).linkVisited) && ((currentSelector.getSelectorPseudoClass() & CSSElement.PC_VISITED) != 0)) {
+                        ((!element.getUi().isEmpty()) && !(element.getUi().firstElement() instanceof HTMLLink)) ||
+                        ((!element.getUi().isEmpty()) && (!((HTMLLink) element.getUi().firstElement()).linkVisited) && ((currentSelector.getSelectorPseudoClass() & CSSElement.PC_LINK) != 0)) ||
+                        ((!element.getUi().isEmpty()) && ((HTMLLink) element.getUi().firstElement()).linkVisited) && ((currentSelector.getSelectorPseudoClass() & CSSElement.PC_VISITED) != 0)) {
                     applyStyle(element, currentSelector, htmlC);
                 }
             } else {
@@ -458,7 +458,7 @@ class CSSEngine {
      * @param htmlC    The HTMLComponent
      */
     private void applyStyle(HTMLElement element, CSSElement selector, HTMLComponent htmlC) {
-        if (element.getUi().size() > 0) {
+        if (!element.getUi().isEmpty()) {
             if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) {
                 String reset = selector.getAttributeById(CSSElement.CSS_COUNTER_RESET);
                 if (reset != null) {

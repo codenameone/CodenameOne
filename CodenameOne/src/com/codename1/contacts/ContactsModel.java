@@ -173,7 +173,7 @@ public class ContactsModel extends DefaultListModel {
             return contact.getPrimaryPhoneNumber();
         }
         Hashtable phones = contact.getPhoneNumbers();
-        if (phones != null && phones.size() > 0) {
+        if (phones != null && !phones.isEmpty()) {
             String first = (String) phones.keys().nextElement();
             return (String) phones.get(first);
 
@@ -186,7 +186,7 @@ public class ContactsModel extends DefaultListModel {
             return contact.getPrimaryEmail();
         }
         Hashtable emails = contact.getEmails();
-        if (emails != null && emails.size() > 0) {
+        if (emails != null && !emails.isEmpty()) {
             String first = (String) emails.keys().nextElement();
             return (String) emails.get(first);
         }

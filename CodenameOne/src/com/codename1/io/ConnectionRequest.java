@@ -1347,7 +1347,7 @@ public class ConnectionRequest implements IOProgressListener {
             } else if (part.indexOf("expires") == 0) {
                 //SimpleDateFormat format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
                 String date = part.substring(part.indexOf("=") + 1);
-                java.util.Date dt = parseDate(date,
+                Date dt = parseDate(date,
                         "EEE, dd-MMM-yyyy HH:mm:ss z",
                         "EEE dd-MMM-yyyy HH:mm:ss z",
                         "EEE, dd MMM yyyy HH:mm:ss z",
@@ -1790,7 +1790,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @throws IllegalStateException if invoked after an addArgument call
      */
     public void setPost(boolean post) {
-        if (this.post != post && requestArguments != null && requestArguments.size() > 0) {
+        if (this.post != post && requestArguments != null && !requestArguments.isEmpty()) {
             throw new IllegalStateException("Request method (post/get) can't be modified once arguments have been assigned to the request");
         }
         this.post = post;
@@ -2196,7 +2196,7 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         actionListeners.removeListener(a);
-        if (actionListeners.getListenerCollection() == null || actionListeners.getListenerCollection().size() == 0) {
+        if (actionListeners.getListenerCollection() == null || actionListeners.getListenerCollection().isEmpty()) {
             actionListeners = null;
         }
     }
@@ -2239,7 +2239,7 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         responseCodeListeners.removeListener(a);
-        if (responseCodeListeners.getListenerCollection() == null || responseCodeListeners.getListenerCollection().size() == 0) {
+        if (responseCodeListeners.getListenerCollection() == null || responseCodeListeners.getListenerCollection().isEmpty()) {
             responseCodeListeners = null;
         }
     }
@@ -2254,7 +2254,7 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         exceptionListeners.removeListener(a);
-        if (exceptionListeners.getListenerCollection() == null || exceptionListeners.getListenerCollection().size() == 0) {
+        if (exceptionListeners.getListenerCollection() == null || exceptionListeners.getListenerCollection().isEmpty()) {
             exceptionListeners = null;
         }
     }

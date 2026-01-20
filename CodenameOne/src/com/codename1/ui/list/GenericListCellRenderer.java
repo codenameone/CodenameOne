@@ -647,7 +647,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
             boolean hasAnimations = false;
             if (parentList != null) {
                 boolean repaint = false;
-                if (pendingAnimations != null && pendingAnimations.size() > 0) {
+                if (pendingAnimations != null && !pendingAnimations.isEmpty()) {
                     int s = pendingAnimations.size();
                     hasAnimations = true;
                     for (int iter = 0; iter < s; iter++) {

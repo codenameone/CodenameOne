@@ -218,7 +218,7 @@ public class RSSReader extends List {
             // the comparison assumes that other container subclases are really just
             // custom components e.g. tree, table and HTMLComponent as well as third party
             // subclasses
-            if (current.getClass() == com.codename1.ui.Container.class ||
+            if (current.getClass() == Container.class ||
                     current.getClass() == com.codename1.ui.Tabs.class) {
                 updateComponentValues((Container) current, h);
                 continue;

@@ -158,9 +158,9 @@ public class Log {
         }
 
         // request the device id from the server
-        com.codename1.io.ConnectionRequest r = new com.codename1.io.ConnectionRequest() {
+        ConnectionRequest r = new ConnectionRequest() {
             @Override
-            protected void readResponse(java.io.InputStream input) throws java.io.IOException {
+            protected void readResponse(InputStream input) throws IOException {
                 com.codename1.io.Preferences.set("UDeviceKey__$", Util.readToString(input));
             }
 

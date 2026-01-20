@@ -300,7 +300,7 @@ public class AsyncResource<V> extends Observable {
                 throw new InterruptedException("Timeout occurred in get()");
             }
             if (isEdt()) {
-                CN.invokeAndBlock(new Runnable() {
+                invokeAndBlock(new Runnable() {
                     @Override
                     public void run() {
                         synchronized (complete) {
@@ -648,12 +648,12 @@ public class AsyncResource<V> extends Observable {
         AsyncCallback(SuccessCallback<T> cb, EasyThread t) {
             this.cb = cb;
             this.t = t;
-            this.edt = t == null && CN.isEdt();
+            this.edt = t == null && isEdt();
         }
 
         @Override
         public void onSucess(final T value) {
-            if (edt && !CN.isEdt()) {
+            if (edt && !isEdt()) {
                 CN.callSerially(new Runnable() {
                     @Override
                     public void run() {

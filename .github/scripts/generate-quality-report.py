@@ -906,7 +906,9 @@ def main() -> None:
             "MethodNamingConventions",
             "OneDeclarationPerLine",
             "MissingOverride",
-            "ControlStatementBraces"
+            "ControlStatementBraces",
+            "UnnecessaryFullyQualifiedName",
+            "UseCollectionIsEmpty"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

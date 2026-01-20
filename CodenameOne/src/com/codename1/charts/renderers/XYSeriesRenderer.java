@@ -90,7 +90,7 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
      */
     @Deprecated
     public boolean isFillBelowLine() {
-        return mFillBelowLine.size() > 0;
+        return !mFillBelowLine.isEmpty();
     }
 
     /**
@@ -157,7 +157,7 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
      */
     @Deprecated
     public void setFillBelowLineColor(int color) {
-        if (mFillBelowLine.size() > 0) {
+        if (!mFillBelowLine.isEmpty()) {
             mFillBelowLine.get(0).setColor(color);
         }
     }
