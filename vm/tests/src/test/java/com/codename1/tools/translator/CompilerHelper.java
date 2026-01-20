@@ -158,15 +158,27 @@ public class CompilerHelper {
             java.nio.file.Files.write(sourceDir.resolve("Main.java"), code.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
             java.nio.file.Path javaApiDir = java.nio.file.Files.createTempDirectory("java-api-classes");
-            compileJavaAPI(javaApiDir);
+            double jdkVer = 1.8;
+            try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+            double targetVer = 1.8;
+            try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+            if (jdkVer >= 9 && targetVer < 9) {
+                return false;
+            }
+            compileJavaAPI(javaApiDir, config);
 
             List<String> compileArgs = new ArrayList<>();
             compileArgs.add("-source");
-            compileArgs.add("1.8");
+            compileArgs.add(config.targetVersion);
             compileArgs.add("-target");
-            compileArgs.add("1.8");
-            compileArgs.add("-bootclasspath");
-            compileArgs.add(javaApiDir.toString());
+            compileArgs.add(config.targetVersion);
+            if (jdkVer >= 9) {
+                compileArgs.add("-classpath");
+                compileArgs.add(javaApiDir.toString());
+            } else {
+                compileArgs.add("-bootclasspath");
+                compileArgs.add(javaApiDir.toString());
+            }
             compileArgs.add("-d");
             compileArgs.add(classesDir.toString());
             compileArgs.add(sourceDir.resolve("Main.java").toString());
@@ -176,21 +188,7 @@ public class CompilerHelper {
             }
 
             // Merge javaApiDir into classesDir so translator finds dependencies
-            java.nio.file.Files.walk(javaApiDir)
-                .forEach(source -> {
-                    try {
-                        java.nio.file.Path destination = classesDir.resolve(javaApiDir.relativize(source));
-                        if (java.nio.file.Files.isDirectory(source)) {
-                            if (!java.nio.file.Files.exists(destination)) {
-                                java.nio.file.Files.createDirectory(destination);
-                            }
-                        } else {
-                            java.nio.file.Files.copy(source, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                        }
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+            copyDirectory(javaApiDir, classesDir);
 
             CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "ExecutorApp");
 
