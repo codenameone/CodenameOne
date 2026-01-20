@@ -30,8 +30,13 @@ import com.codename1.xml.Element;
  * @author shannah
  */
 public class PushBuilder {
-    private String title, body, metaData, imageUrl, category;
-    private int type, badge;
+    private String title;
+    private String body;
+    private String metaData;
+    private String imageUrl;
+    private String category;
+    private int type;
+    private int badge;
 
     /**
      * Sets the title of the push notification.

@@ -187,7 +187,8 @@ public class TextSelection {
     private final ActionListener pressListener = new ActionListener() {
         final Rectangle startSelectedBounds = new Rectangle();
         private final int ONE_MM = CN.convertToPixels(1);
-        int startX, startY;
+        int startX;
+        int startY;
         boolean inSelectionDrag;
 
         @Override
@@ -863,7 +864,8 @@ public class TextSelection {
         private final Rectangle bounds = new Rectangle();
         private final List<Char> chars = new ArrayList<Char>();
         private Component component;
-        private int startPos, endPos;
+        private int startPos;
+        private int endPos;
         private boolean boundsDirty = true;
 
 

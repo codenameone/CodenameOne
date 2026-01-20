@@ -49,7 +49,8 @@ public final class DimConstraint {
 
     private BoundSize size = BoundSize.NULL_SIZE;     // Min, pref, max. Never null, but sizes can be null.
 
-    private BoundSize gapBefore = null, gapAfter = null;
+    private BoundSize gapBefore = null;
+    private BoundSize gapAfter = null;
 
     private UnitValue align = null;
 

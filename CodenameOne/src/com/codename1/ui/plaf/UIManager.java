@@ -160,8 +160,9 @@ public class UIManager {
             int face = 0;
             int style = 0;
             int size = 0;
-            String
-                    faceStr, styleStr, sizeStr;
+            String faceStr;
+            String styleStr;
+            String sizeStr;
             String sysFont = fontStr.substring(fontStr.indexOf("{") + 1, fontStr.indexOf("}"));
             faceStr = sysFont.substring(0, sysFont.indexOf(";"));
             sysFont = sysFont.substring(sysFont.indexOf(";") + 1);

@@ -56,11 +56,15 @@ public class Motion {
     private int targetPosition;
     private int duration;
     private long startTime;
-    private double initVelocity, friction;
+    private double initVelocity;
+    private double friction;
     private int lastReturnedValue;
     private long currentMotionTime = -1;
     private long previousCurrentMotionTime = -1;
-    private float p0, p1, p2, p3;
+    private float p0;
+    private float p1;
+    private float p2;
+    private float p3;
 
     /**
      * Construct a point/destination motion

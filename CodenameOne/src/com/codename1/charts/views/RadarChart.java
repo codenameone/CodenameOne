@@ -107,7 +107,8 @@ public class RadarChart extends RoundChart {
         float angle = 360f / cLength;
 
         // Draw web
-        float centerX = (left + right) / 2f, centerY = (top + bottom) / 2f;
+        float centerX = (left + right) / 2f;
+        float centerY = (top + bottom) / 2f;
         for (int i = 0; i < cLength; i++) {
             paint.setColor(ColorUtil.GRAY);
             float thisRad = (float) Math.toRadians(90 - currentAngle);

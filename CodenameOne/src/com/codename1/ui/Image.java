@@ -416,7 +416,8 @@ public class Image implements ActionSource {
             img = scaled;
             img.lock();
         }
-        Image result, temp;
+        Image result;
+        Image temp;
         switch (orientation) {
             case 0:
             case 1:

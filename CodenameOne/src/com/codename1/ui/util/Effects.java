@@ -213,7 +213,10 @@ public final class Effects {
         Image s = dropshadow(source, blurRadius, opacity);
         Image n = Image.createImage(source.getWidth() + Math.abs(xDistance), source.getHeight() + Math.abs(yDistance), 0);
         Graphics g = n.getGraphics();
-        int shadowX = 0, imageX = 0, shadowY = 0, imageY = 0;
+        int shadowX = 0;
+        int imageX = 0;
+        int shadowY = 0;
+        int imageY = 0;
         if (xDistance < 0) {
             imageX = xDistance * -1;
         } else {

@@ -64,9 +64,11 @@ class Geometry {
          * are the control points.  Cubic curves will have 4 points, quadratic curves, 3 points, lines
          * 2 points.
          */
-        final double[] x, y;
+        final double[] x;
+        final double[] y;
 
-        private Point2D startPoint, endPoint;
+        private Point2D startPoint;
+        private Point2D endPoint;
         private Rectangle2D boundingRect;
 
 

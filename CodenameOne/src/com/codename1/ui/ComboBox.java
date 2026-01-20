@@ -406,7 +406,10 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             showingPopupDialog = false;
             return out;
         } else {
-            int top, bottom, left, right;
+            int top;
+            int bottom;
+            int left;
+            int right;
             Form parentForm = getComponentForm();
 
             int listW = Math.max(getWidth(), l.getPreferredW());

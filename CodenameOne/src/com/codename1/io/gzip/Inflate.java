@@ -628,7 +628,8 @@ final class Inflate {
         int n;       // number of bytes to look at
         int p;       // pointer to bytes
         int m;       // number of marker bytes found in a row
-        long r, w;   // temporaries to save total_in and total_out
+        long r;   // temporaries to save total_in and total_out
+        long w;
 
         // set up
         if (z == null) {

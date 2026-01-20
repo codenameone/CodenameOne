@@ -66,7 +66,8 @@ public class MapComponent extends Container {
     private Coord _center;
     private int _zoom;
     private boolean _needTiles = true;
-    private int draggedx, draggedy;
+    private int draggedx;
+    private int draggedy;
     private Vector _tiles;
     private Point _delta = null;
     private double latitude = Double.NaN;

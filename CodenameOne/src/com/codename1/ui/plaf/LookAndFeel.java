@@ -526,7 +526,8 @@ public abstract class LookAndFeel {
         y += marginTop;
         height -= (marginTop + scrollThumbStyle.getMarginBottom());
 
-        int offset, blockSize;
+        int offset;
+        int blockSize;
 
         if (isVertical) {
             blockSize = (int) (c.getHeight() * blockSizeRatio) + 2;

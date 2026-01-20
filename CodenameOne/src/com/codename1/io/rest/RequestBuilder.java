@@ -69,7 +69,8 @@ public class RequestBuilder {
 
     private Map<String, String> pathParams = new HashMap();
 
-    private Integer timeout, readTimeout;
+    private Integer timeout;
+    private Integer readTimeout;
 
     private Boolean cookiesEnabled;
 

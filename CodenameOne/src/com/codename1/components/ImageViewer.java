@@ -85,10 +85,14 @@ public class ImageViewer extends Component {
     private float zoom = 1;
     private float currentZoom = 1;
     private Image image;
-    private int imageX, imageY, imageDrawWidth, imageDrawHeight;
+    private int imageX;
+    private int imageY;
+    private int imageDrawWidth;
+    private int imageDrawHeight;
     private float panPositionX = 0.5f;
     private float panPositionY = 0.5f;
-    private int pressX, pressY;
+    private int pressX;
+    private int pressY;
     private ListModel<Image> swipeableImages;
     private DataChangedListener listListener;
     private Image swipePlaceholder;
@@ -103,7 +107,10 @@ public class ImageViewer extends Component {
      */
     private boolean allowScaleDown;
     // return values from image aspect calc
-    private int prefX, prefY, prefW, prefH;
+    private int prefX;
+    private int prefY;
+    private int prefW;
+    private int prefH;
     private boolean eagerLock = true;
     private boolean selectLock;
     private boolean cycleLeft = true;
@@ -1061,7 +1068,10 @@ public class ImageViewer extends Component {
          * position to width.  Positive values move inward toward image center
          * Negative values move box out.
          */
-        private double top, left, right, bottom;
+        private double top;
+        private double left;
+        private double right;
+        private double bottom;
 
         CropBox() {
 

@@ -1918,8 +1918,10 @@ public class Dialog extends Form {
             h = h - menuHeight - title.getPreferredH();// - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
             int topBottom = Math.max(0, (h - prefHeight) / 2);
             int leftRight = Math.max(0, (w - prefWidth) / 2);
-            int top = topBottom, bottom = topBottom;
-            int left = leftRight, right = leftRight;
+            int top = topBottom;
+            int bottom = topBottom;
+            int left = leftRight;
+            int right = leftRight;
 
             if (BorderLayout.EAST.equals(position)) {
                 left = Math.max(0, w - prefWidth);

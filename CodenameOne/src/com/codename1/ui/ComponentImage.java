@@ -36,7 +36,8 @@ public class ComponentImage extends Image {
     private int w;
     private int h;
     private boolean pulsingAnimation;
-    private double minPulsingAlpha = 0.2, maxPulsingAlpha = 1.0;
+    private double minPulsingAlpha = 0.2;
+    private double maxPulsingAlpha = 1.0;
     private double pulsingStepSize = 1;
     private double pulsingCurrStep = 0;
     private boolean animation;

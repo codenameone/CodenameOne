@@ -67,7 +67,8 @@ public final class Graphics {
     private Font current = Font.getDefaultFont();
     private Object nativeGraphics;
     private Object[] nativeGraphicsState;
-    private float scaleX = 1, scaleY = 1;
+    private float scaleX = 1;
+    private float scaleY = 1;
 
     /**
      * Constructing new graphics with a given javax.microedition.lcdui.Graphics
@@ -1326,7 +1327,8 @@ public final class Graphics {
         if (nativeGraphicsState != null) {
             throw new IllegalStateException("beginNativeGraphicsAccess invoked twice in a row");
         }
-        Boolean a = Boolean.FALSE, b = Boolean.FALSE;
+        Boolean a = Boolean.FALSE;
+        Boolean b = Boolean.FALSE;
         if (isAntiAliasedText()) {
             b = Boolean.TRUE;
         }

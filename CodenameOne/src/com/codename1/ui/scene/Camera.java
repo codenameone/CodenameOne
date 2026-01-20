@@ -32,7 +32,8 @@ import com.codename1.ui.Transform;
  * @deprecated For internal use only.
  */
 public class Camera {
-    public final Property<Double, Camera> farClip, nearClip;
+    public final Property<Double, Camera> farClip;
+    public final Property<Double, Camera> nearClip;
 
 
     public Camera(double zNear, double zFar) {

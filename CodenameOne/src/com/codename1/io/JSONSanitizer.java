@@ -209,7 +209,12 @@ final class JSONSanitizer {
         // to convert the number to its canonical JS string form.
 
         // Figure out where the parts of the number start and end.
-        int intStart, intEnd, fractionStart, fractionEnd, expStart, expEnd;
+        int intStart;
+        int intEnd;
+        int fractionStart;
+        int fractionEnd;
+        int expStart;
+        int expEnd;
         intStart = sanStart + (sanitizedJson.charAt(sanStart) == '-' ? 1 : 0);
         for (intEnd = intStart; intEnd < sanEnd; ++intEnd) {
             char ch = sanitizedJson.charAt(intEnd);

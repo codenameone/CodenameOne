@@ -1153,7 +1153,10 @@ public final class GeneralPath implements Shape {
      * @param out 4-element float[] array.
      */
     public void getBounds2D(float[] out) {
-        float rx1, ry1, rx2, ry2;
+        float rx1;
+        float ry1;
+        float rx2;
+        float ry2;
         if (pointSize == 0) {
             rx1 = ry1 = rx2 = ry2 = 0.0f;
         } else {
@@ -1214,7 +1217,10 @@ public final class GeneralPath implements Shape {
         // This this method is used inside the Graphics clipping functionality
         // we need to make sure it's fast.
 
-        float rx1, ry1, rx2, ry2;
+        float rx1;
+        float ry1;
+        float rx2;
+        float ry2;
         if (pointSize == 0) {
             rx1 = ry1 = rx2 = ry2 = 0.0f;
         } else {
@@ -2549,7 +2555,10 @@ public final class GeneralPath implements Shape {
          */
         public static int crossPath(PathIterator p, double x, double y) {
             int cross = 0;
-            double mx, my, cx, cy;
+            double mx;
+            double my;
+            double cx;
+            double cy;
             mx = my = cx = cy = 0.0;
             double[] coords = new double[6];
 
@@ -2720,7 +2729,8 @@ public final class GeneralPath implements Shape {
                 }
 
                 // Build bound
-                double bx1, bx2;
+                double bx1;
+                double bx2;
                 if (x1 < x2) {
                     bx1 = x1 < rx1 ? rx1 : x1;
                     bx2 = x2 < rx2 ? x2 : rx2;
@@ -2916,7 +2926,10 @@ public final class GeneralPath implements Shape {
 
             int cross = 0;
             int count;
-            double mx, my, cx, cy;
+            double mx;
+            double my;
+            double cx;
+            double cy;
             mx = my = cx = cy = 0.0;
             double[] coords = new double[6];
 
@@ -2999,8 +3012,14 @@ public final class GeneralPath implements Shape {
          */
         public static class QuadCurve {
 
-            double ax, ay, bx, by;
-            double axCoeff, ayCoeff, bxCoeff, byCoeff;
+            double ax;
+            double ay;
+            double bx;
+            double by;
+            double axCoeff;
+            double ayCoeff;
+            double bxCoeff;
+            double byCoeff;
 
             public QuadCurve(double x1, double y1, double cx, double cy, double x2, double y2) {
                 ax = x2 - x1;
@@ -3097,9 +3116,20 @@ public final class GeneralPath implements Shape {
          */
         public static class CubicCurve {
 
-            double ax, ay, bx, by, cx, cy;
-            double axCoeff, ayCoeff, bxCoeff, byCoeff, cxCoeff, cyCoeff;
-            double axCoeff3, bxCoeff2;
+            double ax;
+            double ay;
+            double bx;
+            double by;
+            double cx;
+            double cy;
+            double axCoeff;
+            double ayCoeff;
+            double bxCoeff;
+            double byCoeff;
+            double cxCoeff;
+            double cyCoeff;
+            double axCoeff3;
+            double bxCoeff2;
 
             public CubicCurve(double x1, double y1, double cx1, double cy1, double cx2, double cy2, double x2, double y2) {
                 ax = x2 - x1;
@@ -3207,7 +3237,8 @@ public final class GeneralPath implements Shape {
 
     private static class Pt {
 
-        double x, y;
+        double x;
+        double y;
 
         void clone(Pt target) {
             target.x = x;

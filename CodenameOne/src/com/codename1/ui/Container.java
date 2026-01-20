@@ -4168,8 +4168,14 @@ public class Container extends Component implements Iterable<Component> {
      */
 
     private static class TmpInsets {
-        float top, left, bottom, right;
-        byte topUnit, leftUnit, bottomUnit, rightUnit;
+        float top;
+        float left;
+        float bottom;
+        float right;
+        byte topUnit;
+        byte leftUnit;
+        byte bottomUnit;
+        byte rightUnit;
 
         @Override
         public String toString() {

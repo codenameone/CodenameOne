@@ -65,8 +65,12 @@ public class Transform {
     private int type = TYPE_UNKNOWN;
     private Transform inverse;
     private boolean inverseDirty = true;
-    private float translateX = 0, translateY = 0, translateZ = 0;
-    private float scaleX = 1f, scaleY = 1f, scaleZ = 1f;
+    private float translateX = 0;
+    private float translateY = 0;
+    private float translateZ = 0;
+    private float scaleX = 1f;
+    private float scaleY = 1f;
+    private float scaleZ = 1f;
     private boolean dirty = true;
     private CodenameOneImplementation impl = null;
     /**

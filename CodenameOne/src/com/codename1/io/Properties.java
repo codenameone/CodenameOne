@@ -53,8 +53,12 @@ import java.util.Set;
  */
 public class Properties extends HashMap<String, String> {
 
-    private static final int NONE = 0, SLASH = 1, UNICODE = 2, CONTINUE = 3,
-            KEY_DONE = 4, IGNORE = 5;
+    private static final int NONE = 0;
+    private static final int SLASH = 1;
+    private static final int UNICODE = 2;
+    private static final int CONTINUE = 3;
+    private static final int KEY_DONE = 4;
+    private static final int IGNORE = 5;
     /**
      * The default values for keys not found in this {@code Properties}
      * instance.
@@ -201,10 +205,14 @@ public class Properties extends HashMap<String, String> {
         if (in == null) {
             throw new NullPointerException("in == null");
         }
-        int mode = NONE, unicode = 0, count = 0;
+        int mode = NONE;
+        int unicode = 0;
+        int count = 0;
         char nextChar;
         char[] buf = new char[40];
-        int offset = 0, keyLength = -1, intVal;
+        int offset = 0;
+        int keyLength = -1;
+        int intVal;
         boolean firstChar = true;
 
         Reader br = in;

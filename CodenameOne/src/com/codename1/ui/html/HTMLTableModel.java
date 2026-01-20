@@ -59,7 +59,8 @@ class HTMLTableModel implements TableModel {
     int curSegmentType = SEGMENT_TBODY;
     int rowInsretionPos = -1;
     int bodyInsertionPos = 0;
-    boolean hasTHead, hasTFoot;
+    boolean hasTHead;
+    boolean hasTFoot;
 
     /**
      * Adds the given component as a cell to the end of the current row of the table

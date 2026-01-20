@@ -1476,7 +1476,8 @@ public final class ConstraintParser {
      * @since 6.7.2 Changed so more than one space in a row works as one space.
      */
     private static String[] toTrimmedTokens(String s, char sep) {
-        int toks = 0, sSize = s.length();
+        int toks = 0;
+        int sSize = s.length();
         boolean disregardDoubles = sep == ' ';
 
         // Count the sep:s
@@ -1507,7 +1508,8 @@ public final class ConstraintParser {
 
         String[] retArr = new String[toks + 1];
 
-        int st = 0, pNr = 0;
+        int st = 0;
+        int pNr = 0;
         p = 0;
         for (int i = 0; i < sSize; i++) {
 
@@ -1549,7 +1551,8 @@ public final class ConstraintParser {
         }
 
         ArrayList<String> retList = new ArrayList<String>(Math.max(s.length() >> 2 + 1, 3)); // Approx return length.
-        int s0 = 0, s1 = 0; // '[' and ']' count.
+        int s0 = 0; // '[' count.
+        int s1 = 0; // ']' count.
         int st = 0; // Start of "next token to add".
         for (int i = 0, iSz = s.length(); i < iSz; i++) {
             char c = s.charAt(i);

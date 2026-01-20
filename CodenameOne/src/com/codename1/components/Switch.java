@@ -162,8 +162,10 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private Image trackDisabledImage;
     private boolean dragged;
     private long dragStartTime;
-    private int pressX, pressY;
-    private int deltaX, deltaY; //pressX - currentdragX
+    private int pressX;
+    private int pressY;
+    private int deltaX; //pressX - currentdragX
+    private int deltaY;
     private final ActionListener pointerPressed = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {

@@ -381,7 +381,8 @@ public final class Display extends CN1Constants {
     private boolean pointerPressedAndNotReleasedOrDragged;
     private boolean recursivePointerReleaseA;
     private boolean recursivePointerReleaseB;
-    private int pointerX, pointerY;
+    private int pointerX;
+    private int pointerY;
     private boolean keyRepeatCharged;
     private boolean longPressCharged;
     private long longKeyPressTime;

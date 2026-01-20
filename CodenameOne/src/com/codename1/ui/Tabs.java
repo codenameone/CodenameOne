@@ -103,7 +103,8 @@ public class Tabs extends Container {
     private boolean changeTabOnFocus;
     private boolean changeTabContainerStyleOnFocus;
     private int tabsGap = 0;
-    private Style originalTabsContainerUnselected, originalTabsContainerSelected;
+    private Style originalTabsContainerUnselected;
+    private Style originalTabsContainerSelected;
     private String tabUIID = "Tab";
     private boolean animateTabSelection = true;
     // A flag that is used internally to temporarily override the output of the

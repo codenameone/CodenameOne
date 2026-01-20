@@ -113,7 +113,10 @@ public class ColorUtil {
         public final static IColor Magenta = new IColor(255, 0, 255);
         public final static IColor Cyan = new IColor(0, 255, 255);
         public final static IColor Blue = new IColor(0, 0, 255);
-        public final int alpha, red, green, blue;
+        public final int alpha;
+        public final int red;
+        public final int green;
+        public final int blue;
         public final int argb;
 
         public IColor(int argb) {

@@ -904,6 +904,7 @@ def main() -> None:
             "LiteralsFirstInComparisons",
             "LocalVariableNamingConventions",
             "MethodNamingConventions",
+            "OneDeclarationPerLine",
             "MissingOverride",
             "ControlStatementBraces"
         }

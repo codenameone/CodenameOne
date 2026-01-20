@@ -1715,7 +1715,10 @@ public class CSSBorder extends Border {
     }
 
     private static class BoxShadow {
-        ScalarUnit hOffset, vOffset, blurRadius, spread;
+        ScalarUnit hOffset;
+        ScalarUnit vOffset;
+        ScalarUnit blurRadius;
+        ScalarUnit spread;
         boolean inset;
         Color color;
 
@@ -2130,7 +2133,9 @@ public class CSSBorder extends Border {
     private static class BackgroundImage {
         LinearGradient linearGradient;
         RadialGradient radialGradient;
-        byte verticalPositionType, horizontalPositionType, verticalSizeType;
+        byte verticalPositionType;
+        byte horizontalPositionType;
+        byte verticalSizeType;
         ScalarUnit verticalPosition;
         ScalarUnit horizontalPosition;
         ScalarUnit verticalSize;

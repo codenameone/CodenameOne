@@ -101,30 +101,37 @@ public final class Grid {
     /**
      * The size of the grid. Row count and column count.
      */
-    private final TreeSet<Integer> rowIndexes = new TreeSet<Integer>(), colIndexes = new TreeSet<Integer>();
+    private final TreeSet<Integer> rowIndexes = new TreeSet<Integer>();
+    private final TreeSet<Integer> colIndexes = new TreeSet<Integer>();
     /**
      * The row and column specifications.
      */
-    private final AC rowConstr, colConstr;
+    private final AC rowConstr;
+    private final AC colConstr;
     /**
      * Components that are connections in one dimension (such as baseline
      * alignment for instance) are grouped together and stored here. One for
      * each row/column.
      */
-    private final ArrayList<LinkedDimGroup>[] colGroupLists, rowGroupLists;   //[(start)row/col number]
-    private final int dockOffY, dockOffX;
-    private final Float[] pushXs, pushYs;
+    private final ArrayList<LinkedDimGroup>[] colGroupLists;   //[(start)row/col number]
+    private final ArrayList<LinkedDimGroup>[] rowGroupLists;
+    private final int dockOffY;
+    private final int dockOffX;
+    private final Float[] pushXs;
+    private final Float[] pushYs;
     private final ArrayList<LayoutCallback> callbackList;
     private HashMap<Integer, BoundSize> wrapGapMap = null;   // Row or Column index depending in the dimension that "wraps". Normally row indexes but may be column indexes if "flowy". 0 means before first row/col.
     /**
      * The in the constructor calculated min/pref/max sizes of the rows and
      * columns.
      */
-    private FlowSizeSpec colFlowSpecs = null, rowFlowSpecs = null;
+    private FlowSizeSpec colFlowSpecs = null;
+    private FlowSizeSpec rowFlowSpecs = null;
     /**
      * The in the constructor calculated min/pref/max size of the whole grid.
      */
-    private int[] width = null, height = null;
+    private int[] width = null;
+    private int[] height = null;
     /**
      * If debug is on contains the bounds for things to paint when calling
      * {@link ContainerWrapper#paintDebugCell(int, int, int, int)}
@@ -139,7 +146,8 @@ public final class Grid {
      * The boolean is true for groups id:s and null for normal id:s.
      */
     private HashMap<String, Boolean> linkTargetIDs = null;
-    private int lastRefWidth = 0, lastRefHeight = 0;
+    private int lastRefWidth = 0;
+    private int lastRefHeight = 0;
 
     /**
      * Constructor.
@@ -172,14 +180,16 @@ public final class Grid {
         final ComponentWrapper[] comps = container.getComponents();
 
         boolean hasTagged = false;  // So we do not have to sort if it will not do any good
-        boolean hasPushX = false, hasPushY = false;
+        boolean hasPushX = false;
+        boolean hasPushY = false;
         boolean hitEndOfRow = false;
         final int[] cellXY = new int[2];
         final ArrayList<int[]> spannedRects = new ArrayList<int[]>(2);
 
         final DimConstraint[] specs = (lc.isFlowX() ? rowConstr : colConstr).getConstaints();
 
-        int sizeGroupsX = 0, sizeGroupsY = 0;
+        int sizeGroupsX = 0;
+        int sizeGroupsY = 0;
         int[] dockInsets = null;    // top, left, bottom, right insets for docks.
 
         LinkHandler.clearTemporaryBounds(container.getLayout());
@@ -1176,7 +1186,8 @@ public final class Grid {
         layoutInOneDim(bounds[2], alignX, false, pushXs);
         layoutInOneDim(bounds[3], alignY, true, pushYs);
 
-        HashMap<String, Integer> endGrpXMap = null, endGrpYMap = null;
+        HashMap<String, Integer> endGrpXMap = null;
+        HashMap<String, Integer> endGrpYMap = null;
         int compCount = container.getComponentCount();
 
         // Transfer the calculated bound from the ComponentWrappers to the actual Components.
@@ -2100,7 +2111,10 @@ public final class Grid {
      * @param cw         The compwrap to put in a cell and add.
      */
     private void addDockingCell(int[] dockInsets, int side, CompWrap cw) {
-        int r, c, spanx = 1, spany = 1;
+        int r;
+        int c;
+        int spanx = 1;
+        int spany = 1;
         switch (side) {
             case 0:
             case 2:
@@ -2134,7 +2148,8 @@ public final class Grid {
      */
     private static class Cell {
 
-        private final int spanx, spany;
+        private final int spanx;
+        private final int spany;
         private final boolean flowx;
         private final ArrayList<CompWrap> compWraps = new ArrayList<CompWrap>(2);
 
@@ -2171,11 +2186,13 @@ public final class Grid {
         private final String linkCtx;
         private final int span;
         private final int linkType;
-        private final boolean isHor, fromEnd;
+        private final boolean isHor;
+        private final boolean fromEnd;
 
         private final ArrayList<CompWrap> _compWraps = new ArrayList<CompWrap>(4);
 
-        private int lStart = 0, lSize = 0;  // Currently mostly for debug painting
+        private int lStart = 0;  // Currently mostly for debug painting
+        private int lSize = 0;
 
         private LinkedDimGroup(String linkCtx, int span, int linkType, boolean isHor, boolean fromEnd) {
             this.linkCtx = linkCtx;
@@ -2311,7 +2328,10 @@ public final class Grid {
     private static class WeakCell {
 
         private final Object componentRef;
-        private final int x, y, spanX, spanY;
+        private final int x;
+        private final int y;
+        private final int spanX;
+        private final int spanY;
 
         private WeakCell(Object component, int x, int y, int spanX, int spanY) {
             this.componentRef = Display.getInstance().createSoftWeakRef(component);
@@ -2341,7 +2361,10 @@ public final class Grid {
         private final boolean isAbsolute;
         private boolean sizesOk = false;
         private int[][] gaps; // [top,left(actually before),bottom,right(actually after)][min,pref,max]
-        private int x = LayoutUtil.NOT_SET, y = LayoutUtil.NOT_SET, w = LayoutUtil.NOT_SET, h = LayoutUtil.NOT_SET;
+        private int x = LayoutUtil.NOT_SET;
+        private int y = LayoutUtil.NOT_SET;
+        private int w = LayoutUtil.NOT_SET;
+        private int h = LayoutUtil.NOT_SET;
 
         private int forcedPushGaps = 0;   // 1 == before, 2 = after. Bitwise.
 

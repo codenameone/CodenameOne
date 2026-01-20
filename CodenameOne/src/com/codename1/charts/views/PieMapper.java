@@ -32,7 +32,8 @@ public class PieMapper {
 
     private int mPieChartRadius;
 
-    private int mCenterX, mCenterY;
+    private int mCenterX;
+    private int mCenterY;
 
     /**
      * Set PieChart location on screen.

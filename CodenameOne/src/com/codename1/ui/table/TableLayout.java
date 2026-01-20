@@ -441,7 +441,10 @@ public class TableLayout extends Layout {
             for (int r = 0; r < rlen; r++) {
                 for (int c = 0; c < clen; c++) {
                     Constraint con = tablePositions[r * columns + c];
-                    int conX, conY, conW, conH;
+                    int conX;
+                    int conY;
+                    int conW;
+                    int conH;
                     if (con != null && con != H_SPAN_CONSTRAINT && con != V_SPAN_CONSTRAINT && con != VH_SPAN_CONSTRAINT) {
                         Style componentStyle = con.parent.getStyle();
                         int leftMargin = componentStyle.getMarginLeft(parent.isRTL());

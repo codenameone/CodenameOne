@@ -31,7 +31,12 @@ import com.codename1.ui.Transform;
  * @since 7.0
  */
 public class AffineTransform {
-    private double m00, m10, m01, m11, m02, m12;
+    private double m00;
+    private double m10;
+    private double m01;
+    private double m11;
+    private double m02;
+    private double m12;
 
     /**
      * Creates identity transform.
@@ -225,7 +230,8 @@ public class AffineTransform {
      * @param vecy y-coordinate of rotation vector.
      */
     public void setToRotation(double vecx, double vecy) {
-        double sin, cos;
+        double sin;
+        double cos;
         if (vecy == 0) {
             sin = 0.0;
             if (vecx < 0.0) {

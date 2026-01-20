@@ -29,7 +29,9 @@ package com.codename1.ui.scene;
  * @deprecated For internal use only
  */
 public class Point3D {
-    private double x, y, z;
+    private double x;
+    private double y;
+    private double z;
 
     /**
      * Creates a new point.

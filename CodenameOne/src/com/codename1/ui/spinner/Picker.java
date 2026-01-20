@@ -94,7 +94,8 @@ public class Picker extends Button {
     private int minuteStep = 5;
     private int minHour = -1;
     private int maxHour = -1;
-    private Date startDate, endDate;
+    private Date startDate;
+    private Date endDate;
     private VirtualInputDevice currentInput;
 
     // Variables to store the form's previous margins before showing
