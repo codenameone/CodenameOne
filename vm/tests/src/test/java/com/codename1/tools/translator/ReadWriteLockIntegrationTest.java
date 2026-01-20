@@ -114,7 +114,7 @@ class ReadWriteLockIntegrationTest {
                 "    }\n" +
                 "    \n" +
                 "    private static void testBasicReadLock() {\n" +
-                "        ReadWriteLock rw = new ReentrantReadWriteLock();\n" +
+                "        ReentrantReadWriteLock rw = new ReentrantReadWriteLock();\n" +
                 "        rw.readLock().lock();\n" +
                 "        try {\n" +
                 "             report(\"TEST: Basic Read Lock OK\");\n" +
@@ -124,7 +124,7 @@ class ReadWriteLockIntegrationTest {
                 "    }\n" +
                 "    \n" +
                 "    private static void testWriteLockExclusion() {\n" +
-                "        final ReadWriteLock rw = new ReentrantReadWriteLock();\n" +
+                "        final ReentrantReadWriteLock rw = new ReentrantReadWriteLock();\n" +
                 "        rw.writeLock().lock();\n" +
                 "        \n" +
                 "        final boolean[] success = new boolean[1];\n" +

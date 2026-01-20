@@ -121,7 +121,7 @@ class LockIntegrationTest {
                 "    }\n" +
                 "    \n" +
                 "    private static void testBasicLock() {\n" +
-                "        Lock lock = new ReentrantLock();\n" +
+                "        ReentrantLock lock = new ReentrantLock();\n" +
                 "        lock.lock();\n" +
                 "        try {\n" +
                 "             report(\"TEST: Basic Lock OK\");\n" +
@@ -148,7 +148,7 @@ class LockIntegrationTest {
                 "    }\n" +
                 "    \n" +
                 "    private static void testTryLock() {\n" +
-                "        Lock lock = new ReentrantLock();\n" +
+                "        ReentrantLock lock = new ReentrantLock();\n" +
                 "        if (lock.tryLock()) {\n" +
                 "            try {\n" +
                 "                report(\"TEST: TryLock OK\");\n" +
@@ -161,7 +161,7 @@ class LockIntegrationTest {
                 "    }\n" +
                 "    \n" +
                 "    private static void testCondition() {\n" +
-                "        final Lock lock = new ReentrantLock();\n" +
+                "        final ReentrantLock lock = new ReentrantLock();\n" +
                 "        final Condition cond = lock.newCondition();\n" +
                 "        final boolean[] signalled = new boolean[1];\n" +
                 "        \n" +
