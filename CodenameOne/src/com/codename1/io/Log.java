@@ -456,14 +456,9 @@ public class Log {
         t.printStackTrace();
         try {
             synchronized (this) {
-                Writer w = null;
-                try {
-                    w = getWriter();
-                    Util.getImplementation().printStackTraceToStream(t, w);
-                    w.flush();
-                } finally {
-                    Util.cleanup(w);
-                }
+                Writer w = getWriter(); //NOPMD CloseResource - shared writer managed by Log
+                Util.getImplementation().printStackTraceToStream(t, w);
+                w.flush();
             }
         } catch (IOException err) {
             err.printStackTrace();
@@ -508,14 +503,9 @@ public class Log {
         }
         try {
             synchronized (this) {
-                Writer w = null;
-                try {
-                    w = getWriter();
-                    w.write(text + "\n");
-                    w.flush();
-                } finally {
-                    Util.cleanup(w);
-                }
+                Writer w = getWriter(); //NOPMD CloseResource - shared writer managed by Log
+                w.write(text + "\n");
+                w.flush();
             }
         } catch (Throwable err) {
             err.printStackTrace();

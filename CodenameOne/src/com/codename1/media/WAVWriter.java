@@ -127,10 +127,10 @@ public class WAVWriter implements AutoCloseable {
     @Override
     public void close() throws Exception {
         final FileSystemStorage fs = FileSystemStorage.getInstance();
+        Util.cleanup(this.out);
         fs.rename(this.outputFile.getAbsolutePath(), new File(this.getPCMFile()).getName());
         InputStream in = null;
         try {
-            Util.cleanup(this.out);
             this.out = fs.openOutputStream(this.outputFile.getAbsolutePath());
             in = fs.openInputStream(this.getPCMFile());
             this.writeHeader();
