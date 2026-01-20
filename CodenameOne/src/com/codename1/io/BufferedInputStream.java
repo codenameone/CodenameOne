@@ -650,7 +650,7 @@ public class BufferedInputStream extends InputStream {
         byte[] buffer = buf;
         if (buffer != null) {
             buf = null;
-            InputStream input = in;
+            InputStream input = in; //NOPMD CloseResource
             in = null;
             if (input != null) {
                 Util.cleanup(input);

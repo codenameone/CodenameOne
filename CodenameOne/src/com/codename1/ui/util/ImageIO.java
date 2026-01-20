@@ -113,7 +113,7 @@ public abstract class ImageIO {
      *                      this isn't implemented in all platforms.
      */
     public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException {
-        InputStream in = null;
+        InputStream in = null; //NOPMD CloseResource
         try {
             in = FileSystemStorage.getInstance().openInputStream(imageFilePath);
             save(in, response, format, width, height, quality);
@@ -182,7 +182,7 @@ public abstract class ImageIO {
                 height = heightBasedOnWidth;
             }
         }
-        OutputStream im = null;
+        OutputStream im = null; //NOPMD CloseResource
         try {
             im = FileSystemStorage.getInstance().openOutputStream(preferredOutputPath);
             save(imageFilePath, im, format, width, height, quality);

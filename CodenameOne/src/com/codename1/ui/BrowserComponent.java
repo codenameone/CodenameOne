@@ -269,7 +269,7 @@ public class BrowserComponent extends Container {
                     } catch (NumberFormatException e) {
                         throw new IllegalArgumentException(
                                 "URLDecoder: Illegal hex characters in escape (%) pattern - "
-                                        + e.getMessage());
+                                        + e.getMessage(), e);
                     }
                     needToChange = true;
                     break;

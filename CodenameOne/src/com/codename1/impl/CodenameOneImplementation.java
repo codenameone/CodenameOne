@@ -4171,7 +4171,7 @@ public abstract class CodenameOneImplementation {
             if (!uri.startsWith("/")) {
                 uri = "/" + uri;
             }
-            InputStream is = getResourceAsStream(this.getClass(), uri);
+            InputStream is = getResourceAsStream(this.getClass(), uri); //NOPMD CloseResource
             String mime = "";
             if (uri.endsWith(".mp3")) {
                 mime = "audio/mp3";
@@ -4572,7 +4572,7 @@ public abstract class CodenameOneImplementation {
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         // load from jar:// URL's
         try {
-            InputStream i = Display.getInstance().getResourceAsStream(getClass(), url.substring(6));
+            InputStream i = Display.getInstance().getResourceAsStream(getClass(), url.substring(6)); //NOPMD CloseResource
             if (i == null) {
                 System.out.println("Local resource not found: " + url);
                 return;
@@ -4965,7 +4965,7 @@ public abstract class CodenameOneImplementation {
 
         String protocol = "";
         int pos = -1;
-        if ((pos = url.indexOf(":")) >= 0) {
+        if ((pos = url.indexOf(":")) >= 0) { //NOPMD AssignmentInOperand
             protocol = url.substring(0, pos);
         }
         boolean isHttp = ("http".equals(protocol) || "https".equals(protocol));
@@ -5384,7 +5384,7 @@ public abstract class CodenameOneImplementation {
      */
     public int getStorageEntrySize(String name) {
         long size = -1;
-        InputStream i = null;
+        InputStream i = null; //NOPMD CloseResource
         try {
             i = createStorageInputStream(name);
             long val = i.skip(1000000);
@@ -6022,7 +6022,7 @@ public abstract class CodenameOneImplementation {
      * Android to support the title bar icon
      */
     public Image getApplicationIconImage() {
-        InputStream i = getResourceAsStream(getClass(), "/icon.png");
+        InputStream i = getResourceAsStream(getClass(), "/icon.png"); //NOPMD CloseResource
         if (i != null) {
             try {
                 return EncodedImage.create(i);
@@ -7766,7 +7766,7 @@ public abstract class CodenameOneImplementation {
             FileSystemStorage fs = FileSystemStorage.getInstance();
             String tardir = fs.getAppHomePath() + "cn1html/";
             fs.mkdir(tardir);
-            TarInputStream is = new TarInputStream(Display.getInstance().getResourceAsStream(getClass(), "/html.tar"));
+            TarInputStream is = new TarInputStream(Display.getInstance().getResourceAsStream(getClass(), "/html.tar")); //NOPMD CloseResource
             try {
                 TarEntry t = is.getNextEntry();
                 byte[] data = new byte[8192];
@@ -7781,7 +7781,7 @@ public abstract class CodenameOneImplementation {
                             mkdirs(fs, dir);
                         }
 
-                        OutputStream os = null;
+                        OutputStream os = null; //NOPMD CloseResource
                         try {
                             os = fs.openOutputStream(tardir + name);
                             int count;

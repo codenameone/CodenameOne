@@ -161,7 +161,7 @@ public class Capture {
             }
             ImageIO scale = Display.getInstance().getImageIO();
             if (scale != null) {
-                OutputStream os = null;
+                OutputStream os = null; //NOPMD CloseResource
                 try {
                     String path = c.url.substring(0, c.url.indexOf(".")) + "s" + c.url.substring(c.url.indexOf("."));
                     os = FileSystemStorage.getInstance().openOutputStream(path);
@@ -285,7 +285,7 @@ public class Capture {
             if (targetWidth > 0 || targetHeight > 0) {
                 ImageIO scale = Display.getInstance().getImageIO();
                 if (scale != null) {
-                    OutputStream os = null;
+                    OutputStream os = null; //NOPMD CloseResource
                     try {
 
                         String path = url.substring(0, url.lastIndexOf(".")) + "s" + url.substring(url.lastIndexOf("."));

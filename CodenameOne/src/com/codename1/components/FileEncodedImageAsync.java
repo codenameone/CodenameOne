@@ -131,7 +131,7 @@ public final class FileEncodedImageAsync extends EncodedImage {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
                 @Override
                 public void run() {
-                    InputStream i = null;
+                    InputStream i = null; //NOPMD CloseResource
                     try {
                         if (!FileSystemStorage.getInstance().exists(fileName)) {
                             Log.p(fileName + " doesn't exist");

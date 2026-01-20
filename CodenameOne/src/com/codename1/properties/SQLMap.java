@@ -574,7 +574,7 @@ public final class SQLMap {
             if (t instanceof IOException) {
                 throw ((IOException) t);
             } else {
-                throw new IOException(t.toString(), t);
+                throw new IOException(t.toString(), t); //NOPMD PreserveStackTrace
             }
         }
     }

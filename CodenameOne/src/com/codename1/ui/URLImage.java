@@ -350,8 +350,8 @@ public final class URLImage extends EncodedImage {
             @Override
             public void run() {
                 try {
-                    InputStream input = null;
-                    OutputStream output = null;
+                    InputStream input = null; //NOPMD CloseResource
+                    OutputStream output = null; //NOPMD CloseResource
                     try {
                         if (url.startsWith("file:/")) {
                             input = FileSystemStorage.getInstance().openInputStream(url);
@@ -373,7 +373,7 @@ public final class URLImage extends EncodedImage {
                     runAndWait(new Runnable() {
                         @Override
                         public void run() {
-                            InputStream imageInput = null;
+                            InputStream imageInput = null; //NOPMD CloseResource
                             try {
                                 Image value = url.startsWith("image:") ? Resources.getGlobalResources().getImage(url) :
                                         Image.createImage(imageInput = useFileSystemStorage ? FileSystemStorage.getInstance().openInputStream(targetKey) : Storage.getInstance().createInputStream(targetKey));
@@ -420,7 +420,7 @@ public final class URLImage extends EncodedImage {
                 if (Storage.getInstance().exists(storageFile)) {
                     super.unlock();
                     imageData = new byte[Storage.getInstance().entrySize(storageFile)];
-                    InputStream is = null;
+                    InputStream is = null; //NOPMD CloseResource
                     try {
                         is = Storage.getInstance().createInputStream(storageFile);
                         Util.readFully(is, imageData);
@@ -494,7 +494,7 @@ public final class URLImage extends EncodedImage {
                 if (FileSystemStorage.getInstance().exists(fileSystemFile)) {
                     super.unlock();
                     imageData = new byte[(int) FileSystemStorage.getInstance().getLength(fileSystemFile)];
-                    InputStream is = null;
+                    InputStream is = null; //NOPMD CloseResource
                     try {
                         is = FileSystemStorage.getInstance().openInputStream(fileSystemFile);
                         Util.readFully(is, imageData);
@@ -827,7 +827,7 @@ public final class URLImage extends EncodedImage {
                     EncodedImage img;
                     if (sourceImage == null) {
                         byte[] d;
-                        InputStream is;
+                        InputStream is; //NOPMD CloseResource
                         if (storageFile != null) {
                             d = new byte[Storage.getInstance().entrySize(storageFile + IMAGE_SUFFIX)];
                             is = Storage.getInstance().createInputStream(storageFile + IMAGE_SUFFIX);
@@ -865,7 +865,7 @@ public final class URLImage extends EncodedImage {
                         }
                     }
                     if (storageFile != null) {
-                        OutputStream o = null;
+                        OutputStream o = null; //NOPMD CloseResource
                         try {
                             o = Storage.getInstance().createOutputStream(storageFile);
                             o.write(adapted.getImageData());
@@ -875,7 +875,7 @@ public final class URLImage extends EncodedImage {
                         Storage.getInstance().deleteStorageFile(storageFile + IMAGE_SUFFIX);
                         pendingToStorage.remove(storageFile);
                     } else if (fileSystemFile != null) {
-                        OutputStream o = null;
+                        OutputStream o = null; //NOPMD CloseResource
                         try {
                             o = FileSystemStorage.getInstance().openOutputStream(fileSystemFile);
                             o.write(adapted.getImageData());

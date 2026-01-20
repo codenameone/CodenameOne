@@ -189,7 +189,7 @@ public class FacebookShare extends ShareService {
                             final String endpoint = "https://graph.facebook.com/me/photos?access_token=" + token;
                             req.setUrl(endpoint);
                             req.addArgumentNoEncoding("message", f[0].getMessage());
-                            InputStream is = null;
+                            InputStream is = null; //NOPMD CloseResource
                             try {
                                 is = FileSystemStorage.getInstance().openInputStream(image);
                                 req.addData("source", is, FileSystemStorage.getInstance().getLength(image), mime);

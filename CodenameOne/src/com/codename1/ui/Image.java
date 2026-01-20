@@ -463,7 +463,7 @@ public class Image implements ActionSource {
         }
         img.unlock();
         if (rotatedImage != null) {
-            OutputStream out = null;
+            OutputStream out = null; //NOPMD CloseResource
             try {
                 out = fss.openOutputStream(rotatedImage);
                 ImageIO.getImageIO().save(result, out, format, 0.9f);
@@ -494,7 +494,7 @@ public class Image implements ActionSource {
      * @throws java.io.IOException
      */
     public static int getExifOrientationTag(String path) throws IOException {
-        InputStream in = null;
+        InputStream in = null; //NOPMD CloseResource
         try {
             in = FileSystemStorage.getInstance().openInputStream(path);
             return getExifOrientationTag(in);

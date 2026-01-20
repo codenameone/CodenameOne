@@ -391,11 +391,11 @@ public class UIBuilder { //implements Externalizable {
 
     Container createContainer(Resources res, String resourceName, EmbeddedContainer parentContainer) {
         onCreateRoot(resourceName);
-        InputStream source = res.getUi(resourceName);
+        InputStream source = res.getUi(resourceName); //NOPMD CloseResource
         if (source == null) {
             throw new RuntimeException("Resource doesn't exist within the current resource object: " + resourceName);
         }
-        DataInputStream in = new DataInputStream(source);
+        DataInputStream in = new DataInputStream(source); //NOPMD CloseResource
         try {
             Hashtable h = null;
             if (localComponentListeners != null) {

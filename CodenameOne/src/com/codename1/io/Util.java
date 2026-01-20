@@ -1995,7 +1995,7 @@ public class Util {
      * @throws IOException
      */
     public static String guessMimeType(String sourceFile) throws IOException {
-        InputStream inputStream = null;
+        InputStream inputStream = null; //NOPMD CloseResource
         try {
             if (sourceFile.indexOf('/') > -1) {
                 inputStream = FileSystemStorage.getInstance().openInputStream(sourceFile);
@@ -2339,7 +2339,7 @@ public class Util {
                         try {
                             // We append the just saved partial download to the fileName, if it exists
                             if (FileSystemStorage.getInstance().exists(partialDownloadPath)) {
-                                InputStream in = null;
+                                InputStream in = null; //NOPMD CloseResource
                                 try {
                                     in = FileSystemStorage.getInstance().openInputStream(partialDownloadPath);
                                     Util.copyNoClose(in, out, 8192);

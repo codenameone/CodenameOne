@@ -113,14 +113,14 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     @Override
     protected void readResponse(InputStream input) throws IOException {
         //BufferedInputStream i = new BufferedInputStream(new InputStreamReader(input, ));
-        BufferedInputStream i;
+        BufferedInputStream i; //NOPMD CloseResource
         if (input instanceof BufferedInputStream) {
             i = (BufferedInputStream) input;
         } else {
             i = new BufferedInputStream(input);
         }
         i.setYield(-1);
-        InputStreamReader reader = null;
+        InputStreamReader reader = null; //NOPMD CloseResource
         try {
             reader = new InputStreamReader(i, "UTF-8");
             JSONParser.parse(reader, this);

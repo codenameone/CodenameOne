@@ -270,7 +270,7 @@ public class Resources {
         String[] over = Display.getInstance().getPlatformOverrides();
         int olen = over.length;
         for (int iter = 0; iter < olen; iter++) {
-            InputStream i = Display.getInstance().getResourceAsStream(classLoader, resource + "_" + over[iter] + ".ovr");
+            InputStream i = Display.getInstance().getResourceAsStream(classLoader, resource + "_" + over[iter] + ".ovr"); //NOPMD CloseResource
             if (i != null) {
                 try {
                     r.override(i);
@@ -302,7 +302,7 @@ public class Resources {
                     return r;
                 }
             }
-            InputStream is = Display.getInstance().getResourceAsStream(classLoader, resource);
+            InputStream is = Display.getInstance().getResourceAsStream(classLoader, resource); //NOPMD CloseResource
             if (is == null) {
                 throw new IOException(resource + " not found");
             }

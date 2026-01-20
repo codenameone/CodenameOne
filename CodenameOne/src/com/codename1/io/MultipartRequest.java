@@ -326,7 +326,7 @@ public class MultipartRequest extends ConnectionRequest {
      */
     @Override
     protected void buildRequestBody(OutputStream os) throws IOException {
-        Writer writer = null;
+        Writer writer = null; //NOPMD CloseResource
         try {
             writer = new OutputStreamWriter(os, "UTF-8");
             Iterator entries = args.entrySet().iterator();
@@ -412,7 +412,7 @@ public class MultipartRequest extends ConnectionRequest {
                         if (canFlushStream) {
                             writer.flush();
                         }
-                        InputStream i = null;
+                        InputStream i = null; //NOPMD CloseResource
                         try {
                             if (value instanceof InputStream) {
                                 i = (InputStream) value;

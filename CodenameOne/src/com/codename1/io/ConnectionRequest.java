@@ -813,7 +813,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
             return;
         }
-        InputStream is = null;
+        InputStream is = null; //NOPMD CloseResource
         try {
             is = FileSystemStorage.getInstance().openInputStream(getCacheFileName());
             readResponse(is);
@@ -891,7 +891,7 @@ public class ConnectionRequest implements IOProgressListener {
             return true;
         }
         if (cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {
-            InputStream is = null;
+            InputStream is = null; //NOPMD CloseResource
             try {
                 is = getCachedData();
                 if (is != null) {
@@ -984,7 +984,7 @@ public class ConnectionRequest implements IOProgressListener {
                     if (shouldWriteUTFAsGetBytes()) {
                         output.write(requestBody.getBytes("UTF-8"));
                     } else {
-                        OutputStreamWriter w = null;
+                        OutputStreamWriter w = null; //NOPMD CloseResource
                         try {
                             w = new OutputStreamWriter(output, "UTF-8");
                             w.write(requestBody);
@@ -1102,7 +1102,7 @@ public class ConnectionRequest implements IOProgressListener {
                 if (!post && (cacheMode == CachingMode.SMART || cacheMode == CachingMode.OFFLINE_FIRST)
                         && destinationFile == null && destinationStorage == null) {
                     byte[] d = Util.readInputStream(input);
-                    OutputStream os = null;
+                    OutputStream os = null; //NOPMD CloseResource
                     try {
                         os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
                         os.write(d);
@@ -1590,7 +1590,7 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         if (destinationFile != null) {
-            OutputStream o = null;
+            OutputStream o = null; //NOPMD CloseResource
             try {
                 o = FileSystemStorage.getInstance().openOutputStream(destinationFile);
                 Util.copy(input, o);
@@ -1604,7 +1604,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
         } else {
             if (destinationStorage != null) {
-                OutputStream o = null;
+                OutputStream o = null; //NOPMD CloseResource
                 try {
                     o = Storage.getInstance().createOutputStream(destinationStorage);
                     Util.copy(input, o);

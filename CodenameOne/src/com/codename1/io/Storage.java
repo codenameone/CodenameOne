@@ -255,7 +255,7 @@ public class Storage {
     public boolean writeObject(String name, Object o, boolean includeLogging) {
         name = fixFileName(name);
         cache.put(name, o);
-        DataOutputStream d = null;
+        DataOutputStream d = null; //NOPMD CloseResource
         try {
             d = new DataOutputStream(createOutputStream(name));
             Util.writeObject(o, d);
@@ -305,7 +305,7 @@ public class Storage {
         if (o != null) {
             return o;
         }
-        DataInputStream d = null;
+        DataInputStream d = null; //NOPMD CloseResource
         try {
             if (!exists(name)) {
                 return null;

@@ -268,7 +268,7 @@ public class File {
      * @throws IOException
      */
     public boolean createNewFile() throws IOException {
-        OutputStream os = null;
+        OutputStream os = null; //NOPMD CloseResource
         try {
             os = FileSystemStorage.getInstance().openOutputStream(path);
         } finally {

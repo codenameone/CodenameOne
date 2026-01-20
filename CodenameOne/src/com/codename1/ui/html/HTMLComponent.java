@@ -824,8 +824,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      */
     public boolean setHTML(String htmlText, String encoding, String title, boolean isFullHTML) {
         boolean success = true;
-        InputStreamReader isr = getStream(htmlText, encoding, title, isFullHTML);
-        final InputStreamReader isReader = isr;
+        InputStreamReader isr = getStream(htmlText, encoding, title, isFullHTML); //NOPMD CloseResource
+        final InputStreamReader isReader = isr; //NOPMD CloseResource
 
         Display.getInstance().startThread(new Runnable() {
             @Override
@@ -892,7 +892,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
         if (isr == null) { //encoding wasn't specified or failed
-            isr = com.codename1.io.Util.getReader(bais);
+            isr = Util.getReader(bais); //NOPMD CloseResource
         }
         return isr;
     }
@@ -1054,7 +1054,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      */
     @Override
     public void streamReady(InputStream is, DocumentInfo docInfo) {
-        InputStreamReader isr = null;
+        InputStreamReader isr = null; //NOPMD CloseResource
         try {
             try {
                 if (is != null) {
@@ -1067,7 +1067,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 }
                 if (cont) { //retry without the encoding
                     try {
-                        isr = com.codename1.io.Util.getReader(is);
+                        isr = Util.getReader(is);
                     } catch (Exception e) {
                         htmlCallback.parsingError(HTMLCallback.ERROR_ENCODING, null, null, null, "Page loading failed, probably due to wrong encoding. " + e.getMessage());
                         isr = getStream("Page loading failed, probably due to encoding mismatch.", null);
@@ -1233,7 +1233,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             });
         } else { // Page was cancelled
             cancelled = false;
-            InputStreamReader isr = null;
+            InputStreamReader isr = null; //NOPMD CloseResource
             try {
                 isr = getStream("Page loading cancelled by user", null);
                 HTMLElement newDoc = parser.parseHTML(isr);

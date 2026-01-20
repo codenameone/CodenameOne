@@ -130,7 +130,7 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
                     }
                 }
                 if (url.startsWith("res://")) {
-                    InputStream i = null;
+                    InputStream i = null; //NOPMD CloseResource
                     Resources r;
                     try {
                         i = Display.getInstance().getResourceAsStream(getClass(), docInfo.getUrl().substring(6));

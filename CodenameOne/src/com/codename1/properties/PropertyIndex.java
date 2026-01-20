@@ -92,7 +92,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param objs a list of business objects
      */
     public static void storeJSONList(String name, List<? extends PropertyBusinessObject> objs) {
-        OutputStream os = null;
+        OutputStream os = null; //NOPMD CloseResource
         try {
             os = Storage.getInstance().createOutputStream(name);
             os.write(com.codename1.util.StringUtil.getBytes(toJSONList(objs)));
@@ -702,7 +702,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param name the name of the storage file
      */
     public void storeJSON(String name) {
-        OutputStream os = null;
+        OutputStream os = null; //NOPMD CloseResource
         try {
             os = Storage.getInstance().createOutputStream(name);
             os.write(toJSON().getBytes("UTF-8"));
@@ -721,7 +721,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @return list of property objects matching this type
      */
     public <X extends PropertyBusinessObject> List<X> loadJSONList(String name) {
-        InputStream is = null;
+        InputStream is = null; //NOPMD CloseResource
         try {
             if (Storage.getInstance().exists(name)) {
                 is = Storage.getInstance().createInputStream(name);
@@ -779,7 +779,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param jsonString the JSON String
      */
     public void fromJSON(String jsonString) {
-        StringReader r = null;
+        StringReader r = null; //NOPMD CloseResource
         try {
             r = new StringReader(jsonString);
             JSONParser jp = new JSONParser();
@@ -802,7 +802,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param name the name of the storage
      */
     public void loadJSON(String name) {
-        InputStream is = null;
+        InputStream is = null; //NOPMD CloseResource
         try {
             if (Storage.getInstance().exists(name)) {
                 is = Storage.getInstance().createInputStream(name);

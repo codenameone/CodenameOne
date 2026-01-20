@@ -333,7 +333,7 @@ public class Log {
                 if (instance.getFileURL() == null) {
                     instance.setFileURL("file:///" + FileSystemStorage.getInstance().getRoots()[0] + "/codenameOne.log");
                 }
-                Reader r = null;
+                Reader r = null; //NOPMD CloseResource
                 try {
                     r = Util.getReader(FileSystemStorage.getInstance().openInputStream(instance.getFileURL()));
                     char[] buffer = new char[1024];
@@ -476,7 +476,7 @@ public class Log {
         if (!initialized) {
             initialized = true;
             try {
-                InputStream is = null;
+                InputStream is = null; //NOPMD CloseResource
                 try {
                     is = Display.getInstance().getResourceAsStream(getClass(), "/cn1-version-numbers");
                     if (is != null) {

@@ -81,7 +81,7 @@ public final class FileEncodedImage extends EncodedImage {
         EncodedImage e = EncodedImage.create(i);
         FileEncodedImage f = new FileEncodedImage(fileName, width, height, true);
         f.data = e.getImageData();
-        OutputStream o = null;
+        OutputStream o = null; //NOPMD CloseResource
         try {
             o = FileSystemStorage.getInstance().openOutputStream(fileName);
             o.write(f.data);
@@ -114,7 +114,7 @@ public final class FileEncodedImage extends EncodedImage {
         if (data != null) {
             return data;
         }
-        InputStream i = null;
+        InputStream i = null; //NOPMD CloseResource
         try {
             byte[] imageData = new byte[(int) FileSystemStorage.getInstance().getLength(fileName)];
             i = FileSystemStorage.getInstance().openInputStream(fileName);
