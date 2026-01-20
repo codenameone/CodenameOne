@@ -357,8 +357,25 @@ class CleanTargetIntegrationTest {
                 "    exit(1);\n" +
                 "}\n" +
                 "\n" +
+                "struct clazz class__java_lang_Object = {0};\n" +
                 "struct clazz class__java_lang_Class = {0};\n" +
-                "int currentGcMarkValue = 1;\n";
+                "int currentGcMarkValue = 1;\n" +
+                "\n" +
+                "void __FINALIZER_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete) {\n" +
+                "    (void)threadStateData;\n" +
+                "    (void)objToDelete;\n" +
+                "}\n" +
+                "\n" +
+                "void __GC_MARK_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force) {\n" +
+                "    (void)threadStateData;\n" +
+                "    (void)objToMark;\n" +
+                "    (void)force;\n" +
+                "}\n" +
+                "\n" +
+                "void __INIT_VTABLE_java_lang_Object(CODENAME_ONE_THREAD_STATE, void** vtable) {\n" +
+                "    (void)threadStateData;\n" +
+                "    (void)vtable;\n" +
+                "}\n";
 
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
     }
