@@ -1,11 +1,7 @@
 package com.codename1.tools.translator;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
-import javax.tools.JavaCompiler;
-import javax.tools.ToolProvider;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -32,56 +28,47 @@ class CleanTargetIntegrationTest {
 
         Path sourceDir = Files.createTempDirectory("clean-target-sources");
         Path classesDir = Files.createTempDirectory("clean-target-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-classes");
         Path javaFile = sourceDir.resolve("HelloWorld.java");
-        Files.createDirectories(sourceDir.resolve("java/lang"));
         Files.write(javaFile, helloWorldSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/Object.java"), javaLangObjectSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/String.java"), javaLangStringSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/Class.java"), javaLangClassSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/Throwable.java"), javaLangThrowableSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/Exception.java"), javaLangExceptionSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/RuntimeException.java"), javaLangRuntimeExceptionSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/NullPointerException.java"), javaLangNullPointerExceptionSource().getBytes(StandardCharsets.UTF_8));
         Files.write(sourceDir.resolve("native_hello.c"), nativeHelloSource().getBytes(StandardCharsets.UTF_8));
 
         List<String> compileArgs = new java.util.ArrayList<>();
 
         double jdkVer = 1.8;
         try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+        double targetVer = 1.8;
+        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+
+        if (jdkVer >= 9 && targetVer < 9) {
+            return;
+        }
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         if (jdkVer >= 9) {
              // For CleanTarget, we are compiling java.lang classes.
-             // On JDK 9+, this requires patching java.base.
-             // However, --patch-module is incompatible with -target 8.
-             // If we can't use --patch-module with -target 8, we skip this permutation.
-             if (Double.parseDouble(config.targetVersion) < 9) {
-                 return; // Skip JDK 9+ compiling for Target < 9 for this specific test
-             }
+             // On JDK 9+, rely on the JDK's bootstrap classes but include JavaAPI in classpath
+             // so non-replaced classes are found.
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
-             compileArgs.add("--patch-module");
-             compileArgs.add("java.base=" + sourceDir.toString());
-             compileArgs.add("-Xlint:-module");
+             compileArgs.add("-classpath");
+             compileArgs.add(javaApiDir.toString());
         } else {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
+             compileArgs.add("-bootclasspath");
+             compileArgs.add(javaApiDir.toString());
              compileArgs.add("-Xlint:-options");
         }
 
         compileArgs.add("-d");
         compileArgs.add(classesDir.toString());
         compileArgs.add(javaFile.toString());
-        compileArgs.add(sourceDir.resolve("java/lang/Object.java").toString());
-        compileArgs.add(sourceDir.resolve("java/lang/String.java").toString());
-        compileArgs.add(sourceDir.resolve("java/lang/Class.java").toString());
-        compileArgs.add(sourceDir.resolve("java/lang/Throwable.java").toString());
-        compileArgs.add(sourceDir.resolve("java/lang/Exception.java").toString());
-        compileArgs.add(sourceDir.resolve("java/lang/RuntimeException.java").toString());
-        compileArgs.add(sourceDir.resolve("java/lang/NullPointerException.java").toString());
 
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "HelloWorld.java should compile with " + config);
@@ -381,94 +368,6 @@ class CleanTargetIntegrationTest {
                 "    public static void main(String[] args) {\n" +
                 "        nativeHello();\n" +
                 "    }\n" +
-                "}\n";
-    }
-
-    static String javaLangObjectSource() {
-        return "package java.lang;\n" +
-                "public class Object {\n" +
-                "}\n";
-    }
-
-    static String javaLangStringSource() {
-        return "package java.lang;\n" +
-                "public class String extends Object {\n" +
-                "}\n";
-    }
-
-    static String javaLangClassSource() {
-        return "package java.lang;\n" +
-                "public final class Class extends Object {\n" +
-                "}\n";
-    }
-
-    static String javaLangThrowableSource() {
-        return "package java.lang;\n" +
-                "public class Throwable extends Object {\n" +
-                "}\n";
-    }
-
-    static String javaLangExceptionSource() {
-        return "package java.lang;\n" +
-                "public class Exception extends Throwable {\n" +
-                "}\n";
-    }
-
-    static String javaLangRuntimeExceptionSource() {
-        return "package java.lang;\n" +
-                "public class RuntimeException extends Exception {\n" +
-                "}\n";
-    }
-
-    static String javaLangNullPointerExceptionSource() {
-        return "package java.lang;\n" +
-                "public class NullPointerException extends RuntimeException {\n" +
-                "}\n";
-    }
-
-    static String javaLangLongSource() {
-        return "package java.lang;\n" +
-                "public final class Long extends Number {\n" +
-                "    public static final long MIN_VALUE = 0x8000000000000000L;\n" +
-                "}\n";
-    }
-
-    static String javaLangFloatSource() {
-        return "package java.lang;\n" +
-                "public final class Float extends Number {\n" +
-                "    public static final float NaN = 0.0f / 0.0f;\n" +
-                "}\n";
-    }
-
-    static String javaLangDoubleSource() {
-        return "package java.lang;\n" +
-                "public final class Double extends Number {\n" +
-                "    public static final double POSITIVE_INFINITY = 1.0 / 0.0;\n" +
-                "    public static boolean isInfinite(double v) { return v == POSITIVE_INFINITY || v == -POSITIVE_INFINITY; }\n" +
-                "}\n";
-    }
-
-    static String javaLangBooleanSource() {
-        return "package java.lang;\n" +
-                "public final class Boolean implements java.io.Serializable {\n" +
-                "}\n";
-    }
-
-    static String javaLangNumberSource() {
-        return "package java.lang;\n" +
-                "public abstract class Number implements java.io.Serializable {\n" +
-                "}\n";
-    }
-
-    static String javaIoSerializableSource() {
-        return "package java.io;\n" +
-                "public interface Serializable {\n" +
-                "}\n";
-    }
-
-    static String javaUtilArrayListSource() {
-        return "package java.util;\n" +
-                "public class ArrayList {\n" +
                 "}\n";
     }
 

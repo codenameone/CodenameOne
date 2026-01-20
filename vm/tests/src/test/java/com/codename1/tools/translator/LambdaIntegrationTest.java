@@ -1,21 +1,14 @@
 package com.codename1.tools.translator;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import javax.tools.JavaCompiler;
-import javax.tools.ToolProvider;
-import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -80,14 +73,24 @@ class LambdaIntegrationTest {
 
         Files.write(sourceDir.resolve("LambdaApp.java"), appSource().getBytes(StandardCharsets.UTF_8));
 
-        // Compile JavaAPI for bootclasspath
-        compileJavaAPI(javaApiDir);
+        CompilerHelper.CompilerConfig config = selectCompiler(targetVersion);
+        if (config == null) {
+            fail("No compiler available for target " + targetVersion);
+        }
+
+        double jdkVer = 1.8;
+        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+        double targetVer = 1.8;
+        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+
+        if (jdkVer >= 9 && targetVer < 9) {
+            return;
+        }
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
-
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        assertNotNull(compiler, "A JDK is required to compile test sources");
 
         // Compile App using JavaAPI as bootclasspath
         List<String> compileArgs = new ArrayList<>();
@@ -95,19 +98,21 @@ class LambdaIntegrationTest {
         compileArgs.add(targetVersion);
         compileArgs.add("-target");
         compileArgs.add(targetVersion);
-        compileArgs.add("-bootclasspath");
-        compileArgs.add(javaApiDir.toString());
+        if (jdkVer >= 9) {
+            compileArgs.add("-classpath");
+            compileArgs.add(javaApiDir.toString());
+        } else {
+            compileArgs.add("-bootclasspath");
+            compileArgs.add(javaApiDir.toString());
+        }
         compileArgs.add("-d");
         compileArgs.add(classesDir.toString());
         compileArgs.add(sourceDir.resolve("LambdaApp.java").toString());
 
-        int compileResult = compiler.run(
-                null,
-                null,
-                null,
-                compileArgs.toArray(new String[0])
-        );
+        int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "LambdaApp should compile");
+
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
 
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
@@ -143,108 +148,24 @@ class LambdaIntegrationTest {
         assertTrue(output.contains("RESULT=145"), "Compiled program should print the expected result: " + output);
     }
 
-    private void compileJavaAPI(Path outputDir) throws Exception {
-        Files.createDirectories(outputDir);
-        Path javaApiRoot = Paths.get("..", "JavaAPI", "src").normalize().toAbsolutePath();
-        List<String> sources = new ArrayList<>();
-        Files.walk(javaApiRoot)
-                .filter(p -> p.toString().endsWith(".java"))
-                .forEach(p -> sources.add(p.toString()));
-
-        // Add stubs for java.lang.invoke
-        Path stubsDir = Files.createTempDirectory("java-lang-invoke-stubs");
-        sources.addAll(generateJavaLangInvokeStubs(stubsDir));
-
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        List<String> args = new ArrayList<>();
-
-        if (!System.getProperty("java.version").startsWith("1.")) {
-             args.add("--patch-module");
-             args.add("java.base=" + javaApiRoot.toString());
-        } else {
-            args.add("-source");
-            args.add("1.5");
-            args.add("-target");
-            args.add("1.5");
+    private CompilerHelper.CompilerConfig selectCompiler(String targetVersion) {
+        List<CompilerHelper.CompilerConfig> configs = CompilerHelper.getAvailableCompilers(targetVersion);
+        if (configs.isEmpty()) {
+            return null;
         }
-
-        args.add("-d");
-        args.add(outputDir.toString());
-        args.addAll(sources);
-
-        int result = compiler.run(null, null, null, args.toArray(new String[0]));
-        assertEquals(0, result, "JavaAPI should compile");
-    }
-
-    private List<String> generateJavaLangInvokeStubs(Path stubsDir) throws IOException {
-        List<String> stubFiles = new ArrayList<>();
-        Path invokePkg = stubsDir.resolve("java/lang/invoke");
-        Files.createDirectories(invokePkg);
-
-        // MethodHandle
-        Path mh = invokePkg.resolve("MethodHandle.java");
-        Files.write(mh, ("package java.lang.invoke;\n" +
-                "public abstract class MethodHandle {\n" +
-                "    public Object invoke(Object... args) throws Throwable { return null; }\n" +
-                "    public Object invokeExact(Object... args) throws Throwable { return null; }\n" +
-                "}").getBytes(StandardCharsets.UTF_8));
-        stubFiles.add(mh.toString());
-
-        // MethodType
-        Path mt = invokePkg.resolve("MethodType.java");
-        Files.write(mt, ("package java.lang.invoke;\n" +
-                "public class MethodType {\n" +
-                "    public static MethodType methodType(Class<?> rtype, Class<?>[] ptypes) { return null; }\n" +
-                "}").getBytes(StandardCharsets.UTF_8));
-        stubFiles.add(mt.toString());
-
-        // MethodHandles
-        Path mhs = invokePkg.resolve("MethodHandles.java");
-        Files.write(mhs, ("package java.lang.invoke;\n" +
-                "public class MethodHandles {\n" +
-                "    public static Lookup lookup() { return null; }\n" +
-                "    public static class Lookup {\n" +
-                "        public MethodHandle findVirtual(Class<?> refc, String name, MethodType type) throws NoSuchMethodException, IllegalAccessException { return null; }\n" +
-                "        public MethodHandle findStatic(Class<?> refc, String name, MethodType type) throws NoSuchMethodException, IllegalAccessException { return null; }\n" +
-                "    }\n" +
-                "}").getBytes(StandardCharsets.UTF_8));
-        stubFiles.add(mhs.toString());
-
-        // CallSite
-        Path cs = invokePkg.resolve("CallSite.java");
-        Files.write(cs, ("package java.lang.invoke;\n" +
-                "public abstract class CallSite {\n" +
-                "    public abstract MethodHandle getTarget();\n" +
-                "    public abstract void setTarget(MethodHandle newTarget);\n" +
-                "}").getBytes(StandardCharsets.UTF_8));
-        stubFiles.add(cs.toString());
-
-        // LambdaMetafactory
-        Path lmf = invokePkg.resolve("LambdaMetafactory.java");
-        Files.write(lmf, ("package java.lang.invoke;\n" +
-                "public class LambdaMetafactory {\n" +
-                "    public static CallSite metafactory(MethodHandles.Lookup caller, String invokedName, MethodType invokedType, MethodType samMethodType, MethodHandle implMethod, MethodType instantiatedMethodType) throws LambdaConversionException { return null; }\n" +
-                "    public static CallSite altMetafactory(MethodHandles.Lookup caller, String invokedName, MethodType invokedType, Object... args) throws LambdaConversionException { return null; }\n" +
-                "}").getBytes(StandardCharsets.UTF_8));
-        stubFiles.add(lmf.toString());
-
-        // LambdaConversionException
-        Path lce = invokePkg.resolve("LambdaConversionException.java");
-        Files.write(lce, ("package java.lang.invoke;\n" +
-                "public class LambdaConversionException extends Exception {}\n").getBytes(StandardCharsets.UTF_8));
-        stubFiles.add(lce.toString());
-
-        // ConstantCallSite
-        Path ccs = invokePkg.resolve("ConstantCallSite.java");
-        Files.write(ccs, ("package java.lang.invoke;\n" +
-                "public class ConstantCallSite extends CallSite {\n" +
-                "    public ConstantCallSite(MethodHandle target) { }\n" +
-                "    public final MethodHandle getTarget() { return null; }\n" +
-                "    public final void setTarget(MethodHandle ignore) { }\n" +
-                "}").getBytes(StandardCharsets.UTF_8));
-        stubFiles.add(ccs.toString());
-
-        return stubFiles;
+        double targetVer = 1.8;
+        try { targetVer = Double.parseDouble(targetVersion); } catch (NumberFormatException ignored) {}
+        if (targetVer < 9) {
+            for (CompilerHelper.CompilerConfig config : configs) {
+                try {
+                    if (Double.parseDouble(config.jdkVersion) < 9) {
+                        return config;
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        return configs.get(0);
     }
 
     private void writeMissingHeadersAndImpls(Path srcRoot) throws Exception {

@@ -5,8 +5,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,50 +21,41 @@ class ReadWriteLockIntegrationTest {
 
         Path sourceDir = Files.createTempDirectory("rwlock-integration-sources");
         Path classesDir = Files.createTempDirectory("rwlock-integration-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-classes");
 
-        // 1. Write minimal mock Java API to sourceDir
-        writeMockJavaClasses(sourceDir);
-
-        // 2. Copy the actual Lock/ReentrantLock/Condition sources we want to test
-        Path javaApiSrc = Paths.get("..", "JavaAPI", "src").toAbsolutePath().normalize();
-        Path locksDir = sourceDir.resolve("java/util/concurrent/locks");
-        Files.createDirectories(locksDir);
-
-        Files.copy(javaApiSrc.resolve("java/util/concurrent/locks/Lock.java"), locksDir.resolve("Lock.java"), StandardCopyOption.REPLACE_EXISTING);
-        Files.copy(javaApiSrc.resolve("java/util/concurrent/locks/ReadWriteLock.java"), locksDir.resolve("ReadWriteLock.java"), StandardCopyOption.REPLACE_EXISTING);
-        Files.copy(javaApiSrc.resolve("java/util/concurrent/locks/ReentrantReadWriteLock.java"), locksDir.resolve("ReentrantReadWriteLock.java"), StandardCopyOption.REPLACE_EXISTING);
-        // We probably don't need Condition for this test, but ReentrantReadWriteLock imports it?
-        // No, ReentrantReadWriteLock implementation I wrote throws UnsupportedOperationException for newCondition()
-        // But the interface Lock requires Condition. So Condition.java is needed.
-        Files.copy(javaApiSrc.resolve("java/util/concurrent/locks/Condition.java"), locksDir.resolve("Condition.java"), StandardCopyOption.REPLACE_EXISTING);
-
-        // 3. Write Test App
+        // 1. Write Test App
         Files.write(sourceDir.resolve("ReadWriteLockTestApp.java"), lockTestAppSource().getBytes(StandardCharsets.UTF_8));
 
-        // 4. Compile everything
+        // 2. Compile Test App against JavaAPI
         List<String> sources = new ArrayList<>();
         Files.walk(sourceDir).filter(p -> p.toString().endsWith(".java")).forEach(p -> sources.add(p.toString()));
 
         List<String> compileArgs = new ArrayList<>();
         double jdkVer = 1.8;
         try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+        double targetVer = 1.8;
+        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+
+        if (jdkVer >= 9 && targetVer < 9) {
+            return;
+        }
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         if (jdkVer >= 9) {
-             if (Double.parseDouble(config.targetVersion) < 9) {
-                 return;
-             }
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
-             compileArgs.add("--patch-module");
-             compileArgs.add("java.base=" + sourceDir.toString());
-             compileArgs.add("-Xlint:-module");
+             compileArgs.add("-classpath");
+             compileArgs.add(javaApiDir.toString());
         } else {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
+             compileArgs.add("-bootclasspath");
+             compileArgs.add(javaApiDir.toString());
              compileArgs.add("-Xlint:-options");
         }
 
@@ -77,12 +66,14 @@ class ReadWriteLockIntegrationTest {
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "Compilation failed");
 
-        // 5. Native Report Stub
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+
+        // 3. Native Report Stub
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
-        // 6. Run Translator
+        // 4. Run Translator
         Path outputDir = Files.createTempDirectory("rwlock-integration-output");
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "ReadWriteLockTestApp");
 
@@ -116,192 +107,6 @@ class ReadWriteLockIntegrationTest {
         // However, we should try to run it if possible. The stubs in LockIntegrationTest seem to support basic threads and synchronization.
         // Let's try to run it. If it fails, we comment it out like in LockIntegrationTest.
         // But verifying correct translation is the main goal.
-    }
-
-    private void writeMockJavaClasses(Path sourceDir) throws Exception {
-        Path lang = sourceDir.resolve("java/lang");
-        Path util = sourceDir.resolve("java/util");
-        Path concurrent = sourceDir.resolve("java/util/concurrent");
-        Path io = sourceDir.resolve("java/io");
-        Files.createDirectories(lang);
-        Files.createDirectories(util);
-        Files.createDirectories(concurrent);
-        Files.createDirectories(io);
-
-        // java.lang.Object
-        Files.write(lang.resolve("Object.java"), ("package java.lang;\n" +
-                "public class Object {\n" +
-                "    public final native void wait(long timeout, int nanos) throws InterruptedException;\n" +
-                "    public final void wait() throws InterruptedException { wait(0, 0); }\n" +
-                "    public final void wait(long timeout) throws InterruptedException { wait(timeout, 0); }\n" +
-                "    public final native void notify();\n" +
-                "    public final native void notifyAll();\n" +
-                "    public native int hashCode();\n" +
-                "    public boolean equals(Object obj) { return this == obj; }\n" +
-                "    public String toString() { return \"Object\"; }\n" +
-                "    public final native Class<?> getClass();\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.String
-        Files.write(lang.resolve("String.java"), ("package java.lang;\n" +
-                "public class String {\n" +
-                "    private char[] value;\n" +
-                "    private int offset;\n" +
-                "    private int count;\n" +
-                "    public String(char[] v) { value = v; count=v.length; }\n" +
-                "    public static String valueOf(Object obj) { return obj == null ? \"null\" : obj.toString(); }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.StringBuilder
-        Files.write(lang.resolve("StringBuilder.java"), ("package java.lang;\n" +
-                "public class StringBuilder {\n" +
-                "    public StringBuilder() {}\n" +
-                "    public StringBuilder(String str) {}\n" +
-                "    public StringBuilder(int cap) {}\n" +
-                "    public StringBuilder append(String s) { return this; }\n" +
-                "    public StringBuilder append(Object o) { return this; }\n" +
-                "    public StringBuilder append(int i) { return this; }\n" +
-                "    public String toString() { return \"\"; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.StringBuffer
-        Files.write(lang.resolve("StringBuffer.java"), ("package java.lang;\n" +
-                "public class StringBuffer {\n" +
-                "    public StringBuffer() {}\n" +
-                "    public StringBuffer(String str) {}\n" +
-                "    public StringBuffer append(String s) { return this; }\n" +
-                "    public StringBuffer append(Object o) { return this; }\n" +
-                "    public StringBuffer append(int i) { return this; }\n" +
-                "    public String toString() { return \"\"; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.Class
-        Files.write(lang.resolve("Class.java"), ("package java.lang;\n" +
-                "public final class Class<T> {}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.Runnable
-        Files.write(lang.resolve("Runnable.java"), ("package java.lang;\n" +
-                "public interface Runnable { void run(); }\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.Thread
-        Files.write(lang.resolve("Thread.java"), ("package java.lang;\n" +
-                "public class Thread implements Runnable {\n" +
-                "    private Runnable target;\n" +
-                "    public Thread() {}\n" +
-                "    public Thread(Runnable target) { this.target = target; }\n" +
-                "    public void run() { if (target != null) target.run(); }\n" +
-                "    public void start() { start0(); }\n" +
-                "    private native void start0();\n" +
-                "    public static native Thread currentThread();\n" +
-                "    public static boolean interrupted() { return currentThread().isInterrupted(true); }\n" +
-                "    public boolean isInterrupted(boolean clear) { return false; }\n" +
-                "    public void interrupt() {}\n" +
-                "    public static void sleep(long millis) throws InterruptedException { sleep0(millis); }\n" +
-                "    private static native void sleep0(long millis);\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.System
-        Files.write(lang.resolve("System.java"), ("package java.lang;\n" +
-                "public final class System {\n" +
-                "    public static native long currentTimeMillis();\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.Integer
-        Files.write(lang.resolve("Integer.java"), ("package java.lang;\n" +
-                "public final class Integer extends Number {\n" +
-                "    private final int value;\n" +
-                "    public Integer(int value) { this.value = value; }\n" +
-                "    public static Integer valueOf(int i) { return new Integer(i); }\n" +
-                "    public int intValue() { return value; }\n" +
-                "    public String toString() { return \"\"+value; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.Number
-        Files.write(lang.resolve("Number.java"), ("package java.lang;\n" +
-                "public abstract class Number implements java.io.Serializable {\n" +
-                "    public abstract int intValue();\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // Exceptions
-        Files.write(lang.resolve("Throwable.java"), "package java.lang; public class Throwable { public Throwable() {} public Throwable(String s) {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("Exception.java"), "package java.lang; public class Exception extends Throwable { public Exception() {} public Exception(String s) {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("RuntimeException.java"), "package java.lang; public class RuntimeException extends Exception { public RuntimeException() {} public RuntimeException(String s) {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("InterruptedException.java"), "package java.lang; public class InterruptedException extends Exception { public InterruptedException() {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("NullPointerException.java"), "package java.lang; public class NullPointerException extends RuntimeException { public NullPointerException() {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("IllegalMonitorStateException.java"), "package java.lang; public class IllegalMonitorStateException extends RuntimeException { public IllegalMonitorStateException() {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("IllegalArgumentException.java"), "package java.lang; public class IllegalArgumentException extends RuntimeException { public IllegalArgumentException(String s) {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("UnsupportedOperationException.java"), "package java.lang; public class UnsupportedOperationException extends RuntimeException { public UnsupportedOperationException() {} }".getBytes(StandardCharsets.UTF_8));
-
-        // java.io.Serializable
-        Files.write(io.resolve("Serializable.java"), "package java.io; public interface Serializable {}".getBytes(StandardCharsets.UTF_8));
-
-        // java.util.Collection
-        Files.write(util.resolve("Collection.java"), "package java.util; public interface Collection<E> {}".getBytes(StandardCharsets.UTF_8));
-
-        // java.util.Date
-        Files.write(util.resolve("Date.java"), "package java.util; public class Date { public long getTime() { return 0; } }".getBytes(StandardCharsets.UTF_8));
-
-        // java.util.Objects
-        Files.write(util.resolve("Objects.java"), ("package java.util;\n" +
-                "public class Objects {\n" +
-                "    public static <T> T requireNonNull(T obj) { if (obj == null) throw new NullPointerException(); return obj; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.util.Map
-        Files.write(util.resolve("Map.java"), ("package java.util;\n" +
-                "public interface Map<K,V> {\n" +
-                "    V get(Object key);\n" +
-                "    V put(K key, V value);\n" +
-                "    V remove(Object key);\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.util.HashMap
-        Files.write(util.resolve("HashMap.java"), ("package java.util;\n" +
-                "public class HashMap<K,V> implements Map<K,V> {\n" +
-                "    private Object[] keys = new Object[16];\n" +
-                "    private Object[] values = new Object[16];\n" +
-                "    private int size = 0;\n" +
-                "    public V get(Object key) {\n" +
-                "        for(int i=0; i<size; i++) if(keys[i] == key) return (V)values[i];\n" +
-                "        return null;\n" +
-                "    }\n" +
-                "    public V put(K key, V value) {\n" +
-                "        for(int i=0; i<size; i++) {\n" +
-                "            if(keys[i] == key) {\n" +
-                "                V old = (V)values[i];\n" +
-                "                values[i] = value;\n" +
-                "                return old;\n" +
-                "            }\n" +
-                "        }\n" +
-                "        if (size >= keys.length) return null;\n" + // overflow ignored for mock
-                "        keys[size] = key;\n" +
-                "        values[size] = value;\n" +
-                "        size++;\n" +
-                "        return null;\n" +
-                "    }\n" +
-                "    public V remove(Object key) {\n" +
-                "        for(int i=0; i<size; i++) {\n" +
-                "            if(keys[i] == key) {\n" +
-                "                V old = (V)values[i];\n" +
-                "                size--;\n" +
-                "                keys[i] = keys[size];\n" +
-                "                values[i] = values[size];\n" +
-                "                keys[size] = null;\n" +
-                "                values[size] = null;\n" +
-                "                return old;\n" +
-                "            }\n" +
-                "        }\n" +
-                "        return null;\n" +
-                "    }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-
-        // java.util.concurrent.TimeUnit
-        Files.write(concurrent.resolve("TimeUnit.java"), ("package java.util.concurrent;\n" +
-                "public class TimeUnit {\n" +
-                "    public long toNanos(long d) { return d; }\n" +
-                "    public long toMillis(long d) { return d; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
     }
 
     private String lockTestAppSource() {

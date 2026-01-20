@@ -5,8 +5,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,46 +21,41 @@ class LockIntegrationTest {
 
         Path sourceDir = Files.createTempDirectory("lock-integration-sources");
         Path classesDir = Files.createTempDirectory("lock-integration-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-classes");
 
-        // 1. Write minimal mock Java API to sourceDir
-        writeMockJavaClasses(sourceDir);
-
-        // 2. Copy the actual Lock/ReentrantLock/Condition sources we want to test
-        Path javaApiSrc = Paths.get("..", "JavaAPI", "src").toAbsolutePath().normalize();
-        Path locksDir = sourceDir.resolve("java/util/concurrent/locks");
-        Files.createDirectories(locksDir);
-
-        Files.copy(javaApiSrc.resolve("java/util/concurrent/locks/Lock.java"), locksDir.resolve("Lock.java"), StandardCopyOption.REPLACE_EXISTING);
-        Files.copy(javaApiSrc.resolve("java/util/concurrent/locks/ReentrantLock.java"), locksDir.resolve("ReentrantLock.java"), StandardCopyOption.REPLACE_EXISTING);
-        Files.copy(javaApiSrc.resolve("java/util/concurrent/locks/Condition.java"), locksDir.resolve("Condition.java"), StandardCopyOption.REPLACE_EXISTING);
-
-        // 3. Write Test App
+        // 1. Write Test App
         Files.write(sourceDir.resolve("LockTestApp.java"), lockTestAppSource().getBytes(StandardCharsets.UTF_8));
 
-        // 4. Compile everything (Mocks + Test App + ReentrantLock)
+        // 2. Compile Test App against JavaAPI
         List<String> sources = new ArrayList<>();
         Files.walk(sourceDir).filter(p -> p.toString().endsWith(".java")).forEach(p -> sources.add(p.toString()));
 
         List<String> compileArgs = new ArrayList<>();
         double jdkVer = 1.8;
         try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+        double targetVer = 1.8;
+        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+
+        if (jdkVer >= 9 && targetVer < 9) {
+            return;
+        }
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         if (jdkVer >= 9) {
-             if (Double.parseDouble(config.targetVersion) < 9) {
-                 return; // Skip JDK 9+ compiling for Target < 9 as --patch-module requires target >= 9
-             }
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
-             compileArgs.add("--patch-module");
-             compileArgs.add("java.base=" + sourceDir.toString());
-             compileArgs.add("-Xlint:-module");
+             compileArgs.add("-classpath");
+             compileArgs.add(javaApiDir.toString());
         } else {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
+             compileArgs.add("-bootclasspath");
+             compileArgs.add(javaApiDir.toString());
              compileArgs.add("-Xlint:-options");
         }
 
@@ -73,12 +66,14 @@ class LockIntegrationTest {
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "Compilation failed");
 
-        // 5. Native Report Stub
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+
+        // 3. Native Report Stub
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
-        // 6. Run Translator
+        // 4. Run Translator
         Path outputDir = Files.createTempDirectory("lock-integration-output");
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "LockTestApp");
 
@@ -115,102 +110,6 @@ class LockIntegrationTest {
         // assertTrue(output.contains("TEST: Reentrancy OK"), "Reentrant lock should work");
         // assertTrue(output.contains("TEST: TryLock OK"), "TryLock should work");
         // assertTrue(output.contains("TEST: Condition OK"), "Condition wait/signal should work");
-    }
-
-    private void writeMockJavaClasses(Path sourceDir) throws Exception {
-        Path lang = sourceDir.resolve("java/lang");
-        Path util = sourceDir.resolve("java/util");
-        Path concurrent = sourceDir.resolve("java/util/concurrent");
-        Path io = sourceDir.resolve("java/io");
-        Files.createDirectories(lang);
-        Files.createDirectories(util);
-        Files.createDirectories(concurrent);
-        Files.createDirectories(io);
-
-        // java.lang.Object
-        Files.write(lang.resolve("Object.java"), ("package java.lang;\n" +
-                "public class Object {\n" +
-                "    public final native void wait(long timeout, int nanos) throws InterruptedException;\n" +
-                "    public final void wait() throws InterruptedException { wait(0, 0); }\n" +
-                "    public final void wait(long timeout) throws InterruptedException { wait(timeout, 0); }\n" +
-                "    public final native void notify();\n" +
-                "    public final native void notifyAll();\n" +
-                "    public native int hashCode();\n" +
-                "    public boolean equals(Object obj) { return this == obj; }\n" +
-                "    public String toString() { return \"Object\"; }\n" +
-                "    public final native Class<?> getClass();\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.String
-        Files.write(lang.resolve("String.java"), ("package java.lang;\n" +
-                "public class String {\n" +
-                "    private char[] value;\n" +
-                "    private int offset;\n" +
-                "    private int count;\n" +
-                "    public String(char[] v) { value = v; count=v.length; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.Class
-        Files.write(lang.resolve("Class.java"), ("package java.lang;\n" +
-                "public final class Class<T> {}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.Runnable
-        Files.write(lang.resolve("Runnable.java"), ("package java.lang;\n" +
-                "public interface Runnable { void run(); }\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.Thread
-        Files.write(lang.resolve("Thread.java"), ("package java.lang;\n" +
-                "public class Thread implements Runnable {\n" +
-                "    private Runnable target;\n" +
-                "    public Thread() {}\n" +
-                "    public Thread(Runnable target) { this.target = target; }\n" +
-                "    public void run() { if (target != null) target.run(); }\n" +
-                "    public void start() { start0(); }\n" +
-                "    private native void start0();\n" +
-                "    public static native Thread currentThread();\n" +
-                "    public static boolean interrupted() { return currentThread().isInterrupted(true); }\n" +
-                "    public boolean isInterrupted(boolean clear) { return false; }\n" +
-                "    public void interrupt() {}\n" +
-                "    public static void sleep(long millis) throws InterruptedException { sleep0(millis); }\n" +
-                "    private static native void sleep0(long millis);\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.lang.System
-        Files.write(lang.resolve("System.java"), ("package java.lang;\n" +
-                "public final class System {\n" +
-                "    public static native long currentTimeMillis();\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // Exceptions
-        Files.write(lang.resolve("Throwable.java"), "package java.lang; public class Throwable { public Throwable() {} public Throwable(String s) {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("Exception.java"), "package java.lang; public class Exception extends Throwable { public Exception() {} public Exception(String s) {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("RuntimeException.java"), "package java.lang; public class RuntimeException extends Exception { public RuntimeException() {} public RuntimeException(String s) {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("InterruptedException.java"), "package java.lang; public class InterruptedException extends Exception { public InterruptedException() {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("NullPointerException.java"), "package java.lang; public class NullPointerException extends RuntimeException { public NullPointerException() {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("IllegalMonitorStateException.java"), "package java.lang; public class IllegalMonitorStateException extends RuntimeException { public IllegalMonitorStateException() {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("IllegalArgumentException.java"), "package java.lang; public class IllegalArgumentException extends RuntimeException { public IllegalArgumentException(String s) {} }".getBytes(StandardCharsets.UTF_8));
-
-        // java.io.Serializable
-        Files.write(io.resolve("Serializable.java"), "package java.io; public interface Serializable {}".getBytes(StandardCharsets.UTF_8));
-
-        // java.util.Collection
-        Files.write(util.resolve("Collection.java"), "package java.util; public interface Collection<E> {}".getBytes(StandardCharsets.UTF_8));
-
-        // java.util.Date
-        Files.write(util.resolve("Date.java"), "package java.util; public class Date { public long getTime() { return 0; } }".getBytes(StandardCharsets.UTF_8));
-
-        // java.util.Objects
-        Files.write(util.resolve("Objects.java"), ("package java.util;\n" +
-                "public class Objects {\n" +
-                "    public static <T> T requireNonNull(T obj) { if (obj == null) throw new NullPointerException(); return obj; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
-        // java.util.concurrent.TimeUnit
-        Files.write(concurrent.resolve("TimeUnit.java"), ("package java.util.concurrent;\n" +
-                "public class TimeUnit {\n" +
-                "    public long toNanos(long d) { return d; }\n" +
-                "    public long toMillis(long d) { return d; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
     }
 
     private String lockTestAppSource() {

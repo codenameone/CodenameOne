@@ -2,8 +2,10 @@ package com.codename1.tools.translator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -551,24 +553,57 @@ public class CompilerHelper {
         }
     }
 
-    private static void compileJavaAPI(java.nio.file.Path outputDir) throws IOException, InterruptedException {
-        java.nio.file.Files.createDirectories(outputDir);
-        java.nio.file.Path javaApiRoot = java.nio.file.Paths.get("..", "JavaAPI", "src").normalize().toAbsolutePath();
+    public static void compileJavaAPI(Path outputDir, CompilerConfig config) throws IOException, InterruptedException {
+        Files.createDirectories(outputDir);
+        Path javaApiRoot = Paths.get("..", "JavaAPI", "src").normalize().toAbsolutePath();
         List<String> sources = new ArrayList<>();
-        java.nio.file.Files.walk(javaApiRoot)
+        Files.walk(javaApiRoot)
                 .filter(p -> p.toString().endsWith(".java"))
                 .forEach(p -> sources.add(p.toString()));
 
-        javax.tools.JavaCompiler compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
         List<String> args = new ArrayList<>();
+
+        double jdkVer = 1.8;
+        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+        double targetVer = 1.8;
+        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+
+        if (jdkVer >= 9) {
+            if (targetVer < 9) {
+                throw new IllegalArgumentException("Cannot compile JavaAPI with --patch-module for target " + config.targetVersion);
+            }
+            args.add("--patch-module");
+            args.add("java.base=" + javaApiRoot.toString());
+        }
+
         args.add("-source");
-        args.add("1.8");
+        args.add(config.targetVersion);
         args.add("-target");
-        args.add("1.8");
+        args.add(config.targetVersion);
+
         args.add("-d");
         args.add(outputDir.toString());
         args.addAll(sources);
 
-        compiler.run(null, null, null, args.toArray(new String[0]));
+        int result = compile(config.jdkHome, args);
+        if (result != 0) {
+            throw new IOException("JavaAPI compilation failed with exit code " + result);
+        }
+    }
+
+    public static void copyDirectory(Path sourceDir, Path targetDir) throws IOException {
+        Files.walk(sourceDir).forEach(source -> {
+            try {
+                Path destination = targetDir.resolve(sourceDir.relativize(source));
+                if (Files.isDirectory(source)) {
+                    Files.createDirectories(destination);
+                } else {
+                    Files.createDirectories(destination.getParent());
+                    Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 }
