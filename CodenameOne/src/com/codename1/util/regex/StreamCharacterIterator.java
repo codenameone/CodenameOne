@@ -26,6 +26,7 @@ import java.io.InputStream;
  * @author <a href="mailto:ales.novak@netbeans.com">Ales Novak</a>
  * @version CVS $Id: StreamCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class StreamCharacterIterator implements CharacterIterator {
     /**
      * Underlying is

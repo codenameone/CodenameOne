@@ -46,6 +46,7 @@ import static com.codename1.ui.CN.isEdt;
  * @author shannah
  * @since 7.0
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class AsyncResource<V> extends Observable {
     private final Object lock = new Object();
     private V value;

@@ -26,6 +26,7 @@ import java.io.Reader;
  * @author <a href="mailto:ales.novak@netbeans.com">Ales Novak</a>
  * @version CVS $Id: ReaderCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class ReaderCharacterIterator implements CharacterIterator {
     /**
      * Underlying reader

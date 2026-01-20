@@ -43,6 +43,7 @@ import java.util.Map;
 /**
  * Parses string constraints.
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class ConstraintParser {
 
     private ConstraintParser() {

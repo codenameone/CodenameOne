@@ -31,6 +31,7 @@ import java.util.HashMap;
  * @version $Id: RECompiler.java 518156 2007-03-14 14:31:26Z vgritsenko $
  * @see RE
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class RECompiler {
     // Node flags
     static final int NODE_NORMAL = 0;                 // No flags (nothing special)

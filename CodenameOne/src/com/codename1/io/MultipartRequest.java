@@ -54,6 +54,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class MultipartRequest extends ConnectionRequest {
 
     private static final String CRLF = "\r\n";

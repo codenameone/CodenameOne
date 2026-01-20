@@ -31,6 +31,7 @@ import com.codename1.ui.plaf.Style;
  *
  * @author shannah
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public abstract class DynamicImage extends Image {
 
     private int w = 250;

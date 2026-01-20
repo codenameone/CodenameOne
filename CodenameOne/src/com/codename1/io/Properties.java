@@ -51,6 +51,7 @@ import java.util.Set;
  * @see Hashtable
  * @see java.lang.System#getProperties
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class Properties extends HashMap<String, String> {
 
     private static final int NONE = 0;

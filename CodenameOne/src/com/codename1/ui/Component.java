@@ -72,6 +72,7 @@ import java.util.HashMap;
  * @author Chen Fishbein
  * @see Container
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class Component implements Animation, StyleListener, Editable {
 
     /**

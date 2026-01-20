@@ -41,6 +41,7 @@ import java.util.Vector;
  *
  * @author Ofir Leitner
  */
+@SuppressWarnings({"PMD.CloseResource"})
 class ResourceThreadQueue {
 
     /**

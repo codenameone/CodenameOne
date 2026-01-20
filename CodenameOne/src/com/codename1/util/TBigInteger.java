@@ -33,6 +33,7 @@ import java.util.Random;
  * discouraged. In simple words: Do NOT implement any bit fields based on
  * BigInteger.
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 class TBigInteger {
 
 

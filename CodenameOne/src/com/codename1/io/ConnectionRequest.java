@@ -72,6 +72,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class ConnectionRequest implements IOProgressListener {
 
     /**

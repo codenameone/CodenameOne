@@ -266,6 +266,7 @@ import java.util.ArrayList;
  * @author <a href="mailto:ts@sch-fer.de">Tobias Sch&auml;fer</a>
  * @see RECompiler
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class RE {
 
     /**

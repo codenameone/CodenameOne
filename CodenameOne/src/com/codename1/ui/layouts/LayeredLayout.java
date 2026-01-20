@@ -180,6 +180,7 @@ import java.util.Set;
  * @see com.codename1.ui.Form#getLayeredPane(java.lang.Class, boolean)
  * @see com.codename1.ui.Form#setGlassPane(com.codename1.ui.Painter)
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class LayeredLayout extends Layout {
 
     /**

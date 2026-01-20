@@ -33,6 +33,7 @@ import com.codename1.ui.plaf.Style;
  * @author shannah
  * @since 7.0
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class CommonProgressAnimations {
 
     /**

@@ -56,6 +56,7 @@ import static com.codename1.ui.Component.TOP;
  * @author shannah
  * @since 7.0
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class CSSBorder extends Border {
     /**
      * Constant indicating no-repeat for background images.

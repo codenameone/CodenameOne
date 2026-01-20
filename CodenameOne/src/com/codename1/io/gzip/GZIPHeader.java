@@ -39,6 +39,7 @@ import java.io.UnsupportedEncodingException;
 /**
  * @see "http://www.ietf.org/rfc/rfc1952.txt"
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class GZIPHeader {
 
     public static final byte OS_MSDOS = (byte) 0x00;

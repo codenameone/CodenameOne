@@ -25,6 +25,7 @@ import java.util.HashMap;
  *
  * @author <a href="mailto:jonl@muppetlabs.com">Jonathan Locke</a>
  */
+@SuppressWarnings({"PMD.AssignmentInOperand", "PMD.CloseResource"})
 public class REDebugCompiler extends RECompiler {
     /**
      * Mapping from opcodes to descriptive strings

@@ -48,6 +48,7 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class Storage {
     private static Storage INSTANCE;
     private final CacheMap cache = new CacheMap();

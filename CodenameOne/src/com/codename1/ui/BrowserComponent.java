@@ -83,6 +83,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class BrowserComponent extends Container {
     /**
      * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}

@@ -75,6 +75,7 @@ import static com.codename1.ui.ComponentSelector.$;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class Picker extends Button {
 
     /**

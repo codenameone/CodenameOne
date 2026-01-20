@@ -116,6 +116,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.AssignmentInOperand", "PMD.CloseResource"})
 public abstract class CodenameOneImplementation {
     /**
      * Indicates the range of "hard" RTL bidi characters in unicode

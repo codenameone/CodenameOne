@@ -34,6 +34,7 @@ import java.util.Vector;
  *
  * @author Chen Fishbein
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class StringUtil {
 
 

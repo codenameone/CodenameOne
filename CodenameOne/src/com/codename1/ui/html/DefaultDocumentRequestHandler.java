@@ -40,6 +40,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandler {
     private static Resources resFile;
     private boolean trackVisitedURLs;

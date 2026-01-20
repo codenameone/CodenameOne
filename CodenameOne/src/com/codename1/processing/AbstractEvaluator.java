@@ -69,6 +69,7 @@ import java.util.List;
  *
  * @author Eric Coolman
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 abstract class AbstractEvaluator implements Evaluator {
 
     private final String expr;

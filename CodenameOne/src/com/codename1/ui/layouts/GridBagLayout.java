@@ -37,6 +37,7 @@ import java.util.Map;
  * <script src="https://gist.github.com/codenameone/6266580.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/gridbag-layout.png" alt="Sample gridbag layout usage" />
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class GridBagLayout extends Layout {
     protected static final int MAXGRIDSIZE = 512;
 

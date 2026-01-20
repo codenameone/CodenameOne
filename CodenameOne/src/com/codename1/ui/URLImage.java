@@ -69,6 +69,7 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public final class URLImage extends EncodedImage {
 
     /**

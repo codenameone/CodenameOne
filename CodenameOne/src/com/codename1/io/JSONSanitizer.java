@@ -90,6 +90,7 @@ package com.codename1.io;
  * <p>The sanitize method takes O(n) time where n is the length in UTF-16
  * code-units.
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class JSONSanitizer {
 
     /**

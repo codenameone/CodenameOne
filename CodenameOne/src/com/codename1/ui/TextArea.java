@@ -60,6 +60,7 @@ import java.util.ArrayList;
  *
  * @author Chen Fishbein
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * Allows any type of input into a text field, if a constraint is not supported

@@ -35,6 +35,7 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class Socket {
     private Socket() {
     }

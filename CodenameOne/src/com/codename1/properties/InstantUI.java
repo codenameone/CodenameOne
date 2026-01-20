@@ -51,6 +51,7 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class InstantUI {
     private PropertyBase[] order;
 

@@ -41,6 +41,7 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public final class FileEncodedImage extends EncodedImage {
     private final String fileName;
     private final boolean keep;

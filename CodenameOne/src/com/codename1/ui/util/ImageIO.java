@@ -42,6 +42,7 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public abstract class ImageIO {
     /**
      * Indicates the JPEG output format

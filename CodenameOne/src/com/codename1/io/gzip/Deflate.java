@@ -35,6 +35,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package com.codename1.io.gzip;
 
 public
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class Deflate {
 
     static final private int MAX_MEM_LEVEL = 9;

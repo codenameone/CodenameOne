@@ -40,6 +40,7 @@ import java.util.Vector;
  *
  * @author Eric Coolman
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class SimpleDateFormat extends DateFormat {
 
     /**

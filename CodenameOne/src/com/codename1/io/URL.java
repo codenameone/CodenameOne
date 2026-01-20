@@ -43,6 +43,7 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class URL {
     private final URI u;
 

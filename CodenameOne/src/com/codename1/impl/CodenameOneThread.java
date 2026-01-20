@@ -36,6 +36,7 @@ import java.util.Hashtable;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class CodenameOneThread extends Thread {
     private static final Class CODE = CodenameOneThread.class;
     private final int[] stack = new int[500];

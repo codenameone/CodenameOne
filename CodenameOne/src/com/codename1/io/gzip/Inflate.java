@@ -34,6 +34,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class Inflate {
 
     static final int Z_NO_FLUSH = 0;

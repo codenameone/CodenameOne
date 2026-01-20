@@ -49,6 +49,7 @@ import java.util.TreeSet;
 /**
  * Holds components in a grid. Does most of the logic behind the layout manager.
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public final class Grid {
 
     public static final boolean TEST_GAPS = true;

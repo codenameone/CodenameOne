@@ -33,6 +33,7 @@ import java.io.InputStream;
  * Based on the buffered input stream from the JDK with some minor tweaks to allow
  * external classes to monitor stream status and progress.
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class BufferedInputStream extends InputStream {
     private static int streamCount = 0;
     private static volatile int defaultBufferSize = 8192;

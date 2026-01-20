@@ -56,6 +56,7 @@ import java.util.Map;
  *
  * @author Chen Fishbein
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class RequestBuilder {
 
     private String method;

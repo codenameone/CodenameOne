@@ -288,6 +288,7 @@ import java.util.Set;
  * @author shannah
  * @see <a href="https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html">jQuery/CSS Style Selectors for Codename One</a>
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class ComponentSelector implements Iterable<Component>, Set<Component> {
     private static final String PROPERTY_TAG = "com.codename1.ui.ComponentSelector#tags";
     private static final int ALL_STYLES = 1;

@@ -34,6 +34,7 @@ import java.io.UnsupportedEncodingException;
  * @author shannah
  * @since 7.0
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public interface Data {
 
     /**

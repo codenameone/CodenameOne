@@ -34,6 +34,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class InfBlocks {
     // Table for deflate from PKZIP's appnote.txt.
     static final int[] border = { // Order of the bit length code lengths

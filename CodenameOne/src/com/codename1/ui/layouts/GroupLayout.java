@@ -101,6 +101,7 @@ import java.util.Iterator;
  * @author Shai Almog
  * @version $Revision: 1.25 $
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class GroupLayout extends Layout {
     /**
      * Compass-direction North (up).

@@ -42,6 +42,7 @@ import java.io.InputStream;
  *
  * @author Chen
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class FacebookShare extends ShareService {
 
     private String token;

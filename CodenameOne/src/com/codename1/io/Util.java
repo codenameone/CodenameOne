@@ -73,6 +73,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class Util {
     private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis());
     private static CodenameOneImplementation implInstance;

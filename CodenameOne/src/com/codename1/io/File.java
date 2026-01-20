@@ -39,6 +39,7 @@ import java.util.ArrayList;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class File {
     public static final char separatorChar = '/';
     public static final String separator = "/";

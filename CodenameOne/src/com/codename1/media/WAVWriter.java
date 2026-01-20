@@ -14,6 +14,7 @@ import java.io.OutputStream;
  * @author shannah
  * @since 7.0
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class WAVWriter implements AutoCloseable {
     private final File outputFile;
     private final int samplingRate;

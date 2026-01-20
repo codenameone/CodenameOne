@@ -50,6 +50,7 @@ import java.io.Writer;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class Log {
     /**
      * Constant indicating the logging level Debug is the default and the lowest level

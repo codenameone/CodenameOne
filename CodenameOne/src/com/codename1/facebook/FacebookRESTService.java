@@ -43,6 +43,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 class FacebookRESTService extends ConnectionRequest implements JSONParseCallback {
 
     // PMD Fix (UnusedPrivateField): Removed redundant token storage; the access token is forwarded directly via request arguments.

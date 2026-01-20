@@ -61,6 +61,7 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class Resources {
 
     /**

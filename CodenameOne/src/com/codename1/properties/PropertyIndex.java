@@ -63,6 +63,7 @@ import java.util.NoSuchElementException;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class PropertyIndex implements Iterable<PropertyBase> {
     private static final Map<String, HashMap<String, Object>> metadata = new LinkedHashMap<String, HashMap<String, Object>>();
     private final PropertyBase[] properties;

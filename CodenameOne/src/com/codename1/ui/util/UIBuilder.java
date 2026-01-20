@@ -81,6 +81,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class UIBuilder { //implements Externalizable {
     /**
      * A key in the form state hashtable used in the back command navigation

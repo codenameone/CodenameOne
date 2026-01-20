@@ -49,6 +49,7 @@ import java.io.OutputStream;
  *
  * @author Chen
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class Capture {
 
     /**

@@ -28,6 +28,7 @@ package com.codename1.util;
  * <li>xor</li>
  * </ul>
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class TLogical {
 
     /**

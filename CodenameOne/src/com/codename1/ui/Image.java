@@ -45,6 +45,7 @@ import java.util.HashMap;
  *
  * @author Chen Fishbein
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class Image implements ActionSource {
     int transform;
     private EventDispatcher listeners;

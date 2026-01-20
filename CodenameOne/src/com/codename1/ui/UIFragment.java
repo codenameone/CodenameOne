@@ -180,6 +180,7 @@ import static com.codename1.ui.ComponentSelector.$;
  * @author shannah
  * @since 7.0
  */
+@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class UIFragment {
 
 

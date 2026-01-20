@@ -36,6 +36,7 @@ import java.util.List;
  *
  * @author Steve Hannah
  */
+@SuppressWarnings({"PMD.AssignmentInOperand"})
 class Geometry {
 
     private static int factorial(int n) {

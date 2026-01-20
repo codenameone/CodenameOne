@@ -66,6 +66,7 @@ import java.util.Vector;
  * cases to use the WebBrowser Component from the Components package. That component works with the native
  * browser when applicable, which is a far superior approach.
  */
+@SuppressWarnings({"PMD.CloseResource"})
 public class HTMLComponent extends Container implements ActionListener, IOCallback {
     /**
      * If true, a full screen width will be assumed, this helps to make less internal components as text is aggregated to long labels
