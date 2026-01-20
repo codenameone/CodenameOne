@@ -122,7 +122,6 @@ public abstract class CodenameOneImplementation {
      */
     private static final int RTL_RANGE_BEGIN = 0x590;
     private static final int RTL_RANGE_END = 0x7BF;
-    private static boolean pollingThreadRunning;
     private static PushCallback callback;
     private static PurchaseCallback purchaseCallback;
     private static Runnable onCurrentFormChange;
@@ -268,7 +267,6 @@ public abstract class CodenameOneImplementation {
      * Stops the polling push loop
      */
     protected static void stopPolling() {
-        pollingThreadRunning = false;
     }
 
     /**

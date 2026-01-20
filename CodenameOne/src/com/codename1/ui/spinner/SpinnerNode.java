@@ -165,8 +165,7 @@ class SpinnerNode extends Node {
 
     public double calcViewportHeight() {
         double circumference = renderer.getPreferredH() * numSides;
-        double diameter = circumference / Math.PI;
-        return diameter;
+        return circumference / Math.PI;
     }
 
     private double calculateRotationForChild(int index) {

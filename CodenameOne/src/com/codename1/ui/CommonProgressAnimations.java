@@ -203,8 +203,7 @@ public class CommonProgressAnimations {
 
         @Override
         protected Dimension calcPreferredSize() {
-            Dimension out = new Dimension(CN.convertToPixels(8f), CN.convertToPixels(8f));
-            return out;
+            return new Dimension(CN.convertToPixels(8f), CN.convertToPixels(8f));
         }
 
 
@@ -230,8 +229,7 @@ public class CommonProgressAnimations {
 
         @Override
         protected Dimension calcPreferredSize() {
-            Dimension out = new Dimension(CN.convertToPixels(8f), CN.convertToPixels(8f));
-            return out;
+            return new Dimension(CN.convertToPixels(8f), CN.convertToPixels(8f));
         }
     }
 
@@ -376,8 +374,8 @@ public class CommonProgressAnimations {
             int charHeight = f.getHeight();
             int leading = charHeight / 2;
 
-            Dimension out = new Dimension(charWidth * cols + getStyle().getHorizontalPadding(), rows * (charHeight + leading) - leading + getStyle().getVerticalPadding());
-            return out;
+            return new Dimension(charWidth * cols + getStyle().getHorizontalPadding(),
+                    rows * (charHeight + leading) - leading + getStyle().getVerticalPadding());
         }
 
         /**

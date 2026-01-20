@@ -236,7 +236,6 @@ public class Component implements Animation, StyleListener, Editable {
      * is too slow to be useful.  This may not be the case on other platforms, but, for now, we'll leave this flag on.
      * Later on, after evaluation, this flag will likely be removed, and the best strategy will be decided upon.
      */
-    private static final boolean useLightweightElevationShadow = true;
     static int restoreDragPercentage = -1;
     /**
      * A flag to dictate whether style changes should trigger a revalidate() call
@@ -5347,8 +5346,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @return true if a press in this point might indicate the desire to begin a drag operation
      */
     protected boolean isDragAndDropOperation(int x, int y) {
-        Component leadParent = LeadUtil.leadParentImpl(this);
-        return leadParent.draggable;
+        return LeadUtil.leadParentImpl(this).draggable;
     }
 
     /**

@@ -424,8 +424,7 @@ public abstract class Login {
      * on the simulator
      */
     protected Oauth2 createOauth2() {
-        Oauth2 auth = new Oauth2(oauth2URL, clientId, redirectURI, scope);
-        return auth;
+        return new Oauth2(oauth2URL, clientId, redirectURI, scope);
     }
 
     /**

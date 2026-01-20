@@ -124,8 +124,7 @@ class SpinnerDateModel implements ListModel {
      */
     @Override
     public int getSelectedIndex() {
-        int out = (int) ((currentValue - min) / DAY);
-        return out;
+        return (int) ((currentValue - min) / DAY);
     }
 
 

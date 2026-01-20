@@ -488,8 +488,7 @@ public class ContainerList extends Container {
             if (c instanceof Container) {
                 ((Container) c).revalidate();
             }
-            Dimension d = c.getPreferredSize();
-            return d;
+            return c.getPreferredSize();
         }
     }
 

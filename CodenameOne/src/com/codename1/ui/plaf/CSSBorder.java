@@ -1545,10 +1545,9 @@ public class CSSBorder extends Border {
         }
 
         public String toCSSString() {
-            String sb = "#" +
+            return "#" +
                     padLeft(Integer.toHexString(color), 6) +
                     padLeft(Integer.toHexString(alpha), 2);
-            return sb;
         }
 
         @Override
@@ -1981,7 +1980,7 @@ public class CSSBorder extends Border {
         }
 
         private String toCSSString() {
-            String sb = topLeftX.toCSSString() + " " +
+            return topLeftX.toCSSString() + " " +
                     topRightX.toCSSString() + " " +
                     bottomRightX.toCSSString() + " " +
                     bottomLeftX.toCSSString() + " / " +
@@ -1989,7 +1988,6 @@ public class CSSBorder extends Border {
                     topRightY.toCSSString() + " " +
                     bottomRightY.toCSSString() + " " +
                     bottomLeftY.toCSSString();
-            return sb;
         }
 
 

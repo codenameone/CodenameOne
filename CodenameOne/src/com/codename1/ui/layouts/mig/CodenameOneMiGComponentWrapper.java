@@ -58,12 +58,6 @@ import com.codename1.ui.table.Table;
  */
 class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     /**
-     * Property to use in LAF settings and as JComponent client property
-     * to specify the visual padding.
-     * <p>
-     */
-    private static final String VISUAL_PADDING_PROPERTY = com.codename1.ui.layouts.mig.PlatformDefaults.VISUAL_PADDING_PROPERTY;
-    /**
      * Cache.
      */
     //private final static IdentityHashMap<FontMetrics, Point.Float> FM_MAP = new IdentityHashMap<FontMetrics, Point.Float>(4);
@@ -295,9 +289,8 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     @Override
     public final int[] getVisualPadding() {
         // TOOD, optimize this
-        int[] padding = new int[]{c.getStyle().getMarginTop(), c.getStyle().getMarginLeftNoRTL(),
+        return new int[]{c.getStyle().getMarginTop(), c.getStyle().getMarginLeftNoRTL(),
                 c.getStyle().getMarginBottom(), c.getStyle().getMarginRightNoRTL()};
-        return padding;
     }
 
     @Override

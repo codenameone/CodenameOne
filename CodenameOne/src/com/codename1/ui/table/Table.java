@@ -985,8 +985,7 @@ public class Table extends Container {
                 double d2 = Util.toDoubleValue(o2);
                 return Double.compare(d1, d2);
             } catch (IllegalArgumentException err) {
-                long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
-                return (int) dd;
+                return (int) (Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime());
             }
         }
     }

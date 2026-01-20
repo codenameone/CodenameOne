@@ -94,8 +94,7 @@ public class GoogleConnect extends Login {
         params.put("approval_prompt", "force");
         params.put("access_type", "offline");
 
-        Oauth2 auth = new Oauth2(oauth2URL, clientId, redirectURI, scope, tokenURL, clientSecret, params);
-        return auth;
+        return new Oauth2(oauth2URL, clientId, redirectURI, scope, tokenURL, clientSecret, params);
     }
 
     @Override

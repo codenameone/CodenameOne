@@ -764,8 +764,7 @@ public class MapComponent extends Container {
      *                                        (index &lt; 0 || index &gt;= size())
      */
     public Layer getLayerAt(int index) {
-        Layer l = ((LayerWithZoomLevels) _layers.elementAt(index)).layer;
-        return l;
+        return ((LayerWithZoomLevels) _layers.elementAt(index)).layer;
     }
 
     /**

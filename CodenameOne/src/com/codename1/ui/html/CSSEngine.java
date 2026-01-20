@@ -68,7 +68,6 @@ class CSSEngine {
      */
     private final static int INDENT_LIST_STYLE_POSITION = 15;
     // The possible values of the 'text-transform' attribute
-    private static final int TEXT_TRANSFORM_NONE = 0;
     private static final int TEXT_TRANSFORM_UPPERCASE = 1;
     private static final int TEXT_TRANSFORM_LOWERCASE = 2;
     private static final int TEXT_TRANSFORM_CAPITALIZE = 3;
@@ -82,23 +81,17 @@ class CSSEngine {
     private static final int INPUT_REQUIRED_FALSE = 1;
     // The possible values of the 'background-attachment' attribute
     private static final int BG_ATTACHMENT_FIXED = 0;
-    private static final int BG_ATTACHMENT_SCROLL = 1;
     // The possible values of the 'white-space' attribute
     private static final int WHITE_SPACE_NORMAL = 0;
     private static final int WHITE_SPACE_PRE = 1;
     private static final int WHITE_SPACE_NOWRAP = 2;
     // The possible values of the 'display' attribute
-    private static final int DISPLAY_INLINE = 0;
-    private static final int DISPLAY_BLOCK = 1;
-    private static final int DISPLAY_LIST_ITEM = 2;
     private static final int DISPLAY_NONE = 3;
     private static final int DISPLAY_MARQUEE = 4;
     // The possible values of the 'font-variant' attribute
-    private static final int FONT_VARIANT_NORMAL = 0;
     private static final int FONT_VARIANT_SMALLCAPS = 1;
     // The possible values of the 'list-style-position' attribute
     private static final int LIST_STYLE_POSITION_INSIDE = 0;
-    private static final int LIST_STYLE_POSITION_OUTSIDE = 1;
     // The possible values of the 'border-style' attribute
     private static final int BORDER_STYLE_NONE = 0;
     private static final int BORDER_STYLE_SOLID = 1;
@@ -119,21 +112,14 @@ class CSSEngine {
     private static final int STYLE = 1;
     private static final int COLOR = 2;
     // The possible values of the 'visibility' attribute
-    private static final int VISIBILITY_HIDDEN = 0;
     private static final int VISIBILITY_VISIBLE = 1;
-    private static final int VISIBILITY_COLLAPSE = 2; // collapse behaves the same as hidden in most browsers.
     // The possible values of the 'border-collapse' attribute
     private static final int BORDER_COLLAPSE_COLLAPSE = 0;
-    private static final int BORDER_COLLAPSE_SEPARATE = 1;
     // The possible values of the 'empty-cells' attribute
-    private static final int EMPTY_CELLS_HIDE = 0;
     private static final int EMPTY_CELLS_SHOW = 1;
     // The possible values of the 'caption-side' attribute
-    private static final int CAPTION_SIDE_BOTTOM = 0;
-    private static final int CAPTION_SIDE_TOP = 1;
     // The possible values of the 'direction' attribute
     private static final int DIRECTION_RTL = 0;
-    private static final int DIRECTION_LTR = 1;
     private static final int DEFAULT_3D_BORDER_COLOR = 0x9a9a9a; // default color for outset/inset/ridge/groove
     private static final Hashtable specialKeys = new Hashtable(); // A hashtable containing all recognized special key strings and their keycodes
     private final Hashtable matchingFonts = new Hashtable(); // A hashtable used as a cache for quick find of matching fonts

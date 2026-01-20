@@ -523,8 +523,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      */
     static int getInt(String intStr, int defaultValue) {
         try {
-            int num = Integer.parseInt(intStr);
-            return num;
+            return Integer.parseInt(intStr);
         } catch (NumberFormatException nfe) {
             return defaultValue;
         }
@@ -4145,10 +4144,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
          * Roman numerals lowercase ordered list type (i, ii, iii, iv, v ...)
          */
         private static final int LIST_ROMAN_LOWER = 4;
-        /**
-         * A list with no numbers at all - can be triggered with CSS
-         */
-        private static final int LIST_NONE = 5;
         int index;
         int listType;
 

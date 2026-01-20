@@ -726,12 +726,10 @@ class Geometry {
                 double x3 = (x[1] - x[0]) * t1 + x[0];
                 double y3 = (y[1] - y[0]) * t1 + y[0];
 
-                BezierCurve b1 = new BezierCurve(x0, y0,
+                return new BezierCurve(x0, y0,
                         x3, y3,
                         xt, yt
                 );
-
-                return b1;
 
             } else if (n() == 3) {
                 if (t0 != 0) {

@@ -74,24 +74,19 @@ final class Deflate {
     static final private int Z_DEFAULT_STRATEGY = 0;
     static final private int Z_NO_FLUSH = 0;
     static final private int Z_PARTIAL_FLUSH = 1;
-    static final private int Z_SYNC_FLUSH = 2;
     static final private int Z_FULL_FLUSH = 3;
     static final private int Z_FINISH = 4;
     static final private int Z_OK = 0;
     static final private int Z_STREAM_END = 1;
     static final private int Z_NEED_DICT = 2;
-    static final private int Z_ERRNO = -1;
     static final private int Z_STREAM_ERROR = -2;
     static final private int Z_DATA_ERROR = -3;
-    static final private int Z_MEM_ERROR = -4;
     static final private int Z_BUF_ERROR = -5;
-    static final private int Z_VERSION_ERROR = -6;
     static final private int INIT_STATE = 42;
     static final private int BUSY_STATE = 113;
     static final private int FINISH_STATE = 666;
     // The deflate compression method
     static final private int Z_DEFLATED = 8;
-    static final private int STORED_BLOCK = 0;
     static final private int STATIC_TREES = 1;
     static final private int DYN_TREES = 2;
     // The three kinds of block type

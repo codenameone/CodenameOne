@@ -17,9 +17,6 @@ package com.codename1.util;
  * <code>BigDecimal</code> with double scale.
  */
 public class BigDecimal {
-    private static final BigInteger ZERO = BigInteger.valueOf(0);
-    private static final BigInteger ONE = BigInteger.valueOf(1);
-
     //private final BigInteger bigInt;
     //private final int scale;
 

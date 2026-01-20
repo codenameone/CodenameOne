@@ -60,14 +60,13 @@ public abstract class TiledProvider extends MapProvider {
      * @return the image url of the tile
      */
     protected String url(int zoomLevel, int xTile, int yTile) {
-        String sb = _url + "/" +
+        return _url + "/" +
                 zoomLevel +
                 "/" +
                 xTile +
                 "/" +
                 yTile +
                 ".png";
-        return sb;
     }
 
     private int tileNo(double pos, double pos0, double scale) {

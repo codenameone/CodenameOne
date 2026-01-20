@@ -979,8 +979,7 @@ public class HTMLElement extends Element {
         }
 
         try {
-            int color = Integer.parseInt(colorStr, 16);
-            return color;
+            return Integer.parseInt(colorStr, 16);
         } catch (NumberFormatException nfe) {
             return defaultColor;
         }
@@ -1577,4 +1576,3 @@ public class HTMLElement extends Element {
     }
 
 }
-

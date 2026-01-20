@@ -45,7 +45,6 @@ import static com.codename1.ui.CN.convertToPixels;
  * @author Steve Hannah
  */
 class DateSpinner3D extends Container implements InternalPickerWidget {
-    private static final String monthRenderingPrototype = "WWW";
     private final SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
     private final Container wrapper = new Container(BoxLayout.x());
     private final Calendar tmpCal = Calendar.getInstance();

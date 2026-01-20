@@ -124,7 +124,6 @@ public final class GeneralPath implements Shape {
      * The path rule
      */
     int rule;
-    private boolean dirty = false;
 
     /**
      * Constructs a GeneralPath with the default ({@link #WIND_NON_ZERO})
@@ -573,7 +572,6 @@ public final class GeneralPath implements Shape {
             // awt.209=Invalid winding rule value
             throw new IllegalArgumentException("Invalid winding rule"); //$NON-NLS-1$
         }
-        dirty = true;
         this.rule = rule;
     }
 
@@ -620,7 +618,6 @@ public final class GeneralPath implements Shape {
             points[pointSize++] = x;
             points[pointSize++] = y;
         }
-        dirty = true;
     }
 
     public void lineTo(double x, double y) {
@@ -638,7 +635,6 @@ public final class GeneralPath implements Shape {
         types[typeSize++] = PathIterator.SEG_LINETO;
         points[pointSize++] = x;
         points[pointSize++] = y;
-        dirty = true;
     }
 
     public void quadTo(double x1, double y1, double x2, double y2) {
@@ -660,7 +656,6 @@ public final class GeneralPath implements Shape {
         points[pointSize++] = y1;
         points[pointSize++] = x2;
         points[pointSize++] = y2;
-        dirty = true;
     }
 
     public void curveTo(double x1, double y1, double x2, double y2, double x3, double y3) {
@@ -692,7 +687,6 @@ public final class GeneralPath implements Shape {
         points[pointSize++] = y2;
         points[pointSize++] = x3;
         points[pointSize++] = y3;
-        dirty = true;
     }
 
     /**
@@ -1001,7 +995,6 @@ public final class GeneralPath implements Shape {
         if (typeSize == 0 || types[typeSize - 1] != PathIterator.SEG_CLOSE) {
             checkBuf(0, true);
             types[typeSize++] = PathIterator.SEG_CLOSE;
-            dirty = true;
         }
     }
 
@@ -1026,7 +1019,6 @@ public final class GeneralPath implements Shape {
             append(p, connect);
         }
 
-        dirty = true;
     }
 
     /**
@@ -1083,7 +1075,6 @@ public final class GeneralPath implements Shape {
             path.next();
             connect = false;
         }
-        dirty = true;
     }
 
     /**
@@ -1132,7 +1123,6 @@ public final class GeneralPath implements Shape {
     public void reset() {
         typeSize = 0;
         pointSize = 0;
-        dirty = true;
     }
 
     /**
@@ -1379,7 +1369,6 @@ public final class GeneralPath implements Shape {
      * @param t The transform to apply to all points in the path.
      */
     public void setPath(GeneralPath p, Transform t) {
-        dirty = true;
         typeSize = p.typeSize;
         pointSize = p.pointSize;
         rule = p.rule;

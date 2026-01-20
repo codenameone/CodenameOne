@@ -96,8 +96,7 @@ public class HTMLParser extends XMLParser {
      */
     @Override
     protected Element createNewElement(String name) {
-        HTMLElement elem = new HTMLElement(name);
-        return elem;
+        return new HTMLElement(name);
     }
 
     /**
@@ -108,8 +107,7 @@ public class HTMLParser extends XMLParser {
      */
     @Override
     protected Element createNewTextElement(String text) {
-        HTMLElement elem = new HTMLElement(text, true);
-        return elem;
+        return new HTMLElement(text, true);
     }
 
     /**

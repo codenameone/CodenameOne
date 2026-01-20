@@ -132,8 +132,7 @@ class IndexedImage extends Image {
         }
 
 
-        IndexedImage i = new IndexedImage(width, height, tempPalette, rgb);
-        return i;
+        return new IndexedImage(width, height, tempPalette, rgb);
     }
 
     /**

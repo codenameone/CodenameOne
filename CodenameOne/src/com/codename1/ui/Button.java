@@ -102,8 +102,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      * @since 7.0
      */
     private ActionListener<? extends ActionEvent> bindListener;
-    private int pressedX;
-    private int pressedY;
 
     /**
      * Constructs a button with an empty string for its text.
@@ -722,8 +720,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     @Override
     public void keyPressed(int keyCode) {
         if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {
-            pressedX = -1;
-            pressedY = -1;
             pressed();
         }
     }
@@ -793,8 +789,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
-        pressedX = x;
-        pressedY = y;
         pressed();
         Form f = getComponentForm();
         // might happen when programmatically triggering press

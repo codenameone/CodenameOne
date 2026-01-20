@@ -343,29 +343,9 @@ public class Style {
      */
     public static final byte UNIT_TYPE_REM = 7;
     /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
-    private static final byte BACKGROUND_IMAGE_ALIGNED = (byte) 5;
-    /**
-     * Indicates the background alignment for use in tiling or aligned images
+     * Indicates the background alignment for use in tiling or aligned images.
      */
     private static final byte BACKGROUND_IMAGE_ALIGN_TOP = (byte) 0xa1;
-    /**
-     * Indicates the background alignment for use in tiling or aligned images
-     */
-    private static final byte BACKGROUND_IMAGE_ALIGN_BOTTOM = (byte) 0xa2;
-    /**
-     * Indicates the background alignment for use in tiling or aligned images
-     */
-    private static final byte BACKGROUND_IMAGE_ALIGN_LEFT = (byte) 0xa3;
-    /**
-     * Indicates the background alignment for use in tiling or aligned images
-     */
-    private static final byte BACKGROUND_IMAGE_ALIGN_RIGHT = (byte) 0xa4;
-    /**
-     * Indicates the background alignment for use in tiling or aligned images
-     */
-    private static final byte BACKGROUND_IMAGE_ALIGN_CENTER = (byte) 0xa5;
     /**
      * Used for modified flag
      */

@@ -263,11 +263,10 @@ final class TMathContext {
     @Override
     public String toString() {
 
-        String sb = String.valueOf(chPrecision) +
+        return String.valueOf(chPrecision) +
                 precision +
                 ' ' +
                 String.valueOf(chRoundingMode) +
                 roundingMode;
-        return sb;
     }
 }

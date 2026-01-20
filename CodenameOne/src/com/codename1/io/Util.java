@@ -2532,14 +2532,13 @@ public class Util {
          * @return
          */
         private static long generateLongFromDeviceInfo() {
-            long random = CN.getDeviceDensity()
+            return CN.getDeviceDensity()
                     * CN.getDisplayHeight()
                     * CN.getDisplayWidth()
                     * CN.convertToPixels(10)
                     * Long.parseLong(sanitizeString(CN.getPlatformName()), 36)
                     * Long.parseLong(sanitizeString(CN.getProperty("User-Agent", "1")), 36)
                     * Long.parseLong(sanitizeString(CN.getProperty("OSVer", "1")), 36);
-            return random;
         }
 
         /**
