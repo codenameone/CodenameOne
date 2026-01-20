@@ -209,6 +209,10 @@ class CleanTargetIntegrationTest {
             String headerContent = "#ifndef __JAVA_LANG_OBJECT_H__\n" +
                     "#define __JAVA_LANG_OBJECT_H__\n" +
                     "#include \"cn1_globals.h\"\n" +
+                    "extern struct clazz class__java_lang_Object;\n" +
+                    "void __FINALIZER_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete);\n" +
+                    "void __GC_MARK_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force);\n" +
+                    "void __INIT_VTABLE_java_lang_Object(CODENAME_ONE_THREAD_STATE, void** vtable);\n" +
                     "#endif\n";
             Files.write(objectHeader, headerContent.getBytes(StandardCharsets.UTF_8));
         }
