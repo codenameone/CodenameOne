@@ -47,7 +47,6 @@ final class InfCodes {
     static final private int Z_STREAM_END = 1;
     static final private int Z_STREAM_ERROR = -2;
     static final private int Z_DATA_ERROR = -3;
-    static final private int Z_BUF_ERROR = -5;
 
     // waiting for "i:"=input,
     //             "o:"=output,
