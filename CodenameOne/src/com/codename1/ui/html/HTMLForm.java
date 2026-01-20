@@ -382,7 +382,7 @@ class HTMLForm {
                 ComboBox combo = ((ComboBox) input);
                 if (defVal != null) {
                     combo.setSelectedItem(defVal);
-                } else if (!combo.isEmpty()) {
+                } else if (combo.getModel().getSize() > 0) {
                     combo.setSelectedIndex(0);
                 }
             }
@@ -507,4 +507,3 @@ class HTMLForm {
     }
 
 }
-
