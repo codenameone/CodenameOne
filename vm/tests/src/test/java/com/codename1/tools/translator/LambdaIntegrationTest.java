@@ -88,6 +88,7 @@ class LambdaIntegrationTest {
         }
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
+        compileJavaLangInvokeStubs(javaApiDir, config);
 
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
@@ -166,6 +167,87 @@ class LambdaIntegrationTest {
             }
         }
         return configs.get(0);
+    }
+
+    private void compileJavaLangInvokeStubs(Path outputDir, CompilerHelper.CompilerConfig config) throws IOException, InterruptedException {
+        Path stubsDir = Files.createTempDirectory("java-lang-invoke-stubs");
+        List<String> sources = generateJavaLangInvokeStubs(stubsDir);
+        List<String> args = new ArrayList<>();
+        args.add("-source");
+        args.add(config.targetVersion);
+        args.add("-target");
+        args.add(config.targetVersion);
+        args.add("-classpath");
+        args.add(outputDir.toString());
+        args.add("-d");
+        args.add(outputDir.toString());
+        args.addAll(sources);
+        int result = CompilerHelper.compile(config.jdkHome, args);
+        assertEquals(0, result, "java.lang.invoke stubs should compile");
+    }
+
+    private List<String> generateJavaLangInvokeStubs(Path stubsDir) throws IOException {
+        List<String> stubFiles = new ArrayList<>();
+        Path invokePkg = stubsDir.resolve("java/lang/invoke");
+        Files.createDirectories(invokePkg);
+
+        Path mh = invokePkg.resolve("MethodHandle.java");
+        Files.write(mh, ("package java.lang.invoke;\n" +
+                "public abstract class MethodHandle {\n" +
+                "    public Object invoke(Object... args) throws Throwable { return null; }\n" +
+                "    public Object invokeExact(Object... args) throws Throwable { return null; }\n" +
+                "}").getBytes(StandardCharsets.UTF_8));
+        stubFiles.add(mh.toString());
+
+        Path mt = invokePkg.resolve("MethodType.java");
+        Files.write(mt, ("package java.lang.invoke;\n" +
+                "public class MethodType {\n" +
+                "    public static MethodType methodType(Class<?> rtype, Class<?>[] ptypes) { return null; }\n" +
+                "}").getBytes(StandardCharsets.UTF_8));
+        stubFiles.add(mt.toString());
+
+        Path mhs = invokePkg.resolve("MethodHandles.java");
+        Files.write(mhs, ("package java.lang.invoke;\n" +
+                "public class MethodHandles {\n" +
+                "    public static Lookup lookup() { return null; }\n" +
+                "    public static class Lookup {\n" +
+                "        public MethodHandle findVirtual(Class<?> refc, String name, MethodType type) throws NoSuchMethodException, IllegalAccessException { return null; }\n" +
+                "        public MethodHandle findStatic(Class<?> refc, String name, MethodType type) throws NoSuchMethodException, IllegalAccessException { return null; }\n" +
+                "    }\n" +
+                "}").getBytes(StandardCharsets.UTF_8));
+        stubFiles.add(mhs.toString());
+
+        Path cs = invokePkg.resolve("CallSite.java");
+        Files.write(cs, ("package java.lang.invoke;\n" +
+                "public abstract class CallSite {\n" +
+                "    public abstract MethodHandle getTarget();\n" +
+                "    public abstract void setTarget(MethodHandle newTarget);\n" +
+                "}").getBytes(StandardCharsets.UTF_8));
+        stubFiles.add(cs.toString());
+
+        Path lmf = invokePkg.resolve("LambdaMetafactory.java");
+        Files.write(lmf, ("package java.lang.invoke;\n" +
+                "public class LambdaMetafactory {\n" +
+                "    public static CallSite metafactory(MethodHandles.Lookup caller, String invokedName, MethodType invokedType, MethodType samMethodType, MethodHandle implMethod, MethodType instantiatedMethodType) throws LambdaConversionException { return null; }\n" +
+                "    public static CallSite altMetafactory(MethodHandles.Lookup caller, String invokedName, MethodType invokedType, Object... args) throws LambdaConversionException { return null; }\n" +
+                "}").getBytes(StandardCharsets.UTF_8));
+        stubFiles.add(lmf.toString());
+
+        Path lce = invokePkg.resolve("LambdaConversionException.java");
+        Files.write(lce, ("package java.lang.invoke;\n" +
+                "public class LambdaConversionException extends Exception {}\n").getBytes(StandardCharsets.UTF_8));
+        stubFiles.add(lce.toString());
+
+        Path ccs = invokePkg.resolve("ConstantCallSite.java");
+        Files.write(ccs, ("package java.lang.invoke;\n" +
+                "public class ConstantCallSite extends CallSite {\n" +
+                "    public ConstantCallSite(MethodHandle target) { }\n" +
+                "    public final MethodHandle getTarget() { return null; }\n" +
+                "    public final void setTarget(MethodHandle ignore) { }\n" +
+                "}").getBytes(StandardCharsets.UTF_8));
+        stubFiles.add(ccs.toString());
+
+        return stubFiles;
     }
 
     private void writeMissingHeadersAndImpls(Path srcRoot) throws Exception {

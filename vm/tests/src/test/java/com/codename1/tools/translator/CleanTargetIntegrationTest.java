@@ -85,6 +85,7 @@ class CleanTargetIntegrationTest {
         Path srcRoot = distDir.resolve("HelloCleanApp-src");
         patchCn1Globals(srcRoot);
         writeRuntimeStubs(srcRoot);
+        writeMissingHeadersAndImpls(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
@@ -360,6 +361,18 @@ class CleanTargetIntegrationTest {
                 "int currentGcMarkValue = 1;\n";
 
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static void writeMissingHeadersAndImpls(Path srcRoot) throws IOException {
+        Path npeHeader = srcRoot.resolve("java_lang_NullPointerException.h");
+        if (!Files.exists(npeHeader)) {
+            String npeContent = "#ifndef __JAVA_LANG_NULLPOINTEREXCEPTION_H__\n" +
+                    "#define __JAVA_LANG_NULLPOINTEREXCEPTION_H__\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "JAVA_OBJECT __NEW_INSTANCE_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);\n" +
+                    "#endif\n";
+            Files.write(npeHeader, npeContent.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     static String helloWorldSource() {
