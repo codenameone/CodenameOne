@@ -349,7 +349,7 @@ public class Log {
                 }
             }
             return text;
-        } catch (Exception ex) {
+        } catch (IOException ex) {
             ex.printStackTrace();
             return "";
         }

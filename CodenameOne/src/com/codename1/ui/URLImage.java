@@ -380,7 +380,7 @@ public final class URLImage extends EncodedImage {
                                 DownloadCompleted onComplete = new DownloadCompleted();
                                 onComplete.setSourceImage(value);
                                 onComplete.actionPerformed(new ActionEvent(value));
-                            } catch (Exception ex) {
+                            } catch (IOException ex) {
                                 if (exceptionHandler != null) {
                                     exceptionHandler.onError(URLImage.this, ex);
                                 } else {
@@ -391,7 +391,7 @@ public final class URLImage extends EncodedImage {
                             }
                         }
                     });
-                } catch (Exception t) {
+                } catch (IOException t) {
                     if (exceptionHandler != null) {
                         exceptionHandler.onError(URLImage.this, t);
                     } else {
