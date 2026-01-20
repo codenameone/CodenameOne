@@ -179,7 +179,7 @@ class IndexEvaluator extends AbstractEvaluator {
             }
             return elements.get(dim);
         } else if (expr.equals(FUNC_LAST)) {
-            if (elements.size() == 0) {
+            if (elements.isEmpty()) {
                 return null;
             }
             return elements.get(elements.size() - 1);

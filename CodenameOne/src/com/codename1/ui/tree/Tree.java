@@ -838,7 +838,7 @@ public class Tree extends Container {
         @Override
         public boolean isLeaf(Object node) {
             Vector v = getChildren(node);
-            return v.size() == 0;
+            return v.isEmpty();
         }
     }
 

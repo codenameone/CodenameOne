@@ -277,7 +277,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      */
     @Override
     public void clear() {
-        if (value.size() > 0) {
+        if (!value.isEmpty()) {
             value.clear();
             firePropertyChanged();
             internalSet();

@@ -159,7 +159,7 @@ public class TextModeLayout extends Layout {
                     tc.add(c);
                 }
             }
-            if (tc.size() > 0) {
+            if (!tc.isEmpty()) {
                 Component[] tcArr = new Component[tc.size()];
                 tc.toArray(tcArr);
                 InputComponent.group(tcArr);

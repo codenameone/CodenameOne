@@ -396,7 +396,7 @@ public final class FaceBookAccess {
         final Vector err = new Vector();
         addResponseCodeListener(new GetUserResponseCodeActionListener(err));
         getFaceBookObject(id, new GetUserFacebookObjectActionListener(user), true, false);
-        if (err.size() > 0) {
+        if (!err.isEmpty()) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
 
@@ -415,7 +415,7 @@ public final class FaceBookAccess {
         final Vector err = new Vector();
         addResponseCodeListener(new GetPageResponseCodeActionListener(err));
         getFaceBookObject(pageId, new GetPageActionListener(page), false, false);
-        if (err.size() > 0) {
+        if (!err.isEmpty()) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
         return page;
@@ -446,7 +446,7 @@ public final class FaceBookAccess {
         final Vector err = new Vector();
         addResponseCodeListener(new GetPostAuthResponseCodeActionListener(err));
         getFaceBookObject(postId, new GetPostAuthActionListener(post), needAuth, false);
-        if (err.size() > 0) {
+        if (!err.isEmpty()) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
         return post;
@@ -478,7 +478,7 @@ public final class FaceBookAccess {
 
         addResponseCodeListener(new GetPhotoAuthResponseCodeActionListener(err));
         getFaceBookObject(photoId, new GetPhotoAuthActionListener(photo), needAuth, false);
-        if (err.size() > 0) {
+        if (!err.isEmpty()) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
         return photo;
@@ -515,7 +515,7 @@ public final class FaceBookAccess {
             }
         });
         getFaceBookObject(albumId, new GetAlbumAuthActionListener(album), needAuth, false);
-        if (err.size() > 0) {
+        if (!err.isEmpty()) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
         return album;

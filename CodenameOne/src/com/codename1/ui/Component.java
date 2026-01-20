@@ -763,7 +763,7 @@ public class Component implements Animation, StyleListener, Editable {
                 if (lst.size() == 1) {
                     lst.get(0).sameWidth = null;
                 } else {
-                    if (lst.size() > 0) {
+                    if (!lst.isEmpty()) {
                         Component[] cmps = new Component[lst.size()];
                         lst.toArray(cmps);
                         setSameWidth(cmps);
@@ -802,7 +802,7 @@ public class Component implements Animation, StyleListener, Editable {
                 if (lst.size() == 1) {
                     lst.get(0).sameHeight = null;
                 } else {
-                    if (lst.size() > 0) {
+                    if (!lst.isEmpty()) {
                         Component[] cmps = new Component[lst.size()];
                         lst.toArray(cmps);
                         setSameHeight(cmps);
@@ -1276,7 +1276,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         if (value == null) {
             clientProperties.remove(key);
-            if (clientProperties.size() == 0) {
+            if (clientProperties.isEmpty()) {
                 clientProperties = null;
             }
         } else {
@@ -3162,7 +3162,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
-    private void drawPainters(com.codename1.ui.Graphics g, Component par, Component c,
+    private void drawPainters(Graphics g, Component par, Component c,
                               int x, int y, int w, int h) {
         if (flatten && getWidth() > 0 && getHeight() > 0) {
             Image i = (Image) getClientProperty("$FLAT");
@@ -3186,7 +3186,7 @@ public class Component implements Animation, StyleListener, Editable {
         drawPaintersImpl(g, par, c, x, y, w, h);
     }
 
-    private void drawPaintersImpl(com.codename1.ui.Graphics g, Component par, Component c,
+    private void drawPaintersImpl(Graphics g, Component par, Component c,
                                   int x, int y, int w, int h) {
         if (par == null) {
             return;

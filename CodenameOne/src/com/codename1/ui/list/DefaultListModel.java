@@ -361,7 +361,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
             if (selectedIndices == null) {
                 selectedIndices = new HashSet<Integer>();
             }
-            java.util.Set newSelections = new HashSet(toList(indices));
+            Set newSelections = new HashSet(toList(indices));
             if (selectedIndices.size() != indices.length || !selectedIndices.containsAll(newSelections)) {
                 HashSet toRemove = new HashSet(selectedIndices);
                 toRemove.removeAll(newSelections);

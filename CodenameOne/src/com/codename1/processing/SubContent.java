@@ -87,7 +87,7 @@ class SubContent implements StructuredContent {
      */
     @Override
     public StructuredContent getChild(int index) {
-        if (root != null && root.size() > 0) {
+        if (root != null && !root.isEmpty()) {
             return root.get(0).getChild(0);
         }
         return null;

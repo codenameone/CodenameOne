@@ -139,7 +139,7 @@ class HTMLTableModel implements TableModel {
      * Commits the current row only if it is not empty
      */
     void commitRowIfNotEmpty() {
-        if (currentRow.size() > 0) {
+        if (!currentRow.isEmpty()) {
             commitRow();
         }
     }

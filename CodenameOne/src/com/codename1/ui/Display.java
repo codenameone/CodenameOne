@@ -479,7 +479,7 @@ public final class Display extends CN1Constants {
             INSTANCE.dragPathY = new float[INSTANCE.PATHLENGTH];
             INSTANCE.dragPathTime = new long[INSTANCE.PATHLENGTH];
             com.codename1.util.StringUtil.setImplementation(impl);
-            com.codename1.io.Util.setImplementation(impl);
+            Util.setImplementation(impl);
 
             // this can happen on some cases where an application was restarted etc...
             // generally its probably a bug but we can let it slide...
@@ -870,7 +870,7 @@ public final class Display extends CN1Constants {
                         while (true) {
                             Runnable nextTask = null;
                             synchronized (lock) {
-                                if (backgroundTasks.size() > 0) {
+                                if (!backgroundTasks.isEmpty()) {
                                     nextTask = backgroundTasks.get(0);
                                 } else {
                                     backgroundThread = null;
@@ -970,7 +970,7 @@ public final class Display extends CN1Constants {
         while (!shouldEDTSleepNoFormAnimation()) {
             edtLoopImpl();
         }
-        while (animationQueue != null && animationQueue.size() > 0) {
+        while (animationQueue != null && !animationQueue.isEmpty()) {
             edtLoopImpl();
         }
     }
@@ -991,7 +991,7 @@ public final class Display extends CN1Constants {
      * @return true if in the middle of form transition
      */
     public boolean isInTransition() {
-        if (animationQueue != null && animationQueue.size() > 0) {
+        if (animationQueue != null && !animationQueue.isEmpty()) {
             Animation ani = animationQueue.get(0);
             return ani instanceof Transition;
         }
@@ -1006,7 +1006,7 @@ public final class Display extends CN1Constants {
                 Form source = (Form) ((Transition) ani).getSource();
                 restoreMenu(source);
 
-                if (animationQueue.size() > 0) {
+                if (!animationQueue.isEmpty()) {
                     ani = animationQueue.get(0);
                     if (ani instanceof Transition) {
                         ((Transition) ani).initTransition();
@@ -1076,7 +1076,7 @@ public final class Display extends CN1Constants {
 
                     // paint transition or intro animations and don't do anything else if such
                     // animations are in progress...
-                    if (animationQueue != null && animationQueue.size() > 0) {
+                    if (animationQueue != null && !animationQueue.isEmpty()) {
                         paintTransitionAnimation();
                         continue;
                     }
@@ -1170,7 +1170,7 @@ public final class Display extends CN1Constants {
     void edtLoopImpl() {
         try {
             // transitions shouldn't be bound by framerate
-            if (animationQueue == null || animationQueue.size() == 0) {
+            if (animationQueue == null || animationQueue.isEmpty()) {
                 // prevents us from waking up the EDT too much and
                 // thus exhausting the systems resources. The + 1
                 // prevents us from ever waiting 0 milliseconds which
@@ -1277,7 +1277,7 @@ public final class Display extends CN1Constants {
     }
 
     boolean hasNoSerialCallsPending() {
-        return pendingSerialCalls.size() == 0;
+        return pendingSerialCalls.isEmpty();
     }
 
     /**
@@ -1596,7 +1596,7 @@ public final class Display extends CN1Constants {
         }
 
         boolean transitionExists = false;
-        if (animationQueue != null && animationQueue.size() > 0) {
+        if (animationQueue != null && !animationQueue.isEmpty()) {
             Object o = animationQueue.get(animationQueue.size() - 1);
             if (o instanceof Transition) {
                 current = (Form) ((Transition) o).getDestination();
@@ -1647,7 +1647,7 @@ public final class Display extends CN1Constants {
         }
 
         if (!transitionExists) {
-            if (animationQueue == null || animationQueue.size() == 0) {
+            if (animationQueue == null || animationQueue.isEmpty()) {
                 setCurrentForm(newForm);
             } else {
                 // we need to add an empty transition to "serialize" this
@@ -2484,7 +2484,7 @@ public final class Display extends CN1Constants {
     boolean shouldEDTSleep() {
         Form current = impl.getCurrentForm();
         return ((current == null || (!current.hasAnimations())) &&
-                (animationQueue == null || animationQueue.size() == 0) &&
+                (animationQueue == null || animationQueue.isEmpty()) &&
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
@@ -3135,7 +3135,7 @@ public final class Display extends CN1Constants {
         if (errorHandler != null) {
             errorHandler.removeListener(e);
             Collection v = errorHandler.getListenerCollection();
-            if (v == null || v.size() == 0) {
+            if (v == null || v.isEmpty()) {
                 errorHandler = null;
             }
         }

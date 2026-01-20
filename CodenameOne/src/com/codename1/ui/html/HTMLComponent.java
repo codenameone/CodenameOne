@@ -755,7 +755,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 throw new IllegalArgumentException("The specified element is not contained in the current document.");
             }
             Vector v = element.getUi();
-            if ((v != null) && (v.size() > 0)) {
+            if ((v != null) && (!v.isEmpty())) {
                 Component cmp = ((Component) v.firstElement());
                 if (cmp != null) {
                     Container parent = cmp.getParent();
@@ -1307,7 +1307,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 getComponentForm().setFocused(mainContainer);
             }
 
-            if (marqueeComponents.size() > 0) {
+            if (!marqueeComponents.isEmpty()) {
                 getComponentForm().registerAnimated(HTMLComponent.this);
                 int dir = getUIManager().getLookAndFeel().isRTL() ? 1 : -1;
                 marqueeMotion = Motion.createLinearMotion(0, dir * HTMLComponent.this.getWidth(), MARQUEE_DELAY / 2);
@@ -1733,7 +1733,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             body = html.getFirstChildByTagId(HTMLElement.TAG_BODY);
             if ((!PROCESS_HTML_MP1_ONLY) && (body == null)) { // frames html does not contain body - but may contain a 'noframes' tag to display
                 Vector noFrames = html.getDescendantsByTagId(HTMLElement.TAG_NOFRAMES);
-                if ((noFrames != null) && (noFrames.size() > 0)) {
+                if ((noFrames != null) && (!noFrames.isEmpty())) {
                     body = (HTMLElement) noFrames.elementAt(0);
                 }
             }
@@ -2876,7 +2876,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                             curForm.setDefaultValue(curTextArea, text);
                         }
                     } else if (element.getTagId() == HTMLElement.TAG_LEGEND) { // Note: this is element, i.e. the child's parent (child is TAG_TEXT, and if parent is TAG_LEGEND then we process this block)
-                        if (fieldsets.size() > 0) {
+                        if (!fieldsets.isEmpty()) {
                             Container fset = (Container) fieldsets.lastElement();
                             fset.getStyle().setBorder(Border.createLineBorder(1, text));
                             fset.getStyle().setPadding(Component.TOP, fset.getStyle().getFont().getHeight() + 1);
@@ -2951,7 +2951,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     newLineIfNotEmpty(curAlign);
                     Container newCont = new Container();
                     newCont.setUIID("HTMLFieldset");
-                    if (fieldsets.size() == 0) { // First fieldset shouldn't have margin
+                    if (fieldsets.isEmpty()) { // First fieldset shouldn't have margin
                         newCont.getStyle().setMargin(Component.LEFT, 0);
                     }
                     newCont.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
@@ -3000,7 +3000,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     olIndex = getInt(child.getAttributeById(HTMLElement.ATTR_START), 1); //olIndex=1;
                     listType = getOrderedListType(child);
 
-                    if ((olUpperLevelIndex.size() == 0) && (ulLevel == 0)) { //newline only if it's the first list
+                    if ((olUpperLevelIndex.isEmpty()) && (ulLevel == 0)) { //newline only if it's the first list
                         newLine(curAlign);
                     } else {
                         listIndent += INDENT_OL; // add indent only for second level - first one already gets it from the numbers alignment to a 4-digit number
@@ -3329,7 +3329,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     popContainer();
                     break;
                 case HTMLElement.TAG_OL:
-                    if (olUpperLevelIndex.size() != 0) {
+                    if (!olUpperLevelIndex.isEmpty()) {
                         String indexStr = (String) olUpperLevelIndex.lastElement();
                         olUpperLevelIndex.removeElementAt(olUpperLevelIndex.size() - 1);
                         listType = getOrderedListType(indexStr.charAt(0), HTMLListIndex.LIST_NUMERIC);
@@ -3518,7 +3518,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                         newLineIfNotEmpty(curAlign);
                     }
 
-                    if (tables.size() == 0) {
+                    if (tables.isEmpty()) {
                         curTable = null;
                     } else {
                         curTable = (HTMLTableModel) tables.lastElement();
@@ -3989,7 +3989,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         counterStr = counterStr.trim();
         int value = reset ? 0 : 1; // 0 is the default value to reset to, while 1 is the default increment step
         Vector v = getWords(counterStr, Component.LEFT, false); // align is LEFT but just as a place holder, it doesn't really have any effect
-        if (v.size() == 0) {
+        if (v.isEmpty()) {
             return;
         }
         counterStr = (String) v.elementAt(0);

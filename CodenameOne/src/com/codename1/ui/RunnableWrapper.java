@@ -143,7 +143,7 @@ class RunnableWrapper implements Runnable {
                     while (!Display.getInstance().codenameOneExited) {
                         Runnable r = null;
                         synchronized (THREADPOOL_LOCK) {
-                            if (threadPool.size() > 0) {
+                            if (!threadPool.isEmpty()) {
                                 r = threadPool.get(0);
                                 threadPool.remove(0);
                             } else {

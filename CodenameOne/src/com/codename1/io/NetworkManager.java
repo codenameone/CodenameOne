@@ -688,7 +688,7 @@ public final class NetworkManager {
         }
         progressListeners.removeListener(al);
         Collection v = progressListeners.getListenerCollection();
-        if (v == null || v.size() == 0) {
+        if (v == null || v.isEmpty()) {
             progressListeners = null;
         }
     }
@@ -731,7 +731,7 @@ public final class NetworkManager {
         return pending == null ||
                 networkThreads == null ||
                 networkThreads[0] == null ||
-                (pending.size() == 0 && networkThreads[0].getCurrentRequest() == null);
+                (pending.isEmpty() && networkThreads[0].getCurrentRequest() == null);
     }
 
     /**
@@ -828,7 +828,7 @@ public final class NetworkManager {
         }
 
         private boolean runCurrentRequest(@Async.Execute ConnectionRequest req) {
-            if (threadAssignements.size() > 0) {
+            if (!threadAssignements.isEmpty()) {
                 String n = currentRequest.getClass().getName();
                 Integer threadOffset = (Integer) threadAssignements.get(n);
                 NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
@@ -837,7 +837,7 @@ public final class NetworkManager {
                 }
                 if (threadOffset != null && networkThreads[threadOffset.intValue()] != this) { //NOPMD CompareObjectsWithEquals
                     synchronized (LOCK) {
-                        if (pending.size() > 0) {
+                        if (!pending.isEmpty()) {
                             pending.insertElementAt(currentRequest, 1);
                             return false;
                         }
@@ -949,11 +949,11 @@ public final class NetworkManager {
         public void run() {
             threadInstance = Thread.currentThread();
             while (running && !stopped) {
-                if (pending.size() > 0) {
+                if (!pending.isEmpty()) {
                     // the synchronization here isn't essential, only for good measure
                     synchronized (LOCK) {
                         //double lock to prevent a potential exception
-                        if (pending.size() == 0) {
+                        if (pending.isEmpty()) {
                             continue;
                         }
                         currentRequest = (ConnectionRequest) pending.elementAt(0);
@@ -990,7 +990,7 @@ public final class NetworkManager {
                             // prevent waiting when there is still a pending request
                             // this can occur with a race condition since the synchronize
                             // scope is limited to prevent blocking on add...
-                            while (pending.size() == 0 && running && !stopped) {
+                            while (pending.isEmpty() && running && !stopped) {
                                 LOCK.wait();
                             }
                         } catch (InterruptedException ex) {

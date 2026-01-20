@@ -1091,7 +1091,7 @@ public class Resources {
         }
     }
 
-    com.codename1.ui.Image createSVG(boolean animated, byte[] data) throws IOException {
+    Image createSVG(boolean animated, byte[] data) throws IOException {
         return Image.createSVG(null, animated, data);
     }
 
@@ -1221,7 +1221,7 @@ public class Resources {
         i.readByte();
     }
 
-    Font loadBitmapFont(DataInputStream input, String id, com.codename1.ui.Font font) throws IOException {
+    Font loadBitmapFont(DataInputStream input, String id, Font font) throws IOException {
         Image bitmap = createImage(input);
         int charCount = input.readShort();
         int[] cutOffsets = new int[charCount];

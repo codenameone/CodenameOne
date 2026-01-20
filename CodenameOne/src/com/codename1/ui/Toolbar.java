@@ -2650,7 +2650,7 @@ public class Toolbar extends Container {
         @Override
         void installRightCommands() {
             super.installRightCommands();
-            if (overflowCommands != null && overflowCommands.size() > 0) {
+            if (overflowCommands != null && !overflowCommands.isEmpty()) {
                 UIManager uim = UIManager.getInstance();
                 Image i = uim.getThemeImageConstant("menuImage");
                 if (uim.getThemeConstant("overflowImageSize", null) != null) {

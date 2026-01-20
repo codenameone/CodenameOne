@@ -199,7 +199,7 @@ public class Ads extends Container implements HTMLCallback {
             h.setSupressExceptions(true);
             HTMLElement dom = h.getDOM();
             Vector links = dom.getDescendantsByTagName("a");
-            if (links.size() > 0) {
+            if (!links.isEmpty()) {
                 HTMLElement e = (HTMLElement) links.elementAt(0);
                 String link = e.getAttribute("href");
                 if (link != null) {

@@ -261,7 +261,7 @@ class HTMLForm {
         boolean error = false; //If this is turned to true anywhere, the form will not be submitted
         String url = action;
         String params = null;
-        if (comps.size() > 0) {
+        if (!comps.isEmpty()) {
             StringBuilder paramsBuilder = new StringBuilder();
             for (Enumeration e = comps.keys(); e.hasMoreElements(); ) {
                 String key = (String) e.nextElement();
@@ -382,7 +382,7 @@ class HTMLForm {
                 ComboBox combo = ((ComboBox) input);
                 if (defVal != null) {
                     combo.setSelectedItem(defVal);
-                } else if (combo.size() > 0) {
+                } else if (combo.getModel().getSize() > 0) {
                     combo.setSelectedIndex(0);
                 }
             }
@@ -507,4 +507,3 @@ class HTMLForm {
     }
 
 }
-

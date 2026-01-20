@@ -1423,7 +1423,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (mgr != null && animations.size() > 0) {
+        if (mgr != null && !animations.isEmpty()) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])));
         }
         return new ComponentSelector(replacements);
@@ -1462,7 +1462,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (mgr != null && animations.size() > 0) {
+        if (mgr != null && !animations.isEmpty()) {
             mgr.addAnimationAndBlock(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])));
         }
 
@@ -3525,7 +3525,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimationAndBlock(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])));
         }
         return this;
@@ -3556,7 +3556,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
                 @Override
                 public void run() {
@@ -3584,7 +3584,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimationAndBlock(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])));
         }
         return this;
@@ -3617,7 +3617,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
                 @Override
                 public void run() {
@@ -3645,7 +3645,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimationAndBlock(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])));
         }
         return this;
@@ -3678,7 +3678,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
 
                 @Override
@@ -3718,7 +3718,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
 
                 @Override
@@ -3747,7 +3747,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimationAndBlock(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])));
         }
         return this;
@@ -3781,7 +3781,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
                 @Override
                 public void run() {
@@ -3810,7 +3810,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             }
         }
         AnimationManager mgr = getAnimationManager();
-        if (animations.size() > 0 && mgr != null) {
+        if (!animations.isEmpty() && mgr != null) {
             mgr.addAnimationAndBlock(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])));
         }
         return this;

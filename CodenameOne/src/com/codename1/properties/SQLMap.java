@@ -446,7 +446,7 @@ public final class SQLMap {
      * @param page        the page within the query to match the max elements value
      * @return the result of the query
      */
-    public java.util.List<PropertyBusinessObject> select(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+    public List<PropertyBusinessObject> select(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         return selectImpl(false, cmp, orderBy, ascending, maxElements, page);
     }
 
@@ -461,7 +461,7 @@ public final class SQLMap {
      * @param page        the page within the query to match the max elements value
      * @return the result of the query
      */
-    public java.util.List<PropertyBusinessObject> selectNot(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+    public List<PropertyBusinessObject> selectNot(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         return selectImpl(true, cmp, orderBy, ascending, maxElements, page);
     }
 
@@ -476,7 +476,7 @@ public final class SQLMap {
      * @param page        the page within the query to match the max elements value
      * @return the result of the query
      */
-    private java.util.List<PropertyBusinessObject> selectImpl(boolean not, PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+    private List<PropertyBusinessObject> selectImpl(boolean not, PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         ArrayList<Object> params = new ArrayList<Object>();
 
         StringBuilder createStatement = new StringBuilder();
@@ -516,7 +516,7 @@ public final class SQLMap {
      * @param page          the page within the query to match the max elements value
      * @return the result of the query
      */
-    private java.util.List<PropertyBusinessObject> selectImpl(PropertyBusinessObject cmp, String where, Class propertyClass, Object[] params, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+    private List<PropertyBusinessObject> selectImpl(PropertyBusinessObject cmp, String where, Class propertyClass, Object[] params, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         String tableName = getTableName(cmp);
         StringBuilder createStatement = new StringBuilder("SELECT * FROM ");
         createStatement.append(tableName);
@@ -782,7 +782,7 @@ public final class SQLMap {
             return new SelectBuilder(property, " < ", null, null, this);
         }
 
-        public java.util.List<PropertyBusinessObject> build(PropertyBusinessObject obj, int maxElements, int page) throws IOException, InstantiationException {
+        public List<PropertyBusinessObject> build(PropertyBusinessObject obj, int maxElements, int page) throws IOException, InstantiationException {
             SelectBuilder root = this;
             while (root.parent.property != null) {
                 root = root.parent;

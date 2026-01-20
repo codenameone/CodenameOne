@@ -273,7 +273,7 @@ class ResourceThreadQueue {
         running.removeElement(finishedThread);
 
 
-        if (queue.size() > 0) {
+        if (!queue.isEmpty()) {
             ResourceThread t = (ResourceThread) queue.firstElement();
             queue.removeElementAt(0);
             running.addElement(t);
@@ -283,7 +283,7 @@ class ResourceThreadQueue {
         }
 
         if (threadCount == 0) {
-            if (images.size() == 0) {
+            if (images.isEmpty()) {
                 htmlC.setPageStatus(HTMLCallback.STATUS_COMPLETED);
             } else {
                 startRunningImages();

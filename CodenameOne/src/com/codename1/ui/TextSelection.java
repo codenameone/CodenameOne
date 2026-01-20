@@ -1050,7 +1050,7 @@ public class TextSelection {
          * @return The first Char, or null.
          */
         public Char first() {
-            if (chars.size() == 0) {
+            if (chars.isEmpty()) {
                 return null;
             }
             return chars.get(0);
@@ -1062,7 +1062,7 @@ public class TextSelection {
          * @return The last Char or null.
          */
         public Char last() {
-            if (chars.size() == 0) {
+            if (chars.isEmpty()) {
                 return null;
             }
             return chars.get(chars.size() - 1);
@@ -1184,7 +1184,7 @@ public class TextSelection {
          * @return
          */
         public Span first() {
-            if (spans.size() > 0) {
+            if (!spans.isEmpty()) {
                 return spans.get(0);
             }
             return null;
@@ -1196,7 +1196,7 @@ public class TextSelection {
          * @return
          */
         public Span last() {
-            if (spans.size() > 0) {
+            if (!spans.isEmpty()) {
                 return spans.get(spans.size() - 1);
             }
             return null;

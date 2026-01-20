@@ -1524,7 +1524,7 @@ public class Label extends Component implements IconHolder, TextHolder {
                 @Override
                 public Span triggerSelectionAt(TextSelection sel, int x, int y) {
                     span = getUIManager().getLookAndFeel().calculateLabelSpan(sel, Label.this);
-                    if (span.size() == 0) {
+                    if (span.isEmpty()) {
                         return null;
                     }
                     Char charAtPoint = span.charAt(x, y);
