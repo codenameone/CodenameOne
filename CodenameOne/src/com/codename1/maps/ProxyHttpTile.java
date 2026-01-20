@@ -35,7 +35,6 @@ import com.codename1.util.StringUtil;
  */
 public class ProxyHttpTile extends Tile {
 
-    private final String _url;
     private Tile _tile;
 
     /**
@@ -47,7 +46,6 @@ public class ProxyHttpTile extends Tile {
      */
     public ProxyHttpTile(Dimension tileSize, BoundingBox bbox, final String url) {
         super(tileSize, bbox, null);
-        _url = url;
         String cacheId = url.substring(url.indexOf(":") + 1);
         cacheId = StringUtil.replaceAll(cacheId, "\\", "_");
         cacheId = StringUtil.replaceAll(cacheId, "/", "_");

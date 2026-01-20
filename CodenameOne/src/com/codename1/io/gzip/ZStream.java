@@ -135,9 +135,8 @@ public class ZStream {
         if (istate == null) {
             return Z_STREAM_ERROR;
         }
-        int ret = istate.inflateEnd();
 //    istate = null;
-        return ret;
+        return istate.inflateEnd();
     }
 
     public int inflateSync() {

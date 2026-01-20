@@ -278,7 +278,6 @@ public final class Display extends CN1Constants {
     private static final int POINTER_HOVER_PRESSED = 12;
     private static final int KEY_PRESSED = 4;
     private static final int KEY_RELEASED = 5;
-    private static final int KEY_LONG_PRESSED = 6;
     private static final int SIZE_CHANGED = 7;
     private static final int HIDE_NOTIFY = 9;
     private static final int SHOW_NOTIFY = 10;
@@ -992,8 +991,7 @@ public final class Display extends CN1Constants {
      */
     public boolean isInTransition() {
         if (animationQueue != null && !animationQueue.isEmpty()) {
-            Animation ani = animationQueue.get(0);
-            return ani instanceof Transition;
+            return animationQueue.get(0) instanceof Transition;
         }
         return false;
     }

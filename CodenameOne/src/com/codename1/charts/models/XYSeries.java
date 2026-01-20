@@ -102,8 +102,7 @@ public class XYSeries {
             return Double.longBitsToDouble(bits) - Double.longBitsToDouble(bits - 1);
         }
         double nextValue = Double.longBitsToDouble(bits + 1);
-        double result = nextValue - value;
-        return result;
+        return nextValue - value;
     }
 
     public int getScaleNumber() {
@@ -536,8 +535,7 @@ public class XYSeries {
                 Collections.sort(indexList, null);
                 sorted = true;
             }
-            int out = Collections.binarySearch(indexList, key, null);
-            return out;
+            return Collections.binarySearch(indexList, key, null);
         }
     }
 }

@@ -3345,9 +3345,7 @@ public class LayeredLayout extends Layout {
 
                         Rectangle baseRect = getReferenceBox(parent, cmp);
                         //System.out.println("Baserect is "+baseRect+" baseValue="+baseValue+" for percent "+value);
-                        int out = (int) (baseValue + (isHorizontalInset() ? baseRect.getWidth() : baseRect.getHeight()) * value / 100f);
-                        //System.out.println("Result is "+out);
-                        return out;
+                        return (int) (baseValue + (isHorizontalInset() ? baseRect.getWidth() : baseRect.getHeight()) * value / 100f);
                     }
                     case UNIT_BASELINE: {
                         Component ref = getReferenceComponent();
@@ -3382,9 +3380,7 @@ public class LayeredLayout extends Layout {
                                 return bottom - top - oppositeInset.getAbsolutePixels(cmp) - baseValue - getOuterPreferredH(cmp);
                             } else {
                                 //System.out.println("Checking opposite inset for value");
-                                int out = right - left - oppositeInset.getAbsolutePixels(cmp) - baseValue - getOuterPreferredW(cmp);
-                                //System.out.println("Auto value is "+out);
-                                return out;
+                                return right - left - oppositeInset.getAbsolutePixels(cmp) - baseValue - getOuterPreferredW(cmp);
                             }
                         }
                     }

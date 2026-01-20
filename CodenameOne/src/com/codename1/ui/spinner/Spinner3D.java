@@ -155,13 +155,11 @@ class Spinner3D extends Container implements InternalPickerWidget {
      * @return new spinner instance
      */
     public static Spinner3D create(double min, double max, double currentValue, double step) {
-        Spinner3D s = new Spinner3D(new SpinnerNumberModel(min, max, currentValue, step));
-        return s;
+        return new Spinner3D(new SpinnerNumberModel(min, max, currentValue, step));
     }
 
     public static Spinner3D create(int min, int max, int currentValue, int step) {
-        Spinner3D s = new Spinner3D(new SpinnerNumberModel(min, max, currentValue, step));
-        return s;
+        return new Spinner3D(new SpinnerNumberModel(min, max, currentValue, step));
     }
 
     /**
@@ -173,8 +171,7 @@ class Spinner3D extends Container implements InternalPickerWidget {
      * @return new spinner instance
      */
     public static Spinner3D createDate(long min, long max, long currentValue) {
-        Spinner3D s = new Spinner3D(new SpinnerDateModel(min, max, currentValue));
-        return s;
+        return new Spinner3D(new SpinnerDateModel(min, max, currentValue));
     }
 
     public int getSelectedIndex() {
@@ -201,9 +198,7 @@ class Spinner3D extends Container implements InternalPickerWidget {
         if (lm instanceof NumberModelAdapter) {
             NumberModelAdapter adapter = (NumberModelAdapter) lm;
             int selectedIndex = adapter.getSelectedIndex();
-            Object out = adapter.inner.getItemAt(selectedIndex);
-
-            return out;
+            return adapter.inner.getItemAt(selectedIndex);
         }
         if (lm instanceof DateModelAdapter) {
             DateModelAdapter adapter = (DateModelAdapter) lm;
@@ -407,4 +402,3 @@ class Spinner3D extends Container implements InternalPickerWidget {
 
     }
 }
-

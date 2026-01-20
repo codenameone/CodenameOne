@@ -129,8 +129,7 @@ public final class CommonTransitions extends Transition {
      * @return empty transition
      */
     public static CommonTransitions createEmpty() {
-        CommonTransitions t = new CommonTransitions(TYPE_EMPTY);
-        return t;
+        return new CommonTransitions(TYPE_EMPTY);
     }
 
     /**
@@ -152,8 +151,7 @@ public final class CommonTransitions extends Transition {
      * Creates a dialog pulsate transition
      */
     public static CommonTransitions createDialogPulsate() {
-        CommonTransitions c = new CommonTransitions(TYPE_PULSATE_DIALOG);
-        return c;
+        return new CommonTransitions(TYPE_PULSATE_DIALOG);
     }
 
     /**
@@ -675,8 +673,7 @@ public final class CommonTransitions extends Transition {
     @Override
     public boolean animate() {
         if (timeline != null) {
-            boolean val = timeline.animate();
-            return val;
+            return timeline.animate();
         }
         if (motion == null) {
             return false;

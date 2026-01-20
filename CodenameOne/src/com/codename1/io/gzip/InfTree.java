@@ -202,14 +202,9 @@ final class InfTree {
     static final int BMAX = 15;         // maximum bit length of any code
     static final private int MANY = 1440;
     static final private int Z_OK = 0;
-    static final private int Z_STREAM_END = 1;
-    static final private int Z_NEED_DICT = 2;
-    static final private int Z_ERRNO = -1;
-    static final private int Z_STREAM_ERROR = -2;
     static final private int Z_DATA_ERROR = -3;
     static final private int Z_MEM_ERROR = -4;
     static final private int Z_BUF_ERROR = -5;
-    static final private int Z_VERSION_ERROR = -6;
     int[] hn = null;  // hufts used in space
     int[] v = null;   // work area for huftBuild
     int[] c = null;   // bit length count table

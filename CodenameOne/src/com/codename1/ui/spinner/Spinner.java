@@ -140,9 +140,8 @@ class Spinner extends List {
      * @deprecated use TimeSpinner
      */
     public static Spinner createTime(int min, int max, int currentValue, int step, boolean twentyFourHours, boolean showSeconds) {
-        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step),
+        return new Spinner(new SpinnerNumberModel(min, max, currentValue, step),
                 DateTimeRenderer.createTimeRenderer(twentyFourHours, showSeconds));
-        return s;
     }
 
     /**

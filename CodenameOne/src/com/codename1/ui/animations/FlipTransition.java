@@ -45,8 +45,6 @@ public class FlipTransition extends Transition {
     private static final int STATE_MOVE_AWAY = 1;
     private static final int STATE_FLIP = 2;
     private static final int STATE_MOVE_CLOSER = 3;
-    private static final boolean firstFinished = false;
-    private static final boolean started = false;
     // Assume supported optimistically
     // will be switched off in paint.
     private boolean perspectiveSupported = true;

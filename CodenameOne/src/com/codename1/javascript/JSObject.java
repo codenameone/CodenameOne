@@ -216,10 +216,6 @@ public class JSObject {
     private static final String R1 = "ca_weblite_codename1_js_JSObject_R1";
 
     /**
-     * Javascript register variable 2.
-     */
-    private static final String R2 = "ca_weblite_codename1_js_JSObject_R2";
-    /**
      * The Javascript context that this object belongs to.
      */
     private final JavascriptContext context;

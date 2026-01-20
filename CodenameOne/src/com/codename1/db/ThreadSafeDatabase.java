@@ -72,6 +72,7 @@ public class ThreadSafeDatabase extends Database {
     private void invokeWithException(final RunnableWithIOException r) throws IOException {
         IOException err = et.run(new RunnableWithResultSync<IOException>() {
             @Override
+            @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
             public IOException run() {
                 try {
                     r.run();
@@ -89,6 +90,7 @@ public class ThreadSafeDatabase extends Database {
     private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
         Object ret = et.run(new RunnableWithResultSync<Object>() {
             @Override
+            @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
             public Object run() {
                 try {
                     return r.run();

@@ -127,8 +127,7 @@ public class Transform {
      */
     public static Transform makeRotation(float angle, float x, float y, float z) {
         Object t = Display.impl.makeTransformRotation(angle, x, y, z);
-        Transform out = new Transform(t);
-        return out;
+        return new Transform(t);
     }
 
     public static Transform makeRotation(float angle, float x, float y) {
@@ -213,8 +212,7 @@ public class Transform {
      */
     public static Transform makePerspective(float fovy, float aspect, float zNear, float zFar) {
         Object t = Display.impl.makeTransformPerspective(fovy, aspect, zNear, zFar);
-        Transform out = new Transform(t);
-        return out;
+        return new Transform(t);
     }
 
     /**
@@ -232,8 +230,7 @@ public class Transform {
     public static Transform makeOrtho(float left, float right, float bottom, float top,
                                       float near, float far) {
         Object t = Display.impl.makeTransformOrtho(left, right, bottom, top, near, far);
-        Transform out = new Transform(t);
-        return out;
+        return new Transform(t);
     }
 
     /**
@@ -255,8 +252,7 @@ public class Transform {
                                        float centerX, float centerY, float centerZ, float upX, float upY,
                                        float upZ) {
         Object t = Display.impl.makeTransformCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
-        Transform out = new Transform(t);
-        return out;
+        return new Transform(t);
     }
 
     /**
@@ -651,8 +647,7 @@ public class Transform {
         } else {
             initNativeTransform();
             Object t = impl.makeTransformInverse(nativeTransform);
-            Transform out = new Transform(t);
-            return out;
+            return new Transform(t);
         }
     }
 
@@ -904,8 +899,7 @@ public class Transform {
         if (type == TYPE_IDENTITY && t2.type == TYPE_IDENTITY) {
             return true;
         }
-        boolean out = impl.transformEqualsImpl(this, t2);
-        return out;
+        return impl.transformEqualsImpl(this, t2);
     }
 
     @Override

@@ -908,7 +908,9 @@ def main() -> None:
             "MissingOverride",
             "ControlStatementBraces",
             "UnnecessaryFullyQualifiedName",
-            "UseCollectionIsEmpty"
+            "UseCollectionIsEmpty",
+            "UnusedPrivateField",
+            "UnnecessaryLocalBeforeReturn"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

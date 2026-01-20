@@ -190,8 +190,7 @@ public class Image implements ActionSource {
      */
     public static Image createImage(int[] rgb, int width, int height) {
         try {
-            Image i = new Image(Display.impl.createImage(rgb, width, height));
-            return i;
+            return new Image(Display.impl.createImage(rgb, width, height));
         } catch (OutOfMemoryError err) {
             // Images have a major bug on many phones where they sometimes throw
             // an OOM with no reason. A system.gc followed by the same call over
@@ -613,8 +612,7 @@ public class Image implements ActionSource {
                 tag = pack(jpeg, offset, 2, littleEndian);
                 if (tag == 0x0112) {
                     // We do not really care about type and count, do we?
-                    int orientation = pack(jpeg, offset + 8, 2, littleEndian);
-                    return orientation;
+                    return pack(jpeg, offset + 8, 2, littleEndian);
                 }
                 offset += 12;
                 length -= 12;
@@ -1237,8 +1235,7 @@ public class Image implements ActionSource {
 
     int[] getRGBCache() {
         if (rgbCache != null) {
-            int[] rgb = (int[]) Display.getInstance().extractHardRef(rgbCache);
-            return rgb;
+            return (int[]) Display.getInstance().extractHardRef(rgbCache);
         }
         return null;
     }

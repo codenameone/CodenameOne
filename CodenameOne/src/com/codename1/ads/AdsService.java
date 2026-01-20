@@ -56,8 +56,7 @@ public abstract class AdsService extends ConnectionRequest {
      */
     public static AdsService createAdsService() {
         try {
-            AdsService adsService = (AdsService) service.newInstance();
-            return adsService;
+            return (AdsService) service.newInstance();
         } catch (InstantiationException ex) {
             ex.printStackTrace();
         } catch (IllegalAccessException ex) {

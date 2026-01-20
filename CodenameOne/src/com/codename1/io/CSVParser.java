@@ -98,8 +98,7 @@ public class CSVParser {
             }
             bufferOffset = 0;
         }
-        int response = buffer[bufferOffset];
-        return response;
+        return buffer[bufferOffset];
     }
 
     /**

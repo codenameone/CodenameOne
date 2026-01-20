@@ -562,8 +562,7 @@ public class RequestBuilder {
         ConnectionRequest request = createRequest(false);
         fetched = true;
         CN.addToQueueAndWait(request);
-        Response res = new Response(request.getResponseCode(), request.getResponseData(), request.getResponseErrorMessage());
-        return res;
+        return new Response(request.getResponseCode(), request.getResponseData(), request.getResponseErrorMessage());
     }
 
     /**

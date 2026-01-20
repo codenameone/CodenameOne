@@ -61,12 +61,10 @@ public class NumberFormat {
             return Double.parseDouble(t);
         } catch (Exception err) {
             try {
-                double val = L10NManager.getInstance().parseDouble(format);
-                return val;
+                return L10NManager.getInstance().parseDouble(format);
             } catch (Exception err2) {
                 try {
-                    double v2 = L10NManager.getInstance().parseCurrency(format);
-                    return v2;
+                    return L10NManager.getInstance().parseCurrency(format);
                 } catch (Exception err3) {
                     Log.e(err3);
                     return 0;

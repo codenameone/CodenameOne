@@ -102,8 +102,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      * @since 7.0
      */
     private ActionListener<? extends ActionEvent> bindListener;
-    private int pressedX;
-    private int pressedY;
 
     /**
      * Constructs a button with an empty string for its text.

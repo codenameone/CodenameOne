@@ -39,33 +39,27 @@ public class ColorUtil {
 
 
     public static int argb(int a, int r, int g, int b) {
-        IColor c = new IColor(a, r, g, b);
-        return c.argb;
+        return new IColor(a, r, g, b).argb;
     }
 
     public static int alpha(int c) {
-        IColor pc = new IColor(c);
-        return pc.alpha;
+        return new IColor(c).alpha;
     }
 
     public static int red(int c) {
-        IColor pc = new IColor(c);
-        return pc.red;
+        return new IColor(c).red;
     }
 
     public static int green(int c) {
-        IColor pc = new IColor(c);
-        return pc.green;
+        return new IColor(c).green;
     }
 
     public static int blue(int c) {
-        IColor pc = new IColor(c);
-        return pc.blue;
+        return new IColor(c).blue;
     }
 
     public static int rgb(int r, int g, int b) {
-        IColor c = new IColor(r, g, b);
-        return c.argb;
+        return new IColor(r, g, b).argb;
     }
 
 

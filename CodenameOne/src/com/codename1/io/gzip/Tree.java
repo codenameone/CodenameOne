@@ -120,8 +120,6 @@ final class Tree {
     // The lengths of the bit length codes are sent in order of decreasing
     // probability, to avoid transmitting the lengths for unused bit
     // length codes.
-    static final private int BL_CODES = 19;
-    static final private int D_CODES = 30;
     static final private int LITERALS = 256;
     static final private int LENGTH_CODES = 29;
     static final private int L_CODES = (LITERALS + 1 + LENGTH_CODES);

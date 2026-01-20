@@ -449,8 +449,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
         }
         JSONParser jp = new JSONParser();
-        Map<String, Object> result = jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), "UTF-8"));
-        return result;
+        return jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), "UTF-8"));
     }
 
     /**

@@ -392,7 +392,7 @@ public class Receipt implements Externalizable {
 
     @Override
     public String toString() {
-        String sb = "Receipt {" +
+        return "Receipt {" +
                 "sku:" + sku + ", " +
                 "expiryDate:" + expiryDate + ", " +
                 "cancellationDate:" + cancellationDate + ", " +
@@ -402,7 +402,6 @@ public class Receipt implements Externalizable {
                 "transactionId:" + transactionId + ", " +
                 "storeCode:" + storeCode + ", " +
                 "internalId:" + internalId + "}";
-        return sb;
     }
 
 

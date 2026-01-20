@@ -214,8 +214,7 @@ final class TLogical {
                     resDigits = new int[resLength];
                     resDigits[resLength - 1] = 1;
 
-                    TBigInteger result = new TBigInteger(-1, resLength, resDigits);
-                    return result;
+                    return new TBigInteger(-1, resLength, resDigits);
                 }
             }
         }
@@ -231,8 +230,7 @@ final class TLogical {
             resDigits[i] = longer.digits[i];
         }
 
-        TBigInteger result = new TBigInteger(-1, resLength, resDigits);
-        return result;
+        return new TBigInteger(-1, resLength, resDigits);
     }
 
     /**
@@ -378,8 +376,7 @@ final class TLogical {
                         resDigits = new int[resLength];
                         resDigits[resLength - 1] = 1;
 
-                        TBigInteger result = new TBigInteger(-1, resLength, resDigits);
-                        return result;
+                        return new TBigInteger(-1, resLength, resDigits);
                     }
                 }
             }
@@ -401,8 +398,7 @@ final class TLogical {
             resDigits[i] = positive.digits[i];
         }
 
-        TBigInteger result = new TBigInteger(-1, resLength, resDigits);
-        return result;
+        return new TBigInteger(-1, resLength, resDigits);
     }
 
     /**
@@ -515,8 +511,7 @@ final class TLogical {
             resDigits[i] = longer.digits[i];
         }
 
-        TBigInteger result = new TBigInteger(1, resLength, resDigits);
-        return result;
+        return new TBigInteger(1, resLength, resDigits);
     }
 
     /**
@@ -817,8 +812,7 @@ final class TLogical {
                         resDigits = new int[resLength];
                         resDigits[resLength - 1] = 1;
 
-                        TBigInteger result = new TBigInteger(-1, resLength, resDigits);
-                        return result;
+                        return new TBigInteger(-1, resLength, resDigits);
                     }
                 }
             }

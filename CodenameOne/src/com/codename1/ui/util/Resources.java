@@ -418,8 +418,7 @@ public class Resources {
                 animations[iter].defineOrientation(input.readInt(), startTime, animDuration, input.readInt(), input.readInt());
             }
         }
-        Timeline tl = Timeline.createTimeline(duration, animations, new Dimension(width, height));
-        return tl;
+        return Timeline.createTimeline(duration, animations, new Dimension(width, height));
     }
 
     /**
@@ -939,8 +938,7 @@ public class Resources {
 
             // the resource was not already loaded when we loaded the theme
             // it must be loaded now so we can resolve the temporary name
-            Border imageBorder = createImageBorder(value);
-            return imageBorder;
+            return createImageBorder(value);
         }
         return (Border) val;
     }
@@ -1081,8 +1079,7 @@ public class Resources {
                     return readMultiImage(input);
 
                 case 0xEF:
-                    Timeline tl = readTimeline(input);
-                    return tl;
+                    return readTimeline(input);
 
                 // Fail this is the wrong data type
                 default:
@@ -1800,8 +1797,7 @@ public class Resources {
 
                 // Image border
             case 0xff08:
-                Object[] imageBorder = readImageBorder(input);
-                return imageBorder;
+                return readImageBorder(input);
 
             // horizontal Image border
             case 0xff09:

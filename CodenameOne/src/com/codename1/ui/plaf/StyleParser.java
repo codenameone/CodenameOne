@@ -1464,9 +1464,7 @@ public class StyleParser {
          */
         public ImageInfo getBgImage() {
             if (values.containsKey("bgImage")) {
-                ImageInfo out = new ImageInfo(values.get("bgImage"));
-
-                return out;
+                return new ImageInfo(values.get("bgImage"));
             }
             return null;
 

@@ -2718,8 +2718,7 @@ public class Toolbar extends Container {
 
         @Override
         protected Button createBackCommandButton() {
-            Button back = new Button(getBackCommand());
-            return back;
+            return new Button(getBackCommand());
         }
 
         @Override

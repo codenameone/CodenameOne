@@ -17,5 +17,6 @@
         <exclude name="LooseCoupling" />
         <exclude name="ReturnEmptyCollectionRatherThanNull"/>
         <exclude name="UncommentedEmptyMethodBody"/>
+        <exclude name="UseLocaleWithCaseConversions"/>
     </rule>
 </ruleset>

@@ -917,9 +917,7 @@ public class Picker extends Button {
     @Override
     public boolean isEditing() {
         Form f = this.getComponentForm();
-        boolean out = currentInput != null && f != null && f.getCurrentInputDevice() == currentInput; //NOPMD CompareObjectsWithEquals
-
-        return out;
+        return currentInput != null && f != null && f.getCurrentInputDevice() == currentInput; //NOPMD CompareObjectsWithEquals
     }
 
     @Override
