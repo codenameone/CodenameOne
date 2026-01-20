@@ -373,6 +373,19 @@ class CleanTargetIntegrationTest {
                     "#endif\n";
             Files.write(npeHeader, npeContent.getBytes(StandardCharsets.UTF_8));
         }
+
+        Path stringHeader = srcRoot.resolve("java_lang_String.h");
+        if (!Files.exists(stringHeader)) {
+            String stringContent = "#ifndef __JAVA_LANG_STRING_H__\n" +
+                    "#define __JAVA_LANG_STRING_H__\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1);\n" +
+                    "JAVA_VOID java_lang_String_wait__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject);\n" +
+                    "JAVA_VOID java_lang_String_wait___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1);\n" +
+                    "JAVA_OBJECT java_lang_String_clone___R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject);\n" +
+                    "#endif\n";
+            Files.write(stringHeader, stringContent.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     static String helloWorldSource() {
