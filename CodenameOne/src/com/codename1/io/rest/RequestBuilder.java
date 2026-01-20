@@ -56,7 +56,6 @@ import java.util.Map;
  *
  * @author Chen Fishbein
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class RequestBuilder {
 
     private String method;
@@ -677,13 +676,13 @@ public class RequestBuilder {
             return new Response(request.getResponseCode(), pb, request.getResponseErrorMessage());
         } catch (InstantiationException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
         } catch (IllegalAccessException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
         } catch (RuntimeException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
         }
     }
 
@@ -742,13 +741,13 @@ public class RequestBuilder {
             return new Response(request.getResponseCode(), result, request.getResponseErrorMessage());
         } catch (InstantiationException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
         } catch (IllegalAccessException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
         } catch (RuntimeException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
         }
     }
 
@@ -869,13 +868,13 @@ public class RequestBuilder {
                 callback.completed(res);
             } catch (InstantiationException err) {
                 Log.e(err);
-                throw new RuntimeException(err.toString());
+                throw new RuntimeException(err.toString(), err);
             } catch (IllegalAccessException err) {
                 Log.e(err);
-                throw new RuntimeException(err.toString());
+                throw new RuntimeException(err.toString(), err);
             } catch (RuntimeException err) {
                 Log.e(err);
-                throw new RuntimeException(err.toString());
+                throw new RuntimeException(err.toString(), err);
             }
         }
     }
@@ -961,13 +960,13 @@ public class RequestBuilder {
                 callback.completed(res);
             } catch (InstantiationException err) {
                 Log.e(err);
-                throw new RuntimeException(err.toString());
+                throw new RuntimeException(err.toString(), err);
             } catch (IllegalAccessException err) {
                 Log.e(err);
-                throw new RuntimeException(err.toString());
+                throw new RuntimeException(err.toString(), err);
             } catch (RuntimeException err) {
                 Log.e(err);
-                throw new RuntimeException(err.toString());
+                throw new RuntimeException(err.toString(), err);
             }
         }
     }
@@ -1149,10 +1148,10 @@ public class RequestBuilder {
                         errorHandler = propertyErrorCallback;
                     } catch (InstantiationException err) {
                         Log.e(err);
-                        throw new IOException(err.toString());
+                        throw new IOException(err.toString(), err);
                     } catch (IllegalAccessException err) {
                         Log.e(err);
-                        throw new IOException(err.toString());
+                        throw new IOException(err.toString(), err);
                     }
                 }
                 return;

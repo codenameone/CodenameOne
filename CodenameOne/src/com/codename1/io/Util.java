@@ -73,7 +73,6 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class Util {
     private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis());
     private static CodenameOneImplementation implInstance;
@@ -123,7 +122,7 @@ public class Util {
             return new InputStreamReader(in, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e.toString());
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
@@ -138,7 +137,7 @@ public class Util {
             return new OutputStreamWriter(out, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e.toString());
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
@@ -851,10 +850,10 @@ public class Util {
             throw new IOException("Object type not supported: " + type);
         } catch (InstantiationException ex1) {
             Log.e(ex1);
-            throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
+            throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage(), ex1);
         } catch (IllegalAccessException ex1) {
             Log.e(ex1);
-            throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
+            throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage(), ex1);
         }
     }
 
@@ -967,10 +966,10 @@ public class Util {
                         try {
                             sb.append(new String(bytes, 0, pos, enc));
                         } catch (UnsupportedEncodingException e) {
-                            throw new RuntimeException(e.toString());
+                            throw new RuntimeException(e.toString(), e);
                         }
                     } catch (NumberFormatException e) {
-                        throw new IllegalArgumentException("Illegal URL encoding: " + s);
+                        throw new IllegalArgumentException("Illegal URL encoding: " + s, e);
                     }
                     modified = true;
                     break;
@@ -1936,7 +1935,7 @@ public class Util {
             try {
                 return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse((String) o);
             } catch (ParseException e) {
-                throw new IllegalArgumentException("Not a supported date, we use this format 'yyyy-MM-dd'T'HH:mm:ss.SSS': " + o);
+                throw new IllegalArgumentException("Not a supported date, we use this format 'yyyy-MM-dd'T'HH:mm:ss.SSS': " + o, e);
             }
         }
         return new Date(toLongValue(o));
@@ -1996,15 +1995,18 @@ public class Util {
      * @throws IOException
      */
     public static String guessMimeType(String sourceFile) throws IOException {
-        InputStream inputStream;
-        if (sourceFile.indexOf('/') > -1) {
-            inputStream = FileSystemStorage.getInstance().openInputStream(sourceFile);
-        } else {
-            // Storage is a flat file system
-            inputStream = Storage.getInstance().createInputStream(sourceFile);
+        InputStream inputStream = null;
+        try {
+            if (sourceFile.indexOf('/') > -1) {
+                inputStream = FileSystemStorage.getInstance().openInputStream(sourceFile);
+            } else {
+                // Storage is a flat file system
+                inputStream = Storage.getInstance().createInputStream(sourceFile);
+            }
+            return guessMimeType(inputStream);
+        } finally {
+            Util.cleanup(inputStream);
         }
-
-        return guessMimeType(inputStream);
     }
 
     /**
@@ -2305,7 +2307,7 @@ public class Util {
         final long fileSize = getFileSizeWithoutDownload(url, true); // total expected download size, with a check partial download support
         final int splittingSize = 512 * 1024; // 512 kbyte, size of each small download
         final Wrapper<Long> downloadedTotalBytes = new Wrapper<Long>(0l);
-        final OutputStream out;
+        final OutputStream out; //NOPMD CloseResource - stream closed when download completes
         if (isStorage) {
             out = Storage.getInstance().createOutputStream(fileName); // leave it open to append partial downloads
         } else {
@@ -2337,9 +2339,13 @@ public class Util {
                         try {
                             // We append the just saved partial download to the fileName, if it exists
                             if (FileSystemStorage.getInstance().exists(partialDownloadPath)) {
-                                InputStream in = FileSystemStorage.getInstance().openInputStream(partialDownloadPath);
-                                Util.copyNoClose(in, out, 8192);
-                                Util.cleanup(in);
+                                InputStream in = null;
+                                try {
+                                    in = FileSystemStorage.getInstance().openInputStream(partialDownloadPath);
+                                    Util.copyNoClose(in, out, 8192);
+                                } finally {
+                                    Util.cleanup(in);
+                                }
                                 // before deleting the file, we check and update how much data we have actually downloaded
                                 downloadedTotalBytes.set(downloadedTotalBytes.get() + FileSystemStorage.getInstance().getLength(partialDownloadPath));
                                 FileSystemStorage.getInstance().delete(partialDownloadPath);

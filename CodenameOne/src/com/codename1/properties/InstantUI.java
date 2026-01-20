@@ -51,7 +51,6 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class InstantUI {
     private PropertyBase[] order;
 
@@ -241,13 +240,13 @@ public class InstantUI {
                 allBindings.add(uib.bind(b, cmp));
             } catch (InstantiationException err) {
                 Log.e(err);
-                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err);
+                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err, err);
             } catch (IllegalAccessException err) {
                 Log.e(err);
-                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err);
+                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err, err);
             } catch (RuntimeException err) {
                 Log.e(err);
-                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err);
+                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err, err);
             }
             return;
         }

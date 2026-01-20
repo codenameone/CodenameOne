@@ -42,7 +42,6 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public abstract class ImageIO {
     /**
      * Indicates the JPEG output format
@@ -114,9 +113,13 @@ public abstract class ImageIO {
      *                      this isn't implemented in all platforms.
      */
     public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException {
-        InputStream in = FileSystemStorage.getInstance().openInputStream(imageFilePath);
-        save(in, response, format, width, height, quality);
-        Util.cleanup(in);
+        InputStream in = null;
+        try {
+            in = FileSystemStorage.getInstance().openInputStream(imageFilePath);
+            save(in, response, format, width, height, quality);
+        } finally {
+            Util.cleanup(in);
+        }
     }
 
     /**
@@ -179,8 +182,13 @@ public abstract class ImageIO {
                 height = heightBasedOnWidth;
             }
         }
-        OutputStream im = FileSystemStorage.getInstance().openOutputStream(preferredOutputPath);
-        save(imageFilePath, im, format, width, height, quality);
+        OutputStream im = null;
+        try {
+            im = FileSystemStorage.getInstance().openOutputStream(preferredOutputPath);
+            save(imageFilePath, im, format, width, height, quality);
+        } finally {
+            Util.cleanup(im);
+        }
         return preferredOutputPath;
     }
 

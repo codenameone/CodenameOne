@@ -36,7 +36,6 @@ import java.util.List;
  *
  * @author Steve Hannah
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 class Geometry {
 
     private static int factorial(int n) {
@@ -652,22 +651,22 @@ class Geometry {
             double epsilon = 0.01;
             // left edge
 
-            if ((numMatches = findTValuesForX(rect.getX(), rect.getY(), rect.getY() + rect.getHeight(), res)) > 0) {
+            if ((numMatches = findTValuesForX(rect.getX(), rect.getY(), rect.getY() + rect.getHeight(), res)) > 0) { //NOPMD AssignmentInOperand
                 //System.out.println("left: "+numMatches);
                 nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);
             }
             // right edge
-            if ((numMatches = findTValuesForX(rect.getX() + rect.getWidth(), rect.getY(), rect.getY() + rect.getHeight(), res)) > 0) {
+            if ((numMatches = findTValuesForX(rect.getX() + rect.getWidth(), rect.getY(), rect.getY() + rect.getHeight(), res)) > 0) { //NOPMD AssignmentInOperand
                 //System.out.println("right: "+numMatches);
                 nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);
             }
             // top edge
-            if ((numMatches = findTValuesForY(rect.getY(), rect.getX(), rect.getX() + rect.getWidth(), res)) > 0) {
+            if ((numMatches = findTValuesForY(rect.getY(), rect.getX(), rect.getX() + rect.getWidth(), res)) > 0) { //NOPMD AssignmentInOperand
                 //System.out.println("Top: "+numMatches);
                 nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);
             }
             // bottom edge
-            if ((numMatches = findTValuesForY(rect.getY() + rect.getHeight(), rect.getX(), rect.getX() + rect.getWidth(), res)) > 0) {
+            if ((numMatches = findTValuesForY(rect.getY() + rect.getHeight(), rect.getX(), rect.getX() + rect.getWidth(), res)) > 0) { //NOPMD AssignmentInOperand
                 //System.out.println("Bottom: "+numMatches+" "+Arrays.toString(res));
                 nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);
             }

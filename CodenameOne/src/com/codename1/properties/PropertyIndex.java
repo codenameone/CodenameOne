@@ -63,7 +63,6 @@ import java.util.NoSuchElementException;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class PropertyIndex implements Iterable<PropertyBase> {
     private static final Map<String, HashMap<String, Object>> metadata = new LinkedHashMap<String, HashMap<String, Object>>();
     private final PropertyBase[] properties;
@@ -93,13 +92,15 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param objs a list of business objects
      */
     public static void storeJSONList(String name, List<? extends PropertyBusinessObject> objs) {
+        OutputStream os = null;
         try {
-            OutputStream os = Storage.getInstance().createOutputStream(name);
+            os = Storage.getInstance().createOutputStream(name);
             os.write(com.codename1.util.StringUtil.getBytes(toJSONList(objs)));
-            os.close();
         } catch (IOException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
+        } finally {
+            Util.cleanup(os);
         }
     }
 
@@ -500,10 +501,10 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             }
         } catch (InstantiationException err) {
             Log.e(err);
-            throw new RuntimeException("Can't create instanceof class: " + err);
+            throw new RuntimeException("Can't create instanceof class: " + err, err);
         } catch (IllegalAccessException err) {
             Log.e(err);
-            throw new RuntimeException("Can't create instanceof class: " + err);
+            throw new RuntimeException("Can't create instanceof class: " + err, err);
         }
     }
 
@@ -701,13 +702,15 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param name the name of the storage file
      */
     public void storeJSON(String name) {
+        OutputStream os = null;
         try {
-            OutputStream os = Storage.getInstance().createOutputStream(name);
+            os = Storage.getInstance().createOutputStream(name);
             os.write(toJSON().getBytes("UTF-8"));
-            os.close();
         } catch (IOException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
+        } finally {
+            Util.cleanup(os);
         }
     }
 
@@ -718,15 +721,19 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @return list of property objects matching this type
      */
     public <X extends PropertyBusinessObject> List<X> loadJSONList(String name) {
+        InputStream is = null;
         try {
             if (Storage.getInstance().exists(name)) {
-                return loadJSONList(Storage.getInstance().createInputStream(name));
+                is = Storage.getInstance().createInputStream(name);
+                return loadJSONList(is);
             }
-            InputStream is = CN.getResourceAsStream("/" + name);
+            is = CN.getResourceAsStream("/" + name);
             return loadJSONList(is);
         } catch (IOException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
+        } finally {
+            Util.cleanup(is);
         }
     }
 
@@ -772,15 +779,18 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param jsonString the JSON String
      */
     public void fromJSON(String jsonString) {
+        StringReader r = null;
         try {
-            StringReader r = new StringReader(jsonString);
+            r = new StringReader(jsonString);
             JSONParser jp = new JSONParser();
             jp.setUseBooleanInstance(true);
             jp.setUseLongsInstance(true);
             populateFromMap(jp.parseJSON(r), parent.getClass());
         } catch (IOException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
+        } finally {
+            Util.cleanup(r);
         }
     }
 
@@ -792,11 +802,13 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param name the name of the storage
      */
     public void loadJSON(String name) {
+        InputStream is = null;
         try {
             if (Storage.getInstance().exists(name)) {
-                loadJSON(Storage.getInstance().createInputStream(name));
+                is = Storage.getInstance().createInputStream(name);
+                loadJSON(is);
             } else {
-                InputStream is = CN.getResourceAsStream("/" + name);
+                is = CN.getResourceAsStream("/" + name);
                 if (is != null) {
                     loadJSON(is);
                 } else {
@@ -805,7 +817,9 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             }
         } catch (IOException err) {
             Log.e(err);
-            throw new RuntimeException(err.toString());
+            throw new RuntimeException(err.toString(), err);
+        } finally {
+            Util.cleanup(is);
         }
     }
 

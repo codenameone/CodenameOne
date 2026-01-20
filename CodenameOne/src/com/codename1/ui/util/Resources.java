@@ -24,6 +24,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
@@ -61,7 +62,6 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class Resources {
 
     /**
@@ -272,8 +272,11 @@ public class Resources {
         for (int iter = 0; iter < olen; iter++) {
             InputStream i = Display.getInstance().getResourceAsStream(classLoader, resource + "_" + over[iter] + ".ovr");
             if (i != null) {
-                r.override(i);
-                i.close();
+                try {
+                    r.override(i);
+                } finally {
+                    Util.cleanup(i);
+                }
             }
         }
 
@@ -303,8 +306,12 @@ public class Resources {
             if (is == null) {
                 throw new IOException(resource + " not found");
             }
-            Resources r = new Resources(is, dpi);
-            is.close();
+            Resources r;
+            try {
+                r = new Resources(is, dpi);
+            } finally {
+                Util.cleanup(is);
+            }
 
             if (Resources.systemResourceLocation.equals(resource)) {
                 systemResource = r;
@@ -318,7 +325,7 @@ public class Resources {
         } catch (RuntimeException err) {
             // intercept exceptions since user code might not deal well with runtime exceptions
             Log.e(err);
-            throw new IOException(err.getMessage());
+            throw new IOException(err.getMessage(), err);
         }
     }
 

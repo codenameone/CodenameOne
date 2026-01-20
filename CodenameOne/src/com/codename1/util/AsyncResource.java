@@ -46,7 +46,6 @@ import static com.codename1.ui.CN.isEdt;
  * @author shannah
  * @since 7.0
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class AsyncResource<V> extends Observable {
     private final Object lock = new Object();
     private V value;
@@ -258,7 +257,7 @@ public class AsyncResource<V> extends Observable {
             return get(-1);
         } catch (InterruptedException ex) {
             // This should never happen
-            throw new RuntimeException("Interrupted exception occurred, but this should never happen.  Likely programming error.");
+            throw new RuntimeException("Interrupted exception occurred, but this should never happen.  Likely programming error.", ex);
         }
     }
 

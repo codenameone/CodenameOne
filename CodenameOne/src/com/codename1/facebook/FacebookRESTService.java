@@ -43,7 +43,6 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource"})
 class FacebookRESTService extends ConnectionRequest implements JSONParseCallback {
 
     // PMD Fix (UnusedPrivateField): Removed redundant token storage; the access token is forwarded directly via request arguments.
@@ -121,9 +120,14 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
             i = new BufferedInputStream(input);
         }
         i.setYield(-1);
-        InputStreamReader reader = new InputStreamReader(i, "UTF-8");
-        JSONParser.parse(reader, this);
-        Util.cleanup(reader);
+        InputStreamReader reader = null;
+        try {
+            reader = new InputStreamReader(i, "UTF-8");
+            JSONParser.parse(reader, this);
+        } finally {
+            Util.cleanup(reader);
+            Util.cleanup(i);
+        }
         if (!stack.isEmpty()) {
             fireResponseListener(new NetworkEvent(this, stack.elementAt(0)));
         }

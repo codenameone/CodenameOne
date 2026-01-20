@@ -31,7 +31,6 @@ import com.codename1.ui.plaf.Style;
  *
  * @author shannah
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public abstract class DynamicImage extends Image {
 
     private int w = 250;
@@ -134,7 +133,7 @@ public abstract class DynamicImage extends Image {
             img.setStyle(style);
             return img;
         } catch (Throwable t) {
-            throw new RuntimeException(t.getMessage());
+            throw new RuntimeException(t.getMessage(), t);
         }
     }
 

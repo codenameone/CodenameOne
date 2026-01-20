@@ -28,7 +28,6 @@ package com.codename1.util;
  * <li>xor</li>
  * </ul>
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class TLogical {
 
     /**
@@ -202,7 +201,7 @@ final class TLogical {
             digit = -shorter.digits[i] & -longer.digits[i];
         }
         if (digit == 0) {
-            for (i++; i < shorter.numberLength && (digit = ~(longer.digits[i] | shorter.digits[i])) == 0; i++) {
+            for (i++; i < shorter.numberLength && (digit = ~(longer.digits[i] | shorter.digits[i])) == 0; i++) { //NOPMD AssignmentInOperand
                 // do nothing
             }
             if (digit == 0) {
@@ -361,7 +360,7 @@ final class TLogical {
             digit = -negative.digits[i] & ~positive.digits[i];
             if (digit == 0) {
                 limit = Math.min(positive.numberLength, negative.numberLength);
-                for (i++; i < limit && (digit = ~(negative.digits[i] | positive.digits[i])) == 0; i++) {
+                for (i++; i < limit && (digit = ~(negative.digits[i] | positive.digits[i])) == 0; i++) { //NOPMD AssignmentInOperand
                     // do nothing
                 }
                 if (digit == 0) {
@@ -797,7 +796,7 @@ final class TLogical {
             digit = positive.digits[i] ^ -negative.digits[i];
             if (digit == 0) {
                 limit = Math.min(positive.numberLength, negative.numberLength);
-                for (i++; i < limit && (digit = positive.digits[i] ^ ~negative.digits[i]) == 0; i++) {
+                for (i++; i < limit && (digit = positive.digits[i] ^ ~negative.digits[i]) == 0; i++) { //NOPMD AssignmentInOperand
                     // do nothing
                 }
                 if (digit == 0) {

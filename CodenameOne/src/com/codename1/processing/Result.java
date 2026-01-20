@@ -90,7 +90,6 @@ import java.util.Vector;
  *
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class Result {
 
     public static final String JSON = "json";
@@ -180,7 +179,7 @@ public final class Result {
                     format);
         } catch (IOException e) {
             // should never get here with a string
-            throw new IllegalArgumentException(e.getMessage());
+            throw new IllegalArgumentException(e.getMessage(), e);
         }
     }
 

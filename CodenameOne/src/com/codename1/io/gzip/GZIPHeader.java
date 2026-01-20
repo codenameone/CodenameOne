@@ -39,7 +39,6 @@ import java.io.UnsupportedEncodingException;
 /**
  * @see "http://www.ietf.org/rfc/rfc1952.txt"
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class GZIPHeader {
 
     public static final byte OS_MSDOS = (byte) 0x00;
@@ -94,7 +93,7 @@ public class GZIPHeader {
         try {
             return new String(name, "ISO-8859-1");
         } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e.toString());
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
@@ -102,7 +101,7 @@ public class GZIPHeader {
         try {
             this.name = name.getBytes("ISO-8859-1");
         } catch (UnsupportedEncodingException e) {
-            throw new IllegalArgumentException("name must be in ISO-8859-1 " + name);
+            throw new IllegalArgumentException("name must be in ISO-8859-1 " + name, e);
         }
     }
 
@@ -113,7 +112,7 @@ public class GZIPHeader {
         try {
             return new String(comment, "ISO-8859-1");
         } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e.toString());
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
@@ -121,7 +120,7 @@ public class GZIPHeader {
         try {
             this.comment = comment.getBytes("ISO-8859-1");
         } catch (UnsupportedEncodingException e) {
-            throw new IllegalArgumentException("comment must be in ISO-8859-1 " + comment);
+            throw new IllegalArgumentException("comment must be in ISO-8859-1 " + comment, e);
         }
     }
 

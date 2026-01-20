@@ -33,7 +33,6 @@ import java.io.InputStream;
  * Based on the buffered input stream from the JDK with some minor tweaks to allow
  * external classes to monitor stream status and progress.
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public class BufferedInputStream extends InputStream {
     private static int streamCount = 0;
     private static volatile int defaultBufferSize = 8192;
@@ -475,7 +474,7 @@ public class BufferedInputStream extends InputStream {
                 break;
             }
             // if not closed but no bytes available, return
-            InputStream input = in;
+            InputStream input = in; //NOPMD CloseResource - stream managed by BufferedInputStream#close
             if (input != null && superAvailable() <= 0) {
                 break;
             }
@@ -654,7 +653,7 @@ public class BufferedInputStream extends InputStream {
             InputStream input = in;
             in = null;
             if (input != null) {
-                input.close();
+                Util.cleanup(input);
             }
         }
     }

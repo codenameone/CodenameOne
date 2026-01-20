@@ -75,7 +75,6 @@ import static com.codename1.ui.ComponentSelector.$;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public class Picker extends Button {
 
     /**
@@ -1116,7 +1115,7 @@ public class Picker extends Button {
             }
 
             try {
-                VirtualInputDevice nextInput = new VirtualInputDevice() {
+                VirtualInputDevice nextInput = new VirtualInputDevice() { //NOPMD CloseResource - managed by Form#setCurrentInputDevice
 
                     @Override
                     public void close() throws Exception {

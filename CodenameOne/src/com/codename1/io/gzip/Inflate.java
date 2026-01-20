@@ -34,7 +34,6 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class Inflate {
 
     static final int Z_NO_FLUSH = 0;
@@ -635,7 +634,7 @@ final class Inflate {
             this.mode = BAD;
             this.marker = 0;
         }
-        if ((n = z.availIn) == 0) {
+        if ((n = z.availIn) == 0) { //NOPMD AssignmentInOperand
             return Z_BUF_ERROR;
         }
 

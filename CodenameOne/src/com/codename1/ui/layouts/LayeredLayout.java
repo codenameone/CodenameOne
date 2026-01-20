@@ -180,7 +180,6 @@ import java.util.Set;
  * @see com.codename1.ui.Form#getLayeredPane(java.lang.Class, boolean)
  * @see com.codename1.ui.Form#setGlassPane(com.codename1.ui.Painter)
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class LayeredLayout extends Layout {
 
     /**
@@ -2985,11 +2984,11 @@ public class LayeredLayout extends Layout {
              */
             private void setValue(String val) {
                 int pos;
-                if ((pos = val.indexOf("mm")) != -1) {
+                if ((pos = val.indexOf("mm")) != -1) { //NOPMD AssignmentInOperand
                     this.setDips(Float.parseFloat(val.substring(0, pos)));
-                } else if ((pos = val.indexOf("px")) != -1) {
+                } else if ((pos = val.indexOf("px")) != -1) { //NOPMD AssignmentInOperand
                     this.setPixels(Integer.parseInt(val.substring(0, pos)));
-                } else if ((pos = val.indexOf("%")) != -1) {
+                } else if ((pos = val.indexOf("%")) != -1) { //NOPMD AssignmentInOperand
                     this.setPercent(Float.parseFloat(val.substring(0, pos)));
                 } else if ("auto".equals(val)) {
                     this.setAuto();

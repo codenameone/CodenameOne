@@ -72,7 +72,6 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class ConnectionRequest implements IOProgressListener {
 
     /**
@@ -814,9 +813,13 @@ public class ConnectionRequest implements IOProgressListener {
             }
             return;
         }
-        InputStream is = FileSystemStorage.getInstance().openInputStream(getCacheFileName());
-        readResponse(is);
-        Util.cleanup(is);
+        InputStream is = null;
+        try {
+            is = FileSystemStorage.getInstance().openInputStream(getCacheFileName());
+            readResponse(is);
+        } finally {
+            Util.cleanup(is);
+        }
 
     }
 
@@ -888,16 +891,20 @@ public class ConnectionRequest implements IOProgressListener {
             return true;
         }
         if (cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {
-            InputStream is = getCachedData();
-            if (is != null) {
-                readResponse(is);
-                Util.cleanup(is);
-                return true;
-            } else {
-                if (cacheMode == CachingMode.OFFLINE) {
-                    responseCode = 404;
-                    throw new IOException("File unavilable in cache");
+            InputStream is = null;
+            try {
+                is = getCachedData();
+                if (is != null) {
+                    readResponse(is);
+                    return true;
+                } else {
+                    if (cacheMode == CachingMode.OFFLINE) {
+                        responseCode = 404;
+                        throw new IOException("File unavilable in cache");
+                    }
                 }
+            } finally {
+                Util.cleanup(is);
             }
         }
         CodenameOneImplementation impl = Util.getImplementation();
@@ -977,8 +984,14 @@ public class ConnectionRequest implements IOProgressListener {
                     if (shouldWriteUTFAsGetBytes()) {
                         output.write(requestBody.getBytes("UTF-8"));
                     } else {
-                        OutputStreamWriter w = new OutputStreamWriter(output, "UTF-8");
-                        w.write(requestBody);
+                        OutputStreamWriter w = null;
+                        try {
+                            w = new OutputStreamWriter(output, "UTF-8");
+                            w.write(requestBody);
+                            w.flush();
+                        } finally {
+                            Util.cleanup(w);
+                        }
                     }
                 } else if (requestBodyData != null) {
                     requestBodyData.appendTo(output);
@@ -1089,9 +1102,13 @@ public class ConnectionRequest implements IOProgressListener {
                 if (!post && (cacheMode == CachingMode.SMART || cacheMode == CachingMode.OFFLINE_FIRST)
                         && destinationFile == null && destinationStorage == null) {
                     byte[] d = Util.readInputStream(input);
-                    OutputStream os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
-                    os.write(d);
-                    os.close();
+                    OutputStream os = null;
+                    try {
+                        os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
+                        os.write(d);
+                    } finally {
+                        Util.cleanup(os);
+                    }
                     readResponse(new ByteArrayInputStream(d));
                 } else {
                     readResponse(input);
@@ -1573,21 +1590,31 @@ public class ConnectionRequest implements IOProgressListener {
             return;
         }
         if (destinationFile != null) {
-            OutputStream o = FileSystemStorage.getInstance().openOutputStream(destinationFile);
-            Util.copy(input, o);
-
-            // was the download killed while we downloaded
-            if (isKilled()) {
-                FileSystemStorage.getInstance().delete(destinationFile);
-            }
-        } else {
-            if (destinationStorage != null) {
-                OutputStream o = Storage.getInstance().createOutputStream(destinationStorage);
+            OutputStream o = null;
+            try {
+                o = FileSystemStorage.getInstance().openOutputStream(destinationFile);
                 Util.copy(input, o);
 
                 // was the download killed while we downloaded
                 if (isKilled()) {
-                    Storage.getInstance().deleteStorageFile(destinationStorage);
+                    FileSystemStorage.getInstance().delete(destinationFile);
+                }
+            } finally {
+                Util.cleanup(o);
+            }
+        } else {
+            if (destinationStorage != null) {
+                OutputStream o = null;
+                try {
+                    o = Storage.getInstance().createOutputStream(destinationStorage);
+                    Util.copy(input, o);
+
+                    // was the download killed while we downloaded
+                    if (isKilled()) {
+                        Storage.getInstance().deleteStorageFile(destinationStorage);
+                    }
+                } finally {
+                    Util.cleanup(o);
                 }
             } else {
                 data = Util.readInputStream(input);
@@ -2789,7 +2816,7 @@ public class ConnectionRequest implements IOProgressListener {
                 return new String(baos.toByteArray(), "UTF-8");
             } catch (Exception ex) {
                 Log.e(ex);
-                throw new RuntimeException("Failed to write request body to string");
+                throw new RuntimeException("Failed to write request body to string", ex);
             }
         }
         return requestBody;

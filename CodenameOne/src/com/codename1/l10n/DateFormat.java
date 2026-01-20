@@ -35,7 +35,6 @@ import java.util.Date;
  * @author Eric Coolman
  * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html">http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html</a>
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class DateFormat extends Format {
     /**
      * Constant for full style parsing/formatting pattern.
@@ -179,7 +178,7 @@ public class DateFormat extends Format {
             try {
                 source = parse((String) obj);
             } catch (ParseException pe) {
-                throw new RuntimeException(pe.toString());
+                throw new RuntimeException(pe.toString(), pe);
             }
         }
         if (source == null) {

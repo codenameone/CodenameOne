@@ -37,7 +37,6 @@ import java.io.InputStream;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public abstract class DeviceRunner {
     private static final int VERSION = 1;
     private int failedTests;

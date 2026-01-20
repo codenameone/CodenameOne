@@ -34,7 +34,6 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class InfTree {
 
     static final int fixed_bl = 9;
@@ -300,11 +299,11 @@ final class InfTree {
 
         // Adjust last length count to fill out codes, if needed
         for (y = 1 << j; j < i; j++, y <<= 1) {
-            if ((y -= c[j]) < 0) {
+            if ((y -= c[j]) < 0) { //NOPMD AssignmentInOperand
                 return Z_DATA_ERROR;
             }
         }
-        if ((y -= c[i]) < 0) {
+        if ((y -= c[i]) < 0) { //NOPMD AssignmentInOperand
             return Z_DATA_ERROR;
         }
         c[i] += y;
@@ -323,7 +322,7 @@ final class InfTree {
         i = 0;
         p = 0;
         do {
-            if ((j = b[bindex + p]) != 0) {
+            if ((j = b[bindex + p]) != 0) { //NOPMD AssignmentInOperand
                 v[x[j]++] = i;
             }
             p++;
@@ -352,13 +351,13 @@ final class InfTree {
                     // compute minimum size table less than or equal to l bits
                     z = g - w;
                     z = (z > l) ? l : z;        // table size upper limit
-                    if ((f = 1 << (j = k - w)) > a + 1) {     // try a k-w bit table
+                    if ((f = 1 << (j = k - w)) > a + 1) {     // try a k-w bit table //NOPMD AssignmentInOperand
                         // too few codes for k-w bit table
                         f -= a + 1;               // deduct codes from patterns left
                         xp = k;
                         if (j < z) {
                             while (++j < z) {        // try smaller tables up to z bits
-                                if ((f <<= 1) <= c[++xp]) {
+                                if ((f <<= 1) <= c[++xp]) { //NOPMD AssignmentInOperand
                                     break;              // enough codes to use up j bits
                                 }
                                 f -= c[xp];           // else deduct codes from patterns

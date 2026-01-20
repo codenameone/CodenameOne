@@ -51,7 +51,6 @@ import java.util.Set;
  * @see Hashtable
  * @see java.lang.System#getProperties
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class Properties extends HashMap<String, String> {
 
     private static final int NONE = 0;
@@ -234,7 +233,7 @@ public class Properties extends HashMap<String, String> {
                 int digit = Character.digit(nextChar, 16);
                 if (digit >= 0) {
                     unicode = (unicode << 4) + digit;
-                    if (++count < 4) {
+                    if (++count < 4) { //NOPMD AssignmentInOperand
                         continue;
                     }
                 } else if (count <= 4) {

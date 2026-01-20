@@ -116,7 +116,6 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.AssignmentInOperand", "PMD.CloseResource"})
 public abstract class CodenameOneImplementation {
     /**
      * Indicates the range of "hard" RTL bidi characters in unicode
@@ -797,7 +796,7 @@ public abstract class CodenameOneImplementation {
         int y2 = y + c.getHeight();
 
         Container parent = null;
-        if ((parent = c.getParent()) != null) {
+        if ((parent = c.getParent()) != null) { //NOPMD AssignmentInOperand
             getPaintableBounds(parent, out);
             x = Math.max(out.getX(), x);
             y = Math.max(out.getY(), y);
@@ -3693,7 +3692,7 @@ public abstract class CodenameOneImplementation {
 
         if (doSwap) {
             while (ix0 < ixEnd) {
-                if ((ix1 = scanSecond(chars, ix0, ixEnd)) < 0) {
+                if ((ix1 = scanSecond(chars, ix0, ixEnd)) < 0) { //NOPMD AssignmentInOperand
                     break;
                 } else {
                     ix0 = ix1;
@@ -4183,8 +4182,11 @@ public abstract class CodenameOneImplementation {
             } else if (uri.endsWith(".3gp")) {
                 mime = "audio/3gpp";
             }
-
-            return createMedia(is, mime, null);
+            try {
+                return createMedia(is, mime, null);
+            } finally {
+                Util.cleanup(is);
+            }
         }
         return createMedia(uri, false, null);
     }
@@ -4575,18 +4577,21 @@ public abstract class CodenameOneImplementation {
                 System.out.println("Local resource not found: " + url);
                 return;
             }
-            byte[] buffer = new byte[4096];
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
-            int size = i.read(buffer);
-            while (size > -1) {
-                bo.write(buffer, 0, size);
-                size = i.read(buffer);
+            try {
+                byte[] buffer = new byte[4096];
+                int size = i.read(buffer);
+                while (size > -1) {
+                    bo.write(buffer, 0, size);
+                    size = i.read(buffer);
+                }
+                String htmlText = new String(bo.toByteArray(), "UTF-8");
+                String baseUrl = url.substring(0, url.lastIndexOf('/'));
+                setBrowserPage(browserPeer, htmlText, baseUrl);
+            } finally {
+                Util.cleanup(i);
+                Util.cleanup(bo);
             }
-            i.close();
-            bo.close();
-            String htmlText = new String(bo.toByteArray(), "UTF-8");
-            String baseUrl = url.substring(0, url.lastIndexOf('/'));
-            setBrowserPage(browserPeer, htmlText, baseUrl);
         } catch (IOException ex) {
             Log.e(ex);
         }
@@ -4954,7 +4959,7 @@ public abstract class CodenameOneImplementation {
      */
     public Vector getCookiesForURL(String url) {
         Vector response = null;
-        if (Cookie.isAutoStored()) {
+        if (Cookie.isAutoStored()) { //NOPMD AssignmentInOperand
             cookies = (Hashtable) Storage.getInstance().readObject(Cookie.STORAGE_NAME);
         }
 
@@ -5379,8 +5384,9 @@ public abstract class CodenameOneImplementation {
      */
     public int getStorageEntrySize(String name) {
         long size = -1;
+        InputStream i = null;
         try {
-            InputStream i = createStorageInputStream(name);
+            i = createStorageInputStream(name);
             long val = i.skip(1000000);
             if (val > -1) {
                 size = 0;
@@ -5389,9 +5395,10 @@ public abstract class CodenameOneImplementation {
                     val = i.skip(1000000);
                 }
             }
-            Util.cleanup(i);
         } catch (IOException err) {
             Log.e(err);
+        } finally {
+            Util.cleanup(i);
         }
         return (int) size;
     }
@@ -6021,6 +6028,8 @@ public abstract class CodenameOneImplementation {
                 return EncodedImage.create(i);
             } catch (IOException ex) {
                 Log.e(ex);
+            } finally {
+                Util.cleanup(i);
             }
         }
         return null;
@@ -7758,33 +7767,37 @@ public abstract class CodenameOneImplementation {
             String tardir = fs.getAppHomePath() + "cn1html/";
             fs.mkdir(tardir);
             TarInputStream is = new TarInputStream(Display.getInstance().getResourceAsStream(getClass(), "/html.tar"));
+            try {
+                TarEntry t = is.getNextEntry();
+                byte[] data = new byte[8192];
+                while (t != null) {
+                    String name = t.getName();
+                    if (t.isDirectory()) {
+                        fs.mkdir(tardir + name);
+                    } else {
+                        String path = tardir + name;
+                        String dir = path.substring(0, path.lastIndexOf('/'));
+                        if (!fs.exists(dir)) {
+                            mkdirs(fs, dir);
+                        }
 
-            TarEntry t = is.getNextEntry();
-            byte[] data = new byte[8192];
-            while (t != null) {
-                String name = t.getName();
-                if (t.isDirectory()) {
-                    fs.mkdir(tardir + name);
-                } else {
-                    String path = tardir + name;
-                    String dir = path.substring(0, path.lastIndexOf('/'));
-                    if (!fs.exists(dir)) {
-                        mkdirs(fs, dir);
+                        OutputStream os = null;
+                        try {
+                            os = fs.openOutputStream(tardir + name);
+                            int count;
+                            while ((count = is.read(data)) != -1) {
+                                os.write(data, 0, count);
+                            }
+                        } finally {
+                            Util.cleanup(os);
+                        }
                     }
 
-                    OutputStream os = fs.openOutputStream(tardir + name);
-                    int count;
-                    while ((count = is.read(data)) != -1) {
-                        os.write(data, 0, count);
-                    }
-
-                    os.close();
+                    t = is.getNextEntry();
                 }
-
-                t = is.getNextEntry();
+            } finally {
+                Util.cleanup(is);
             }
-
-            Util.cleanup(is);
             Preferences.set("cn1$InstallKey", buildKey);
         }
     }

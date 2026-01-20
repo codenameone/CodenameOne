@@ -42,7 +42,6 @@ import java.io.InputStream;
  *
  * @author Chen
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public class FacebookShare extends ShareService {
 
     private String token;
@@ -196,6 +195,8 @@ public class FacebookShare extends ShareService {
                                 NetworkManager.getInstance().addToQueue(req);
                             } catch (IOException ioe) {
                                 Log.e(ioe);
+                            } finally {
+                                Util.cleanup(is);
                             }
                         }
                     });

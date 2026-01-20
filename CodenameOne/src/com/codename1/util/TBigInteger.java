@@ -33,7 +33,6 @@ import java.util.Random;
  * discouraged. In simple words: Do NOT implement any bit fields based on
  * BigInteger.
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 class TBigInteger {
 
 
@@ -1321,7 +1320,7 @@ class TBigInteger {
         while ((numberLength > 0) && (digits[--numberLength] == 0)) {
             // Empty
         }
-        if (digits[numberLength++] == 0) {
+        if (digits[numberLength++] == 0) { //NOPMD AssignmentInOperand
             sign = 0;
         }
     }

@@ -43,7 +43,6 @@ import java.util.Map;
 /**
  * Parses string constraints.
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class ConstraintParser {
 
     private ConstraintParser() {
@@ -282,7 +281,7 @@ public final class ConstraintParser {
                 throw new IllegalArgumentException("Unknown Constraint: '" + part + "'\n");
 
             } catch (Exception ex) {
-                throw new IllegalArgumentException("Illegal Constraint: '" + part + "'\n" + ex.getMessage());
+                throw new IllegalArgumentException("Illegal Constraint: '" + part + "'\n" + ex.getMessage(), ex);
             }
         }
 
@@ -455,7 +454,7 @@ public final class ConstraintParser {
                 dimConstraint.setSize(parseBoundSize(part, false, isCols));
 
             } catch (Exception ex) {
-                throw new IllegalArgumentException("Illegal constraint: '" + part + "'\n" + ex.getMessage());
+                throw new IllegalArgumentException("Illegal constraint: '" + part + "'\n" + ex.getMessage(), ex);
             }
         }
         return dimConstraint;
@@ -936,7 +935,7 @@ public final class ConstraintParser {
 
             } catch (RuntimeException ex) {
                 Log.e(ex);
-                throw new IllegalArgumentException("Error parsing Constraint: '" + part + "'");
+                throw new IllegalArgumentException("Error parsing Constraint: '" + part + "'", ex);
             }
         }
 
@@ -1236,7 +1235,7 @@ public final class ConstraintParser {
 
             } catch (Exception e) {
                 Log.e(e);
-                throw new IllegalArgumentException("Malformed UnitValue: '" + s + "'");
+                throw new IllegalArgumentException("Malformed UnitValue: '" + s + "'", e);
             }
         }
     }

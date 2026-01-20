@@ -14,7 +14,6 @@ import java.io.OutputStream;
  * @author shannah
  * @since 7.0
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public class WAVWriter implements AutoCloseable {
     private final File outputFile;
     private final int samplingRate;
@@ -127,23 +126,18 @@ public class WAVWriter implements AutoCloseable {
      */
     @Override
     public void close() throws Exception {
-        this.out.close();
         final FileSystemStorage fs = FileSystemStorage.getInstance();
         fs.rename(this.outputFile.getAbsolutePath(), new File(this.getPCMFile()).getName());
+        InputStream in = null;
         try {
+            Util.cleanup(this.out);
             this.out = fs.openOutputStream(this.outputFile.getAbsolutePath());
-            final InputStream in = fs.openInputStream(this.getPCMFile());
+            in = fs.openInputStream(this.getPCMFile());
             this.writeHeader();
             Util.copy(in, this.out);
-            try {
-                this.out.close();
-            } catch (Throwable t) {
-            }
-            try {
-                in.close();
-            } catch (Throwable t2) {
-            }
         } finally {
+            Util.cleanup(this.out);
+            Util.cleanup(in);
             fs.delete(this.getPCMFile());
         }
     }

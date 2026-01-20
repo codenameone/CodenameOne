@@ -49,7 +49,6 @@ import java.util.TreeSet;
 /**
  * Holds components in a grid. Does most of the logic behind the layout manager.
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 public final class Grid {
 
     public static final boolean TEST_GAPS = true;
@@ -1247,7 +1246,7 @@ public final class Grid {
                         }
                     }
                     clearGroupLinkBounds();
-                    if (++count > ((compCount << 3) + 10)) {
+                    if (++count > ((compCount << 3) + 10)) { //NOPMD AssignmentInOperand
                         System.err.println("Unstable cyclic dependency in absolute linked values!");
                         break;
                     }

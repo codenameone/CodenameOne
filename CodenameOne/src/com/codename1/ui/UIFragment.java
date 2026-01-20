@@ -180,7 +180,6 @@ import static com.codename1.ui.ComponentSelector.$;
  * @author shannah
  * @since 7.0
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class UIFragment {
 
 
@@ -213,7 +212,7 @@ public final class UIFragment {
             return new UIFragment(el);
         } catch (Exception ex) {
             Log.e(ex);
-            throw new RuntimeException(ex.getMessage());
+            throw new RuntimeException(ex.getMessage(), ex);
         }
     }
 
@@ -231,7 +230,7 @@ public final class UIFragment {
             return new UIFragment(el);
         } catch (Exception ex) {
             Log.e(ex);
-            throw new RuntimeException(ex.getMessage());
+            throw new RuntimeException(ex.getMessage(), ex);
         }
     }
 
@@ -248,7 +247,7 @@ public final class UIFragment {
             return new UIFragment(el);
         } catch (Exception ex) {
             Log.e(ex);
-            throw new RuntimeException(ex.getMessage());
+            throw new RuntimeException(ex.getMessage(), ex);
         }
     }
 
@@ -569,7 +568,7 @@ public final class UIFragment {
                     cols = Integer.parseInt(colsStr);
                 } catch (Throwable t) {
 
-                    throw new RuntimeException("grid requires cols attribute.");
+                    throw new RuntimeException("grid requires cols attribute.", t);
                 }
                 String rowsStr = el.getAttribute("rows");
                 int rows = -1;

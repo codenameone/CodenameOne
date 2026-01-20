@@ -45,7 +45,6 @@ import java.util.HashMap;
  *
  * @author Chen Fishbein
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public class Image implements ActionSource {
     int transform;
     private EventDispatcher listeners;
@@ -464,9 +463,13 @@ public class Image implements ActionSource {
         }
         img.unlock();
         if (rotatedImage != null) {
-            OutputStream out = fss.openOutputStream(rotatedImage);
-            ImageIO.getImageIO().save(result, out, format, 0.9f);
-            Util.cleanup(out);
+            OutputStream out = null;
+            try {
+                out = fss.openOutputStream(rotatedImage);
+                ImageIO.getImageIO().save(result, out, format, 0.9f);
+            } finally {
+                Util.cleanup(out);
+            }
         }
         return EncodedImage.createFromImage(result, isJpeg);
     }
@@ -491,8 +494,13 @@ public class Image implements ActionSource {
      * @throws java.io.IOException
      */
     public static int getExifOrientationTag(String path) throws IOException {
-        InputStream in = FileSystemStorage.getInstance().openInputStream(path);
-        return getExifOrientationTag(in);
+        InputStream in = null;
+        try {
+            in = FileSystemStorage.getInstance().openInputStream(path);
+            return getExifOrientationTag(in);
+        } finally {
+            Util.cleanup(in);
+        }
     }
 
     /**

@@ -39,7 +39,6 @@ import java.util.ArrayList;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource", "PMD.PreserveStackTrace"})
 public class File {
     public static final char separatorChar = '/';
     public static final String separator = "/";
@@ -269,8 +268,12 @@ public class File {
      * @throws IOException
      */
     public boolean createNewFile() throws IOException {
-        OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
-        os.close();
+        OutputStream os = null;
+        try {
+            os = FileSystemStorage.getInstance().openOutputStream(path);
+        } finally {
+            Util.cleanup(os);
+        }
         return exists();
     }
 
@@ -484,7 +487,9 @@ public class File {
         try {
             return new URL(toURI());
         } catch (URISyntaxException ex) {
-            throw new MalformedURLException("Invalid URL format: " + ex.getMessage());
+            MalformedURLException err = new MalformedURLException("Invalid URL format: " + ex.getMessage());
+            err.initCause(ex);
+            throw err;
         }
     }
 

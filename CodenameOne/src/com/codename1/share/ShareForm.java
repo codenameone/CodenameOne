@@ -44,7 +44,6 @@ import java.io.InputStream;
 /**
  * @author Chen
  */
-@SuppressWarnings({"PMD.CloseResource"})
 class ShareForm extends Form {
 
     private final TextField to = new TextField();

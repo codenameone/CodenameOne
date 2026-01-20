@@ -33,7 +33,6 @@ import com.codename1.ui.plaf.Style;
  * @author shannah
  * @since 7.0
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class CommonProgressAnimations {
 
     /**
@@ -73,7 +72,7 @@ public class CommonProgressAnimations {
                 return prg;
             } catch (Throwable t) {
                 Log.e(t);
-                throw new RuntimeException("Failed to create progress component: " + t.getMessage());
+                throw new RuntimeException("Failed to create progress component: " + t.getMessage(), t);
             }
         }
 

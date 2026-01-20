@@ -25,6 +25,7 @@ package com.codename1.ui.util;
 
 import com.codename1.analytics.AnalyticsService;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.ComboBox;
@@ -81,7 +82,6 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public class UIBuilder { //implements Externalizable {
     /**
      * A key in the form state hashtable used in the back command navigation
@@ -422,6 +422,8 @@ public class UIBuilder { //implements Externalizable {
             // If this happens its probably a serious bug
             ex.printStackTrace();
             return null;
+        } finally {
+            Util.cleanup(in);
         }
     }
 

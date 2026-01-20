@@ -34,7 +34,6 @@ import java.io.UnsupportedEncodingException;
  * @author shannah
  * @since 7.0
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public interface Data {
 
     /**
@@ -65,7 +64,7 @@ public interface Data {
                 bytes = str.getBytes(charset);
             } catch (UnsupportedEncodingException ex) {
                 Log.e(ex);
-                throw new RuntimeException("Failed to create StringData with encoding " + charset);
+                throw new RuntimeException("Failed to create StringData with encoding " + charset, ex);
             }
         }
 

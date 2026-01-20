@@ -49,7 +49,6 @@ import java.util.Vector;
  *
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 class ResultTokenizer {
 
     private final String expression;
@@ -90,7 +89,7 @@ class ResultTokenizer {
         String tok;
         int i;
         for (pos = 0, tok = next(); !"".equals(tok); tok = next()) {
-            if (namespaceAliases != null && ((i = tok.indexOf(':')) != -1)) {
+            if (namespaceAliases != null && ((i = tok.indexOf(':')) != -1)) { //NOPMD AssignmentInOperand
                 String mapto = (String) namespaceAliases.get(tok.substring(0, i));
                 if (mapto != null) {
                     tok = mapto + tok.substring(i);

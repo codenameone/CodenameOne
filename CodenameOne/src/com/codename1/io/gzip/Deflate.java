@@ -35,7 +35,6 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package com.codename1.io.gzip;
 
 public
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class Deflate {
 
     static final private int MAX_MEM_LEVEL = 9;
@@ -407,7 +406,7 @@ final class Deflate {
         for (n = 0; n <= maxCode; n++) {
             curlen = nextlen;
             nextlen = tree[(n + 1) * 2 + 1];
-            if (++count < maxCount && curlen == nextlen) {
+            if (++count < maxCount && curlen == nextlen) { //NOPMD AssignmentInOperand
                 continue;
             } else if (count < minCount) {
                 blTree[curlen * 2] += count;
@@ -502,7 +501,7 @@ final class Deflate {
         for (n = 0; n <= maxCode; n++) {
             curlen = nextlen;
             nextlen = tree[(n + 1) * 2 + 1];
-            if (++count < maxCount && curlen == nextlen) {
+            if (++count < maxCount && curlen == nextlen) { //NOPMD AssignmentInOperand
                 continue;
             } else if (count < minCount) {
                 do {
@@ -1197,7 +1196,7 @@ final class Deflate {
                 lookahead -= prevLength - 1;
                 prevLength -= 2;
                 do {
-                    if (++strStart <= maxInsert) {
+                    if (++strStart <= maxInsert) { //NOPMD AssignmentInOperand
                         insH = (((insH) << hashShift) ^ (window[(strStart) + (MIN_MATCH - 1)] & 0xff)) & hashMask;
                         //prev[strstart&w_mask]=hashHead=head[ins_h];
                         hashHead = (head[insH] & 0xffff);
@@ -1297,7 +1296,7 @@ final class Deflate {
 
             // Skip to next match if the match length cannot increase
             // or if the match length is less than 2:
-            if (window[match + bestLen] != scanEnd ||
+            if (window[match + bestLen] != scanEnd || //NOPMD AssignmentInOperand
                     window[match + bestLen - 1] != scanEnd1 ||
                     window[match] != window[scan] ||
                     window[++match] != window[scan + 1]) {

@@ -54,7 +54,6 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public class MultipartRequest extends ConnectionRequest {
 
     private static final String CRLF = "\r\n";
@@ -328,131 +327,137 @@ public class MultipartRequest extends ConnectionRequest {
     @Override
     protected void buildRequestBody(OutputStream os) throws IOException {
         Writer writer = null;
-        writer = new OutputStreamWriter(os, "UTF-8");
-        Iterator entries = args.entrySet().iterator();
-        while (entries.hasNext()) {
-            if (shouldStop()) {
-                break;
-            }
-            Map.Entry entry = (Map.Entry) entries.next();
-            String key = (String) entry.getKey();
-            Object value = entry.getValue();
+        try {
+            writer = new OutputStreamWriter(os, "UTF-8");
+            Iterator entries = args.entrySet().iterator();
+            while (entries.hasNext()) {
+                if (shouldStop()) {
+                    break;
+                }
+                Map.Entry entry = (Map.Entry) entries.next();
+                String key = (String) entry.getKey();
+                Object value = entry.getValue();
 
-            writer.write("--");
-            writer.write(boundary);
-            writer.write(CRLF);
-            if (value instanceof String) {
-                writer.write("Content-Disposition: form-data; name=\"");
-                writer.write(key);
-                writer.write("\"");
+                writer.write("--");
+                writer.write(boundary);
                 writer.write(CRLF);
-                writer.write("Content-Type: text/plain; charset=UTF-8");
-                writer.write(CRLF);
-                writer.write(CRLF);
-                if (canFlushStream) {
-                    writer.flush();
-                }
-                if (ignoreEncoding.contains(key)) {
-                    writer.write((String) value);
-                } else {
-                    if (base64Binaries) {
-                        writer.write(Util.encodeBody((String) value));
-                    } else {
-                        writer.write((String) value);
+                if (value instanceof String) {
+                    writer.write("Content-Disposition: form-data; name=\"");
+                    writer.write(key);
+                    writer.write("\"");
+                    writer.write(CRLF);
+                    writer.write("Content-Type: text/plain; charset=UTF-8");
+                    writer.write(CRLF);
+                    writer.write(CRLF);
+                    if (canFlushStream) {
+                        writer.flush();
                     }
-                }
-                //writer.write(CRLF);
-                if (canFlushStream) {
-                    writer.flush();
-                }
-            } else {
-                if (value instanceof String[]) {
-                    boolean first = true;
-                    for (String s : (String[]) value) {
-                        if (!first) {
-                            writer.write(CRLF);
-                            writer.write("--");
-                            writer.write(boundary);
-                            writer.write(CRLF);
-                        }
-                        first = false;
-                        writer.write("Content-Disposition: form-data; name=\"");
-                        writer.write(key);
-                        writer.write("\"");
-                        writer.write(CRLF);
-                        writer.write("Content-Type: text/plain; charset=UTF-8");
-                        writer.write(CRLF);
-                        writer.write(CRLF);
-                        if (canFlushStream) {
-                            writer.flush();
-                        }
-                        if (ignoreEncoding.contains(key)) {
-                            writer.write(s);
+                    if (ignoreEncoding.contains(key)) {
+                        writer.write((String) value);
+                    } else {
+                        if (base64Binaries) {
+                            writer.write(Util.encodeBody((String) value));
                         } else {
-                            if (base64Binaries) {
-                                writer.write(Util.encodeBody(s));
-                            } else {
+                            writer.write((String) value);
+                        }
+                    }
+                    //writer.write(CRLF);
+                    if (canFlushStream) {
+                        writer.flush();
+                    }
+                } else {
+                    if (value instanceof String[]) {
+                        boolean first = true;
+                        for (String s : (String[]) value) {
+                            if (!first) {
+                                writer.write(CRLF);
+                                writer.write("--");
+                                writer.write(boundary);
+                                writer.write(CRLF);
+                            }
+                            first = false;
+                            writer.write("Content-Disposition: form-data; name=\"");
+                            writer.write(key);
+                            writer.write("\"");
+                            writer.write(CRLF);
+                            writer.write("Content-Type: text/plain; charset=UTF-8");
+                            writer.write(CRLF);
+                            writer.write(CRLF);
+                            if (canFlushStream) {
+                                writer.flush();
+                            }
+                            if (ignoreEncoding.contains(key)) {
                                 writer.write(s);
+                            } else {
+                                if (base64Binaries) {
+                                    writer.write(Util.encodeBody(s));
+                                } else {
+                                    writer.write(s);
+                                }
+                            }
+                            //writer.write(CRLF);
+                            if (canFlushStream) {
+                                writer.flush();
                             }
                         }
-                        //writer.write(CRLF);
+                    } else {
+                        writer.write("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + filenames.get(key) + "\"");
+                        writer.write(CRLF);
+                        writer.write("Content-Type: ");
+                        writer.write((String) mimeTypes.get(key));
+                        writer.write(CRLF);
+                        writer.write("Content-Transfer-Encoding: binary");
+                        writer.write(CRLF);
+                        writer.write(CRLF);
                         if (canFlushStream) {
                             writer.flush();
                         }
-                    }
-                } else {
-                    writer.write("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + filenames.get(key) + "\"");
-                    writer.write(CRLF);
-                    writer.write("Content-Type: ");
-                    writer.write((String) mimeTypes.get(key));
-                    writer.write(CRLF);
-                    writer.write("Content-Transfer-Encoding: binary");
-                    writer.write(CRLF);
-                    writer.write(CRLF);
-                    if (canFlushStream) {
-                        writer.flush();
-                    }
-                    InputStream i;
-                    if (value instanceof InputStream) {
-                        i = (InputStream) value;
-                    } else {
-                        i = new ByteArrayInputStream((byte[]) value);
-                    }
-                    byte[] buffer = new byte[8192];
-                    int s = i.read(buffer);
-                    while (s > -1) {
-                        if (shouldStop()) {
-                            break;
+                        InputStream i = null;
+                        try {
+                            if (value instanceof InputStream) {
+                                i = (InputStream) value;
+                            } else {
+                                i = new ByteArrayInputStream((byte[]) value);
+                            }
+                            byte[] buffer = new byte[8192];
+                            int s = i.read(buffer);
+                            while (s > -1) {
+                                if (shouldStop()) {
+                                    break;
+                                }
+                                os.write(buffer, 0, s);
+                                if (canFlushStream) {
+                                    writer.flush();
+                                }
+                                s = i.read(buffer);
+                            }
+                        } finally {
+                            if (value instanceof InputStream) {
+                                if (!leaveInputStreamsOpen) {
+                                    Util.cleanup(i);
+                                }
+                            } else {
+                                Util.cleanup(i);
+                            }
                         }
-                        os.write(buffer, 0, s);
+                        //args.remove(key);
+                        value = null;
                         if (canFlushStream) {
                             writer.flush();
                         }
-                        s = i.read(buffer);
-                    }
-                    if (value instanceof InputStream) {
-                        if (!leaveInputStreamsOpen) {
-                            Util.cleanup(i);
-                        }
-                    } else {
-                        Util.cleanup(i);
-                    }
-                    //args.remove(key);
-                    value = null;
-                    if (canFlushStream) {
-                        writer.flush();
                     }
                 }
+                writer.write(CRLF);
+                if (canFlushStream) {
+                    writer.flush();
+                }
             }
-            writer.write(CRLF);
-            if (canFlushStream) {
-                writer.flush();
-            }
-        }
 
-        writer.write("--" + boundary + "--");
-        writer.write(CRLF);
-        writer.close();
+            writer.write("--" + boundary + "--");
+            writer.write(CRLF);
+        } finally {
+            Util.cleanup(writer);
+        }
     }
 
     /* (non-Javadoc)

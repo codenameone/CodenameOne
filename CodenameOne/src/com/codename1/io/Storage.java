@@ -48,7 +48,6 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public class Storage {
     private static Storage INSTANCE;
     private final CacheMap cache = new CacheMap();
@@ -260,7 +259,6 @@ public class Storage {
         try {
             d = new DataOutputStream(createOutputStream(name));
             Util.writeObject(o, d);
-            d.close();
             return true;
         } catch (Exception err) {
             if (includeLogging) {
@@ -270,8 +268,9 @@ public class Storage {
                 }
             }
             Util.getImplementation().deleteStorageFile(name);
-            Util.getImplementation().cleanup(d);
             return false;
+        } finally {
+            Util.getImplementation().cleanup(d);
         }
     }
 
@@ -313,7 +312,6 @@ public class Storage {
             }
             d = new DataInputStream(createInputStream(name));
             o = Util.readObject(d);
-            d.close();
             cache.put(name, o);
             return o;
         } catch (Throwable err) {
@@ -324,8 +322,9 @@ public class Storage {
                     Log.sendLog();
                 }
             }
-            Util.getImplementation().cleanup(d);
             return null;
+        } finally {
+            Util.getImplementation().cleanup(d);
         }
     }
 

@@ -26,7 +26,6 @@ import java.io.Reader;
  * @author <a href="mailto:ales.novak@netbeans.com">Ales Novak</a>
  * @version CVS $Id: ReaderCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class ReaderCharacterIterator implements CharacterIterator {
     /**
      * Underlying reader
@@ -61,7 +60,9 @@ public final class ReaderCharacterIterator implements CharacterIterator {
             ensure(endIndex);
             return buff.toString().substring(beginIndex, endIndex);
         } catch (IOException e) {
-            throw new StringIndexOutOfBoundsException(e.getMessage());
+            StringIndexOutOfBoundsException err = new StringIndexOutOfBoundsException(e.getMessage());
+            err.initCause(e);
+            throw err;
         }
     }
 
@@ -74,7 +75,9 @@ public final class ReaderCharacterIterator implements CharacterIterator {
             readAll();
             return buff.toString().substring(beginIndex);
         } catch (IOException e) {
-            throw new StringIndexOutOfBoundsException(e.getMessage());
+            StringIndexOutOfBoundsException err = new StringIndexOutOfBoundsException(e.getMessage());
+            err.initCause(e);
+            throw err;
         }
     }
 
@@ -87,7 +90,9 @@ public final class ReaderCharacterIterator implements CharacterIterator {
             ensure(pos);
             return buff.charAt(pos);
         } catch (IOException e) {
-            throw new StringIndexOutOfBoundsException(e.getMessage());
+            StringIndexOutOfBoundsException err = new StringIndexOutOfBoundsException(e.getMessage());
+            err.initCause(e);
+            throw err;
         }
     }
 
@@ -103,7 +108,9 @@ public final class ReaderCharacterIterator implements CharacterIterator {
                 ensure(pos);
                 return (buff.length() <= pos);
             } catch (IOException e) {
-                throw new StringIndexOutOfBoundsException(e.getMessage());
+                StringIndexOutOfBoundsException err = new StringIndexOutOfBoundsException(e.getMessage());
+                err.initCause(e);
+                throw err;
             }
         }
     }

@@ -31,7 +31,6 @@ import java.util.HashMap;
  * @version $Id: RECompiler.java 518156 2007-03-14 14:31:26Z vgritsenko $
  * @see RE
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class RECompiler {
     // Node flags
     static final int NODE_NORMAL = 0;                 // No flags (nothing special)
@@ -229,7 +228,7 @@ public class RECompiler {
      */
     void bracket() throws RESyntaxException {
         // Current character must be a '{'
-        if (idx >= len || pattern.charAt(idx++) != '{') {
+        if (idx >= len || pattern.charAt(idx++) != '{') { //NOPMD AssignmentInOperand
             internalError();
         }
 
@@ -262,7 +261,7 @@ public class RECompiler {
         }
 
         // Must have at least {m,} and maybe {m,n}.
-        if (idx >= len || pattern.charAt(idx++) != ',') {
+        if (idx >= len || pattern.charAt(idx++) != ',') { //NOPMD AssignmentInOperand
             syntaxError("Expected comma");
         }
 
@@ -300,7 +299,7 @@ public class RECompiler {
         }
 
         // Must have close brace
-        if (idx >= len || pattern.charAt(idx++) != '}') {
+        if (idx >= len || pattern.charAt(idx++) != '}') { //NOPMD AssignmentInOperand
             syntaxError("Missing close brace");
         }
     }
@@ -432,7 +431,7 @@ public class RECompiler {
         }
 
         // Check for unterminated or empty class
-        if ((idx + 1) >= len || pattern.charAt(++idx) == ']') {
+        if ((idx + 1) >= len || pattern.charAt(++idx) == ']') { //NOPMD AssignmentInOperand
             syntaxError("Empty or unterminated class");
         }
 
@@ -531,7 +530,7 @@ public class RECompiler {
                     rangeStart = (last == charInvalid ? 0 : last);
 
                     // Premature end of range. define up to Character.MAX_VALUE
-                    if ((idx + 1) < len && pattern.charAt(++idx) == ']') {
+                    if ((idx + 1) < len && pattern.charAt(++idx) == ']') { //NOPMD AssignmentInOperand
                         simpleChar = Character.MAX_VALUE;
                         break;
                     }

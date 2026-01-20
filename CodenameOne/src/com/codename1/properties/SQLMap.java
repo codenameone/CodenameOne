@@ -42,7 +42,6 @@ import java.util.List;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public final class SQLMap {
     private boolean verbose = true;
     private Database db;
@@ -575,7 +574,7 @@ public final class SQLMap {
             if (t instanceof IOException) {
                 throw ((IOException) t);
             } else {
-                throw new IOException(t.toString());
+                throw new IOException(t.toString(), t);
             }
         }
     }

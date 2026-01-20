@@ -34,7 +34,6 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class InfBlocks {
     // Table for deflate from PKZIP's appnote.txt.
     static final int[] border = { // Order of the bit length code lengths
@@ -293,7 +292,7 @@ final class InfBlocks {
                     n -= t;
                     q += t;
                     m -= t;
-                    if ((left -= t) != 0) {
+                    if ((left -= t) != 0) { //NOPMD AssignmentInOperand
                         break;
                     }
                     mode = last != 0 ? DRY : TYPE;
@@ -522,7 +521,7 @@ final class InfBlocks {
                     z.nextInIndex = p;
                     write = q;
 
-                    if ((r = codes.proc(r)) != Z_STREAM_END) {
+                    if ((r = codes.proc(r)) != Z_STREAM_END) { //NOPMD AssignmentInOperand
                         return inflateFlush(r);
                     }
                     r = Z_OK;

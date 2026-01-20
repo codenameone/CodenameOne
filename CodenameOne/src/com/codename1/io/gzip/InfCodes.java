@@ -34,7 +34,6 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 final class InfCodes {
 
     static final private int[] inflate_mask = {
@@ -513,7 +512,7 @@ final class InfCodes {
             tp = tl;
             tpIndex = tlIndex;
             tpIndexT3 = (tpIndex + t) * 3;
-            if ((e = tp[tpIndexT3]) == 0) {
+            if ((e = tp[tpIndexT3]) == 0) { //NOPMD AssignmentInOperand
                 b >>= (tp[tpIndexT3 + 1]);
                 k -= (tp[tpIndexT3 + 1]);
 
@@ -649,7 +648,7 @@ final class InfCodes {
                     t += tp[tpIndexT3 + 2];
                     t += (b & inflate_mask[e]);
                     tpIndexT3 = (tpIndex + t) * 3;
-                    if ((e = tp[tpIndexT3]) == 0) {
+                    if ((e = tp[tpIndexT3]) == 0) { //NOPMD AssignmentInOperand
 
                         b >>= (tp[tpIndexT3 + 1]);
                         k -= (tp[tpIndexT3 + 1]);

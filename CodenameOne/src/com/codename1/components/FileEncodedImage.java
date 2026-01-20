@@ -41,7 +41,6 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.CloseResource"})
 public final class FileEncodedImage extends EncodedImage {
     private final String fileName;
     private final boolean keep;
@@ -82,9 +81,13 @@ public final class FileEncodedImage extends EncodedImage {
         EncodedImage e = EncodedImage.create(i);
         FileEncodedImage f = new FileEncodedImage(fileName, width, height, true);
         f.data = e.getImageData();
-        OutputStream o = FileSystemStorage.getInstance().openOutputStream(fileName);
-        o.write(f.data);
-        o.close();
+        OutputStream o = null;
+        try {
+            o = FileSystemStorage.getInstance().openOutputStream(fileName);
+            o.write(f.data);
+        } finally {
+            Util.cleanup(o);
+        }
         return f;
     }
 

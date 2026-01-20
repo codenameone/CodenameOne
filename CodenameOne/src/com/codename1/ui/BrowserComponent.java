@@ -83,7 +83,6 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-@SuppressWarnings({"PMD.PreserveStackTrace"})
 public class BrowserComponent extends Container {
     /**
      * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
@@ -265,7 +264,7 @@ public class BrowserComponent extends Container {
                         try {
                             sb.append(new String(bytes, 0, pos, enc));
                         } catch (Throwable t) {
-                            throw new RuntimeException(t.getMessage());
+                            throw new RuntimeException(t.getMessage(), t);
                         }
                     } catch (NumberFormatException e) {
                         throw new IllegalArgumentException(
@@ -2134,7 +2133,7 @@ public class BrowserComponent extends Container {
                     throw (RuntimeException) ex;
                 } else {
                     Log.e(ex);
-                    throw new RuntimeException(ex.getMessage());
+                    throw new RuntimeException(ex.getMessage(), ex);
                 }
             }
 

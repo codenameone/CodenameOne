@@ -288,7 +288,6 @@ import java.util.Set;
  * @author shannah
  * @see <a href="https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html">jQuery/CSS Style Selectors for Codename One</a>
  */
-@SuppressWarnings({"PMD.AssignmentInOperand"})
 public class ComponentSelector implements Iterable<Component>, Set<Component> {
     private static final String PROPERTY_TAG = "com.codename1.ui.ComponentSelector#tags";
     private static final int ALL_STYLES = 1;
@@ -1548,11 +1547,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
             int pos;
 
-            if ((pos = selector.indexOf(":")) != -1) {
+            if ((pos = selector.indexOf(":")) != -1) { //NOPMD AssignmentInOperand
                 out.state = selector.substring(pos + 1);
                 selector = selector.substring(0, pos);
             }
-            if ((pos = selector.indexOf(".")) != -1) {
+            if ((pos = selector.indexOf(".")) != -1) { //NOPMD AssignmentInOperand
                 out.tags = Util.split(selector.substring(pos + 1), ".");
                 len = out.tags.length;
                 out.tagsNeedles = new String[len];
@@ -1563,7 +1562,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                 }
                 selector = selector.substring(0, pos);
             }
-            if ((pos = selector.indexOf("#")) >= 0) {
+            if ((pos = selector.indexOf("#")) >= 0) { //NOPMD AssignmentInOperand
                 out.name = selector.substring(pos + 1);
                 selector = selector.substring(0, pos);
             }
