@@ -854,9 +854,10 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             if (properties.length == other.properties.length) {
                 int index = 0;
                 for (PropertyBase property : properties) {
-                    if (!property.equals(other.properties[index++])) {
+                    if (!property.equals(other.properties[index])) {
                         return false;
                     }
+                    index++;
                 }
                 return true;
             }

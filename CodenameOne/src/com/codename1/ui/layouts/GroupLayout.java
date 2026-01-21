@@ -941,9 +941,8 @@ public class GroupLayout extends Layout {
             isValid = true;
             horizontalGroup.setSize(HORIZONTAL, UNSET, UNSET);
             verticalGroup.setSize(VERTICAL, UNSET, UNSET);
-            for (Iterator cis = componentInfos.values().iterator();
-                 cis.hasNext(); ) {
-                ComponentInfo ci = (ComponentInfo) cis.next();
+            for (Object info : componentInfos.values()) {
+                ComponentInfo ci = (ComponentInfo) info;
                 if (ci.updateVisibility()) {
                     visChanged = true;
                 }

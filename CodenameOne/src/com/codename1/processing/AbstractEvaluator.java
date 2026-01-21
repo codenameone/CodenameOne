@@ -358,8 +358,7 @@ abstract class AbstractEvaluator implements Evaluator {
         } else {
             array = new ArrayList();
         }
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateSingle((StructuredContent) o, expr);
                 if (o != null) {
@@ -393,8 +392,7 @@ abstract class AbstractEvaluator implements Evaluator {
             array = new ArrayList();
         }
 
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateLeftLessRight((StructuredContent) o, lvalue, rvalue);
                 if (o != null) {
@@ -442,8 +440,7 @@ abstract class AbstractEvaluator implements Evaluator {
             array = new ArrayList();
         }
 
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateLeftGreaterRight((StructuredContent) o, lvalue, rvalue);
                 if (o != null) {
@@ -491,8 +488,7 @@ abstract class AbstractEvaluator implements Evaluator {
             array = new ArrayList();
         }
 
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateLeftEqualsRight((StructuredContent) o, lvalue, rvalue);
                 if (o != null) {
@@ -540,8 +536,7 @@ abstract class AbstractEvaluator implements Evaluator {
             array = new ArrayList();
         }
 
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateLeftContainsRight((StructuredContent) o, lvalue, rvalue);
                 if (o != null) {
