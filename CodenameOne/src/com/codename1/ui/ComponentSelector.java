@@ -1545,24 +1545,26 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             selector = selector.trim();
 
 
-            int pos;
-
-            if ((pos = selector.indexOf(":")) != -1) { //NOPMD AssignmentInOperand
+            int pos = selector.indexOf(":");
+            if (pos != -1) {
                 out.state = selector.substring(pos + 1);
                 selector = selector.substring(0, pos);
             }
-            if ((pos = selector.indexOf(".")) != -1) { //NOPMD AssignmentInOperand
+            pos = selector.indexOf(".");
+            if (pos != -1) {
                 out.tags = Util.split(selector.substring(pos + 1), ".");
                 len = out.tags.length;
                 out.tagsNeedles = new String[len];
                 String[] needles = out.tagsNeedles;
                 String[] tags = out.tags;
                 for (int i = 0; i < len; i++) {
-                    needles[i] = " " + tags[i] + " "; // Will make it easier to match against components' tags.
+                    // Will make it easier to match against components' tags.
+                    needles[i] = " " + tags[i] + " ";
                 }
                 selector = selector.substring(0, pos);
             }
-            if ((pos = selector.indexOf("#")) >= 0) { //NOPMD AssignmentInOperand
+            pos = selector.indexOf("#");
+            if (pos >= 0) {
                 out.name = selector.substring(pos + 1);
                 selector = selector.substring(0, pos);
             }

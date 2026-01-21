@@ -795,8 +795,8 @@ public abstract class CodenameOneImplementation {
         int x2 = x + c.getWidth();
         int y2 = y + c.getHeight();
 
-        Container parent = null;
-        if ((parent = c.getParent()) != null) { //NOPMD AssignmentInOperand
+        Container parent = c.getParent();
+        if (parent != null) {
             getPaintableBounds(parent, out);
             x = Math.max(out.getX(), x);
             y = Math.max(out.getY(), y);
@@ -3692,26 +3692,25 @@ public abstract class CodenameOneImplementation {
 
         if (doSwap) {
             while (ix0 < ixEnd) {
-                if ((ix1 = scanSecond(chars, ix0, ixEnd)) < 0) { //NOPMD AssignmentInOperand
+                ix1 = scanSecond(chars, ix0, ixEnd);
+                if (ix1 < 0) {
                     break;
-                } else {
-                    ix0 = ix1;
-                    ix1 = scanBackFirst(chars, ix0, ixEnd);
-                    // swap
-                    for (int iy0 = ix0, iy1 = ix1 - 1; iy0 < iy1; iy0++, iy1--) {
-                        char tmp = chars[iy0];
-                        chars[iy0] = chars[iy1];
-                        chars[iy1] = tmp;
-
-                        if (index == iy1) {
-                            //System.out.println("IY: Found char: new index="+iy0);
-                            destIndex = iy0;
-                            index = iy0;
-                        }
-                    }
-
-                    ix0 = ix1;
                 }
+                ix0 = ix1;
+                ix1 = scanBackFirst(chars, ix0, ixEnd);
+                // swap
+                for (int iy0 = ix0, iy1 = ix1 - 1; iy0 < iy1; iy0++, iy1--) {
+                    char tmp = chars[iy0];
+                    chars[iy0] = chars[iy1];
+                    chars[iy1] = tmp;
+
+                    if (index == iy1) {
+                        destIndex = iy0;
+                        index = iy0;
+                    }
+                }
+
+                ix0 = ix1;
             }
         }
 
@@ -4959,13 +4958,13 @@ public abstract class CodenameOneImplementation {
      */
     public Vector getCookiesForURL(String url) {
         Vector response = null;
-        if (Cookie.isAutoStored()) { //NOPMD AssignmentInOperand
+        if (Cookie.isAutoStored()) {
             cookies = (Hashtable) Storage.getInstance().readObject(Cookie.STORAGE_NAME);
         }
 
         String protocol = "";
-        int pos = -1;
-        if ((pos = url.indexOf(":")) >= 0) { //NOPMD AssignmentInOperand
+        int pos = url.indexOf(":");
+        if (pos >= 0) {
             protocol = url.substring(0, pos);
         }
         boolean isHttp = ("http".equals(protocol) || "https".equals(protocol));

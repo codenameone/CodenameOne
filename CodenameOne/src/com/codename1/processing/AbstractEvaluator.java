@@ -360,7 +360,8 @@ abstract class AbstractEvaluator implements Evaluator {
         for (Iterator e = elements.iterator(); e.hasNext(); ) {
             Object o = e.next();
             if (o instanceof StructuredContent) {
-                if ((o = evaluateSingle((StructuredContent) o, expr)) != null) { //NOPMD AssignmentInOperand
+                o = evaluateSingle((StructuredContent) o, expr);
+                if (o != null) {
                     array.add(o);
                 }
             }
@@ -394,7 +395,8 @@ abstract class AbstractEvaluator implements Evaluator {
         for (Iterator e = elements.iterator(); e.hasNext(); ) {
             Object o = e.next();
             if (o instanceof StructuredContent) {
-                if ((o = evaluateLeftLessRight((StructuredContent) o, lvalue, rvalue)) != null) { //NOPMD AssignmentInOperand
+                o = evaluateLeftLessRight((StructuredContent) o, lvalue, rvalue);
+                if (o != null) {
                     array.add(o);
                 }
             }
@@ -442,7 +444,8 @@ abstract class AbstractEvaluator implements Evaluator {
         for (Iterator e = elements.iterator(); e.hasNext(); ) {
             Object o = e.next();
             if (o instanceof StructuredContent) {
-                if ((o = evaluateLeftGreaterRight((StructuredContent) o, lvalue, rvalue)) != null) { //NOPMD AssignmentInOperand
+                o = evaluateLeftGreaterRight((StructuredContent) o, lvalue, rvalue);
+                if (o != null) {
                     array.add(o);
                 }
             }
@@ -490,7 +493,8 @@ abstract class AbstractEvaluator implements Evaluator {
         for (Iterator e = elements.iterator(); e.hasNext(); ) {
             Object o = e.next();
             if (o instanceof StructuredContent) {
-                if ((o = evaluateLeftEqualsRight((StructuredContent) o, lvalue, rvalue)) != null) { //NOPMD AssignmentInOperand
+                o = evaluateLeftEqualsRight((StructuredContent) o, lvalue, rvalue);
+                if (o != null) {
                     array.add(o);
                 }
             }
@@ -538,7 +542,8 @@ abstract class AbstractEvaluator implements Evaluator {
         for (Iterator e = elements.iterator(); e.hasNext(); ) {
             Object o = e.next();
             if (o instanceof StructuredContent) {
-                if ((o = evaluateLeftContainsRight((StructuredContent) o, lvalue, rvalue)) != null) { //NOPMD AssignmentInOperand
+                o = evaluateLeftContainsRight((StructuredContent) o, lvalue, rvalue);
+                if (o != null) {
                     array.add(o);
                 }
             }
