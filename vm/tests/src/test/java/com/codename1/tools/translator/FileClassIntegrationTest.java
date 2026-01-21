@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,15 +28,13 @@ public class FileClassIntegrationTest {
 
         Files.write(javaFile, fileTestAppSource().getBytes(StandardCharsets.UTF_8));
 
-        // Use real JavaAPI sources
-        Path javaApiSrc = Paths.get("../JavaAPI/src");
-        if (!Files.exists(javaApiSrc)) {
-            javaApiSrc = Paths.get("vm/JavaAPI/src");
-        }
+        Path javaApiDir = Files.createTempDirectory("java-api-classes");
 
         List<String> compileArgs = new ArrayList<>();
         assertTrue(CompilerHelper.isJavaApiCompatible(config),
                 "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         if (CompilerHelper.useClasspath(config)) {
              compileArgs.add("-source");
@@ -45,12 +42,14 @@ public class FileClassIntegrationTest {
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-classpath");
-             compileArgs.add(javaApiSrc.toString());
+             compileArgs.add(javaApiDir.toString());
         } else {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
+             compileArgs.add("-bootclasspath");
+             compileArgs.add(javaApiDir.toString());
              compileArgs.add("-Xlint:-options");
         }
 
@@ -58,13 +57,10 @@ public class FileClassIntegrationTest {
         compileArgs.add(classesDir.toString());
         compileArgs.add(javaFile.toString());
 
-        // Add all JavaAPI source files
-        Files.walk(javaApiSrc)
-            .filter(p -> p.toString().endsWith(".java"))
-            .forEach(p -> compileArgs.add(p.toString()));
-
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "FileTestApp.java compilation failed with " + config);
+
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
 
         Path outputDir = Files.createTempDirectory("file-test-output");
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "FileTestApp");

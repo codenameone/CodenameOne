@@ -16,8 +16,6 @@ import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 
-import javax.tools.JavaCompiler;
-import javax.tools.ToolProvider;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FilenameFilter;
@@ -27,7 +25,6 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -63,8 +60,9 @@ class BytecodeInstructionIntegrationTest {
 
         Files.write(sourceDir.resolve("BytecodeInstructionApp.java"), appSource().getBytes(StandardCharsets.UTF_8));
 
-        // Compile JavaAPI for bootclasspath
-        compileJavaAPI(javaApiDir);
+        assertTrue(CompilerHelper.isJavaApiCompatible(config),
+                "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
@@ -100,6 +98,8 @@ class BytecodeInstructionIntegrationTest {
 
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "BytecodeInstructionApp should compile with " + config);
+
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
 
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
@@ -215,8 +215,9 @@ class BytecodeInstructionIntegrationTest {
 
         Files.write(sourceDir.resolve("InvokeLdcLocalVarsApp.java"), invokeLdcLocalVarsAppSource().getBytes(StandardCharsets.UTF_8));
 
-        // Compile JavaAPI for bootclasspath
-        compileJavaAPI(javaApiDir);
+        assertTrue(CompilerHelper.isJavaApiCompatible(config),
+                "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
@@ -248,6 +249,8 @@ class BytecodeInstructionIntegrationTest {
 
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "InvokeLdcLocalVarsApp should compile with " + config);
+
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
 
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
@@ -496,37 +499,6 @@ class BytecodeInstructionIntegrationTest {
                     .orElseThrow(() -> new AssertionError("Translated source for BytecodeInstructionApp not found"));
         }
     }
-
-    private void compileJavaAPI(Path outputDir) throws Exception {
-        Files.createDirectories(outputDir);
-        Path javaApiRoot = Paths.get("..", "JavaAPI", "src").normalize().toAbsolutePath();
-        List<String> sources = new ArrayList<>();
-        Files.walk(javaApiRoot)
-                .filter(p -> p.toString().endsWith(".java"))
-                .forEach(p -> sources.add(p.toString()));
-
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        List<String> args = new ArrayList<>();
-
-        if (!System.getProperty("java.version").startsWith("1.")) {
-             args.add("--patch-module");
-             args.add("java.base=" + javaApiRoot.toString());
-        } else {
-            args.add("-source");
-            args.add("1.5");
-            args.add("-target");
-            args.add("1.5");
-        }
-
-        args.add("-d");
-        args.add(outputDir.toString());
-        args.addAll(sources);
-
-        int result = compiler.run(null, null, null, args.toArray(new String[0]));
-        assertEquals(0, result, "JavaAPI should compile");
-    }
-
-
 
 
     private String appSource() {
