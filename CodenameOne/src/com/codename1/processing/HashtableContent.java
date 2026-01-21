@@ -288,8 +288,7 @@ class MapContent implements StructuredContent {
      * @param name   node name we are searching for
      */
     private void findByName(List target, List source, String name) {
-        for (int i = 0; i < source.size(); i++) {
-            Object o = source.get(i);
+        for (Object o : source) {
             if (o instanceof Map) {
                 findByName(target, (Map) o, name);
             } else if (o instanceof List) {

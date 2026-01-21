@@ -217,8 +217,8 @@ class CSSParser {
      * @return true if the specified CSS media type is uspported, false otherwise
      */
     private boolean isMediaTypeSupported(String media) {
-        for (int i = 0; i < SUPPORTED_MEDIA_TYPES.length; i++) {
-            if (media.equalsIgnoreCase(SUPPORTED_MEDIA_TYPES[i])) {
+        for (String supportedMediaType : SUPPORTED_MEDIA_TYPES) {
+            if (media.equalsIgnoreCase(supportedMediaType)) {
                 return true;
             }
         }
@@ -580,6 +580,7 @@ class CSSParser {
                         // unsupported token we need to read until the newline
                         //while(nextToken(r, false, false,false) != null && !newline) {}
                         while (nextToken(r, false, false, false, false) != null) {
+                            continue;
                         } //TODO - is newline truly unnecessary ? + what if that happens in the end of the file - do we get into an infinite loop?
                     }
                 }

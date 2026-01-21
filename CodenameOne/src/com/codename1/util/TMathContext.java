@@ -144,7 +144,7 @@ final class TMathContext {
         }
         // Parsing "precision=" String
         for (i = 0; (i < chPrecision.length) && (charVal[i] == chPrecision[i]); i++) {
-            // do nothing
+            continue;
         }
 
         if (i < chPrecision.length) {
@@ -178,7 +178,7 @@ final class TMathContext {
         } while (true);
         // Parsing "roundingMode="
         for (j = 0; (j < chRoundingMode.length) && (charVal[i] == chRoundingMode[j]); i++, j++) {
-            // do nothing
+            continue;
         }
 
         if (j < chRoundingMode.length) {

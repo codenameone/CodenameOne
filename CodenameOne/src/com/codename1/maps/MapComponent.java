@@ -432,34 +432,30 @@ public class MapComponent extends Container {
             Coord refCoord = this.getCoordFromPosition(zoomCenterX + getAbsoluteX(), zoomCenterY + getAbsoluteY());
             int oldZoom = _zoom;
             if (scale > 1) {
-                if (scale < 1.2) {
-                    //do nothing
-                } else if (scale < 1.6) {
-                    zoomIn();
-                } else if (scale < 2.0) {
-                    zoomIn();
-                    zoomIn();
-                } else if (scale < 2.4) {
+                if (scale >= 2.4) {
                     zoomIn();
                     zoomIn();
                     zoomIn();
-                } else {
+                    zoomIn();
+                } else if (scale >= 2.0) {
                     zoomIn();
                     zoomIn();
                     zoomIn();
+                } else if (scale >= 1.6) {
+                    zoomIn();
+                    zoomIn();
+                } else if (scale >= 1.2) {
                     zoomIn();
                 }
             } else {
-                if (scale > 0.8) {
-                    //do nothing
-                } else if (scale > 0.5) {
-                    zoomOut();
-                } else if (scale > 0.2) {
+                if (scale <= 0.2) {
                     zoomOut();
                     zoomOut();
-                } else {
+                    zoomOut();
+                } else if (scale <= 0.5) {
                     zoomOut();
                     zoomOut();
+                } else if (scale <= 0.8) {
                     zoomOut();
                 }
             }

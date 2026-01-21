@@ -320,8 +320,9 @@ abstract class AbstractEvaluator implements Evaluator {
         }
         List v = StringUtil.tokenizeString(arrayAsString, ',');
         String[] a = new String[v.size()];
-        for (int i = 0; i < v.size(); i++) {
-            a[i] = stripQuotes(v.get(i).toString().trim());
+        int index = 0;
+        for (Object item : v) {
+            a[index++] = stripQuotes(item.toString().trim());
         }
         return a;
     }

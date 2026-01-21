@@ -126,8 +126,8 @@ public final class CC {
             final ArrayList<String> targets = new ArrayList<String>(2);
 
             if (pos != null) {
-                for (int i = 0; i < pos.length; i++) {
-                    addLinkTargetIDs(targets, pos[i]);
+                for (UnitValue value : pos) {
+                    addLinkTargetIDs(targets, value);
                 }
             }
 

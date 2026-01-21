@@ -1733,15 +1733,15 @@ public class UIBuilder { //implements Externalizable {
         }
         Object currentListeners = formListeners.get(componentName);
         if (currentListeners == null) {
-        } else {
-            if (currentListeners instanceof Vector) {
-                ((Vector) currentListeners).removeElement(listener);
-                if (((Vector) currentListeners).isEmpty()) {
-                    formListeners.remove(componentName);
-                }
-            } else {
+            return;
+        }
+        if (currentListeners instanceof Vector) {
+            ((Vector) currentListeners).removeElement(listener);
+            if (((Vector) currentListeners).isEmpty()) {
                 formListeners.remove(componentName);
             }
+        } else {
+            formListeners.remove(componentName);
         }
     }
 

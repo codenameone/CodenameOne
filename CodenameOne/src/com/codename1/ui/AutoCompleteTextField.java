@@ -646,9 +646,7 @@ public class AutoCompleteTextField extends TextField {
                 Container wrap = (Container) layered.getComponentAt(i);
                 Component pop = wrap.getComponentAt(0);
                 if (pop.isVisible()) {
-                    if (!pop.contains(evt.getX(), evt.getY())) {
-
-                    } else {
+                    if (pop.contains(evt.getX(), evt.getY())) {
                         pressInBounds = true;
                     }
                 }

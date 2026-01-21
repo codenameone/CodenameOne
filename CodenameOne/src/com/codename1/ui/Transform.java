@@ -665,7 +665,7 @@ public class Transform {
 
     public void invert() throws NotInvertibleException {
         if (type == TYPE_IDENTITY) {
-            // Do nothing
+            return;
         } else if (type == TYPE_TRANSLATION) {
             setTranslation(-translateX, -translateY, -translateZ);
         } else if (type == TYPE_SCALE) {

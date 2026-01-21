@@ -383,6 +383,7 @@ final class JSONSanitizer {
             // abs(n-1) (with no leading zeros).
             if (k == 1) {
                 // Sole digit already on sanitizedJson.
+                sanitizedJson.length();
 
                 // 10. Return the String consisting of the most significant digit of the
                 // decimal representation of s, followed by a decimal point '.', followed

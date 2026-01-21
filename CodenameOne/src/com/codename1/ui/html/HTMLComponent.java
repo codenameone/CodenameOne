@@ -235,8 +235,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * This is used later on for lookup.
      */
     static {
-        for (int i = 0; i < INPUT_TYPE_STRINGS.length; i++) {
-            INPUT_TYPES.addElement(INPUT_TYPE_STRINGS[i]);
+        for (String inputType : INPUT_TYPE_STRINGS) {
+            INPUT_TYPES.addElement(inputType);
         }
     }
 
@@ -2806,9 +2806,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         int rowspan = getInt(tdTag.getAttributeById(HTMLElement.ATTR_ROWSPAN));
         String cWidth = tdTag.getAttributeById(HTMLElement.ATTR_WIDTH);
         int pW = getPercentage(cWidth);
-        if ((pW > 0) && (pW < 100)) {
-            //constraint.setWidthPercentage(pW); //TODO - Setting a width constraint currently makes the field width 0 - needs to be fixed in TableLayout
-        } else {
+        if ((pW <= 0) || (pW >= 100)) {
             pW = getInt(cWidth);
             if (pW != 0) {
                 cell.setPreferredW(pW);
@@ -2816,9 +2814,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
         String cHeight = tdTag.getAttributeById(HTMLElement.ATTR_HEIGHT);
         int pH = getPercentage(cHeight);
-        if ((pH > 0) && (pH < 100)) {
-            //constraint.setHeightPercentage(pH); //TODO - Setting a height constraint currently makes the field height 0 - needs to be fixed in TableLayout
-        } else {
+        if ((pH <= 0) || (pH >= 100)) {
             pH = getInt(cHeight);
             if (pH != 0) {
                 cell.setPreferredH(pH);

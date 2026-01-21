@@ -93,7 +93,7 @@ final class TPrimality {
         // If n < "last prime of table" searches next prime in the table
         if ((n.numberLength == 1) && (n.digits[0] >= 0) && (n.digits[0] < primes[primes.length - 1])) {
             for (i = 0; n.digits[0] >= primes[i]; i++) {
-                // do nothing
+                continue;
             }
             return BIprimes[i];
         }
@@ -112,7 +112,7 @@ final class TPrimality {
         // To set the improved certainly of Miller-Rabin
         j = startPoint.bitLength();
         for (certainty = 2; j < BITS[certainty]; certainty++) {
-            // do nothing
+            continue;
         }
         // To calculate modules: N mod p1, N mod p2, ... for first primes.
         for (i = 0; i < primes.length; i++) {
@@ -208,7 +208,7 @@ final class TPrimality {
         int bitLength = n.bitLength();
 
         for (i = 2; bitLength < BITS[i]; i++) {
-            // do nothing
+            continue;
         }
         certainty = Math.min(i, 1 + ((certainty - 1) >> 1));
 

@@ -84,8 +84,8 @@ public class FileTreeModel implements TreeModel {
         try {
             if (parent == null) {
                 String[] roots = FileSystemStorage.getInstance().getRoots();
-                for (int iter = 0; iter < roots.length; iter++) {
-                    response.addElement(roots[iter]);
+                for (String root : roots) {
+                    response.addElement(root);
                 }
             } else {
                 String name = (String) parent;
@@ -95,8 +95,7 @@ public class FileTreeModel implements TreeModel {
                 String[] res = FileSystemStorage.getInstance().listFiles(name);
                 if (res != null) {
                     if (showFiles) {
-                        for (int iter = 0; iter < res.length; iter++) {
-                            String f = res[iter];
+                        for (String f : res) {
                             if (!FileSystemStorage.getInstance().isDirectory(name + f) && ext != null) {
                                 int i = f.lastIndexOf('.');
                                 if (i > 0) {
@@ -110,9 +109,9 @@ public class FileTreeModel implements TreeModel {
                             }
                         }
                     } else {
-                        for (int iter = 0; iter < res.length; iter++) {
-                            if (FileSystemStorage.getInstance().isDirectory(name + res[iter])) {
-                                response.addElement(name + res[iter]);
+                        for (String item : res) {
+                            if (FileSystemStorage.getInstance().isDirectory(name + item)) {
+                                response.addElement(name + item);
                             }
                         }
                     }

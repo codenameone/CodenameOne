@@ -923,8 +923,8 @@ class TBigInteger {
         if (hashCode != 0) {
             return hashCode;
         }
-        for (int i = 0; i < digits.length; i++) {
-            hashCode = (hashCode * 33 + digits[i]);
+        for (int digit : digits) {
+            hashCode = (hashCode * 33 + digit);
         }
         hashCode = hashCode * sign;
         return hashCode;
@@ -953,7 +953,7 @@ class TBigInteger {
     boolean equalsArrays(final int[] b) {
         int i;
         for (i = numberLength - 1; (i >= 0) && (digits[i] == b[i]); i--) {
-            // Empty
+            continue;
         }
         return i < 0;
     }
@@ -1318,7 +1318,7 @@ class TBigInteger {
      */
     final void cutOffLeadingZeroes() {
         while ((numberLength > 0) && (digits[--numberLength] == 0)) {
-            // Empty
+            continue;
         }
         if (digits[numberLength++] == 0) { //NOPMD AssignmentInOperand
             sign = 0;
@@ -1405,7 +1405,7 @@ class TBigInteger {
                 i = -1;
             } else {
                 for (i = 0; digits[i] == 0; i++) {
-                    // Empty
+                    continue;
                 }
             }
             firstNonzeroDigit = i;

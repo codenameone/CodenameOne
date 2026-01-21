@@ -389,8 +389,8 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
                 return;
             }
         }
-        for (int iter = 0; iter < listeners.size(); iter++) {
-            listeners.get(iter).dataChanged(type, index);
+        for (DataChangedListener listener : listeners) {
+            listener.dataChanged(type, index);
         }
     }
 

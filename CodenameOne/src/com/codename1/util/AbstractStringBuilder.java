@@ -558,7 +558,7 @@ abstract class AbstractStringBuilder {
                 int o1 = i;
                 int o2 = 0;
                 while (++o2 < subCount && value[++o1] == subString.charAt(o2)) {
-                    // Intentionally empty
+                    continue;
                 }
                 if (o2 == subCount) {
                     return i;
@@ -622,7 +622,7 @@ abstract class AbstractStringBuilder {
                     int o2 = 0;
                     while (++o2 < subCount
                             && value[++o1] == subString.charAt(o2)) {
-                        // Intentionally empty
+                        continue;
                     }
                     if (o2 == subCount) {
                         return i;

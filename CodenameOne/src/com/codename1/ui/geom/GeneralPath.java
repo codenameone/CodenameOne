@@ -2455,8 +2455,7 @@ public final class GeneralPath implements Shape {
             }
 
             // DOWN
-            if (y < y1 && y < y2) {
-            } else {
+            if (!(y < y1 && y < y2)) {
                 // INSIDE
                 if ((y2 - y1) * (x - x1) / (x2 - x1) <= y - y1) {
                     // INSIDE-UP
@@ -2709,8 +2708,7 @@ public final class GeneralPath implements Shape {
             }
 
             // DOWN
-            if (ry2 < y1 && ry2 < y2) {
-            } else {
+            if (!(ry2 < y1 && ry2 < y2)) {
 
                 // INSIDE
                 if (x1 == x2) {
@@ -2737,8 +2735,7 @@ public final class GeneralPath implements Shape {
                 }
 
                 // BOUND-DOWN
-                if (by1 > ry2 && by2 > ry2) {
-                } else {
+                if (!(by1 > ry2 && by2 > ry2)) {
                     return CROSSING;
                 }
             }

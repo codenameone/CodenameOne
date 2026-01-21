@@ -137,7 +137,7 @@ final class TBitLevel {
         int i;
 
         for (i = 0; (i < intCount) && (digits[i] == 0); i++) {
-            // do nothing
+            continue;
         }
         return ((i != intCount) || (digits[i] << (32 - bitCount) != 0));
     }
@@ -250,7 +250,7 @@ final class TBitLevel {
             // Checking if the dropped bits are zeros (the remainder equals to
             // 0)
             for (i = 0; (i < intCount) && (source.digits[i] == 0); i++) {
-                // do nothing
+                continue;
             }
             // If the remainder is not zero, add 1 to the result
             if ((i < intCount) || ((count > 0) && ((source.digits[i] << (32 - count)) != 0))) {

@@ -97,7 +97,7 @@ final class TConversion {
                     result[--currentChar] = '0';
                 }
                 for (i = tempLen - 1; (i > 0) && (temp[i] == 0); i--) {
-                    // do nothing
+                    continue;
                 }
                 tempLen = i + 1;
                 if ((tempLen == 1) && (temp[0] == 0)) { // the quotient is 0

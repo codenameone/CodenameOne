@@ -55,11 +55,11 @@ final class TLogical {
             // ~val = -val + 1
             if (val.digits[val.numberLength - 1] != -1) {
                 for (i = 0; val.digits[i] == -1; i++) {
-                    // do nothing
+                    continue;
                 }
             } else {
                 for (i = 0; (i < val.numberLength) && (val.digits[i] == -1); i++) {
-                    // do nothing
+                    continue;
                 }
                 if (i == val.numberLength) {
                     resDigits[i] = 1;
@@ -202,12 +202,12 @@ final class TLogical {
         }
         if (digit == 0) {
             for (i++; i < shorter.numberLength && (digit = ~(longer.digits[i] | shorter.digits[i])) == 0; i++) { //NOPMD AssignmentInOperand
-                // do nothing
+                continue;
             }
             if (digit == 0) {
                 // shorter has only the remaining virtual sign bits
                 for (; i < longer.numberLength && (digit = ~longer.digits[i]) == 0; i++) {
-                    // do nothing
+                    continue;
                 }
                 if (digit == 0) {
                     resLength = longer.numberLength + 1;
@@ -361,15 +361,15 @@ final class TLogical {
             if (digit == 0) {
                 limit = Math.min(positive.numberLength, negative.numberLength);
                 for (i++; i < limit && (digit = ~(negative.digits[i] | positive.digits[i])) == 0; i++) { //NOPMD AssignmentInOperand
-                    // do nothing
+                    continue;
                 }
                 if (digit == 0) {
                     // the shorter has only the remaining virtual sign bits
                     for (; i < positive.numberLength && (digit = ~positive.digits[i]) == 0; i++) {
-                        // do nothing
+                        continue;
                     }
                     for (; i < negative.numberLength && (digit = ~negative.digits[i]) == 0; i++) {
-                        // do nothing
+                        continue;
                     }
                     if (digit == 0) {
                         resLength++;
@@ -797,15 +797,15 @@ final class TLogical {
             if (digit == 0) {
                 limit = Math.min(positive.numberLength, negative.numberLength);
                 for (i++; i < limit && (digit = positive.digits[i] ^ ~negative.digits[i]) == 0; i++) { //NOPMD AssignmentInOperand
-                    // do nothing
+                    continue;
                 }
                 if (digit == 0) {
                     // shorter has only the remaining virtual sign bits
                     for (; i < positive.numberLength && (digit = ~positive.digits[i]) == 0; i++) {
-                        // do nothing
+                        continue;
                     }
                     for (; i < negative.numberLength && (digit = ~negative.digits[i]) == 0; i++) {
-                        // do nothing
+                        continue;
                     }
                     if (digit == 0) {
                         resLength = resLength + 1;

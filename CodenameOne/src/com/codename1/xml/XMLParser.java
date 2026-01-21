@@ -469,9 +469,7 @@ public class XMLParser {
                     if (element != null) {
                         if (ct.equalsIgnoreCase(element.getTagName())) {
                             return;
-                        } else if (isEmptyTag(ct)) {
-                            // do nothing, someone chose to close an empty tag i.e. <img ....></img> or <br></br>
-                        } else {
+                        } else if (!isEmptyTag(ct)) {
                             notifyError(ParserCallback.ERROR_NO_CLOSE_TAG, element.getTagName(), null, null, "Malformed XML - no appropriate closing tag for " + element.getTagName());
                         }
                     }

@@ -523,8 +523,8 @@ public class Dialog extends Form {
             if (commandsAsButtons) {
                 dialog.placeButtonCommands(cmds);
             } else {
-                for (int iter = 0; iter < cmds.length; iter++) {
-                    dialog.addCommand(cmds[iter]);
+                for (Command cmd : cmds) {
+                    dialog.addCommand(cmd);
                 }
             }
 
