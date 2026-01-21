@@ -1,8 +1,6 @@
 package com.codename1.tools.translator;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,20 +36,18 @@ public class FileClassIntegrationTest {
         }
 
         List<String> compileArgs = new ArrayList<>();
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+        // JDK 9+ requires --patch-module for JavaAPI sources, which cannot target < 9 bytecode.
+        if (!CompilerHelper.isJavaApiCompatible(config)) {
+            return;
+        }
 
-        if (jdkVer >= 9) {
-             if (Double.parseDouble(config.targetVersion) < 9) {
-                 return;
-             }
+        if (CompilerHelper.useClasspath(config)) {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
-             compileArgs.add("--patch-module");
-             compileArgs.add("java.base=" + javaApiSrc.toString());
-             compileArgs.add("-Xlint:-module");
+             compileArgs.add("-classpath");
+             compileArgs.add(javaApiSrc.toString());
         } else {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);

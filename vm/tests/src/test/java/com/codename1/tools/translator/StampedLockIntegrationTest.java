@@ -31,18 +31,14 @@ class StampedLockIntegrationTest {
         Files.walk(sourceDir).filter(p -> p.toString().endsWith(".java")).forEach(p -> sources.add(p.toString()));
 
         List<String> compileArgs = new ArrayList<>();
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
-
-        if (jdkVer >= 9 && targetVer < 9) {
+        // JDK 9+ requires --patch-module for JavaAPI sources, which cannot target < 9 bytecode.
+        if (!CompilerHelper.isJavaApiCompatible(config)) {
             return;
         }
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
 
-        if (jdkVer >= 9) {
+        if (CompilerHelper.useClasspath(config)) {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");

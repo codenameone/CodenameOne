@@ -79,12 +79,8 @@ class LambdaIntegrationTest {
             fail("No compiler available for target " + targetVersion);
         }
 
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
-
-        if (jdkVer >= 9 && targetVer < 9) {
+        // JDK 9+ requires --patch-module for JavaAPI sources, which cannot target < 9 bytecode.
+        if (!CompilerHelper.isJavaApiCompatible(config)) {
             return;
         }
 
@@ -100,7 +96,7 @@ class LambdaIntegrationTest {
         compileArgs.add(targetVersion);
         compileArgs.add("-target");
         compileArgs.add(targetVersion);
-        if (jdkVer >= 9) {
+        if (CompilerHelper.useClasspath(config)) {
             compileArgs.add("-classpath");
             compileArgs.add(javaApiDir.toString());
         } else {
@@ -130,7 +126,24 @@ class LambdaIntegrationTest {
         writeRuntimeStubs(srcRoot);
         writeMissingHeadersAndImpls(srcRoot);
 
-        // Skip CMake build for now to avoid missing java.lang.Object method stubs in the generated C.
+        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+
+        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+                "cmake",
+                "-S", distDir.toString(),
+                "-B", buildDir.toString(),
+                "-DCMAKE_C_COMPILER=clang",
+                "-DCMAKE_OBJC_COMPILER=clang"
+        ), distDir);
+
+        CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        Path executable = buildDir.resolve("LambdaApp");
+        String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
+        assertTrue(output.contains("RESULT=145"), "Compiled program should print the expected result: " + output);
     }
 
     private CompilerHelper.CompilerConfig selectCompiler(String targetVersion) {
@@ -138,21 +151,18 @@ class LambdaIntegrationTest {
         if (configs.isEmpty()) {
             return null;
         }
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(targetVersion); } catch (NumberFormatException ignored) {}
-        if (targetVer < 9) {
+        int targetMajor = CompilerHelper.parseJavaMajor(targetVersion);
+        if (targetMajor < 9) {
             for (CompilerHelper.CompilerConfig config : configs) {
-                try {
-                    if (Double.parseDouble(config.jdkVersion) < 9) {
-                        return config;
-                    }
-                } catch (NumberFormatException ignored) {
+                if (CompilerHelper.getJdkMajor(config) < 9) {
+                    return config;
                 }
             }
         }
         return configs.get(0);
     }
 
+    // JavaAPI doesn't yet provide java.lang.invoke; compile minimal stubs so javac can resolve lambdas.
     private void compileJavaLangInvokeStubs(Path outputDir, CompilerHelper.CompilerConfig config) throws IOException, InterruptedException {
         Path stubsDir = Files.createTempDirectory("java-lang-invoke-stubs");
         List<String> sources = generateJavaLangInvokeStubs(stubsDir);
@@ -292,6 +302,10 @@ class LambdaIntegrationTest {
                 "void java_lang_Object___INIT____(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
                 "JAVA_OBJECT __NEW_java_lang_Object(CODENAME_ONE_THREAD_STATE);\n" +
                 "void __INIT_VTABLE_java_lang_Object(CODENAME_ONE_THREAD_STATE, void** vtable);\n" +
+                "JAVA_BOOLEAN java_lang_Object_equals___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_OBJECT other);\n" +
+                "JAVA_VOID java_lang_Object_wait__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
+                "JAVA_VOID java_lang_Object_wait___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_LONG millis);\n" +
+                "JAVA_OBJECT java_lang_Object_clone___R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
                 "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
                 "JAVA_OBJECT virtual_java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
                 "#endif\n";
@@ -325,6 +339,12 @@ class LambdaIntegrationTest {
                      "void __FINALIZER_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {}\n" +
                      "void __GC_MARK_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {}\n" +
                      "void java_lang_Object___INIT____(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {}\n" +
+                     "JAVA_BOOLEAN java_lang_Object_equals___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_OBJECT other) {\n" +
+                     "    return obj == other;\n" +
+                     "}\n" +
+                     "JAVA_VOID java_lang_Object_wait__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
+                     "JAVA_VOID java_lang_Object_wait___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_LONG millis) { (void)obj; (void)millis; }\n" +
+                     "JAVA_OBJECT java_lang_Object_clone___R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { return obj; }\n" +
                      "JAVA_OBJECT __NEW_java_lang_Object(CODENAME_ONE_THREAD_STATE) {\n" +
                      "    fprintf(stderr, \"__NEW_java_lang_Object called\\n\");\n" +
                      "    fflush(stderr);\n" +
@@ -360,6 +380,7 @@ class LambdaIntegrationTest {
     }
 
     private void writeRuntimeStubs(Path srcRoot) throws java.io.IOException {
+        // Minimal runtime stubs so the translated C can link for this test.
         Path objectHeader = srcRoot.resolve("java_lang_Object.h");
         if (!Files.exists(objectHeader)) {
             String headerContent = "#ifndef __JAVA_LANG_OBJECT_H__\n" +

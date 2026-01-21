@@ -12,9 +12,11 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 cd "$REPO_ROOT/maven"
 
+TEST_CLASS="${1:-${TEST_CLASS:-ButtonGroupTest}}"
+
 mvn -pl core-unittests -am \
   -DunitTests=true \
   -Dmaven.javadoc.skip=true \
-  -Dtest=ButtonGroupTest \
+  -Dtest="$TEST_CLASS" \
   -Plocal-dev-javase \
   test

@@ -35,18 +35,14 @@ class CleanTargetIntegrationTest {
 
         List<String> compileArgs = new java.util.ArrayList<>();
 
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
-
-        if (jdkVer >= 9 && targetVer < 9) {
+        // JDK 9+ requires --patch-module for JavaAPI sources, which cannot target < 9 bytecode.
+        if (!CompilerHelper.isJavaApiCompatible(config)) {
             return;
         }
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
 
-        if (jdkVer >= 9) {
+        if (CompilerHelper.useClasspath(config)) {
              // For CleanTarget, we are compiling java.lang classes.
              // On JDK 9+, rely on the JDK's bootstrap classes but include JavaAPI in classpath
              // so non-replaced classes are found.
@@ -204,6 +200,7 @@ class CleanTargetIntegrationTest {
     }
 
     static void writeRuntimeStubs(Path srcRoot) throws IOException {
+        // Minimal runtime stubs so the translated C can link for this test.
         Path objectHeader = srcRoot.resolve("java_lang_Object.h");
         if (!Files.exists(objectHeader)) {
             String headerContent = "#ifndef __JAVA_LANG_OBJECT_H__\n" +

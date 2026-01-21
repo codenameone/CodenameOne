@@ -72,29 +72,67 @@ public class CompilerHelper {
     }
 
     private static boolean canCompile(String compilerVersion, String targetVersion) {
-        try {
-            double compilerVer = Double.parseDouble(compilerVersion);
-            double targetVer = Double.parseDouble(targetVersion);
+        int compilerMajor = parseJavaMajor(compilerVersion);
+        int targetMajor = parseJavaMajor(targetVersion);
 
-            // Java 9+ (version 9, 11, etc) dropped support for 1.5
-            if (targetVer == 1.5) {
-                return compilerVer < 9;
-            }
-            // Java 21? dropped support for 1.6/1.7?
-            // Generally newer JDKs support 1.8+
-            return compilerVer >= targetVer || (compilerVer >= 1.8 && targetVer <= 1.8);
-        } catch (NumberFormatException e) {
-            // Handle "1.8" format
-            if (compilerVersion.startsWith("1.")) {
-                return true; // Old JDKs support old targets
-            }
-            // Fallback for "25-ea"
-            if (compilerVersion.contains("-")) {
-                 // Assume it's a new JDK
-                 return !"1.5".equals(targetVersion);
-            }
+        if (compilerMajor == 0 || targetMajor == 0) {
             return true;
         }
+        // Java 9+ (version 9, 11, etc) dropped support for 1.5
+        if (targetMajor == 5) {
+            return compilerMajor < 9;
+        }
+        // Generally newer JDKs support 1.8+
+        return compilerMajor >= targetMajor || (compilerMajor >= 8 && targetMajor <= 8);
+    }
+
+    public static int parseJavaMajor(String version) {
+        if (version == null || version.isEmpty()) {
+            return 0;
+        }
+        String normalized = version.trim();
+        if (normalized.startsWith("1.")) {
+            normalized = normalized.substring(2);
+        }
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < normalized.length(); i++) {
+            char ch = normalized.charAt(i);
+            if (Character.isDigit(ch)) {
+                digits.append(ch);
+            } else {
+                break;
+            }
+        }
+        if (digits.length() == 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(digits.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    public static int getJdkMajor(CompilerConfig config) {
+        return parseJavaMajor(config.jdkVersion);
+    }
+
+    public static int getTargetMajor(CompilerConfig config) {
+        return parseJavaMajor(config.targetVersion);
+    }
+
+    /**
+     * JavaAPI includes java.lang sources; on JDK 9+ they must be compiled with --patch-module.
+     * JDK 9+ rejects --patch-module when targeting < 9 bytecode, so those permutations are skipped.
+     */
+    public static boolean isJavaApiCompatible(CompilerConfig config) {
+        int jdkMajor = getJdkMajor(config);
+        int targetMajor = getTargetMajor(config);
+        return jdkMajor < 9 || targetMajor >= 9;
+    }
+
+    public static boolean useClasspath(CompilerConfig config) {
+        return getJdkMajor(config) >= 9;
     }
 
     public static int compile(Path jdkHome, List<String> args) throws IOException, InterruptedException {
@@ -158,11 +196,7 @@ public class CompilerHelper {
             java.nio.file.Files.write(sourceDir.resolve("Main.java"), code.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
             java.nio.file.Path javaApiDir = java.nio.file.Files.createTempDirectory("java-api-classes");
-            double jdkVer = 1.8;
-            try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-            double targetVer = 1.8;
-            try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
-            if (jdkVer >= 9 && targetVer < 9) {
+            if (!isJavaApiCompatible(config)) {
                 return false;
             }
             compileJavaAPI(javaApiDir, config);
@@ -172,7 +206,7 @@ public class CompilerHelper {
             compileArgs.add(config.targetVersion);
             compileArgs.add("-target");
             compileArgs.add(config.targetVersion);
-            if (jdkVer >= 9) {
+            if (useClasspath(config)) {
                 compileArgs.add("-classpath");
                 compileArgs.add(javaApiDir.toString());
             } else {
@@ -561,13 +595,11 @@ public class CompilerHelper {
 
         List<String> args = new ArrayList<>();
 
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+        int jdkMajor = getJdkMajor(config);
+        int targetMajor = getTargetMajor(config);
 
-        if (jdkVer >= 9) {
-            if (targetVer < 9) {
+        if (jdkMajor >= 9) {
+            if (targetMajor < 9) {
                 throw new IllegalArgumentException("Cannot compile JavaAPI with --patch-module for target " + config.targetVersion);
             }
             args.add("--patch-module");

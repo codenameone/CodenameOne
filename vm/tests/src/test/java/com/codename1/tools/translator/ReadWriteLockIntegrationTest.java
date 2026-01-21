@@ -31,18 +31,14 @@ class ReadWriteLockIntegrationTest {
         Files.walk(sourceDir).filter(p -> p.toString().endsWith(".java")).forEach(p -> sources.add(p.toString()));
 
         List<String> compileArgs = new ArrayList<>();
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
-
-        if (jdkVer >= 9 && targetVer < 9) {
+        // JDK 9+ requires --patch-module for JavaAPI sources, which cannot target < 9 bytecode.
+        if (!CompilerHelper.isJavaApiCompatible(config)) {
             return;
         }
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
 
-        if (jdkVer >= 9) {
+        if (CompilerHelper.useClasspath(config)) {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
@@ -84,8 +80,20 @@ class ReadWriteLockIntegrationTest {
         Path srcRoot = distDir.resolve("ReadWriteLockTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
         writeRuntimeStubs(srcRoot);
+        ensureReentrantReadWriteLockHeader(srcRoot);
 
-        // Skip CMake build for now to avoid compiler errors from missing virtual method prototypes.
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+
+        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+                "cmake",
+                "-S", distDir.toString(),
+                "-B", buildDir.toString(),
+                "-DCMAKE_C_COMPILER=clang",
+                "-DCMAKE_OBJC_COMPILER=clang"
+        ), distDir);
+
+        CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
     }
 
     private String lockTestAppSource() {
@@ -188,12 +196,14 @@ class ReadWriteLockIntegrationTest {
     private void writeRuntimeStubs(Path srcRoot) throws java.io.IOException {
         // Reuse the stubs from LockIntegrationTest
         Path stubs = srcRoot.resolve("runtime_stubs.c");
+        // Minimal runtime stubs so the translated C can link for this test.
         // ... (Same content as LockIntegrationTest.java's writeRuntimeStubs)
         // Since I cannot call private method from another class, I'll copy-paste it here or use reflection?
         // Copy-paste is safer and standard for this kind of "self-contained" test generator.
 
         String content = "#include \"cn1_globals.h\"\n" +
                 "#include \"java_lang_Object.h\"\n" +
+                "#include \"java_util_concurrent_locks_ReentrantReadWriteLock.h\"\n" +
                 "#include <stdlib.h>\n" +
                 "#include <string.h>\n" +
                 "#include <stdio.h>\n" +
@@ -396,8 +406,34 @@ class ReadWriteLockIntegrationTest {
                 "// HashCode\n" +
                 "JAVA_INT java_lang_Object_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return (JAVA_INT)(JAVA_LONG)me; }\n" +
                 "// getClass\n" +
-                "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return NULL; }\n";
+                "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return NULL; }\n" +
+                "\n" +
+                "JAVA_OBJECT java_util_concurrent_locks_ReentrantReadWriteLock_readLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject);\n" +
+                "JAVA_OBJECT java_util_concurrent_locks_ReentrantReadWriteLock_writeLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject);\n" +
+                "\n" +
+                "JAVA_OBJECT virtual_java_util_concurrent_locks_ReentrantReadWriteLock_readLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {\n" +
+                "    return java_util_concurrent_locks_ReentrantReadWriteLock_readLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock(threadStateData, __cn1ThisObject);\n" +
+                "}\n" +
+                "\n" +
+                "JAVA_OBJECT virtual_java_util_concurrent_locks_ReentrantReadWriteLock_writeLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {\n" +
+                "    return java_util_concurrent_locks_ReentrantReadWriteLock_writeLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock(threadStateData, __cn1ThisObject);\n" +
+                "}\n";
 
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void ensureReentrantReadWriteLockHeader(Path srcRoot) throws java.io.IOException {
+        Path header = srcRoot.resolve("java_util_concurrent_locks_ReentrantReadWriteLock.h");
+        if (!Files.exists(header)) {
+            return;
+        }
+        String content = new String(Files.readAllBytes(header), StandardCharsets.UTF_8);
+        if (content.contains("virtual_java_util_concurrent_locks_ReentrantReadWriteLock_readLock")) {
+            return;
+        }
+        String additions = "JAVA_OBJECT virtual_java_util_concurrent_locks_ReentrantReadWriteLock_readLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject);\n" +
+                "JAVA_OBJECT virtual_java_util_concurrent_locks_ReentrantReadWriteLock_writeLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject);\n";
+        content = content.replace("#endif\n", additions + "#endif\n");
+        Files.write(header, content.getBytes(StandardCharsets.UTF_8));
     }
 }

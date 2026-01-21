@@ -31,18 +31,14 @@ class LockIntegrationTest {
         Files.walk(sourceDir).filter(p -> p.toString().endsWith(".java")).forEach(p -> sources.add(p.toString()));
 
         List<String> compileArgs = new ArrayList<>();
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
-
-        if (jdkVer >= 9 && targetVer < 9) {
+        // JDK 9+ requires --patch-module for JavaAPI sources, which cannot target < 9 bytecode.
+        if (!CompilerHelper.isJavaApiCompatible(config)) {
             return;
         }
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
 
-        if (jdkVer >= 9) {
+        if (CompilerHelper.useClasspath(config)) {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
@@ -98,7 +94,8 @@ class LockIntegrationTest {
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
-        // Execution skipped; building the generated library validates translation output.
+        // TODO: Execution still skipped because the generated executable SIGSEGVs on Linux runners.
+        // Track and fix the underlying runtime stub issues before enabling.
 
         // Verify output assertions
         // assertTrue(output.contains("TEST: Basic Lock OK"), "Basic lock should work");
@@ -220,6 +217,7 @@ class LockIntegrationTest {
     }
 
     private void writeRuntimeStubs(Path srcRoot) throws java.io.IOException {
+        // Minimal runtime stubs so the translated C can link for this test.
         Path stubs = srcRoot.resolve("runtime_stubs.c");
         String content = "#include \"cn1_globals.h\"\n" +
                 "#include \"java_lang_Object.h\"\n" +

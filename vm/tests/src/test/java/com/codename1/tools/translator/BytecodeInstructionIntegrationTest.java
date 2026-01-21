@@ -72,13 +72,9 @@ class BytecodeInstructionIntegrationTest {
         // Compile App using the specific JDK
         List<String> compileArgs = new ArrayList<>();
 
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+        int jdkMajor = CompilerHelper.getJdkMajor(config);
 
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-
-        if (jdkVer >= 9) {
+        if (jdkMajor >= 9) {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
@@ -231,13 +227,9 @@ class BytecodeInstructionIntegrationTest {
 
         List<String> compileArgs = new ArrayList<>();
 
-        double targetVer = 1.8;
-        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+        int jdkMajor = CompilerHelper.getJdkMajor(config);
 
-        double jdkVer = 1.8;
-        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
-
-        if (jdkVer >= 9) {
+        if (jdkMajor >= 9) {
              compileArgs.add("-source");
              compileArgs.add(config.targetVersion);
              compileArgs.add("-target");
