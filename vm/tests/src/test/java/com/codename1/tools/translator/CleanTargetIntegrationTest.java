@@ -158,9 +158,6 @@ class CleanTargetIntegrationTest {
 
     static void replaceLibraryWithExecutableTarget(Path cmakeLists, String sourceDirName) throws IOException {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
-        String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
-        String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
-        content = content.replace(globWithObjc, globCOnly);
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
                 "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
