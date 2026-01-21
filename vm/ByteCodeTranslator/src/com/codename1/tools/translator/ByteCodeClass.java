@@ -1531,7 +1531,7 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName());
-                    b.append("();\n");
+                    b.append("(CODENAME_ONE_THREAD_STATE);\n");
                     if(!(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName()))) {
                         b.append("extern ");
                         b.append(bf.getCStorageDefinition());
