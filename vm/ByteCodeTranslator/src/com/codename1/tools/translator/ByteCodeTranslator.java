@@ -242,10 +242,12 @@ public class ByteCodeTranslator {
         }
         File xmlvm = new File(srcRoot, "xmlvm.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
-        File nativeMethods = new File(srcRoot, "nativeMethods.m");
+        File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsC));
+        File nativeMethods = new File(srcRoot, "nativeMethods.c");
         copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
-        File javaIoFileM = new File(srcRoot, "java_io_File.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileM));
+        File javaIoFileC = new File(srcRoot, "java_io_File.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
 
         Parser.writeOutput(srcRoot);
 
@@ -558,7 +560,7 @@ public class ByteCodeTranslator {
         try {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             writer.append("project(").append(appName).append(" LANGUAGES C OBJC)\n");
-            writer.append("enable_language(OBJC)\n");
+            writer.append("enable_language(OBJC OPTIONAL)\n");
             writer.append("set(CMAKE_C_STANDARD 99)\n");
             writer.append("file(GLOB TRANSLATOR_SOURCES \"").append(srcRoot.getName()).append("/*.c\" \"").append(srcRoot.getName()).append("/*.m\")\n");
             writer.append("file(GLOB TRANSLATOR_HEADERS \"").append(srcRoot.getName()).append("/*.h\")\n");
