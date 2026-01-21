@@ -74,7 +74,7 @@ class ShareForm extends Form {
             Label im = new Label();
             ImageIO scale = ImageIO.getImageIO();
             if (scale != null) {
-                InputStream is = null;
+                InputStream is = null; //NOPMD CloseResource
                 ByteArrayOutputStream os = new ByteArrayOutputStream();
                 try {
                     is = FileSystemStorage.getInstance().openInputStream(image);

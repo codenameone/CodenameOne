@@ -1246,7 +1246,8 @@ public final class Grid {
                         }
                     }
                     clearGroupLinkBounds();
-                    if (++count > ((compCount << 3) + 10)) {
+                    count++;
+                    if (count > ((compCount << 3) + 10)) {
                         System.err.println("Unstable cyclic dependency in absolute linked values!");
                         break;
                     }

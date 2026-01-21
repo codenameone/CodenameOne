@@ -569,7 +569,7 @@ public class SimpleDateFormat extends DateFormat {
                     break;
                 case AMPM_LETTER:
                     s = readAmPmMarker(source, startIndex);
-                    if (s == null || ((v = parseAmPmMarker(source, startIndex)) == -1)) {
+                    if (s == null || ((v = parseAmPmMarker(source, startIndex)) == -1)) { //NOPMD AssignmentInOperand
                         throwInvalid("am/pm marker", startIndex);
                     }
                     if (v == Calendar.PM) {
@@ -587,7 +587,7 @@ public class SimpleDateFormat extends DateFormat {
                 case ISO_TIMEZONE_LETTER:
                     s = readTimeZone(source, startIndex);
                     TimeZoneResult res = new TimeZoneResult();
-                    if (s == null || (v = parseTimeZone(s, startIndex, res)) == -1) {
+                    if (s == null || (v = parseTimeZone(s, startIndex, res)) == -1) { //NOPMD AssignmentInOperand
 
                         throwInvalid("timezone", startIndex);
                     }

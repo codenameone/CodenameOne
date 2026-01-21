@@ -132,7 +132,7 @@ public final class Socket {
                         Thread.sleep(200);
                     } catch (InterruptedException e) {
                         Log.e(e);
-                        throw new RuntimeException(e.getMessage());
+                        throw new RuntimeException(e.getMessage(), e);
                     }
                 }
                 if (Util.getImplementation().isSocketConnected(connection[0])) {

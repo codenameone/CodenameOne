@@ -179,7 +179,7 @@ public final class Result {
                     format);
         } catch (IOException e) {
             // should never get here with a string
-            throw new IllegalArgumentException(e.getMessage());
+            throw new IllegalArgumentException(e.getMessage(), e);
         }
     }
 

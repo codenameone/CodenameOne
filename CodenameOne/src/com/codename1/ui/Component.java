@@ -561,20 +561,26 @@ public class Component implements Animation, StyleListener, Editable {
         int unitPos;
         float pixelsPerMM = Display.getInstance().convertToPixels(1000f) / 1000f;
         try {
-            if ((unitPos = wStr.indexOf("mm")) != -1) {
+            unitPos = wStr.indexOf("mm");
+            if (unitPos != -1) {
                 baseSize.setWidth(Math.round(Float.parseFloat(wStr.substring(0, unitPos)) * pixelsPerMM));
-            } else if ((unitPos = wStr.indexOf("px")) != -1) {
-                baseSize.setWidth(Integer.parseInt(wStr.substring(0, unitPos)));
-            } else if (!"inherit".equals(wStr)) {
-                baseSize.setWidth(Integer.parseInt(wStr));
+            } else {
+                unitPos = wStr.indexOf("px");
+                if (unitPos != -1) {
+                    baseSize.setWidth(Integer.parseInt(wStr.substring(0, unitPos)));
+                } else {
+                    if (!"inherit".equals(wStr)) {
+                        baseSize.setWidth(Integer.parseInt(wStr));
+                    }
+                }
             }
         } catch (Throwable t) {
         }
 
         try {
-            if ((unitPos = hStr.indexOf("mm")) != -1) {
+            if ((unitPos = hStr.indexOf("mm")) != -1) { //NOPMD AssignmentInOperand
                 baseSize.setHeight(Math.round(Float.parseFloat(hStr.substring(0, unitPos)) * pixelsPerMM));
-            } else if ((unitPos = hStr.indexOf("px")) != -1) {
+            } else if ((unitPos = hStr.indexOf("px")) != -1) { //NOPMD AssignmentInOperand
                 baseSize.setHeight(Integer.parseInt(hStr.substring(0, unitPos)));
             } else if (!"inherit".equals(hStr)) {
                 baseSize.setHeight(Integer.parseInt(hStr));

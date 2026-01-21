@@ -795,8 +795,8 @@ public abstract class CodenameOneImplementation {
         int x2 = x + c.getWidth();
         int y2 = y + c.getHeight();
 
-        Container parent = null;
-        if ((parent = c.getParent()) != null) {
+        Container parent = c.getParent();
+        if (parent != null) {
             getPaintableBounds(parent, out);
             x = Math.max(out.getX(), x);
             y = Math.max(out.getY(), y);
@@ -3692,26 +3692,25 @@ public abstract class CodenameOneImplementation {
 
         if (doSwap) {
             while (ix0 < ixEnd) {
-                if ((ix1 = scanSecond(chars, ix0, ixEnd)) < 0) {
+                ix1 = scanSecond(chars, ix0, ixEnd);
+                if (ix1 < 0) {
                     break;
-                } else {
-                    ix0 = ix1;
-                    ix1 = scanBackFirst(chars, ix0, ixEnd);
-                    // swap
-                    for (int iy0 = ix0, iy1 = ix1 - 1; iy0 < iy1; iy0++, iy1--) {
-                        char tmp = chars[iy0];
-                        chars[iy0] = chars[iy1];
-                        chars[iy1] = tmp;
-
-                        if (index == iy1) {
-                            //System.out.println("IY: Found char: new index="+iy0);
-                            destIndex = iy0;
-                            index = iy0;
-                        }
-                    }
-
-                    ix0 = ix1;
                 }
+                ix0 = ix1;
+                ix1 = scanBackFirst(chars, ix0, ixEnd);
+                // swap
+                for (int iy0 = ix0, iy1 = ix1 - 1; iy0 < iy1; iy0++, iy1--) {
+                    char tmp = chars[iy0];
+                    chars[iy0] = chars[iy1];
+                    chars[iy1] = tmp;
+
+                    if (index == iy1) {
+                        destIndex = iy0;
+                        index = iy0;
+                    }
+                }
+
+                ix0 = ix1;
             }
         }
 
@@ -4171,7 +4170,7 @@ public abstract class CodenameOneImplementation {
             if (!uri.startsWith("/")) {
                 uri = "/" + uri;
             }
-            InputStream is = getResourceAsStream(this.getClass(), uri);
+            InputStream is = getResourceAsStream(this.getClass(), uri); //NOPMD CloseResource
             String mime = "";
             if (uri.endsWith(".mp3")) {
                 mime = "audio/mp3";
@@ -4182,8 +4181,11 @@ public abstract class CodenameOneImplementation {
             } else if (uri.endsWith(".3gp")) {
                 mime = "audio/3gpp";
             }
-
-            return createMedia(is, mime, null);
+            try {
+                return createMedia(is, mime, null);
+            } finally {
+                Util.cleanup(is);
+            }
         }
         return createMedia(uri, false, null);
     }
@@ -4569,23 +4571,26 @@ public abstract class CodenameOneImplementation {
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         // load from jar:// URL's
         try {
-            InputStream i = Display.getInstance().getResourceAsStream(getClass(), url.substring(6));
+            InputStream i = Display.getInstance().getResourceAsStream(getClass(), url.substring(6)); //NOPMD CloseResource
             if (i == null) {
                 System.out.println("Local resource not found: " + url);
                 return;
             }
-            byte[] buffer = new byte[4096];
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
-            int size = i.read(buffer);
-            while (size > -1) {
-                bo.write(buffer, 0, size);
-                size = i.read(buffer);
+            try {
+                byte[] buffer = new byte[4096];
+                int size = i.read(buffer);
+                while (size > -1) {
+                    bo.write(buffer, 0, size);
+                    size = i.read(buffer);
+                }
+                String htmlText = new String(bo.toByteArray(), "UTF-8");
+                String baseUrl = url.substring(0, url.lastIndexOf('/'));
+                setBrowserPage(browserPeer, htmlText, baseUrl);
+            } finally {
+                Util.cleanup(i);
+                Util.cleanup(bo);
             }
-            i.close();
-            bo.close();
-            String htmlText = new String(bo.toByteArray(), "UTF-8");
-            String baseUrl = url.substring(0, url.lastIndexOf('/'));
-            setBrowserPage(browserPeer, htmlText, baseUrl);
         } catch (IOException ex) {
             Log.e(ex);
         }
@@ -4958,8 +4963,8 @@ public abstract class CodenameOneImplementation {
         }
 
         String protocol = "";
-        int pos = -1;
-        if ((pos = url.indexOf(":")) >= 0) {
+        int pos = url.indexOf(":");
+        if (pos >= 0) {
             protocol = url.substring(0, pos);
         }
         boolean isHttp = ("http".equals(protocol) || "https".equals(protocol));
@@ -5378,8 +5383,9 @@ public abstract class CodenameOneImplementation {
      */
     public int getStorageEntrySize(String name) {
         long size = -1;
+        InputStream i = null; //NOPMD CloseResource
         try {
-            InputStream i = createStorageInputStream(name);
+            i = createStorageInputStream(name);
             long val = i.skip(1000000);
             if (val > -1) {
                 size = 0;
@@ -5388,9 +5394,10 @@ public abstract class CodenameOneImplementation {
                     val = i.skip(1000000);
                 }
             }
-            Util.cleanup(i);
         } catch (IOException err) {
             Log.e(err);
+        } finally {
+            Util.cleanup(i);
         }
         return (int) size;
     }
@@ -6014,12 +6021,14 @@ public abstract class CodenameOneImplementation {
      * Android to support the title bar icon
      */
     public Image getApplicationIconImage() {
-        InputStream i = getResourceAsStream(getClass(), "/icon.png");
+        InputStream i = getResourceAsStream(getClass(), "/icon.png"); //NOPMD CloseResource
         if (i != null) {
             try {
                 return EncodedImage.create(i);
             } catch (IOException ex) {
                 Log.e(ex);
+            } finally {
+                Util.cleanup(i);
             }
         }
         return null;
@@ -7756,34 +7765,38 @@ public abstract class CodenameOneImplementation {
             FileSystemStorage fs = FileSystemStorage.getInstance();
             String tardir = fs.getAppHomePath() + "cn1html/";
             fs.mkdir(tardir);
-            TarInputStream is = new TarInputStream(Display.getInstance().getResourceAsStream(getClass(), "/html.tar"));
+            TarInputStream is = new TarInputStream(Display.getInstance().getResourceAsStream(getClass(), "/html.tar")); //NOPMD CloseResource
+            try {
+                TarEntry t = is.getNextEntry();
+                byte[] data = new byte[8192];
+                while (t != null) {
+                    String name = t.getName();
+                    if (t.isDirectory()) {
+                        fs.mkdir(tardir + name);
+                    } else {
+                        String path = tardir + name;
+                        String dir = path.substring(0, path.lastIndexOf('/'));
+                        if (!fs.exists(dir)) {
+                            mkdirs(fs, dir);
+                        }
 
-            TarEntry t = is.getNextEntry();
-            byte[] data = new byte[8192];
-            while (t != null) {
-                String name = t.getName();
-                if (t.isDirectory()) {
-                    fs.mkdir(tardir + name);
-                } else {
-                    String path = tardir + name;
-                    String dir = path.substring(0, path.lastIndexOf('/'));
-                    if (!fs.exists(dir)) {
-                        mkdirs(fs, dir);
+                        OutputStream os = null; //NOPMD CloseResource
+                        try {
+                            os = fs.openOutputStream(tardir + name);
+                            int count;
+                            while ((count = is.read(data)) != -1) {
+                                os.write(data, 0, count);
+                            }
+                        } finally {
+                            Util.cleanup(os);
+                        }
                     }
 
-                    OutputStream os = fs.openOutputStream(tardir + name);
-                    int count;
-                    while ((count = is.read(data)) != -1) {
-                        os.write(data, 0, count);
-                    }
-
-                    os.close();
+                    t = is.getNextEntry();
                 }
-
-                t = is.getNextEntry();
+            } finally {
+                Util.cleanup(is);
             }
-
-            Util.cleanup(is);
             Preferences.set("cn1$InstallKey", buildKey);
         }
     }

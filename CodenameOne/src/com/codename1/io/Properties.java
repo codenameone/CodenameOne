@@ -233,11 +233,14 @@ public class Properties extends HashMap<String, String> {
                 int digit = Character.digit(nextChar, 16);
                 if (digit >= 0) {
                     unicode = (unicode << 4) + digit;
-                    if (++count < 4) {
+                    count++;
+                    if (count < 4) {
                         continue;
                     }
-                } else if (count <= 4) {
-                    throw new IllegalArgumentException("Invalid Unicode sequence: illegal character");
+                } else {
+                    if (count <= 4) {
+                        throw new IllegalArgumentException("Invalid Unicode sequence: illegal character");
+                    }
                 }
                 mode = NONE;
                 buf[offset++] = (char) unicode;

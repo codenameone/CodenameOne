@@ -1320,7 +1320,7 @@ class TBigInteger {
         while ((numberLength > 0) && (digits[--numberLength] == 0)) {
             // Empty
         }
-        if (digits[numberLength++] == 0) {
+        if (digits[numberLength++] == 0) { //NOPMD AssignmentInOperand
             sign = 0;
         }
     }

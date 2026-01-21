@@ -72,7 +72,7 @@ public class CommonProgressAnimations {
                 return prg;
             } catch (Throwable t) {
                 Log.e(t);
-                throw new RuntimeException("Failed to create progress component: " + t.getMessage());
+                throw new RuntimeException("Failed to create progress component: " + t.getMessage(), t);
             }
         }
 

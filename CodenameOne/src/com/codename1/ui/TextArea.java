@@ -1981,7 +1981,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
         if (f != null && Display.impl.getEditingText() != this) { //NOPMD CompareObjectsWithEquals
             try {
-                TextAreaInputDevice previousInput = null;
+                TextAreaInputDevice previousInput = null; //NOPMD CloseResource - managed by Form#setCurrentInputDevice
                 if (f.getCurrentInputDevice() instanceof TextAreaInputDevice) {
                     previousInput = (TextAreaInputDevice) f.getCurrentInputDevice();
                     if (previousInput.editedTextArea == this) {
@@ -1994,7 +1994,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 if (previousInput != null) {
                     previousInput.deferStopEditingToNativeLayer = true;
                 }
-                TextAreaInputDevice currInput = new TextAreaInputDevice(this);
+                TextAreaInputDevice currInput = new TextAreaInputDevice(this); //NOPMD CloseResource - managed by Form#setCurrentInputDevice
                 f.setCurrentInputDevice(currInput);
 
 

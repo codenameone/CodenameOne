@@ -31,4 +31,21 @@ public class IllegalStateException extends RuntimeException {
     public IllegalStateException(String s) {
         super(s);
     }
+
+    /**
+     * Constructs an IllegalStateException with the specified detail message and cause.
+     * s - the detail message.
+     * cause - the cause.
+     */
+    public IllegalStateException(String s, Throwable cause) {
+        super(s, cause);
+    }
+
+    /**
+     * Constructs an IllegalStateException with the specified cause.
+     * cause - the cause.
+     */
+    public IllegalStateException(Throwable cause) {
+        super(cause);
+    }
 }

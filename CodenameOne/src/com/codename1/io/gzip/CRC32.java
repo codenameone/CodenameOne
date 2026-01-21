@@ -44,7 +44,8 @@ final public class CRC32 implements Checksum {
         crc_table = new int[256];
         for (int n = 0; n < 256; n++) {
             int c = n;
-            for (int k = 8; --k >= 0; ) {
+
+            for (int k = 8; --k >= 0; ) { //NOPMD AssignmentInOperand
                 if ((c & 1) != 0) {
                     c = 0xedb88320 ^ (c >>> 1);
                 } else {

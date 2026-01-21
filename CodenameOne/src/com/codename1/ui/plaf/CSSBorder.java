@@ -1126,7 +1126,7 @@ public class CSSBorder extends Border {
             }
         } catch (Throwable t) {
             Log.e(t);
-            throw new RuntimeException("Failed parsing border style: " + Arrays.toString(styles));
+            throw new RuntimeException("Failed parsing border style: " + Arrays.toString(styles), t);
         }
         return this;
     }
@@ -1170,7 +1170,7 @@ public class CSSBorder extends Border {
 
                 } catch (IOException ex) {
                     Log.e(ex);
-                    throw new IllegalArgumentException("Failed to parse image: " + part);
+                    throw new IllegalArgumentException("Failed to parse image: " + part, ex);
                 }
             }
             imgs.add(im);
@@ -2105,7 +2105,7 @@ public class CSSBorder extends Border {
                         image = EncodedImage.create("/" + imageName);
                     } catch (IOException ex) {
                         Log.p("Failed to load image named " + imageName + " for CSSBorder");
-                        throw new IllegalStateException("Failed to load image " + imageName);
+                        throw new IllegalStateException("Failed to load image " + imageName, ex);
                     }
                 }
             }

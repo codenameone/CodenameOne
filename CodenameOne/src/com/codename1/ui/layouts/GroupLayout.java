@@ -2585,7 +2585,7 @@ public class GroupLayout extends Layout {
                 Spring spring = getSpring(counter);
                 int baseline;
                 int springMax = spring.getMaximumSize(VERTICAL);
-                if ((spring.getAlignment() == NO_ALIGNMENT ||
+                if ((spring.getAlignment() == NO_ALIGNMENT || //NOPMD AssignmentInOperand
                         spring.getAlignment() == BASELINE) &&
                         (baseline = spring.getBaseline()) >= 0) {
                     int springPref = spring.getPreferredSize(VERTICAL);
@@ -2628,7 +2628,7 @@ public class GroupLayout extends Layout {
                 Spring spring = getSpring(counter);
                 int springMin = spring.getMinimumSize(VERTICAL);
                 int baseline;
-                if ((spring.getAlignment() == NO_ALIGNMENT ||
+                if ((spring.getAlignment() == NO_ALIGNMENT || //NOPMD AssignmentInOperand
                         spring.getAlignment() == BASELINE) &&
                         (baseline = spring.getBaseline()) >= 0) {
                     int springPref = spring.getPreferredSize(VERTICAL);

@@ -910,7 +910,10 @@ def main() -> None:
             "UnnecessaryFullyQualifiedName",
             "UseCollectionIsEmpty",
             "UnusedPrivateField",
-            "UnnecessaryLocalBeforeReturn"
+            "UnnecessaryLocalBeforeReturn",
+            "PreserveStackTrace",
+            "CloseResource",
+            "AssignmentInOperand"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

@@ -257,7 +257,7 @@ public class AsyncResource<V> extends Observable {
             return get(-1);
         } catch (InterruptedException ex) {
             // This should never happen
-            throw new RuntimeException("Interrupted exception occurred, but this should never happen.  Likely programming error.");
+            throw new RuntimeException("Interrupted exception occurred, but this should never happen.  Likely programming error.", ex);
         }
     }
 

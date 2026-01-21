@@ -151,7 +151,7 @@ public class GridBagLayout extends Layout {
         } catch (RuntimeException e) {
             // awt.87=PreferredLayoutSize: {0}
             Log.e(e);
-            throw new IllegalArgumentException("PreferredLayoutSize: " + e.getMessage()); //$NON-NLS-1$
+            throw new IllegalArgumentException("PreferredLayoutSize: " + e.getMessage(), e); //$NON-NLS-1$
         }
         Dimension d = info.grid.preferredSize();
         d.setWidth(d.getWidth() + s.getHorizontalPadding());
@@ -171,7 +171,7 @@ public class GridBagLayout extends Layout {
         } catch (RuntimeException e) {
             // awt.88=LayoutContainer: {0}
             e.printStackTrace();
-            throw new IllegalArgumentException("LayoutContainer: " + e.getMessage()); //$NON-NLS-1$
+            throw new IllegalArgumentException("LayoutContainer: " + e.getMessage(), e); //$NON-NLS-1$
         }
         setComponentsBounds(info);
     }
@@ -245,7 +245,7 @@ public class GridBagLayout extends Layout {
         } catch (RuntimeException e) {
             // awt.86=MinimumLayoutSize: {0}
             e.printStackTrace();
-            throw new IllegalArgumentException("MinimumLayoutSize: " + e.getMessage()); //$NON-NLS-1$
+            throw new IllegalArgumentException("MinimumLayoutSize: " + e.getMessage(), e); //$NON-NLS-1$
         }
     }
 

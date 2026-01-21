@@ -131,7 +131,7 @@ public final class FileEncodedImageAsync extends EncodedImage {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
                 @Override
                 public void run() {
-                    InputStream i = null;
+                    InputStream i = null; //NOPMD CloseResource
                     try {
                         if (!FileSystemStorage.getInstance().exists(fileName)) {
                             Log.p(fileName + " doesn't exist");
@@ -140,7 +140,6 @@ public final class FileEncodedImageAsync extends EncodedImage {
                         final byte[] imageDataLocal = new byte[(int) FileSystemStorage.getInstance().getLength(fileName)];
                         i = FileSystemStorage.getInstance().openInputStream(fileName);
                         Util.readFully(i, imageDataLocal);
-                        i.close();
 
                         // we need to change the image on the EDT to avoid potential race conditions
                         Display.getInstance().callSerially(new Runnable() {

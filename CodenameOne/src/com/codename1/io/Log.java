@@ -333,19 +333,23 @@ public class Log {
                 if (instance.getFileURL() == null) {
                     instance.setFileURL("file:///" + FileSystemStorage.getInstance().getRoots()[0] + "/codenameOne.log");
                 }
-                Reader r = Util.getReader(FileSystemStorage.getInstance().openInputStream(instance.getFileURL()));
-                char[] buffer = new char[1024];
-                int size = r.read(buffer);
-                StringBuilder textBuilder = new StringBuilder();
-                while (size > -1) {
-                    textBuilder.append(new String(buffer, 0, size));
-                    size = r.read(buffer);
+                Reader r = null; //NOPMD CloseResource
+                try {
+                    r = Util.getReader(FileSystemStorage.getInstance().openInputStream(instance.getFileURL()));
+                    char[] buffer = new char[1024];
+                    int size = r.read(buffer);
+                    StringBuilder textBuilder = new StringBuilder();
+                    while (size > -1) {
+                        textBuilder.append(new String(buffer, 0, size));
+                        size = r.read(buffer);
+                    }
+                    text = textBuilder.toString();
+                } finally {
+                    Util.cleanup(r);
                 }
-                text = textBuilder.toString();
-                r.close();
             }
             return text;
-        } catch (Exception ex) {
+        } catch (IOException ex) {
             ex.printStackTrace();
             return "";
         }
@@ -452,7 +456,7 @@ public class Log {
         t.printStackTrace();
         try {
             synchronized (this) {
-                Writer w = getWriter();
+                Writer w = getWriter(); //NOPMD CloseResource - shared writer managed by Log
                 Util.getImplementation().printStackTraceToStream(t, w);
                 w.flush();
             }
@@ -472,9 +476,14 @@ public class Log {
         if (!initialized) {
             initialized = true;
             try {
-                InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/cn1-version-numbers");
-                if (is != null) {
-                    print("Codename One revisions: " + Util.readToString(is), INFO);
+                InputStream is = null; //NOPMD CloseResource
+                try {
+                    is = Display.getInstance().getResourceAsStream(getClass(), "/cn1-version-numbers");
+                    if (is != null) {
+                        print("Codename One revisions: " + Util.readToString(is), INFO);
+                    }
+                } finally {
+                    Util.cleanup(is);
                 }
             } catch (IOException err) {
                 // shouldn't happen...
@@ -494,7 +503,7 @@ public class Log {
         }
         try {
             synchronized (this) {
-                Writer w = getWriter();
+                Writer w = getWriter(); //NOPMD CloseResource - shared writer managed by Log
                 w.write(text + "\n");
                 w.flush();
             }

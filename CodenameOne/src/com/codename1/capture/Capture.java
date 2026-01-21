@@ -161,15 +161,17 @@ public class Capture {
             }
             ImageIO scale = Display.getInstance().getImageIO();
             if (scale != null) {
+                OutputStream os = null; //NOPMD CloseResource
                 try {
                     String path = c.url.substring(0, c.url.indexOf(".")) + "s" + c.url.substring(c.url.indexOf("."));
-                    OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
+                    os = FileSystemStorage.getInstance().openOutputStream(path);
                     scale.save(c.url, os, ImageIO.FORMAT_JPEG, width, height, 1);
-                    Util.cleanup(os);
                     FileSystemStorage.getInstance().delete(c.url);
                     return path;
                 } catch (IOException ex) {
                     Log.e(ex);
+                } finally {
+                    Util.cleanup(os);
                 }
             }
         } else {
@@ -283,16 +285,18 @@ public class Capture {
             if (targetWidth > 0 || targetHeight > 0) {
                 ImageIO scale = Display.getInstance().getImageIO();
                 if (scale != null) {
+                    OutputStream os = null; //NOPMD CloseResource
                     try {
 
                         String path = url.substring(0, url.lastIndexOf(".")) + "s" + url.substring(url.lastIndexOf("."));
-                        OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
+                        os = FileSystemStorage.getInstance().openOutputStream(path);
                         scale.save(url, os, ImageIO.FORMAT_JPEG, targetWidth, targetHeight, 1);
-                        Util.cleanup(os);
                         FileSystemStorage.getInstance().delete(url);
                         url = path;
                     } catch (IOException ex) {
                         Log.e(ex);
+                    } finally {
+                        Util.cleanup(os);
                     }
                 }
             }

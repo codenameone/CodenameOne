@@ -178,7 +178,7 @@ public class DateFormat extends Format {
             try {
                 source = parse((String) obj);
             } catch (ParseException pe) {
-                throw new RuntimeException(pe.toString());
+                throw new RuntimeException(pe.toString(), pe);
             }
         }
         if (source == null) {

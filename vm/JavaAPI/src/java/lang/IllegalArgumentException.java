@@ -41,4 +41,20 @@ public class IllegalArgumentException extends java.lang.RuntimeException{
          super(s);
     }
 
+    /**
+     * Constructs an IllegalArgumentException with the specified detail message and cause.
+     * s - the detail message.
+     * cause - the cause.
+     */
+    public IllegalArgumentException(java.lang.String s, java.lang.Throwable cause) {
+        super(s, cause);
+    }
+
+    /**
+     * Constructs an IllegalArgumentException with the specified cause.
+     * cause - the cause.
+     */
+    public IllegalArgumentException(java.lang.Throwable cause) {
+        super(cause);
+    }
 }

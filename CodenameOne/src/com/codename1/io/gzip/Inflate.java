@@ -634,7 +634,7 @@ final class Inflate {
             this.mode = BAD;
             this.marker = 0;
         }
-        if ((n = z.availIn) == 0) {
+        if ((n = z.availIn) == 0) { //NOPMD AssignmentInOperand
             return Z_BUF_ERROR;
         }
 

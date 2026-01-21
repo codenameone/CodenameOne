@@ -1115,7 +1115,7 @@ public class Picker extends Button {
             }
 
             try {
-                VirtualInputDevice nextInput = new VirtualInputDevice() {
+                VirtualInputDevice nextInput = new VirtualInputDevice() { //NOPMD CloseResource - managed by Form#setCurrentInputDevice
 
                     @Override
                     public void close() throws Exception {

@@ -433,7 +433,7 @@ class ResourceThreadQueue {
         @Override
         public void run() {
             DocumentInfo docInfo = cssDocInfo != null ? cssDocInfo : new DocumentInfo(imageUrl, DocumentInfo.TYPE_IMAGE);
-            InputStream is = handler.resourceRequested(docInfo);
+            InputStream is = handler.resourceRequested(docInfo); //NOPMD CloseResource - streamReady closes the stream
             streamReady(is, docInfo);
         }
 

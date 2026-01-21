@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.html;
 
+import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.ComboBox;
@@ -823,14 +824,18 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      */
     public boolean setHTML(String htmlText, String encoding, String title, boolean isFullHTML) {
         boolean success = true;
-        InputStreamReader isr = getStream(htmlText, encoding, title, isFullHTML);
-        final InputStreamReader isReader = isr;
+        InputStreamReader isr = getStream(htmlText, encoding, title, isFullHTML); //NOPMD CloseResource
+        final InputStreamReader isReader = isr; //NOPMD CloseResource
 
         Display.getInstance().startThread(new Runnable() {
             @Override
             public void run() {
-                HTMLElement doc = parser.parseHTML(isReader);
-                documentReady(null, doc);
+                try {
+                    HTMLElement doc = parser.parseHTML(isReader);
+                    documentReady(null, doc);
+                } finally {
+                    Util.cleanup(isReader);
+                }
             }
         }, "setHTML").start();
 
@@ -887,7 +892,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
         if (isr == null) { //encoding wasn't specified or failed
-            isr = com.codename1.io.Util.getReader(bais);
+            isr = Util.getReader(bais); //NOPMD CloseResource
         }
         return isr;
     }
@@ -1034,7 +1039,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 @Override
                 public void run() {
                     setPageStatus(HTMLCallback.STATUS_REQUESTED);
-                    InputStream is = handler.resourceRequested(docInfo);
+                    InputStream is = handler.resourceRequested(docInfo); //NOPMD CloseResource - streamReady closes the stream
                     streamReady(is, docInfo);
                 }
             }, "setPage").start();
@@ -1049,64 +1054,68 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      */
     @Override
     public void streamReady(InputStream is, DocumentInfo docInfo) {
-        InputStreamReader isr = null;
+        InputStreamReader isr = null; //NOPMD CloseResource
         try {
-            if (is != null) {
-                isr = new InputStreamReader(is, docInfo.getEncoding());
-            }
-        } catch (Exception uee) {
-            boolean cont = true;
-            if (htmlCallback != null) {
-                cont = htmlCallback.parsingError(HTMLCallback.ERROR_ENCODING, null, null, null, "Page encoding " + docInfo.getEncoding() + " failed: " + uee.getMessage());
-            }
-            if (cont) { //retry without the encoding
-                try {
-                    isr = com.codename1.io.Util.getReader(is);
-                } catch (Exception e) {
-                    htmlCallback.parsingError(HTMLCallback.ERROR_ENCODING, null, null, null, "Page loading failed, probably due to wrong encoding. " + e.getMessage());
-                    isr = getStream("Page loading failed, probably due to encoding mismatch.", null);
+            try {
+                if (is != null) {
+                    isr = new InputStreamReader(is, docInfo.getEncoding());
+                }
+            } catch (Exception uee) {
+                boolean cont = true;
+                if (htmlCallback != null) {
+                    cont = htmlCallback.parsingError(HTMLCallback.ERROR_ENCODING, null, null, null, "Page encoding " + docInfo.getEncoding() + " failed: " + uee.getMessage());
+                }
+                if (cont) { //retry without the encoding
+                    try {
+                        isr = Util.getReader(is);
+                    } catch (Exception e) {
+                        htmlCallback.parsingError(HTMLCallback.ERROR_ENCODING, null, null, null, "Page loading failed, probably due to wrong encoding. " + e.getMessage());
+                        isr = getStream("Page loading failed, probably due to encoding mismatch.", null);
+                        setPageStatus(HTMLCallback.STATUS_ERROR);
+                    }
+                } else {
+                    isr = getStream("Page encoding not supported", null);
                     setPageStatus(HTMLCallback.STATUS_ERROR);
                 }
-            } else {
-                isr = getStream("Page encoding not supported", null);
+            }
+
+            if (cancelled) {
+                isr = getStream("Page loading cancelled by user", null);
+            }
+
+            if (isr == null) {
+                if (htmlCallback != null) {
+                    htmlCallback.parsingError(HTMLCallback.ERROR_CONNECTING, null, null, null, "Error connecting to stream");
+                }
                 setPageStatus(HTMLCallback.STATUS_ERROR);
+                isr = getStream("Error connecting to stream", null); //TODO - dynamic error messages
+            } else {
+                setPageStatus(HTMLCallback.STATUS_CONNECTED);
             }
-        }
 
-        if (cancelled) {
-            isr = getStream("Page loading cancelled by user", null);
-        }
+            HTMLElement newDoc = null;
 
-        if (isr == null) {
-            if (htmlCallback != null) {
-                htmlCallback.parsingError(HTMLCallback.ERROR_CONNECTING, null, null, null, "Error connecting to stream");
+            try {
+                newDoc = parser.parseHTML(isr);
+            } catch (IllegalArgumentException iae) {
+                iae.printStackTrace();
+                setPageStatus(HTMLCallback.STATUS_ERROR);
+                Util.cleanup(isr);
+                isr = getStream("Parsing error " + iae.getMessage(), null);
+                newDoc = parser.parseHTML(isr);
             }
-            setPageStatus(HTMLCallback.STATUS_ERROR);
-            isr = getStream("Error connecting to stream", null); //TODO - dynamic error messages
-        } else {
-            setPageStatus(HTMLCallback.STATUS_CONNECTED);
+
+            if (cancelled) {
+                Util.cleanup(isr);
+                isr = getStream("Page loading cancelled by user", null);
+                newDoc = parser.parseHTML(isr);
+            }
+
+            setPageStatus(HTMLCallback.STATUS_PARSED);
+            documentReady(docInfo, newDoc);
+        } finally {
+            Util.cleanup(isr);
         }
-
-        HTMLElement newDoc = null;
-
-        try {
-            newDoc = parser.parseHTML(isr);
-        } catch (IllegalArgumentException iae) {
-            iae.printStackTrace();
-            setPageStatus(HTMLCallback.STATUS_ERROR);
-            isr = getStream("Parsing error " + iae.getMessage(), null);
-            newDoc = parser.parseHTML(isr);
-        }
-
-        if (cancelled) {
-            isr = getStream("Page loading cancelled by user", null);
-            newDoc = parser.parseHTML(isr);
-        }
-
-
-        setPageStatus(HTMLCallback.STATUS_PARSED);
-        documentReady(docInfo, newDoc);
-
     }
 
     /**
@@ -1224,9 +1233,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             });
         } else { // Page was cancelled
             cancelled = false;
-            InputStreamReader isr = getStream("Page loading cancelled by user", null);
-            HTMLElement newDoc = parser.parseHTML(isr);
-            documentReady(docInfo, newDoc);
+            InputStreamReader isr = null; //NOPMD CloseResource
+            try {
+                isr = getStream("Page loading cancelled by user", null);
+                HTMLElement newDoc = parser.parseHTML(isr);
+                documentReady(docInfo, newDoc);
+            } finally {
+                Util.cleanup(isr);
+            }
         }
 
     }

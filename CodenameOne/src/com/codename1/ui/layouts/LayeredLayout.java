@@ -2983,21 +2983,35 @@ public class LayeredLayout extends Layout {
              * @param val
              */
             private void setValue(String val) {
-                int pos;
-                if ((pos = val.indexOf("mm")) != -1) {
+                int pos = val.indexOf("mm");
+                if (pos != -1) {
                     this.setDips(Float.parseFloat(val.substring(0, pos)));
-                } else if ((pos = val.indexOf("px")) != -1) {
-                    this.setPixels(Integer.parseInt(val.substring(0, pos)));
-                } else if ((pos = val.indexOf("%")) != -1) {
-                    this.setPercent(Float.parseFloat(val.substring(0, pos)));
-                } else if ("auto".equals(val)) {
-                    this.setAuto();
-                } else if ("baseline".equals(val)) {
-                    this.unit(UNIT_BASELINE);
-                } else {
-                    this.setPixels(Integer.parseInt(val));
-
+                    return;
                 }
+
+                pos = val.indexOf("px");
+                if (pos != -1) {
+                    this.setPixels(Integer.parseInt(val.substring(0, pos)));
+                    return;
+                }
+
+                pos = val.indexOf("%");
+                if (pos != -1) {
+                    this.setPercent(Float.parseFloat(val.substring(0, pos)));
+                    return;
+                }
+
+                if ("auto".equals(val)) {
+                    this.setAuto();
+                    return;
+                }
+
+                if ("baseline".equals(val)) {
+                    this.unit(UNIT_BASELINE);
+                    return;
+                }
+
+                this.setPixels(Integer.parseInt(val));
             }
 
             /**

@@ -49,8 +49,8 @@ public abstract class DeviceRunner {
         failedTests = 0;
         passedTests = 0;
         Log.p("-----STARTING TESTS-----");
-        InputStream is = null;
-        DataInputStream di = null;
+        InputStream is = null; //NOPMD CloseResource
+        DataInputStream di = null; //NOPMD CloseResource
         try {
             is = DeviceRunner.class.getResourceAsStream("/tests.dat");
 

@@ -295,7 +295,7 @@ public class StringUtil {
             return s.getBytes("UTF-8");
         } catch (UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e.toString());
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
@@ -310,7 +310,7 @@ public class StringUtil {
             return new String(b, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e.toString());
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
@@ -327,7 +327,7 @@ public class StringUtil {
             return new String(b, offset, length, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e.toString());
+            throw new RuntimeException(e.toString(), e);
         }
     }
 }

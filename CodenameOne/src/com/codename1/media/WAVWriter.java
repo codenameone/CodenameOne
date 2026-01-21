@@ -126,23 +126,18 @@ public class WAVWriter implements AutoCloseable {
      */
     @Override
     public void close() throws Exception {
-        this.out.close();
         final FileSystemStorage fs = FileSystemStorage.getInstance();
+        Util.cleanup(this.out);
         fs.rename(this.outputFile.getAbsolutePath(), new File(this.getPCMFile()).getName());
+        InputStream in = null; //NOPMD CloseResource
         try {
             this.out = fs.openOutputStream(this.outputFile.getAbsolutePath());
-            final InputStream in = fs.openInputStream(this.getPCMFile());
+            in = fs.openInputStream(this.getPCMFile());
             this.writeHeader();
             Util.copy(in, this.out);
-            try {
-                this.out.close();
-            } catch (Throwable t) {
-            }
-            try {
-                in.close();
-            } catch (Throwable t2) {
-            }
         } finally {
+            Util.cleanup(this.out);
+            Util.cleanup(in);
             fs.delete(this.getPCMFile());
         }
     }

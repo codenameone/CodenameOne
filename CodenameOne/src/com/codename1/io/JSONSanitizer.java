@@ -178,7 +178,7 @@ final class JSONSanitizer {
      */
     private static int endOfQuotedString(String s, int start) {
         char quote = s.charAt(start);
-        for (int i = start; (i = s.indexOf(quote, i + 1)) >= 0; ) {
+        for (int i = start; (i = s.indexOf(quote, i + 1)) >= 0; ) { //NOPMD AssignmentInOperand
             // If there are an even number of preceding backslashes then this is
             // the end of the string.
             int slashRunStart = i;
@@ -582,7 +582,7 @@ final class JSONSanitizer {
                                     end = n;
                                     if (i + 3 < n) {
                                         for (int j = i + 2;
-                                             (j = jsonish.indexOf('/', j + 1)) >= 0; ) {
+                                             (j = jsonish.indexOf('/', j + 1)) >= 0; ) { //NOPMD AssignmentInOperand
                                             if (jsonish.charAt(j - 1) == '*') {
                                                 end = j + 1;
                                                 break;
@@ -888,7 +888,7 @@ final class JSONSanitizer {
                         continue;
                     }
                     replace(i, i + 1, "\\u");
-                    for (int j = 4; --j >= 0; ) {
+                    for (int j = 4; --j >= 0; ) { //NOPMD AssignmentInOperand
                         sanitizedJson.append(HEX_DIGITS[(ch >>> (j << 2)) & 0xf]);
                     }
                     break;
@@ -968,7 +968,7 @@ final class JSONSanitizer {
         // 2. jsonish.substring(cleaned, closeBracketPos)
         // We walk over whitespace characters in both right-to-left looking for a
         // comma.
-        for (int i = closeBracketPos; --i >= cleaned; ) {
+        for (int i = closeBracketPos; --i >= cleaned; ) { //NOPMD AssignmentInOperand
             switch (jsonish.charAt(i)) {
                 case '\t':
                 case '\n':
@@ -983,7 +983,7 @@ final class JSONSanitizer {
             }
         }
         assert sanitizedJson != null;
-        for (int i = sanitizedJson.length(); --i >= 0; ) {
+        for (int i = sanitizedJson.length(); --i >= 0; ) { //NOPMD AssignmentInOperand
             switch (sanitizedJson.charAt(i)) {
                 case '\t':
                 case '\n':

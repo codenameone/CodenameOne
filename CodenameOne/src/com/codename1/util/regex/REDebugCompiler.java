@@ -163,7 +163,7 @@ public class REDebugCompiler extends RECompiler {
                     p.write(", \"");
 
                     // Print each character in the atom
-                    for (int len = opdata; len-- != 0; ) {
+                    for (int len = opdata; len-- != 0; ) { //NOPMD AssignmentInOperand
                         p.write(charToString(instruction[i++]));
                     }
 
@@ -183,7 +183,7 @@ public class REDebugCompiler extends RECompiler {
      * Dumps the current program to a <code>System.out</code>.
      */
     public void dumpProgram() {
-        java.io.OutputStreamWriter w = com.codename1.io.Util.getWriter(System.out);
+        java.io.OutputStreamWriter w = com.codename1.io.Util.getWriter(System.out); //NOPMD CloseResource - should not close System.out
         dumpProgram(w);
         try {
             w.flush();

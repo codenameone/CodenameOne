@@ -474,7 +474,7 @@ public class BufferedInputStream extends InputStream {
                 break;
             }
             // if not closed but no bytes available, return
-            InputStream input = in;
+            InputStream input = in; //NOPMD CloseResource - stream managed by BufferedInputStream#close
             if (input != null && superAvailable() <= 0) {
                 break;
             }
@@ -650,10 +650,10 @@ public class BufferedInputStream extends InputStream {
         byte[] buffer = buf;
         if (buffer != null) {
             buf = null;
-            InputStream input = in;
+            InputStream input = in; //NOPMD CloseResource
             in = null;
             if (input != null) {
-                input.close();
+                Util.cleanup(input);
             }
         }
     }

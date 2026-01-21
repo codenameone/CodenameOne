@@ -28,6 +28,7 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.MultipartRequest;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.Util;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
@@ -188,13 +189,15 @@ public class FacebookShare extends ShareService {
                             final String endpoint = "https://graph.facebook.com/me/photos?access_token=" + token;
                             req.setUrl(endpoint);
                             req.addArgumentNoEncoding("message", f[0].getMessage());
-                            InputStream is = null;
+                            InputStream is = null; //NOPMD CloseResource
                             try {
                                 is = FileSystemStorage.getInstance().openInputStream(image);
                                 req.addData("source", is, FileSystemStorage.getInstance().getLength(image), mime);
                                 NetworkManager.getInstance().addToQueue(req);
                             } catch (IOException ioe) {
                                 Log.e(ioe);
+                            } finally {
+                                Util.cleanup(is);
                             }
                         }
                     });

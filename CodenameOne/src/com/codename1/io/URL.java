@@ -288,7 +288,7 @@ public class URL {
                 try {
                     impl.setHttpMethod(connection, requestMethod);
                 } catch (IOException ex) {
-                    throw new IllegalArgumentException("Failed to set request method " + method + ". " + ex.getMessage());
+                    throw new IllegalArgumentException("Failed to set request method " + method + ". " + ex.getMessage(), ex);
                 }
             }
         }

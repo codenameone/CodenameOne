@@ -651,22 +651,23 @@ class Geometry {
             double epsilon = 0.01;
             // left edge
 
-            if ((numMatches = findTValuesForX(rect.getX(), rect.getY(), rect.getY() + rect.getHeight(), res)) > 0) {
-                //System.out.println("left: "+numMatches);
+            numMatches = findTValuesForX(rect.getX(), rect.getY(), rect.getY() + rect.getHeight(), res);
+            if (numMatches > 0) {
                 nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);
             }
             // right edge
-            if ((numMatches = findTValuesForX(rect.getX() + rect.getWidth(), rect.getY(), rect.getY() + rect.getHeight(), res)) > 0) {
-                //System.out.println("right: "+numMatches);
+            numMatches = findTValuesForX(rect.getX() + rect.getWidth(), rect.getY(), rect.getY() + rect.getHeight(), res);
+            if (numMatches > 0) {
                 nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);
             }
             // top edge
-            if ((numMatches = findTValuesForY(rect.getY(), rect.getX(), rect.getX() + rect.getWidth(), res)) > 0) {
-                //System.out.println("Top: "+numMatches);
+            numMatches = findTValuesForY(rect.getY(), rect.getX(), rect.getX() + rect.getWidth(), res);
+            if (numMatches > 0) {
                 nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);
             }
             // bottom edge
-            if ((numMatches = findTValuesForY(rect.getY() + rect.getHeight(), rect.getX(), rect.getX() + rect.getWidth(), res)) > 0) {
+            numMatches = findTValuesForY(rect.getY() + rect.getHeight(), rect.getX(), rect.getX() + rect.getWidth(), res);
+            if (numMatches > 0) {
                 //System.out.println("Bottom: "+numMatches+" "+Arrays.toString(res));
                 nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);
             }

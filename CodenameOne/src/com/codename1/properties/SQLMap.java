@@ -571,11 +571,7 @@ public final class SQLMap {
             if (c != null) {
                 c.close();
             }
-            if (t instanceof IOException) {
-                throw ((IOException) t);
-            } else {
-                throw new IOException(t.toString());
-            }
+            throw new IOException(t.toString(), t);
         }
     }
 

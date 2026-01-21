@@ -64,7 +64,7 @@ public interface Data {
                 bytes = str.getBytes(charset);
             } catch (UnsupportedEncodingException ex) {
                 Log.e(ex);
-                throw new RuntimeException("Failed to create StringData with encoding " + charset);
+                throw new RuntimeException("Failed to create StringData with encoding " + charset, ex);
             }
         }
 

@@ -42,4 +42,20 @@ public class IllegalArgumentException extends java.lang.RuntimeException{
          //TODO codavaj!!
     }
 
+    /**
+     * Constructs an IllegalArgumentException with the specified detail message and cause.
+     * s - the detail message.
+     * cause - the cause.
+     */
+    public IllegalArgumentException(java.lang.String s, java.lang.Throwable cause) {
+         //TODO codavaj!!
+    }
+
+    /**
+     * Constructs an IllegalArgumentException with the specified cause.
+     * cause - the cause.
+     */
+    public IllegalArgumentException(java.lang.Throwable cause) {
+         //TODO codavaj!!
+    }
 }

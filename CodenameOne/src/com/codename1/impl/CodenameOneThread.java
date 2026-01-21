@@ -134,8 +134,8 @@ public class CodenameOneThread extends Thread {
      * Prints the stack trace matching the given stack
      */
     public String getStack(Throwable t) {
-        InputStream inp = null;
-        DataInputStream di = null;
+        InputStream inp = null; //NOPMD CloseResource
+        DataInputStream di = null; //NOPMD CloseResource
         try {
             StringBuilder b = new StringBuilder();
             int size;

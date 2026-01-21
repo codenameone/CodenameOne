@@ -264,12 +264,12 @@ public class BrowserComponent extends Container {
                         try {
                             sb.append(new String(bytes, 0, pos, enc));
                         } catch (Throwable t) {
-                            throw new RuntimeException(t.getMessage());
+                            throw new RuntimeException(t.getMessage(), t);
                         }
                     } catch (NumberFormatException e) {
                         throw new IllegalArgumentException(
                                 "URLDecoder: Illegal hex characters in escape (%) pattern - "
-                                        + e.getMessage());
+                                        + e.getMessage(), e);
                     }
                     needToChange = true;
                     break;
@@ -2133,7 +2133,7 @@ public class BrowserComponent extends Container {
                     throw (RuntimeException) ex;
                 } else {
                     Log.e(ex);
-                    throw new RuntimeException(ex.getMessage());
+                    throw new RuntimeException(ex.getMessage(), ex);
                 }
             }
 

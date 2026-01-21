@@ -25,6 +25,7 @@ package com.codename1.ui.util;
 
 import com.codename1.analytics.AnalyticsService;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.ComboBox;
@@ -390,11 +391,11 @@ public class UIBuilder { //implements Externalizable {
 
     Container createContainer(Resources res, String resourceName, EmbeddedContainer parentContainer) {
         onCreateRoot(resourceName);
-        InputStream source = res.getUi(resourceName);
+        InputStream source = res.getUi(resourceName); //NOPMD CloseResource
         if (source == null) {
             throw new RuntimeException("Resource doesn't exist within the current resource object: " + resourceName);
         }
-        DataInputStream in = new DataInputStream(source);
+        DataInputStream in = new DataInputStream(source); //NOPMD CloseResource
         try {
             Hashtable h = null;
             if (localComponentListeners != null) {
@@ -421,6 +422,8 @@ public class UIBuilder { //implements Externalizable {
             // If this happens its probably a serious bug
             ex.printStackTrace();
             return null;
+        } finally {
+            Util.cleanup(in);
         }
     }
 

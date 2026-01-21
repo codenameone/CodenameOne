@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.html;
 
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
@@ -129,9 +130,14 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
                     }
                 }
                 if (url.startsWith("res://")) {
-                    InputStream i = Display.getInstance().getResourceAsStream(getClass(), docInfo.getUrl().substring(6));
-                    Resources r = Resources.open(i);
-                    i.close();
+                    InputStream i = null; //NOPMD CloseResource
+                    Resources r;
+                    try {
+                        i = Display.getInstance().getResourceAsStream(getClass(), docInfo.getUrl().substring(6));
+                        r = Resources.open(i);
+                    } finally {
+                        Util.cleanup(i);
+                    }
                     i = r.getData(docInfo.getParams());
                     if (i != null) {
                         callback.streamReady(i, docInfo);

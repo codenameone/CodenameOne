@@ -564,7 +564,7 @@ public class RE {
      */
     public String getParen(int which) {
         int start;
-        if (which < parenCount && (start = getParenStart(which)) >= 0) {
+        if (which < parenCount && (start = getParenStart(which)) >= 0) { //NOPMD AssignmentInOperand
             return search.substring(start, getParenEnd(which));
         }
         return null;
@@ -757,7 +757,7 @@ public class RE {
                     // Try to match the following subexpr. If it matches:
                     //   MAYBE:  Continues matching rest of the expression
                     //    STAR:  Points back here to repeat subexpr matching
-                    if ((idxNew = matchNodes(node + nodeSize, maxNode, idx)) != -1) {
+                    if ((idxNew = matchNodes(node + nodeSize, maxNode, idx)) != -1) { //NOPMD AssignmentInOperand
                         return idxNew;
                     }
 
@@ -767,7 +767,7 @@ public class RE {
 
                 case OP_PLUS: {
                     // Try to match the subexpr again (and again (and ...
-                    if ((idxNew = matchNodes(next, maxNode, idx)) != -1) {
+                    if ((idxNew = matchNodes(next, maxNode, idx)) != -1) { //NOPMD AssignmentInOperand
                         return idxNew;
                     }
 
@@ -781,7 +781,7 @@ public class RE {
                 case OP_RELUCTANTMAYBE:
                 case OP_RELUCTANTSTAR: {
                     // Try to match the rest without using the reluctant subexpr
-                    if ((idxNew = matchNodes(next, maxNode, idx)) != -1) {
+                    if ((idxNew = matchNodes(next, maxNode, idx)) != -1) { //NOPMD AssignmentInOperand
                         return idxNew;
                     }
 
@@ -793,7 +793,7 @@ public class RE {
 
                 case OP_RELUCTANTPLUS: {
                     // Continue matching the rest without using the reluctant subexpr
-                    if ((idxNew = matchNodes(next + (short) instruction[next + offsetNext], maxNode, idx)) != -1) {
+                    if ((idxNew = matchNodes(next + (short) instruction[next + offsetNext], maxNode, idx)) != -1) { //NOPMD AssignmentInOperand
                         return idxNew;
                     }
 
@@ -807,7 +807,7 @@ public class RE {
                     if ((program.flags & REProgram.OPT_HASBACKREFS) != 0) {
                         startBackref[opdata] = idx;
                     }
-                    if ((idxNew = matchNodes(next, maxNode, idx)) != -1) {
+                    if ((idxNew = matchNodes(next, maxNode, idx)) != -1) { //NOPMD AssignmentInOperand
                         // Increase valid paren count
                         if (opdata >= parenCount) {
                             parenCount = opdata + 1;
@@ -826,7 +826,7 @@ public class RE {
                     if ((program.flags & REProgram.OPT_HASBACKREFS) != 0) {
                         endBackref[opdata] = idx;
                     }
-                    if ((idxNew = matchNodes(next, maxNode, idx)) != -1) {
+                    if ((idxNew = matchNodes(next, maxNode, idx)) != -1) { //NOPMD AssignmentInOperand
                         // Increase valid paren count
                         if (opdata >= parenCount) {
                             parenCount = opdata + 1;
@@ -867,7 +867,7 @@ public class RE {
                             ((matchFlags & MATCH_CASEINDEPENDENT) != 0);
                     // Compare backref to input
                     for (int i = 0; i < l; i++) {
-                        if (compareChars(search.charAt(idx++), search.charAt(s + i), caseFold) != 0) {
+                        if (compareChars(search.charAt(idx++), search.charAt(s + i), caseFold) != 0) { //NOPMD AssignmentInOperand
                             return -1;
                         }
                     }
@@ -1001,7 +1001,7 @@ public class RE {
                             ((matchFlags & MATCH_CASEINDEPENDENT) != 0);
 
                     for (int i = 0; i < opdata; i++) {
-                        if (compareChars(search.charAt(idx++), instruction[startAtom + i], caseFold) != 0) {
+                        if (compareChars(search.charAt(idx++), instruction[startAtom + i], caseFold) != 0) { //NOPMD AssignmentInOperand
                             return -1;
                         }
                     }
@@ -1173,7 +1173,7 @@ public class RE {
                     int nextBranch;
                     do {
                         // Try matching the branch against the string
-                        if ((idxNew = matchNodes(node + nodeSize, maxNode, idx)) != -1) {
+                        if ((idxNew = matchNodes(node + nodeSize, maxNode, idx)) != -1) { //NOPMD AssignmentInOperand
                             return idxNew;
                         }
 
@@ -1252,7 +1252,7 @@ public class RE {
 
         // Match against string
         int idx;
-        if ((idx = matchNodes(0, maxNode, i)) != -1) {
+        if ((idx = matchNodes(0, maxNode, i)) != -1) { //NOPMD AssignmentInOperand
             setParenEnd(0, idx);
             return true;
         }
