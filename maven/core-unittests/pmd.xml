@@ -10,6 +10,12 @@
         -->
         <exclude name="UselessParentheses" />
 
+        <!-- We do that a lot in some APIs -->
+        <exclude name="AvoidCatchingThrowable" />
+
+        <!-- not valuable -->
+        <exclude name="UncommentedEmptyConstructor" />
+
         <!-- Excluded since this isn't true for Codename One.
         Coding to an interface is measurably slower in an AOT
         environment. We also use many legacy classes at the API
