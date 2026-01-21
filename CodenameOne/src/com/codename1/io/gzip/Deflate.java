@@ -1313,8 +1313,7 @@ final class Deflate {
 
             // We check for insufficient lookahead only every 8th comparison;
             // the 256th check will be made at strstart+258.
-            do {
-                continue;
+            do { // NOPMD EmptyControlStatement - loop body intentionally empty; comparisons advance scan/match.
             } while (window[++scan] == window[++match] &&
                     window[++scan] == window[++match] &&
                     window[++scan] == window[++match] &&

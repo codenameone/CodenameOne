@@ -146,8 +146,9 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         input.mark(10);
 
         // Skip the bom marking UTF-8 in some streams
-        while (input.read() != '<') {
-            continue;
+        int firstChar = input.read();
+        while (firstChar != -1 && firstChar != '<') {
+            firstChar = input.read();
         }
         int question = input.read();
         String cType = "UTF-8";
