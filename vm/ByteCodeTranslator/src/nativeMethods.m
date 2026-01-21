@@ -1956,9 +1956,11 @@ struct elementStruct* pop(struct elementStruct**sp) {
     (*sp)--;
     return *sp;
 }
+#ifndef CN1_CLEAN_BUILD
 void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct**sp) {
     (*sp) -= count;
 }
+#endif
 
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_String(CODENAME_ONE_THREAD_STATE);
 
@@ -1977,6 +1979,7 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     return s;
 }
 
+#ifndef CN1_CLEAN_BUILD
 const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     if (str == JAVA_NULL) return NULL;
     struct obj__java_lang_String* s = (struct obj__java_lang_String*)str;
@@ -1990,12 +1993,17 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     buf[len] = 0;
     return buf;
 }
+#endif
 
+#ifndef CN1_CLEAN_BUILD
 void initConstantPool() {
     // Allocate dummy pool to prevent segfaults, though contents will be null
     constantPoolObjects = calloc(65536, sizeof(void*));
 }
+#endif
+#ifndef CN1_CLEAN_BUILD
 pthread_key_t recursionKey;
 int currentGcMarkValue = 0;
+#endif
 
 #endif

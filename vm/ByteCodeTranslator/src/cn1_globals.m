@@ -1011,6 +1011,10 @@ JAVA_INT java_lang_System_identityHashCode___java_lang_Object_R_int(CODENAME_ONE
 
 extern int mallocWhileSuspended;
 extern BOOL isAppSuspended;
+#if !defined(__OBJC__)
+int mallocWhileSuspended = 0;
+BOOL isAppSuspended = 0;
+#endif
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
     if(isAppSuspended) {
