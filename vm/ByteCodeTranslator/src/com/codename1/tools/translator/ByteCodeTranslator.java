@@ -251,6 +251,13 @@ public class ByteCodeTranslator {
 
         Parser.writeOutput(srcRoot);
 
+        File classMethodIndexM = new File(srcRoot, "cn1_class_method_index.m");
+        if (classMethodIndexM.exists()) {
+            File classMethodIndexC = new File(srcRoot, "cn1_class_method_index.c");
+            copy(new FileInputStream(classMethodIndexM), new FileOutputStream(classMethodIndexC));
+            classMethodIndexM.delete();
+        }
+
         writeCmakeProject(root, srcRoot, appName);
     }
 

@@ -611,10 +611,10 @@ void codenameOneGCMark() {
                         {   long later = time(0)-now;
                             if(later>10000)
                             {
-                            #if defined(__OBJC__)
+#if defined(__OBJC__)
                             NSLog(@"GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
-                            #endif
                                   (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
+#endif
                             }
                         }
                     }
