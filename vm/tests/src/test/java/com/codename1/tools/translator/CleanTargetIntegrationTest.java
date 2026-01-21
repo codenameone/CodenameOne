@@ -67,6 +67,8 @@ class CleanTargetIntegrationTest {
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "HelloWorld.java should compile with " + config);
 
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+
         Files.copy(sourceDir.resolve("native_hello.c"), classesDir.resolve("native_hello.c"));
 
         Path outputDir = Files.createTempDirectory("clean-target-output");
