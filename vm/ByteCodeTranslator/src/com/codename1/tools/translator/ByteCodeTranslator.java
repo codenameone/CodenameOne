@@ -558,7 +558,7 @@ public class ByteCodeTranslator {
         try {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             writer.append("project(").append(appName).append(" LANGUAGES C OBJC)\n");
-            writer.append("enable_language(OBJC OPTIONAL)\n");
+            writer.append("enable_language(OBJC)\n");
             writer.append("set(CMAKE_C_STANDARD 99)\n");
             writer.append("file(GLOB TRANSLATOR_SOURCES \"").append(srcRoot.getName()).append("/*.c\" \"").append(srcRoot.getName()).append("/*.m\")\n");
             writer.append("file(GLOB TRANSLATOR_HEADERS \"").append(srcRoot.getName()).append("/*.h\")\n");
