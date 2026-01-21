@@ -724,7 +724,7 @@ public class Element implements Iterable<Element> {
             str.append(">\n");
             if (children != null) {
                 for (Object child : children) {
-                    str.append(child.toString(spacing + ' '));
+                    str.append(((Element) child).toString(spacing + ' '));
                 }
             }
             str.append(spacing).append("</").append(getTagName()).append(">\n");
