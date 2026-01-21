@@ -579,8 +579,7 @@ class CSSParser {
                     if (result != -1) {
                         // unsupported token we need to read until the newline
                         //while(nextToken(r, false, false,false) != null && !newline) {}
-                        while (nextToken(r, false, false, false, false) != null) {
-                            continue;
+                        while (nextToken(r, false, false, false, false) != null) { // NOPMD EmptyControlStatement
                         } //TODO - is newline truly unnecessary ? + what if that happens in the end of the file - do we get into an infinite loop?
                     }
                 }

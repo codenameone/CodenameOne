@@ -952,8 +952,7 @@ class TBigInteger {
 
     boolean equalsArrays(final int[] b) {
         int i;
-        for (i = numberLength - 1; (i >= 0) && (digits[i] == b[i]); i--) {
-            continue;
+        for (i = numberLength - 1; (i >= 0) && (digits[i] == b[i]); i--) { // NOPMD EmptyControlStatement
         }
         return i < 0;
     }
@@ -1317,8 +1316,7 @@ class TBigInteger {
      * Decreases {@code numberLength} if there are zero high elements.
      */
     final void cutOffLeadingZeroes() {
-        while ((numberLength > 0) && (digits[--numberLength] == 0)) {
-            continue;
+        while ((numberLength > 0) && (digits[--numberLength] == 0)) { // NOPMD EmptyControlStatement
         }
         if (digits[numberLength++] == 0) { //NOPMD AssignmentInOperand
             sign = 0;
@@ -1404,8 +1402,7 @@ class TBigInteger {
             if (this.sign == 0) {
                 i = -1;
             } else {
-                for (i = 0; digits[i] == 0; i++) {
-                    continue;
+                for (i = 0; digits[i] == 0; i++) { // NOPMD EmptyControlStatement
                 }
             }
             firstNonzeroDigit = i;

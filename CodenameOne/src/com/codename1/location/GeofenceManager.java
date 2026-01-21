@@ -598,10 +598,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
     }
 
     private void removeAll(List l, Object o) {
-        for (Iterator it = l.iterator(); it.hasNext(); ) {
-            if (o.equals(it.next())) {
-                it.remove();
-            }
+        while (l.remove(o)) { // NOPMD EmptyControlStatement - intentional remove-all loop.
         }
     }
 

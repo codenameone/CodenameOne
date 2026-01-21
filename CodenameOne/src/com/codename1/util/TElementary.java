@@ -47,8 +47,7 @@ final class TElementary {
      */
     static int compareArrays(final int[] a, final int[] b, final int size) {
         int i;
-        for (i = size - 1; (i >= 0) && (a[i] == b[i]); i--) {
-            continue;
+        for (i = size - 1; (i >= 0) && (a[i] == b[i]); i--) { // NOPMD EmptyControlStatement
         }
         return ((i < 0) ? TBigInteger.EQUALS : (a[i] & 0xFFFFFFFFL) < (b[i] & 0xFFFFFFFFL) ? TBigInteger.LESS
                 : TBigInteger.GREATER);
@@ -416,8 +415,7 @@ final class TElementary {
             return -1;
         } else {
             int i;
-            for (i = aSize - 1; i >= 0 && a[i] == b[i]; i--) {
-                continue;
+            for (i = aSize - 1; i >= 0 && a[i] == b[i]; i--) { // NOPMD EmptyControlStatement
             }
             return i < 0 ? TBigInteger.EQUALS : ((a[i] & 0xFFFFFFFFL) < (b[i] & 0xFFFFFFFFL) ? TBigInteger.LESS
                     : TBigInteger.GREATER);
