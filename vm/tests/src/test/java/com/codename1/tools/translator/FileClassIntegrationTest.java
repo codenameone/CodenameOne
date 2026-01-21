@@ -36,10 +36,8 @@ public class FileClassIntegrationTest {
         }
 
         List<String> compileArgs = new ArrayList<>();
-        // JDK 9+ requires --patch-module for JavaAPI sources, which cannot target < 9 bytecode.
-        if (!CompilerHelper.isJavaApiCompatible(config)) {
-            return;
-        }
+        assertTrue(CompilerHelper.isJavaApiCompatible(config),
+                "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");
 
         if (CompilerHelper.useClasspath(config)) {
              compileArgs.add("-source");

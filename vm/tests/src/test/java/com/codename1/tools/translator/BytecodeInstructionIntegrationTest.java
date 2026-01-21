@@ -80,10 +80,8 @@ class BytecodeInstructionIntegrationTest {
              compileArgs.add("-target");
              compileArgs.add(config.targetVersion);
              // On JDK 9+, -bootclasspath is removed.
-             // --patch-module is not allowed with -target 8.
              // We rely on the JDK's own bootstrap classes but include our JavaAPI in classpath
              // so that any non-replaced classes are found.
-             // This means we compile against JDK 9+ API but emit older bytecode.
              compileArgs.add("-classpath");
              compileArgs.add(javaApiDir.toString());
         } else {
@@ -114,8 +112,6 @@ class BytecodeInstructionIntegrationTest {
 
         Path srcRoot = distDir.resolve("CustomBytecodeApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
-        writeRuntimeStubs(srcRoot);
-        writeMissingHeadersAndImpls(srcRoot);
 
         Path generatedSource = findGeneratedSource(srcRoot);
         String generatedCode = new String(Files.readAllBytes(generatedSource), StandardCharsets.UTF_8);
@@ -264,9 +260,6 @@ class BytecodeInstructionIntegrationTest {
 
         Path srcRoot = distDir.resolve("InvokeLdcLocalVars-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
-        writeRuntimeStubs(srcRoot);
-        writeInvokeLdcRuntimeStubs(srcRoot);
-        writeMissingHeadersAndImpls(srcRoot);
 
         Path generatedSource = findGeneratedSource(srcRoot, "InvokeLdcLocalVarsApp");
         String generatedCode = new String(Files.readAllBytes(generatedSource), StandardCharsets.UTF_8);
@@ -533,283 +526,8 @@ class BytecodeInstructionIntegrationTest {
         assertEquals(0, result, "JavaAPI should compile");
     }
 
-    private void writeInvokeLdcRuntimeStubs(Path srcRoot) throws Exception {
-        Path doubleHeader = srcRoot.resolve("java_lang_Double.h");
-        Path doubleSource = srcRoot.resolve("java_lang_Double.c");
-        if (!Files.exists(doubleHeader)) {
-            Files.write(doubleHeader, javaLangDoubleHeader().getBytes(StandardCharsets.UTF_8));
-        }
-        if (!Files.exists(doubleSource)) {
-            Files.write(doubleSource, javaLangDoubleSource().getBytes(StandardCharsets.UTF_8));
-        }
-
-        Path arrayListHeader = srcRoot.resolve("java_util_ArrayList.h");
-        Path arrayListSource = srcRoot.resolve("java_util_ArrayList.c");
-        if (!Files.exists(arrayListHeader)) {
-            Files.write(arrayListHeader, javaUtilArrayListHeader().getBytes(StandardCharsets.UTF_8));
-        }
-        if (!Files.exists(arrayListSource)) {
-            Files.write(arrayListSource, javaUtilArrayListSource().getBytes(StandardCharsets.UTF_8));
-        }
-    }
-
-    private void writeMissingHeadersAndImpls(Path srcRoot) throws Exception {
-        // java_lang_NullPointerException
-        Path npeHeader = srcRoot.resolve("java_lang_NullPointerException.h");
-        if (!Files.exists(npeHeader)) {
-            String npeContent = "#ifndef __JAVA_LANG_NULLPOINTEREXCEPTION_H__\n" +
-                    "#define __JAVA_LANG_NULLPOINTEREXCEPTION_H__\n" +
-                    "#include \"cn1_globals.h\"\n" +
-                    "JAVA_OBJECT __NEW_INSTANCE_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);\n" +
-                    "#endif\n";
-            Files.write(npeHeader, npeContent.getBytes(StandardCharsets.UTF_8));
-        }
-
-        // java_lang_String
-        Path stringHeader = srcRoot.resolve("java_lang_String.h");
-        if (!Files.exists(stringHeader)) {
-            String stringContent = "#ifndef __JAVA_LANG_STRING_H__\n" +
-                    "#define __JAVA_LANG_STRING_H__\n" +
-                    "#include \"cn1_globals.h\"\n" +
-                    "extern struct clazz class__java_lang_String;\n" +
-                    "extern struct clazz class_array2__java_lang_String;\n" +
-                    "JAVA_OBJECT __NEW_ARRAY_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_INT size);\n" +
-                    "#endif\n";
-            Files.write(stringHeader, stringContent.getBytes(StandardCharsets.UTF_8));
-        }
-
-        // java_lang_Class
-        Path classHeader = srcRoot.resolve("java_lang_Class.h");
-        if (!Files.exists(classHeader)) {
-             String classHeaderContent = "#ifndef __JAVA_LANG_CLASS_H__\n#define __JAVA_LANG_CLASS_H__\n#include \"cn1_globals.h\"\n" +
-                     "extern struct clazz class__java_lang_Class;\n" +
-                     "#endif\n";
-             Files.write(classHeader, classHeaderContent.getBytes(StandardCharsets.UTF_8));
-        }
-
-        // java_lang_Object
-        Path objectHeader = srcRoot.resolve("java_lang_Object.h");
-        // Overwrite or create
-        String objectContent = "#ifndef __JAVA_LANG_OBJECT_H__\n" +
-                "#define __JAVA_LANG_OBJECT_H__\n" +
-                "#include \"cn1_globals.h\"\n" +
-                "extern struct clazz class__java_lang_Object;\n" +
-                "void __FINALIZER_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
-                "void __GC_MARK_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);\n" +
-                "void java_lang_Object___INIT____(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
-                "JAVA_OBJECT __NEW_java_lang_Object(CODENAME_ONE_THREAD_STATE);\n" +
-                "void __INIT_VTABLE_java_lang_Object(CODENAME_ONE_THREAD_STATE, void** vtable);\n" +
-                "#endif\n";
-        Files.write(objectHeader, objectContent.getBytes(StandardCharsets.UTF_8));
 
 
-        // Append implementations to runtime_stubs.c or create extra_stubs.c
-        Path extraStubs = srcRoot.resolve("extra_stubs.c");
-        if (!Files.exists(extraStubs)) {
-             String stubs = "#include \"cn1_globals.h\"\n" +
-                     "#include \"java_lang_NullPointerException.h\"\n" +
-                     "#include \"java_lang_String.h\"\n" +
-                     "#include \"java_lang_Class.h\"\n" +
-                     "#include \"java_lang_Object.h\"\n" +
-                     "#include <stdlib.h>\n" +
-                     "#include <string.h>\n" +
-                     "#include <stdio.h>\n" +
-                     "\n" +
-                     "// class__java_lang_String defined in runtime_stubs.c\n" +
-                     "struct clazz class_array2__java_lang_String = {0};\n" +
-                     "// class__java_lang_Class defined in runtime_stubs.c\n" +
-                     "struct clazz class__java_lang_Object = {0};\n" +
-                     "\n" +
-                     "JAVA_OBJECT __NEW_INSTANCE_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE) {\n" +
-                     "    fprintf(stderr, \"Allocating NullPointerException\\n\");\n" +
-                     "    fflush(stderr);\n" +
-                     "    return JAVA_NULL;\n" +
-                     "}\n" +
-                     "void __FINALIZER_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {}\n" +
-                     "void __GC_MARK_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {}\n" +
-                     "void java_lang_Object___INIT____(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {}\n" +
-                     "JAVA_OBJECT __NEW_java_lang_Object(CODENAME_ONE_THREAD_STATE) {\n" +
-                     "    fprintf(stderr, \"__NEW_java_lang_Object called\\n\");\n" +
-                     "    fflush(stderr);\n" +
-                     "    struct JavaObjectPrototype* ptr = (struct JavaObjectPrototype*)malloc(sizeof(struct JavaObjectPrototype));\n" +
-                     "    if (ptr) {\n" +
-                     "        memset(ptr, 0, sizeof(struct JavaObjectPrototype));\n" +
-                     "        ptr->__codenameOneParentClsReference = &class__java_lang_Object;\n" +
-                     "    }\n" +
-                     "    return (JAVA_OBJECT)ptr;\n" +
-                     "}\n" +
-                     "void __INIT_VTABLE_java_lang_Object(CODENAME_ONE_THREAD_STATE, void** vtable) {}\n" +
-                     "JAVA_OBJECT __NEW_ARRAY_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {\n" +
-                     "    return 0;\n" +
-                     "}\n";
-             Files.write(extraStubs, stubs.getBytes(StandardCharsets.UTF_8));
-        }
-    }
-
-    private void writeRuntimeStubs(Path srcRoot) throws java.io.IOException {
-        Path objectHeader = srcRoot.resolve("java_lang_Object.h");
-        if (!Files.exists(objectHeader)) {
-            String headerContent = "#ifndef __JAVA_LANG_OBJECT_H__\n" +
-                    "#define __JAVA_LANG_OBJECT_H__\n" +
-                    "#include \"cn1_globals.h\"\n" +
-                    "#endif\n";
-            Files.write(objectHeader, headerContent.getBytes(StandardCharsets.UTF_8));
-        }
-
-        Path stubs = srcRoot.resolve("runtime_stubs.c");
-        if (Files.exists(stubs)) {
-            return;
-        }
-        String content = "#include \"cn1_globals.h\"\n" +
-                "#include <stdlib.h>\n" +
-                "#include <string.h>\n" +
-                "#include <math.h>\n" +
-                "#include <limits.h>\n" +
-                "#include <stdio.h>\n" +
-                "\n" +
-                "static struct ThreadLocalData globalThreadData;\n" +
-                "static int runtimeInitialized = 0;\n" +
-                "\n" +
-                "static void initThreadState() {\n" +
-                "    memset(&globalThreadData, 0, sizeof(globalThreadData));\n" +
-                "    globalThreadData.blocks = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(struct TryBlock));\n" +
-                "    globalThreadData.threadObjectStack = calloc(CN1_MAX_OBJECT_STACK_DEPTH, sizeof(struct elementStruct));\n" +
-                "    globalThreadData.pendingHeapAllocations = calloc(CN1_MAX_OBJECT_STACK_DEPTH, sizeof(void*));\n" +
-                "    globalThreadData.callStackClass = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));\n" +
-                "    globalThreadData.callStackLine = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));\n" +
-                "    globalThreadData.callStackMethod = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));\n" +
-                "}\n" +
-                "\n" +
-                "struct ThreadLocalData* getThreadLocalData() {\n" +
-                "    if (!runtimeInitialized) {\n" +
-                "        initThreadState();\n" +
-                "        runtimeInitialized = 1;\n" +
-                "    }\n" +
-                "    return &globalThreadData;\n" +
-                "}\n" +
-                "\n" +
-                "JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {\n" +
-                "    JAVA_OBJECT obj = (JAVA_OBJECT)calloc(1, size);\n" +
-                "    if (obj != JAVA_NULL) {\n" +
-                "        obj->__codenameOneParentClsReference = parent;\n" +
-                "    }\n" +
-                "    return obj;\n" +
-                "}\n" +
-                "\n" +
-                "void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
-                "    free(obj);\n" +
-                "}\n" +
-                "\n" +
-                "JAVA_OBJECT* constantPoolObjects = NULL;\n" +
-                "\n" +
-                "void initConstantPool() {\n" +
-                "    if (constantPoolObjects == NULL) {\n" +
-                "        constantPoolObjects = calloc(32, sizeof(JAVA_OBJECT));\n" +
-                "    }\n" +
-                "}\n" +
-                "\n" +
-                "void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {\n" +
-                "    (void)threadStateData;\n" +
-                "    free(array);\n" +
-                "}\n" +
-                "\n" +
-                "void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {\n" +
-                "    (void)threadStateData;\n" +
-                "    (void)obj;\n" +
-                "    (void)force;\n" +
-                "}\n" +
-                "\n" +
-                "void** initVtableForInterface() {\n" +
-                "    static void* table[1];\n" +
-                "    return (void**)table;\n" +
-                "}\n" +
-                "\n" +
-                "struct clazz class_array1__JAVA_INT = {0};\n" +
-                "struct clazz class_array2__JAVA_INT = {0};\n" +
-                "struct clazz class_array1__JAVA_BOOLEAN = {0};\n" +
-                "struct clazz class_array1__JAVA_CHAR = {0};\n" +
-                "struct clazz class_array1__JAVA_FLOAT = {0};\n" +
-                "struct clazz class_array1__JAVA_DOUBLE = {0};\n" +
-                "struct clazz class_array1__JAVA_BYTE = {0};\n" +
-                "struct clazz class_array1__JAVA_SHORT = {0};\n" +
-                "struct clazz class_array1__JAVA_LONG = {0};\n" +
-                "\n" +
-                "static JAVA_OBJECT allocArrayInternal(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
-                "    fprintf(stderr, \"allocArrayInternal length=%d type=%p\\n\", length, type); fflush(stderr);\n" +
-                "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)calloc(1, sizeof(struct JavaArrayPrototype));\n" +
-                "    arr->__codenameOneParentClsReference = type;\n" +
-                "    arr->length = length;\n" +
-                "    arr->dimensions = dim;\n" +
-                "    arr->primitiveSize = primitiveSize;\n" +
-                "    if (length > 0) {\n" +
-                "        int elementSize = primitiveSize > 0 ? primitiveSize : sizeof(JAVA_OBJECT);\n" +
-                "        arr->data = calloc((size_t)length, (size_t)elementSize);\n" +
-                "    }\n" +
-                "    return (JAVA_OBJECT)arr;\n" +
-                "}\n" +
-                "\n" +
-                "JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
-                "    return allocArrayInternal(threadStateData, length, type, primitiveSize, dim);\n" +
-                "}\n" +
-                "\n" +
-                "JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, struct clazz* parentType, struct clazz* childType, int primitiveSize) {\n" +
-                "    struct JavaArrayPrototype* outer = (struct JavaArrayPrototype*)allocArrayInternal(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 2);\n" +
-                "    JAVA_OBJECT* rows = (JAVA_OBJECT*)outer->data;\n" +
-                "    for (int i = 0; i < length1; i++) {\n" +
-                "        rows[i] = allocArrayInternal(threadStateData, length2, childType, primitiveSize, 1);\n" +
-                "    }\n" +
-                "    return (JAVA_OBJECT)outer;\n" +
-                "}\n" +
-                "\n" +
-                "void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId) {\n" +
-                "    (void)__cn1ThisObject;\n" +
-                "    (void)stackSize;\n" +
-                "    (void)classNameId;\n" +
-                "    (void)methodNameId;\n" +
-                "    threadStateData->threadObjectStackOffset += localsStackSize;\n" +
-                "}\n" +
-                "\n" +
-                "void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {\n" +
-                "    fprintf(stderr, \"releaseForReturn locals=%d\\n\", cn1LocalsBeginInThread); fflush(stderr);\n" +
-                "    threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;\n" +
-                "}\n" +
-                "\n" +
-                "void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int methodBlockOffset) {\n" +
-                "    (void)methodBlockOffset;\n" +
-                "    releaseForReturn(threadStateData, cn1LocalsBeginInThread);\n" +
-                "}\n" +
-                "\n" +
-                "void monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { fprintf(stderr, \"monitorEnter %p\\n\", obj); fflush(stderr); }\n" +
-                "\n" +
-                "void monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { fprintf(stderr, \"monitorExit %p\\n\", obj); fflush(stderr); }\n" +
-                "\n" +
-                "void monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { fprintf(stderr, \"monitorEnterBlock %p\\n\", obj); fflush(stderr); }\n" +
-                "\n" +
-                "void monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { fprintf(stderr, \"monitorExitBlock %p\\n\", obj); fflush(stderr); }\n" +
-                "\n" +
-                "struct elementStruct* pop(struct elementStruct** sp) {\n" +
-                "    (*sp)--;\n" +
-                "    return *sp;\n" +
-                "}\n" +
-                "\n" +
-                "void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** sp) {\n" +
-                "    while (count-- > 0) {\n" +
-                "        (*sp)--;\n" +
-                "    }\n" +
-                "}\n" +
-                "\n" +
-                "void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
-                "    fprintf(stderr, \"Exception thrown! obj=%p\\n\", obj);\n" +
-                "    fflush(stderr);\n" +
-                "    exit(1);\n" +
-                "}\n" +
-                "\n" +
-                "struct clazz class__java_lang_Class = {0};\n" +
-                "struct clazz class__java_lang_String = {0};\n" +
-                "int currentGcMarkValue = 1;\n";
-
-        Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
-    }
 
     private String appSource() {
         return "public class BytecodeInstructionApp {\n" +
