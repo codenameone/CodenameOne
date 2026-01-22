@@ -130,7 +130,7 @@ jobs:
       - name: Run iOS UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
-          IOS_SIM_DESTINATION: platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5
+          IOS_SIM_DESTINATION: platform=iOS Simulator,name=iPhone 16 Pro,OS=26.0
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -152,4 +152,3 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
-

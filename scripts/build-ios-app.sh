@@ -5,7 +5,7 @@ set -euo pipefail
 bia_log() { echo "[build-ios-app] $1"; }
 
 # Pin Xcode so CN1’s Java subprocess sees xcodebuild
-export DEVELOPER_DIR="/Applications/Xcode_16.4.app/Contents/Developer"
+export DEVELOPER_DIR="/Applications/Xcode_26.app/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

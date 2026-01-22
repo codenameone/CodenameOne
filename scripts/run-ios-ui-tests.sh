@@ -54,7 +54,7 @@ ri_log "Loading workspace environment from $ENV_FILE"
 source "$ENV_FILE"
 
 # Use the same Xcode as the build step
-export DEVELOPER_DIR="/Applications/Xcode_16.4.app/Contents/Developer"
+export DEVELOPER_DIR="/Applications/Xcode_26.app/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
 if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
@@ -659,4 +659,3 @@ cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
 
 exit $comment_rc
-
