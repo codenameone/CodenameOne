@@ -1890,42 +1890,6 @@ int byteSizeForArray(struct clazz* cls) {
     return sizeof(JAVA_OBJECT); // Stub
 }
 
-JAVA_OBJECT __NEW_ARRAY_JAVA_CHAR(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
-    return allocArray(threadStateData, size, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
-}
-JAVA_OBJECT __NEW_ARRAY_JAVA_BYTE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
-    return allocArray(threadStateData, size, &class_array1__JAVA_BYTE, sizeof(JAVA_BYTE), 1);
-}
-JAVA_OBJECT __NEW_ARRAY_JAVA_INT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
-    return allocArray(threadStateData, size, &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
-}
-JAVA_OBJECT __NEW_ARRAY_JAVA_LONG(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
-    return allocArray(threadStateData, size, &class_array1__JAVA_LONG, sizeof(JAVA_LONG), 1);
-}
-JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
-    return allocArray(threadStateData, size, &class_array1__JAVA_DOUBLE, sizeof(JAVA_DOUBLE), 1);
-}
-JAVA_OBJECT __NEW_ARRAY_JAVA_FLOAT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
-    return allocArray(threadStateData, size, &class_array1__JAVA_FLOAT, sizeof(JAVA_FLOAT), 1);
-}
-JAVA_OBJECT __NEW_ARRAY_JAVA_SHORT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
-    return allocArray(threadStateData, size, &class_array1__JAVA_SHORT, sizeof(JAVA_SHORT), 1);
-}
-JAVA_OBJECT __NEW_ARRAY_JAVA_BOOLEAN(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
-    return allocArray(threadStateData, size, &class_array1__JAVA_BOOLEAN, sizeof(JAVA_BOOLEAN), 1);
-}
-
-JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) { return JAVA_FALSE; }
-JAVA_OBJECT* constantPoolObjects = 0;
-
-int instanceofFunction(int sourceClass, int destId) { return 1; }
-
-void flushReleaseQueue() {} // TODO
-void codenameOneGCMark() {} // TODO
-void codenameOneGCSweep() {} // TODO
-JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
-void collectThreadResources(struct ThreadLocalData *current) {} // TODO
-
 struct elementStruct* pop(struct elementStruct**sp) {
     (*sp)--;
     return *sp;
