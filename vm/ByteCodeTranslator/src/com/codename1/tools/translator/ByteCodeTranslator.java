@@ -244,6 +244,8 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
         File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsC));
+        File nativeMethods = new File(srcRoot, "nativeMethods.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
         File javaIoFileC = new File(srcRoot, "java_io_File.c");
         copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
 

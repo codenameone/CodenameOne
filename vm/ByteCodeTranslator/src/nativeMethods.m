@@ -1877,6 +1877,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 }
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { free(obj); }
 
+#ifndef CN1_CLEAN_BUILD
 void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     if (exceptionArg != JAVA_NULL && exceptionArg->__codenameOneParentClsReference != 0) {
         printf("Exception thrown: %s\n", exceptionArg->__codenameOneParentClsReference->clsName);
@@ -1893,6 +1894,7 @@ JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exc
     throwException(threadStateData, exceptionArg);
     return 0;
 }
+#endif
 
 void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {
     printf("ArrayIndexOutOfBoundsException: %d\n", index);
@@ -1907,6 +1909,7 @@ int byteSizeForArray(struct clazz* cls) {
     return sizeof(JAVA_OBJECT); // Stub
 }
 
+#ifndef CN1_CLEAN_BUILD
 JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {
     int size = sizeof(struct JavaArrayPrototype) + (length * primitiveSize);
     JAVA_ARRAY arr = (JAVA_ARRAY)calloc(1, size);
@@ -1915,6 +1918,7 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     arr->data = (char*)arr + sizeof(struct JavaArrayPrototype);
     return (JAVA_OBJECT)arr;
 }
+#endif
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_CHAR(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     return allocArray(threadStateData, size, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
@@ -1964,6 +1968,7 @@ void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct**sp) {
 
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_String(CODENAME_ONE_THREAD_STATE);
 
+#ifndef CN1_CLEAN_BUILD
 JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     if (str == NULL) return JAVA_NULL;
     int len = strlen(str);
@@ -1978,6 +1983,7 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     stringObj->java_lang_String_offset = 0;
     return s;
 }
+#endif
 
 #ifndef CN1_CLEAN_BUILD
 const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
