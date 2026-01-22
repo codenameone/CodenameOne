@@ -5,7 +5,14 @@ set -euo pipefail
 bia_log() { echo "[build-ios-app] $1"; }
 
 # Pin Xcode so CN1’s Java subprocess sees xcodebuild
-export DEVELOPER_DIR="/Applications/Xcode_26.app/Contents/Developer"
+XCODE_APP="${XCODE_APP:-/Applications/Xcode_26.app}"
+if [ -d "$XCODE_APP" ]; then
+  export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+else
+  DEVELOPER_DIR="$(xcode-select -p)"
+  bia_log "Xcode 26 not found at $XCODE_APP; using $DEVELOPER_DIR"
+  export DEVELOPER_DIR
+fi
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
