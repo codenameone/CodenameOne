@@ -54,7 +54,12 @@ ri_log "Loading workspace environment from $ENV_FILE"
 source "$ENV_FILE"
 
 # Use the same Xcode as the build step
-export DEVELOPER_DIR="/Applications/Xcode_16.4.app/Contents/Developer"
+XCODE_APP="${XCODE_APP:-/Applications/Xcode_26.0.1.app}"
+if [ ! -d "$XCODE_APP" ]; then
+  ri_log "Xcode 26 not found at $XCODE_APP. Set XCODE_APP to the Xcode 26 app bundle path." >&2
+  exit 3
+fi
+export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
 if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
@@ -475,6 +480,28 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   LOG_STREAM_PID=$!
   sleep 2
 
+  LAUNCH_LOG="$ARTIFACTS_DIR/simctl-launch.log"
+
+  launch_simulator_app() {
+    local target="$1"
+    local attempt=1
+    while true; do
+      local output
+      if output="$(xcrun simctl launch "$target" "$BUNDLE_IDENTIFIER" 2>&1)"; then
+        printf '%s\n' "$output" >> "$LAUNCH_LOG"
+        return 0
+      fi
+      printf '%s\n' "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] simctl launch failed (attempt $attempt): $output" >> "$LAUNCH_LOG"
+      if [ "$attempt" -ge 2 ]; then
+        return 1
+      fi
+      ri_log "simctl launch failed (attempt $attempt), retrying"
+      xcrun simctl bootstatus "$target" -b >/dev/null 2>&1 || true
+      sleep 5
+      attempt=$((attempt + 1))
+    done
+  }
+
   ri_log "Installing simulator app bundle"
   INSTALL_START=$(date +%s)
   if [ -n "$SIM_DEVICE_ID" ]; then
@@ -485,8 +512,8 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     INSTALL_END=$(date +%s)
 
     LAUNCH_START=$(date +%s)
-    if ! xcrun simctl launch "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
-      ri_log "FATAL: simctl launch failed"
+    if ! launch_simulator_app "$SIM_DEVICE_ID"; then
+      ri_log "FATAL: simctl launch failed (see $LAUNCH_LOG)"
       exit 11
     fi
     LAUNCH_END=$(date +%s)
@@ -498,8 +525,8 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     INSTALL_END=$(date +%s)
 
     LAUNCH_START=$(date +%s)
-    if ! xcrun simctl launch booted "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
-      ri_log "FATAL: simctl launch failed"
+    if ! launch_simulator_app booted; then
+      ri_log "FATAL: simctl launch failed (see $LAUNCH_LOG)"
       exit 11
     fi
     LAUNCH_END=$(date +%s)
@@ -659,4 +686,3 @@ cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
 
 exit $comment_rc
-
