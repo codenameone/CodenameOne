@@ -619,8 +619,9 @@ abstract class AbstractStringBuilder {
                     }
                     int o1 = i;
                     int o2 = 0;
+                    // NOPMD EmptyControlStatement
                     while (++o2 < subCount
-                            && value[++o1] == subString.charAt(o2)) { // NOPMD EmptyControlStatement
+                            && value[++o1] == subString.charAt(o2)) {
                     }
                     if (o2 == subCount) {
                         return i;
