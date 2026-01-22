@@ -54,14 +54,12 @@ ri_log "Loading workspace environment from $ENV_FILE"
 source "$ENV_FILE"
 
 # Use the same Xcode as the build step
-XCODE_APP="${XCODE_APP:-/Applications/Xcode_26.app}"
-if [ -d "$XCODE_APP" ]; then
-  export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-else
-  DEVELOPER_DIR="$(xcode-select -p)"
-  ri_log "Xcode 26 not found at $XCODE_APP; using $DEVELOPER_DIR"
-  export DEVELOPER_DIR
+XCODE_APP="${XCODE_APP:-/Applications/Xcode_26.0.1.app}"
+if [ ! -d "$XCODE_APP" ]; then
+  ri_log "Xcode 26 not found at $XCODE_APP. Set XCODE_APP to the Xcode 26 app bundle path." >&2
+  exit 3
 fi
+export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
 if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
