@@ -90,6 +90,9 @@ static JAVA_BOOLEAN GC_THRESHOLDS_INITIALIZED = JAVA_FALSE;
 
 int currentGcMarkValue = 1;
 extern JAVA_BOOLEAN lowMemoryMode;
+#if !defined(__OBJC__)
+JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
+#endif
 
 static JAVA_BOOLEAN isEdt(long threadId) {
     return (CN1_EDT_THREAD_ID == threadId);
