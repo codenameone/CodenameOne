@@ -54,12 +54,10 @@ final class TLogical {
         if (val.sign > 0) {
             // ~val = -val + 1
             if (val.digits[val.numberLength - 1] != -1) {
-                for (i = 0; val.digits[i] == -1; i++) {
-                    // do nothing
+                for (i = 0; val.digits[i] == -1; i++) { // NOPMD EmptyControlStatement
                 }
             } else {
-                for (i = 0; (i < val.numberLength) && (val.digits[i] == -1); i++) {
-                    // do nothing
+                for (i = 0; (i < val.numberLength) && (val.digits[i] == -1); i++) { // NOPMD EmptyControlStatement
                 }
                 if (i == val.numberLength) {
                     resDigits[i] = 1;
@@ -201,13 +199,11 @@ final class TLogical {
             digit = -shorter.digits[i] & -longer.digits[i];
         }
         if (digit == 0) {
-            for (i++; i < shorter.numberLength && (digit = ~(longer.digits[i] | shorter.digits[i])) == 0; i++) { //NOPMD AssignmentInOperand
-                // do nothing
+            for (i++; i < shorter.numberLength && (digit = ~(longer.digits[i] | shorter.digits[i])) == 0; i++) { //NOPMD AssignmentInOperand, EmptyControlStatement
             }
             if (digit == 0) {
                 // shorter has only the remaining virtual sign bits
-                for (; i < longer.numberLength && (digit = ~longer.digits[i]) == 0; i++) {
-                    // do nothing
+                for (; i < longer.numberLength && (digit = ~longer.digits[i]) == 0; i++) { // NOPMD EmptyControlStatement
                 }
                 if (digit == 0) {
                     resLength = longer.numberLength + 1;
@@ -360,16 +356,13 @@ final class TLogical {
             digit = -negative.digits[i] & ~positive.digits[i];
             if (digit == 0) {
                 limit = Math.min(positive.numberLength, negative.numberLength);
-                for (i++; i < limit && (digit = ~(negative.digits[i] | positive.digits[i])) == 0; i++) { //NOPMD AssignmentInOperand
-                    // do nothing
+                for (i++; i < limit && (digit = ~(negative.digits[i] | positive.digits[i])) == 0; i++) { //NOPMD AssignmentInOperand, EmptyControlStatement
                 }
                 if (digit == 0) {
                     // the shorter has only the remaining virtual sign bits
-                    for (; i < positive.numberLength && (digit = ~positive.digits[i]) == 0; i++) {
-                        // do nothing
+                    for (; i < positive.numberLength && (digit = ~positive.digits[i]) == 0; i++) { // NOPMD EmptyControlStatement
                     }
-                    for (; i < negative.numberLength && (digit = ~negative.digits[i]) == 0; i++) {
-                        // do nothing
+                    for (; i < negative.numberLength && (digit = ~negative.digits[i]) == 0; i++) { // NOPMD EmptyControlStatement
                     }
                     if (digit == 0) {
                         resLength++;
@@ -796,16 +789,13 @@ final class TLogical {
             digit = positive.digits[i] ^ -negative.digits[i];
             if (digit == 0) {
                 limit = Math.min(positive.numberLength, negative.numberLength);
-                for (i++; i < limit && (digit = positive.digits[i] ^ ~negative.digits[i]) == 0; i++) { //NOPMD AssignmentInOperand
-                    // do nothing
+                for (i++; i < limit && (digit = positive.digits[i] ^ ~negative.digits[i]) == 0; i++) { //NOPMD AssignmentInOperand, EmptyControlStatement
                 }
                 if (digit == 0) {
                     // shorter has only the remaining virtual sign bits
-                    for (; i < positive.numberLength && (digit = ~positive.digits[i]) == 0; i++) {
-                        // do nothing
+                    for (; i < positive.numberLength && (digit = ~positive.digits[i]) == 0; i++) { // NOPMD EmptyControlStatement
                     }
-                    for (; i < negative.numberLength && (digit = ~negative.digits[i]) == 0; i++) {
-                        // do nothing
+                    for (; i < negative.numberLength && (digit = ~negative.digits[i]) == 0; i++) { // NOPMD EmptyControlStatement
                     }
                     if (digit == 0) {
                         resLength = resLength + 1;

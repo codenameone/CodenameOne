@@ -206,10 +206,10 @@ final class HTMLInputFormat {
         String[] curModes = tf.getInputModeOrder();
         String[] newModes = new String[curModes.length - 1];
         int j = 0;
-        for (int i = 0; i < curModes.length; i++) {
-            if (!curModes[i].equals(modeToExclude)) {
+        for (String mode : curModes) {
+            if (!mode.equals(modeToExclude)) {
                 if (j < newModes.length) {
-                    newModes[j] = curModes[i];
+                    newModes[j] = mode;
                     j++;
                 } else {
                     return; //Mode was not there in the first place
@@ -303,8 +303,8 @@ final class HTMLInputFormat {
 
         if ((constraint & FormatConstraint.TYPE_SYMBOL) != 0) {
             char[] symbols = TextField.getSymbolTable();
-            for (int i = 0; i < symbols.length; i++) {
-                if (symbols[i] == c) {
+            for (char symbol : symbols) {
+                if (symbol == c) {
                     return true;
                 }
             }
@@ -447,12 +447,12 @@ final class HTMLInputFormat {
         @Override
         public String toString() {
             StringBuilder str = new StringBuilder();
-            if (count == COUNT_EXACTLY_ONE) {
-                //str.append("");
-            } else if (count == COUNT_NO_LIMIT) {
-                str.append(UIManager.getInstance().localize("html.format.anynumber", "any number of"));
-            } else {
-                str.append(UIManager.getInstance().localize("html.format.upto", "up to")).append(" ").append(count);
+            if (count != COUNT_EXACTLY_ONE) {
+                if (count == COUNT_NO_LIMIT) {
+                    str.append(UIManager.getInstance().localize("html.format.anynumber", "any number of"));
+                } else {
+                    str.append(UIManager.getInstance().localize("html.format.upto", "up to")).append(" ").append(count);
+                }
             }
             str.append(" ");
             String orString = " " + UIManager.getInstance().localize("html.format.or", "or") + " ";
@@ -500,4 +500,3 @@ final class HTMLInputFormat {
         }
     }
 }
-

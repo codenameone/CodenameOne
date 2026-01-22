@@ -503,10 +503,7 @@ public class Container extends Component implements Iterable<Component> {
         if (lead == null) {
             // clear the lead component from the hierarchy
 
-            if (!isBlockLead() && getParent() != null && getParent().hasLead) {
-                // hasLead should still be true because of parent lead
-
-            } else {
+            if (isBlockLead() || getParent() == null || !getParent().hasLead) {
                 setFocusable(false);
                 hasLead = false;
                 if (isInitialized()) {

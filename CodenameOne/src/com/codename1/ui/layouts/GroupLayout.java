@@ -417,8 +417,8 @@ public class GroupLayout extends Layout {
         if (spring instanceof Group) {
             ArrayList springs = ((Group) spring).springs;
             indent += "  ";
-            for (int counter = 0; counter < springs.size(); counter++) {
-                dump(buffer, (Spring) springs.get(counter), indent, axis);
+            for (Object childSpring : springs) {
+                dump(buffer, (Spring) childSpring, indent, axis);
             }
         }
     }
@@ -941,9 +941,8 @@ public class GroupLayout extends Layout {
             isValid = true;
             horizontalGroup.setSize(HORIZONTAL, UNSET, UNSET);
             verticalGroup.setSize(VERTICAL, UNSET, UNSET);
-            for (Iterator cis = componentInfos.values().iterator();
-                 cis.hasNext(); ) {
-                ComponentInfo ci = (ComponentInfo) cis.next();
+            for (Object info : componentInfos.values()) {
+                ComponentInfo ci = (ComponentInfo) info;
                 if (ci.updateVisibility()) {
                     visChanged = true;
                 }
@@ -1218,8 +1217,8 @@ public class GroupLayout extends Layout {
 
         private int calculateLinkedSize(int axis) {
             int size = 0;
-            for (int i = 0; i < linked.size(); i++) {
-                ComponentInfo info = (ComponentInfo) linked.get(i);
+            for (Object linkedInfo : linked) {
+                ComponentInfo info = (ComponentInfo) linkedInfo;
                 ComponentSpring spring;
                 if (axis == HORIZONTAL) {
                     spring = info.horizontalSpring;
@@ -2085,9 +2084,8 @@ public class GroupLayout extends Layout {
                             counter++;
                             continue;
                         }
-                        for (int i = 0; i < newLeadingPadding.size(); i++) {
-                            ((AutopaddingSpring) newLeadingPadding.get(i)).
-                                    addTarget(cSpring, axis);
+                        for (Object padding : newLeadingPadding) {
+                            ((AutopaddingSpring) padding).addTarget(cSpring, axis);
                         }
                         newLeading.clear();
                         newLeadingPadding.clear();
@@ -2436,8 +2434,8 @@ public class GroupLayout extends Layout {
                 Spring spring = getSpring(counter);
                 if (spring instanceof ComponentSpring) {
                     if (((ComponentSpring) spring).isVisible()) {
-                        for (int i = 0; i < leadingPadding.size(); i++) {
-                            ((AutopaddingSpring) leadingPadding.get(i)).addTarget(
+                        for (Object padding : leadingPadding) {
+                            ((AutopaddingSpring) padding).addTarget(
                                     (ComponentSpring) spring, axis);
                         }
                         trailing.add(spring);

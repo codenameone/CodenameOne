@@ -143,8 +143,7 @@ final class TMathContext {
             throw new IllegalArgumentException("bad string format");
         }
         // Parsing "precision=" String
-        for (i = 0; (i < chPrecision.length) && (charVal[i] == chPrecision[i]); i++) {
-            // do nothing
+        for (i = 0; (i < chPrecision.length) && (charVal[i] == chPrecision[i]); i++) { // NOPMD EmptyControlStatement
         }
 
         if (i < chPrecision.length) {
@@ -177,8 +176,7 @@ final class TMathContext {
             i++;
         } while (true);
         // Parsing "roundingMode="
-        for (j = 0; (j < chRoundingMode.length) && (charVal[i] == chRoundingMode[j]); i++, j++) {
-            // do nothing
+        for (j = 0; (j < chRoundingMode.length) && (charVal[i] == chRoundingMode[j]); i++, j++) { // NOPMD EmptyControlStatement
         }
 
         if (j < chRoundingMode.length) {

@@ -881,8 +881,8 @@ public final class TestUtils {
      */
     public static Component getComponentByPath(int[] path) {
         Component current = Display.getInstance().getCurrent().getContentPane();
-        for (int iter = 0; iter < path.length; iter++) {
-            current = ((Container) current).getComponentAt(path[iter]);
+        for (int offset : path) {
+            current = ((Container) current).getComponentAt(offset);
         }
         return current;
     }

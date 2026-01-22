@@ -852,10 +852,12 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 return false;
             }
             if (properties.length == other.properties.length) {
-                for (int iter = 0; iter < properties.length; iter++) {
-                    if (!properties[iter].equals(other.properties[iter])) {
+                int index = 0;
+                for (PropertyBase property : properties) {
+                    if (!property.equals(other.properties[index])) {
                         return false;
                     }
+                    index++;
                 }
                 return true;
             }
@@ -871,9 +873,9 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     @Override
     public int hashCode() {
         int value = 0;
-        for (int iter = 0; iter < properties.length; iter++) {
-            if (properties[iter] instanceof Property) {
-                Object v = properties[iter].get();
+        for (PropertyBase property : properties) {
+            if (property instanceof Property) {
+                Object v = property.get();
                 if (v != null) {
                     int b = v.hashCode();
                     value = 31 * value + b;

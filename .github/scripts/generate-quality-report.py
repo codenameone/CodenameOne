@@ -913,7 +913,9 @@ def main() -> None:
             "UnnecessaryLocalBeforeReturn",
             "PreserveStackTrace",
             "CloseResource",
-            "AssignmentInOperand"
+            "AssignmentInOperand",
+            "EmptyControlStatement",
+            "ForLoopCanBeForeach"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

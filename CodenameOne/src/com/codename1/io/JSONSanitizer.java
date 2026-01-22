@@ -381,17 +381,7 @@ final class JSONSanitizer {
             // sign '+' or minus sign '-' according to whether n-1 is positive or
             // negative, followed by the decimal representation of the integer
             // abs(n-1) (with no leading zeros).
-            if (k == 1) {
-                // Sole digit already on sanitizedJson.
-
-                // 10. Return the String consisting of the most significant digit of the
-                // decimal representation of s, followed by a decimal point '.', followed
-                // by the remaining k-1 digits of the decimal representation of s,
-                // followed by the lowercase character 'e', followed by a plus sign '+'
-                // or minus sign '-' according to whether n-1 is positive or negative,
-                // followed by the decimal representation of the integer abs(n-1) (with
-                // no leading zeros).
-            } else {
+            if (k != 1) {
                 sanitizedJson.insert(intStart + 1, '.');
             }
             int nLess1 = n - 1;

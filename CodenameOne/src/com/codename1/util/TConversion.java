@@ -96,8 +96,7 @@ final class TConversion {
                 for (i = 0; i < delta && currentChar > 0; i++) {
                     result[--currentChar] = '0';
                 }
-                for (i = tempLen - 1; (i > 0) && (temp[i] == 0); i--) {
-                    // do nothing
+                for (i = tempLen - 1; (i > 0) && (temp[i] == 0); i--) { // NOPMD EmptyControlStatement
                 }
                 tempLen = i + 1;
                 if ((tempLen == 1) && (temp[0] == 0)) { // the quotient is 0

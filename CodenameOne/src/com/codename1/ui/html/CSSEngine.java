@@ -190,8 +190,7 @@ class CSSEngine {
     private CSSElement[] sortSelectorsBySpecificity(CSSElement[] css) {
         Vector sortedSelectors = new Vector();
 
-        for (int s = 0; s < css.length; s++) {
-            CSSElement cssRoot = css[s];
+        for (CSSElement cssRoot : css) {
             String cssPageURL = cssRoot.getAttributeById(CSSElement.CSS_PAGEURL);
             DocumentInfo cssDocInfo = null;
             if (cssPageURL != null) {
@@ -200,11 +199,11 @@ class CSSEngine {
             for (int iter = 0; iter < cssRoot.getNumChildren(); iter++) {
                 CSSElement currentSelector = cssRoot.getCSSChildAt(iter);
                 if (cssPageURL != null) { // Since with external CSS pages, the base URL is that of the CSS file and not of the HTML document, we have to convert relative image URLs to absolute URLs
-                    for (int i = 0; i < URL_ATTRIBUTES.length; i++) {
-                        String imageURL = getCSSUrl(currentSelector.getAttributeById(URL_ATTRIBUTES[i]));
+                    for (int attribute : URL_ATTRIBUTES) {
+                        String imageURL = getCSSUrl(currentSelector.getAttributeById(attribute));
                         if (imageURL != null) {
                             imageURL = cssDocInfo.convertURL(imageURL);
-                            currentSelector.setAttribute(currentSelector.getAttributeName(Integer.valueOf(URL_ATTRIBUTES[i])), "url(" + imageURL + ")");
+                            currentSelector.setAttribute(currentSelector.getAttributeName(Integer.valueOf(attribute)), "url(" + imageURL + ")");
                         }
                     }
                 }
@@ -317,8 +316,7 @@ class CSSEngine {
         if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) { // sibling selectors are not supported in HTML-MP1
             nextSiblingSelectors = new Vector();
         }
-        for (int e = 0; e < css.length; e++) {
-            CSSElement currentSelector = css[e];
+        for (CSSElement currentSelector : css) {
             checkSelector(currentSelector, element, htmlC, className, id, nextNestedSelectors, nextSiblingSelectors);
         }
 

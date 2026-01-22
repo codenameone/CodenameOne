@@ -1161,12 +1161,12 @@ public class HTMLElement extends Element {
             return "Unknown";
         }
         StringBuilder list = new StringBuilder();
-        for (int a = 0; a < TAG_ATTRIBUTES[id].length; a++) {
-            list.append(ATTRIBUTE_NAMES[TAG_ATTRIBUTES[id][a]]).append(",");
+        for (int attribute : TAG_ATTRIBUTES[id]) {
+            list.append(ATTRIBUTE_NAMES[attribute]).append(",");
         }
         if (supportsCoreAttributes()) {
-            for (int a = 0; a < COMMON_ATTRIBUTES.length; a++) {
-                list.append(ATTRIBUTE_NAMES[COMMON_ATTRIBUTES[a]]).append(",");
+            for (int attribute : COMMON_ATTRIBUTES) {
+                list.append(ATTRIBUTE_NAMES[attribute]).append(",");
             }
         }
 
@@ -1308,8 +1308,8 @@ public class HTMLElement extends Element {
      * @return true if the string equals to one of the allowed, false otherwise
      */
     boolean verifyStringGroup(String value, String[] allowed) {
-        for (int i = 0; i < allowed.length; i++) {
-            if (value.equalsIgnoreCase(allowed[i])) {
+        for (String allowedValue : allowed) {
+            if (value.equalsIgnoreCase(allowedValue)) {
                 return true;
             }
         }

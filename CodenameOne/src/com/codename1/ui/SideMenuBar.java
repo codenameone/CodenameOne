@@ -1102,15 +1102,9 @@ public class SideMenuBar extends MenuBar {
                 shadowLabel.setPreferredW(shadow.getWidth());
                 c.addComponent(BorderLayout.WEST, shadowLabel);
                 shadowLabel.getStyle().setBgImage(shadow.rotate180Degrees(true));
-            } else {
-                if (COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
-                    //shadowLabel.setPreferredH(shadow.getHeight());
-                    //c.addComponent(BorderLayout.SOUTH, shadowLabel);
-                    //shadowLabel.getStyle().setBgImage(shadow.rotate90Degrees(true));
-                } else {
-                    shadowLabel.setPreferredW(shadow.getWidth());
-                    c.addComponent(BorderLayout.EAST, shadowLabel);
-                }
+            } else if (!COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
+                shadowLabel.setPreferredW(shadow.getWidth());
+                c.addComponent(BorderLayout.EAST, shadowLabel);
             }
 
             main.addComponent(menu);

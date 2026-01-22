@@ -320,8 +320,9 @@ abstract class AbstractEvaluator implements Evaluator {
         }
         List v = StringUtil.tokenizeString(arrayAsString, ',');
         String[] a = new String[v.size()];
-        for (int i = 0; i < v.size(); i++) {
-            a[i] = stripQuotes(v.get(i).toString().trim());
+        int index = 0;
+        for (Object item : v) {
+            a[index++] = stripQuotes(item.toString().trim());
         }
         return a;
     }
@@ -357,8 +358,7 @@ abstract class AbstractEvaluator implements Evaluator {
         } else {
             array = new ArrayList();
         }
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateSingle((StructuredContent) o, expr);
                 if (o != null) {
@@ -392,8 +392,7 @@ abstract class AbstractEvaluator implements Evaluator {
             array = new ArrayList();
         }
 
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateLeftLessRight((StructuredContent) o, lvalue, rvalue);
                 if (o != null) {
@@ -441,8 +440,7 @@ abstract class AbstractEvaluator implements Evaluator {
             array = new ArrayList();
         }
 
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateLeftGreaterRight((StructuredContent) o, lvalue, rvalue);
                 if (o != null) {
@@ -490,8 +488,7 @@ abstract class AbstractEvaluator implements Evaluator {
             array = new ArrayList();
         }
 
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateLeftEqualsRight((StructuredContent) o, lvalue, rvalue);
                 if (o != null) {
@@ -539,8 +536,7 @@ abstract class AbstractEvaluator implements Evaluator {
             array = new ArrayList();
         }
 
-        for (Iterator e = elements.iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : elements) {
             if (o instanceof StructuredContent) {
                 o = evaluateLeftContainsRight((StructuredContent) o, lvalue, rvalue);
                 if (o != null) {

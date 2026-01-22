@@ -154,8 +154,7 @@ class MapContent implements StructuredContent {
             children = new ArrayList();
         }
 
-        for (Iterator elements = array.iterator(); elements.hasNext(); ) {
-            Object o = elements.next();
+        for (Object o : array) {
             // There is a bug that needs to be addressed, should always have
             // Maps.
             // for now prevent the critical cast exception.
@@ -183,8 +182,8 @@ class MapContent implements StructuredContent {
         boolean oldList = node == null || (node instanceof Vector);
         if (node instanceof List) {
             Object tmp = null;
-            for (Iterator e = ((List) node).iterator(); e.hasNext(); ) {
-                tmp = e.next();
+            for (Object entry : (List) node) {
+                tmp = entry;
                 if ((tmp instanceof Map)) {
                     if (((Map) tmp).containsKey(name)) {
                         break;
@@ -288,8 +287,7 @@ class MapContent implements StructuredContent {
      * @param name   node name we are searching for
      */
     private void findByName(List target, List source, String name) {
-        for (int i = 0; i < source.size(); i++) {
-            Object o = source.get(i);
+        for (Object o : source) {
             if (o instanceof Map) {
                 findByName(target, (Map) o, name);
             } else if (o instanceof List) {
@@ -315,8 +313,7 @@ class MapContent implements StructuredContent {
                 target.add(new MapContent(o, new MapContent(source)));
             }
         }
-        for (Iterator e = source.values().iterator(); e.hasNext(); ) {
-            Object o = e.next();
+        for (Object o : source.values()) {
             if (o instanceof List) {
                 findByName(target, (List) o, name);
             } else if (o instanceof Map) {

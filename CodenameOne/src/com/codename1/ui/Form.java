@@ -2120,10 +2120,7 @@ public class Form extends Container {
 
     @Override
     protected void paintScrollbars(Graphics g) {
-        if (getParent() == null) {
-            // Don't paint scrollbars on top-level form.
-            // Let the content pane do that.
-        } else {
+        if (getParent() != null) {
             super.paintScrollbars(g);
         }
     }
@@ -2131,7 +2128,7 @@ public class Form extends Container {
     private void loopAnimations(ArrayList<Animation> v, ArrayList<Animation> notIn) {
         // we don't save size() in a varible since the animate method may deregister
         // the animation thus invalidating the size
-        for (int iter = 0; iter < v.size(); iter++) {
+        for (int iter = 0; iter < v.size(); iter++) { // NOPMD ForLoopCanBeForeach
             Animation c = v.get(iter);
             if (c == null || notIn != null && notIn.contains(c)) {
                 continue;
@@ -2196,8 +2193,8 @@ public class Form extends Container {
                 cmds[iter] = getCommand(iter);
             }
             removeAllCommands();
-            for (int iter = 0; iter < cmds.length; iter++) {
-                addCommand(cmds[iter], getCommandCount());
+            for (Command cmd : cmds) {
+                addCommand(cmd, getCommandCount());
             }
             if (getBackCommand() != null) {
                 setBackCommand(getBackCommand());
@@ -3107,8 +3104,8 @@ public class Form extends Container {
             ArrayList<ActionListener> listeners = keyListeners.get(Integer.valueOf(keyCode));
             if (listeners != null) {
                 ActionEvent evt = new ActionEvent(this, keyCode);
-                for (int iter = 0; iter < listeners.size(); iter++) {
-                    listeners.get(iter).actionPerformed(evt);
+                for (ActionListener listener : listeners) {
+                    listener.actionPerformed(evt);
                     if (evt.isConsumed()) {
                         return;
                     }
@@ -3878,8 +3875,7 @@ public class Form extends Container {
             }
             stickyDrag = null;
             if (componentsAwaitingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
-                for (int iter = 0; iter < componentsAwaitingRelease.size(); iter++) {
-                    Component c = componentsAwaitingRelease.get(iter);
+                for (Component c : componentsAwaitingRelease) {
                     if (LeadUtil.leadComponentImpl(c) instanceof ReleasableComponent) {
                         ReleasableComponent rc = (ReleasableComponent) LeadUtil.leadComponentImpl(c);
                         rc.setReleased();

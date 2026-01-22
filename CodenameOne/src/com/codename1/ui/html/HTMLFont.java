@@ -64,8 +64,8 @@ class HTMLFont {
      * This vector is used for lookup later on.
      */
     static {
-        for (int i = 0; i < SPECIAL_FONT_TAGS_ID.length; i++) {
-            SPECIAL_FONT_TAGS.addElement(HTMLElement.TAG_NAMES[SPECIAL_FONT_TAGS_ID[i]]);
+        for (int tagId : SPECIAL_FONT_TAGS_ID) {
+            SPECIAL_FONT_TAGS.addElement(HTMLElement.TAG_NAMES[tagId]);
         }
     }
 
@@ -117,14 +117,14 @@ class HTMLFont {
                             bold = true;
                         } else if ("italic".equalsIgnoreCase(str)) {
                             italic = true;
-                        } else if ("plain".equalsIgnoreCase(str)) {
-                            // do nothing, but don't save as a family
-                        } else if (SPECIAL_FONT_TAGS.contains(str)) {
-                            HTMLComponent.fonts.put(str, this);
-                            sufficientInfo = true;
-                        } else {
-                            family = str.toLowerCase();
-                            sufficientInfo = true;
+                        } else if (!"plain".equalsIgnoreCase(str)) {
+                            if (SPECIAL_FONT_TAGS.contains(str)) {
+                                HTMLComponent.fonts.put(str, this);
+                                sufficientInfo = true;
+                            } else {
+                                family = str.toLowerCase();
+                                sufficientInfo = true;
+                            }
                         }
 
                     }

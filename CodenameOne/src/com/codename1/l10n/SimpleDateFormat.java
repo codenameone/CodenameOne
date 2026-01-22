@@ -371,8 +371,7 @@ public class SimpleDateFormat extends DateFormat {
         Calendar calendar = Calendar.getInstance(TimeZone.getDefault());
         calendar.setTime(source);
         List<String> pattern = getPatternTokens();
-        for (int i = 0; i < pattern.size(); i++) {
-            String token = pattern.get(i);
+        for (String token : pattern) {
             char patternChar = token.charAt(0);
             token = token.substring(1);
             int len = token.length();

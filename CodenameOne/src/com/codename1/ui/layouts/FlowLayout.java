@@ -486,15 +486,11 @@ public class FlowLayout extends Layout {
                 case Component.BOTTOM:
                     if (vAlignByRow) {
                         m.setY(y + Math.max(marginTop, height - m.getHeight() - style.getMarginBottom()));
-                    } else {
-                        //m.setY(y + Math.max(marginTop, target.getHeight() - m.getHeight()) - style.getMarginBottom());
                     }
                     break;
                 case Component.CENTER:
                     if (vAlignByRow) {
                         m.setY(y + Math.max(marginTop, (height - m.getOuterHeight()) / 2 + style.getMarginTop()));
-                    } else {
-                        //m.setY(y + Math.max(marginTop, (target.getHeight() - m.getHeight()) / 2));
                     }
                     break;
                 case Component.BASELINE:

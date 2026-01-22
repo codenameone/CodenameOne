@@ -219,8 +219,8 @@ public class MenuBar extends Container implements ActionListener {
                 }
             }
             // It doesn't make sense for softbuttons to have ... at the end
-            for (int iter = 0; iter < soft.length; iter++) {
-                soft[iter].setEndsWith3Points(false);
+            for (Button button : soft) {
+                button.setEndsWith3Points(false);
             }
         } else {
             // special case for touch screens we still want the 3 softbutton areas...
@@ -656,8 +656,8 @@ public class MenuBar extends Container implements ActionListener {
         style.setMargin(Component.BOTTOM, 0, true);
         super.setUnselectedStyle(style);
         if (soft != null) {
-            for (int iter = 0; iter < soft.length; iter++) {
-                updateSoftButtonStyle(soft[iter]);
+            for (Button button : soft) {
+                updateSoftButtonStyle(button);
             }
         }
     }
@@ -907,9 +907,6 @@ public class MenuBar extends Container implements ActionListener {
                     if (parent.getBackCommand() != null) {
                         //ensureCommandsInContainer(getCommand(1), getCommand(0), rightContainer, "TitleCommand", "TitleCommand");
                         ensureCommandsInContainer(parent.getBackCommand(), null, leftContainer, "BackCommand", null);
-                    } else {
-                        //ensureCommandsInContainer(getCommand(2), getCommand(1), rightContainer, "TitleCommand", "TitleCommand");
-                        //ensureCommandsInContainer(getCommand(0), null, leftContainer, "TitleCommand", null);
                     }
                     if (getCommandBehavior() != Display.COMMAND_BEHAVIOR_ICS) {
                         removeAll();
@@ -1440,8 +1437,8 @@ public class MenuBar extends Container implements ActionListener {
             tmp.setListCellRenderer(menuCellRenderer);
             tmp.refreshTheme(merge);
         }
-        for (int iter = 0; iter < soft.length; iter++) {
-            updateSoftButtonStyle(soft[iter]);
+        for (Button button : soft) {
+            updateSoftButtonStyle(button);
         }
 
         revalidate();

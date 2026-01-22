@@ -379,8 +379,7 @@ public final class ConstraintParser {
         dimConstraint.setGapAfter(gapAfter);
 
         String[] parts = toTrimmedTokens(s, ',');
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
+        for (String part : parts) {
             try {
                 if (part.length() == 0) {
                     continue;

@@ -1555,9 +1555,9 @@ public class RE {
         ArrayList v = new ArrayList();
 
         // Traverse array of objects
-        for (int i = 0; i < search.length; i++) {
+        for (Object item : search) {
             // Get next object as a string
-            String s = search[i].toString();
+            String s = item.toString();
 
             // If it matches this regexp, add it to the list
             if (match(s)) {

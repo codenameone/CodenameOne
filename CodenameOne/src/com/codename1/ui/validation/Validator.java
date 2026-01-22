@@ -704,9 +704,6 @@ public class Validator {
                 }
                 return;
             }
-            if (validationFailureHighlightMode == HighlightMode.EMBLEM && validationFailedEmblem != null) {
-
-            }
         } else {
             if (validationFailureHighlightMode == HighlightMode.UIID || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
                 String uiid = cmp.getUIID();

@@ -557,8 +557,7 @@ abstract class AbstractStringBuilder {
                 }
                 int o1 = i;
                 int o2 = 0;
-                while (++o2 < subCount && value[++o1] == subString.charAt(o2)) {
-                    // Intentionally empty
+                while (++o2 < subCount && value[++o1] == subString.charAt(o2)) { // NOPMD EmptyControlStatement
                 }
                 if (o2 == subCount) {
                     return i;
@@ -596,6 +595,7 @@ abstract class AbstractStringBuilder {
      * @see String#lastIndexOf(String, int)
      * @since 1.4
      */
+    @SuppressWarnings("PMD.EmptyControlStatement")
     public int lastIndexOf(String subString, int start) {
         int subCount = subString.length();
         if (subCount <= count && start >= 0) {
@@ -620,9 +620,9 @@ abstract class AbstractStringBuilder {
                     }
                     int o1 = i;
                     int o2 = 0;
+                    // NOPMD EmptyControlStatement
                     while (++o2 < subCount
                             && value[++o1] == subString.charAt(o2)) {
-                        // Intentionally empty
                     }
                     if (o2 == subCount) {
                         return i;

@@ -723,8 +723,8 @@ public class Element implements Iterable<Element> {
             }
             str.append(">\n");
             if (children != null) {
-                for (int i = 0; i < children.size(); i++) {
-                    str.append(children.get(i).toString(spacing + ' '));
+                for (Object child : children) {
+                    str.append(((Element) child).toString(spacing + ' '));
                 }
             }
             str.append(spacing).append("</").append(getTagName()).append(">\n");
@@ -741,8 +741,7 @@ public class Element implements Iterable<Element> {
      */
     public boolean hasTextChild() {
         if (children != null) {
-            for (int iter = 0; iter < children.size(); iter++) {
-                Object child = children.get(iter);
+            for (Object child : children) {
                 if (child instanceof Element && ((Element) child).isTextElement()) {
                     return true;
                 }

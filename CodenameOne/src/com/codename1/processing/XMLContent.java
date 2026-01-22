@@ -108,8 +108,8 @@ class XMLContent implements StructuredContent {
         } else {
             children = new ArrayList();
         }
-        for (Iterator elements = array.iterator(); elements.hasNext(); ) {
-            children.add(new XMLContent((Element) elements.next()));
+        for (Object element : array) {
+            children.add(new XMLContent((Element) element));
         }
         return children;
     }

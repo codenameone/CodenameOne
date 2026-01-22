@@ -2010,14 +2010,14 @@ public final class Display extends CN1Constants {
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = x.length;
             inputEventStackPointer++;
-            for (int iter = 0; iter < x.length; iter++) {
-                inputEventStack[inputEventStackPointer] = x[iter];
+            for (int value : x) {
+                inputEventStack[inputEventStackPointer] = value;
                 inputEventStackPointer++;
             }
             inputEventStack[inputEventStackPointer] = y.length;
             inputEventStackPointer++;
-            for (int iter = 0; iter < y.length; iter++) {
-                inputEventStack[inputEventStackPointer] = y[iter];
+            for (int value : y) {
+                inputEventStack[inputEventStackPointer] = value;
                 inputEventStackPointer++;
             }
             lock.notifyAll();
