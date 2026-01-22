@@ -595,6 +595,7 @@ abstract class AbstractStringBuilder {
      * @see String#lastIndexOf(String, int)
      * @since 1.4
      */
+    @SuppressWarnings("PMD.EmptyControlStatement")
     public int lastIndexOf(String subString, int start) {
         int subCount = subString.length();
         if (subCount <= count && start >= 0) {
