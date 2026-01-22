@@ -573,7 +573,6 @@ public class ByteCodeTranslator {
             writer.append("file(GLOB TRANSLATOR_HEADERS \"").append(srcRoot.getName()).append("/*.h\")\n");
             writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
             writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ").append(srcRoot.getName()).append(")\n");
-            writer.append("target_compile_definitions(${PROJECT_NAME} PUBLIC CN1_CLEAN_BUILD)\n");
         } finally {
             writer.close();
         }

@@ -1877,25 +1877,6 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 }
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { free(obj); }
 
-#ifndef CN1_CLEAN_BUILD
-void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
-    if (exceptionArg != JAVA_NULL && exceptionArg->__codenameOneParentClsReference != 0) {
-        printf("Exception thrown: %s\n", exceptionArg->__codenameOneParentClsReference->clsName);
-    } else {
-        printf("Exception thrown: %p\n", exceptionArg);
-    }
-    exit(1);
-}
-JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
-    throwException(threadStateData, exceptionArg);
-    return 0;
-}
-JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
-    throwException(threadStateData, exceptionArg);
-    return 0;
-}
-#endif
-
 void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {
     printf("ArrayIndexOutOfBoundsException: %d\n", index);
     exit(1);
@@ -1908,17 +1889,6 @@ JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_S
 int byteSizeForArray(struct clazz* cls) {
     return sizeof(JAVA_OBJECT); // Stub
 }
-
-#ifndef CN1_CLEAN_BUILD
-JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {
-    int size = sizeof(struct JavaArrayPrototype) + (length * primitiveSize);
-    JAVA_ARRAY arr = (JAVA_ARRAY)calloc(1, size);
-    arr->__codenameOneParentClsReference = type;
-    arr->length = length;
-    arr->data = (char*)arr + sizeof(struct JavaArrayPrototype);
-    return (JAVA_OBJECT)arr;
-}
-#endif
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_CHAR(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     return allocArray(threadStateData, size, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
@@ -1960,56 +1930,6 @@ struct elementStruct* pop(struct elementStruct**sp) {
     (*sp)--;
     return *sp;
 }
-#ifndef CN1_CLEAN_BUILD
-void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct**sp) {
-    (*sp) -= count;
-}
-#endif
-
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_String(CODENAME_ONE_THREAD_STATE);
-
-#ifndef CN1_CLEAN_BUILD
-JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
-    if (str == NULL) return JAVA_NULL;
-    int len = strlen(str);
-    JAVA_OBJECT charArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-    JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)charArr)->data;
-    for(int i=0; i<len; i++) chars[i] = str[i];
-
-    JAVA_OBJECT s = __NEW_INSTANCE_java_lang_String(threadStateData);
-    struct obj__java_lang_String* stringObj = (struct obj__java_lang_String*)s;
-    stringObj->java_lang_String_value = charArr;
-    stringObj->java_lang_String_count = len;
-    stringObj->java_lang_String_offset = 0;
-    return s;
-}
-#endif
-
-#ifndef CN1_CLEAN_BUILD
-const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
-    if (str == JAVA_NULL) return NULL;
-    struct obj__java_lang_String* s = (struct obj__java_lang_String*)str;
-    JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)s->java_lang_String_value)->data;
-    int len = s->java_lang_String_count;
-    int offset = s->java_lang_String_offset;
-    char* buf = (char*)malloc(len + 1);
-    for(int i=0; i<len; i++) {
-        buf[i] = (char)chars[offset + i];
-    }
-    buf[len] = 0;
-    return buf;
-}
-#endif
-
-#ifndef CN1_CLEAN_BUILD
-void initConstantPool() {
-    // Allocate dummy pool to prevent segfaults, though contents will be null
-    constantPoolObjects = calloc(65536, sizeof(void*));
-}
-#endif
-#ifndef CN1_CLEAN_BUILD
-pthread_key_t recursionKey;
-int currentGcMarkValue = 0;
-#endif
 
 #endif
