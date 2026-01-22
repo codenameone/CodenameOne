@@ -242,12 +242,6 @@ public class ByteCodeTranslator {
         }
         File xmlvm = new File(srcRoot, "xmlvm.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
-        File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsC));
-        File nativeMethods = new File(srcRoot, "nativeMethods.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
-        File javaIoFileC = new File(srcRoot, "java_io_File.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
 
         Parser.writeOutput(srcRoot);
 
@@ -563,19 +557,39 @@ public class ByteCodeTranslator {
 
     private static void writeCmakeProject(File projectRoot, File srcRoot, String appName) throws IOException {
         File cmakeLists = new File(projectRoot, "CMakeLists.txt");
+        File translatorSourcesRoot = resolveTranslatorSourcesRoot();
         FileWriter writer = new FileWriter(cmakeLists);
         try {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             writer.append("project(").append(appName).append(" LANGUAGES C OBJC)\n");
             writer.append("enable_language(OBJC OPTIONAL)\n");
             writer.append("set(CMAKE_C_STANDARD 99)\n");
-            writer.append("file(GLOB TRANSLATOR_SOURCES \"").append(srcRoot.getName()).append("/*.c\" \"").append(srcRoot.getName()).append("/*.m\")\n");
-            writer.append("file(GLOB TRANSLATOR_HEADERS \"").append(srcRoot.getName()).append("/*.h\")\n");
+            writer.append("set(CN1_TRANSLATOR_SOURCE_ROOT \"")
+                    .append(escapeCmakePath(translatorSourcesRoot.getAbsolutePath()))
+                    .append("\")\n");
+            writer.append("file(GLOB TRANSLATOR_SOURCES \"").append(srcRoot.getName()).append("/*.c\" \"")
+                    .append(srcRoot.getName()).append("/*.m\" \"${CN1_TRANSLATOR_SOURCE_ROOT}/*.c\" \"")
+                    .append("${CN1_TRANSLATOR_SOURCE_ROOT}/*.m\")\n");
+            writer.append("file(GLOB TRANSLATOR_HEADERS \"").append(srcRoot.getName()).append("/*.h\" \"")
+                    .append("${CN1_TRANSLATOR_SOURCE_ROOT}/*.h\")\n");
             writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
-            writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ").append(srcRoot.getName()).append(")\n");
+            writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ").append(srcRoot.getName())
+                    .append(" ${CN1_TRANSLATOR_SOURCE_ROOT})\n");
         } finally {
             writer.close();
         }
+    }
+
+    private static File resolveTranslatorSourcesRoot() {
+        try {
+            return new File(ByteCodeTranslator.class.getResource("/cn1_globals.h").toURI()).getParentFile();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to resolve ByteCodeTranslator source root", e);
+        }
+    }
+
+    private static String escapeCmakePath(String path) {
+        return path.replace("\\", "\\\\");
     }
     
     private static String getFileType(String s) {

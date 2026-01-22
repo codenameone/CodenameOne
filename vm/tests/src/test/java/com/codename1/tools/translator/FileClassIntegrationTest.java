@@ -72,8 +72,6 @@ public class FileClassIntegrationTest {
         Path srcRoot = distDir.resolve("FileTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
 
-        assertTrue(Files.exists(srcRoot.resolve("java_io_File.c")), "java_io_File.c should exist");
-
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
         Path buildDir = distDir.resolve("build");
