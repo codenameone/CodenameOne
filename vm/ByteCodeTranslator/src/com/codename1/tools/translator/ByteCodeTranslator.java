@@ -571,6 +571,7 @@ public class ByteCodeTranslator {
             writer.append("set(CN1_TRANSLATOR_SOURCE_ROOT \"")
                     .append(escapeCmakePath(translatorSourcesRoot.getAbsolutePath()))
                     .append("\")\n");
+            writer.append("include_directories(${CN1_APP_SOURCE_ROOT} ${CN1_TRANSLATOR_SOURCE_ROOT})\n");
             writer.append("file(GLOB TRANSLATOR_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.c\" \"")
                     .append("${CN1_APP_SOURCE_ROOT}/*.m\" \"${CN1_TRANSLATOR_SOURCE_ROOT}/*.c\" \"")
                     .append("${CN1_TRANSLATOR_SOURCE_ROOT}/*.m\")\n");
