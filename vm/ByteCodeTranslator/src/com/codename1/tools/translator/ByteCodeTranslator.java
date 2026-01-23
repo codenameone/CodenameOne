@@ -240,6 +240,20 @@ public class ByteCodeTranslator {
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
+        File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
+        File nativeMethods = new File(srcRoot, "nativeMethods.m");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
+        File javaIoFileM = new File(srcRoot, "java_io_File.m");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileM));
+        if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
+            File malloc = new File(srcRoot, "malloc.c");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
+            File rpmalloc = new File(srcRoot, "rpmalloc.c");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
+            File rpmalloch = new File(srcRoot, "rpmalloc.h");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+        }
         File xmlvm = new File(srcRoot, "xmlvm.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
 
