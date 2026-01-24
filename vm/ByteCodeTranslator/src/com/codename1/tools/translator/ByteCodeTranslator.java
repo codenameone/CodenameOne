@@ -244,8 +244,6 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsC));
         File nativeMethodsC = new File(srcRoot, "nativeMethods.c");
         copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethodsC));
-        File javaIoFileC = new File(srcRoot, "java_io_File.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
         if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
             File malloc = new File(srcRoot, "malloc.c");
             copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
@@ -258,6 +256,9 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
 
         Parser.writeOutput(srcRoot);
+
+        File javaIoFileC = new File(srcRoot, "java_io_File_runtime.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
 
         File classMethodIndexM = new File(srcRoot, "cn1_class_method_index.m");
         if (classMethodIndexM.exists()) {
