@@ -6,6 +6,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.plaf.StyleParser.BorderInfo;
 import com.codename1.ui.plaf.StyleParser.FontInfo;
@@ -85,6 +86,34 @@ class BorderAndPlafTest extends UITestBase {
         assertTrue(border.isBottomLeft());
         assertFalse(border.isBottomRight());
         assertNotEquals(RoundRectBorder.create(), border);
+    }
+
+    @FormTest
+    void testRoundRectBorderOddStrokeInsetsEvenly() {
+        RoundRectBorder border = RoundRectBorder.create()
+                .cornerRadius(0f)
+                .stroke(3f, false);
+
+        Label label = new Label("Stroke");
+        label.setX(0);
+        label.setY(0);
+        label.setWidth(20);
+        label.setHeight(10);
+        label.getStyle().setBackgroundType(Style.BACKGROUND_NONE);
+        label.getStyle().setBgTransparency(0xff);
+        label.getStyle().setBgColor(0xffffff);
+        label.getStyle().setBorder(border);
+
+        implementation.resetShapeTracking();
+        Graphics testGraphics = Image.createImage(30, 20).getGraphics();
+        border.paintBorderBackground(testGraphics, label);
+        assertTrue(implementation.wasDrawShapeInvoked());
+        float[] bounds = implementation.getLastDrawShape().getBounds2D();
+
+        assertEquals(1.5f, bounds[0], 0.001f);
+        assertEquals(1.5f, bounds[1], 0.001f);
+        assertEquals(17f, bounds[2], 0.001f);
+        assertEquals(7f, bounds[3], 0.001f);
     }
 
     @FormTest
