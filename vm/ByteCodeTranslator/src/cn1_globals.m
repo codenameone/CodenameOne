@@ -89,8 +89,9 @@ long CN1_EDT_THREAD_ID = -1;
 static JAVA_BOOLEAN GC_THRESHOLDS_INITIALIZED = JAVA_FALSE;
 
 int currentGcMarkValue = 1;
+#if defined(__APPLE__) && defined(__OBJC__)
 extern JAVA_BOOLEAN lowMemoryMode;
-#if !defined(__OBJC__)
+#else
 JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
 #endif
 
@@ -1012,9 +1013,10 @@ JAVA_INT java_lang_System_identityHashCode___java_lang_Object_R_int(CODENAME_ONE
     return (JAVA_INT)__cn1Arg1;
 }
 
+#if defined(__APPLE__) && defined(__OBJC__)
 extern int mallocWhileSuspended;
 extern BOOL isAppSuspended;
-#if !defined(__OBJC__)
+#else
 int mallocWhileSuspended = 0;
 BOOL isAppSuspended = 0;
 #endif

@@ -240,12 +240,12 @@ public class ByteCodeTranslator {
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
-        File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
-        File nativeMethods = new File(srcRoot, "nativeMethods.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
-        File javaIoFileM = new File(srcRoot, "java_io_File.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileM));
+        File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsC));
+        File nativeMethodsC = new File(srcRoot, "nativeMethods.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethodsC));
+        File javaIoFileC = new File(srcRoot, "java_io_File.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
         if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
             File malloc = new File(srcRoot, "malloc.c");
             copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
@@ -571,39 +571,22 @@ public class ByteCodeTranslator {
 
     private static void writeCmakeProject(File projectRoot, File srcRoot, String appName) throws IOException {
         File cmakeLists = new File(projectRoot, "CMakeLists.txt");
-        File translatorSourcesRoot = resolveTranslatorSourcesRoot();
         String srcRootPath = srcRoot.getAbsolutePath();
         FileWriter writer = new FileWriter(cmakeLists);
         try {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
-            writer.append("project(").append(appName).append(" LANGUAGES C OBJC)\n");
-            writer.append("enable_language(OBJC OPTIONAL)\n");
+            writer.append("project(").append(appName).append(" LANGUAGES C)\n");
             writer.append("set(CMAKE_C_STANDARD 99)\n");
             writer.append("set(CN1_APP_SOURCE_ROOT \"")
                     .append(escapeCmakePath(srcRootPath))
                     .append("\")\n");
-            writer.append("set(CN1_TRANSLATOR_SOURCE_ROOT \"")
-                    .append(escapeCmakePath(translatorSourcesRoot.getAbsolutePath()))
-                    .append("\")\n");
-            writer.append("include_directories(${CN1_APP_SOURCE_ROOT} ${CN1_TRANSLATOR_SOURCE_ROOT})\n");
-            writer.append("file(GLOB TRANSLATOR_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.c\" \"")
-                    .append("${CN1_APP_SOURCE_ROOT}/*.m\" \"${CN1_TRANSLATOR_SOURCE_ROOT}/*.c\" \"")
-                    .append("${CN1_TRANSLATOR_SOURCE_ROOT}/*.m\")\n");
-            writer.append("file(GLOB TRANSLATOR_HEADERS \"${CN1_APP_SOURCE_ROOT}/*.h\" \"")
-                    .append("${CN1_TRANSLATOR_SOURCE_ROOT}/*.h\")\n");
+            writer.append("include_directories(${CN1_APP_SOURCE_ROOT})\n");
+            writer.append("file(GLOB TRANSLATOR_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.c\")\n");
+            writer.append("file(GLOB TRANSLATOR_HEADERS \"${CN1_APP_SOURCE_ROOT}/*.h\")\n");
             writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
-            writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT} ")
-                    .append("${CN1_TRANSLATOR_SOURCE_ROOT})\n");
+            writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
         } finally {
             writer.close();
-        }
-    }
-
-    private static File resolveTranslatorSourcesRoot() {
-        try {
-            return new File(ByteCodeTranslator.class.getResource("/cn1_globals.h").toURI()).getParentFile();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to resolve ByteCodeTranslator source root", e);
         }
     }
 
