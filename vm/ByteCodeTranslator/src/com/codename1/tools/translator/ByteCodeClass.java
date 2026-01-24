@@ -688,7 +688,7 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_'));
-                    b.append("(CODENAME_ONE_THREAD_STATE) {\n    return ");
+                    b.append("() {\n    return ");
                     if(bf.getValue() instanceof String) {
                         b.append("STRING_FROM_CONSTANT_POOL_OFFSET(");
                         b.append(Parser.addToConstantPool((String)bf.getValue()));
@@ -1531,7 +1531,7 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName());
-                    b.append("(CODENAME_ONE_THREAD_STATE);\n");
+                    b.append("();\n");
                     if(!(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName()))) {
                         b.append("extern ");
                         b.append(bf.getCStorageDefinition());
@@ -1555,11 +1555,11 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName());
-                    b.append("(threadStateArgument) get_static_");
+                    b.append("() get_static_");
                     b.append(bf.getClsName());
                     b.append("_");
                     b.append(bf.getFieldName());
-                    b.append("(threadStateArgument)\n");
+                    b.append("()\n");
 
                     b.append("#define set_static_");
                     b.append(clsName);
