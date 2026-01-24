@@ -97,7 +97,8 @@ class BorderAndPlafTest extends UITestBase {
         Label label = new Label("Stroke");
         label.setX(0);
         label.setY(0);
-        label.setSize(20, 10);
+        label.setWidth(20);
+        label.setHeight(10);
         label.getStyle().setBackgroundType(Style.BACKGROUND_NONE);
         label.getStyle().setBgTransparency(0xff);
         label.getStyle().setBgColor(0xffffff);
