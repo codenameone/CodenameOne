@@ -257,8 +257,11 @@ public class ByteCodeTranslator {
 
         Parser.writeOutput(srcRoot);
 
-        File javaIoFileC = new File(srcRoot, "java_io_File_runtime.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
+        File javaIoFileHeader = new File(srcRoot, "java_io_File.h");
+        if (javaIoFileHeader.exists()) {
+            File javaIoFileC = new File(srcRoot, "java_io_File_runtime.c");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
+        }
 
         File classMethodIndexM = new File(srcRoot, "cn1_class_method_index.m");
         if (classMethodIndexM.exists()) {
