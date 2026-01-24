@@ -173,6 +173,43 @@ public class File {
         }
         return fs;
     }
+
+    public File[] listFiles(FileFilter filter) {
+        String[] names = list();
+        if (names == null) return null;
+        File[] results = new File[names.length];
+        int count = 0;
+        for (int i = 0; i < names.length; i++) {
+            File f = new File(this, names[i]);
+            if (filter == null || filter.accept(f)) {
+                results[count++] = f;
+            }
+        }
+        if (count == results.length) {
+            return results;
+        }
+        File[] trimmed = new File[count];
+        System.arraycopy(results, 0, trimmed, 0, count);
+        return trimmed;
+    }
+
+    public File[] listFiles(FilenameFilter filter) {
+        String[] names = list();
+        if (names == null) return null;
+        File[] results = new File[names.length];
+        int count = 0;
+        for (int i = 0; i < names.length; i++) {
+            if (filter == null || filter.accept(this, names[i])) {
+                results[count++] = new File(this, names[i]);
+            }
+        }
+        if (count == results.length) {
+            return results;
+        }
+        File[] trimmed = new File[count];
+        System.arraycopy(results, 0, trimmed, 0, count);
+        return trimmed;
+    }
     
     public boolean mkdir() {
         return mkdirImpl(path);

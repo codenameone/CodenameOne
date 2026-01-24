@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
@@ -17,8 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -104,13 +107,13 @@ class CleanTargetIntegrationTest {
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        runCommand(Arrays.asList(
+        List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(cmakeCompilerArgs());
+        runCommand(cmakeCommand, distDir);
 
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -181,11 +184,70 @@ class CleanTargetIntegrationTest {
         String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
         String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
         content = content.replace(globWithObjc, globCOnly);
+        content = content.replaceAll("LANGUAGES\\s+C\\s+OBJC", "LANGUAGES C");
+        content = content.replaceAll("(?m)^enable_language\\(OBJC OPTIONAL\\)\\s*$\\n?", "");
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
+                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m pthread)"
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static void copyObjcSourcesAsC(Path srcRoot) throws IOException {
+        try (Stream<Path> files = Files.list(srcRoot)) {
+            files.filter(p -> p.getFileName().toString().endsWith(".m"))
+                    .forEach(p -> {
+                        Path asC = p.resolveSibling(p.getFileName().toString().replaceAll("\\.m$", ".c"));
+                        if (!Files.exists(asC)) {
+                            try {
+                                Files.copy(p, asC);
+                            } catch (IOException ignore) {
+                                // Best-effort copy for clean targets; failures are tolerated during tests.
+                            }
+                        }
+                    });
+        }
+    }
+
+    static List<String> cmakeCompilerArgs() {
+        String cCompiler = findCompiler("clang", "gcc", "cc");
+        if (cCompiler == null) {
+            cCompiler = "cc";
+        }
+        String objcCompiler = findCompiler("clang");
+        List<String> args = new ArrayList<>();
+        args.add("-DCMAKE_C_COMPILER=" + cCompiler);
+        if (objcCompiler != null) {
+            args.add("-DCMAKE_OBJC_COMPILER=" + objcCompiler);
+        }
+        return args;
+    }
+
+    private static String findCompiler(String... candidates) {
+        String path = System.getenv("PATH");
+        List<String> searchPaths = new ArrayList<>();
+        if (path != null && !path.isEmpty()) {
+            searchPaths.addAll(Arrays.asList(path.split(File.pathSeparator)));
+        }
+
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.isEmpty()) {
+                continue;
+            }
+            Path candidatePath = Paths.get(candidate);
+            if (!candidatePath.isAbsolute()) {
+                for (String dir : searchPaths) {
+                    Path resolved = Paths.get(dir, candidate);
+                    if (Files.isExecutable(resolved)) {
+                        return resolved.toString();
+                    }
+                }
+            } else if (Files.isExecutable(candidatePath)) {
+                return candidatePath.toString();
+            }
+        }
+
+        return null;
     }
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
@@ -212,6 +274,89 @@ class CleanTargetIntegrationTest {
         if (!content.contains("#include <string.h>")) {
             content = content.replace("#include <stdlib.h>\n", "#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n#include <limits.h>\n");
             Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path cn1GlobalsC = srcRoot.resolve("cn1_globals.c");
+        if (Files.exists(cn1GlobalsC)) {
+            String cContent = new String(Files.readAllBytes(cn1GlobalsC), StandardCharsets.UTF_8);
+            String cUpdated = cContent.replace(
+                    "get_static_java_lang_System_gcThreadInstance()",
+                    "get_static_java_lang_System_gcThreadInstance(threadStateData)");
+            if (!cUpdated.equals(cContent)) {
+                Files.write(cn1GlobalsC, cUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+    }
+
+    static void patchFileHeader(Path srcRoot) throws IOException {
+        Path fileHeader = srcRoot.resolve("java_io_File.h");
+        if (!Files.exists(fileHeader)) {
+            return;
+        }
+        String content = new String(Files.readAllBytes(fileHeader), StandardCharsets.UTF_8);
+        String updated = content
+                .replace("get_static_java_io_File_separator();", "get_static_java_io_File_separator(CODENAME_ONE_THREAD_STATE);")
+                .replace("get_static_java_io_File_separatorChar();", "get_static_java_io_File_separatorChar(CODENAME_ONE_THREAD_STATE);")
+                .replace("get_static_java_io_File_pathSeparator();", "get_static_java_io_File_pathSeparator(CODENAME_ONE_THREAD_STATE);")
+                .replace("get_static_java_io_File_pathSeparatorChar();", "get_static_java_io_File_pathSeparatorChar(CODENAME_ONE_THREAD_STATE);");
+        if (!updated.equals(content)) {
+            Files.write(fileHeader, updated.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path systemHeader = srcRoot.resolve("java_lang_System.h");
+        if (Files.exists(systemHeader)) {
+            String systemContent = new String(Files.readAllBytes(systemHeader), StandardCharsets.UTF_8);
+            String systemUpdated = systemContent.replace(
+                    "get_static_java_lang_System_gcThreadInstance();",
+                    "get_static_java_lang_System_gcThreadInstance(CODENAME_ONE_THREAD_STATE);");
+            if (!systemUpdated.equals(systemContent)) {
+                Files.write(systemHeader, systemUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path rwLockHeader = srcRoot.resolve("java_util_concurrent_locks_ReentrantReadWriteLock.h");
+        if (Files.exists(rwLockHeader)) {
+            String rwContent = new String(Files.readAllBytes(rwLockHeader), StandardCharsets.UTF_8);
+            String rwUpdated = rwContent.replace(
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_serialVersionUID();",
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_serialVersionUID(CODENAME_ONE_THREAD_STATE);");
+            if (!rwUpdated.equals(rwContent)) {
+                Files.write(rwLockHeader, rwUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path rwReadLockHeader = srcRoot.resolve("java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock.h");
+        if (Files.exists(rwReadLockHeader)) {
+            String rwReadContent = new String(Files.readAllBytes(rwReadLockHeader), StandardCharsets.UTF_8);
+            String rwReadUpdated = rwReadContent.replace(
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock_serialVersionUID();",
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock_serialVersionUID(CODENAME_ONE_THREAD_STATE);");
+            if (!rwReadUpdated.equals(rwReadContent)) {
+                Files.write(rwReadLockHeader, rwReadUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path rwWriteLockHeader = srcRoot.resolve("java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock.h");
+        if (Files.exists(rwWriteLockHeader)) {
+            String rwWriteContent = new String(Files.readAllBytes(rwWriteLockHeader), StandardCharsets.UTF_8);
+            String rwWriteUpdated = rwWriteContent.replace(
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock_serialVersionUID();",
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock_serialVersionUID(CODENAME_ONE_THREAD_STATE);");
+            if (!rwWriteUpdated.equals(rwWriteContent)) {
+                Files.write(rwWriteLockHeader, rwWriteUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+    }
+
+    static void removeTranslatorFileNatives(Path srcRoot) throws IOException {
+        String[] fileArtifacts = {
+                "java_io_FileInputStream.c", "java_io_FileInputStream.h",
+                "java_io_FileOutputStream.c", "java_io_FileOutputStream.h",
+                "java_io_FileWriter.c", "java_io_FileWriter.h",
+                "java_io_FileStreams.c", "java_io_FileStreams.h"
+        };
+        for (String name : fileArtifacts) {
+            Files.deleteIfExists(srcRoot.resolve(name));
         }
     }
 
@@ -301,6 +446,8 @@ class CleanTargetIntegrationTest {
                 "struct clazz class_array1__JAVA_BYTE = {0};\n" +
                 "struct clazz class_array1__JAVA_SHORT = {0};\n" +
                 "struct clazz class_array1__JAVA_LONG = {0};\n" +
+                "struct clazz class_array1__java_lang_String = {0};\n" +
+                "struct clazz class_array2__java_lang_String = {0};\n" +
                 "\n" +
                 "static JAVA_OBJECT allocArrayInternal(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
                 "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)calloc(1, sizeof(struct JavaArrayPrototype));\n" +

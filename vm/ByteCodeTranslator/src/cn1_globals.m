@@ -1,5 +1,6 @@
 #include "cn1_globals.h"
 #include <assert.h>
+#include <unistd.h>
 #include "java_lang_Class.h"
 #include "java_lang_Object.h"
 #include "java_lang_Boolean.h"
@@ -14,14 +15,20 @@
 #include "java_lang_Float.h"
 #include "java_lang_Runnable.h"
 #include "java_lang_System.h"
+
+JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
+int mallocWhileSuspended = 0;
+BOOL isAppSuspended = NO;
 #include "java_lang_ArrayIndexOutOfBoundsException.h"
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <TargetConditionals.h>
 #import <mach/mach.h>
 #import <mach/mach_host.h>
+#define CN1_LOG(fmt, ...) NSLog(@fmt, ##__VA_ARGS__)
 #else
 #include <time.h>
-#define NSLog(...) printf(__VA_ARGS__); printf("\n")
+#include <stdio.h>
+#define CN1_LOG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #endif
 
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -280,6 +287,11 @@ struct clazz class_array3__JAVA_FLOAT = {
 struct clazz class_array1__JAVA_DOUBLE = {
     DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 1, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
+
+// Minimal stubs for String array classes so clean-target builds that only
+// reference primitive wrappers still have constant pool backing storage.
+struct clazz class_array1__java_lang_String = {0};
+struct clazz class_array2__java_lang_String = {0};
 
 struct clazz class_array2__JAVA_DOUBLE = {
    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 2, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
@@ -606,8 +618,8 @@ void codenameOneGCMark() {
                         {   long later = time(0)-now;
                             if(later>10000)
                             {
-                            NSLog(@"GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
-                                  (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
+                            CN1_LOG("GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
+                                    (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
                             }
                         }
                     }
@@ -642,7 +654,7 @@ void codenameOneGCMark() {
                 }
                 if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
                     long freeMemory = get_free_memory();
-                    NSLog(@"[GC] Blocking EDT as aggressive allocator, free memory=%lld", freeMemory);
+                    CN1_LOG("[GC] Blocking EDT as aggressive allocator, free memory=%ld", freeMemory);
                     
                 }
                 
@@ -745,7 +757,7 @@ void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
         }
     }
     int actualTotalMemory = 0;
-    NSLog(@"\n\n**** There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i ****", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
+    CN1_LOG("\n\n**** There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i ****", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
             if(classTypeCountPreSweep[iter] - classTypeCount[iter] > 0) {
@@ -764,7 +776,7 @@ void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
         }
     }
     //NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
-    NSLog(@"**** GC cycle complete ****");
+    CN1_LOG("**** GC cycle complete ****");
     
     free(arrayOfNames);
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -802,7 +814,7 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
         }
     }
     int actualTotalMemory = 0;
-    NSLog(@"There are %i null available entries out of %i objects in heap which take up %i", nullSpaces, t, totalAllocatedHeap);
+    CN1_LOG("There are %i null available entries out of %i objects in heap which take up %i", nullSpaces, t, totalAllocatedHeap);
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
             float f = ((float)classTypeCount[iter]) / ((float)t) * 100.0f;
@@ -820,7 +832,7 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
             actualTotalMemory += sizeInHeapForType[iter];
         }
     }
-    NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
+    CN1_LOG("Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
     
     free(arrayOfNames);
 #if defined(__APPLE__) && defined(__OBJC__)

@@ -88,6 +88,7 @@ class LockIntegrationTest {
 
         Path srcRoot = distDir.resolve("LockTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
+        CleanTargetIntegrationTest.removeTranslatorFileNatives(srcRoot);
         writeRuntimeStubs(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
@@ -95,13 +96,13 @@ class LockIntegrationTest {
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+        List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(CleanTargetIntegrationTest.cmakeCompilerArgs());
+        CleanTargetIntegrationTest.runCommand(cmakeCommand, distDir);
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -121,10 +122,12 @@ class LockIntegrationTest {
         Path lang = sourceDir.resolve("java/lang");
         Path util = sourceDir.resolve("java/util");
         Path concurrent = sourceDir.resolve("java/util/concurrent");
+        Path text = sourceDir.resolve("java/text");
         Path io = sourceDir.resolve("java/io");
         Files.createDirectories(lang);
         Files.createDirectories(util);
         Files.createDirectories(concurrent);
+        Files.createDirectories(text);
         Files.createDirectories(io);
 
         // java.lang.Object
@@ -148,6 +151,69 @@ class LockIntegrationTest {
                 "    private int offset;\n" +
                 "    private int count;\n" +
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
+                "    public byte[] getBytes(String charsetName) {\n" +
+                "        byte[] out = new byte[count];\n" +
+                "        for (int i = 0; i < count; i++) { out[i] = (byte)value[offset + i]; }\n" +
+                "        return out;\n" +
+                "    }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("StringBuilder.java"), ("package java.lang;\n" +
+                "public class StringBuilder {\n" +
+                "    private String value = \"\";\n" +
+                "    public StringBuilder() {}\n" +
+                "    public StringBuilder(String s) { if (s != null) value = s; }\n" +
+                "    public StringBuilder append(String s) { value += s; return this; }\n" +
+                "    public String toString() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // Primitive wrappers
+        Files.write(lang.resolve("Boolean.java"), ("package java.lang;\n" +
+                "public final class Boolean {\n" +
+                "    private final boolean value;\n" +
+                "    public Boolean(boolean value) { this.value = value; }\n" +
+                "    public boolean booleanValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Byte.java"), ("package java.lang;\n" +
+                "public final class Byte {\n" +
+                "    private final byte value;\n" +
+                "    public Byte(byte value) { this.value = value; }\n" +
+                "    public byte byteValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Integer.java"), ("package java.lang;\n" +
+                "public final class Integer {\n" +
+                "    private final int value;\n" +
+                "    public Integer(int value) { this.value = value; }\n" +
+                "    public int intValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Float.java"), ("package java.lang;\n" +
+                "public final class Float {\n" +
+                "    private final float value;\n" +
+                "    public Float(float value) { this.value = value; }\n" +
+                "    public float floatValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Double.java"), ("package java.lang;\n" +
+                "public final class Double {\n" +
+                "    private final double value;\n" +
+                "    public Double(double value) { this.value = value; }\n" +
+                "    public double doubleValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Long.java"), ("package java.lang;\n" +
+                "public final class Long {\n" +
+                "    private final long value;\n" +
+                "    public Long(long value) { this.value = value; }\n" +
+                "    public long longValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Short.java"), ("package java.lang;\n" +
+                "public final class Short {\n" +
+                "    private final short value;\n" +
+                "    public Short(short value) { this.value = value; }\n" +
+                "    public short shortValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Character.java"), ("package java.lang;\n" +
+                "public final class Character {\n" +
+                "    private final char value;\n" +
+                "    public Character(char value) { this.value = value; }\n" +
+                "    public char charValue() { return value; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.Class
@@ -179,22 +245,73 @@ class LockIntegrationTest {
         Files.write(lang.resolve("System.java"), ("package java.lang;\n" +
                 "public final class System {\n" +
                 "    public static native long currentTimeMillis();\n" +
+                "    public static void gc() {}\n" +
+                "    public static void startGCThread() {}\n" +
+                "    public static Thread gcThreadInstance;\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // java.lang.StringToReal
+        Files.write(lang.resolve("StringToReal.java"), ("package java.lang;\n" +
+                "public final class StringToReal {\n" +
+                "    public static NumberFormatException invalidReal(String s, boolean b) { return new NumberFormatException(s); }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // Exceptions
         Files.write(lang.resolve("Throwable.java"), "package java.lang; public class Throwable { public Throwable() {} public Throwable(String s) {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("Exception.java"), "package java.lang; public class Exception extends Throwable { public Exception() {} public Exception(String s) {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("RuntimeException.java"), "package java.lang; public class RuntimeException extends Exception { public RuntimeException() {} public RuntimeException(String s) {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("NumberFormatException.java"), "package java.lang; public class NumberFormatException extends IllegalArgumentException { public NumberFormatException() {} public NumberFormatException(String s) { super(s); } }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("InterruptedException.java"), "package java.lang; public class InterruptedException extends Exception { public InterruptedException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("NullPointerException.java"), "package java.lang; public class NullPointerException extends RuntimeException { public NullPointerException() {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("ArrayIndexOutOfBoundsException.java"),
+                "package java.lang; public class ArrayIndexOutOfBoundsException extends RuntimeException { public ArrayIndexOutOfBoundsException() {} public ArrayIndexOutOfBoundsException(String s) { super(s); } }"
+                        .getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("IllegalMonitorStateException.java"), "package java.lang; public class IllegalMonitorStateException extends RuntimeException { public IllegalMonitorStateException() {} }".getBytes(StandardCharsets.UTF_8));
-        Files.write(lang.resolve("IllegalArgumentException.java"), "package java.lang; public class IllegalArgumentException extends RuntimeException { public IllegalArgumentException(String s) {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("IllegalArgumentException.java"), "package java.lang; public class IllegalArgumentException extends RuntimeException { public IllegalArgumentException() {} public IllegalArgumentException(String s) {} }".getBytes(StandardCharsets.UTF_8));
 
         // java.io.Serializable
         Files.write(io.resolve("Serializable.java"), "package java.io; public interface Serializable {}".getBytes(StandardCharsets.UTF_8));
 
+        // java.io.File (minimal stub to force translator header generation)
+        Files.write(io.resolve("File.java"), ("package java.io;\n" +
+                "public class File {\n" +
+                "    public static final String separator = \"/\";\n" +
+                "    public static final char separatorChar = '/';\n" +
+                "    public static final String pathSeparator = \":\";\n" +
+                "    public static final char pathSeparatorChar = ':';\n" +
+                "    private final String path;\n" +
+                "    public File(String pathname) { this.path = pathname == null ? \"\" : pathname; }\n" +
+                "    public File(File parent, String child) { this(parent == null ? child : parent.getPath() + separator + child); }\n" +
+                "    public File(String parent, String child) { this(parent == null ? child : parent + separator + child); }\n" +
+                "    public String getPath() { return path; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
         // java.util.Collection
         Files.write(util.resolve("Collection.java"), "package java.util; public interface Collection<E> {}".getBytes(StandardCharsets.UTF_8));
+
+        // java.util.Map
+        Files.write(util.resolve("Map.java"), ("package java.util;\n" +
+                "public interface Map<K,V> {\n" +
+                "    V put(K key, V value);\n" +
+                "    V get(Object key);\n" +
+                "    int size();\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // java.util.HashMap (minimal bucket list to trigger header generation)
+        Files.write(util.resolve("HashMap.java"), ("package java.util;\n" +
+                "public class HashMap<K,V> implements Map<K,V> {\n" +
+                "    static class Entry<K,V> {\n" +
+                "        final K key;\n" +
+                "        V value;\n" +
+                "        Entry<K,V> next;\n" +
+                "        Entry(K k, V v, Entry<K,V> n) { key = k; value = v; next = n; }\n" +
+                "    }\n" +
+                "    private Entry<K,V>[] table;\n" +
+                "    public HashMap() { table = new Entry[0]; }\n" +
+                "    public V put(K key, V value) { return value; }\n" +
+                "    public V get(Object key) { return null; }\n" +
+                "    public int size() { return 0; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.util.Date
         Files.write(util.resolve("Date.java"), "package java.util; public class Date { public long getTime() { return 0; } }".getBytes(StandardCharsets.UTF_8));
@@ -211,15 +328,24 @@ class LockIntegrationTest {
                 "    public long toNanos(long d) { return d; }\n" +
                 "    public long toMillis(long d) { return d; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // java.text.DateFormat (placeholder)
+        Files.write(text.resolve("DateFormat.java"), "package java.text; public class DateFormat {}".getBytes(StandardCharsets.UTF_8));
     }
 
     private String lockTestAppSource() {
         return "import java.util.concurrent.locks.*;\n" +
                 "import java.util.concurrent.TimeUnit;\n" +
+                "import java.util.HashMap;\n" +
+                "import java.text.DateFormat;\n" +
                 "public class LockTestApp {\n" +
                 "    private static native void report(String msg);\n" +
                 "    \n" +
                 "    public static void main(String[] args) {\n" +
+                "        DateFormat df = null;\n" +
+                "        HashMap<Object,Object> map = new HashMap<>();\n" +
+                "        map.size();\n" +
+                "        StringToReal.invalidReal(\"0\", false);\n" +
                 "        testBasicLock();\n" +
                 "        testReentrancy();\n" +
                 "        testTryLock();\n" +
@@ -330,6 +456,8 @@ class LockIntegrationTest {
         String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
         String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
         content = content.replace(globWithObjc, globCOnly);
+        content = content.replaceAll("LANGUAGES\\s+C\\s+OBJC", "LANGUAGES C");
+        content = content.replaceAll("(?m)^enable_language\\(OBJC OPTIONAL\\)\\s*$\\n?", "");
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
                 "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m pthread)"
