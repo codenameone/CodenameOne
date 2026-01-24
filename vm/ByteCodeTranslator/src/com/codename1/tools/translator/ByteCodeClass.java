@@ -763,16 +763,16 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_'));
-                    b.append("(CODENAME_ONE_THREAD_STATE) {\n    __STATIC_INITIALIZER_");
+                    b.append("() {\n    __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
                     if (bf.isVolatile()) {
-                        b.append("(threadStateData);\n     return atomic_load_explicit(&STATIC_FIELD_");
+                        b.append("(getThreadLocalData());\n     return atomic_load_explicit(&STATIC_FIELD_");
                         b.append(bf.getClsName());
                         b.append("_");
                         b.append(bf.getFieldName());
                         b.append(", memory_order_acquire);\n}\n\n");
                     } else {
-                        b.append("(threadStateData);\n     return STATIC_FIELD_");
+                        b.append("(getThreadLocalData());\n     return STATIC_FIELD_");
                         b.append(bf.getClsName());
                         b.append("_");
                         b.append(bf.getFieldName());
