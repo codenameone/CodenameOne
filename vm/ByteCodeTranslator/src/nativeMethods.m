@@ -1551,7 +1551,7 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
         THROW_NULL_POINTER_EXCEPTION();
     }
 #endif
-    if (threadStateData->callStackOffset >= CN1_MAX_STACK_CALL_DEPTH - 1) {
+    if (threadStateData->callStackOffset >= CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT - 1) {
         throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
         return;
     }
