@@ -113,7 +113,10 @@ class StackOverflowIntegrationTest {
                 "            overflowed = true;\n" +
                 "        }\n" +
                 "        report(overflowed ? \"STACK_OVERFLOW_OK\" : \"STACK_OVERFLOW_MISSING\");\n" +
-                "        report(\"RECOVERY_OK:\" + postOverflow(3));\n" +
+                "        StringBuilder sb = new StringBuilder();\n" +
+                "        sb.append(\"RECOVERY_OK:\");\n" +
+                "        sb.append(postOverflow(3));\n" +
+                "        report(sb.toString());\n" +
                 "    }\n" +
                 "}\n";
     }
