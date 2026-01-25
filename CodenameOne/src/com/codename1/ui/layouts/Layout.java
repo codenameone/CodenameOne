@@ -40,12 +40,11 @@ public abstract class Layout {
     /**
      * Utility method
      *
-     * @param parent
      * @param components
      * @param offset
      * @return
      */
-    private static int updateTabIndicesImpl(Container parent, Component[] components, int offset) {
+    private static int updateTabIndicesImpl(Component[] components, int offset) {
         int len = components.length;
         int idx = offset;
         for (int i = 0; i < len; i++) {
@@ -189,7 +188,7 @@ public abstract class Layout {
     public final int updateTabIndices(Container parent, int offset) {
         if (overridesTabIndices(parent)) {
             Component[] cmps = getChildrenInTraversalOrder(parent);
-            return updateTabIndicesImpl(parent, cmps, offset);
+            return updateTabIndicesImpl(cmps, offset);
         }
         return offset;
     }

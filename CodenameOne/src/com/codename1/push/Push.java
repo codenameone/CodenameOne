@@ -161,6 +161,7 @@ public class Push {
         NetworkManager.getInstance().addToQueue(createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort));
     }
 
+    @SuppressWarnings("PMD.UnusedFormalParameter")
     private static ConnectionRequest createPushMessage(String body, String deviceKey, boolean production, String googleAuthKey,
                                                        String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
         throw new RuntimeException("The old push servers no longer work! Please migrate to the new Push servers!");

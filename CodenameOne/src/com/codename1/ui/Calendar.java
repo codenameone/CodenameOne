@@ -119,7 +119,7 @@ public class Calendar extends Container implements ActionSource {
      * @param tmz  a reference timezone
      */
     public Calendar(long time, TimeZone tmz) {
-        this(time, TimeZone.getDefault(), null, null);
+        this(time, tmz, null, null);
     }
 
     /**

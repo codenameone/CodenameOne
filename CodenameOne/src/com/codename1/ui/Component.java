@@ -5819,10 +5819,10 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private void pointerReleaseImpl(int x, int y) {
-        LeadUtil.leadParentImpl(this).pointerReleaseImpl(this, x, y);
+        LeadUtil.leadParentImpl(this).pointerReleaseImplLead(x, y);
     }
 
-    private void pointerReleaseImpl(Component lead, int x, int y) {
+    private void pointerReleaseImplLead(int x, int y) {
         if (restoreDragPercentage > -1) {
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
         }
@@ -8144,7 +8144,7 @@ public class Component implements Animation, StyleListener, Editable {
             impl = Display.impl;
         }
 
-        public BGPainter(Form parent, Painter p) {
+        public BGPainter(Painter p) {
             this.painter = p;
             impl = Display.impl;
         }

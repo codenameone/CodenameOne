@@ -529,6 +529,10 @@ public final class GeofenceManager implements Iterable<Geofence> {
      */
     public synchronized void update(int timeout, boolean forceRefresh) {
         Location here = LocationManager.getLocationManager().getCurrentLocationSync(timeout);
+        update(forceRefresh, here);
+    }
+
+    private synchronized void update(boolean forceRefresh, Location here) {
         if (here == null) {
             LocationManager.getLocationManager().setBackgroundLocationListener(Listener.class);
             return;
@@ -548,9 +552,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
                 LocationManager.getLocationManager().removeGeoFencing(id);
                 removeAll(activeKeys, id);
                 activeFences.remove(id);
-
             }
-
         }
 
         for (Geofence g : asSortedList()) {
@@ -563,12 +565,9 @@ public final class GeofenceManager implements Iterable<Geofence> {
                 if (forceRefresh || !activeKeys.contains(g.getId()) || !g.equals(ag)) {
                     if (!activeKeys.contains(g.getId())) {
                         activeKeys.add(g.getId());
-
                     }
                     activeFences.put(g.getId(), g);
                     LocationManager.getLocationManager().addGeoFencing(Listener.class, g);
-
-
                 }
             }
         }
@@ -593,7 +592,6 @@ public final class GeofenceManager implements Iterable<Geofence> {
         if (BUBBLE_GEOFENCE_ID.equals(id)) {
             // We are exiting our bubble
             update(defaultTimeout);
-
         }
     }
 
@@ -620,7 +618,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
     }
 
     private void locationUpdated(Location location) {
-        update(defaultTimeout);
+        update(false, location);
     }
 
     /**

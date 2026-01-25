@@ -810,7 +810,7 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    private Object readCustomPropertyValue(DataInputStream in, Class type, String typeName, Resources res, String name) throws IOException {
+    private Object readCustomPropertyValue(DataInputStream in, Class type, String typeName, Resources res) throws IOException {
         if (type == String.class) {
             return in.readUTF();
         }
@@ -1053,7 +1053,7 @@ public class UIBuilder { //implements Externalizable {
                             if (typeNames != null && typeNames.length > iter) {
                                 typeName = typeNames[iter];
                             }
-                            Object value = readCustomPropertyValue(in, type, typeName, res, propertyNames[iter]);
+                            Object value = readCustomPropertyValue(in, type, typeName, res);
                             if (cl && "ListItems".equals(customPropertyName) && setListModel((ContainerList) cmp)) {
                                 break;
                             }

@@ -679,7 +679,7 @@ public class Picker extends Button {
                         @Override
                         public void run() {
                             dlg.show(top, bottom, left, right);
-                            padContentPane(top, bottom, left, right);
+                            padContentPane(top);
                         }
 
                     });
@@ -1032,7 +1032,7 @@ public class Picker extends Button {
         }
     }
 
-    private void padContentPane(final int top, final int bottom, final int left, final int right) {
+    private void padContentPane(final int top) {
         final Form f = getComponentForm();
         if (f != null) {
             f.getAnimationManager().flushAnimation(new Runnable() {
@@ -1100,7 +1100,7 @@ public class Picker extends Button {
                             @Override
                             public void run() {
                                 dlg.resize(top, bottom, left, right);
-                                padContentPane(top, bottom, left, right);
+                                padContentPane(top);
 
 
                             }

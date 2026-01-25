@@ -279,11 +279,10 @@ class CSSParser {
      *
      * @param isr      The stream representing the CSS
      * @param encoding The encoding string
-     * @param htmlC    The HTMLComponent
      * @return An input stream with the relevant media segment or null if the media is not supported
      * @throws IOException on input stream failure
      */
-    private ExtInputStreamReader getMediaSegment(ExtInputStreamReader r, String encoding, HTMLComponent htmlC) throws IOException {
+    private ExtInputStreamReader getMediaSegment(ExtInputStreamReader r, String encoding) throws IOException {
         String token = nextToken(r, true, true, true, true);
         char c = r.readCharFromReader();
 
@@ -367,9 +366,9 @@ class CSSParser {
                     }
                 }
             } else if ("@media".equals(token)) {
-                ExtInputStreamReader mediaReader = getMediaSegment(r, encoding, htmlC);
+                ExtInputStreamReader mediaReader = getMediaSegment(r, encoding);
                 if (mediaReader != null) {
-                    parseCSS(mediaReader, htmlC, addTo, null);
+                    parseCSS(mediaReader, addTo, null);
                 }
             } else if ("@charset".equals(token)) {
                 token = CSSEngine.omitQuotesIfExist(nextToken(r, true, false, true, false));
@@ -386,7 +385,7 @@ class CSSParser {
             token = nextToken(r, true, false, true, false);
         }
 
-        return parseCSS(r, htmlC, addTo, token);
+        return parseCSS(r, addTo, token);
     }
 
     /**
@@ -395,13 +394,12 @@ class CSSParser {
      * This method is called either directly on style attributes.
      *
      * @param r     The stream reader containing the CSS segment
-     * @param htmlC The HTMLComponent
      * @return A CSSElement containing all selectors found in the stream as its children
      * @throws IOException on input stream failure
      */
-    CSSElement parseCSS(InputStreamReader r, HTMLComponent htmlC) throws IOException {
+    CSSElement parseCSS(InputStreamReader r) throws IOException {
         ExtInputStreamReader er = new ExtInputStreamReader(r);
-        return parseCSS(er, htmlC, null, null);
+        return parseCSS(er, null, null);
     }
 
     /**
@@ -409,13 +407,12 @@ class CSSParser {
      * root appearing as a "style".
      *
      * @param r          The stream reader containing the CSS segment
-     * @param htmlC      The HTMLComponent
      * @param addTo      the master CSSElement to add the selectors to (or null to open a new one_
      * @param firstToken A first toekn to process, or null if none
      * @return A CSSElement containing all selectors found in the stream as its children
      * @throws IOException on input stream failure
      */
-    CSSElement parseCSS(ExtInputStreamReader r, HTMLComponent htmlC, CSSElement addTo, String firstToken) throws IOException {
+    CSSElement parseCSS(ExtInputStreamReader r, CSSElement addTo, String firstToken) throws IOException {
         if (addTo == null) {
             addTo = new CSSElement("style");
         }
@@ -560,7 +557,7 @@ class CSSParser {
                             for (int i = 0; i < CSSElement.CSS_COLLATABLE_ORDER[valsAdded - 1].length; i++) {
                                 for (int j = 0; j < CSSElement.CSS_COLLATABLE_ORDER[valsAdded - 1][i].length; j++) {
                                     int side = CSSElement.CSS_COLLATABLE_ORDER[valsAdded - 1][i][j];
-                                    addAttributeTo(parent, CSSElement.CSS_SHORTHAND_ATTRIBUTE_INDEX[iter][side], tokens[i], htmlC);
+                                    addAttributeTo(parent, CSSElement.CSS_SHORTHAND_ATTRIBUTE_INDEX[iter][side], tokens[i]);
                                 }
                             }
                         }
@@ -575,7 +572,7 @@ class CSSParser {
                     int result = addAttributeTo(parent, token, nextToken(r, false, true, false,
                             ("-wap-access-key".equalsIgnoreCase(token) || ("font-family".equalsIgnoreCase(token)) ||
                                     ("quotes".equalsIgnoreCase(token)) || ("border-spacing".equalsIgnoreCase(token)) ||
-                                    ("content".equalsIgnoreCase(token)) || ("counter-reset".equalsIgnoreCase(token)) || ("counter-increment".equalsIgnoreCase(token)))), htmlC);
+                                    ("content".equalsIgnoreCase(token)) || ("counter-reset".equalsIgnoreCase(token)) || ("counter-increment".equalsIgnoreCase(token)))));
                     if (result != -1) {
                         // unsupported token we need to read until the newline
                         //while(nextToken(r, false, false,false) != null && !newline) {}
@@ -655,12 +652,11 @@ class CSSParser {
      * @param selector The selector we're working on
      * @param attrId   The attribute's id
      * @param value    The attribute value
-     * @param htmlC    The HTMLComponent (To obtain the ParserCallback)
      * @return a positive value if an error occured, or -1 otherwise
      */
-    private int addAttributeTo(CSSElement selector, int attrId, String value, HTMLComponent htmlC) {
+    private int addAttributeTo(CSSElement selector, int attrId, String value) {
         int error = selector.addAttribute(attrId, value);
-        reportAddAttributeError(error, selector, selector.getAttributeName(Integer.valueOf(attrId)), value, htmlC);
+        reportAddAttributeError(error, selector, selector.getAttributeName(Integer.valueOf(attrId)), value);
         return error;
     }
 
@@ -670,12 +666,11 @@ class CSSParser {
      * @param selector      The selector we're working on
      * @param attributeName The attribute's name
      * @param value         The attribute value
-     * @param htmlC         The HTMLComponent (To obtain the ParserCallback)
      * @return a positive value if an error occured, or -1 otherwise
      */
-    private int addAttributeTo(CSSElement selector, String attributeName, String value, HTMLComponent htmlC) {
+    private int addAttributeTo(CSSElement selector, String attributeName, String value) {
         int error = selector.setAttribute(attributeName, value);
-        reportAddAttributeError(error, selector, attributeName, value, htmlC);
+        reportAddAttributeError(error, selector, attributeName, value);
         return error;
     }
 
@@ -686,9 +681,8 @@ class CSSParser {
      * @param selector      The selector we're working on
      * @param attributeName The attribute's name
      * @param value         The attribute value
-     * @param htmlC         The HTMLComponent (To obtain the ParserCallback)
      */
-    private void reportAddAttributeError(int errorCode, CSSElement selector, String attributeName, String value, HTMLComponent htmlC) {
+    private void reportAddAttributeError(int errorCode, CSSElement selector, String attributeName, String value) {
         if (errorCode != -1) {
             if (errorCode == CSSParserCallback.ERROR_CSS_ATTRIBUTE_NOT_SUPPORTED) {
                 notifyError(errorCode, selector.getTagName(), attributeName, value, "CSS Attribute '" + attributeName + "' (Appeared in selector '" + selector.getTagName() + "') is not supported in WCSS.");
