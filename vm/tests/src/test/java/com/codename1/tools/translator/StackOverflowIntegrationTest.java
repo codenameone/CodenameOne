@@ -96,8 +96,9 @@ class StackOverflowIntegrationTest {
     private String appSource() {
         return "public class StackOverflowApp {\n" +
                 "    private static native void report(String msg);\n" +
+                "    private static native int prepareStackOverflow();\n" +
+                "    private static native void restoreCallStackOffset(int value);\n" +
                 "    private static void triggerOverflow() {\n" +
-                "        triggerOverflow();\n" +
                 "    }\n" +
                 "    private static int postOverflow(int value) {\n" +
                 "        if (value <= 0) {\n" +
@@ -107,10 +108,13 @@ class StackOverflowIntegrationTest {
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        boolean overflowed = false;\n" +
+                "        int previous = prepareStackOverflow();\n" +
                 "        try {\n" +
                 "            triggerOverflow();\n" +
                 "        } catch (StackOverflowError err) {\n" +
                 "            overflowed = true;\n" +
+                "        } finally {\n" +
+                "            restoreCallStackOffset(previous);\n" +
                 "        }\n" +
                 "        report(overflowed ? \"STACK_OVERFLOW_OK\" : \"STACK_OVERFLOW_MISSING\");\n" +
                 "        StringBuilder sb = new StringBuilder();\n" +
@@ -124,6 +128,14 @@ class StackOverflowIntegrationTest {
     private String nativeReportSource() {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
+                "JAVA_INT StackOverflowApp_prepareStackOverflow___R_int(CODENAME_ONE_THREAD_STATE) {\n" +
+                "    JAVA_INT previous = threadStateData->callStackOffset;\n" +
+                "    threadStateData->callStackOffset = CN1_MAX_STACK_CALL_DEPTH - 1;\n" +
+                "    return previous;\n" +
+                "}\n" +
+                "void StackOverflowApp_restoreCallStackOffset___int(CODENAME_ONE_THREAD_STATE, JAVA_INT value) {\n" +
+                "    threadStateData->callStackOffset = value;\n" +
+                "}\n" +
                 "void StackOverflowApp_report___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT msg) {\n" +
                 "    struct String_Struct {\n" +
                 "        JAVA_OBJECT header;\n" +
