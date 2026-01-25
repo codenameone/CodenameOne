@@ -32,8 +32,8 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
         readHolds = new HashMap<Thread, Integer>();
     }
 
-    public Lock readLock() { return readerLock; }
-    public Lock writeLock() { return writerLock; }
+    public ReadLock readLock() { return readerLock; }
+    public WriteLock writeLock() { return writerLock; }
 
     public static class ReadLock implements Lock, java.io.Serializable {
         private static final long serialVersionUID = -5992448646407690164L;

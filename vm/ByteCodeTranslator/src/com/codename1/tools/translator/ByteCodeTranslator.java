@@ -240,14 +240,35 @@ public class ByteCodeTranslator {
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
+        File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsC));
+        File nativeMethodsC = new File(srcRoot, "nativeMethods.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethodsC));
+        if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
+            File malloc = new File(srcRoot, "malloc.c");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
+            File rpmalloc = new File(srcRoot, "rpmalloc.c");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
+            File rpmalloch = new File(srcRoot, "rpmalloc.h");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+        }
         File xmlvm = new File(srcRoot, "xmlvm.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
-        File nativeMethods = new File(srcRoot, "nativeMethods.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
-        File javaIoFileM = new File(srcRoot, "java_io_File.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileM));
 
         Parser.writeOutput(srcRoot);
+
+        File javaIoFileHeader = new File(srcRoot, "java_io_File.h");
+        if (javaIoFileHeader.exists()) {
+            File javaIoFileC = new File(srcRoot, "java_io_File_runtime.c");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
+        }
+
+        File classMethodIndexM = new File(srcRoot, "cn1_class_method_index.m");
+        if (classMethodIndexM.exists()) {
+            File classMethodIndexC = new File(srcRoot, "cn1_class_method_index.c");
+            copy(new FileInputStream(classMethodIndexM), new FileOutputStream(classMethodIndexC));
+            classMethodIndexM.delete();
+        }
 
         writeCmakeProject(root, srcRoot, appName);
     }
@@ -554,19 +575,27 @@ public class ByteCodeTranslator {
 
     private static void writeCmakeProject(File projectRoot, File srcRoot, String appName) throws IOException {
         File cmakeLists = new File(projectRoot, "CMakeLists.txt");
+        String srcRootPath = srcRoot.getAbsolutePath();
         FileWriter writer = new FileWriter(cmakeLists);
         try {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
-            writer.append("project(").append(appName).append(" LANGUAGES C OBJC)\n");
-            writer.append("enable_language(OBJC OPTIONAL)\n");
+            writer.append("project(").append(appName).append(" LANGUAGES C)\n");
             writer.append("set(CMAKE_C_STANDARD 99)\n");
-            writer.append("file(GLOB TRANSLATOR_SOURCES \"").append(srcRoot.getName()).append("/*.c\" \"").append(srcRoot.getName()).append("/*.m\")\n");
-            writer.append("file(GLOB TRANSLATOR_HEADERS \"").append(srcRoot.getName()).append("/*.h\")\n");
+            writer.append("set(CN1_APP_SOURCE_ROOT \"")
+                    .append(escapeCmakePath(srcRootPath))
+                    .append("\")\n");
+            writer.append("include_directories(${CN1_APP_SOURCE_ROOT})\n");
+            writer.append("file(GLOB TRANSLATOR_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.c\")\n");
+            writer.append("file(GLOB TRANSLATOR_HEADERS \"${CN1_APP_SOURCE_ROOT}/*.h\")\n");
             writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
-            writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ").append(srcRoot.getName()).append(")\n");
+            writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
         } finally {
             writer.close();
         }
+    }
+
+    private static String escapeCmakePath(String path) {
+        return path.replace("\\", "\\\\");
     }
     
     private static String getFileType(String s) {

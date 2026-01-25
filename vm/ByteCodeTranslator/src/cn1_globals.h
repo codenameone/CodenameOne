@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <limits.h>
 #include "cn1_class_method_index.h"
 #include <pthread.h>
 #include <setjmp.h>

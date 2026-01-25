@@ -21,6 +21,7 @@
 #import <mach/mach_host.h>
 #else
 #include <time.h>
+#include <unistd.h>
 #define NSLog(...) printf(__VA_ARGS__); printf("\n")
 #endif
 
@@ -88,7 +89,11 @@ long CN1_EDT_THREAD_ID = -1;
 static JAVA_BOOLEAN GC_THRESHOLDS_INITIALIZED = JAVA_FALSE;
 
 int currentGcMarkValue = 1;
+#if defined(__APPLE__) && defined(__OBJC__)
 extern JAVA_BOOLEAN lowMemoryMode;
+#else
+JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
+#endif
 
 static JAVA_BOOLEAN isEdt(long threadId) {
     return (CN1_EDT_THREAD_ID == threadId);
@@ -107,7 +112,9 @@ static JAVA_BOOLEAN isEdt(long threadId) {
    vm_statistics_data_t vm_stat;
    if (host_statistics(host_port, HOST_VM_INFO, (host_info_t)&vm_stat, &host_size) != KERN_SUCCESS)
    {
+     #if defined(__OBJC__)
      NSLog(@"Failed to fetch vm statistics");
+     #endif
      return 0;
    }
    /* Stats in bytes */
@@ -580,7 +587,9 @@ void codenameOneGCMark() {
     //int marked = 0;
     
     // copy the allocated objects from already deleted threads so we can delete that data
+    #if defined(__OBJC__)
     //NSLog(@"GC mark, %d dead processes pending",nThreadsToKill);
+    #endif
     
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
@@ -606,8 +615,10 @@ void codenameOneGCMark() {
                         {   long later = time(0)-now;
                             if(later>10000)
                             {
+#if defined(__OBJC__)
                             NSLog(@"GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
                                   (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
+#endif
                             }
                         }
                     }
@@ -642,7 +653,9 @@ void codenameOneGCMark() {
                 }
                 if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
                     long freeMemory = get_free_memory();
+                    #if defined(__OBJC__)
                     NSLog(@"[GC] Blocking EDT as aggressive allocator, free memory=%lld", freeMemory);
+                    #endif
                     
                 }
                 
@@ -657,7 +670,9 @@ void codenameOneGCMark() {
                         CN1_GC_ASSERT(current->type >= CN1_TYPE_INVALID && current->type <= CN1_TYPE_PRIMITIVE,
                             "CN1_GC_STACK_ENTRY_TYPE");
 #else
+                        #if defined(__OBJC__)
                         NSLog(@"[GC] Invalid stack entry type %d at index %d; skipping entry", current->type, stackIter);
+                        #endif
                         continue;
 #endif
 #else
@@ -679,7 +694,9 @@ void codenameOneGCMark() {
             }
         }
     }
+    #if defined(__OBJC__)
     //NSLog(@"Mark set %i objects to %i", marked, currentGcMarkValue);
+    #endif
     // since they are immutable this probably doesn't need as much sync as the statics...
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
         gcMarkObject(d, (JAVA_OBJECT)constantPoolObjects[iter], JAVA_TRUE);
@@ -745,26 +762,36 @@ void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
         }
     }
     int actualTotalMemory = 0;
+    #if defined(__OBJC__)
     NSLog(@"\n\n**** There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i ****", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
+    #endif
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
             if(classTypeCountPreSweep[iter] - classTypeCount[iter] > 0) {
                 if(iter > cn1_array_start_offset) {
 #if defined(__APPLE__) && defined(__OBJC__)
+                    #if defined(__OBJC__)
                     NSLog(@"There are %i instances of %@ taking up %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], sizeInHeapForType[iter], classTypeCountPreSweep[iter] - classTypeCount[iter], sizeInHeapForTypePreSweep[iter] - sizeInHeapForType[iter]);
+                    #endif
 #endif
                 } else {
                     JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
 #if defined(__APPLE__) && defined(__OBJC__)
+                    #if defined(__OBJC__)
                     NSLog(@"There are %i instances of %@ taking up %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], toNSString(threadStateData, str), sizeInHeapForType[iter], classTypeCountPreSweep[iter] - classTypeCount[iter], sizeInHeapForTypePreSweep[iter] - sizeInHeapForType[iter]);
+                    #endif
 #endif
                 }
             }
             actualTotalMemory += sizeInHeapForType[iter];
         }
     }
+    #if defined(__OBJC__)
     //NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
+    #endif
+    #if defined(__OBJC__)
     NSLog(@"**** GC cycle complete ****");
+    #endif
     
     free(arrayOfNames);
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -802,25 +829,33 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
         }
     }
     int actualTotalMemory = 0;
+    #if defined(__OBJC__)
     NSLog(@"There are %i null available entries out of %i objects in heap which take up %i", nullSpaces, t, totalAllocatedHeap);
+    #endif
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
             float f = ((float)classTypeCount[iter]) / ((float)t) * 100.0f;
             float f2 = ((float)sizeInHeapForType[iter]) / ((float)totalAllocatedHeap) * 100.0f;
             if(iter > cn1_array_start_offset) {
 #if defined(__APPLE__) && defined(__OBJC__)
+                #if defined(__OBJC__)
                 NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], (int)f, sizeInHeapForType[iter], (int)f2);
+                #endif
 #endif
             } else {
                 JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
 #if defined(__APPLE__) && defined(__OBJC__)
+                #if defined(__OBJC__)
                 NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], toNSString(threadStateData, str), (int)f, sizeInHeapForType[iter], (int)f2);
+                #endif
 #endif
             }
             actualTotalMemory += sizeInHeapForType[iter];
         }
     }
+    #if defined(__OBJC__)
     NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
+    #endif
     
     free(arrayOfNames);
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -851,7 +886,9 @@ void codenameOneGCSweep() {
 #if TARGET_OS_SIMULATOR
                         CN1_GC_ASSERT(o->__codenameOneGcMark > 0, "CN1_GC_INVALID_MARK");
 #else
+                        #if defined(__OBJC__)
                         NSLog(@"[GC] Invalid GC mark %d for object %p; skipping sweep", o->__codenameOneGcMark, o);
+                        #endif
                         continue;
 #endif
 #else
@@ -860,7 +897,9 @@ void codenameOneGCSweep() {
                     }
                     allObjectsInHeap[iter] = JAVA_NULL;
                     //if(o->__codenameOneReferenceCount > 0) {
+                    #if defined(__OBJC__)
                     //    NSLog(@"Sweped %X", (int)o);
+                    #endif
                     //}
                     
 #ifdef DEBUG_GC_ALLOCATIONS
@@ -882,9 +921,13 @@ void codenameOneGCSweep() {
                                 data[iter] = ch[iter];
                             }
                             data[arr->length] = 0;
+                            #if defined(__OBJC__)
                             NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i type: %@, which is: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], [NSString stringWithUTF8String:data]);
+                            #endif
                         } else {
+                            #if defined(__OBJC__)
                             NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName]);
+                            #endif
                         }
                     } else {
                         JAVA_OBJECT str = java_lang_Object_toString___R_java_lang_String(threadStateData, o);
@@ -892,7 +935,9 @@ void codenameOneGCSweep() {
                         if(ns == nil) {
                             ns = @"[NULL]";
                         }
+                        #if defined(__OBJC__)
                         NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@, toString: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], ns);
+                        #endif
                     }
 #endif
 #endif
@@ -968,8 +1013,13 @@ JAVA_INT java_lang_System_identityHashCode___java_lang_Object_R_int(CODENAME_ONE
     return (JAVA_INT)__cn1Arg1;
 }
 
+#if defined(__APPLE__) && defined(__OBJC__)
 extern int mallocWhileSuspended;
 extern BOOL isAppSuspended;
+#else
+int mallocWhileSuspended = 0;
+BOOL isAppSuspended = 0;
+#endif
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
     if(isAppSuspended) {
@@ -1050,7 +1100,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                 threadStateData->nativeAllocationMode = JAVA_FALSE;
                 threadStateData->threadActive = JAVA_FALSE;
                 while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
-                    if (get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
+                    if (get_static_java_lang_System_gcThreadInstance(threadStateData) == JAVA_NULL) {
                         // For some reason the gcThread is dead
                         threadStateData->nativeAllocationMode = JAVA_TRUE;
                         java_lang_System_gc__(threadStateData);
@@ -1311,7 +1361,9 @@ void initConstantPool() {
         tmpConstantPoolObjects[iter]->__codenameOneReferenceCount = 999999;
        // java_util_ArrayList_add___java_lang_Object_R_boolean(threadStateData, internedStrings, oo);
     }
+    #if defined(__OBJC__)
     //NSLog(@"Size of constant pool in c: %i and j: %i", cStringSize, jStringSize);
+    #endif
     constantPoolObjects = tmpConstantPoolObjects;
     invokedGC = NO;
 
@@ -1452,7 +1504,9 @@ JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
 }
 
 void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    #if defined(__OBJC__)
     //NSLog(@"Throwing exception!"); 
+    #endif
     java_lang_Throwable_fillInStack__(threadStateData, exceptionArg); 
     threadStateData->exception = exceptionArg; 
     threadStateData->tryBlockOffset--; 

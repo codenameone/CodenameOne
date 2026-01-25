@@ -688,7 +688,7 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_'));
-                    b.append("(CODENAME_ONE_THREAD_STATE) {\n    return ");
+                    b.append("() {\n    return ");
                     if(bf.getValue() instanceof String) {
                         b.append("STRING_FROM_CONSTANT_POOL_OFFSET(");
                         b.append(Parser.addToConstantPool((String)bf.getValue()));
@@ -763,16 +763,16 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_'));
-                    b.append("(CODENAME_ONE_THREAD_STATE) {\n    __STATIC_INITIALIZER_");
+                    b.append("() {\n    __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
                     if (bf.isVolatile()) {
-                        b.append("(threadStateData);\n     return atomic_load_explicit(&STATIC_FIELD_");
+                        b.append("(getThreadLocalData());\n     return atomic_load_explicit(&STATIC_FIELD_");
                         b.append(bf.getClsName());
                         b.append("_");
                         b.append(bf.getFieldName());
                         b.append(", memory_order_acquire);\n}\n\n");
                     } else {
-                        b.append("(threadStateData);\n     return STATIC_FIELD_");
+                        b.append("(getThreadLocalData());\n     return STATIC_FIELD_");
                         b.append(bf.getClsName());
                         b.append("_");
                         b.append(bf.getFieldName());
@@ -1559,7 +1559,7 @@ public class ByteCodeClass {
                     b.append(bf.getClsName());
                     b.append("_");
                     b.append(bf.getFieldName());
-                    b.append("(threadStateArgument)\n");
+                    b.append("()\n");
 
                     b.append("#define set_static_");
                     b.append(clsName);
