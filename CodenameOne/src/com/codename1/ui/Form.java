@@ -2667,7 +2667,7 @@ public class Form extends Container {
         if (p instanceof BGPainter && ((BGPainter) p).getPreviousForm() != null) {
             ((BGPainter) p).setPreviousForm(previousForm);
         } else {
-            BGPainter b = new BGPainter(this, p);
+            BGPainter b = new BGPainter(p);
             getStyle().setBgPainter(b);
             b.setPreviousForm(previousForm);
         }

@@ -318,7 +318,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     @Override
     public int getComponentType(boolean disregardScrollPane) {
         if (compType == TYPE_UNSET) {
-            compType = checkType(disregardScrollPane);
+            compType = checkType();
         }
 
         return compType;
@@ -341,7 +341,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return hash;
     }
 
-    private int checkType(boolean disregardScrollPane) {
+    private int checkType() {
         Component c = this.c;
 
         if (c instanceof TextField) {

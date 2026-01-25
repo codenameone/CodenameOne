@@ -567,7 +567,7 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    private Image createTargetComponentImage(final Component c, final int w, final int h, final boolean fast) {
+    private Image createTargetComponentImage(final Component c, final int w, final int h) {
         return new com.codename1.ui.ComponentImage(new Component() {
             @Override
             public void paint(Graphics g) {
@@ -641,7 +641,7 @@ public final class RoundRectBorder extends Border {
 
     private Image createTargetImage(Component c, int w, int h, boolean fast) {
         if (!useCache) {
-            return createTargetComponentImage(c, w, h, fast);
+            return createTargetComponentImage(c, w, h);
         }
         Image target = ImageFactory.createImage(c, w, h, 0);
 

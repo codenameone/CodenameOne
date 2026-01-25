@@ -829,7 +829,7 @@ public final class NetworkManager {
 
         private boolean runCurrentRequest(@Async.Execute ConnectionRequest req) {
             if (!threadAssignements.isEmpty()) {
-                String n = currentRequest.getClass().getName();
+                String n = req.getClass().getName();
                 Integer threadOffset = (Integer) threadAssignements.get(n);
                 NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
                 if (networkThreads == null) {
@@ -838,10 +838,10 @@ public final class NetworkManager {
                 if (threadOffset != null && networkThreads[threadOffset.intValue()] != this) { //NOPMD CompareObjectsWithEquals
                     synchronized (LOCK) {
                         if (!pending.isEmpty()) {
-                            pending.insertElementAt(currentRequest, 1);
+                            pending.insertElementAt(req, 1);
                             return false;
                         }
-                        pending.addElement(currentRequest);
+                        pending.addElement(req);
                         LOCK.notifyAll();
                         long end = System.currentTimeMillis() + 30;
                         while (true) {
@@ -869,7 +869,7 @@ public final class NetworkManager {
                 // for higher priority tasks increase the thread priority, for lower
                 // prioirty tasks decrease it. In critical priority reduce the Codename One
                 // rendering thread speed for even faster download
-                switch (currentRequest.getPriority()) {
+                switch (req.getPriority()) {
                     case ConnectionRequest.PRIORITY_CRITICAL:
                         frameRate = Display.getInstance().getFrameRate();
                         Display.getInstance().setFramerate(4);
@@ -891,26 +891,26 @@ public final class NetworkManager {
                 }
 
                 if (progressListeners != null) {
-                    progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_INITIALIZING));
+                    progressListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_INITIALIZING));
                 }
-                if (currentRequest.getShowOnInit() != null) {
-                    currentRequest.getShowOnInit().showModeless();
+                if (req.getShowOnInit() != null) {
+                    req.getShowOnInit().showModeless();
                 }
 
-                requestWasCompleted = currentRequest.performOperationComplete();
+                requestWasCompleted = req.performOperationComplete();
             } catch (IOException e) {
-                if (!currentRequest.isFailSilently()) {
-                    if (!handleException(currentRequest, e)) {
-                        currentRequest.handleIOException(e);
+                if (!req.isFailSilently()) {
+                    if (!handleException(req, e)) {
+                        req.handleIOException(e);
                     }
                 } else {
                     // for the record
                     Log.e(e);
                 }
             } catch (RuntimeException er) {
-                if (!currentRequest.isFailSilently()) {
-                    if (!handleException(currentRequest, er)) {
-                        currentRequest.handleRuntimeException(er);
+                if (!req.isFailSilently()) {
+                    if (!handleException(req, er)) {
+                        req.handleRuntimeException(er);
                     }
                 } else {
                     // for the record
@@ -922,15 +922,15 @@ public final class NetworkManager {
                     Display.getInstance().setFramerate(frameRate);
                 }
                 if (requestWasCompleted) {
-                    currentRequest.complete = true;
+                    req.complete = true;
                 }
                 if (progressListeners != null) {
-                    progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
+                    progressListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_COMPLETED));
                 }
-                if (currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
+                if (req.getDisposeOnCompletion() != null && !req.isRedirecting()) {
                     // there may be a race condition where the dialog hasn't yet appeared but the
                     // network request completed
-                    final ConnectionRequest finalReq = currentRequest;
+                    final ConnectionRequest finalReq = req;
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {

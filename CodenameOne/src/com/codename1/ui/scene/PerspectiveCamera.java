@@ -41,7 +41,7 @@ public class PerspectiveCamera extends Camera {
     public PerspectiveCamera(Scene scene, double fovY, double zNear, double zFar) {
         super(zNear, zFar);
         this.scene = scene;
-        verticalFieldOfView = new Property<Double, Camera>("verticalFieldOfView", 0.25);
+        verticalFieldOfView = new Property<Double, Camera>("verticalFieldOfView", fovY);
     }
 
     @Override

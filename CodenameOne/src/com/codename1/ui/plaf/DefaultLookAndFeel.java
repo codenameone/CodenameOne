@@ -791,7 +791,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         //return f.getHeight() + f.getDescent();
     }
 
-    private void append(TextSelection sel, Component l, Span span, String text, Font f, int posOffset, int x, int y, int h) {
+    private void append(TextSelection sel, Span span, String text, Font f, int posOffset, int x, int y, int h) {
         int len = text.length();
         int xPos = 0;
         int curPos = 1;
@@ -868,12 +868,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 if (displayText.length() > 3) {
                     displayText = displayText.substring(0, displayText.length() - 3);
                 }
-                append(sel, ta, rowSpan, displayText + "...", f, posOffset, x, y, getSelectionHeight(f) - yDiff);
+                append(sel, rowSpan, displayText + "...", f, posOffset, x, y, getSelectionHeight(f) - yDiff);
                 rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
                 out.add(rowSpan);
                 return out;
             } else {
-                append(sel, ta, rowSpan, displayText, f, posOffset, x, y, getSelectionHeight(f) - yDiff);
+                append(sel, rowSpan, displayText, f, posOffset, x, y, getSelectionHeight(f) - yDiff);
                 lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
                 rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
                 out.add(rowSpan);
@@ -1954,18 +1954,18 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             switch (ta.getVerticalAlignment()) {
                 case Component.BOTTOM:
                     //g.drawString(displayText, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), style.getTextDecoration());
-                    append(sel, ta, out, displayText, f, 0, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - h, h);
+                    append(sel, out, displayText, f, 0, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - h, h);
                     // c = sel.newChar(i, charX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), charW , charH);
                     break;
                 case Component.CENTER:
                     //g.drawString(displayText, displayX, ta.getY() + ta.getHeight() / 2  - f.getHeight() / 2, style.getTextDecoration());
                     //c = sel.newChar(i, charX, ta.getY() + ta.getHeight() / 2  - f.getHeight() / 2, charW, charH);
-                    append(sel, ta, out, displayText, f, 0, displayX, ta.getY() + ta.getHeight() / 2 - h / 2, h);
+                    append(sel, out, displayText, f, 0, displayX, ta.getY() + ta.getHeight() / 2 - h / 2, h);
                     break;
                 default:
                     //g.drawString(displayText, displayX, ta.getY() + style.getPaddingTop(), style.getTextDecoration());
                     //c = sel.newChar(i, charX, ta.getY() + style.getPaddingTop(), charW, charH);
-                    append(sel, ta, out, displayText, f, 0, displayX, ta.getY() + style.getPaddingTop(), h);
+                    append(sel, out, displayText, f, 0, displayX, ta.getY() + style.getPaddingTop(), h);
                     break;
             }
 

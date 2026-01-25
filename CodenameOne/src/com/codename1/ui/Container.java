@@ -1000,7 +1000,7 @@ public class Container extends Component implements Iterable<Component> {
      *                a Transition can be null
      */
     public void replaceAndWait(final Component current, final Component next, final Transition t) {
-        replaceComponents(current, next, t, true, false, null, 0, 0, true);
+        replaceComponents(current, next, t, true, null, 0, 0, true);
     }
 
     /**
@@ -1016,7 +1016,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     public void replaceAndWait(final Component current, final Component next, final Transition t, int layoutAnimationSpeed) {
         setEnableLayoutOnPaint(false);
-        replaceComponents(current, next, t, true, false, null, 0, layoutAnimationSpeed, true);
+        replaceComponents(current, next, t, true, null, 0, layoutAnimationSpeed, true);
         if (layoutAnimationSpeed > 0) {
             animateLayoutAndWait(layoutAnimationSpeed);
         }
@@ -1037,7 +1037,7 @@ public class Container extends Component implements Iterable<Component> {
      *                  a special case where no validation occurs
      */
     public void replace(final Component current, final Component next, final Transition t, Runnable onFinish, int growSpeed) {
-        replaceComponents(current, next, t, false, false, onFinish, growSpeed, 0, true);
+        replaceComponents(current, next, t, false, onFinish, growSpeed, 0, true);
     }
 
     /**
@@ -1054,7 +1054,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     public void replaceAndWait(final Component current, final Component next,
                                final Transition t, boolean dropEvents) {
-        replaceComponents(current, next, t, true, dropEvents, null, 0, 0, true);
+        replaceComponents(current, next, t, true, null, 0, 0, true);
     }
 
     /**
@@ -1068,7 +1068,7 @@ public class Container extends Component implements Iterable<Component> {
      *                a Transition can be null
      */
     public void replace(final Component current, final Component next, final Transition t) {
-        replaceComponents(current, next, t, false, false, null, 0, 0, true);
+        replaceComponents(current, next, t, false, null, 0, 0, true);
     }
 
     /**
@@ -1083,11 +1083,11 @@ public class Container extends Component implements Iterable<Component> {
      * @return animation component that can be queued
      */
     public ComponentAnimation createReplaceTransition(Component current, Component next, Transition t) {
-        return replaceComponents(current, next, t, false, false, null, 0, 0, false);
+        return replaceComponents(current, next, t, false, null, 0, 0, false);
     }
 
     private ComponentAnimation replaceComponents(final Component current, final Component next,
-                                                 final Transition t, boolean wait, boolean dropEvents, Runnable onFinish, int growSpeed, int layoutAnimationSpeed,
+                                                 final Transition t, boolean wait, Runnable onFinish, int growSpeed, int layoutAnimationSpeed,
                                                  boolean addAnimtion) {
         if (!contains(current)) {
             throw new IllegalArgumentException("Component " + current + " is not contained in this Container");
@@ -1117,12 +1117,6 @@ public class Container extends Component implements Iterable<Component> {
         anim.growSpeed = growSpeed;
         anim.layoutAnimationSpeed = layoutAnimationSpeed;
 
-        // register the transition animation
-        /*getComponentForm().registerAnimatedInternal(anim);
-        //wait until animation has finished
-        if (wait) {
-            Display.getInstance().invokeAndBlock(anim, dropEvents);
-        }*/
         if (addAnimtion) {
             if (wait) {
                 getAnimationManager().addAnimationAndBlock(anim);
@@ -1707,22 +1701,20 @@ public class Container extends Component implements Iterable<Component> {
      * just return 0 (meaning that you need to scan the children from the beginning
      * to find visible children).</p>
      *
-     * <p>After you obtain this value, use the {@link #calculateLastPaintableOffset(int, int, int, int, int) } method
+     * <p>After you obtain this value, use the {@link #calculateLastPaintableOffset(int, int) } method
      * to get the end of the visible region.</p>
      *
      * <p>The motivation for this is to try to improve performance in places where the container
      * has many (say 2500) children, and most of them aren't actually visible.</p>
      *
-     * @param clipX1 Left bounds of region to check.  (0,0) is the top left corner of this component.
      * @param clipY1 Top bounds of region to check.  (0,0) is top left corner of this component.
-     * @param clipX2 Right bounds of region to check.  (0,0) is top left corner of this component.
      * @param clipY2 Bottom bounds of region to check.  (0,0) is top left corner of this component.
      * @return The index within the "components" array where the first child that intersects the provided
      * clip occurs, or -1 if there is no "fast" way to find it.  If there was a fast way to do it, but no visible
      * components were found, then this will return components.size().
-     * @see #calculateLastPaintableOffset(int, int, int, int, int)
+     * @see #calculateLastPaintableOffset(int, int)
      */
-    private int calculateFirstPaintableOffset(int clipX1, int clipY1, int clipX2, int clipY2) {
+    private int calculateFirstPaintableOffset(int clipY1, int clipY2) {
         int len = components.size();
         Layout l = getLayout();
         if (l.getClass() == BoxLayout.class) {
@@ -1747,13 +1739,10 @@ public class Container extends Component implements Iterable<Component> {
      *
      * @param pos    The starting position to search.  It is assumed that this starting
      *               position is in the visible region.
-     * @param clipX1 The left bounds of the region to search.  (0,0) is the top left corner of the container.
-     * @param clipY1 The top bounds of the region to search. (0,0) is the top left corner of the container.
-     * @param clipX2 The right bounds of the region to search. (0,0) is the top left corner of the container.
      * @param clipY2 The bottom bounds of the region to search. (0,0) is the top left corner of the container.
      * @return The index of the last visible component in this container - or components.size()-1
      */
-    private int calculateLastPaintableOffset(int pos, int clipX1, int clipY1, int clipX2, int clipY2) {
+    private int calculateLastPaintableOffset(int pos, int clipY2) {
         final int len = components.size();
         if (pos >= len - 1) {
             // Start position is after the last index, so we didn't
@@ -2076,18 +2065,16 @@ public class Container extends Component implements Iterable<Component> {
         int size = components.size();
         int startIter = 0;
         if (size >= 30) {
-            int clipX1 = g.getClipX();
-            int clipX2 = g.getClipX() + g.getClipWidth();
             int clipY1 = g.getClipY();
             int clipY2 = g.getClipY() + g.getClipHeight();
-            startIter = calculateFirstPaintableOffset(clipX1, clipY1, clipX2, clipY2);
+            startIter = calculateFirstPaintableOffset(clipY1, clipY2);
             if (startIter < 0) {
                 // There was no efficient way to calculate the offset
                 startIter = 0;
             } else if (startIter < size) {
                 // There was an efficient way to calculate the offset so we
                 // will continue this approach
-                size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2) + 1;
+                size = calculateLastPaintableOffset(startIter, clipY2) + 1;
             }
         }
 
@@ -2826,10 +2813,9 @@ public class Container extends Component implements Iterable<Component> {
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
-            int relx = x - getAbsoluteX();
             int rely = y - getAbsoluteY();
 
-            startIter = calculateFirstPaintableOffset(relx, rely, relx, rely);
+            startIter = calculateFirstPaintableOffset(rely, rely);
             if (startIter < 0) {
                 // There was no efficient way to calculate the first paintable offset
                 // start counting from 0
@@ -2837,7 +2823,7 @@ public class Container extends Component implements Iterable<Component> {
             } else if (startIter < count) {
                 // We found a start offset using an efficient method
                 // Find an appropriate end offset.
-                count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
+                count = calculateLastPaintableOffset(startIter, rely) + 1;
             }
         }
         for (int i = count - 1; i >= startIter; i--) {
@@ -2879,10 +2865,9 @@ public class Container extends Component implements Iterable<Component> {
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
-            int relx = x - getAbsoluteX();
             int rely = y - getAbsoluteY();
 
-            startIter = calculateFirstPaintableOffset(relx, rely, relx, rely);
+            startIter = calculateFirstPaintableOffset(rely, rely);
             if (startIter < 0) {
                 // There was no efficient way to calculate the first paintable offset
                 // start counting from 0
@@ -2890,7 +2875,7 @@ public class Container extends Component implements Iterable<Component> {
             } else if (startIter < count) {
                 // We found a start offset using an efficient method
                 // Find an appropriate end offset.
-                count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
+                count = calculateLastPaintableOffset(startIter, rely) + 1;
             }
         }
         boolean overlaps = getActualLayout().isOverlapSupported();

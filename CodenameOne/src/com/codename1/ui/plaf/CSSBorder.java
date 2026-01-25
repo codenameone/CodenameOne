@@ -1265,9 +1265,7 @@ public class CSSBorder extends Border {
         for (int i = 0; i < len; i++) {
             if (backgroundImages[i] == null) {
                 backgroundImages[i] = new BackgroundImage();
-
             }
-            backgroundImages[i].setPosition(pos[i].trim());
         }
         return this;
     }
@@ -2168,10 +2166,6 @@ public class CSSBorder extends Border {
             }
 
             return "none";
-
-        }
-
-        private void setPosition(String pos) {
 
         }
 

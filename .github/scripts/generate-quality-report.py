@@ -915,7 +915,8 @@ def main() -> None:
             "CloseResource",
             "AssignmentInOperand",
             "EmptyControlStatement",
-            "ForLoopCanBeForeach"
+            "ForLoopCanBeForeach",
+            "UnusedFormalParameter"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

@@ -2394,7 +2394,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             x += totalWidth;
 
             //Alignment
-            imgLabel.setAlignment(getHorizAlign(alignStr, align, false));
+            imgLabel.setAlignment(getHorizAlign(alignStr, align));
             imgLabel.setVerticalAlignment(getVertAlign(alignStr, Component.CENTER));
 
             if (showImages) {
@@ -2793,14 +2793,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             HTMLElement tGroupTag = (HTMLElement) trTag.getParent();
             int tagId = tGroupTag.getTagId();
             if ((tagId == HTMLElement.TAG_TBODY) || (tagId == HTMLElement.TAG_THEAD) || (tagId == HTMLElement.TAG_TFOOT)) {
-                halign = getHorizAlign(tGroupTag.getAttributeById(HTMLElement.ATTR_ALIGN), halign, false); // Get the default TR alignment
+                halign = getHorizAlign(tGroupTag.getAttributeById(HTMLElement.ATTR_ALIGN), halign); // Get the default TR alignment
                 valign = getVertAlign(tGroupTag.getAttributeById(HTMLElement.ATTR_VALIGN), valign); // Get the default TR valignment
             }
-            halign = getHorizAlign(trTag.getAttributeById(HTMLElement.ATTR_ALIGN), halign, false); // Get the default TR alignment
+            halign = getHorizAlign(trTag.getAttributeById(HTMLElement.ATTR_ALIGN), halign); // Get the default TR alignment
             valign = getVertAlign(trTag.getAttributeById(HTMLElement.ATTR_VALIGN), valign); // Get the default TR valignment
         }
 
-        halign = getHorizAlign(tdTag.getAttributeById(HTMLElement.ATTR_ALIGN), halign, false);
+        halign = getHorizAlign(tdTag.getAttributeById(HTMLElement.ATTR_ALIGN), halign);
         valign = getVertAlign(tdTag.getAttributeById(HTMLElement.ATTR_VALIGN), valign);
         int colspan = getInt(tdTag.getAttributeById(HTMLElement.ATTR_COLSPAN));
         int rowspan = getInt(tdTag.getAttributeById(HTMLElement.ATTR_ROWSPAN));
@@ -2949,7 +2949,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     break;
                 case HTMLElement.TAG_DIV:
                 case HTMLElement.TAG_CENTER: // CENTER is practically DIV align=CENTER
-                    curAlign = child.getTagId() == HTMLElement.TAG_DIV ? getHorizAlign(child.getAttributeById(HTMLElement.ATTR_ALIGN), align, true) : Component.CENTER;
+                    curAlign = child.getTagId() == HTMLElement.TAG_DIV ? getHorizAlign(child.getAttributeById(HTMLElement.ATTR_ALIGN), align) : Component.CENTER;
                     adjustAlignment(align, curAlign);
                     newLineIfNotEmpty(curAlign);
                     pushContainer(child);
@@ -3627,7 +3627,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     private int tagP(int align, HTMLElement child) {
         int curAlign;
-        curAlign = getHorizAlign(child.getAttributeById(HTMLElement.ATTR_ALIGN), align, true);
+        curAlign = getHorizAlign(child.getAttributeById(HTMLElement.ATTR_ALIGN), align);
         adjustAlignment(align, curAlign);
         newLineIfNotEmpty(curAlign);
         newLineIfLastWasNotEmpty(curAlign);
@@ -3763,10 +3763,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      *
      * @param alignment    The string describing the alignment
      * @param defaultAlign The default alignment if the string cannot be converted
-     * @param allowJustify true to allow justify alignment, false to return center if justify is mentioned
      * @return Component.LEFT, RIGHT or CENTER or the defaultAlign in case no match was found.
      */
-    private int getHorizAlign(String alignment, int defaultAlign, boolean allowJustify) {
+    private int getHorizAlign(String alignment, int defaultAlign) {
         if (alignment != null) {
             if ("left".equals(alignment)) {
                 return Component.LEFT;

@@ -61,7 +61,7 @@ public abstract class ComponentAnimation {
      * @return the sequential animation
      */
     public static ComponentAnimation sequentialAnimation(ComponentAnimation... anims) {
-        return new CompoundAnimation(anims, true);
+        return new CompoundAnimation(anims, 0);
     }
 
     /**
@@ -189,9 +189,9 @@ public abstract class ComponentAnimation {
             sequence = -1;
         }
 
-        public CompoundAnimation(ComponentAnimation[] anims, boolean s) {
+        public CompoundAnimation(ComponentAnimation[] anims, int sequence) {
             this.anims = anims;
-            sequence = 0;
+            this.sequence = sequence;
         }
 
         @Override
@@ -310,6 +310,7 @@ public abstract class ComponentAnimation {
          * @param cnt  The container that is being mutated.
          * @param anim The animation.
          */
+        @SuppressWarnings("PMD.UnusedFormalParameter")
         public UIMutation(Container cnt, ComponentAnimation anim) {
             super(new ComponentAnimation[]{anim});
         }

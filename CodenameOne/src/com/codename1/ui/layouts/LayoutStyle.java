@@ -229,10 +229,6 @@ public class LayoutStyle {
      */
     int getCBRBPadding(Component source, Component target, int position,
                        int offset) {
-        offset -= getCBRBPadding(source, position);
-        if (offset > 0) {
-            offset -= getCBRBPadding(target, flipDirection(position));
-        }
         if (offset < 0) {
             return 0;
         }
@@ -251,7 +247,6 @@ public class LayoutStyle {
      * @return offset - border/margin around the component.
      */
     int getCBRBPadding(Component source, int position, int offset) {
-        offset -= getCBRBPadding(source, position);
         return Math.max(offset, 0);
     }
 
@@ -268,17 +263,6 @@ public class LayoutStyle {
             default:
                 throw new IllegalArgumentException("Illegal position: " + position);
         }
-    }
-
-    private int getCBRBPadding(Component c, int position) {
-        /*if (c.getUIClassID() == "CheckBoxUI" ||
-              c.getUIClassID() == "RadioButtonUI") {
-            Border border = c.getBorder();
-            if (border instanceof UIResource) {
-                return getInset(c, position);
-            }
-        }*/
-        return 0;
     }
 
     // Fix component alignment to work with labels etc when doing bidi

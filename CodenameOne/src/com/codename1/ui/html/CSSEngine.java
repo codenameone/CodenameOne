@@ -291,7 +291,7 @@ class CSSEngine {
             CSSElement style = null;
             styleStr = "{" + styleStr + "}"; // So it will be parsed correctly
             try {
-                style = CSSParser.getInstance().parseCSS(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(styleStr))), htmlC);
+                style = CSSParser.getInstance().parseCSS(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(styleStr))));
                 applyStyle(element, style, htmlC);
             } catch (IOException ex) {
                 ex.printStackTrace();

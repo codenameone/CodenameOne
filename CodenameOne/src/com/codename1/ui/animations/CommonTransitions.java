@@ -439,7 +439,7 @@ public final class CommonTransitions extends Transition {
                 // transparent image!
                 buffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()),
                         Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight() +
-                                getDialogTitleHeight(dlg)), 0);
+                                getDialogTitleHeight()), 0);
                 Style stl = dlg.getDialogComponent().getStyle();
                 byte bgt = stl.getBgTransparency();
                 stl.setBgTransparency(0xff);
@@ -559,7 +559,7 @@ public final class CommonTransitions extends Transition {
                 dest = h;
                 if (destination instanceof Dialog) {
                     startOffset = h - getDialogParent(destination).getHeight() -
-                            getDialogTitleHeight((Dialog) destination);
+                            getDialogTitleHeight();
                     if (direction) {
                         startOffset -= getDialogParent(destination).getStyle().getMarginBottom();
                     } else {
@@ -575,7 +575,7 @@ public final class CommonTransitions extends Transition {
                 } else {
                     if (source instanceof Dialog) {
                         dest = getDialogParent(source).getHeight() +
-                                getDialogTitleHeight((Dialog) source);
+                                getDialogTitleHeight();
                         if (direction) {
                             dest += getDialogParent(source).getStyle().getMarginBottom();
                         } else {
@@ -612,7 +612,7 @@ public final class CommonTransitions extends Transition {
                     Dialog d = (Dialog) source;
                     secondaryBuffer = createMutableImage(getDialogParent(d).getWidth(),
                             getDialogParent(d).getHeight() +
-                                    getDialogTitleHeight(d));
+                                    getDialogTitleHeight());
                     drawDialogCmp(secondaryBuffer.getGraphics(), d);
                 }
             } else {
@@ -622,7 +622,7 @@ public final class CommonTransitions extends Transition {
                         Dialog d = (Dialog) destination;
                         secondaryBuffer = createMutableImage(getDialogParent(d).getWidth(),
                                 d.getContentPane().getParent().getHeight() +
-                                        getDialogTitleHeight(d));
+                                        getDialogTitleHeight());
                         drawDialogCmp(secondaryBuffer.getGraphics(), d);
                     }
                 } else {
@@ -1152,7 +1152,7 @@ public final class CommonTransitions extends Transition {
         }
     }
 
-    private int getDialogTitleHeight(Dialog d) {
+    private int getDialogTitleHeight() {
         return 0;
     }
 
@@ -1160,7 +1160,7 @@ public final class CommonTransitions extends Transition {
         Painter p = dlg.getStyle().getBgPainter();
         dlg.getStyle().setBgPainter(null);
         g.setClip(0, 0, dlg.getWidth(), dlg.getHeight());
-        g.translate(-getDialogParent(dlg).getX(), -getDialogParent(dlg).getY() + getDialogTitleHeight(dlg));
+        g.translate(-getDialogParent(dlg).getX(), -getDialogParent(dlg).getY() + getDialogTitleHeight());
         getDialogParent(dlg).paintComponent(g, false);
         if (drawDialogMenu && dlg.getCommandCount() > 0) {
             Component menuBar = dlg.getSoftButton(0).getParent();

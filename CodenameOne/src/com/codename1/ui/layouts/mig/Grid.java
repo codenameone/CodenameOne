@@ -734,7 +734,7 @@ public final class Grid {
         }
     }
 
-    private static void layoutSerial(ContainerWrapper parent, ArrayList<CompWrap> compWraps, DimConstraint dc, int start, int size, boolean isHor, int spanCount, boolean fromEnd) {
+    private static void layoutSerial(ContainerWrapper parent, ArrayList<CompWrap> compWraps, DimConstraint dc, int start, int size, boolean isHor, boolean fromEnd) {
         FlowSizeSpec fss = mergeSizesGapsAndResConstrs(
                 getComponentResizeConstraints(compWraps, isHor),
                 getComponentGapPush(compWraps, isHor),
@@ -2228,7 +2228,7 @@ public final class Grid {
             } else if (linkType == TYPE_BASELINE) {
                 layoutBaseline(parent, _compWraps, dc, start, size, LayoutUtil.PREF, spanCount);
             } else {
-                layoutSerial(parent, _compWraps, dc, start, size, isHor, spanCount, fromEnd);
+                layoutSerial(parent, _compWraps, dc, start, size, isHor, fromEnd);
             }
         }
 

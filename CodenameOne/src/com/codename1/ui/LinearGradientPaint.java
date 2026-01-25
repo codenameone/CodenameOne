@@ -96,13 +96,11 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         paint(g, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
     }
 
-    private double insetStartLength(double x, double y, double w, double h) {
-
-
+    private double insetStartLength(double w, double h) {
         return Math.max(w, h);
     }
 
-    private double insetEndLength(double x, double y, double w, double h) {
+    private double insetEndLength(double w, double h) {
         return Math.max(w, h);
     }
 
@@ -157,23 +155,21 @@ public class LinearGradientPaint extends MultipleGradientPaint {
      * @param h
      */
     @Override
+    @SuppressWarnings("UnusedFormalParameter")
     public void paint(Graphics g, double x, double y, double w, double h) {
-        paint(g, x, y, w, h, true);
+        // TODO: x and y probably need to be taken into consideration here...
+        paint(g, w, h, true);
     }
 
-    private void paint(Graphics g, double x, double y, double w, double h, boolean processCycles) {
+    private void paint(Graphics g, double w, double h, boolean processCycles) {
         Paint p = g.getPaint();
         int[] colors = getColors();
         float[] fractions = getFractions();
 
         double theta = theta();
-        double px = 0;
-        double py = 0;
         double pw = length();
         double ph = Math.max(w, h) * 2;
 
-
-        //System.out.println("px="+px+", "+py+", "+pw+", "+ph+" theta="+theta);
 
         g.getTransform(t);
         t2.setTransform(t);
@@ -195,24 +191,18 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         if (getTransparency() < 0xff) {
             g.setAlpha((int) (alpha * gradientTrans / 255.0));
         }
-        /*
-        if (pStartX > 0) {
-            g.setColor(colors[0]);
-            g.fillRect(0, 0, (int)Math.round(pStartX), (int)Math.round(ph));
-        }
-        */
         if (processCycles) {
             switch (getCycleMethod()) {
                 case NO_CYCLE: {
 
                     g.setColor(colors[0]);
-                    g.fillRect((int) Math.floor(-insetStartLength(x, y, w, h)), 0, (int) Math.ceil(insetStartLength(x, y, w, h)) + 1, (int) Math.round(ph));
+                    g.fillRect((int) Math.floor(-insetStartLength(w, h)), 0, (int) Math.ceil(insetStartLength(w, h)) + 1, (int) Math.round(ph));
                     break;
                 }
                 case REPEAT:
                 case REFLECT: {
                     int currPos = 0;
-                    int endPos = (int) Math.floor(-insetStartLength(x, y, w, h));
+                    int endPos = (int) Math.floor(-insetStartLength(w, h));
                     int iter = 0;
 
                     while (currPos > endPos) {
@@ -252,13 +242,13 @@ public class LinearGradientPaint extends MultipleGradientPaint {
                 case NO_CYCLE: {
 
                     g.setColor(colors[len - 1]);
-                    g.fillRect((int) Math.floor(pw) - 1, 0, (int) Math.ceil(insetEndLength(x, y, w, h)), (int) Math.round(ph));
+                    g.fillRect((int) Math.floor(pw) - 1, 0, (int) Math.ceil(insetEndLength(w, h)), (int) Math.round(ph));
                     break;
                 }
                 case REPEAT:
                 case REFLECT: {
                     int currPos = 0;
-                    int endPos = (int) Math.ceil(insetEndLength(x, y, w, h));
+                    int endPos = (int) Math.ceil(insetEndLength(w, h));
                     int iter = 0;
 
                     while (currPos < endPos) {
