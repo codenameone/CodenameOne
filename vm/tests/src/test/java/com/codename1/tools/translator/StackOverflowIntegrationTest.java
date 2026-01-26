@@ -85,10 +85,12 @@ class StackOverflowIntegrationTest {
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
         Path executable = buildDir.resolve("StackOverflowApp");
-        String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
+        ProcessResult result = runProcess(Arrays.asList(executable.toString()), buildDir);
 
-        assertTrue(output.contains("STACK_OVERFLOW_OK"),
-                "StackOverflowError should be thrown and caught. Output was:\n" + output);
+        assertEquals(0, result.exitCode,
+                "StackOverflowApp exited with code " + result.exitCode + ". Output:\n" + result.output);
+        assertTrue(result.output.contains("STACK_OVERFLOW_OK"),
+                "StackOverflowError should be thrown and caught. Output was:\n" + result.output);
     }
 
     private String appSource() {
@@ -130,5 +132,29 @@ class StackOverflowIntegrationTest {
                 "        fflush(stdout);\n" +
                 "    }\n" +
                 "}\n";
+    }
+
+    private ProcessResult runProcess(List<String> command, Path workingDir) throws Exception {
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(workingDir.toFile());
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        String output;
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
+        }
+        int exit = process.waitFor();
+        return new ProcessResult(exit, output);
+    }
+
+    private static final class ProcessResult {
+        private final int exitCode;
+        private final String output;
+
+        private ProcessResult(int exitCode, String output) {
+            this.exitCode = exitCode;
+            this.output = output;
+        }
     }
 }
