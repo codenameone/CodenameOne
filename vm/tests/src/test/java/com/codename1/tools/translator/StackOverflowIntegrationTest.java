@@ -86,8 +86,16 @@ class StackOverflowIntegrationTest {
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
         Path executable = buildDir.resolve("StackOverflowApp");
-        ProcessResult result = runProcess(Arrays.asList(executable.toString()), buildDir);
+        ProcessResult smokeResult = runProcess(Arrays.asList(executable.toString(), "smoke"), buildDir);
+        String smokeDiagnostics = buildDiagnostics(srcRoot, executable, smokeResult);
+        assertEquals(0, smokeResult.exitCode,
+                "StackOverflowApp smoke run exited with code " + smokeResult.exitCode
+                        + ". Output:\n" + smokeResult.output
+                        + smokeDiagnostics);
+        assertTrue(smokeResult.output.contains("SMOKE_OK"),
+                "StackOverflowApp smoke run should succeed. Output was:\n" + smokeResult.output + smokeDiagnostics);
 
+        ProcessResult result = runProcess(Arrays.asList(executable.toString()), buildDir);
         String diagnostics = buildDiagnostics(srcRoot, executable, result);
         assertEquals(0, result.exitCode,
                 "StackOverflowApp exited with code " + result.exitCode
@@ -103,7 +111,18 @@ class StackOverflowIntegrationTest {
                 "    private static void triggerOverflow() {\n" +
                 "        triggerOverflow();\n" +
                 "    }\n" +
+                "    private static int boundedRecursion(int depth) {\n" +
+                "        if (depth <= 0) {\n" +
+                "            return 1;\n" +
+                "        }\n" +
+                "        return depth + boundedRecursion(depth - 1);\n" +
+                "    }\n" +
                 "    public static void main(String[] args) {\n" +
+                "        if (args != null && args.length > 0 && \"smoke\".equals(args[0])) {\n" +
+                "            int value = boundedRecursion(5);\n" +
+                "            report(\"SMOKE_OK:\" + value);\n" +
+                "            return;\n" +
+                "        }\n" +
                 "        try {\n" +
                 "            triggerOverflow();\n" +
                 "        } catch (StackOverflowError err) {\n" +
