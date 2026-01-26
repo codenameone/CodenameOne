@@ -214,6 +214,12 @@ class StackOverflowIntegrationTest {
             String appSourceText = new String(Files.readAllBytes(appSource), StandardCharsets.UTF_8);
             diagnostics.append("\ntriggerOverflow snippet: ")
                     .append(extractSnippet(appSourceText, "StackOverflowApp_triggerOverflow__", 120));
+            diagnostics.append("\nboundedRecursion snippet: ")
+                    .append(extractSnippet(appSourceText, "StackOverflowApp_boundedRecursion___int_R_int", 120));
+            diagnostics.append("\nmain snippet: ")
+                    .append(extractSnippet(appSourceText, "StackOverflowApp_main___java_lang_String_1ARRAY", 160));
+            diagnostics.append("\nreport snippet: ")
+                    .append(extractSnippet(appSourceText, "StackOverflowApp_report___java_lang_String", 120));
         }
         if (!result.output.isEmpty()) {
             diagnostics.append("\nOutput length: ").append(result.output.length());
