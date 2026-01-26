@@ -88,12 +88,13 @@ class StackOverflowIntegrationTest {
         Path executable = buildDir.resolve("StackOverflowApp");
         ProcessResult result = runProcess(Arrays.asList(executable.toString()), buildDir);
 
+        String diagnostics = buildDiagnostics(srcRoot, executable, result);
         assertEquals(0, result.exitCode,
                 "StackOverflowApp exited with code " + result.exitCode
                         + ". Output:\n" + result.output
-                        + "\nExecutable: " + executable);
+                        + diagnostics);
         assertTrue(result.output.contains("STACK_OVERFLOW_OK"),
-                "StackOverflowError should be thrown and caught. Output was:\n" + result.output);
+                "StackOverflowError should be thrown and caught. Output was:\n" + result.output + diagnostics);
     }
 
     private String appSource() {
@@ -160,6 +161,70 @@ class StackOverflowIntegrationTest {
         String appSourceText = new String(Files.readAllBytes(appSource), StandardCharsets.UTF_8);
         assertTrue(appSourceText.contains("StackOverflowApp_triggerOverflow__"),
                 "StackOverflowApp.c should include triggerOverflow method for recursion.");
+    }
+
+    private String buildDiagnostics(Path srcRoot, Path executable, ProcessResult result) throws Exception {
+        StringBuilder diagnostics = new StringBuilder();
+        diagnostics.append("\nExecutable: ").append(executable);
+        if (Files.exists(executable)) {
+            diagnostics.append("\nExecutable size: ").append(Files.size(executable)).append(" bytes");
+        }
+
+        Path cn1Globals = srcRoot.resolve("cn1_globals.h");
+        if (Files.exists(cn1Globals)) {
+            String globalsSource = new String(Files.readAllBytes(cn1Globals), StandardCharsets.UTF_8);
+            diagnostics.append("\n").append(extractLine(globalsSource, "CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT"));
+        }
+
+        Path nativeMethods = srcRoot.resolve("nativeMethods.c");
+        if (Files.exists(nativeMethods)) {
+            String nativeMethodsSource = new String(Files.readAllBytes(nativeMethods), StandardCharsets.UTF_8);
+            diagnostics.append("\nContains java_lang_StackOverflowError.h: ")
+                    .append(nativeMethodsSource.contains("java_lang_StackOverflowError.h"));
+            diagnostics.append("\nContains CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT: ")
+                    .append(nativeMethodsSource.contains("CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT"));
+            diagnostics.append("\ninitMethodStack snippet: ")
+                    .append(extractSnippet(nativeMethodsSource, "initMethodStack", 120));
+        }
+
+        Path appSource = srcRoot.resolve("StackOverflowApp.c");
+        if (Files.exists(appSource)) {
+            String appSourceText = new String(Files.readAllBytes(appSource), StandardCharsets.UTF_8);
+            diagnostics.append("\ntriggerOverflow snippet: ")
+                    .append(extractSnippet(appSourceText, "StackOverflowApp_triggerOverflow__", 120));
+        }
+        if (!result.output.isEmpty()) {
+            diagnostics.append("\nOutput length: ").append(result.output.length());
+        }
+        return diagnostics.toString();
+    }
+
+    private String extractLine(String source, String token) {
+        int idx = source.indexOf(token);
+        if (idx < 0) {
+            return "Missing " + token;
+        }
+        int lineStart = source.lastIndexOf('\n', idx);
+        int lineEnd = source.indexOf('\n', idx);
+        if (lineStart < 0) {
+            lineStart = 0;
+        } else {
+            lineStart += 1;
+        }
+        if (lineEnd < 0) {
+            lineEnd = source.length();
+        }
+        return source.substring(lineStart, lineEnd).trim();
+    }
+
+    private String extractSnippet(String source, String token, int radius) {
+        int idx = source.indexOf(token);
+        if (idx < 0) {
+            return "Missing " + token;
+        }
+        int start = Math.max(0, idx - radius);
+        int end = Math.min(source.length(), idx + radius);
+        return source.substring(start, end).replace("\n", "\\n");
     }
 
     private ProcessResult runProcess(List<String> command, Path workingDir) throws Exception {
