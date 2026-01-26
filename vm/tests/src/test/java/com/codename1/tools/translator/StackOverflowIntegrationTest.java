@@ -119,11 +119,13 @@ class StackOverflowIntegrationTest {
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        if (args != null && args.length > 0 && \"smoke\".equals(args[0])) {\n" +
+                "            report(\"SMOKE_START\");\n" +
                 "            int value = boundedRecursion(5);\n" +
                 "            StringBuilder sb = new StringBuilder();\n" +
                 "            sb.append(\"SMOKE_OK:\");\n" +
                 "            sb.append(value);\n" +
                 "            report(sb.toString());\n" +
+                "            report(\"SMOKE_DONE\");\n" +
                 "            return;\n" +
                 "        }\n" +
                 "        try {\n" +
