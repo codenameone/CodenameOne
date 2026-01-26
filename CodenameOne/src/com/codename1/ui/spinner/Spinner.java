@@ -191,7 +191,7 @@ class Spinner extends List {
         Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new SpinnerRenderer<Object>() {
             @Override
             public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
-                if (value != null && value instanceof Double) {
+                if (value instanceof Double) {
                     // round the number in the spinner to two digits
                     double d = ((Double) value).doubleValue();
                     long l = (long) d;

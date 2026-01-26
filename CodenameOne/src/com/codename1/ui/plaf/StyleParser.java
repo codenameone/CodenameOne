@@ -342,8 +342,9 @@ public class StyleParser {
                 return "left";
             case Component.RIGHT:
                 return "right";
+            default:
+                return null;
         }
-        return null;
     }
 
     private static float getMMValue(String val) {
@@ -356,8 +357,9 @@ public class StyleParser {
             case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
                 return (float) Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0)
                         / Display.getInstance().convertToPixels(1f);
+            default:
+                return 0;
         }
-        return 0;
     }
 
     private static String parseStroke(BorderInfo out, String rem) {
@@ -760,10 +762,9 @@ public class StyleParser {
                 out[Component.LEFT] = v4;
                 return out;
             }
-
-
+            default:
+                return null;
         }
-        return null;
     }
 
     private static ScalarValue parseSingleTRBLValue(String val) {
@@ -2995,9 +2996,9 @@ public class StyleParser {
                     return "mm";
                 case Style.UNIT_TYPE_PIXELS:
                     return "px";
-
+                default:
+                    return "px";
             }
-            return "px";
         }
 
         private String nameString(String prefix) {

@@ -108,6 +108,7 @@ final class InfBlocks {
         }
     }
 
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     int proc(int r) {
         int t;              // temporary storage
         int b;              // bit buffer

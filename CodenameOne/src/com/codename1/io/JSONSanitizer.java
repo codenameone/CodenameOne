@@ -410,6 +410,7 @@ final class JSONSanitizer {
         return this.maximumNestingDepth;
     }
 
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     void sanitize() {
         // Return to consistent state.
         bracketDepth = cleaned = 0;

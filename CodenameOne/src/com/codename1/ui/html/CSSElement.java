@@ -913,6 +913,8 @@ class CSSElement extends HTMLElement {
                                 return false;
                             }
                             break;
+                        default:
+                            return true;
                     }
                 }
             }

@@ -996,6 +996,8 @@ public final class Display extends CN1Constants {
         return false;
     }
 
+    // Seems to be a false positive on this rule
+    @SuppressWarnings("PMD.SimplifyConditional")
     private void paintTransitionAnimation() {
         Animation ani = animationQueue.get(0);
         if (!ani.animate()) {
@@ -1557,6 +1559,8 @@ public final class Display extends CN1Constants {
                 case SHOW_DURING_EDIT_SET_AS_NEXT:
                     impl.setCurrentForm(newForm);
                     return;
+                default:
+                    break;
             }
         }
 
@@ -2543,7 +2547,7 @@ public final class Display extends CN1Constants {
      */
     public Form getCurrent() {
         Form current = impl.getCurrentForm();
-        if (current != null && current instanceof Dialog) {
+        if (current instanceof Dialog) {
             if (current.isMenu() || current.isDisposed()) {
                 Form p = current.getPreviousForm();
                 if (p != null) {

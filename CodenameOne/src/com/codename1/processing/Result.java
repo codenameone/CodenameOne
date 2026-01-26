@@ -1018,6 +1018,7 @@ public final class Result {
      * @return
      * @throws IllegalArgumentException
      */
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     private StructuredContent apply(final StructuredContent start,
                                     final List tokens, final int firstToken)
             throws IllegalArgumentException {

@@ -1255,8 +1255,9 @@ public class Border {
                 b.themeColors = themeColors;
                 return b;
             }
+            default:
+                return this;
         }
-        return this;
     }
 
     /**
@@ -1291,6 +1292,7 @@ public class Border {
         }
     }
 
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     private void paintBorderBackground(Graphics g, final int xParameter, final int yParameter,
                                        final int widthParameter, final int heightParameter, Component c) {
         int originalColor = g.getColor();
@@ -1859,10 +1861,7 @@ public class Border {
                     //g.popClip();
                 }
                 break;
-            case TYPE_IMAGE:
-            case TYPE_IMAGE_SCALED:
-            case TYPE_IMAGE_HORIZONTAL:
-            case TYPE_IMAGE_VERTICAL:
+            default:
                 break;
         }
         g.setColor(originalColor);

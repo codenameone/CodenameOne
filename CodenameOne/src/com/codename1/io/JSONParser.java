@@ -166,6 +166,7 @@ public class JSONParser implements JSONParseCallback {
      * @param callback a generic callback to receive the parse events
      * @throws IOException if thrown by the stream
      */
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     public static void parse(Reader i, JSONParseCallback callback) throws IOException {
         boolean quoteMode = false;
         ReaderClass rc = new ReaderClass();

@@ -648,6 +648,7 @@ public class RECompiler {
      * @return Index of new atom node
      * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     int atom() throws RESyntaxException {
         // Create a string node
         int ret = node(RE.OP_ATOM, 0);
@@ -817,6 +818,8 @@ public class RECompiler {
                         break;
                 }
             }
+            default:
+                break;
         }
 
         // Everything above either fails or returns.

@@ -178,8 +178,9 @@ public class VideoCaptureConstraints {
                 return "Low quality";
             case QUALITY_HIGH:
                 return "High quality";
+            default:
+                return "";
         }
-        return "";
     }
 
     private String getMaxFileSizeString() {

@@ -162,8 +162,9 @@ abstract class AbstractEvaluator implements Evaluator {
                 return evaluateLeftLessRightInternal(element, lvalue, rvalue);
             case '%':
                 return evaluateLeftContainsRightInternal(element, lvalue, rvalue);
+            default:
+                return null;
         }
-        return null;
     }
 
     /**

@@ -95,6 +95,7 @@ public class REProgram {
      * @param instruction    Program instruction buffer
      * @param lenInstruction Length of instruction buffer in use
      */
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     public void setInstructions(char[] instruction, int lenInstruction) {
         // Save reference to instruction array
         this.instruction = instruction;
