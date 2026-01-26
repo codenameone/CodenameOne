@@ -133,6 +133,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     return Component.LEFT;
                 case Component.LEFT:
                     return Component.RIGHT;
+                default:
+                    // unnecessary but makes PMD happy
+                    return align;
             }
         }
         return align;

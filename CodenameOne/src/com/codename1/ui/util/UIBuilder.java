@@ -2398,7 +2398,7 @@ public class UIBuilder { //implements Externalizable {
 
     Form createForm(Form f) {
         Form currentForm = Display.getInstance().getCurrent();
-        if (currentForm != null && currentForm instanceof Dialog) {
+        if (currentForm instanceof Dialog) {
             ((Dialog) Display.getInstance().getCurrent()).dispose();
             currentForm = Display.getInstance().getCurrent();
         }
@@ -2442,7 +2442,7 @@ public class UIBuilder { //implements Externalizable {
 
     private void showForm(Form f, Command sourceCommand, Component sourceComponent) {
         Form currentForm = Display.getInstance().getCurrent();
-        if (currentForm != null && currentForm instanceof Dialog) {
+        if (currentForm instanceof Dialog) {
             ((Dialog) Display.getInstance().getCurrent()).dispose();
             currentForm = Display.getInstance().getCurrent();
         }

@@ -755,17 +755,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     private boolean isTypedKey(int code) {
-        if (true) {
-            return code > 0;
-        }
-
-        return (code >= 48 && code <= 90) // 0-9a-z
-                ||
-                (code >= 96 && code <= 111) // number pad and arithmetic
-                ||
-                (code >= 186 && code <= 192) // punctuation
-                ||
-                (code >= 219 && code <= 222); // brackets & quotes
+        return code > 0;
     }
 
     /**
@@ -1634,6 +1624,9 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                     return LEFT;
                 case LEFT:
                     return RIGHT;
+                default:
+                    // unnecessary, but makes the flow clearer and makes PMD happy
+                    return a;
             }
         }
         return a;

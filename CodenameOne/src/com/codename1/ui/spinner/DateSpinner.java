@@ -69,7 +69,7 @@ public class DateSpinner extends BaseSpinner {
             SpinnerRenderer<Object> render = new SpinnerRenderer<Object>() {
                 @Override
                 public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
-                    if (value != null && value instanceof Integer) {
+                    if (value instanceof Integer) {
                         // round the number in the spinner to two digits
                         int d = ((Integer) value).intValue();
                         if (numericMonths) {

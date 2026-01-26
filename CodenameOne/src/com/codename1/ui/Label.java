@@ -478,8 +478,9 @@ public class Label extends Component implements IconHolder, TextHolder {
                 return BRB_CONSTANT_DESCENT;
             case CENTER:
                 return BRB_CENTER_OFFSET;
+            default:
+                return BRB_OTHER;
         }
-        return BRB_OTHER;
     }
 
     @Override

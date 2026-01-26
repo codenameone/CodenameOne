@@ -433,9 +433,9 @@ public final class UnitValue {
                 case LABEL_ALIGN:
                     return PlatformDefaults.getLabelAlignPercentage() * refValue;
 
-                case IDENTITY:
+                default:
+                    throw new IllegalArgumentException("Unknown/illegal unit: " + unit + ", unitStr: " + unitStr);
             }
-            throw new IllegalArgumentException("Unknown/illegal unit: " + unit + ", unitStr: " + unitStr);
         }
 
         if (subUnits != null && subUnits.length == 2) {
@@ -456,10 +456,12 @@ public final class UnitValue {
                     return r1 > r2 ? r1 : r2;
                 case MID:
                     return (r1 + r2) * 0.5f;
+                default:
+                    throw new IllegalArgumentException("Subunit: Unknown Oper: " + oper);
             }
         }
 
-        throw new IllegalArgumentException("Internal: Unknown Oper: " + oper);
+        throw new IllegalArgumentException("Internal: invalid subunits: " + Arrays.toString(subUnits));
     }
 
     private float lookup(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
@@ -568,9 +570,10 @@ public final class UnitValue {
             case LABEL_ALIGN:
                 return false;
 
-            case IDENTITY:
+            //case IDENTITY:
+            default:
+                throw new IllegalArgumentException("Unknown/illegal unit: " + unit + ", unitStr: " + unitStr);
         }
-        throw new IllegalArgumentException("Unknown/illegal unit: " + unit + ", unitStr: " + unitStr);
     }
 
     boolean isAbsoluteDeep() {

@@ -671,6 +671,7 @@ public final class CommonTransitions extends Transition {
      * {@inheritDoc}
      */
     @Override
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     public boolean animate() {
         if (timeline != null) {
             return timeline.animate();

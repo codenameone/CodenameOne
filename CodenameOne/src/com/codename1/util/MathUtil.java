@@ -1117,6 +1117,8 @@ public abstract class MathUtil {
                     return pi + tiny;/* atan(+0,-anything) = pi */
                 case 3:
                     return -pi - tiny;/* atan(-0,-anything) =-pi */
+                default:
+                    break;
             }
         }
         /* when x = 0 */
@@ -1136,6 +1138,8 @@ public abstract class MathUtil {
                         return 3.0 * pi_o_4 + tiny;/*atan(+INF,-INF)*/
                     case 3:
                         return -3.0 * pi_o_4 - tiny;/*atan(-INF,-INF)*/
+                    default:
+                        break;
                 }
             } else {
                 switch (m) {
@@ -1147,6 +1151,8 @@ public abstract class MathUtil {
                         return pi + tiny;  /* atan(+...,-INF) */
                     case 3:
                         return -pi - tiny;  /* atan(-...,-INF) */
+                    default:
+                        break;
                 }
             }
         }

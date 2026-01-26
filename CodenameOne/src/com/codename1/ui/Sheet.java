@@ -665,8 +665,9 @@ public class Sheet extends Container {
                 return cnt.getWidth();
             case W:
                 return -getPreferredW(cnt);
+            default:
+                return 0;
         }
-        return 0;
     }
 
     /**
@@ -686,8 +687,9 @@ public class Sheet extends Container {
                 return 0;
             case N:
                 return -getPreferredH(cnt);
+            default:
+                return 0;
         }
-        return 0;
     }
 
     /**
@@ -707,11 +709,9 @@ public class Sheet extends Container {
             case W:
             case E:
                 return Math.min(getPreferredW() + (backButton.getPreferredW() + backButton.getStyle().getHorizontalMargins()) * 2, cnt.getWidth());
-
-
+            default:
+                return getPreferredW();
         }
-        return getPreferredW();
-
     }
 
     private int getPositionInt() {

@@ -211,7 +211,7 @@ public class ChartComponent extends Component {
     public ChartComponent(AbstractChart chart) {
         setUIIDFinal("ChartComponent");
         this.chart = chart;
-        if (chart != null && chart instanceof XYChart) {
+        if (chart instanceof XYChart) {
             XYChart xyChart = (XYChart) chart;
             zoomEnabled = xyChart.getRenderer().isZoomEnabled();
             panEnabled = xyChart.getRenderer().isPanEnabled();

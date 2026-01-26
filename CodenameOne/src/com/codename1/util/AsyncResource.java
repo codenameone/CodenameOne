@@ -615,7 +615,7 @@ public class AsyncResource<V> extends Observable {
             if (cause != null && cause.getClass() == CancellationException.class) {
                 return true;
             }
-            if (cause != null && cause instanceof AsyncExecutionException) {
+            if (cause instanceof AsyncExecutionException) {
                 return ((AsyncExecutionException) cause).isCancelled();
             }
             return false;

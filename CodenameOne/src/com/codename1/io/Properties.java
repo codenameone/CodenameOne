@@ -200,7 +200,7 @@ public class Properties extends HashMap<String, String> {
      * @throws IOException
      * @since 1.6
      */
-    @SuppressWarnings("fallthrough")
+    @SuppressWarnings({"fallthrough", "PMD.SwitchStmtsShouldHaveDefault"})
     public synchronized void load(Reader in) throws IOException {
         if (in == null) {
             throw new NullPointerException("in == null");

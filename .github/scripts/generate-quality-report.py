@@ -916,7 +916,10 @@ def main() -> None:
             "AssignmentInOperand",
             "EmptyControlStatement",
             "ForLoopCanBeForeach",
-            "UnusedFormalParameter"
+            "UnusedFormalParameter",
+            "SwitchStmtsShouldHaveDefault",
+            "UnconditionalIfStatement",
+            "SimplifyConditional"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

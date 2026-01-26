@@ -197,8 +197,9 @@ public final class PlatformDefaults {
                 return 96;
             case Display.DENSITY_VERY_LOW:
                 return 72;
+            default:
+                return 96;
         }
-        return 96;
     }
 
     /**

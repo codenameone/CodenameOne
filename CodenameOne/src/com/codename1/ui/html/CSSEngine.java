@@ -460,7 +460,7 @@ class CSSEngine {
             }
             for (int iter = 0; iter < element.getUi().size(); iter++) {
                 Object o = element.getUi().elementAt(iter);
-                if (o != null && o instanceof Component) {
+                if (o instanceof Component) {
                     final Component cmp = (Component) o;
                     applyStyleToUIElement(cmp, selector, element, htmlC);
                 }
@@ -971,6 +971,7 @@ class CSSEngine {
      * @param htmlC    The HTMLComponent to which this element belongs to
      * @param focus    true if the style should be applied only to the selected state iof the ui (a result of pseudo-class selector a:focus etc.)
      */
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     private void applyStyleToUIElement(Component ui, CSSElement selector, HTMLElement element, HTMLComponent htmlC) {
         //count++;
         int styles = getApplicableStyles(ui, selector); // This is relevant only for non recursive types - otherwise we need to recheck everytime since it depends on the specific UI component class

@@ -4188,8 +4188,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     return getRomanIndexString(index);
                 case LIST_ROMAN_LOWER:
                     return getRomanIndexString(index).toLowerCase();
+                default:
+                    return "    "; //In case of "none" - To keep indentation
             }
-            return "    "; //In case of "none" - To keep indentation
         }
 
         String getLiteral(int index, char baseChar) {

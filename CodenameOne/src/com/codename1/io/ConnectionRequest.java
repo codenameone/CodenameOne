@@ -1740,7 +1740,7 @@ public class ConnectionRequest implements IOProgressListener {
         killed = true;
         //if the connection is in the midle of a reading, stop it to release the
         //resources
-        if (input != null && input instanceof BufferedInputStream) {
+        if (input instanceof BufferedInputStream) {
             ((BufferedInputStream) input).stop();
         }
         NetworkManager.getInstance().kill9(this);
@@ -2142,13 +2142,13 @@ public class ConnectionRequest implements IOProgressListener {
      * Returns the time since the last activity update
      */
     int getTimeSinceLastActivity() {
-        if (input != null && input instanceof BufferedInputStream) {
+        if (input instanceof BufferedInputStream) {
             long t = ((BufferedInputStream) input).getLastActivityTime();
             if (t > timeSinceLastUpdate) {
                 timeSinceLastUpdate = t;
             }
         }
-        if (output != null && output instanceof BufferedOutputStream) {
+        if (output instanceof BufferedOutputStream) {
             long t = ((BufferedOutputStream) output).getLastActivityTime();
             if (t > timeSinceLastUpdate) {
                 timeSinceLastUpdate = t;

@@ -432,7 +432,7 @@ public class TimeSpinner extends BaseSpinner {
     private static class TimeSpinnerRenderer extends SpinnerRenderer<Object> {
         @Override
         public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
-            if (value != null && value instanceof Integer) {
+            if (value instanceof Integer) {
                 int d = ((Integer) value).intValue();
                 if (d == 0) {
                     value = "AM";
@@ -447,7 +447,7 @@ public class TimeSpinner extends BaseSpinner {
     private static class TwoDigitSpinnerRenderer extends SpinnerRenderer<Object> {
         @Override
         public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
-            if (value != null && value instanceof Integer) {
+            if (value instanceof Integer) {
                 int i = ((Integer) value).intValue();
                 if (i < 10) {
                     value = "0" + i;

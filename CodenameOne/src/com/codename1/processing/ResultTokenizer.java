@@ -72,8 +72,9 @@ class ResultTokenizer {
             case Result.ARRAY_START:
             case Result.ARRAY_END:
                 return true;
+            default:
+                return false;
         }
-        return false;
     }
 
     static boolean isSeparator(final char ch) {

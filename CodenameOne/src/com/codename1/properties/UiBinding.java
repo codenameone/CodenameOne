@@ -115,8 +115,9 @@ public class UiBinding {
                 return new IntegerConverter();
             case Display.PICKER_TYPE_STRINGS:
                 return new StringConverter();
+            default:
+                throw new IllegalArgumentException("Unsupported picker type: " + type);
         }
-        throw new IllegalArgumentException("Unsupported picker type: " + type);
     }
 
     /**

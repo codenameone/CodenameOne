@@ -8183,7 +8183,7 @@ public class Component implements Animation, StyleListener, Editable {
                     y = rect.getY();
                     int iW = img.getWidth();
                     int iH = img.getHeight();
-                    switch (s.getBackgroundType()) {
+                    switch (s.getBackgroundType()) { // NOPMD SwitchStmtsShouldHaveDefault
                         case Style.BACKGROUND_IMAGE_SCALED:
                             if (Display.impl.isScaledImageDrawingSupported()) {
                                 g.drawImage(img, x, y, width, height);

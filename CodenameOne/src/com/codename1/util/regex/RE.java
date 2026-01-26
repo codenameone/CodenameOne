@@ -736,6 +736,7 @@ public class RE {
      * @param idxStart  Starting position in character array
      * @return Final input array index if match succeeded.  -1 if not.
      */
+    @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     protected int matchNodes(int firstNode, int lastNode, int idxStart) {
         // Our current place in the string
         int idx = idxStart;

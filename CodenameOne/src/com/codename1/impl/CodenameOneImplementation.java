@@ -4741,8 +4741,9 @@ public abstract class CodenameOneImplementation {
                 return dipCount * 14;
             case Display.DENSITY_HD:
                 return dipCount * 20;
+            default:
+                return dipCount;
         }
-        return dipCount;
     }
 
     /**
