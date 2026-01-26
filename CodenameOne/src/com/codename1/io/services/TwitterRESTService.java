@@ -137,12 +137,11 @@ public class TwitterRESTService extends ConnectionRequest {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public int hashCode() {
-        return super.hashCode();
+        int result = super.hashCode();
+        result = 31 * result + (parseTree != null ? parseTree.hashCode() : 0);
+        return result;
     }
 
     /**

@@ -919,7 +919,12 @@ def main() -> None:
             "UnusedFormalParameter",
             "SwitchStmtsShouldHaveDefault",
             "UnconditionalIfStatement",
-            "SimplifyConditional"
+            "SimplifyConditional",
+            "UselessOverridingMethod",
+            "UselessQualifiedThis",
+            "AvoidBranchingStatementAsLastInLoop",
+            "AvoidUsingVolatile",
+            "DoNotCallGarbageCollectionExplicitly"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

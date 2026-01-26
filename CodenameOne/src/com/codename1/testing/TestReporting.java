@@ -37,7 +37,7 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class TestReporting {
-    private static volatile TestReporting instanceOverride;
+    private static TestReporting instanceOverride;
     private final Hashtable<String, Boolean> testsExecuted = new Hashtable<String, Boolean>();
 
     /**

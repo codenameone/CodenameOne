@@ -153,7 +153,7 @@ public abstract class InfiniteContainer extends Container {
             });
         } else {
             removeAll();
-            InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
+            InfiniteScrollAdapter.addMoreComponents(this, cmps, shouldContinue(cmps));
             requestingResults = false;
         }
     }
@@ -187,7 +187,7 @@ public abstract class InfiniteContainer extends Container {
                 }
             });
         } else {
-            InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
+            InfiniteScrollAdapter.addMoreComponents(this, cmps, shouldContinue(cmps));
             requestingResults = false;
         }
     }

@@ -97,12 +97,12 @@ public final class CachedDataService extends ConnectionRequest {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public int hashCode() {
-        return super.hashCode();
+        int result = super.hashCode();
+        result = 31 * result + data.hashCode();
+        result = 31 * result + (responseProcessed ? 1 : 0);
+        return result;
     }
 
     /**

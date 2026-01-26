@@ -167,11 +167,18 @@ public class Page extends FBObject {
         return super.equals(o);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public int hashCode() {
-        return super.hashCode();
+        int result = super.hashCode();
+        result = 31 * result + (about != null ? about.hashCode() : 0);
+        result = 31 * result + (category != null ? category.hashCode() : 0);
+        result = 31 * result + (founded != null ? founded.hashCode() : 0);
+        result = 31 * result + likesCount;
+        result = 31 * result + (link != null ? link.hashCode() : 0);
+        result = 31 * result + (username != null ? username.hashCode() : 0);
+        result = 31 * result + (website != null ? website.hashCode() : 0);
+        result = 31 * result + (coverId != null ? coverId.hashCode() : 0);
+        result = 31 * result + (coverLink != null ? coverLink.hashCode() : 0);
+        return result;
     }
 }

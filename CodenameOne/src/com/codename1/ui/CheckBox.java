@@ -204,11 +204,6 @@ public class CheckBox extends Button {
         return super.paramString() + ", selected = " + selected;
     }
 
-    @Override
-    void initComponentImpl() {
-        super.initComponentImpl();
-    }
-
     private void updateSide() {
         Boolean v = getUIManager().isThemeConstant("checkBoxOppositeSideBool");
         if (v != null) {

@@ -1947,7 +1947,7 @@ public class StyleParser {
          * @return
          */
         private String splicedImageToString() {
-            return getType() + " " + getSpliceImage() + " " + BorderInfo.this.getSpliceInsets();
+            return getType() + " " + getSpliceImage() + " " + getSpliceInsets();
         }
 
         /**
@@ -2386,7 +2386,7 @@ public class StyleParser {
          * @return 4-element array of insets.  Indices {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, and {@link Component#RIGHT}.
          */
         public double[] getSpliceInsets(double[] out) {
-            String[] parts = Util.split(BorderInfo.this.getSpliceInsets(), " ");
+            String[] parts = Util.split(getSpliceInsets(), " ");
 
             out[Component.TOP] = Double.parseDouble(parts[0]);
             out[Component.RIGHT] = Double.parseDouble(parts[1]);

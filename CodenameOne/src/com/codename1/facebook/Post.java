@@ -242,11 +242,20 @@ public class Post extends FBObject {
         return super.equals(o);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public int hashCode() {
-        return super.hashCode();
+        int result = super.hashCode();
+        result = 31 * result + (type != null ? type.hashCode() : 0);
+        result = 31 * result + (attribution != null ? attribution.hashCode() : 0);
+        result = 31 * result + (message != null ? message.hashCode() : 0);
+        result = 31 * result + (linkUrl != null ? linkUrl.hashCode() : 0);
+        result = 31 * result + (linkDescription != null ? linkDescription.hashCode() : 0);
+        result = 31 * result + (commentsCount != null ? commentsCount.hashCode() : 0);
+        result = 31 * result + (likes != null ? likes.hashCode() : 0);
+        result = 31 * result + (from != null ? from.hashCode() : 0);
+        result = 31 * result + (to != null ? to.hashCode() : 0);
+        result = 31 * result + (created_time != null ? created_time.hashCode() : 0);
+        result = 31 * result + (picture != null ? picture.hashCode() : 0);
+        return result;
     }
 }

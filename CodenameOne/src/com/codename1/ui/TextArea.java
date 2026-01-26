@@ -2234,7 +2234,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * @since 7.0
      */
     protected Spans calculateTextSelectionSpan(TextSelection sel) {
-        return getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, TextArea.this);
+        return getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, this);
     }
 
     /**

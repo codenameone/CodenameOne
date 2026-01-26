@@ -466,6 +466,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
      * @return the string representation of the data in this builder.
      */
     @Override
+    @SuppressWarnings("PMD.UselessOverridingMethod")
     public String toString() {
         /* Note: This method is required to workaround a compiler bug
          * in the RI javac (at least in 1.5.0_06) that will generate a

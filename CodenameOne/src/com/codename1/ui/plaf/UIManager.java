@@ -60,7 +60,7 @@ import java.util.Vector;
  */
 public class UIManager {
 
-    static volatile UIManager instance;
+    static UIManager instance;
     /**
      * This member is used by the resource editor
      */

@@ -1633,14 +1633,6 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
-     * {@inheritDoc}
-     */
-    @Override
-    void focusLostInternal() {
-        super.focusLostInternal();
-    }
-
-    /**
      * Returns the gap between items
      *
      * @return the gap between items

@@ -249,6 +249,8 @@ public class Capture {
 
     static class CallBack implements ActionListener<ActionEvent>, Runnable {
         String url;
+        // We need volatile due to the usage of double locking optimization
+        @SuppressWarnings("PMD.AvoidUsingVolatile")
         private volatile boolean completed;
         private int targetWidth = -1;
         private int targetHeight = -1;

@@ -502,12 +502,11 @@ public class RSSReader extends List {
             return true;
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public int hashCode() {
-            return super.hashCode();
+            int result = super.hashCode();
+            result = 31 * result + (sourceForm != null ? sourceForm.hashCode() : 0);
+            return result;
         }
     }
 

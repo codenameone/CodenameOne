@@ -81,14 +81,6 @@ public abstract class BaseSpinner extends Container {
      * {@inheritDoc}
      */
     @Override
-    public void setUIID(String id) {
-        super.setUIID(id);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         overlayStyle = getUIManager().getComponentStyle("SpinnerOverlay");

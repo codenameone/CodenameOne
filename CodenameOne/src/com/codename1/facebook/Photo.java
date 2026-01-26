@@ -260,11 +260,21 @@ public class Photo extends FBObject {
         return super.equals(o);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public int hashCode() {
-        return super.hashCode();
+        int result = super.hashCode();
+        result = 31 * result + from.hashCode();
+        result = 31 * result + (iconUrl != null ? iconUrl.hashCode() : 0);
+        result = 31 * result + (pictureUrl != null ? pictureUrl.hashCode() : 0);
+        result = 31 * result + (sourceUrl != null ? sourceUrl.hashCode() : 0);
+        result = 31 * result + height;
+        result = 31 * result + width;
+        result = 31 * result + (link != null ? link.hashCode() : 0);
+        result = 31 * result + (created_time != null ? created_time.hashCode() : 0);
+        result = 31 * result + (updated_time != null ? updated_time.hashCode() : 0);
+        result = 31 * result + position;
+        result = 31 * result + (images != null ? images.hashCode() : 0);
+        result = 31 * result + (comments != null ? comments.hashCode() : 0);
+        return result;
     }
 }

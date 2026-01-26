@@ -230,11 +230,19 @@ public class Album extends FBObject {
         return super.equals(o);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public int hashCode() {
-        return super.hashCode();
+        int result = super.hashCode();
+        result = 31 * result + from.hashCode();
+        result = 31 * result + (description != null ? description.hashCode() : 0);
+        result = 31 * result + (location != null ? location.hashCode() : 0);
+        result = 31 * result + (link != null ? link.hashCode() : 0);
+        result = 31 * result + (cover_photo != null ? cover_photo.hashCode() : 0);
+        result = 31 * result + (privacy != null ? privacy.hashCode() : 0);
+        result = 31 * result + count;
+        result = 31 * result + (type != null ? type.hashCode() : 0);
+        result = 31 * result + (created_time != null ? created_time.hashCode() : 0);
+        result = 31 * result + (updated_time != null ? updated_time.hashCode() : 0);
+        return result;
     }
 }

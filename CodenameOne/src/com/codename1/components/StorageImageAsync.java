@@ -40,7 +40,9 @@ public final class StorageImageAsync extends EncodedImage {
     private final Image placeholderImage;
     private boolean changePending;
     private boolean imageCreated;
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private volatile byte[] imageData;
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private volatile boolean queued;
 
     private StorageImageAsync(String fileName, Image placeholderImage) {

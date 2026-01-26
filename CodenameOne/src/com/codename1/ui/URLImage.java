@@ -569,7 +569,7 @@ public final class URLImage extends EncodedImage {
             }
         } catch (IOException ioErr) {
             if (exceptionHandler != null) {
-                exceptionHandler.onError(URLImage.this, ioErr);
+                exceptionHandler.onError(this, ioErr);
             } else {
                 throw new RuntimeException(ioErr.toString(), ioErr);
             }
