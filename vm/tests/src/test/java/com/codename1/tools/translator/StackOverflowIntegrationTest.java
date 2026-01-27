@@ -86,6 +86,14 @@ class StackOverflowIntegrationTest {
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
         Path executable = buildDir.resolve("StackOverflowApp");
+        ProcessResult probeResult = runProcess(Arrays.asList(executable.toString(), "probe"), buildDir);
+        String probeDiagnostics = buildDiagnostics(srcRoot, executable, probeResult);
+        assertEquals(0, probeResult.exitCode,
+                "StackOverflowApp probe run exited with code " + probeResult.exitCode
+                        + ". Output:\n" + probeResult.output
+                        + probeDiagnostics);
+        assertTrue(probeResult.output.contains("PROBE_OK"),
+                "StackOverflowApp probe run should succeed. Output was:\n" + probeResult.output + probeDiagnostics);
         ProcessResult smokeResult = runProcess(Arrays.asList(executable.toString(), "smoke"), buildDir);
         String smokeDiagnostics = buildDiagnostics(srcRoot, executable, smokeResult);
         assertEquals(0, smokeResult.exitCode,
@@ -118,6 +126,10 @@ class StackOverflowIntegrationTest {
                 "        return depth + boundedRecursion(depth - 1);\n" +
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
+                "        if (args != null && args.length > 0 && \"probe\".equals(args[0])) {\n" +
+                "            report(\"PROBE_OK\");\n" +
+                "            return;\n" +
+                "        }\n" +
                 "        if (args != null && args.length > 0 && \"smoke\".equals(args[0])) {\n" +
                 "            report(\"SMOKE_START\");\n" +
                 "            int value = boundedRecursion(5);\n" +
