@@ -28,6 +28,7 @@ import com.codename1.compat.java.util.Objects;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.TextSelectionSupport;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.ComponentAnimation;
@@ -575,6 +576,7 @@ public class Component implements Animation, StyleListener, Editable {
                 }
             }
         } catch (Throwable t) {
+            Log.e(t);
         }
 
         try {
@@ -586,6 +588,7 @@ public class Component implements Animation, StyleListener, Editable {
                 baseSize.setHeight(Integer.parseInt(hStr));
             }
         } catch (Throwable t) {
+            Log.e(t);
         }
         return baseSize;
     }

@@ -27,7 +27,8 @@ import com.codename1.ui.geom.Rectangle2D;
 /**
  * @author shannah
  */
-class PkgUtils {
+final class PkgUtils {
+    private PkgUtils() {}
     static Rectangle2D makeRect(double x1, double y1, double x2, double y2) {
         return new Rectangle2D(x1, y1, x2 - x1, y2 - y1);
     }

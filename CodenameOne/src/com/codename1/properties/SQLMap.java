@@ -744,6 +744,7 @@ public final class SQLMap {
          * @param property the property
          * @return the builder instance
          */
+        @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
         public SelectBuilder equals(PropertyBase property) {
             return new SelectBuilder(property, " = ", null, null, this);
         }

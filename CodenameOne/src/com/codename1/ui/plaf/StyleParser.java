@@ -148,7 +148,7 @@ import java.util.Map;
  *
  * @author shannah
  */
-public class StyleParser {
+public abstract class StyleParser {
 
     public static final byte UNIT_INHERIT = 99;
     private static final Map<String, Integer> BG_TYPES = createBgTypes();

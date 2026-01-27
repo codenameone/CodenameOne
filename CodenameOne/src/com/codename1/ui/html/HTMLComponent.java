@@ -1867,6 +1867,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      *
      * @param head The HEAD element of the document
      */
+    @SuppressWarnings("PMD.EmptyCatchBlock")
     private void checkRedirect(HTMLElement head) {
         if (head != null) {
             HTMLElement meta = head.getFirstChildByTagId(HTMLElement.TAG_META);
@@ -2425,6 +2426,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      *
      * @param areaTag The AREA tag
      */
+    @SuppressWarnings("PMD.EmptyCatchBlock")
     private void handleImageMapArea(HTMLElement areaTag) {
         if (curImageMap != null) {
             String shape = areaTag.getAttributeById(HTMLElement.ATTR_SHAPE);
@@ -3993,6 +3995,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * @param counterStr The counter-increment/reset property value which is the string counter name followed optionally by the factor by which to increment or the value to reset to
      * @param reset      true to reset, false to increment
      */
+    @SuppressWarnings("PMD.EmptyCatchBlock")
     void incCounter(String counterStr, boolean reset) {
         counterStr = counterStr.trim();
         int value = reset ? 0 : 1; // 0 is the default value to reset to, while 1 is the default increment step

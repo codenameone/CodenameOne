@@ -28,7 +28,7 @@ package com.codename1.ui;
  * @author Steve Hannah
  * @since 7.0
  */
-class LeadUtil {
+abstract class LeadUtil {
 
     /**
      * Gets the lead parent for a component, or the component itself if there is

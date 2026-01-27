@@ -47,7 +47,7 @@ import java.util.Set;
  * @author Shai Almog
  * @author Miguel Mu\u00f1oz
  */
-public class Preferences {
+public final class Preferences {
     private static final HashMap<String, ArrayList<PreferenceListener>> listenerMap = new HashMap<String, ArrayList<PreferenceListener>>();
     private static Hashtable<String, Object> p;
     private static String preferencesLocation = "CN1Preferences";
@@ -55,7 +55,7 @@ public class Preferences {
     /**
      * Block instantiation of preferences
      */
-    Preferences() {
+    private Preferences() {
     }
 
     /**

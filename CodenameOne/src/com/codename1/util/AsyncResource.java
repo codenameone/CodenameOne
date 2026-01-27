@@ -24,6 +24,7 @@ package com.codename1.util;
 
 
 import com.codename1.annotations.Async;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.CN;
 import com.codename1.util.promise.Promise;
@@ -240,6 +241,7 @@ public class AsyncResource<V> extends Observable {
         try {
             get();
         } catch (Throwable t) {
+            Log.e(t);
         }
     }
 

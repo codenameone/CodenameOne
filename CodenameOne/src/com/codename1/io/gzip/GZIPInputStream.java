@@ -29,6 +29,8 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
+import com.codename1.io.Log;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -137,6 +139,7 @@ public class GZIPInputStream extends InflaterInputStream {
             try {
                 i = in.read(buf, n, buf.length - n);
             } catch (IOException e) {
+                Log.e(e);
             }
             if (i == -1) {
                 break;

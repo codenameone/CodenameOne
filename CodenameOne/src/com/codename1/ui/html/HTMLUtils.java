@@ -105,6 +105,7 @@ public final class HTMLUtils {
      * @param userDefinedCharEntities A hashtable containing (String,int) dentoing the char entity name and its unicode
      * @return A string containing a single char, or the original char entity string  (with &amp; and ;) if the char entity couldn't be resolved
      */
+    @SuppressWarnings("PMD.EmptyCatchBlock")
     public static String convertCharEntity(String charEntity, boolean lookupHTMLentities, Hashtable userDefinedCharEntities) {
         int charCode = -1;
         if (charEntity.startsWith("#")) { //numbered char entity

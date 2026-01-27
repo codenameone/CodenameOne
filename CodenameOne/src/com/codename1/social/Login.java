@@ -333,6 +333,7 @@ public abstract class Login {
                     Preferences.set(getClass().getName() + "Token", getAccessToken().getToken());
                     return;
                 } catch (Throwable t) {
+                    Log.e(t);
                 }
             }
 

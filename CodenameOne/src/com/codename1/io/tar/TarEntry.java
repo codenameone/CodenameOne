@@ -47,6 +47,7 @@ public class TarEntry {
         this.parseTarHeader(headerBuf);
     }
 
+    @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
     public boolean equals(TarEntry it) {
         return this.header.name.toString().equals(it.header.name.toString());
     }

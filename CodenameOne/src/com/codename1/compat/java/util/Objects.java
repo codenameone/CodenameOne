@@ -37,6 +37,8 @@ import java.util.Comparator;
  * @author shannah
  */
 public final class Objects {
+    private Objects() {}
+
     /**
      * Returns true if the arguments are equal to each other and false otherwise. Consequently, if both arguments are null, true is returned and if exactly one argument is null, false is returned. Otherwise, equality is determined by using the equals method of the first argument.
      *
@@ -44,6 +46,7 @@ public final class Objects {
      * @param b
      * @return
      */
+    @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
     public static boolean equals(Object a, Object b) {
         if (a == b) { //NOPMD CompareObjectsWithEquals
             return true;

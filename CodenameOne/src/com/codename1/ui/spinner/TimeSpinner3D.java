@@ -545,6 +545,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     private static class MinuteRowFormatter implements RowFormatter {
 
         @Override
+        @SuppressWarnings("PMD.EmptyCatchBlock")
         public String format(String input) {
             if (input != null) {
                 try {

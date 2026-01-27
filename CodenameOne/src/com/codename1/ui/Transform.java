@@ -895,6 +895,7 @@ public class Transform {
 
     }
 
+    @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
     public boolean equals(Transform t2) {
         if (type == TYPE_IDENTITY && t2.type == TYPE_IDENTITY) {
             return true;

@@ -1402,6 +1402,7 @@ public class ConnectionRequest implements IOProgressListener {
                 SimpleDateFormat sdf = new SimpleDateFormat(format);
                 return sdf.parse(date);
             } catch (Throwable t) {
+                Log.e(t);
             }
         }
         return null;

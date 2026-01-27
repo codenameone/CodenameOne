@@ -447,6 +447,7 @@ public final class LayoutUtil {
      * @param o2 The second object. May be <code>null</code>.
      * @return Returns <code>true</code> if <code>o1</code> and <code>o2</code> are equal (using .equals()) or both are <code>null</code>.
      */
+    @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
     static boolean equals(Object o1, Object o2) {
         return o1 == o2 || (o1 != null && o2 != null && o1.equals(o2)); //NOPMD CompareObjectsWithEquals
     }

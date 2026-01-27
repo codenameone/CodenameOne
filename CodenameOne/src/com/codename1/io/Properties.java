@@ -424,6 +424,7 @@ public class Properties extends HashMap<String, String> {
      * handling.
      */
     @Deprecated
+    @SuppressWarnings("PMD.EmptyCatchBlock")
     public void save(OutputStream out, String comment) {
         try {
             store(out, comment);

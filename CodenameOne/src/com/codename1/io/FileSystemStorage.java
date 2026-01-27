@@ -160,6 +160,7 @@ public final class FileSystemStorage {
      * @param file       file to delete
      * @param retryCount the number of times to retry
      */
+    @SuppressWarnings("PMD.EmptyCatchBlock")
     public void deleteRetry(final String file, final int retryCount) {
         try {
             Util.getImplementation().deleteFile(file);

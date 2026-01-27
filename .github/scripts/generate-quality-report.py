@@ -924,7 +924,10 @@ def main() -> None:
             "UselessQualifiedThis",
             "AvoidBranchingStatementAsLastInLoop",
             "AvoidUsingVolatile",
-            "DoNotCallGarbageCollectionExplicitly"
+            "DoNotCallGarbageCollectionExplicitly",
+            "SuspiciousEqualsMethodName",
+            "UseUtilityClass",
+            "EmptyCatchBlock"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:
