@@ -38,7 +38,9 @@ package com.codename1.util;
  * </li>
  * </ul>
  */
-class TDivision {
+final class TDivision {
+
+    private TDivision() {}
 
     /**
      * Divides the array 'a' by the array 'b' and gets the quotient and the

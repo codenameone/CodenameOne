@@ -23,7 +23,7 @@ package com.codename1.util.regex;
  * @author <a href="mailto:jonl@muppetlabs.com">Jonathan Locke</a>
  * @version $Id: REUtil.java 518156 2007-03-14 14:31:26Z vgritsenko $
  */
-public class REUtil {
+public abstract class REUtil {
     /**
      * complex:
      */

@@ -366,7 +366,7 @@ public class JSONParser implements JSONParseCallback {
                                         callback.keyValue(lastKey, currentToken.toString());
                                         lastKey = null;
                                     }
-                                } catch (NumberFormatException err) {
+                                } catch (NumberFormatException err) { // NOPMD EmptyCatchBlock
                                     // this isn't a number!
                                 }
                             }
@@ -404,7 +404,7 @@ public class JSONParser implements JSONParseCallback {
                                         callback.keyValue(lastKey, currentToken.toString());
                                         lastKey = null;
                                     }
-                                } catch (NumberFormatException err) {
+                                } catch (NumberFormatException err) { // NOPMD EmptyCatchBlock
                                     // this isn't a number!
                                 }
                             }

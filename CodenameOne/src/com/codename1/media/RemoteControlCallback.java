@@ -28,7 +28,7 @@ import com.codename1.ui.CN;
  * @author shannah
  * @deprecated for internal use only.
  */
-class RemoteControlCallback {
+abstract class RemoteControlCallback {
     private static final RemoteControlListener nullListener = new RemoteControlListener();
 
     private static RemoteControlListener l() {

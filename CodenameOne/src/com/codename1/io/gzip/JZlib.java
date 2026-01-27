@@ -74,6 +74,8 @@ final public class JZlib {
         return version;
     }
 
+    private JZlib() {}
+
     /**
      * @deprecated Use {@link #adler32Combine(long, long, long)}.
      */

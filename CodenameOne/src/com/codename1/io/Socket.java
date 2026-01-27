@@ -267,11 +267,10 @@ public final class Socket {
             }
         }
 
-        // [ddyer 12/2015]
         // try to read some data into the buffer if we think there is some
         // available, but don't wait if there is not.  This is used to get
         // additional data for a read that has more room in it's buffer.
-        //
+        @SuppressWarnings("PMD.EmptyCatchBlock")
         private boolean getDataIfAvailable() {
             try {
                 if (available() > 0) {

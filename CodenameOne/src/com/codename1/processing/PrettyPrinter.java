@@ -127,7 +127,7 @@ final class PrettyPrinter {
             if (value instanceof String) {
                 return quote((String) value);
             }
-        } catch (Exception e) {
+        } catch (Exception e) { // NOPMD EmptyCatchBlock
             /* forget about it */
         }
         if (value instanceof Float || value instanceof Double ||

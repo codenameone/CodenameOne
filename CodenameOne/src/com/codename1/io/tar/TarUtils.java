@@ -27,7 +27,9 @@ import java.io.IOException;
 /**
  * @author Kamran
  */
-public class TarUtils {
+public final class TarUtils {
+    private TarUtils() {}
+
     /**
      * Determines the tar file size of the given folder/file path
      *

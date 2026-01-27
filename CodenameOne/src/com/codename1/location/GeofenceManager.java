@@ -155,6 +155,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
             try {
                 expiryTimes = (Map) Storage.getInstance().readObject(EXPIRATIONS_KEY);
             } catch (Throwable t) {
+                Log.e(t);
             }
             if (expiryTimes == null) {
                 expiryTimes = new HashMap<String, Long>();

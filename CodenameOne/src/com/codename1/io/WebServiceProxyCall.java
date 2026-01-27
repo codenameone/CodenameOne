@@ -38,7 +38,7 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
-public class WebServiceProxyCall {
+public abstract class WebServiceProxyCall {
     /**
      * Web protocol argument/return type
      */

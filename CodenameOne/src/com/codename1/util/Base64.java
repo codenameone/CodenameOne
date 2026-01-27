@@ -25,7 +25,7 @@ package com.codename1.util;
  * This class implements Base64 encoding/decoding functionality
  * as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
  */
-public class Base64 {
+public abstract class Base64 {
 
     private static final byte[] map = new byte[]
             {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',

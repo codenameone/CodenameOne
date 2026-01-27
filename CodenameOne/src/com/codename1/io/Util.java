@@ -73,7 +73,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-public class Util {
+public final class Util {
     private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis());
     private static CodenameOneImplementation implInstance;
     private static Hashtable externalizables = new Hashtable();
@@ -110,6 +110,7 @@ public class Util {
         ignoreCharsWhenEncoding = s;
     }
 
+    private Util() {}
 
     /**
      * Helper to get a reader from an input stream with UTF-8 encoding
@@ -279,17 +280,12 @@ public class Util {
         if (charset == null) {
             charset = "UTF-8";
         }
-        OutputStream output = null;
+        OutputStream output = null; // NOPMD CloseResource - false positive
         try {
             output = FileSystemStorage.getInstance().openOutputStream(file.getAbsolutePath());
             output.write(contents.getBytes(charset));
         } finally {
-            if (output != null) {
-                try {
-                    output.close();
-                } catch (Exception ex) {
-                }
-            }
+            cleanup(output);
         }
     }
 

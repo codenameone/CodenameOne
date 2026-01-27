@@ -1805,8 +1805,9 @@ public final class GeneralPath implements Shape {
     /**
      * @author shannah
      */
-    static class ShapeUtil {
-
+    final static class ShapeUtil {
+        private ShapeUtil() {
+        }
 
         /**
          * Rectangle cross segment

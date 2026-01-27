@@ -41,7 +41,9 @@ import com.codename1.ui.layouts.BorderLayout;
  * @author Shai Almog
  * @deprecated this was a half baked idea that made it into the public API
  */
-public class MasterDetail {
+public final class MasterDetail {
+    private MasterDetail() {}
+
     /**
      * @deprecated this was a half baked idea that made it into the public API
      */

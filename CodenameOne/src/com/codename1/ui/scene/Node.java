@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.scene;
 
+import com.codename1.io.Log;
 import com.codename1.properties.Property;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
@@ -630,7 +631,7 @@ public class Node {
                 g.drawRect(getX(), getY(), getWidth() - 1, getHeight() - 1);
                 g.setAlpha(alpha);
             } catch (Throwable t) {
-
+                Log.e(t);
             }
         }
     }

@@ -49,7 +49,7 @@ import java.io.OutputStream;
  *
  * @author Chen
  */
-public class Capture {
+public abstract class Capture {
 
     /**
      * Returns true if the device has camera false otherwise.

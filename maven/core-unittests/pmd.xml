@@ -16,6 +16,17 @@
         <!-- This is used in the code -->
         <exclude name="AvoidDollarSigns" />
 
+        <!-- We use our own custom logging framework,
+        and this check doesn't work well with it -->
+        <exclude name="GuardLogStatement" />
+        <exclude name="ProperLogger" />
+
+        <!-- We don't support clone -->
+        <exclude name="ProperCloneImplementation" />
+
+        <!-- This conflicts with other checks from PMD and SpotBugs -->
+        <exclude name="SingletonClassReturningNewInstance" />
+
         <!--
         We use these a lot in the code. I don't see the value in removing them
         -->

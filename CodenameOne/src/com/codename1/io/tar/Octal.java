@@ -23,7 +23,9 @@ package com.codename1.io.tar;
 /**
  * @author Kamran Zafar
  */
-public class Octal {
+public final class Octal {
+
+    private Octal() {}
 
     /**
      * Parse an octal string from a header buffer. This is used for the file

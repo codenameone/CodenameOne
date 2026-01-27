@@ -39,7 +39,7 @@ package com.codename1.processing;
  *
  * @author Eric Coolman
  */
-class EvaluatorFactory {
+abstract class EvaluatorFactory {
     /**
      * Construct an evaluator for a given predicate expression.
      *

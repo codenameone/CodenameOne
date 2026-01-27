@@ -28,7 +28,7 @@ package com.codename1.io.rest;
  *
  * @author Chen Fishbein
  */
-public class Rest {
+public abstract class Rest {
 
     /**
      * Creates a GET request builder

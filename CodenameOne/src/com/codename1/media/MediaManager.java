@@ -61,7 +61,7 @@ import java.util.TimerTask;
  * <script src="https://gist.github.com/jsfan3/419f44a9ad49d8fc1c1e3e325d1e5422.js"></script>
  * <img src="https://user-images.githubusercontent.com/1997316/78480286-02131b00-7735-11ea-8a70-5ca5512e7d92.png" alt="Demonstrates capturing of audio files and their playback using the Codename One APIs Media, MediaManager and MediaRecorderBuilder" />
  */
-public class MediaManager {
+public abstract class MediaManager {
 
     /**
      * A static map of audio buffers.  These can be used to register an Audio buffer to receive

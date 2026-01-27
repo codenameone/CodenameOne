@@ -19,7 +19,7 @@ package com.codename1.util.regex;
 /**
  * @author Nikolay Neizvesny
  */
-public class RECharacter {
+public abstract class RECharacter {
 
     public static final byte UNASSIGNED = 0;
     public static final byte UPPERCASE_LETTER = 1;

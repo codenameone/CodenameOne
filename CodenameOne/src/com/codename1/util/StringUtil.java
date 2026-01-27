@@ -34,7 +34,7 @@ import java.util.Vector;
  *
  * @author Chen Fishbein
  */
-public class StringUtil {
+public abstract class StringUtil {
 
 
     private static CodenameOneImplementation impl;
