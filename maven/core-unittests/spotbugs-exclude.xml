@@ -243,6 +243,23 @@
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
 
+    <!-- Marking the field as volatile here is probably just expensive and doesn't
+     contribute much -->
+    <Match>
+        <Class name="com.codename1.location.GeofenceManager" />
+        <Bug pattern="DC_DOUBLECHECK" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.ui.plaf.UIManager" />
+        <Bug pattern="DC_DOUBLECHECK" />
+    </Match>
+
+    <!-- The code in this class is always single threaded anyway -->
+    <Match>
+        <Class name="com.codename1.ui.layouts.mig.LayoutUtil" />
+        <Bug pattern="LI_LAZY_INIT_STATIC" />
+    </Match>
+
     <!-- The API canExecute should return null when we don't know the answer -->
     <Match>
         <Class name="com.codename1.impl.CodenameOneImplementation" />

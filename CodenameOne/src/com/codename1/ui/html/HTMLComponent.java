@@ -1032,7 +1032,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         this.pageURL = docInfo.getFullUrl();
         if (handler instanceof AsyncDocumentRequestHandler) {
             setPageStatus(HTMLCallback.STATUS_REQUESTED);
-            ((AsyncDocumentRequestHandler) handler).resourceRequestedAsync(docInfo, HTMLComponent.this);
+            ((AsyncDocumentRequestHandler) handler).resourceRequestedAsync(docInfo, this);
         } else {
             Display.getInstance().startThread(new Runnable() {
 
@@ -1321,9 +1321,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
 
             if (!marqueeComponents.isEmpty()) {
-                getComponentForm().registerAnimated(HTMLComponent.this);
+                getComponentForm().registerAnimated(this);
                 int dir = getUIManager().getLookAndFeel().isRTL() ? 1 : -1;
-                marqueeMotion = Motion.createLinearMotion(0, dir * HTMLComponent.this.getWidth(), MARQUEE_DELAY / 2);
+                marqueeMotion = Motion.createLinearMotion(0, dir * getWidth(), MARQUEE_DELAY / 2);
                 marqueeMotion.start();
             }
 
@@ -1348,7 +1348,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
         if (marqueeMotion.isFinished()) {
             int dir = getUIManager().getLookAndFeel().isRTL() ? 1 : -1;
-            marqueeMotion = Motion.createLinearMotion(dir * -HTMLComponent.this.getWidth(), dir * HTMLComponent.this.getWidth(), MARQUEE_DELAY);
+            marqueeMotion = Motion.createLinearMotion(dir * -getWidth(), dir * getWidth(), MARQUEE_DELAY);
             marqueeMotion.start();
         }
 

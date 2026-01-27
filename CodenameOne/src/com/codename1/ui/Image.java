@@ -132,6 +132,7 @@ public class Image implements ActionSource {
      * @return newly created image object
      * @throws java.io.IOException
      */
+    @SuppressWarnings("PMD.DoNotCallGarbageCollectionExplicitly")
     public static Image createImage(String path) throws IOException {
         try {
             return new Image(Display.impl.createImage(path));
@@ -166,6 +167,7 @@ public class Image implements ActionSource {
      * @return the newly created image
      * @throws java.io.IOException
      */
+    @SuppressWarnings("PMD.DoNotCallGarbageCollectionExplicitly")
     public static Image createImage(InputStream stream) throws IOException {
         try {
             return new Image(Display.impl.createImage(stream));
@@ -173,7 +175,7 @@ public class Image implements ActionSource {
             // Images have a major bug on many phones where they sometimes throw
             // an OOM with no reason. A system.gc followed by the same call over
             // solves the problem. This has something to do with the fact that
-            // there is no Image.dispose method in existance.
+            // there is no Image.dispose method in existence.
             System.gc();
             System.gc();
             return new Image(Display.impl.createImage(stream));
@@ -188,6 +190,7 @@ public class Image implements ActionSource {
      * @param height the image height
      * @return an image from an RGB image
      */
+    @SuppressWarnings("PMD.DoNotCallGarbageCollectionExplicitly")
     public static Image createImage(int[] rgb, int width, int height) {
         try {
             return new Image(Display.impl.createImage(rgb, width, height));
@@ -242,6 +245,7 @@ public class Image implements ActionSource {
      * @param fillColor the color with which the image should be initially filled
      * @return an image in a given width and height dimension
      */
+    @SuppressWarnings("PMD.DoNotCallGarbageCollectionExplicitly")
     public static Image createImage(int width, int height, int fillColor) {
         try {
             return new Image(Display.impl.createMutableImage(width, height, fillColor));
@@ -264,6 +268,7 @@ public class Image implements ActionSource {
      * @param len    the length of the data in the array
      * @return the newly created image
      */
+    @SuppressWarnings("PMD.DoNotCallGarbageCollectionExplicitly")
     public static Image createImage(byte[] bytes, int offset, int len) {
         try {
             Object o = Display.impl.createImage(bytes, offset, len);

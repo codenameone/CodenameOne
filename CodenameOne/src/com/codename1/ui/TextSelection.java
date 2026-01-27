@@ -698,7 +698,7 @@ public class TextSelection {
         selectedBounds.setBounds(0, 0, selectionRoot.getWidth(), selectionRoot.getHeight());
         update();
         selectionRoot.getComponentForm().revalidateLater();
-        textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
+        textSelectionListeners.fireActionEvent(new ActionEvent(this, Type.Change));
     }
 
     /**

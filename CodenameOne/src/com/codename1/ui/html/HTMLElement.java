@@ -1051,15 +1051,6 @@ public class HTMLElement extends Element {
         comps.insertElementAt(cmp, index);
     }
 
-
-    @Override
-    public void addChild(Element childElement) {
-        //if (((HTMLElement)childElement).getId()!=TAG_UNSUPPORTED) {
-        super.addChild(childElement);
-        //}
-
-    }
-
     /**
      * Returns whether this element supports the common core attributes.
      * These are attributes most HTML tags support, with a few exceptions that are checked here.

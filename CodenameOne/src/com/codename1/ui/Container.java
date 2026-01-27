@@ -1206,7 +1206,7 @@ public class Container extends Component implements Iterable<Component> {
         Object constraint = layout.getComponentConstraint(current);
         if (constraint != null) {
             removeComponentImplNoAnimationSafety(current);
-            layout.addLayoutComponent(constraint, next, Container.this);
+            layout.addLayoutComponent(constraint, next, this);
         } else {
             removeComponentImplNoAnimationSafety(current);
         }
@@ -3387,16 +3387,6 @@ public class Container extends Component implements Iterable<Component> {
         if (shouldPaintContainerBackground()) {
             super.paintComponentBackground(g);
         }
-    }
-
-    @Override
-    protected void paintBackground(Graphics g) {
-        super.paintBackground(g);
-    }
-
-    @Override
-    protected void paintBorderBackground(Graphics g) {
-        super.paintBorderBackground(g);
     }
 
     /**

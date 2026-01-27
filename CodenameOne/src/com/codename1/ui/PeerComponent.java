@@ -136,22 +136,6 @@ public class PeerComponent extends Component {
      * {@inheritDoc}
      */
     @Override
-    protected Dimension calcPreferredSize() {
-        return super.calcPreferredSize();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected Dimension calcScrollSize() {
-        return super.calcScrollSize();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
     protected void deinitialize() {
         Form.activePeerCount--;
         super.deinitialize();
@@ -162,30 +146,6 @@ public class PeerComponent extends Component {
      */
     @Override
     protected void fireClicked() {
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected void focusGained() {
-        super.focusGained();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected void focusLost() {
-        super.focusLost();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean handlesInput() {
-        return super.handlesInput();
     }
 
     /**

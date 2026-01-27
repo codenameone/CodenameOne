@@ -1045,7 +1045,7 @@ public class Tabs extends Container {
             }
             slideToDestMotion = createTabSlideMotion(start, end);
             slideToDestMotion.start();
-            form.registerAnimatedInternal(Tabs.this);
+            form.registerAnimatedInternal(this);
             active = index;
         } else {
             if (selectionListener != null) {

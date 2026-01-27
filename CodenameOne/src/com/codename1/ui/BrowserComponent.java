@@ -544,11 +544,6 @@ public class BrowserComponent extends Container {
     }
 
     @Override
-    protected void initComponent() {
-        super.initComponent();
-    }
-
-    @Override
     protected void deinitialize() {
         uninstallMessageListener();
 

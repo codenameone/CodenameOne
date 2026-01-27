@@ -62,8 +62,8 @@ public final class LayoutUtil {
      */
     static final int NOT_SET = Integer.MIN_VALUE + 12346;   // Magic value...
     private static final IdentityHashMap<Object, Object> SER_MAP = new IdentityHashMap<Object, Object>(2);
-    private static volatile HashMap<Object, String> CR_MAP = null;
-    private static volatile HashMap<Object, Boolean> DT_MAP = null;      // The Containers that have design time. Value not used.
+    private static HashMap<Object, String> CR_MAP = null;
+    private static HashMap<Object, Boolean> DT_MAP = null;      // The Containers that have design time. Value not used.
     private static int eSz = 0;
     private static int globalDebugMillis = 0;
 

@@ -230,7 +230,7 @@ public abstract class Login {
         } else {
             setAccessToken(null);
         }
-        Preferences.delete(Login.this.getClass().getName() + "Token");
+        Preferences.delete(getClass().getName() + "Token");
     }
 
     /**
@@ -320,7 +320,7 @@ public abstract class Login {
      */
     public void validateToken() throws IOException {
 
-        String token = Preferences.get(Login.this.getClass().getName() + "Token", null);
+        String token = Preferences.get(getClass().getName() + "Token", null);
         if (token == null || !validateToken(token)) {
             AccessToken accessTok = getAccessToken();
             if (accessTok != null && accessTok.getRefreshToken() != null) {
@@ -330,7 +330,7 @@ public abstract class Login {
                     System.out.println("Attempting to refresh the access token");
                     AccessToken newTok = refreshReq.get(5000);
                     setAccessToken(newTok);
-                    Preferences.set(Login.this.getClass().getName() + "Token", getAccessToken().getToken());
+                    Preferences.set(getClass().getName() + "Token", getAccessToken().getToken());
                     return;
                 } catch (Throwable t) {
                 }

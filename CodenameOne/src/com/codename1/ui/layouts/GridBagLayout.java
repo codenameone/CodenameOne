@@ -48,9 +48,9 @@ public class GridBagLayout extends Layout {
     public int[] columnWidths;
     public int[] rowHeights;
     // Direct modification is forbidden
-    protected volatile Hashtable<Component, GridBagConstraints> comptable;
-    protected volatile GridBagConstraints defaultConstraints;
-    protected volatile GridBagLayoutInfo layoutInfo;
+    protected Hashtable<Component, GridBagConstraints> comptable;
+    protected GridBagConstraints defaultConstraints;
+    protected GridBagLayoutInfo layoutInfo;
     private ParentInfo lastParentInfo;
 
     public GridBagLayout() {

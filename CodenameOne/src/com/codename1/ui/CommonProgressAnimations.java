@@ -170,11 +170,6 @@ public class CommonProgressAnimations {
         }
 
         @Override
-        public void paint(Graphics g) {
-            super.paint(g);
-        }
-
-        @Override
         public boolean animate() {
             step += stepSize;
             step = step % 720;
@@ -294,11 +289,6 @@ public class CommonProgressAnimations {
                 }
             }
             return true;
-        }
-
-        @Override
-        public void paint(Graphics g) {
-            super.paint(g);
         }
 
         @Override

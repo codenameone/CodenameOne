@@ -95,7 +95,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
      */
     private static final int defaultTimeout = 10000;
     private static int MAX_ACTIVE_GEOFENCES = 19;
-    private static volatile GeofenceManager instance;
+    private static GeofenceManager instance;
     // Reference to the last bubble set.
     Geofence lastBubble;
     /**

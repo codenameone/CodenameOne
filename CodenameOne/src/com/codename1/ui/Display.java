@@ -997,7 +997,7 @@ public final class Display extends CN1Constants {
     }
 
     // Seems to be a false positive on this rule
-    @SuppressWarnings("PMD.SimplifyConditional")
+    @SuppressWarnings({"PMD.SimplifyConditional", "PMD.AvoidBranchingStatementAsLastInLoop"})
     private void paintTransitionAnimation() {
         Animation ani = animationQueue.get(0);
         if (!ani.animate()) {

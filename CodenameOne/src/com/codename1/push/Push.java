@@ -469,12 +469,11 @@ public class Push {
             return true;
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public int hashCode() {
-            return super.hashCode();
+            int result = super.hashCode();
+            result = 31 * result + (successful ? 1 : 0);
+            return result;
         }
     }
 

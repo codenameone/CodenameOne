@@ -594,9 +594,9 @@ public class Toolbar extends Container {
      */
     public void showSearchBar(final ActionListener<ActionEvent> callback) {
         SearchBar s = new CallbackSearchBar(this, callback);
-        Form f = Toolbar.this.getComponentForm();
+        Form f = getComponentForm();
         setHidden(true);
-        f.removeComponentFromForm(Toolbar.this);
+        f.removeComponentFromForm(this);
         f.setToolbar(s);
         s.initSearchBar();
         if (f == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals

@@ -35,6 +35,8 @@ import java.io.InputStream;
  */
 public class BufferedInputStream extends InputStream {
     private static int streamCount = 0;
+
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private static volatile int defaultBufferSize = 8192;
     private final String name;
     private int actualAvailable = defaultBufferSize;

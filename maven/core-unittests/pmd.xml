@@ -5,6 +5,17 @@
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
     <description>PMD rules for core unit tests.</description>
     <rule ref="rulesets/java/quickstart.xml">
+        <!-- This is a dumb micro-optimization that doesn't work well
+        in Codename One -->
+        <exclude name="OptimizableToArrayCall" />
+
+        <!-- This is dumb, it blocks switch cases with
+        multiple options on the same entry -->
+        <exclude name="ImplicitSwitchFallThrough" />
+
+        <!-- This is used in the code -->
+        <exclude name="AvoidDollarSigns" />
+
         <!--
         We use these a lot in the code. I don't see the value in removing them
         -->
