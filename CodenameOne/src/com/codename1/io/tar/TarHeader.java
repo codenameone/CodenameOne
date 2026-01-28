@@ -114,6 +114,7 @@ public class TarHeader {
     public static final int DEVLEN = 8;
 
     // Header values
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     public StringBuffer name;
     public int mode;
     public int userId;
@@ -122,9 +123,17 @@ public class TarHeader {
     public long modTime;
     public int checkSum;
     public byte linkFlag;
+
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     public StringBuffer linkName;
+
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     public StringBuffer magic;
+
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     public StringBuffer userName;
+
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     public StringBuffer groupName;
     public int devMajor;
     public int devMinor;

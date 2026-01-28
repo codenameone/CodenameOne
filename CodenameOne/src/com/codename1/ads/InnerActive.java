@@ -40,7 +40,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
 
     private static final String protocolVersion = "Sm2m-1.5.3";
     private static boolean testAds = true;
-    private final String REQUEST_URL = "http://m2m1.inner-active.com/simpleM2M/clientRequestHtmlAd";
+    private static final String REQUEST_URL = "http://m2m1.inner-active.com/simpleM2M/clientRequestHtmlAd";
     //Distribution channel ID
     private int po = 559;
     private String os;
@@ -160,7 +160,6 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
         return super.equals(o) &&
                 po == that.po &&
                 banner == that.banner &&
-                REQUEST_URL.equals(that.REQUEST_URL) &&
                 (os == null ? that.os == null : os.equals(that.os)) &&
                 (hid == null ? that.hid == null : hid.equals(that.hid));
     }

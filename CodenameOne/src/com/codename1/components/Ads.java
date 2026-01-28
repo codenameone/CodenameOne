@@ -521,8 +521,7 @@ public class Ads extends Container implements HTMLCallback {
      */
     @Override
     public Class[] getPropertyTypes() {
-        Class c = new String[0].getClass();
-        return new Class[]{String.class, Integer.class, String.class, String.class, String.class, String.class, c};
+        return new Class[]{String.class, Integer.class, String.class, String.class, String.class, String.class, String.class};
     }
 
     /**

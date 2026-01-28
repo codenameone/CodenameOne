@@ -62,7 +62,7 @@ public class MapComponent extends Container {
     private static final int doubleTapThreshold = 200;
     private final MapProvider _map;
     private final Vector _layers;
-    private final boolean _debugInfo = false;
+    private static final boolean _debugInfo = false;
     private Coord _center;
     private int _zoom;
     private boolean _needTiles = true;

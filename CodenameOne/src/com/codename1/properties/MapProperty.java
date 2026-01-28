@@ -34,8 +34,8 @@ import java.util.Set;
  *
  * @author Shai Almog
  */
-public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> implements Iterable<Map.Entry<T1, T2>> {
-    private final LinkedHashMap<T1, T2> value = new LinkedHashMap<T1, T2>();
+public class MapProperty<T, J, K> extends PropertyBase<Map.Entry<T, J>, K> implements Iterable<Map.Entry<T, J>> {
+    private final LinkedHashMap<T, J> value = new LinkedHashMap<T, J>();
     private Class keyType;
     private Class valueType;
 
@@ -88,7 +88,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @param key the map key
      * @return the property value
      */
-    public T2 get(T1 key) {
+    public J get(T key) {
         internalGet();
         return value.get(key);
     }
@@ -109,7 +109,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @param key the key to set
      * @param v   the new value
      */
-    public K set(T1 key, T2 v) {
+    public K set(T key, J v) {
         value.put(key, v);
         firePropertyChanged();
         internalSet();
@@ -123,7 +123,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @param key the key to set
      * @param v   the new value
      */
-    public K put(T1 key, T2 v) {
+    public K put(T key, J v) {
         return set(key, v);
     }
 
@@ -132,7 +132,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      *
      * @param key the key
      */
-    public K remove(T1 key) {
+    public K remove(T key) {
         value.remove(key);
         internalSet();
         return (K) parent.parent;
@@ -169,7 +169,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @return an iterator
      */
     @Override
-    public Iterator<Map.Entry<T1, T2>> iterator() {
+    public Iterator<Map.Entry<T, J>> iterator() {
         internalGet();
         return value.entrySet().iterator();
     }
@@ -179,7 +179,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      *
      * @return the keys
      */
-    public Set<T1> keySet() {
+    public Set<T> keySet() {
         return value.keySet();
     }
 
@@ -188,7 +188,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      *
      * @return the values
      */
-    public Collection<T2> valueSet() {
+    public Collection<J> valueSet() {
         return value.values();
     }
 
@@ -197,9 +197,9 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      *
      * @return a map
      */
-    public Map<T1, T2> asMap() {
+    public Map<T, J> asMap() {
         internalGet();
-        return new LinkedHashMap<T1, T2>(value);
+        return new LinkedHashMap<T, J>(value);
     }
 
     /**
@@ -208,11 +208,11 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      *
      * @return a map
      */
-    public Map<T1, Object> asExplodedMap() {
-        Map<T1, Object> m = new LinkedHashMap<T1, Object>();
-        for (Map.Entry<T1, T2> entry : value.entrySet()) {
-            T1 k = entry.getKey();
-            T2 v = entry.getValue();
+    public Map<T, Object> asExplodedMap() {
+        Map<T, Object> m = new LinkedHashMap<T, Object>();
+        for (Map.Entry<T, J> entry : value.entrySet()) {
+            T k = entry.getKey();
+            J v = entry.getValue();
             if (v instanceof PropertyBusinessObject) {
                 m.put(k, ((PropertyBusinessObject) v).getPropertyIndex().toMapRepresentation());
             } else {
@@ -229,7 +229,7 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      * @param t the map of elements to set
      * @return the parent object for chaining
      */
-    public K setMap(Map<T1, T2> t) {
+    public K setMap(Map<T, J> t) {
         value.clear();
         value.putAll(t);
         firePropertyChanged();

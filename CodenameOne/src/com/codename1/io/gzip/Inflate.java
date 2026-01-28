@@ -75,6 +75,8 @@ final class Inflate {
     static final private int FLAGS = 23;
     static private final byte[] mark = {(byte) 0, (byte) 0, (byte) 0xff, (byte) 0xff};
     private final ZStream z;
+
+    @SuppressWarnings("PMD.SingularField")
     private final byte[] crcbuf = new byte[4];
     int mode;                            // current inflate mode
     // mode dependent information
@@ -93,6 +95,8 @@ final class Inflate {
     int wbits;            // log2(window size)  (8..15, defaults to 15)
     InfBlocks blocks;     // current inflate_blocks state
     GZIPHeader gheader = null;
+
+    @SuppressWarnings("PMD.SingularField")
     private int flags;
     private int need_bytes = -1;
     private java.io.ByteArrayOutputStream tmp_string = null;

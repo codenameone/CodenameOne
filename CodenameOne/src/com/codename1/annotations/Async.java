@@ -16,6 +16,7 @@ import java.lang.annotation.Target;
  *
  * @author egor
  */
+@SuppressWarnings("PMD.MissingStaticMethodInNonInstantiatableClass")
 public final class Async {
 
     /**

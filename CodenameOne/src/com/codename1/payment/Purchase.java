@@ -574,7 +574,7 @@ public abstract class Purchase {
      * @param callback      Callback called when request is complete.  Passed {@code true} if
      *                      the data was successfully fetched.  {@code false} otherwise.
      */
-    private final void loadReceipts(long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
+    private void loadReceipts(long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
         if (loadInProgress) {
             Log.p("Did not load receipts because another load is in progress");
             callback.onSucess(false);

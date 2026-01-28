@@ -222,7 +222,7 @@ public class Accordion extends Container {
         if (autoClose) {
             for (Component cc : this) {
                 AccordionContent c = (AccordionContent) cc;
-                c.openClose(!(body == c.body));
+                c.openClose(body != c.body);
             }
         } else {
             for (Component cc : this) {

@@ -33,12 +33,10 @@ import com.codename1.ui.geom.Rectangle;
 public class PathMeasure {
 
     private final GeneralPath path;
-    private final boolean forceClosed;
 
     public PathMeasure(GeneralPath p, boolean b) {
         path = p;
-        forceClosed = b;
-        if (forceClosed && path != null) {
+        if (b && path != null) {
             path.closePath();
         }
     }

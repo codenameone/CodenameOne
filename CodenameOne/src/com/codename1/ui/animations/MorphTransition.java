@@ -126,7 +126,7 @@ public final class MorphTransition extends Transition {
      * {@inheritDoc}
      */
     @Override
-    public final void initTransition() {
+    public void initTransition() {
         animationMotion = Motion.createEaseInOutMotion(0, 255, duration);
         animationMotion.start();
         Container s = (Container) getSource();

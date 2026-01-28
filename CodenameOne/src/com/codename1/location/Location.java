@@ -95,7 +95,7 @@ public class Location {
     }
 
     public void setAccuracy(float accuracy) {
-        if (accuracy != Float.NaN) {
+        if (Float.isNaN(accuracy)) {
             this.accuracy = accuracy;
         }
     }

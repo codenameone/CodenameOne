@@ -37,7 +37,6 @@ import static com.codename1.ui.ComponentSelector.$;
 class Spinner3D extends Container implements InternalPickerWidget {
     private final SpinnerNode root;
 
-    private final Scene scene;
     private final ScrollingContainer scroller;
 
 
@@ -50,7 +49,7 @@ class Spinner3D extends Container implements InternalPickerWidget {
         super(BoxLayout.y());
         setScrollableY(false);
         root = new SpinnerNode();
-        scene = new Scene() {
+        Scene scene = new Scene() {
             @Override
             public void setWidth(int width) {
                 super.setWidth(width);

@@ -1230,7 +1230,7 @@ public final class Util {
      *                     input stream does not support reading after close, or
      *                     another I/O error occurs.
      */
-    public static final void readFully(InputStream i, byte b[], int off, int len) throws IOException {
+    public static void readFully(InputStream i, byte b[], int off, int len) throws IOException {
         if (len < 0) {
             throw new IndexOutOfBoundsException();
         }

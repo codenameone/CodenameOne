@@ -23,6 +23,8 @@
 
         <!-- We don't support clone -->
         <exclude name="ProperCloneImplementation" />
+        <exclude name="CloneMethodReturnTypeMustMatchClassName" />
+        <exclude name="CloneMethodMustImplementCloneable" />
 
         <!-- This conflicts with other checks from PMD and SpotBugs -->
         <exclude name="SingletonClassReturningNewInstance" />

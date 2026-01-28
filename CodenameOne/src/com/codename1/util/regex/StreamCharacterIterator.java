@@ -35,6 +35,7 @@ public final class StreamCharacterIterator implements CharacterIterator {
     /**
      * Buffer of read chars
      */
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     private final StringBuffer buff;
 
     /**

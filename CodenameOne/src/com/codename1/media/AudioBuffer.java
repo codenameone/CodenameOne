@@ -280,7 +280,7 @@ public class AudioBuffer {
                 }
             }
             len = size / numChannels;
-            for (float i = 0; i < len; i += stepSize) {
+            for (float i = 0; i < len; i += stepSize) { // NOPMD DontUseFloatTypeForLoopIndices
 
                 int i0 = (int) Math.floor(i);
                 int i1 = (int) Math.ceil(i);

@@ -173,7 +173,7 @@ public class TextSelection {
     private final EventDispatcher textSelectionListeners = new EventDispatcher();
     private final Rectangle tmpRect = new Rectangle();
     private final Component root;
-    private final boolean ltr = true;
+    private boolean rtl;
     private final TextSelectionTrigger trigger = getDefaultTextSelectionTrigger();
     private SelectionMask selectionMask;
     private boolean enabled;
@@ -589,7 +589,7 @@ public class TextSelection {
             selectionRoot = root;
 
         }
-        final TreeSet<Component> selectedComponents = new TreeSet<Component>(ltr ? LTRComparator : RTLComparator);
+        final TreeSet<Component> selectedComponents = new TreeSet<Component>(rtl ? RTLComparator : LTRComparator);
         $("*", selectionRoot).each(new ComponentClosure() {
             @Override
             public void call(Component c) {
@@ -640,6 +640,24 @@ public class TextSelection {
             return isVerticallyCoveredByBounds(parent, bounds);
         }
         return false;
+    }
+
+    /**
+     * Indicates if selection is operating in RTL (Right to left, bidi) mode.
+     *
+     * @return true if the selection is in RTL mode
+     */
+    public boolean isRtl() {
+        return rtl;
+    }
+
+    /**
+     * Toggles selection RTL (Right to left, bidi) mode.
+     *
+     * @param rtl true to activate the right to left mode
+     */
+    public void setRtl(boolean rtl) {
+        this.rtl = rtl;
     }
 
     private void updateSnappedSelectedBounds() {

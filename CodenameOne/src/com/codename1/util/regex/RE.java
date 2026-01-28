@@ -939,24 +939,24 @@ public class RE {
                             switch (opdata) {
                                 case E_ALNUM:
                                 case E_NALNUM:
-                                    if (!((RECharacter.isLetterOrDigit(c) || c == '_') == (opdata == E_ALNUM))) {
-                                        return -1;
+                                    if ((RECharacter.isLetterOrDigit(c) || c == '_') == (opdata == E_ALNUM)) {
+                                        break;
                                     }
-                                    break;
+                                    return -1;
 
                                 case E_DIGIT:
                                 case E_NDIGIT:
-                                    if (!(RECharacter.isDigit(c) == (opdata == E_DIGIT))) {
-                                        return -1;
+                                    if (RECharacter.isDigit(c) == (opdata == E_DIGIT)) {
+                                        break;
                                     }
-                                    break;
+                                    return -1;
 
                                 case E_SPACE:
                                 case E_NSPACE:
-                                    if (!(RECharacter.isWhitespace(c) == (opdata == E_SPACE))) {
-                                        return -1;
+                                    if (RECharacter.isWhitespace(c) == (opdata == E_SPACE)) {
+                                        break;
                                     }
-                                    break;
+                                    return -1;
                             }
                             idx++;
                             break;

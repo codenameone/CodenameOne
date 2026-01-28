@@ -2123,15 +2123,12 @@ public class BrowserComponent extends Container {
                     out.put(prop, new JSRef((String) propVal.get("value"), (String) propVal.get("type")));
                 }
                 return out;
+            } catch (RuntimeException e) {
+                throw e;
             } catch (Exception ex) {
-                if (ex instanceof RuntimeException) {
-                    throw (RuntimeException) ex;
-                } else {
-                    Log.e(ex);
-                    throw new RuntimeException(ex.getMessage(), ex);
-                }
+                Log.e(ex);
+                throw new RuntimeException(ex.getMessage(), ex);
             }
-
         }
 
         /**

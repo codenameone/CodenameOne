@@ -379,7 +379,7 @@ public abstract class MathUtil {
         return ieee754Atan2(a, b);
     }
 
-    private static final double ieee754Exp(double x) {
+    private static double ieee754Exp(double x) {
         double y;
         double c;
         double t;

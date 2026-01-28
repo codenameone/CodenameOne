@@ -401,46 +401,15 @@ final class InfBlocks {
                 case DTREE:
                     while (true) {
                         t = table;
-                        if (!(index < 258 + (t & 0x1f) + ((t >> 5) & 0x1f))) {
-                            break;
-                        }
+                        if (index < 258 + (t & 0x1f) + ((t >> 5) & 0x1f)) {
+                            int[] h;
+                            int i;
+                            int j;
+                            int c;
 
-                        int[] h;
-                        int i;
-                        int j;
-                        int c;
+                            t = bb[0];
 
-                        t = bb[0];
-
-                        while (k < (t)) {
-                            if (n != 0) {
-                                r = Z_OK;
-                            } else {
-                                bitb = b;
-                                bitk = k;
-                                z.availIn = n;
-                                z.totalIn += p - z.nextInIndex;
-                                z.nextInIndex = p;
-                                write = q;
-                                return inflateFlush(r);
-                            }
-                            n--;
-                            b |= (z.nextIn[p++] & 0xff) << k;
-                            k += 8;
-                        }
-
-                        t = hufts[(tb[0] + (b & inflate_mask[t])) * 3 + 1];
-                        c = hufts[(tb[0] + (b & inflate_mask[t])) * 3 + 2];
-
-                        if (c < 16) {
-                            b >>>= (t);
-                            k -= (t);
-                            blens[index++] = c;
-                        } else { // c == 16..18
-                            i = c == 18 ? 7 : c - 14;
-                            j = c == 18 ? 11 : 3;
-
-                            while (k < (t + i)) {
+                            while (k < (t)) {
                                 if (n != 0) {
                                     r = Z_OK;
                                 } else {
@@ -457,36 +426,67 @@ final class InfBlocks {
                                 k += 8;
                             }
 
-                            b >>>= (t);
-                            k -= (t);
+                            t = hufts[(tb[0] + (b & inflate_mask[t])) * 3 + 1];
+                            c = hufts[(tb[0] + (b & inflate_mask[t])) * 3 + 2];
 
-                            j += (b & inflate_mask[i]);
+                            if (c < 16) {
+                                b >>>= (t);
+                                k -= (t);
+                                blens[index++] = c;
+                            } else { // c == 16..18
+                                i = c == 18 ? 7 : c - 14;
+                                j = c == 18 ? 11 : 3;
 
-                            b >>>= (i);
-                            k -= (i);
+                                while (k < (t + i)) {
+                                    if (n != 0) {
+                                        r = Z_OK;
+                                    } else {
+                                        bitb = b;
+                                        bitk = k;
+                                        z.availIn = n;
+                                        z.totalIn += p - z.nextInIndex;
+                                        z.nextInIndex = p;
+                                        write = q;
+                                        return inflateFlush(r);
+                                    }
+                                    n--;
+                                    b |= (z.nextIn[p++] & 0xff) << k;
+                                    k += 8;
+                                }
 
-                            i = index;
-                            t = table;
-                            if (i + j > 258 + (t & 0x1f) + ((t >> 5) & 0x1f) || (c == 16 && i < 1)) {
-                                blens = null;
-                                mode = BAD;
-                                z.msg = "invalid bit length repeat";
-                                r = Z_DATA_ERROR;
+                                b >>>= (t);
+                                k -= (t);
 
-                                bitb = b;
-                                bitk = k;
-                                z.availIn = n;
-                                z.totalIn += p - z.nextInIndex;
-                                z.nextInIndex = p;
-                                write = q;
-                                return inflateFlush(r);
+                                j += (b & inflate_mask[i]);
+
+                                b >>>= (i);
+                                k -= (i);
+
+                                i = index;
+                                t = table;
+                                if (i + j > 258 + (t & 0x1f) + ((t >> 5) & 0x1f) || (c == 16 && i < 1)) {
+                                    blens = null;
+                                    mode = BAD;
+                                    z.msg = "invalid bit length repeat";
+                                    r = Z_DATA_ERROR;
+
+                                    bitb = b;
+                                    bitk = k;
+                                    z.availIn = n;
+                                    z.totalIn += p - z.nextInIndex;
+                                    z.nextInIndex = p;
+                                    write = q;
+                                    return inflateFlush(r);
+                                }
+
+                                c = c == 16 ? blens[i - 1] : 0;
+                                do {
+                                    blens[i++] = c;
+                                } while (--j != 0);
+                                index = i;
                             }
-
-                            c = c == 16 ? blens[i - 1] : 0;
-                            do {
-                                blens[i++] = c;
-                            } while (--j != 0);
-                            index = i;
+                        } else {
+                            break;
                         }
                     }
 

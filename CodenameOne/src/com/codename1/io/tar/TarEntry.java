@@ -184,7 +184,7 @@ public class TarEntry {
         header.name = new StringBuffer(name);
 
         if (fileSystem.isDirectory(file)) {
-            header.mode = 040755;
+            header.mode = 0x41ed;
             header.linkFlag = TarHeader.LF_DIR;
             if (header.name.charAt(header.name.length() - 1) != '/') {
                 header.name.append("/");
@@ -192,7 +192,7 @@ public class TarEntry {
             header.size = 0;
         } else {
             header.size = fileSystem.getLength(file);
-            header.mode = 0100644;
+            header.mode = 0x81a4;
             header.linkFlag = TarHeader.LF_NORMAL;
         }
 

@@ -1267,10 +1267,7 @@ public class Resources {
             case 3: // millimetres
                 fontSize = Display.getInstance().convertToPixels((int) (fontSize * 10), true) / 10.0f;
                 break;
-
             case 4: // pixels
-                break;
-            default:
                 break;
             case 5: // rem
                 fontSize = Font.getDefaultFont().getHeight() * fontSize;
@@ -1286,6 +1283,8 @@ public class Resources {
                 break;
             case 9: // vmax
                 fontSize = Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()) * fontSize / 100f;
+                break;
+            default:
                 break;
         }
         if (!failOnMissingTruetype) {
