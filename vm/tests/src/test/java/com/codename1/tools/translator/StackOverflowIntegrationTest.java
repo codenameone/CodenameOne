@@ -100,8 +100,14 @@ class StackOverflowIntegrationTest {
                 "StackOverflowApp smoke run exited with code " + smokeResult.exitCode
                         + ". Output:\n" + smokeResult.output
                         + smokeDiagnostics);
+        assertTrue(smokeResult.output.contains("PROBE_CONSTANT"),
+                "StackOverflowApp smoke run should emit probe marker before recursion. Output was:\n"
+                        + smokeResult.output + smokeDiagnostics);
         assertTrue(smokeResult.output.contains("SMOKE_OK"),
-                "StackOverflowApp smoke run should succeed. Output was:\n" + smokeResult.output + smokeDiagnostics);
+                "StackOverflowApp smoke run should succeed. Output was:\n"
+                        + smokeResult.output
+                        + "\nMissing SMOKE_OK suggests a crash during boundedRecursion or report(String)."
+                        + smokeDiagnostics);
 
         ProcessResult result = runProcess(Arrays.asList(executable.toString(), "overflow", "run"), buildDir);
         String diagnostics = buildDiagnostics(srcRoot, executable, result);
