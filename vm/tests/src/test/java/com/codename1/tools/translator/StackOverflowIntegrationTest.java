@@ -92,7 +92,7 @@ class StackOverflowIntegrationTest {
                 "StackOverflowApp probe run exited with code " + probeResult.exitCode
                         + ". Output:\n" + probeResult.output
                         + probeDiagnostics);
-        assertTrue(probeResult.output.contains("PROBE_OK"),
+        assertTrue(probeResult.output.contains("PROBE_CONSTANT"),
                 "StackOverflowApp probe run should succeed. Output was:\n" + probeResult.output + probeDiagnostics);
         ProcessResult smokeResult = runProcess(Arrays.asList(executable.toString(), "smoke"), buildDir);
         String smokeDiagnostics = buildDiagnostics(srcRoot, executable, smokeResult);
@@ -116,6 +116,7 @@ class StackOverflowIntegrationTest {
     private String appSource() {
         return "public class StackOverflowApp {\n" +
                 "    private static native void report(String msg);\n" +
+                "    private static native void reportConstant();\n" +
                 "    private static void triggerOverflow() {\n" +
                 "        triggerOverflow();\n" +
                 "    }\n" +
@@ -127,19 +128,17 @@ class StackOverflowIntegrationTest {
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        if (args != null && args.length > 0 && \"probe\".equals(args[0])) {\n" +
-                "            report(\"PROBE_START\");\n" +
-                "            report(\"PROBE_OK\");\n" +
-                "            report(\"PROBE_DONE\");\n" +
+                "            reportConstant();\n" +
                 "            return;\n" +
                 "        }\n" +
                 "        if (args != null && args.length > 0 && \"smoke\".equals(args[0])) {\n" +
-                "            report(\"SMOKE_START\");\n" +
+                "            reportConstant();\n" +
                 "            int value = boundedRecursion(5);\n" +
                 "            StringBuilder sb = new StringBuilder();\n" +
                 "            sb.append(\"SMOKE_OK:\");\n" +
                 "            sb.append(value);\n" +
                 "            report(sb.toString());\n" +
-                "            report(\"SMOKE_DONE\");\n" +
+                "            reportConstant();\n" +
                 "            return;\n" +
                 "        }\n" +
                 "        try {\n" +
@@ -154,6 +153,10 @@ class StackOverflowIntegrationTest {
     private String nativeReportSource() {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
+                "void StackOverflowApp_reportConstant__(CODENAME_ONE_THREAD_STATE) {\n" +
+                "    printf(\"PROBE_CONSTANT\\n\");\n" +
+                "    fflush(stdout);\n" +
+                "}\n" +
                 "void StackOverflowApp_report___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT msg) {\n" +
                 "    struct String_Struct {\n" +
                 "        JAVA_OBJECT header;\n" +
