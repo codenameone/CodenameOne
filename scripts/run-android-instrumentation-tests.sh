@@ -76,6 +76,25 @@ if [ -z "$ANDROID_SDK_ROOT" ]; then
 fi
 if [ -n "$ANDROID_SDK_ROOT" ] && [ -d "$ANDROID_SDK_ROOT" ]; then
   export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
+  SDKMANAGER_BIN=""
+  if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+    SDKMANAGER_BIN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+  elif command -v sdkmanager >/dev/null 2>&1; then
+    SDKMANAGER_BIN="$(command -v sdkmanager)"
+  fi
+  if [ -n "$SDKMANAGER_BIN" ]; then
+    ra_log "Ensuring Android SDK platform/build-tools 36 are installed"
+    SDK_INSTALL_LOG="$ARTIFACTS_DIR/sdkmanager-android-36.log"
+    if yes | "$SDKMANAGER_BIN" "platforms;android-36" "build-tools;36.0.0" >"$SDK_INSTALL_LOG" 2>&1; then
+      ra_log "Android SDK 36 components installed"
+    else
+      ra_log "Warning: unable to install Android SDK 36 components (see $SDK_INSTALL_LOG)"
+    fi
+  else
+    ra_log "Warning: sdkmanager not found; cannot install API 36 components"
+  fi
+else
+  ra_log "Warning: Android SDK root not found; cannot install API 36 components"
 fi
 
 # ---- Prepare app + emulator state -----------------------------------------
@@ -122,13 +141,14 @@ sleep 2
 
 GRADLEW="./gradlew"
 GRADLE_CMD=("$GRADLEW" --stacktrace --info --no-daemon connectedDebugAndroidTest)
+GRADLE_LOG="$ARTIFACTS_DIR/connectedDebugAndroidTest-gradle.log"
 
 ra_log "Executing connectedDebugAndroidTest via Gradle"
 if ! (
   cd "scripts/hellocodenameone/android/target/hellocodenameone-android-1.0-SNAPSHOT-android-source"
-  JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}" "${GRADLE_CMD[@]}"
+  JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}" "${GRADLE_CMD[@]}" 2>&1 | tee "$GRADLE_LOG"
 ); then
-  ra_log "FATAL: connectedDebugAndroidTest failed"
+  ra_log "FATAL: connectedDebugAndroidTest failed (see $GRADLE_LOG)"
   exit 10
 fi
 

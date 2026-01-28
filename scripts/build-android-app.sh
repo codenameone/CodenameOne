@@ -140,8 +140,8 @@ fi
 "$PATCH_GRADLE_JAVA" "$PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" \
   --root "$ROOT_BUILD_GRADLE" \
   --app "$APP_BUILD_GRADLE" \
-  --compile-sdk 33 \
-  --target-sdk 33
+  --compile-sdk 36 \
+  --target-sdk 36
 # --- END: robust Gradle patch ---
 
 echo "----- app/build.gradle tail -----"
@@ -155,8 +155,12 @@ export JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}"
 (
   cd "$GRADLE_PROJECT_DIR"
   if command -v sdkmanager >/dev/null 2>&1; then
+    ba_log "Ensuring Android SDK platform/build-tools 36 are installed"
+    yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || ba_log "Warning: unable to install Android SDK 36 components"
     yes | sdkmanager --licenses >/dev/null 2>&1 || true
   elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+    ba_log "Ensuring Android SDK platform/build-tools 36 are installed"
+    yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || ba_log "Warning: unable to install Android SDK 36 components"
     yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
   fi
   ./gradlew --no-daemon assembleDebug
