@@ -69,6 +69,24 @@ cn1ss_setup "$TARGET_JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 [ -d "$GRADLE_PROJECT_DIR" ] || { ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR"; exit 4; }
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 
+ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+if [ -z "$ANDROID_SDK_ROOT" ]; then
+  if [ -d "/usr/local/lib/android/sdk" ]; then ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+  elif [ -d "$HOME/Android/Sdk" ]; then ANDROID_SDK_ROOT="$HOME/Android/Sdk"; fi
+fi
+if [ -n "$ANDROID_SDK_ROOT" ] && [ -d "$ANDROID_SDK_ROOT" ]; then
+  export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
+  if command -v sdkmanager >/dev/null 2>&1; then
+    ra_log "Ensuring Android SDK platform 36 is installed"
+    yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || ra_log "Warning: unable to install Android SDK 36 components"
+  elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+    ra_log "Ensuring Android SDK platform 36 is installed"
+    yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || ra_log "Warning: unable to install Android SDK 36 components"
+  fi
+else
+  ra_log "Warning: Android SDK root not found; skipping SDK component installation"
+fi
+
 # ---- Prepare app + emulator state -----------------------------------------
 MANIFEST="$GRADLE_PROJECT_DIR/app/src/main/AndroidManifest.xml"
 if [ ! -f "$MANIFEST" ]; then
