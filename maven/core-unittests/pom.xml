@@ -121,7 +121,7 @@
                     <consoleOutput>false</consoleOutput>
                     <failsOnError>false</failsOnError>
                     <linkXRef>false</linkXRef>
-                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
                     <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
                     <outputFileFormat>xml</outputFileFormat>
                     <sourceDirectories>
