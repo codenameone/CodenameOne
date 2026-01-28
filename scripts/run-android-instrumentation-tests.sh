@@ -74,35 +74,8 @@ if [ -z "$ANDROID_SDK_ROOT" ]; then
   if [ -d "/usr/local/lib/android/sdk" ]; then ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
   elif [ -d "$HOME/Android/Sdk" ]; then ANDROID_SDK_ROOT="$HOME/Android/Sdk"; fi
 fi
-SDKMANAGER_BIN=""
-ANDROID_PLATFORM_DIR="${ANDROID_SDK_ROOT%/}/platforms/android-36"
-ANDROID_BUILD_TOOLS_DIR="${ANDROID_SDK_ROOT%/}/build-tools/36.0.0"
 if [ -n "$ANDROID_SDK_ROOT" ] && [ -d "$ANDROID_SDK_ROOT" ]; then
   export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
-  if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-    SDKMANAGER_BIN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-  elif command -v sdkmanager >/dev/null 2>&1; then
-    SDKMANAGER_BIN="$(command -v sdkmanager)"
-  fi
-fi
-
-if [ ! -d "$ANDROID_PLATFORM_DIR" ] || [ ! -d "$ANDROID_BUILD_TOOLS_DIR" ]; then
-  if [ -n "$SDKMANAGER_BIN" ]; then
-    ra_log "Ensuring Android SDK platform 36 is installed"
-    SDK_INSTALL_LOG="$ARTIFACTS_DIR/sdkmanager-android-36.log"
-    if yes | "$SDKMANAGER_BIN" "platforms;android-36" "build-tools;36.0.0" >"$SDK_INSTALL_LOG" 2>&1; then
-      ra_log "Android SDK 36 components installed"
-    else
-      ra_log "Warning: unable to install Android SDK 36 components (see $SDK_INSTALL_LOG)"
-    fi
-  else
-    ra_log "Warning: Android SDK root or sdkmanager not found; cannot install API 36 components"
-  fi
-fi
-
-if [ ! -d "$ANDROID_PLATFORM_DIR" ] || [ ! -d "$ANDROID_BUILD_TOOLS_DIR" ]; then
-  ra_log "FATAL: Android SDK 36 platform/build-tools not available at $ANDROID_SDK_ROOT" >&2
-  exit 6
 fi
 
 # ---- Prepare app + emulator state -----------------------------------------
