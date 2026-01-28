@@ -750,7 +750,6 @@ final class Deflate {
                    int len,         // its length
                    boolean header   // true if block header must be written
     ) {
-        int index = 0;
         biWindup();      // align on byte boundary
         lastEobLen = 8; // enough lookahead for inflate
 

@@ -78,12 +78,6 @@ public final class LC {
 
     private boolean visualPadding = true;
 
-    /**
-     * Empty constructor.
-     */
-    public LC() {
-    }
-
     // ************************************************************************
     // * JavaBean get/set methods.
     // ************************************************************************

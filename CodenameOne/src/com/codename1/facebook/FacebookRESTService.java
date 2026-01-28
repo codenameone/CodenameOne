@@ -297,34 +297,19 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public void booleanToken(boolean tok) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof FacebookRESTService)) {
             return false;
         }
-        if (!super.equals(o)) {
-            return false;
-        }
-
         FacebookRESTService that = (FacebookRESTService) o;
-
-        if (responseOffset != that.responseOffset) {
-            return false;
-        }
-        if (connectionType != null ? !connectionType.equals(that.connectionType) : that.connectionType != null) {
-            return false;
-        }
-        if (root != null ? !root.equals(that.root) : that.root != null) {
-            return false;
-        }
-
-        return true;
+        return super.equals(o) && responseOffset == that.responseOffset &&
+                entry.equals(that.entry) &&
+                stack.equals(that.stack) &&
+                (currentData == null ? that.currentData == null : currentData.equals(that.currentData)) &&
+                (connectionType == null ? that.connectionType == null : connectionType.equals(that.connectionType)) &&
+                (responseDestination == null ? that.responseDestination == null : responseDestination.equals(that.responseDestination)) &&
+                (root == null ? that.root == null : root.equals(that.root));
     }
 
     /**

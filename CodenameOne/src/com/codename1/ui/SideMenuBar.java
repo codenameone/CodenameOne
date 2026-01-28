@@ -104,12 +104,6 @@ public class SideMenuBar extends MenuBar {
     private boolean topSwipePotential;
 
     /**
-     * Empty Constructor
-     */
-    public SideMenuBar() {
-    }
-
-    /**
      * Returns true if a side menu is currently controlling the screen
      *
      * @return true if a side menu is currently controlling the screen
@@ -1809,28 +1803,15 @@ public class SideMenuBar extends MenuBar {
             cmd.setMaterialIcon(materialIcon);
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            if (!super.equals(o)) {
+        public final boolean equals(Object o) {
+            if (!(o instanceof CommandWrapper)) {
                 return false;
             }
 
             CommandWrapper that = (CommandWrapper) o;
-
-            if (cmd != null ? !cmd.equals(that.cmd) : that.cmd != null) {
-                return false;
-            }
-
-            return true;
+            return super.equals(o) &&
+                    (cmd == null ? that.cmd == null : cmd.equals(that.cmd));
         }
 
         /**

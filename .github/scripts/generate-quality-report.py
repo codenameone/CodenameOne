@@ -927,7 +927,11 @@ def main() -> None:
             "DoNotCallGarbageCollectionExplicitly",
             "SuspiciousEqualsMethodName",
             "UseUtilityClass",
-            "EmptyCatchBlock"
+            "EmptyCatchBlock",
+            "SimplifyBooleanReturns",
+            "UnusedLocalVariable",
+            "UnnecessaryConstructor",
+            "UnnecessaryImport"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

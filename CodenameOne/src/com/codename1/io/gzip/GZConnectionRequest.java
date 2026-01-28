@@ -45,28 +45,13 @@ import java.io.InputStream;
 public class GZConnectionRequest extends ConnectionRequest {
     private boolean isGzipped;
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof GZConnectionRequest)) {
             return false;
         }
-        if (!super.equals(o)) {
-            return false;
-        }
-
         GZConnectionRequest that = (GZConnectionRequest) o;
-
-        if (isGzipped != that.isGzipped) {
-            return false;
-        }
-
-        return true;
+        return super.equals(o) && isGzipped == that.isGzipped;
     }
 
     /**

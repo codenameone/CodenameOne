@@ -640,8 +640,6 @@ public class AutoCompleteTextField extends TextField {
             final Form f = getComponentForm();
             Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
 
-            boolean canOpenPopup = true;
-
             for (int i = 0; i < layered.getComponentCount(); i++) {
                 Container wrap = (Container) layered.getComponentAt(i);
                 Component pop = wrap.getComponentAt(0);

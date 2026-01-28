@@ -103,12 +103,6 @@ public class LocalNotification {
     private boolean foreground;
 
     /**
-     * Creates a new local notification
-     */
-    public LocalNotification() {
-    }
-
-    /**
      * Gets the badge number to set for this notification.
      *
      * @return the badgeNumber

@@ -23,7 +23,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 
 /**

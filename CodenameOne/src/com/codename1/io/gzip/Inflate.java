@@ -165,8 +165,6 @@ final class Inflate {
 
     @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
     int inflate(int f) {
-        int hold = 0;
-
         int r;
         int b;
 
@@ -622,7 +620,6 @@ final class Inflate {
     int inflateSync() {
         int n;       // number of bytes to look at
         int p;       // pointer to bytes
-        int m;       // number of marker bytes found in a row
         long r;   // temporaries to save total_in and total_out
         long w;
 

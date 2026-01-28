@@ -485,21 +485,15 @@ public class RSSReader extends List {
             sourceForm.showBack();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
+            if (!(o instanceof BackCommand)) {
                 return false;
             }
-            if (!super.equals(o)) {
-                return false;
-            }
-            return true;
+            BackCommand that = (BackCommand) o;
+            return super.equals(o) &&
+                    (sourceForm == null ? that.sourceForm == null :
+                            sourceForm.equals(that.sourceForm));
         }
 
         @Override

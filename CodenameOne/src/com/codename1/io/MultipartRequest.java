@@ -513,31 +513,22 @@ public class MultipartRequest extends ConnectionRequest {
         this.base64Binaries = base64Binaries;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof MultipartRequest)) {
             return false;
         }
-        if (!super.equals(o)) {
-            return false;
-        }
-
         MultipartRequest that = (MultipartRequest) o;
-
-        if (boundary != null ? !boundary.equals(that.boundary) : that.boundary != null) {
-            return false;
-        }
-        if (args != null ? !args.equals(that.args) : that.args != null) {
-            return false;
-        }
-
-        return true;
+        return super.equals(o) &&
+                contentLength == that.contentLength &&
+                manualRedirect == that.manualRedirect &&
+                base64Binaries == that.base64Binaries &&
+                (boundary == null ? that.boundary == null : boundary.equals(that.boundary)) &&
+                (args == null ? that.args == null : args.equals(that.args)) &&
+                (filenames == null ? that.filenames == null : filenames.equals(that.filenames)) &&
+                (filesizes == null ? that.filesizes == null : filesizes.equals(that.filesizes)) &&
+                (mimeTypes == null ? that.mimeTypes == null : mimeTypes.equals(that.mimeTypes)) &&
+                (ignoreEncoding == null ? that.ignoreEncoding == null : ignoreEncoding.equals(that.ignoreEncoding));
     }
 
     /**

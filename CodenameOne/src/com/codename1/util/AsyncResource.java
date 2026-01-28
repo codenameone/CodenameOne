@@ -58,8 +58,8 @@ public class AsyncResource<V> extends Observable {
 
 
     @Async.Schedule
+    @SuppressWarnings("PMD.UnnecessaryConstructor")
     public AsyncResource() {
-
     }
 
     /**

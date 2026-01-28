@@ -97,28 +97,15 @@ public class NavigationCommand extends Command {
         this.nextForm = nextForm;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
+        if (!(o instanceof NavigationCommand)) {
             return false;
         }
 
         NavigationCommand that = (NavigationCommand) o;
-
-        if (nextForm != null ? !nextForm.equals(that.nextForm) : that.nextForm != null) {
-            return false;
-        }
-
-        return true;
+        return super.equals(o) &&
+                (nextForm == null ? that.nextForm == null : nextForm.equals(that.nextForm));
     }
 
     /**

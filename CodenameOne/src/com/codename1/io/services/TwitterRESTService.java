@@ -120,21 +120,14 @@ public class TwitterRESTService extends ConnectionRequest {
         authToken = token;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof TwitterRESTService)) {
             return false;
         }
-        if (!super.equals(o)) {
-            return false;
-        }
-        return true;
+        TwitterRESTService that = (TwitterRESTService) o;
+        return super.equals(o) &&
+                (parseTree == null ? that.parseTree == null : parseTree.equals(that.parseTree));
     }
 
     @Override

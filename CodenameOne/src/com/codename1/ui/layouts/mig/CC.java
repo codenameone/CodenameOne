@@ -115,12 +115,6 @@ public final class CC {
     private Float pushY = null;
     private transient String[] linkTargets = null;
 
-    /**
-     * Empty constructor.
-     */
-    public CC() {
-    }
-
     String[] getLinkTargets() {
         if (linkTargets == null) {
             final ArrayList<String> targets = new ArrayList<String>(2);

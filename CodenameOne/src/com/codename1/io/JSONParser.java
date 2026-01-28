@@ -791,7 +791,6 @@ public class JSONParser implements JSONParseCallback {
     @Override
     public void startArray(String arrayName) {
         java.util.List<Object> currentVector;
-        Map newOne;
         if (modern) {
             currentVector = new ArrayList<Object>();
         } else {

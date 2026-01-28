@@ -27,6 +27,15 @@
         <!-- This conflicts with other checks from PMD and SpotBugs -->
         <exclude name="SingletonClassReturningNewInstance" />
 
+        <!-- Since we don't support Java 7, we can't merge catch blocks -->
+        <exclude name="IdenticalCatchBranches" />
+
+        <!-- Unfortunately, this check is remarkably buggy -->
+        <exclude name="UnusedPrivateMethod" />
+
+        <!-- This is probably not a big deal in most areas where we have it -->
+        <exclude name="AssignmentToNonFinalStatic" />
+
         <!--
         We use these a lot in the code. I don't see the value in removing them
         -->

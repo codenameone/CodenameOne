@@ -25,7 +25,6 @@ package com.codename1.processing;
 import com.codename1.util.StringUtil;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 /**

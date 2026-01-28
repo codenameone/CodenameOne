@@ -90,37 +90,19 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         setDuplicateSupported(true);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof RSSService)) {
             return false;
         }
-        if (!super.equals(o)) {
-            return false;
-        }
-
         RSSService that = (RSSService) o;
-
-        if (limit != that.limit) {
-            return false;
-        }
-        if (startOffset != that.startOffset) {
-            return false;
-        }
-        if (createPlainTextDetails != that.createPlainTextDetails) {
-            return false;
-        }
-        if (iconPlaceholder != null ? !iconPlaceholder.equals(that.iconPlaceholder) : that.iconPlaceholder != null) {
-            return false;
-        }
-
-        return true;
+        return super.equals(o) &&
+                limit == that.limit &&
+                startOffset == that.startOffset &&
+                hasMore == that.hasMore &&
+                createPlainTextDetails == that.createPlainTextDetails &&
+                (results == null ? that.results == null : results.equals(that.results)) &&
+                (iconPlaceholder == null ? that.iconPlaceholder == null : iconPlaceholder.equals(that.iconPlaceholder));
     }
 
     /**

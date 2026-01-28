@@ -80,21 +80,15 @@ public final class CachedDataService extends ConnectionRequest {
         NetworkManager.getInstance().addToQueue(c);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof CachedDataService)) {
             return false;
         }
-        if (!super.equals(o)) {
-            return false;
-        }
-        return true;
+        CachedDataService that = (CachedDataService) o;
+        return super.equals(o) &&
+                responseProcessed == that.responseProcessed &&
+                data.equals(that.data);
     }
 
     @Override
