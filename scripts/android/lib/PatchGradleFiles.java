@@ -356,8 +356,8 @@ afterEvaluate {
         static Arguments parse(String[] args) {
             Path root = null;
             Path app = null;
-            int compileSdk = 33;
-            int targetSdk = 33;
+            int compileSdk = 36;
+            int targetSdk = 36;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
