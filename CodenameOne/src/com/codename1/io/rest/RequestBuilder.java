@@ -1073,28 +1073,18 @@ public class RequestBuilder {
             this.parseJSON = parseJSON;
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
+            if (!(o instanceof Connection)) {
                 return false;
             }
-            if (!super.equals(o)) {
-                return false;
-            }
-
             Connection that = (Connection) o;
-
-            if (parseJSON != that.parseJSON) {
-                return false;
-            }
-
-            return true;
+            return super.equals(o) &&
+                    errorCode == that.errorCode &&
+                    parseJSON == that.parseJSON &&
+                    (json == null ? that.json == null : json.equals(that.json)) &&
+                    (errorHandler == null ? that.errorHandler == null : errorHandler.equals(that.errorHandler)) &&
+                    (errorObject == null ? that.errorObject == null : errorObject.equals(that.errorObject));
         }
 
         /**

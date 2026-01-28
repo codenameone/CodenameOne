@@ -76,15 +76,6 @@ public class TimeSpinner extends BaseSpinner {
     private int currentMinute = 0;
     private boolean currentMeridiem;
 
-    /**
-     * Default constructor
-     */
-    public TimeSpinner() {
-    }
-
-    /**
-     * Default constructor
-     */
     @Override
     void initSpinner() {
         if (hour == null) {

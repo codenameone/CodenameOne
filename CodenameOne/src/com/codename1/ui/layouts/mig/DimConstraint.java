@@ -67,12 +67,6 @@ public final class DimConstraint {
     private boolean noGrid = false;
 
     /**
-     * Empty constructor.
-     */
-    public DimConstraint() {
-    }
-
-    /**
      * Returns the grow priority. Relative priority is used for determining which entities gets the extra space first.
      * <p>
      * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.

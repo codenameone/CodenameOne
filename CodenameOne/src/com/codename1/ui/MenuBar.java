@@ -120,12 +120,6 @@ public class MenuBar extends Container implements ActionListener {
     private boolean hideEmptyCommands;
     private boolean menuDisplaying;
 
-    /**
-     * Empty Constructor
-     */
-    public MenuBar() {
-    }
-
     static boolean isLSK(int keyCode) {
         return keyCode != 0 && keyCode == leftSK;
     }

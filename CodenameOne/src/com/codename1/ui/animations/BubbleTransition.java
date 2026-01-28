@@ -142,7 +142,6 @@ public class BubbleTransition extends Transition {
             destBuffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()),
                     Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight()
                     ), 0);
-            Graphics g = destBuffer.getGraphics();
             Style stl = dlg.getDialogComponent().getStyle();
             byte bgt = stl.getBgTransparency();
             stl.setBgTransparency(0xff);
@@ -155,7 +154,6 @@ public class BubbleTransition extends Transition {
             destBuffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()),
                     Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight()
                     ), 0);
-            Graphics g = destBuffer.getGraphics();
             Style stl = dlg.getDialogComponent().getStyle();
             byte bgt = stl.getBgTransparency();
             stl.setBgTransparency(0xff);

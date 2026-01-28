@@ -36,12 +36,6 @@ public class Address {
     private String country;
 
     /**
-     * Empty Constructor
-     */
-    public Address() {
-    }
-
-    /**
      * Gets Address Country
      *
      * @return

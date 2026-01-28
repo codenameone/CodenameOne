@@ -292,28 +292,16 @@ public class SimpleDateFormat extends DateFormat {
         return patternTokens;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof SimpleDateFormat)) {
             return false;
         }
-        if (!super.equals(o)) {
-            return false;
-        }
-
         SimpleDateFormat that = (SimpleDateFormat) o;
-
-        if (pattern != null ? !pattern.equals(that.pattern) : that.pattern != null) {
-            return false;
-        }
-
-        return true;
+        return super.equals(o) &&
+                (dateFormatSymbols == null ? that.dateFormatSymbols == null : dateFormatSymbols.equals(that.dateFormatSymbols)) &&
+                (pattern == null ? that.pattern == null : pattern.equals(that.pattern)) &&
+                (patternTokens == null ? that.patternTokens == null : patternTokens.equals(that.patternTokens));
     }
 
     /**

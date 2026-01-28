@@ -48,12 +48,6 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
     private String hid;
     private boolean banner = true;
 
-    /**
-     * Empty constructor of the inner active ads service.
-     */
-    public InnerActive() {
-    }
-
     private static void addParam(ConnectionRequest req, String key, String val) {
         if (val != null && val.length() > 0) {
             req.addArgument(key, val);
@@ -157,37 +151,18 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
         setDuplicateSupported(true);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof InnerActive)) {
             return false;
         }
-        if (!super.equals(o)) {
-            return false;
-        }
-
         InnerActive that = (InnerActive) o;
-
-        if (po != that.po) {
-            return false;
-        }
-        if (banner != that.banner) {
-            return false;
-        }
-        if (os != null ? !os.equals(that.os) : that.os != null) {
-            return false;
-        }
-        if (hid != null ? !hid.equals(that.hid) : that.hid != null) {
-            return false;
-        }
-
-        return true;
+        return super.equals(o) &&
+                po == that.po &&
+                banner == that.banner &&
+                REQUEST_URL.equals(that.REQUEST_URL) &&
+                (os == null ? that.os == null : os.equals(that.os)) &&
+                (hid == null ? that.hid == null : hid.equals(that.hid));
     }
 
     /**

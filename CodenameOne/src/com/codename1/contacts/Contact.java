@@ -68,12 +68,6 @@ public class Contact {
     private String[] linkedIds;
 
     /**
-     * Empty Constructor
-     */
-    public Contact() {
-    }
-
-    /**
      * Gets the Contact Addresses, the Hashtable contains key/value pairs where
      * the key is a String which represents the type of the Address, types can
      * be: "home", "work", "other" the value is an Address Object.

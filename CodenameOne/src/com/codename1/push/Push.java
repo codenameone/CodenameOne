@@ -452,21 +452,14 @@ public class Push {
             Log.e(err);
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
+            if (!(o instanceof PushConnection)) {
                 return false;
             }
-            if (!super.equals(o)) {
-                return false;
-            }
-            return true;
+
+            PushConnection that = (PushConnection) o;
+            return super.equals(o) && successful == that.successful;
         }
 
         @Override

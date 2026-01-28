@@ -91,12 +91,6 @@ public class XMLParser {
      */
     private Hashtable userDefinedCharEntities;
 
-    /**
-     * Constructs the XMLParser
-     */
-    public XMLParser() {
-    }
-
     private static int read(Reader is) throws IOException {
         int c = -1;
         if (buffSize < 0 || buffOffset >= buffSize) {

@@ -88,31 +88,17 @@ public class PointLayer extends Coord implements Layer {
         this.displayName = displayName;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
+        if (!(o instanceof PointLayer)) {
             return false;
         }
 
         PointLayer that = (PointLayer) o;
-
-        if (name != null ? !name.equals(that.name) : that.name != null) {
-            return false;
-        }
-        if (icon != null ? !icon.equals(that.icon) : that.icon != null) {
-            return false;
-        }
-
-        return true;
+        return super.equals(o) &&
+                displayName == that.displayName &&
+                (name == null ? that.name == null : name.equals(that.name)) &&
+                (icon == null ? that.icon == null : icon.equals(that.icon));
     }
 
     /**

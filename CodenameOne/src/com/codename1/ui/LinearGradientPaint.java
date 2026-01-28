@@ -206,17 +206,9 @@ public class LinearGradientPaint extends MultipleGradientPaint {
                     int iter = 0;
 
                     while (currPos > endPos) {
-                        float sx = (float) startX;
-                        float sy = (float) startY;
-                        float ex = (float) endX;
-                        float ey = (float) endY;
                         int[] cols = getColors();
                         float[] fracs = getFractions();
                         if (iter % 2 == 0 && getCycleMethod() == REFLECT) {
-                            sx = (float) endX;
-                            sy = (float) endY;
-                            ex = (float) startX;
-                            ey = (float) startY;
                             cols = reverseColors();
                             fracs = reverseFractions();
                         }
@@ -252,17 +244,9 @@ public class LinearGradientPaint extends MultipleGradientPaint {
                     int iter = 0;
 
                     while (currPos < endPos) {
-                        float sx = (float) startX;
-                        float sy = (float) startY;
-                        float ex = (float) endX;
-                        float ey = (float) endY;
                         int[] cols = getColors();
                         float[] fracs = getFractions();
                         if (iter % 2 == 0 && getCycleMethod() == REFLECT) {
-                            sx = (float) endX;
-                            sy = (float) endY;
-                            ex = (float) startX;
-                            ey = (float) startY;
                             cols = reverseColors();
                             fracs = reverseFractions();
                         }
