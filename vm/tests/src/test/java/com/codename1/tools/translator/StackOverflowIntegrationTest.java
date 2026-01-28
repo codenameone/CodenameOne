@@ -86,7 +86,7 @@ class StackOverflowIntegrationTest {
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
         Path executable = buildDir.resolve("StackOverflowApp");
-        ProcessResult probeResult = runProcess(Arrays.asList(executable.toString(), "probe"), buildDir);
+        ProcessResult probeResult = runProcess(Arrays.asList(executable.toString()), buildDir);
         String probeDiagnostics = buildDiagnostics(srcRoot, executable, probeResult);
         assertEquals(0, probeResult.exitCode,
                 "StackOverflowApp probe run exited with code " + probeResult.exitCode
@@ -103,7 +103,7 @@ class StackOverflowIntegrationTest {
         assertTrue(smokeResult.output.contains("SMOKE_OK"),
                 "StackOverflowApp smoke run should succeed. Output was:\n" + smokeResult.output + smokeDiagnostics);
 
-        ProcessResult result = runProcess(Arrays.asList(executable.toString()), buildDir);
+        ProcessResult result = runProcess(Arrays.asList(executable.toString(), "overflow", "run"), buildDir);
         String diagnostics = buildDiagnostics(srcRoot, executable, result);
         assertEquals(0, result.exitCode,
                 "StackOverflowApp exited with code " + result.exitCode
@@ -127,11 +127,11 @@ class StackOverflowIntegrationTest {
                 "        return depth + boundedRecursion(depth - 1);\n" +
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
-                "        if (args != null && args.length > 0 && \"probe\".equals(args[0])) {\n" +
+                "        if (args == null || args.length == 0) {\n" +
                 "            reportConstant();\n" +
                 "            return;\n" +
                 "        }\n" +
-                "        if (args != null && args.length > 0 && \"smoke\".equals(args[0])) {\n" +
+                "        if (args.length == 1) {\n" +
                 "            reportConstant();\n" +
                 "            int value = boundedRecursion(5);\n" +
                 "            StringBuilder sb = new StringBuilder();\n" +
