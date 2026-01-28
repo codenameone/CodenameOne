@@ -127,7 +127,9 @@ class StackOverflowIntegrationTest {
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        if (args != null && args.length > 0 && \"probe\".equals(args[0])) {\n" +
+                "            report(\"PROBE_START\");\n" +
                 "            report(\"PROBE_OK\");\n" +
+                "            report(\"PROBE_DONE\");\n" +
                 "            return;\n" +
                 "        }\n" +
                 "        if (args != null && args.length > 0 && \"smoke\".equals(args[0])) {\n" +
