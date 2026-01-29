@@ -122,6 +122,7 @@ class StackOverflowIntegrationTest {
         return "public class StackOverflowApp {\n" +
                 "    private static native void report(String msg);\n" +
                 "    private static native void reportConstant();\n" +
+                "    private static native void reportConstantTwice();\n" +
                 "    private static void triggerOverflow() {\n" +
                 "        triggerOverflow();\n" +
                 "    }\n" +
@@ -137,8 +138,7 @@ class StackOverflowIntegrationTest {
                 "            return;\n" +
                 "        }\n" +
                 "        if (args.length == 1) {\n" +
-                "            reportConstant();\n" +
-                "            reportConstant();\n" +
+                "            reportConstantTwice();\n" +
                 "            return;\n" +
                 "        }\n" +
                 "        try {\n" +
@@ -154,6 +154,11 @@ class StackOverflowIntegrationTest {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
                 "void StackOverflowApp_reportConstant__(CODENAME_ONE_THREAD_STATE) {\n" +
+                "    printf(\"PROBE_CONSTANT\\n\");\n" +
+                "    fflush(stdout);\n" +
+                "}\n" +
+                "void StackOverflowApp_reportConstantTwice__(CODENAME_ONE_THREAD_STATE) {\n" +
+                "    printf(\"PROBE_CONSTANT\\n\");\n" +
                 "    printf(\"PROBE_CONSTANT\\n\");\n" +
                 "    fflush(stdout);\n" +
                 "}\n" +
