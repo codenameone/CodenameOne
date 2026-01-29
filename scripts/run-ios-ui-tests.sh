@@ -237,6 +237,34 @@ auto_select_destination() {
   return $rc
 }
 
+auto_select_destination_retry() {
+  local attempt=1
+  local selected=""
+  while [ "$attempt" -le 3 ]; do
+    selected="$(auto_select_destination || true)"
+    if [ -n "$selected" ]; then
+      printf '%s\n' "$selected"
+      return 0
+    fi
+    ri_log "Auto-select attempt $attempt did not return a destination; retrying"
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+destination_visible_to_xcodebuild() {
+  local destination="$1"
+  local id=""
+  id="$(printf '%s\n' "$destination" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
+  [ -z "$id" ] && return 1
+  set +e
+  xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null | grep -q "$id"
+  local rc=$?
+  set -e
+  return $rc
+}
+
 fallback_sim_destination() {
   if ! command -v xcrun >/dev/null 2>&1; then
     return
@@ -315,7 +343,7 @@ fallback_sim_destination() {
 
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
 if [ -z "$SIM_DESTINATION" ]; then
-  SELECTED_DESTINATION="$(auto_select_destination || true)"
+  SELECTED_DESTINATION="$(auto_select_destination_retry || true)"
   if [ -n "${SELECTED_DESTINATION:-}" ]; then
     SIM_DESTINATION="$SELECTED_DESTINATION"
     ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
@@ -336,7 +364,7 @@ fi
 
 SIM_DESTINATION="$(normalize_destination "$SIM_DESTINATION")"
 
-# Extract UDID and prefer id-only destination to avoid OS/SDK mismatches
+# Extract UDID and prefer platform+id destination for xcodebuild stability
 SIM_UDID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
 if [ -n "$SIM_UDID" ]; then
   ri_log "Booting simulator $SIM_UDID"
@@ -345,7 +373,21 @@ if [ -n "$SIM_UDID" ]; then
   xcrun simctl bootstatus "$SIM_UDID" -b
   BOOT_END=$(date +%s)
   echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
-  SIM_DESTINATION="id=$SIM_UDID"
+  SIM_DESTINATION="platform=iOS Simulator,id=$SIM_UDID"
+fi
+if ! destination_visible_to_xcodebuild "$SIM_DESTINATION"; then
+  ri_log "Selected simulator destination not visible to xcodebuild; attempting re-selection"
+  SELECTED_DESTINATION="$(auto_select_destination_retry || true)"
+  if [ -n "${SELECTED_DESTINATION:-}" ]; then
+    SIM_DESTINATION="$(normalize_destination "$SELECTED_DESTINATION")"
+    SIM_UDID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
+    if [ -n "$SIM_UDID" ]; then
+      SIM_DESTINATION="platform=iOS Simulator,id=$SIM_UDID"
+    fi
+    ri_log "Re-selected simulator destination '$SIM_DESTINATION'"
+  else
+    ri_log "Auto-selection still did not return a destination; continuing with '$SIM_DESTINATION'"
+  fi
 fi
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
 
@@ -355,17 +397,42 @@ BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
-if ! xcodebuild \
-  -workspace "$WORKSPACE_PATH" \
-  -scheme "$SCHEME" \
-  -sdk iphonesimulator \
-  -configuration Debug \
-  -destination "$SIM_DESTINATION" \
-  -destination-timeout 120 \
-  -derivedDataPath "$DERIVED_DATA_DIR" \
-  build | tee "$BUILD_LOG"; then
-  ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
-  exit 10
+build_with_destination() {
+  local dest="$1"
+  xcodebuild \
+    -workspace "$WORKSPACE_PATH" \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Debug \
+    -destination "$dest" \
+    -destination-timeout 120 \
+    -derivedDataPath "$DERIVED_DATA_DIR" \
+    build | tee "$BUILD_LOG"
+}
+
+if ! build_with_destination "$SIM_DESTINATION"; then
+  if grep -q "Unable to find a destination matching the provided destination specifier" "$BUILD_LOG"; then
+    ri_log "xcodebuild could not find destination; retrying after re-selection"
+    SELECTED_DESTINATION="$(auto_select_destination_retry || true)"
+    if [ -n "${SELECTED_DESTINATION:-}" ]; then
+      SIM_DESTINATION="$(normalize_destination "$SELECTED_DESTINATION")"
+      SIM_UDID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
+      if [ -n "$SIM_UDID" ]; then
+        SIM_DESTINATION="platform=iOS Simulator,id=$SIM_UDID"
+      fi
+      ri_log "Retrying xcodebuild with destination '$SIM_DESTINATION'"
+      if ! build_with_destination "$SIM_DESTINATION"; then
+        ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
+        exit 10
+      fi
+    else
+      ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
+      exit 10
+    fi
+  else
+    ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
+    exit 10
+  fi
 fi
 COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
