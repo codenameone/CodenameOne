@@ -144,7 +144,7 @@ public class HTMLElement extends Element {
     public static final int TAG_S = 67; // Strike through
     public static final int TAG_STRIKE = 68; // Strike through
     public static final int TAG_CENTER = 69; // shorthand for DIV align=center
-    public static final int TAG_DIR = 70;// Same as UL
+    public static final int TAG_DIR = 70; // Same as UL
     public static final int TAG_MAP = 71;
     public static final int TAG_AREA = 72;
     public static final int TAG_LEGEND = 73;
@@ -703,7 +703,7 @@ public class HTMLElement extends Element {
             {}, //S = 67; // Strike through
             {}, //STRIKE = 68; // Strike through
             {}, //CENTER = 69; // shorthand for DIV align=center
-            {}, //DIR = 70;// Same as UL
+            {}, //DIR = 70; // Same as UL
             {
                     ATTR_NAME
             }, //MAP = 71;
@@ -746,7 +746,7 @@ public class HTMLElement extends Element {
                     ATTR_VALUE, // cdata
                     ATTR_DISABLED,
                     ATTR_READONLY
-            },//BUTTON = 81;
+            }, //BUTTON = 81;
             {}, //TEXT = 82;
 
     };

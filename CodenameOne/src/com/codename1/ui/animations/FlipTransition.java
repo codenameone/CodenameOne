@@ -261,7 +261,7 @@ public class FlipTransition extends Transition {
                     double sin = flipState * 2.0;
                     double angle = MathUtil.asin(sin);
 
-                    currTransform.rotate((float) angle, 0, 1, 0);// rotate about y axis
+                    currTransform.rotate((float) angle, 0, 1, 0); // rotate about y axis
                 }
             } else {
                 img = destBuffer;
@@ -273,7 +273,7 @@ public class FlipTransition extends Transition {
                     // 1.0 -> 0 degrees
                     double sin = (1.0 - flipState) * 2.0;
                     double angle = Math.PI - MathUtil.asin(sin);
-                    currTransform.rotate((float) angle, 0, 1, 0);// rotate about y axis
+                    currTransform.rotate((float) angle, 0, 1, 0); // rotate about y axis
                 }
             }
             if (transitionState == STATE_FLIP) {

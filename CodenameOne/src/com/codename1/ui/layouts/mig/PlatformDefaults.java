@@ -86,26 +86,26 @@ public final class PlatformDefaults {
      * <p>
      */
     public static final String VISUAL_PADDING_PROPERTY = "visualPadding";
-    //	private static final UnitValue LPX1 = new UnitValue(1, UnitValue.LPX, null);
-//	private static final UnitValue LPX4 = new UnitValue(4, UnitValue.LPX, null);
+    //    private static final UnitValue LPX1 = new UnitValue(1, UnitValue.LPX, null);
+//    private static final UnitValue LPX4 = new UnitValue(4, UnitValue.LPX, null);
     private static final UnitValue LPX6 = new UnitValue(6, UnitValue.LPX, null);
     private static final UnitValue LPX7 = new UnitValue(7, UnitValue.LPX, null);
-    //	private static final UnitValue LPX8 = new UnitValue(8, UnitValue.LPX, null);
-//	private static final UnitValue LPX9 = new UnitValue(9, UnitValue.LPX, null);
-//	private static final UnitValue LPX10 = new UnitValue(10, UnitValue.LPX, null);
+    //    private static final UnitValue LPX8 = new UnitValue(8, UnitValue.LPX, null);
+//    private static final UnitValue LPX9 = new UnitValue(9, UnitValue.LPX, null);
+//    private static final UnitValue LPX10 = new UnitValue(10, UnitValue.LPX, null);
     private static final UnitValue LPX11 = new UnitValue(11, UnitValue.LPX, null);
     private static final UnitValue LPX12 = new UnitValue(12, UnitValue.LPX, null);
-    //	private static final UnitValue LPX14 = new UnitValue(14, UnitValue.LPX, null);
+    //    private static final UnitValue LPX14 = new UnitValue(14, UnitValue.LPX, null);
     private static final UnitValue LPX16 = new UnitValue(16, UnitValue.LPX, null);
     private static final UnitValue LPX18 = new UnitValue(18, UnitValue.LPX, null);
     private static final UnitValue LPX20 = new UnitValue(20, UnitValue.LPX, null);
-    //	private static final UnitValue LPY1 = new UnitValue(1, UnitValue.LPY, null);
-//	private static final UnitValue LPY4 = new UnitValue(4, UnitValue.LPY, null);
+    //    private static final UnitValue LPY1 = new UnitValue(1, UnitValue.LPY, null);
+//    private static final UnitValue LPY4 = new UnitValue(4, UnitValue.LPY, null);
     private static final UnitValue LPY6 = new UnitValue(6, UnitValue.LPY, null);
     private static final UnitValue LPY7 = new UnitValue(7, UnitValue.LPY, null);
-    //	private static final UnitValue LPY8 = new UnitValue(8, UnitValue.LPY, null);
-//	private static final UnitValue LPY9 = new UnitValue(9, UnitValue.LPY, null);
-//	private static final UnitValue LPY10 = new UnitValue(10, UnitValue.LPY, null);
+    //    private static final UnitValue LPY8 = new UnitValue(8, UnitValue.LPY, null);
+//    private static final UnitValue LPY9 = new UnitValue(9, UnitValue.LPY, null);
+//    private static final UnitValue LPY10 = new UnitValue(10, UnitValue.LPY, null);
     private static final UnitValue LPY11 = new UnitValue(11, UnitValue.LPY, null);
     private static final UnitValue LPY12 = new UnitValue(12, UnitValue.LPY, null);
     private static final UnitValue LPY14 = new UnitValue(14, UnitValue.LPY, null);
@@ -115,7 +115,7 @@ public final class PlatformDefaults {
     // Used for holding values.
     private final static UnitValue[] PANEL_INS = new UnitValue[4];
     private final static UnitValue[] DIALOG_INS = new UnitValue[4];
-    //	private static final int KDE = 3;
+    //    private static final int KDE = 3;
     private static final HashMap<String, UnitValue> HOR_DEFS = new HashMap<String, UnitValue>(32);
     private static final HashMap<String, UnitValue> VER_DEFS = new HashMap<String, UnitValue>(32);
     private static final HashMap<String, int[]> VISUAL_BOUNDS = new HashMap<String, int[]>(64);
@@ -758,10 +758,10 @@ public final class PlatformDefaults {
             return null;
         }
 
-//		if (adjacentComp == null || adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.TOP)
-//			return null;
+//        if (adjacentComp == null || adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.TOP)
+//            return null;
 
-//		SwingConstants.RIGHT == 4, SwingConstants.LEFT == 2
+//        SwingConstants.RIGHT == 4, SwingConstants.LEFT == 2
         return (adjacentSide == 2 || adjacentSide == 4) ? RELATED_X : RELATED_Y;
     }
 

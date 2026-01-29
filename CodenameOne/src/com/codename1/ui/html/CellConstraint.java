@@ -35,8 +35,8 @@ package com.codename1.ui.html;
  * @author Ofir Leitner
  */
 class CellConstraint {
-    int width = -1;//defaultColumnWidth;
-    int height = -1;//defaultRowHeight;
+    int width = -1; //defaultColumnWidth;
+    int height = -1; //defaultRowHeight;
     int spanHorizontal = 1;
     int spanVertical = 1;
     int align = -1;

@@ -38,7 +38,7 @@ package com.codename1.ui.layouts.mig;
  * <p>
  * <b>NOTE!</b>.equals() and .hashcode() should be forwarded to the wrapped component. E.g.
  * <pre>
- * 	public int hashCode()
+ *     public int hashCode()
  * {
  * return getComponent().hashCode();
  * }

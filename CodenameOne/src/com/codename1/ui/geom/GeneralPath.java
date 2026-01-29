@@ -482,7 +482,7 @@ public final class GeneralPath implements Shape {
         StringBuilder sb = new StringBuilder();
         sb.append("[General Path: ");
         Iterator it = createIteratorFromPool(this, null);
-        float[] buf = createFloatArrayFromPool(6);//new float[6];
+        float[] buf = createFloatArrayFromPool(6); //new float[6];
         try {
             while (!it.isDone()) {
                 int type = it.currentSegment(buf);
@@ -1036,7 +1036,7 @@ public final class GeneralPath implements Shape {
      *                {@link PathIterator#SEG_MOVETO} unchanged.
      */
     public void append(PathIterator path, boolean connect) {
-        float[] coords = createFloatArrayFromPool(6);//new float[6];
+        float[] coords = createFloatArrayFromPool(6); //new float[6];
         append(path, connect, coords);
         recycle(coords);
     }
@@ -1631,7 +1631,7 @@ public final class GeneralPath implements Shape {
 //
 //            }
 //
-//            final double q1 = r1s;//ax * ax + ay * ay;
+//            final double q1 = r1s; //ax * ax + ay * ay;
 //            final double q2 = q1 + ax * bx + ay * by;
 //            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
 //            final float x2 = (float)(cx + ax - k2 * ay);
@@ -1847,7 +1847,7 @@ public final class GeneralPath implements Shape {
             Shape segmentedShape = segmentShape(r, s);
             Iterator it = createIteratorFromPool((GeneralPath) segmentedShape, null);
             //GeneralPath out = new GeneralPath();
-            float[] buf = createFloatArrayFromPool(6);//new float[6];
+            float[] buf = createFloatArrayFromPool(6); //new float[6];
             try {
                 boolean started = false;
                 float x1 = r.getX();
