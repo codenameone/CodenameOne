@@ -56,7 +56,7 @@ final class Deflate {
             "data error",          // Z_DATA_ERROR    (-3)
             "insufficient memory", // Z_MEM_ERROR     (-4)
             "buffer error",        // Z_BUF_ERROR     (-5)
-            "incompatible version",// Z_VERSION_ERROR (-6)
+            "incompatible version", // Z_VERSION_ERROR (-6)
             ""
     };
     // block not completed, need more input or more output
@@ -386,7 +386,7 @@ final class Deflate {
 
     // Scan a literal or distance tree to determine the frequencies of the codes
     // in the bit length tree.
-    void scanTree(short[] tree,// the tree to be scanned
+    void scanTree(short[] tree, // the tree to be scanned
                   int maxCode // and its largest code of non-zero frequency
     ) {
         int n;                     // iterates over all tree elements
@@ -482,7 +482,7 @@ final class Deflate {
 
     // Send a literal or distance tree in compressed form, using the codes in
     // bl_tree.
-    void sendTree(short[] tree,// the tree to be sent
+    void sendTree(short[] tree, // the tree to be sent
                   int maxCode // and its largest code of non zero frequency
     ) {
         int n;                     // iterates over all tree elements
@@ -1033,7 +1033,7 @@ final class Deflate {
             if (lookahead >= MIN_MATCH) {
                 insH = (((insH) << hashShift) ^ (window[(strStart) + (MIN_MATCH - 1)] & 0xff)) & hashMask;
 
-//	prev[strstart&w_mask]=hashHead=head[ins_h];
+//    prev[strstart&w_mask]=hashHead=head[ins_h];
                 hashHead = (head[insH] & 0xffff);
                 prev[strStart & wMask] = head[insH];
                 head[insH] = (short) strStart;
@@ -1069,7 +1069,7 @@ final class Deflate {
                         strStart++;
 
                         insH = ((insH << hashShift) ^ (window[(strStart) + (MIN_MATCH - 1)] & 0xff)) & hashMask;
-//	    prev[strstart&w_mask]=hashHead=head[ins_h];
+//        prev[strstart&w_mask]=hashHead=head[ins_h];
                         hashHead = (head[insH] & 0xffff);
                         prev[strStart & wMask] = head[insH];
                         head[insH] = (short) strStart;
@@ -1145,7 +1145,7 @@ final class Deflate {
 
             if (lookahead >= MIN_MATCH) {
                 insH = (((insH) << hashShift) ^ (window[(strStart) + (MIN_MATCH - 1)] & 0xff)) & hashMask;
-//	prev[strstart&w_mask]=hashHead=head[ins_h];
+//    prev[strstart&w_mask]=hashHead=head[ins_h];
                 hashHead = (head[insH] & 0xffff);
                 prev[strStart & wMask] = head[insH];
                 head[insH] = (short) strStart;

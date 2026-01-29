@@ -131,20 +131,20 @@ public class MultiList extends List {
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
-                String.class,// name1
-                String.class,// name2
-                String.class,// name3
-                String.class,// name4
-                String.class,// uiid1
-                String.class,// uiid2
-                String.class,// uiid3
-                String.class,// uiid4
-                String.class,// iconName
-                String.class,// iconUiid
-                String.class,// iconPosition
-                String.class,// emblemName
-                String.class,// emblemUiid
-                String.class,// emblemPosition
+                String.class, // name1
+                String.class, // name2
+                String.class, // name3
+                String.class, // name4
+                String.class, // uiid1
+                String.class, // uiid2
+                String.class, // uiid3
+                String.class, // uiid4
+                String.class, // iconName
+                String.class, // iconUiid
+                String.class, // iconPosition
+                String.class, // emblemName
+                String.class, // emblemUiid
+                String.class, // emblemPosition
                 Boolean.class,
                 Boolean.class,
                 Boolean.class,

@@ -1915,7 +1915,7 @@ public class Dialog extends Form {
                 menuHeight = menuBar.getPreferredH() + menuStyle.getVerticalMargins();
             }
             prefWidth = Math.min(prefWidth, w);
-            h = h - menuHeight - title.getPreferredH();// - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
+            h = h - menuHeight - title.getPreferredH(); // - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
             int topBottom = Math.max(0, (h - prefHeight) / 2);
             int leftRight = Math.max(0, (w - prefWidth) / 2);
             int top = topBottom;

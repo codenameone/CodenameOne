@@ -921,31 +921,31 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
-                String.class,// line1
-                String.class,// line2
-                String.class,// line3
-                String.class,// line4
-                String.class,// name1
-                String.class,// name2
-                String.class,// name3
-                String.class,// name4
-                String.class,// uiid1
-                String.class,// uiid2
-                String.class,// uiid3
-                String.class,// uiid4
-                Image.class,// icon
-                String.class,// iconName
-                String.class,// iconUiid
-                String.class,// iconPosition
-                Image.class,// emblem
-                String.class,// emblemName
-                String.class,// emblemUiid
-                String.class,// emblemPosition
+                String.class, // line1
+                String.class, // line2
+                String.class, // line3
+                String.class, // line4
+                String.class, // name1
+                String.class, // name2
+                String.class, // name3
+                String.class, // name4
+                String.class, // uiid1
+                String.class, // uiid2
+                String.class, // uiid3
+                String.class, // uiid4
+                Image.class, // icon
+                String.class, // iconName
+                String.class, // iconUiid
+                String.class, // iconPosition
+                Image.class, // emblem
+                String.class, // emblemName
+                String.class, // emblemUiid
+                String.class, // emblemPosition
                 Boolean.class,
                 Boolean.class,
                 Boolean.class,
                 Boolean.class,
-                String.class,// group
+                String.class, // group
                 Boolean.class, // selected
                 String.class
         };

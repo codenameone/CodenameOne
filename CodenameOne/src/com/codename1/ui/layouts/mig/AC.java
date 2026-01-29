@@ -189,35 +189,35 @@ public final class AC {
         return this;
     }
 
-//	/** Specifies that the current row/column should be put in the end group <code>s</code> and will thus share the same ending
-//	 * coordinate within the group.
-//	 * <p>
-//	 * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
-//	 * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
-//	 * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
-//	 */
-//	public final AxisConstraint endGroup(String s)
-//	{
-//		return endGroup(s, curIx);
-//	}
+//    /** Specifies that the current row/column should be put in the end group <code>s</code> and will thus share the same ending
+//     * coordinate within the group.
+//     * <p>
+//     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+//     * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
+//     * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
+//     */
+//    public final AxisConstraint endGroup(String s)
+//    {
+//        return endGroup(s, curIx);
+//    }
 //
-//	/** Specifies that the indicated rows/columns should be put in the end group <code>s</code> and will thus share the same ending
-//	 * coordinate within the group.
-//	 * <p>
-//	 * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
-//	 * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
-//	 * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
-//	 * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
-//	 */
-//	public final AxisConstraint endGroup(String s, int... indexes)
-//	{
-//		for (int i = indexes.length - 1; i >= 0; i--) {
-//			int ix = indexes[i];
-//			makeSize(ix);
-//			cList.get(ix).setEndGroup(s);
-//		}
-//		return this;
-//	}
+//    /** Specifies that the indicated rows/columns should be put in the end group <code>s</code> and will thus share the same ending
+//     * coordinate within the group.
+//     * <p>
+//     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+//     * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
+//     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+//     * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
+//     */
+//    public final AxisConstraint endGroup(String s, int... indexes)
+//    {
+//        for (int i = indexes.length - 1; i >= 0; i--) {
+//            int ix = indexes[i];
+//            makeSize(ix);
+//            cList.get(ix).setEndGroup(s);
+//        }
+//        return this;
+//    }
 
     /**
      * Specifies that the current row/column should be put in the size group <code>s</code> and will thus share the same size
