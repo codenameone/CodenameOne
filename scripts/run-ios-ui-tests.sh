@@ -246,7 +246,7 @@ auto_select_destination_retry() {
       printf '%s\n' "$selected"
       return 0
     fi
-    ri_log "Auto-select attempt $attempt did not return a destination; retrying"
+    ri_log "Auto-select attempt $attempt did not return a destination; retrying" >&2
     sleep 5
     attempt=$((attempt + 1))
   done
