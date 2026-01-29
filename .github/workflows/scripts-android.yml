@@ -141,7 +141,7 @@ jobs:
       - name: Run Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 31
+          api-level: 36
           arch: x86_64
           target: google_apis
           disk-size: 2048M
@@ -152,6 +152,24 @@ jobs:
         with:
           name: emulator-screenshot
           path: artifacts/*.png
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
+      - name: Upload Android Gradle logs
+        if: always() && matrix.id == 'default'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-gradle-logs
+          path: artifacts/*gradle*.log
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
+      - name: Upload Android test report
+        if: always() && matrix.id == 'default'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-report
+          path: artifacts/android-test-report
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6
