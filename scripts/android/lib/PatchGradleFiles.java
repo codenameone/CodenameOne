@@ -48,6 +48,7 @@ public class PatchGradleFiles {
     private static boolean patchRootBuildGradle(Path path) throws IOException {
         String content = Files.readString(path, StandardCharsets.UTF_8);
         Matcher matcher = REPOSITORIES_PATTERN.matcher(content);
+        boolean changed = false;
         if (!matcher.find()) {
             if (!content.endsWith("\n")) {
                 content += "\n";
@@ -57,31 +58,37 @@ public class PatchGradleFiles {
             return true;
         }
 
-        String block = matcher.group();
-        boolean changed = false;
-        if (!block.contains("google()") || !block.contains("mavenCentral()")) {
-            String[] lines = block.split("\n");
-            java.util.LinkedHashSet<String> body = new java.util.LinkedHashSet<>();
-            for (int i = 1; i < lines.length - 1; i++) {
-                String line = lines[i].trim();
-                if (!line.isEmpty()) {
-                    body.add("    " + line.trim());
+        matcher.reset();
+        StringBuffer updated = new StringBuffer();
+        while (matcher.find()) {
+            String block = matcher.group();
+            if (!block.contains("google()") || !block.contains("mavenCentral()")) {
+                String[] lines = block.split("\n");
+                java.util.LinkedHashSet<String> body = new java.util.LinkedHashSet<>();
+                for (int i = 1; i < lines.length - 1; i++) {
+                    String line = lines[i].trim();
+                    if (!line.isEmpty()) {
+                        body.add("    " + line.trim());
+                    }
                 }
+                body.add("    google()");
+                body.add("    mavenCentral()");
+                StringBuilder newBlock = new StringBuilder();
+                newBlock.append(lines[0]).append('\n');
+                for (String line : body) {
+                    newBlock.append(line).append('\n');
+                }
+                newBlock.append(lines[lines.length - 1]);
+                matcher.appendReplacement(updated, Matcher.quoteReplacement(newBlock.toString()));
+                changed = true;
+            } else {
+                matcher.appendReplacement(updated, Matcher.quoteReplacement(block));
             }
-            body.add("    google()");
-            body.add("    mavenCentral()");
-            StringBuilder newBlock = new StringBuilder();
-            newBlock.append(lines[0]).append('\n');
-            for (String line : body) {
-                newBlock.append(line).append('\n');
-            }
-            newBlock.append(lines[lines.length - 1]);
-            content = content.substring(0, matcher.start()) + newBlock + content.substring(matcher.end());
-            changed = true;
         }
+        matcher.appendTail(updated);
 
         if (changed) {
-            Files.writeString(path, ensureTrailingNewline(content), StandardCharsets.UTF_8);
+            Files.writeString(path, ensureTrailingNewline(updated.toString()), StandardCharsets.UTF_8);
         }
         return changed;
     }
