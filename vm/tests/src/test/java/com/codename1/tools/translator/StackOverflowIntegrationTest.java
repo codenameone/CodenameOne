@@ -103,7 +103,10 @@ class StackOverflowIntegrationTest {
         int smokeProbeCount = countOccurrences(smokeResult.output, "PROBE_CONSTANT");
         assertTrue(smokeProbeCount >= 2,
                 "StackOverflowApp smoke run should emit two probe markers. Output was:\n"
-                        + smokeResult.output + smokeDiagnostics);
+                        + smokeResult.output
+                        + "\nObserved PROBE_CONSTANT count: " + smokeProbeCount
+                        + "\nA count of 1 suggests a crash between the first and second reportConstant() calls."
+                        + smokeDiagnostics);
 
         ProcessResult result = runProcess(Arrays.asList(executable.toString(), "overflow", "run"), buildDir);
         String diagnostics = buildDiagnostics(srcRoot, executable, result);
