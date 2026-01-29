@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntentIntegrator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">IntentIntegrator.java</span></div><h1>IntentIntegrator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2009 ZXing authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.impl.android;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.util.Log;
+
+import com.codename1.components.SpanLabel;
+import com.codename1.ui.Button;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+
+/**
+ * &lt;p&gt;A utility class which helps ease integration with Barcode Scanner via {@link Intent}s.
+ * This is a simple way to invoke barcode scanning and receive the result,
+ * without any need to integrate, modify, or learn the project's source
+ * code.&lt;/p&gt;
+ *
+ * &lt;h2&gt;Initiating a barcode scan&lt;/h2&gt;
+ *
+ * &lt;p&gt;To integrate, create an instance of {@code IntentIntegrator} and call {@link #initiateScan()}
+ * and wait for the result in your app.&lt;/p&gt;
+ *
+ * &lt;p&gt;It does require that the Barcode Scanner (or work-alike) application is
+ * installed. The
+ * {@link #initiateScan()} method will prompt the user to download the
+ * application, if needed.&lt;/p&gt;
+ *
+ * &lt;p&gt;There are a few steps to using this integration. First, your {@link Activity}
+ * must implement the method {@link Activity#onActivityResult(int, int, Intent)}
+ * and include a line of code like this:&lt;/p&gt;
+ *
+ * &lt;pre&gt;{@code
+ * public void onActivityResult(int requestCode, int resultCode, Intent intent) {
+ *   IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
+ *   if (scanResult != null) {
+ *     // handle scan result
+ *   }
+ *   // else continue with any other code you need in the method ... } }&lt;/pre&gt;
+ *
+ * &lt;p&gt;This is where you will handle a scan result.&lt;/p&gt;
+ *
+ * &lt;p&gt;Second, just call this in response to a user action somewhere to begin the
+ * scan process:&lt;/p&gt;
+ *
+ * &lt;pre&gt;{@code
+ * IntentIntegrator integrator = new IntentIntegrator(yourActivity);
+ * integrator.initiateScan();
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;Note that {@link #initiateScan()} returns an {@link AlertDialog} which is
+ * non-null if the user was prompted to download the application. This lets the
+ * calling app potentially manage the dialog. In particular, ideally, the app
+ * dismisses the dialog if it's still active in its {@link Activity#onPause()}
+ * method.&lt;/p&gt;
+ *
+ * &lt;p&gt;You can use {@link #setTitle(String)} to customize the title of this
+ * download prompt dialog (or, use
+ * {@link #setTitleByID(int)} to set the title by string resource ID.) Likewise,
+ * the prompt message, and yes/no button labels can be changed.&lt;/p&gt;
+ *
+ * &lt;p&gt;Finally, you can use {@link #addExtra(String, Object)} to add more
+ * parameters to the Intent used to invoke the scanner. This can be used to set
+ * additional options not directly exposed by this simplified API.&lt;/p&gt;
+ *
+ * &lt;p&gt;By default, this will only allow applications that are known to respond to
+ * this intent correctly do so. The apps that are allowed to response can be set
+ * with {@link #setTargetApplications(Collection)}. For example, set to {@link #TARGET_BARCODE_SCANNER_ONLY}
+ * to only target the Barcode Scanner app itself.&lt;/p&gt;
+ *
+ * &lt;h2&gt;Sharing text via barcode&lt;/h2&gt;
+ *
+ * &lt;p&gt;To share text, encoded as a QR Code on-screen, similarly, see {@link #shareText(CharSequence)}.&lt;/p&gt;
+ *
+ * &lt;p&gt;Some code, particularly download integration, was contributed from the
+ * Anobiit application.&lt;/p&gt;
+ *
+ * &lt;h2&gt;Enabling experimental barcode formats&lt;/h2&gt;
+ *
+ * &lt;p&gt;Some formats are not enabled by default even when scanning with {@link #ALL_CODE_TYPES},
+ * such as
+ * {@link com.google.zxing.BarcodeFormat#PDF_417}. Use {@link #initiateScan(java.util.Collection)}
+ * with a collection containing the names of formats to scan for explicitly,
+ * like &quot;PDF_417&quot;, to use such formats.&lt;/p&gt;
+ *
+ * @author Sean Owen
+ * @author Fred Lin
+ * @author Isaac Potoczny-Jones
+ * @author Brad Drehmer
+ * @author gcstang
+ */
+public class IntentIntegrator {
+
+    public static final int REQUEST_CODE = 0x0000c0de; // Only use bottom 16 bits
+<span class="nc" id="L126">    private static final String TAG = IntentIntegrator.class.getSimpleName();</span>
+    public static final String DEFAULT_TITLE = &quot;Install Barcode Scanner?&quot;;
+    public static final String DEFAULT_MESSAGE =
+            &quot;This application requires Barcode Scanner. Would you like to install it?&quot;;
+    public static final String DEFAULT_YES = &quot;Yes&quot;;
+    public static final String DEFAULT_NO = &quot;No&quot;;
+    private static final String BS_PACKAGE = &quot;com.google.zxing.client.android&quot;;
+    private static final String BSPLUS_PACKAGE = &quot;com.srowen.bs.android&quot;;
+    private static final String BSSIMPLE_PACKAGE = BSPLUS_PACKAGE+&quot;.simple&quot;;
+
+    // supported barcode formats
+<span class="nc" id="L137">    public static final Collection&lt;String&gt; PRODUCT_CODE_TYPES = list(&quot;UPC_A&quot;, &quot;UPC_E&quot;, &quot;EAN_8&quot;, &quot;EAN_13&quot;, &quot;RSS_14&quot;);</span>
+<span class="nc" id="L138">    public static final Collection&lt;String&gt; ONE_D_CODE_TYPES =</span>
+<span class="nc" id="L139">            list(&quot;UPC_A&quot;, &quot;UPC_E&quot;, &quot;EAN_8&quot;, &quot;EAN_13&quot;, &quot;CODE_39&quot;, &quot;CODE_93&quot;, &quot;CODE_128&quot;,</span>
+                    &quot;ITF&quot;, &quot;RSS_14&quot;, &quot;RSS_EXPANDED&quot;);
+<span class="nc" id="L141">    public static final Collection&lt;String&gt; QR_CODE_TYPES = Collections.singleton(&quot;QR_CODE&quot;);</span>
+<span class="nc" id="L142">    public static final Collection&lt;String&gt; DATA_MATRIX_TYPES = Collections.singleton(&quot;DATA_MATRIX&quot;);</span>
+<span class="nc" id="L143">    public static final Collection&lt;String&gt; ALL_CODE_TYPES = null;</span>
+<span class="nc" id="L144">    public static final Collection&lt;String&gt; TARGET_BARCODE_SCANNER_ONLY = Collections.singleton(BS_PACKAGE);</span>
+<span class="nc" id="L145">    public static final Collection&lt;String&gt; TARGET_ALL_KNOWN = list(</span>
+            BS_PACKAGE,
+            BSSIMPLE_PACKAGE, // Barcode Scanner+ Simple
+            BSPLUS_PACKAGE, // Barcode Scanner+
+            &quot;la.droid.qr&quot;,
+            &quot;la.droid.qr.priva&quot;
+    );
+    private final Activity activity;
+    private String title;
+    private String message;
+    private String buttonYes;
+    private String buttonNo;
+    private Collection&lt;String&gt; targetApplications;
+    private final Map&lt;String, Object&gt; moreExtras;
+
+<span class="nc" id="L160">    public IntentIntegrator(Activity activity) {</span>
+<span class="nc" id="L161">        this.activity = activity;</span>
+<span class="nc" id="L162">        title = DEFAULT_TITLE;</span>
+<span class="nc" id="L163">        message = DEFAULT_MESSAGE;</span>
+<span class="nc" id="L164">        buttonYes = DEFAULT_YES;</span>
+<span class="nc" id="L165">        buttonNo = DEFAULT_NO;</span>
+<span class="nc" id="L166">        targetApplications = TARGET_ALL_KNOWN;</span>
+<span class="nc" id="L167">        moreExtras = new HashMap&lt;String, Object&gt;(3);</span>
+<span class="nc" id="L168">    }</span>
+
+    public String getTitle() {
+<span class="nc" id="L171">        return title;</span>
+    }
+
+    public void setTitle(String title) {
+<span class="nc" id="L175">        this.title = title;</span>
+<span class="nc" id="L176">    }</span>
+
+    public void setTitleByID(int titleID) {
+<span class="nc" id="L179">        title = activity.getString(titleID);</span>
+<span class="nc" id="L180">    }</span>
+
+    public String getMessage() {
+<span class="nc" id="L183">        return message;</span>
+    }
+
+    public void setMessage(String message) {
+<span class="nc" id="L187">        this.message = message;</span>
+<span class="nc" id="L188">    }</span>
+
+    public void setMessageByID(int messageID) {
+<span class="nc" id="L191">        message = activity.getString(messageID);</span>
+<span class="nc" id="L192">    }</span>
+
+    public String getButtonYes() {
+<span class="nc" id="L195">        return buttonYes;</span>
+    }
+
+    public void setButtonYes(String buttonYes) {
+<span class="nc" id="L199">        this.buttonYes = buttonYes;</span>
+<span class="nc" id="L200">    }</span>
+
+    public void setButtonYesByID(int buttonYesID) {
+<span class="nc" id="L203">        buttonYes = activity.getString(buttonYesID);</span>
+<span class="nc" id="L204">    }</span>
+
+    public String getButtonNo() {
+<span class="nc" id="L207">        return buttonNo;</span>
+    }
+
+    public void setButtonNo(String buttonNo) {
+<span class="nc" id="L211">        this.buttonNo = buttonNo;</span>
+<span class="nc" id="L212">    }</span>
+
+    public void setButtonNoByID(int buttonNoID) {
+<span class="nc" id="L215">        buttonNo = activity.getString(buttonNoID);</span>
+<span class="nc" id="L216">    }</span>
+
+    public Collection&lt;String&gt; getTargetApplications() {
+<span class="nc" id="L219">        return targetApplications;</span>
+    }
+
+    public void setTargetApplications(Collection&lt;String&gt; targetApplications) {
+<span class="nc" id="L223">        this.targetApplications = targetApplications;</span>
+<span class="nc" id="L224">    }</span>
+
+    public void setSingleTargetApplication(String targetApplication) {
+<span class="nc" id="L227">        this.targetApplications = Collections.singleton(targetApplication);</span>
+<span class="nc" id="L228">    }</span>
+
+    public Map&lt;String, ?&gt; getMoreExtras() {
+<span class="nc" id="L231">        return moreExtras;</span>
+    }
+
+    public void addExtra(String key, Object value) {
+<span class="nc" id="L235">        moreExtras.put(key, value);</span>
+<span class="nc" id="L236">    }</span>
+
+    /**
+     * Initiates a scan for all known barcode types.
+     */
+    //public boolean initiateScan() {
+    //    return initiateScan(ALL_CODE_TYPES);
+    //}
+
+    /**
+     * Initiates a scan only for a certain set of barcode types, given as
+     * strings corresponding to their names in ZXing's {@code BarcodeFormat}
+     * class like &quot;UPC_A&quot;. You can supply constants like {@link #PRODUCT_CODE_TYPES}
+     * for example.
+     *
+     * to download the app if a prompt was needed, or null otherwise
+     */
+    public boolean initiateScan(Collection&lt;String&gt; desiredBarcodeFormats, String mode) {
+<span class="nc" id="L254">        Intent intentScan = new Intent(BS_PACKAGE + &quot;.SCAN&quot;);</span>
+<span class="nc" id="L255">        intentScan.addCategory(Intent.CATEGORY_DEFAULT);</span>
+
+<span class="nc" id="L257">        intentScan.putExtra(&quot;SCAN_MODE&quot;, mode);</span>
+        // check which types of codes to scan for
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (desiredBarcodeFormats != null) {</span>
+            // set the desired barcode types
+<span class="nc" id="L261">            StringBuilder joinedByComma = new StringBuilder();</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            for (String format : desiredBarcodeFormats) {</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                if (joinedByComma.length() &gt; 0) {</span>
+<span class="nc" id="L264">                    joinedByComma.append(',');</span>
+                }
+<span class="nc" id="L266">                joinedByComma.append(format);</span>
+<span class="nc" id="L267">            }</span>
+<span class="nc" id="L268">            intentScan.putExtra(&quot;SCAN_FORMATS&quot;, joinedByComma.toString());</span>
+        }
+
+<span class="nc" id="L271">        String targetAppPackage = findTargetAppPackage(intentScan);</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        if (targetAppPackage == null) {</span>
+<span class="nc" id="L273">            showDownloadDialog();</span>
+<span class="nc" id="L274">            return false;</span>
+        }
+<span class="nc" id="L276">        intentScan.setPackage(targetAppPackage);</span>
+<span class="nc" id="L277">        intentScan.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);</span>
+<span class="nc" id="L278">        intentScan.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);</span>
+<span class="nc" id="L279">        attachMoreExtras(intentScan);</span>
+<span class="nc" id="L280">        startActivityForResult(intentScan, REQUEST_CODE);</span>
+<span class="nc" id="L281">        return true;</span>
+    }
+
+    /**
+     * Start an activity.&lt;br&gt; This method is defined to allow different methods
+     * of activity starting for newer versions of Android and for compatibility
+     * library.
+     *
+     * @param intent Intent to start.
+     * @param code Request code for the activity
+     * @see android.app.Activity#startActivityForResult(Intent, int)
+     * @see android.app.Fragment#startActivityForResult(Intent, int)
+     */
+    protected void startActivityForResult(Intent intent, int code) {
+<span class="nc" id="L295">        activity.startActivityForResult(intent, code);</span>
+<span class="nc" id="L296">    }</span>
+
+    private String findTargetAppPackage(Intent intent) {
+<span class="nc" id="L299">        PackageManager pm = activity.getPackageManager();</span>
+<span class="nc" id="L300">        List&lt;ResolveInfo&gt; availableApps = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        if (availableApps != null) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            for (ResolveInfo availableApp : availableApps) {</span>
+<span class="nc" id="L303">                String packageName = availableApp.activityInfo.packageName;</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                if (targetApplications.contains(packageName)) {</span>
+<span class="nc" id="L305">                    return packageName;</span>
+                }
+<span class="nc" id="L307">            }</span>
+        }
+<span class="nc" id="L309">        return null;</span>
+    }
+
+    private void showDownloadDialog() {
+<span class="nc" id="L313">        final Dialog d = new Dialog();</span>
+<span class="nc" id="L314">        d.setTitle(title);</span>
+
+
+<span class="nc" id="L317">        final String[] chosenPackage = new String[1];</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (android.os.Build.VERSION.SDK_INT &gt;= 33) {</span>
+
+<span class="nc" id="L320">            Button bs = new Button(&quot;Barcode Scanner&quot;);</span>
+<span class="nc" id="L321">            Button bsSimple = new Button(&quot;Barcode Scanner + Simple&quot;);</span>
+<span class="nc" id="L322">            Button cancel = new Button(&quot;Cancel&quot;);</span>
+<span class="nc" id="L323">            bsSimple.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L326">                    chosenPackage[0] = BSSIMPLE_PACKAGE;</span>
+<span class="nc" id="L327">                    d.dispose();</span>
+<span class="nc" id="L328">                }</span>
+            });
+
+<span class="nc" id="L331">            bs.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L334">                    chosenPackage[0] = BS_PACKAGE;</span>
+<span class="nc" id="L335">                    d.dispose();</span>
+<span class="nc" id="L336">                }</span>
+            });
+<span class="nc" id="L338">            cancel.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L341">                    d.dispose();</span>
+<span class="nc" id="L342">                }</span>
+            });
+
+<span class="nc" id="L345">            Container dialogBody = BoxLayout.encloseY(</span>
+                    new SpanLabel(&quot;Please select a barcode scanner app to install:&quot;),
+                    bs,
+                    bsSimple,
+                    cancel
+            );
+<span class="nc" id="L351">            d.getContentPane().removeAll();</span>
+<span class="nc" id="L352">            d.getContentPane().setLayout(new BorderLayout());</span>
+<span class="nc" id="L353">            d.getContentPane().add(BorderLayout.CENTER, dialogBody);</span>
+<span class="nc" id="L354">            d.show();</span>
+<span class="nc" id="L355">        } else {</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">            if (Dialog.show(title, message, &quot;Yes&quot;, &quot;No&quot;)) {</span>
+<span class="nc" id="L357">                chosenPackage[0] = BSSIMPLE_PACKAGE;</span>
+            }
+        }
+
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (chosenPackage[0] != null) {</span>
+<span class="nc" id="L362">            Uri uri = Uri.parse(&quot;market://details?id=&quot; + chosenPackage[0]);</span>
+<span class="nc" id="L363">            Intent intent = new Intent(Intent.ACTION_VIEW, uri);</span>
+            try {
+<span class="nc" id="L365">                activity.startActivity(intent);</span>
+<span class="nc" id="L366">            } catch (ActivityNotFoundException anfe) {</span>
+                // Hmm, market is not installed
+<span class="nc" id="L368">                Log.w(TAG, &quot;Android Market is not installed; cannot install Barcode Scanner&quot;);</span>
+<span class="nc" id="L369">            }</span>
+        }
+
+<span class="nc" id="L372">    }</span>
+
+    /**
+     * Defaults to type &quot;TEXT_TYPE&quot;.
+     *
+     * @see #shareText(CharSequence, CharSequence)
+     */
+    public boolean shareText(CharSequence text) {
+<span class="nc" id="L380">        return shareText(text, &quot;TEXT_TYPE&quot;);</span>
+    }
+
+    /**
+     * Shares the given text by encoding it as a barcode, such that another user
+     * can scan the text off the screen of the device.
+     *
+     * @param text the text string to encode as a barcode
+     * @param type type of data to encode. See {@code com.google.zxing.client.android.Contents.Type}
+     * constants.
+     * to download the app if a prompt was needed, or null otherwise
+     */
+    public boolean shareText(CharSequence text, CharSequence type) {
+<span class="nc" id="L393">        Intent intent = new Intent();</span>
+<span class="nc" id="L394">        intent.addCategory(Intent.CATEGORY_DEFAULT);</span>
+<span class="nc" id="L395">        intent.setAction(BS_PACKAGE + &quot;.ENCODE&quot;);</span>
+<span class="nc" id="L396">        intent.putExtra(&quot;ENCODE_TYPE&quot;, type);</span>
+<span class="nc" id="L397">        intent.putExtra(&quot;ENCODE_DATA&quot;, text);</span>
+<span class="nc" id="L398">        String targetAppPackage = findTargetAppPackage(intent);</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (targetAppPackage == null) {</span>
+<span class="nc" id="L400">            showDownloadDialog();</span>
+<span class="nc" id="L401">            return false;</span>
+        }
+<span class="nc" id="L403">        intent.setPackage(targetAppPackage);</span>
+<span class="nc" id="L404">        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);</span>
+<span class="nc" id="L405">        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);</span>
+<span class="nc" id="L406">        attachMoreExtras(intent);</span>
+<span class="nc" id="L407">        activity.startActivity(intent);</span>
+<span class="nc" id="L408">        return true;</span>
+    }
+
+    private static Collection&lt;String&gt; list(String... values) {
+<span class="nc" id="L412">        return Collections.unmodifiableCollection(Arrays.asList(values));</span>
+    }
+
+    private void attachMoreExtras(Intent intent) {
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        for (Map.Entry&lt;String, Object&gt; entry : moreExtras.entrySet()) {</span>
+<span class="nc" id="L417">            String key = entry.getKey();</span>
+<span class="nc" id="L418">            Object value = entry.getValue();</span>
+            // Kind of hacky
+<span class="nc bnc" id="L420" title="All 2 branches missed.">            if (value instanceof Integer) {</span>
+<span class="nc" id="L421">                intent.putExtra(key, (Integer) value);</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">            } else if (value instanceof Long) {</span>
+<span class="nc" id="L423">                intent.putExtra(key, (Long) value);</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">            } else if (value instanceof Boolean) {</span>
+<span class="nc" id="L425">                intent.putExtra(key, (Boolean) value);</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">            } else if (value instanceof Double) {</span>
+<span class="nc" id="L427">                intent.putExtra(key, (Double) value);</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            } else if (value instanceof Float) {</span>
+<span class="nc" id="L429">                intent.putExtra(key, (Float) value);</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">            } else if (value instanceof Bundle) {</span>
+<span class="nc" id="L431">                intent.putExtra(key, (Bundle) value);</span>
+            } else {
+<span class="nc" id="L433">                intent.putExtra(key, value.toString());</span>
+            }
+<span class="nc" id="L435">        }</span>
+<span class="nc" id="L436">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
