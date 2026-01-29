@@ -390,8 +390,8 @@ if ! destination_visible_to_xcodebuild "$SIM_DESTINATION"; then
     ri_log "Re-selected simulator destination '$SIM_DESTINATION'"
   else
     ri_log "Auto-selection still did not return a destination; continuing with '$SIM_DESTINATION'"
-    BUILD_DESTINATION="generic/platform=iOS Simulator"
-    ri_log "Using generic simulator destination for build '${BUILD_DESTINATION}'"
+    BUILD_DESTINATION=""
+    ri_log "Using default simulator destination for build"
   fi
 fi
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
@@ -440,15 +440,15 @@ if ! build_with_destination "$BUILD_DESTINATION"; then
       BUILD_DESTINATION="$SIM_DESTINATION"
       ri_log "Retrying xcodebuild with destination '$BUILD_DESTINATION'"
       if ! build_with_destination "$BUILD_DESTINATION"; then
-        ri_log "Retrying xcodebuild with generic simulator destination"
-        if ! build_with_destination "generic/platform=iOS Simulator"; then
+        ri_log "Retrying xcodebuild with default simulator destination"
+        if ! build_with_destination ""; then
           ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
           exit 10
         fi
       fi
     else
-      ri_log "Retrying xcodebuild with generic simulator destination"
-      if ! build_with_destination "generic/platform=iOS Simulator"; then
+      ri_log "Retrying xcodebuild with default simulator destination"
+      if ! build_with_destination ""; then
         ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
         exit 10
       fi
