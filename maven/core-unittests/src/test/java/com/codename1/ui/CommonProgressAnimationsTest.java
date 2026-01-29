@@ -115,12 +115,6 @@ class CommonProgressAnimationsTest extends UITestBase {
     @Test
     void testLoadingTextAnimationEntersPauseCycle() throws Exception {
         LoadingTextAnimation animation = new LoadingTextAnimation();
-        Field cyclesPerChunk = LoadingTextAnimation.class.getDeclaredField("cyclesPerChunk");
-        cyclesPerChunk.setAccessible(true);
-        cyclesPerChunk.setInt(animation, 2);
-        Field lettersPerChunk = LoadingTextAnimation.class.getDeclaredField("lettersPerChunk");
-        lettersPerChunk.setAccessible(true);
-        lettersPerChunk.setInt(animation, 1);
         Field strlenField = LoadingTextAnimation.class.getDeclaredField("strlen");
         strlenField.setAccessible(true);
         strlenField.setInt(animation, 1);

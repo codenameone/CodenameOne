@@ -2413,10 +2413,6 @@ public final class Grid {
                 for (int i = LayoutUtil.MIN; i <= LayoutUtil.MAX; i++) {
                     switch (contentBias) {
                         case -1: // None
-                        default:
-                            horSizes[i] = getSize(hBS, i, true, useVisualPadding, -1);
-                            verSizes[i] = getSize(vBS, i, false, useVisualPadding, -1);
-                            break;
                         case 0: // Hor
                             horSizes[i] = getSize(hBS, i, true, useVisualPadding, -1);
                             verSizes[i] = getSize(vBS, i, false, useVisualPadding, sizeHint > 0 ? sizeHint : horSizes[i]);
@@ -2424,6 +2420,10 @@ public final class Grid {
                         case 1: // Ver
                             verSizes[i] = getSize(vBS, i, false, useVisualPadding, -1);
                             horSizes[i] = getSize(hBS, i, true, useVisualPadding, sizeHint > 0 ? sizeHint : verSizes[i]);
+                            break;
+                        default:
+                            horSizes[i] = getSize(hBS, i, true, useVisualPadding, -1);
+                            verSizes[i] = getSize(vBS, i, false, useVisualPadding, -1);
                             break;
                     }
                 }

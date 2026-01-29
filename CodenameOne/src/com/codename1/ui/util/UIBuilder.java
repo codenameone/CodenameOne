@@ -1062,8 +1062,6 @@ public class UIBuilder { //implements Externalizable {
                         }
                     }
                     break;
-                default:
-                    break;
 
                 case PROPERTY_EMBED:
                     root.putClientProperty(EMBEDDED_FORM_FLAG, "");
@@ -1183,8 +1181,7 @@ public class UIBuilder { //implements Externalizable {
                             layout = b;
                             break;
                         }
-                        default:
-                            break;
+
                         case LAYOUT_BORDER: {
                             BorderLayout b = new BorderLayout();
                             if (in.readBoolean()) {
@@ -1230,6 +1227,9 @@ public class UIBuilder { //implements Externalizable {
                             break;
                         case LAYOUT_TABLE:
                             layout = new TableLayout(in.readInt(), in.readInt());
+                            break;
+
+                        default:
                             break;
                     }
                     ((Container) cmp).setLayout(layout);
@@ -1504,6 +1504,9 @@ public class UIBuilder { //implements Externalizable {
 
                 case PROPERTY_MIN_VALUE:
                     ((Slider) cmp).setMinValue(in.readInt());
+                    break;
+
+                default:
                     break;
             }
 

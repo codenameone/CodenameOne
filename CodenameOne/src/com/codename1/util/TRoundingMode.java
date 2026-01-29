@@ -84,7 +84,7 @@ enum TRoundingMode {
     /**
      * The old constant of <code>BigDecimal</code>.
      */
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "PMD.SingularField"})
     private final int bigDecimalRM;
 
     /**

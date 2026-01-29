@@ -931,7 +931,22 @@ def main() -> None:
             "SimplifyBooleanReturns",
             "UnusedLocalVariable",
             "UnnecessaryConstructor",
-            "UnnecessaryImport"
+            "UnnecessaryImport",
+            "AvoidStringBufferField",
+            "LogicInversion",
+            "DefaultLabelNotLastInSwitchStmt",
+            "SingularField",
+            "InstantiationToGetClass",
+            "UnnecessaryModifier",
+            "FinalFieldCouldBeStatic",
+            "AvoidInstanceofChecksInCatchClause",
+            "AvoidUsingOctalValues",
+            "NonThreadSafeSingleton",
+            "ComparisonWithNaN",
+            "DontUseFloatTypeForLoopIndices",
+            "MissingStaticMethodInNonInstantiatableClass",
+            "OverrideBothEqualsAndHashcode",
+            "UnnecessarySemicolon"
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:

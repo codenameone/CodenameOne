@@ -207,8 +207,6 @@ public class Picker extends Button {
                             }
                             break;
                         }
-                        default:
-                            break;
                         case Display.PICKER_TYPE_CALENDAR:
                             showInteractionDialog();
                             evt.consume();
@@ -323,7 +321,8 @@ public class Picker extends Button {
                             }
                             break;
                         }
-
+                        default:
+                            break;
                     }
                     updateValue();
                 }

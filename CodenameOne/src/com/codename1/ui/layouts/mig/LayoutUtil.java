@@ -121,6 +121,7 @@ public final class LayoutUtil {
      *           this method you indicate that you will take responsibility for the design time value.
      * @param b  <code>true</code> means design time on.
      */
+    @SuppressWarnings("PMD.NonThreadSafeSingleton")
     public static void setDesignTime(ContainerWrapper cw, boolean b) {
         if (DT_MAP == null) {
             DT_MAP = new HashMap<Object, Boolean>();
@@ -180,6 +181,7 @@ public final class LayoutUtil {
      * @param con The object. if <code>null</code> the method does nothing.
      * @param s   The creation string. if <code>null</code> the method does nothing.
      */
+    @SuppressWarnings("PMD.NonThreadSafeSingleton")
     static void putCCString(Object con, String s) {
         if (s != null && con != null && isDesignTime(null)) {
             if (CR_MAP == null) {

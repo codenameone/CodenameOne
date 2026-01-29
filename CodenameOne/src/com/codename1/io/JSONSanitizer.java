@@ -127,6 +127,7 @@ final class JSONSanitizer {
      * If {@code null}, then no unclean constructs have been found in
      * {@code jsonish} yet.
      */
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     private StringBuilder sanitizedJson;
     /**
      * The length of the prefix of {@link #jsonish} that has been written onto
@@ -236,7 +237,7 @@ final class JSONSanitizer {
         if (fractionEnd == sanEnd) {
             expStart = expEnd = sanEnd;
         } else {
-            if (!('e' == (sanitizedJson.charAt(fractionEnd) | 32))) {
+            if ('e' != (sanitizedJson.charAt(fractionEnd) | 32)) {
                 throw new RuntimeException("AssertionError: 'e' == (sanitizedJson.charAt(fractionEnd) | 32))");
             }
             expStart = fractionEnd + 1;

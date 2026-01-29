@@ -248,7 +248,7 @@ public final class EasyThread {
      *
      * @param newPriority priority to set this thread to
      */
-    public final void setPriority(int newPriority) {
+    public void setPriority(int newPriority) {
         t.setPriority(newPriority);
     }
 

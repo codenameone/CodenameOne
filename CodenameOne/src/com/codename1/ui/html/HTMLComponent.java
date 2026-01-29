@@ -2956,8 +2956,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     newLineIfNotEmpty(curAlign);
                     pushContainer(child);
                     break;
-                default:
-                    break;
                 case HTMLElement.TAG_FIELDSET:
                     newLineIfNotEmpty(curAlign);
                     Container newCont = new Container();
@@ -3269,6 +3267,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     if (curTable != null) {
                         curTable.startSegment(HTMLTableModel.SEGMENT_TFOOT);
                     }
+                    break;
+                default:
                     break;
             }
 

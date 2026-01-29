@@ -37,7 +37,6 @@ public class DeflaterOutputStream extends FilterOutputStream {
 
     protected static final int DEFAULT_BUFSIZE = 512;
     protected final Deflater deflater;
-    private final byte[] buf1 = new byte[1];
     protected byte[] buffer;
     protected boolean mydeflater = false;
     private boolean closed = false;
@@ -78,8 +77,7 @@ public class DeflaterOutputStream extends FilterOutputStream {
 
     @Override
     public void write(int b) throws IOException {
-        buf1[0] = (byte) (b & 0xff);
-        write(buf1, 0, 1);
+        write(new byte[] {(byte) (b & 0xff)}, 0, 1);
     }
 
     @Override

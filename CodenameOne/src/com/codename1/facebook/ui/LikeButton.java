@@ -118,7 +118,7 @@ public class LikeButton extends Button implements ActionListener {
      */
     @Override
     public Class[] getPropertyTypes() {
-        return new Class[]{String.class, String.class, String.class, String.class, new String[0].getClass()};
+        return new Class[]{String.class, String.class, String.class, String.class, String.class};
     }
 
     /**

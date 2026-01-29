@@ -1320,7 +1320,6 @@ public final class FaceBookAccess {
         @Override
         public void actionPerformed(NetworkEvent evt) {
             final Object val = evt.getMetaData();
-            ;
             if (val instanceof Vector) {
                 final Vector v = (Vector) val;
                 final Object o = v.elementAt(0);

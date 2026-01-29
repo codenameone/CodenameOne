@@ -421,6 +421,9 @@ public final class Display extends CN1Constants {
     private int previousKeyPressed;
     private int lastKeyPressed;
     private int lastDragOffset;
+
+    // huge false positive from PMD...
+    @SuppressWarnings("PMD.SingularField")
     private Form eventForm;
 
     /**
@@ -1469,10 +1472,10 @@ public final class Display extends CN1Constants {
             } else {
                 r.run();
             }
+        } catch (BlockingDisallowedException re) {
+            Log.e(re);
+            throw re;
         } catch (RuntimeException re) {
-            if (!(re instanceof BlockingDisallowedException)) {
-                Log.e(re);
-            }
             throw re;
         } finally {
             this.dropEvents = false;
@@ -2319,8 +2322,6 @@ public final class Display extends CN1Constants {
                     offset++;
                 }
                 break;
-            default:
-                break;
             case POINTER_PRESSED:
                 if (recursivePointerReleaseA) {
                     recursivePointerReleaseB = true;
@@ -2464,6 +2465,8 @@ public final class Display extends CN1Constants {
                 break;
             case SHOW_NOTIFY:
                 f.showNotify();
+                break;
+            default:
                 break;
         }
         return offset;

@@ -669,7 +669,7 @@ public final class NetworkManager {
      *
      * @param al action listener
      */
-    public final void addProgressListener(ActionListener<NetworkEvent> al) {
+    public void addProgressListener(ActionListener<NetworkEvent> al) {
         if (progressListeners == null) {
             progressListeners = new EventDispatcher();
             progressListeners.setBlocking(false);
@@ -1076,5 +1076,12 @@ public final class NetworkManager {
             return this == o;
         }
 
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (aps != null ? aps.hashCode() : 0);
+            result = 31 * result + currentAP;
+            return result;
+        }
     }
 }
