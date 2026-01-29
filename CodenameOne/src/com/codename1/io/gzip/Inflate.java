@@ -247,9 +247,9 @@ final class Inflate {
                         this.mode = BAD;
                         z.msg = "unknown compression method";
                         // since zlib 1.2, it is allowted to inflateSync for this case.
-	  /*
+      /*
           this.marker = 5;       // can't try inflateSync
-	  */
+      */
                         break;
                     }
 
@@ -261,9 +261,9 @@ final class Inflate {
                         this.mode = BAD;
                         z.msg = "invalid window size";
                         // since zlib 1.2, it is allowted to inflateSync for this case.
-	  /*
+      /*
           this.marker = 5;       // can't try inflateSync
-	  */
+      */
                         break;
                     }
 
@@ -403,7 +403,7 @@ final class Inflate {
           this.mode = BAD;
           this.marker = 5;       // can't try inflateSync
           break;
-	  */
+      */
                     } else if (flags != 0 && gheader != null) {
                         gheader.crc = this.need;
                     }

@@ -190,8 +190,8 @@ class CSSElement extends HTMLElement {
             TYPE_NMTOKENS, // CSS_PAGE_URL (internal usage)
             TYPE_NMTOKENS, // CSS_BORDER_COLLAPSE
             TYPE_NMTOKENS, // CSS_EMPTY_CELLS
-            TYPE_NMTOKENS,// CSS_BORDER_SPACING
-            TYPE_NMTOKENS,// CSS_CAPTION_SIDE
+            TYPE_NMTOKENS, // CSS_BORDER_SPACING
+            TYPE_NMTOKENS, // CSS_CAPTION_SIDE
             TYPE_CSS_LENGTH_OR_PERCENTAGE, // CSS_WORD_SPACING
             TYPE_CSS_LENGTH_OR_PERCENTAGE_OR_MULTIPLIER, //CSS_LINE_HEIGHT
             TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MIN_WIDTH
@@ -461,8 +461,8 @@ class CSSElement extends HTMLElement {
             null, //TYPE_NMTOKENS, // baseurl (internal usage)
             null, // CSS_BORDER_COLLAPSE
             null, // CSS_EMPTY_CELLS
-            null,// CSS_BORDER_SPACING
-            null,// CSS_CAPTION_SIDE
+            null, // CSS_BORDER_SPACING
+            null, // CSS_CAPTION_SIDE
             null, // CSS_WORD_SPACING
             {1}, //CSS_LINE_HEIGHT //normal means 100% of the font height (or 1 * font height)
             null, //CSS_MIN_WIDTH
@@ -544,8 +544,8 @@ class CSSElement extends HTMLElement {
             null, //TYPE_NMTOKENS, // baseurl (internal usage)
             {"collapse", "separate"}, // CSS_BORDER_COLLAPSE
             {"hide", "show"}, // CSS_EMPTY_CELLS
-            null,// CSS_BORDER_SPACING
-            {"bottom", "top"},// CSS_CAPTION_SIDE
+            null, // CSS_BORDER_SPACING
+            {"bottom", "top"}, // CSS_CAPTION_SIDE
             null, // CSS_WORD_SPACING
             {"normal"}, //CSS_LINE_HEIGHT
             null, //CSS_MIN_WIDTH

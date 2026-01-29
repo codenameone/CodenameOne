@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Derivative Revision History:
 
 2012-03 - Pulled this code from Sun's JavaME JSON impl, JSONObject
-	and moved to separate utility class.
+    and moved to separate utility class.
  */
 package com.codename1.processing;
 

@@ -1294,7 +1294,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             rowStrings.add(rowText);
             //adding minCharactersInRow doesn't work if what is left is less
             //then minCharactersInRow
-            to = from;//+minCharactersInRow;
+            to = from; //+minCharactersInRow;
         }
         if (text[text.length - 1] == '\n') {
             rowStrings.add("");

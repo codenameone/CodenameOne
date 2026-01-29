@@ -223,12 +223,12 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * A hashtable containing all defined HTMLFont objects
      */
     static Hashtable fonts = new Hashtable();
-    private static int INDENT_OL = -1;//Font.getDefaultFont().stringWidth("8888. "); //Ordered list
-    private static int INDENT_UL = -1;//Font.getDefaultFont().charWidth('W'); //Unordered list
+    private static int INDENT_OL = -1; //Font.getDefaultFont().stringWidth("8888. "); //Ordered list
+    private static int INDENT_UL = -1; //Font.getDefaultFont().charWidth('W'); //Unordered list
     /**
      * The default font to use
      */
-    private static HTMLFont DEFAULT_FONT = null;//new HTMLFont(null,Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
+    private static HTMLFont DEFAULT_FONT = null; //new HTMLFont(null,Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
 
     /**
      * This static segment sets up the INPUT_TYPES vector with values from INPUT_TYPE_STRINGS.
@@ -301,8 +301,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     private Style pageStyle; // The page's user defined style
     private String pageUIID; // The page's user defined UIID
     // Links related
-    private Hashtable accessKeys = new Hashtable();// A hastable containing all the access keys in this document and their respective links
-    private Hashtable anchors;// A hashtable containing all the anchors of this document
+    private Hashtable accessKeys = new Hashtable(); // A hastable containing all the access keys in this document and their respective links
+    private Hashtable anchors; // A hashtable containing all the anchors of this document
     private Hashtable inputFields; // A hashtable containing all the input fields in the page. Used for FOR labels
     // this variable is only useful with the properties mostly for the purpose of the resource editor GUI builder
     private String htmlBody;
@@ -347,12 +347,12 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     // Lists
     private int ulLevel; //Unordered list level (Used to display the right bullet)
     private int olIndex; //Index of the current item in the list
-    private Vector olUpperLevelIndex;// = new Vector(); //Used to save the index when nesting
+    private Vector olUpperLevelIndex; // = new Vector(); //Used to save the index when nesting
     private int listType; // The type of the current list
     private int listIndent; // Holds the current list margin
     // Tables
-    private Vector tables;// A vector used for nesting, when a table contains a table ,the current one is "pushed" into the vector, to be "popped" later when the nested table processing ends.
-    private Vector tableCells;// A vector used for nesting of table cells
+    private Vector tables; // A vector used for nesting, when a table contains a table ,the current one is "pushed" into the vector, to be "popped" later when the nested table processing ends.
+    private Vector tableCells; // A vector used for nesting of table cells
     // Misc. tags
     private Vector fieldsets; // A vector used to support FIELDSET tag nesting
     private int preTagCount = 0; // A counter used to support PRE tag nesting
@@ -2125,7 +2125,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 mainLink = (HTMLLink) lbl;
             }
             if (accesskey != '\0') {
-                addAccessKey(accesskey, lbl, false);//accessKeys.put(new Integer(accesskey), lbl);
+                addAccessKey(accesskey, lbl, false); //accessKeys.put(new Integer(accesskey), lbl);
                 accesskey = '\0'; // To prevent the access key from adding again to all words of the link
             }
             lbl.getSelectedStyle().setMargin(0, 0, 0, 0);
@@ -2138,7 +2138,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             if (labelForID != null) {
                 lbl = new ForLabel(str, this, labelForID);
                 if (accesskey != '\0') {
-                    addAccessKey(accesskey, lbl, false);//accessKeys.put(new Integer(accesskey), lbl);
+                    addAccessKey(accesskey, lbl, false); //accessKeys.put(new Integer(accesskey), lbl);
                     accesskey = '\0'; // To prevent the access key from adding again to all words of the link
                 }
                 labelForID = null;
@@ -2320,7 +2320,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     mainLink = (HTMLLink) imgLabel;
                 }
                 if (accesskey != '\0') {
-                    addAccessKey(accesskey, imgLabel, false);//accessKeys.put(new Integer(accesskey), imgLabel);
+                    addAccessKey(accesskey, imgLabel, false); //accessKeys.put(new Integer(accesskey), imgLabel);
                 }
                 if (!PROCESS_HTML_MP1_ONLY) {
                     ((HTMLLink) imgLabel).isMap = (imgElement.getAttributeById(HTMLElement.ATTR_ISMAP) != null);
@@ -2656,7 +2656,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
             String aKey = element.getAttributeById(HTMLElement.ATTR_ACCESSKEY);
             if ((aKey != null) && (aKey.length() == 1)) {
-                addAccessKey(aKey.charAt(0), cmp, false);//accessKeys.put(new Integer(aKey.charAt(0)), cmp);
+                addAccessKey(aKey.charAt(0), cmp, false); //accessKeys.put(new Integer(aKey.charAt(0)), cmp);
             }
             if (eventsListener != null) {
                 eventsListener.registerComponent(cmp, element);
@@ -3176,7 +3176,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     child.setAssociatedComponents(curTextArea); //Even if CSS is off, we need to associate it for HTMLElement.getCurentValue
                     String aKey = element.getAttributeById(HTMLElement.ATTR_ACCESSKEY);
                     if ((aKey != null) && (aKey.length() == 1)) {
-                        addAccessKey(aKey.charAt(0), curTextArea, false);//accessKeys.put(new Integer(aKey.charAt(0)), curTextArea);
+                        addAccessKey(aKey.charAt(0), curTextArea, false); //accessKeys.put(new Integer(aKey.charAt(0)), curTextArea);
                     }
 
                     break;

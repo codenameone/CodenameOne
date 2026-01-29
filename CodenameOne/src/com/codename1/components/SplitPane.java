@@ -123,29 +123,33 @@ public class SplitPane extends Container {
     /**
      * Material icon for expand button.
      */
-    private char expandMaterialIcon,
+    private char expandMaterialIcon;
 
     /**
      * Material icon for collapse button.
      */
-    collapseMaterialIcon,
+    private char collapseMaterialIcon;
 
     /**
      * Material icon for drag handle.
      */
-    dragHandleMaterialIcon;
+    private char dragHandleMaterialIcon;
+
     /**
      * Icon for expand button.
      */
-    private Image expandIcon,
+    private Image expandIcon;
+
     /**
      * Icon for collapse button.
      */
-    collapseIcon,
+    private Image collapseIcon;
+
     /**
      * Icon or drag handle
      */
-    dragHandleIcon;
+    private Image dragHandleIcon;
+
     /**
      * The UIID for the divider.  Default is null so that we can generate the style and border
      * manually.
