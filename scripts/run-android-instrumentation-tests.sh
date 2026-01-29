@@ -142,12 +142,21 @@ sleep 2
 GRADLEW="./gradlew"
 GRADLE_CMD=("$GRADLEW" --stacktrace --info --no-daemon connectedDebugAndroidTest)
 GRADLE_LOG="$ARTIFACTS_DIR/connectedDebugAndroidTest-gradle.log"
+ANDROID_TEST_REPORT_DIR="scripts/hellocodenameone/android/target/hellocodenameone-android-1.0-SNAPSHOT-android-source/app/build/reports/androidTests/connected"
+ANDROID_TEST_REPORT_DEST="$ARTIFACTS_DIR/android-test-report"
 
 ra_log "Executing connectedDebugAndroidTest via Gradle"
 if ! (
   cd "scripts/hellocodenameone/android/target/hellocodenameone-android-1.0-SNAPSHOT-android-source"
   JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}" "${GRADLE_CMD[@]}" 2>&1 | tee "$GRADLE_LOG"
 ); then
+  if [ -d "$ANDROID_TEST_REPORT_DIR" ]; then
+    rm -rf "$ANDROID_TEST_REPORT_DEST"
+    cp -R "$ANDROID_TEST_REPORT_DIR" "$ANDROID_TEST_REPORT_DEST"
+    ra_log "Saved Android test report to $ANDROID_TEST_REPORT_DEST"
+  else
+    ra_log "Android test report directory not found at $ANDROID_TEST_REPORT_DIR"
+  fi
   ra_log "FATAL: connectedDebugAndroidTest failed (see $GRADLE_LOG)"
   exit 10
 fi

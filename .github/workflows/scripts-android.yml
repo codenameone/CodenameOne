@@ -164,6 +164,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6
+      - name: Upload Android test report
+        if: always() && matrix.id == 'default'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-report
+          path: artifacts/android-test-report
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
       - name: Upload Android Jacoco coverage report
         if: always() && matrix.id == 'default'
         uses: actions/upload-artifact@v4
