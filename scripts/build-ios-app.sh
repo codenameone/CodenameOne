@@ -5,14 +5,11 @@ set -euo pipefail
 bia_log() { echo "[build-ios-app] $1"; }
 
 # Pin Xcode so CN1's Java subprocess sees xcodebuild
-XCODE_APP="${XCODE_APP:-/Applications/Xcode_15.4.app}"
+# Use default Xcode.app which points to latest stable GA version on the runner
+XCODE_APP="${XCODE_APP:-/Applications/Xcode.app}"
 if [ ! -d "$XCODE_APP" ]; then
-  # Fallback to default Xcode if specific version not found
-  XCODE_APP="/Applications/Xcode.app"
-  if [ ! -d "$XCODE_APP" ]; then
-    bia_log "Xcode not found. Set XCODE_APP to the Xcode app bundle path." >&2
-    exit 1
-  fi
+  bia_log "Xcode not found at $XCODE_APP. Set XCODE_APP to the Xcode app bundle path." >&2
+  exit 1
 fi
 export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
