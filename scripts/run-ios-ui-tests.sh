@@ -345,8 +345,22 @@ if [ -n "$SIM_UDID" ]; then
   xcrun simctl bootstatus "$SIM_UDID" -b
   BOOT_END=$(date +%s)
   echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
-  # Give xcodebuild a moment to recognize the freshly booted simulator
-  sleep 3
+  
+  # Wait for xcodebuild to recognize the freshly booted simulator
+  # This is particularly important with Xcode 26 / iOS 26 where there can be a delay
+  # between simctl reporting the simulator as booted and xcodebuild being able to use it
+  ri_log "Waiting for xcodebuild to recognize simulator..."
+  WAIT_START=$(date +%s)
+  for attempt in {1..10}; do
+    if xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator \
+       -showdestinations 2>/dev/null | grep -q "$SIM_UDID"; then
+      WAIT_END=$(date +%s)
+      ri_log "Simulator recognized by xcodebuild after $((WAIT_END - WAIT_START))s"
+      break
+    fi
+    [ "$attempt" -lt 10 ] && sleep 2
+  done
+  
   SIM_DESTINATION="id=$SIM_UDID"
 fi
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
