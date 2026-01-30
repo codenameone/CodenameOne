@@ -63,12 +63,21 @@ fi
 export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
-if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
-  ri_log "JAVA17_HOME not set correctly" >&2
-  exit 3
-fi
+# Validate Xcode version is at least 16.0
 if ! command -v xcodebuild >/dev/null 2>&1; then
   ri_log "xcodebuild not found" >&2
+  exit 3
+fi
+XCODE_VERSION=$(xcodebuild -version | head -n 1 | awk '{print $2}')
+XCODE_MAJOR=$(echo "$XCODE_VERSION" | cut -d. -f1)
+if [ "$XCODE_MAJOR" -lt 16 ]; then
+  ri_log "Error: Xcode version $XCODE_VERSION is too old. Minimum required version is 16.0" >&2
+  exit 3
+fi
+ri_log "Using Xcode version $XCODE_VERSION"
+
+if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
+  ri_log "JAVA17_HOME not set correctly" >&2
   exit 3
 fi
 if ! command -v xcrun >/dev/null 2>&1; then

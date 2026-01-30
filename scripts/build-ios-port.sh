@@ -10,6 +10,15 @@ if ! command -v xcodebuild >/dev/null; then
   exit 1
 fi
 
+# Validate Xcode version is at least 16.0
+XCODE_VERSION=$(xcodebuild -version | head -n 1 | awk '{print $2}')
+XCODE_MAJOR=$(echo "$XCODE_VERSION" | cut -d. -f1)
+if [ "$XCODE_MAJOR" -lt 16 ]; then
+  echo "Error: Xcode version $XCODE_VERSION is too old. Minimum required version is 16.0" >&2
+  exit 1
+fi
+echo "Using Xcode version $XCODE_VERSION"
+
 # Normalize TMPDIR and compose paths without duplicate slashes
 TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
