@@ -80,7 +80,7 @@ ARM64_AVAILABLE=0
 if [ "$HOST_ARCH" = "x86_64" ]; then
   ARM64_AVAILABLE="$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)"
 fi
-XCODE_ARCH_PREFIX=()
+declare -a XCODE_ARCH_PREFIX=()
 if [ "$HOST_ARCH" = "x86_64" ] && [ "$ARM64_AVAILABLE" = "1" ]; then
   ri_log "Detected Rosetta shell; running Xcode tools under arm64"
   XCODE_ARCH_PREFIX=(arch -arm64)
