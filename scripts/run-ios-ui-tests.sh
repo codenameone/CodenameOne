@@ -309,7 +309,7 @@ fallback_sim_destination() {
       [ -n "$current_version" ] && best_line="$best_line,OS=$current_version"
       best_line="$best_line,name=$name"
     fi
-  done < <(xcrun simctl list devices 2>/dev/null)
+  done < <(xcrun simctl list devices available 2>/dev/null)
 
   if [ -n "$best_line" ]; then
     printf '%s\n' "$best_line"
@@ -441,7 +441,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
           resolved_id="$(trim_whitespace "$id_part")"
           break
         fi
-      done < <(xcrun simctl list devices 2>/dev/null)
+      done < <(xcrun simctl list devices available 2>/dev/null)
       SIM_DEVICE_ID="$resolved_id"
     fi
   fi
