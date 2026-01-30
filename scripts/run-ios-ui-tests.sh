@@ -371,10 +371,11 @@ BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
+# Note: Omitting -sdk flag to let xcodebuild infer the correct SDK from the destination
+# This prevents SDK version mismatches when the simulator OS differs from Xcode's default SDK
 if ! xcodebuild \
   -workspace "$WORKSPACE_PATH" \
   -scheme "$SCHEME" \
-  -sdk iphonesimulator \
   -configuration Debug \
   -destination "$SIM_DESTINATION" \
   -destination-timeout 120 \
@@ -387,7 +388,7 @@ COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
 
-BUILD_SETTINGS="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
+BUILD_SETTINGS="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
 WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}')"
 if [ -z "$WRAPPER_NAME" ]; then
