@@ -346,27 +346,19 @@ if [ -n "$SIM_UDID" ]; then
   BOOT_END=$(date +%s)
   echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   
-  # Wait for xcodebuild to recognize the freshly booted simulator
+  # Wait for the simulator to stabilize after boot
   # This is particularly important with Xcode 26 / iOS 26 where there can be a delay
   # between simctl reporting the simulator as booted and xcodebuild being able to use it
-  XCODEBUILD_POLL_MAX_ATTEMPTS=10  # max polling attempts
-  XCODEBUILD_POLL_SLEEP=2          # seconds to sleep between attempts
-  ri_log "Waiting for xcodebuild to recognize simulator..."
-  WAIT_START=$(date +%s)
-  RECOGNIZED=0
-  for attempt in $(seq 1 "$XCODEBUILD_POLL_MAX_ATTEMPTS"); do
-    if xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator \
-       -showdestinations 2>/dev/null | grep -q "$SIM_UDID"; then
-      WAIT_END=$(date +%s)
-      ri_log "Simulator recognized by xcodebuild after $((WAIT_END - WAIT_START))s"
-      RECOGNIZED=1
-      break
-    fi
-    [ "$attempt" -lt "$XCODEBUILD_POLL_MAX_ATTEMPTS" ] && sleep "$XCODEBUILD_POLL_SLEEP"
-  done
-  if [ "$RECOGNIZED" -eq 0 ]; then
-    WAIT_END=$(date +%s)
-    ri_log "Warning: xcodebuild did not recognize simulator after $((WAIT_END - WAIT_START))s (max sleep: $(((XCODEBUILD_POLL_MAX_ATTEMPTS - 1) * XCODEBUILD_POLL_SLEEP))s)"
+  # Using a fixed delay is more reliable than polling xcodebuild -showdestinations which
+  # is very slow (~10-15s per call) and can hang on macOS runners with iOS 26
+  XCODEBUILD_STABILIZATION_DELAY=15  # seconds to wait after boot completes
+  ri_log "Waiting ${XCODEBUILD_STABILIZATION_DELAY}s for simulator to stabilize..."
+  sleep "$XCODEBUILD_STABILIZATION_DELAY"
+  
+  # Verify simulator is still in Booted state
+  SIM_STATE="$(xcrun simctl list devices 2>/dev/null | grep "$SIM_UDID" | grep -o '(.*' | tr -d '()' || true)"
+  if [ -n "$SIM_STATE" ]; then
+    ri_log "Simulator state after stabilization: $SIM_STATE"
   fi
   
   SIM_DESTINATION="id=$SIM_UDID"
