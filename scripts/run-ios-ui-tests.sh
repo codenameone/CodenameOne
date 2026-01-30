@@ -349,17 +349,25 @@ if [ -n "$SIM_UDID" ]; then
   # Wait for xcodebuild to recognize the freshly booted simulator
   # This is particularly important with Xcode 26 / iOS 26 where there can be a delay
   # between simctl reporting the simulator as booted and xcodebuild being able to use it
+  XCODEBUILD_POLL_MAX_ATTEMPTS=10  # max polling attempts
+  XCODEBUILD_POLL_SLEEP=2          # seconds to sleep between attempts
   ri_log "Waiting for xcodebuild to recognize simulator..."
   WAIT_START=$(date +%s)
-  for attempt in {1..10}; do
+  recognized=0
+  for attempt in $(seq 1 $XCODEBUILD_POLL_MAX_ATTEMPTS); do
     if xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator \
        -showdestinations 2>/dev/null | grep -q "$SIM_UDID"; then
       WAIT_END=$(date +%s)
       ri_log "Simulator recognized by xcodebuild after $((WAIT_END - WAIT_START))s"
+      recognized=1
       break
     fi
-    [ "$attempt" -lt 10 ] && sleep 2
+    [ "$attempt" -lt "$XCODEBUILD_POLL_MAX_ATTEMPTS" ] && sleep "$XCODEBUILD_POLL_SLEEP"
   done
+  if [ "$recognized" -eq 0 ]; then
+    WAIT_END=$(date +%s)
+    ri_log "Warning: xcodebuild did not recognize simulator after $((WAIT_END - WAIT_START))s (max wait: $((XCODEBUILD_POLL_MAX_ATTEMPTS * XCODEBUILD_POLL_SLEEP))s)"
+  fi
   
   SIM_DESTINATION="id=$SIM_UDID"
 fi
