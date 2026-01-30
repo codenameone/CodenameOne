@@ -68,7 +68,7 @@ if ! command -v xcodebuild >/dev/null 2>&1; then
   ri_log "xcodebuild not found" >&2
   exit 3
 fi
-XCODE_VERSION=$(xcodebuild -version | head -n 1 | awk '{print $2}')
+XCODE_VERSION=$(xcodebuild -version 2>/dev/null | head -n 1 | awk '{print $2}')
 XCODE_MAJOR=$(echo "$XCODE_VERSION" | cut -d. -f1)
 if [ "$XCODE_MAJOR" -lt 16 ]; then
   ri_log "Error: Xcode version $XCODE_VERSION is too old. Minimum required version is 16.0" >&2
