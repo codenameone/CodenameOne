@@ -100,12 +100,13 @@ class StackOverflowIntegrationTest {
                 "StackOverflowApp smoke run exited with code " + smokeResult.exitCode
                         + ". Output:\n" + smokeResult.output
                         + smokeDiagnostics);
-        int smokeProbeCount = countOccurrences(smokeResult.output, "PROBE_CONSTANT");
-        assertTrue(smokeProbeCount >= 2,
-                "StackOverflowApp smoke run should emit two probe markers. Output was:\n"
+        assertTrue(smokeResult.output.contains("PROBE_CONSTANT_ONE"),
+                "StackOverflowApp smoke run should emit PROBE_CONSTANT_ONE. Output was:\n"
+                        + smokeResult.output + smokeDiagnostics);
+        assertTrue(smokeResult.output.contains("PROBE_CONSTANT_TWO"),
+                "StackOverflowApp smoke run should emit PROBE_CONSTANT_TWO. Output was:\n"
                         + smokeResult.output
-                        + "\nObserved PROBE_CONSTANT count: " + smokeProbeCount
-                        + "\nA count of 1 suggests a crash between the first and second reportConstant() calls."
+                        + "\nMissing PROBE_CONSTANT_TWO suggests a crash between the first and second print."
                         + smokeDiagnostics);
 
         ProcessResult result = runProcess(Arrays.asList(executable.toString(), "overflow", "run"), buildDir);
@@ -158,8 +159,9 @@ class StackOverflowIntegrationTest {
                 "    fflush(stdout);\n" +
                 "}\n" +
                 "void StackOverflowApp_reportConstantTwice__(CODENAME_ONE_THREAD_STATE) {\n" +
-                "    printf(\"PROBE_CONSTANT\\n\");\n" +
-                "    printf(\"PROBE_CONSTANT\\n\");\n" +
+                "    printf(\"PROBE_CONSTANT_ONE\\n\");\n" +
+                "    fflush(stdout);\n" +
+                "    printf(\"PROBE_CONSTANT_TWO\\n\");\n" +
                 "    fflush(stdout);\n" +
                 "}\n" +
                 "void StackOverflowApp_report___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT msg) {\n" +
