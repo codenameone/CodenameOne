@@ -353,18 +353,18 @@ if [ -n "$SIM_UDID" ]; then
   XCODEBUILD_POLL_SLEEP=2          # seconds to sleep between attempts
   ri_log "Waiting for xcodebuild to recognize simulator..."
   WAIT_START=$(date +%s)
-  recognized=0
+  RECOGNIZED=0
   for attempt in $(seq 1 $XCODEBUILD_POLL_MAX_ATTEMPTS); do
     if xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator \
        -showdestinations 2>/dev/null | grep -q "$SIM_UDID"; then
       WAIT_END=$(date +%s)
       ri_log "Simulator recognized by xcodebuild after $((WAIT_END - WAIT_START))s"
-      recognized=1
+      RECOGNIZED=1
       break
     fi
     [ "$attempt" -lt "$XCODEBUILD_POLL_MAX_ATTEMPTS" ] && sleep "$XCODEBUILD_POLL_SLEEP"
   done
-  if [ "$recognized" -eq 0 ]; then
+  if [ "$RECOGNIZED" -eq 0 ]; then
     WAIT_END=$(date +%s)
     ri_log "Warning: xcodebuild did not recognize simulator after $((WAIT_END - WAIT_START))s (max wait: $((XCODEBUILD_POLL_MAX_ATTEMPTS * XCODEBUILD_POLL_SLEEP))s)"
   fi
