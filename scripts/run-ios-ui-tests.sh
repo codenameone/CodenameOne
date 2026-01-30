@@ -87,11 +87,19 @@ if [ "$HOST_ARCH" = "x86_64" ] && [ "$ARM64_AVAILABLE" = "1" ]; then
 fi
 
 xcodebuild_cmd() {
-  "${XCODE_ARCH_PREFIX[@]:-}" xcodebuild "$@"
+  if [ ${#XCODE_ARCH_PREFIX[@]} -gt 0 ]; then
+    "${XCODE_ARCH_PREFIX[@]}" xcodebuild "$@"
+  else
+    xcodebuild "$@"
+  fi
 }
 
 xcrun_cmd() {
-  "${XCODE_ARCH_PREFIX[@]:-}" xcrun "$@"
+  if [ ${#XCODE_ARCH_PREFIX[@]} -gt 0 ]; then
+    "${XCODE_ARCH_PREFIX[@]}" xcrun "$@"
+  else
+    xcrun "$@"
+  fi
 }
 
 JAVA17_BIN="$JAVA17_HOME/bin/java"
