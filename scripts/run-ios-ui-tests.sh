@@ -345,6 +345,8 @@ if [ -n "$SIM_UDID" ]; then
   xcrun simctl bootstatus "$SIM_UDID" -b
   BOOT_END=$(date +%s)
   echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
+  # Give xcodebuild a moment to recognize the freshly booted simulator
+  sleep 3
   SIM_DESTINATION="id=$SIM_UDID"
 fi
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
