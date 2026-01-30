@@ -55,7 +55,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    runs-on: macos-15-xlarge    # ARM architecture for better performance and native builds
+    runs-on: macos-15           # using macos-15 with Apple Silicon (ARM64) and latest stable Xcode
     timeout-minutes: 60         # allow enough time for dependency installs and full build
     concurrency:                # ensure only one mac build runs at once
       group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
