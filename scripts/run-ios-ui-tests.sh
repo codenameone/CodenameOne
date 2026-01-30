@@ -119,7 +119,12 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-MAX_SIM_OS_MAJOR=20
+SIM_SDK_VERSION="$(xcodebuild -showsdks 2>/dev/null | awk '/iphonesimulator/ {print $NF}' | tail -n 1 | sed 's/iphonesimulator//')"
+SIM_SDK_MAJOR="${SIM_SDK_VERSION%%.*}"
+case "$SIM_SDK_MAJOR" in
+  ''|*[!0-9]*) SIM_SDK_MAJOR=20 ;;
+esac
+MAX_SIM_OS_MAJOR="$SIM_SDK_MAJOR"
 
 trim_whitespace() {
   local value="$1"
