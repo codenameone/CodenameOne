@@ -54,10 +54,15 @@ ri_log "Loading workspace environment from $ENV_FILE"
 source "$ENV_FILE"
 
 # Use the same Xcode as the build step
-XCODE_APP="${XCODE_APP:-/Applications/Xcode_26.0.1.app}"
+# Using stable Xcode 15 instead of beta Xcode 26 for reliability
+XCODE_APP="${XCODE_APP:-/Applications/Xcode_15.4.app}"
 if [ ! -d "$XCODE_APP" ]; then
-  ri_log "Xcode 26 not found at $XCODE_APP. Set XCODE_APP to the Xcode 26 app bundle path." >&2
-  exit 3
+  # Fallback to default Xcode if specific version not found
+  XCODE_APP="/Applications/Xcode.app"
+  if [ ! -d "$XCODE_APP" ]; then
+    ri_log "Xcode not found. Set XCODE_APP to the Xcode app bundle path." >&2
+    exit 3
+  fi
 fi
 export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"

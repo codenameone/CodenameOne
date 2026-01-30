@@ -55,7 +55,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
+    runs-on: macos-14           # using macos-14 with stable Xcode 15 instead of macos-15 with beta Xcode 26
     timeout-minutes: 60         # allow enough time for dependency installs and full build
     concurrency:                # ensure only one mac build runs at once
       group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
