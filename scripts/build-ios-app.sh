@@ -14,11 +14,11 @@ fi
 export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
-# Validate Xcode version is at least 16.0
+# Validate Xcode version is at least 26.0
 XCODE_VERSION=$(xcodebuild -version 2>/dev/null | head -n 1 | awk '{print $2}' || true)
 XCODE_MAJOR=$(echo "$XCODE_VERSION" | cut -d. -f1)
-if [ "$XCODE_MAJOR" -lt 16 ]; then
-  bia_log "Error: Xcode version $XCODE_VERSION is too old. Minimum required version is 16.0" >&2
+if [ "$XCODE_MAJOR" -lt 26 ]; then
+  bia_log "Error: Xcode version $XCODE_VERSION is too old. Minimum required version is 26.0" >&2
   exit 1
 fi
 bia_log "Using Xcode version $XCODE_VERSION"
