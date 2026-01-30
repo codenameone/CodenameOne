@@ -75,6 +75,25 @@ if ! command -v xcrun >/dev/null 2>&1; then
   exit 3
 fi
 
+HOST_ARCH="$(uname -m)"
+ARM64_AVAILABLE=0
+if [ "$HOST_ARCH" = "x86_64" ]; then
+  ARM64_AVAILABLE="$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)"
+fi
+XCODE_ARCH_PREFIX=()
+if [ "$HOST_ARCH" = "x86_64" ] && [ "$ARM64_AVAILABLE" = "1" ]; then
+  ri_log "Detected Rosetta shell; running Xcode tools under arm64"
+  XCODE_ARCH_PREFIX=(arch -arm64)
+fi
+
+xcodebuild_cmd() {
+  "${XCODE_ARCH_PREFIX[@]}" xcodebuild "$@"
+}
+
+xcrun_cmd() {
+  "${XCODE_ARCH_PREFIX[@]}" xcrun "$@"
+}
+
 JAVA17_BIN="$JAVA17_HOME/bin/java"
 
 cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
@@ -168,7 +187,7 @@ normalize_destination() {
 auto_select_destination() {
   local show_dest rc=0 best_line="" best_key="" line payload platform id name os priority key part value
   set +e
-  show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
+  show_dest="$(xcodebuild_cmd -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
   rc=$?
   set -e
 
@@ -259,7 +278,7 @@ destination_visible_to_xcodebuild() {
   id="$(printf '%s\n' "$destination" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
   [ -z "$id" ] && return 1
   set +e
-  xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null | grep -q "$id"
+  xcodebuild_cmd -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null | grep -q "$id"
   local rc=$?
   set -e
   return $rc
@@ -332,7 +351,7 @@ fallback_sim_destination() {
       [ -n "$current_version" ] && best_line="$best_line,OS=$current_version"
       best_line="$best_line,name=$name"
     fi
-  done < <(xcrun simctl list devices 2>/dev/null)
+  done < <(xcrun_cmd simctl list devices 2>/dev/null)
 
   if [ -n "$best_line" ]; then
     printf '%s\n' "$best_line"
@@ -370,8 +389,8 @@ SIM_UDID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' 
 if [ -n "$SIM_UDID" ]; then
   ri_log "Booting simulator $SIM_UDID"
   BOOT_START=$(date +%s)
-  xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
-  xcrun simctl bootstatus "$SIM_UDID" -b
+  xcrun_cmd simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
+  xcrun_cmd simctl bootstatus "$SIM_UDID" -b
   BOOT_END=$(date +%s)
   echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   SIM_DESTINATION="platform=iOS Simulator,id=$SIM_UDID"
@@ -424,7 +443,7 @@ build_with_destination() {
       build
     )
   fi
-  xcodebuild "${args[@]}" | tee "$BUILD_LOG"
+  xcodebuild_cmd "${args[@]}" | tee "$BUILD_LOG"
 }
 
 if ! build_with_destination "$BUILD_DESTINATION"; then
@@ -462,7 +481,7 @@ COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
 
-BUILD_SETTINGS="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
+BUILD_SETTINGS="$(xcodebuild_cmd -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
 WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}')"
 if [ -z "$WRAPPER_NAME" ]; then
@@ -527,7 +546,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
           resolved_id="$(trim_whitespace "$id_part")"
           break
         fi
-      done < <(xcrun simctl list devices 2>/dev/null)
+      done < <(xcrun_cmd simctl list devices 2>/dev/null)
       SIM_DEVICE_ID="$resolved_id"
     fi
   fi
@@ -535,13 +554,13 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   if [ -n "$SIM_DEVICE_ID" ]; then
     ri_log "Booting simulator $SIM_DEVICE_ID"
     BOOT_START=$(date +%s)
-    xcrun simctl boot "$SIM_DEVICE_ID" >/dev/null 2>&1 || true
-    xcrun simctl bootstatus "$SIM_DEVICE_ID" -b
+    xcrun_cmd simctl boot "$SIM_DEVICE_ID" >/dev/null 2>&1 || true
+    xcrun_cmd simctl bootstatus "$SIM_DEVICE_ID" -b
     BOOT_END=$(date +%s)
     echo "Simulator Boot (Run) : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   else
     ri_log "Warning: simulator UDID not resolved; relying on default booted device"
-    xcrun simctl bootstatus booted -b || true
+    xcrun_cmd simctl bootstatus booted -b || true
   fi
 
   LOG_STREAM_PID=0
@@ -551,22 +570,22 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
       wait "$LOG_STREAM_PID" 2>/dev/null || true
     fi
     if [ -n "$SIM_DEVICE_ID" ] && [ -n "$BUNDLE_IDENTIFIER" ]; then
-      xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+      xcrun_cmd simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
     fi
   }
   trap cleanup EXIT
 
   ri_log "Streaming simulator logs to $TEST_LOG"
   if [ -n "$SIM_DEVICE_ID" ]; then
-    xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
-    xcrun simctl uninstall "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+    xcrun_cmd simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+    xcrun_cmd simctl uninstall "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 
-    xcrun simctl spawn "$SIM_DEVICE_ID" \
+    xcrun_cmd simctl spawn "$SIM_DEVICE_ID" \
       log stream --style json --level debug \
       --predicate 'eventMessage CONTAINS "CN1SS"' \
       > "$TEST_LOG" 2>&1 &
   else
-    xcrun simctl spawn booted log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
+    xcrun_cmd simctl spawn booted log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
   fi
   LOG_STREAM_PID=$!
   sleep 2
@@ -578,7 +597,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     local attempt=1
     while true; do
       local output
-      if output="$(xcrun simctl launch "$target" "$BUNDLE_IDENTIFIER" 2>&1)"; then
+      if output="$(xcrun_cmd simctl launch "$target" "$BUNDLE_IDENTIFIER" 2>&1)"; then
         printf '%s\n' "$output" >> "$LAUNCH_LOG"
         return 0
       fi
@@ -587,7 +606,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
         return 1
       fi
       ri_log "simctl launch failed (attempt $attempt), retrying"
-      xcrun simctl bootstatus "$target" -b >/dev/null 2>&1 || true
+      xcrun_cmd simctl bootstatus "$target" -b >/dev/null 2>&1 || true
       sleep 5
       attempt=$((attempt + 1))
     done
@@ -596,7 +615,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   ri_log "Installing simulator app bundle"
   INSTALL_START=$(date +%s)
   if [ -n "$SIM_DEVICE_ID" ]; then
-    if ! xcrun simctl install "$SIM_DEVICE_ID" "$APP_BUNDLE_PATH"; then
+    if ! xcrun_cmd simctl install "$SIM_DEVICE_ID" "$APP_BUNDLE_PATH"; then
       ri_log "FATAL: simctl install failed"
       exit 11
     fi
@@ -609,7 +628,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     fi
     LAUNCH_END=$(date +%s)
   else
-    if ! xcrun simctl install booted "$APP_BUNDLE_PATH"; then
+    if ! xcrun_cmd simctl install booted "$APP_BUNDLE_PATH"; then
       ri_log "FATAL: simctl install failed"
       exit 11
     fi
@@ -651,13 +670,13 @@ wait "$LOG_STREAM_PID" 2>/dev/null || true
 LOG_STREAM_PID=0
 
 FALLBACK_LOG="$ARTIFACTS_DIR/device-runner-fallback.log"
-xcrun simctl spawn "$SIM_DEVICE_ID" \
+xcrun_cmd simctl spawn "$SIM_DEVICE_ID" \
   log show --style syslog --last 30m \
   --predicate 'eventMessage CONTAINS "CN1SS"' \
   > "$FALLBACK_LOG" 2>/dev/null || true
 
 if [ -n "$SIM_DEVICE_ID" ]; then
-  xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+  xcrun_cmd simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 fi
 
 declare -a CN1SS_SOURCES=("SIMLOG:$TEST_LOG")
