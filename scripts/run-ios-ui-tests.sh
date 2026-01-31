@@ -192,6 +192,31 @@ normalize_destination() {
   printf '%s\n' "$joined"
 }
 
+strip_id_from_destination() {
+  local raw="$1"
+  IFS=',' read -r -a parts <<< "$raw"
+  local components=() part key value
+  for part in "${parts[@]}"; do
+    part="$(trim_whitespace "$part")"
+    key="${part%%=*}"
+    value="${part#*=}"
+    key="$(trim_whitespace "$key")"
+    if [ "$key" = "id" ]; then
+      continue
+    fi
+    components+=("$part")
+  done
+  local joined=""
+  for part in "${components[@]}"; do
+    if [ -z "$joined" ]; then
+      joined="$part"
+    else
+      joined+=",$part"
+    fi
+  done
+  printf '%s\n' "$joined"
+}
+
 auto_select_destination() {
   local show_dest rc=0 best_line="" best_key="" line payload platform id name os priority key part value
   set +e
@@ -383,14 +408,18 @@ if [ -z "$SIM_DESTINATION" ]; then
   if [ -n "${FALLBACK_DESTINATION:-}" ]; then
     SIM_DESTINATION="$FALLBACK_DESTINATION"
     ri_log "Using fallback simulator destination '$SIM_DESTINATION'"
+    BUILD_DESTINATION="$(strip_id_from_destination "$SIM_DESTINATION")"
   else
     SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16"
     ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
+    BUILD_DESTINATION="$SIM_DESTINATION"
   fi
 fi
 
 SIM_DESTINATION="$(normalize_destination "$SIM_DESTINATION")"
-BUILD_DESTINATION="$SIM_DESTINATION"
+if [ -z "${BUILD_DESTINATION:-}" ]; then
+  BUILD_DESTINATION="$SIM_DESTINATION"
+fi
 
 # Extract UDID and prefer platform+id destination for xcodebuild stability
 SIM_UDID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
@@ -417,8 +446,8 @@ if ! destination_visible_to_xcodebuild "$SIM_DESTINATION"; then
     ri_log "Re-selected simulator destination '$SIM_DESTINATION'"
   else
     ri_log "Auto-selection still did not return a destination; continuing with '$SIM_DESTINATION'"
-    BUILD_DESTINATION=""
-    ri_log "Using default simulator destination for build"
+    BUILD_DESTINATION="$(strip_id_from_destination "$SIM_DESTINATION")"
+    ri_log "Using name-based simulator destination for build '$BUILD_DESTINATION'"
   fi
 fi
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
@@ -467,18 +496,24 @@ if ! build_with_destination "$BUILD_DESTINATION"; then
       BUILD_DESTINATION="$SIM_DESTINATION"
       ri_log "Retrying xcodebuild with destination '$BUILD_DESTINATION'"
       if ! build_with_destination "$BUILD_DESTINATION"; then
-        ri_log "Retrying xcodebuild with default simulator destination"
-        if ! build_with_destination ""; then
+        ri_log "Retrying xcodebuild with name-based simulator destination"
+        if ! build_with_destination "$(strip_id_from_destination "$SIM_DESTINATION")"; then
           ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
           exit 10
         fi
       fi
     else
-      ri_log "Retrying xcodebuild with default simulator destination"
-      if ! build_with_destination ""; then
+      ri_log "Retrying xcodebuild with name-based simulator destination"
+      if ! build_with_destination "$(strip_id_from_destination "$SIM_DESTINATION")"; then
         ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
         exit 10
       fi
+    fi
+  elif grep -q "Found no destinations for the scheme" "$BUILD_LOG"; then
+    ri_log "xcodebuild found no destinations; retrying with name-based simulator destination"
+    if ! build_with_destination "$(strip_id_from_destination "$SIM_DESTINATION")"; then
+      ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
+      exit 10
     fi
   else
     ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
