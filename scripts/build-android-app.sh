@@ -121,6 +121,7 @@ GRADLE_PROPS="$GRADLE_PROJECT_DIR/gradle.properties"
 grep -q '^android.useAndroidX=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.useAndroidX=true' >> "$GRADLE_PROPS"
 grep -q '^android.enableJetifier=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.enableJetifier=true' >> "$GRADLE_PROPS"
 grep -q '^android.suppressUnsupportedCompileSdk=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.suppressUnsupportedCompileSdk=36' >> "$GRADLE_PROPS"
+grep -q '^android.experimental.androidTest.useUnifiedTestPlatform=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.experimental.androidTest.useUnifiedTestPlatform=false' >> "$GRADLE_PROPS"
 
 APP_BUILD_GRADLE="$GRADLE_PROJECT_DIR/app/build.gradle"
 ROOT_BUILD_GRADLE="$GRADLE_PROJECT_DIR/build.gradle"
