@@ -83,6 +83,20 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 
+SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator"; then
+  ri_log "No iOS simulator SDKs detected in Xcode. Install the iOS platform in Xcode > Settings > Components." >&2
+  printf '%s\n' "$SDK_LIST" > "$ARTIFACTS_DIR/xcodebuild-showsdks.log"
+  exit 3
+fi
+
+RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
+if ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
+  ri_log "No available iOS simulator runtimes detected. Install an iOS simulator runtime in Xcode > Settings > Components." >&2
+  printf '%s\n' "$RUNTIME_LIST" > "$ARTIFACTS_DIR/simctl-runtimes.log"
+  exit 3
+fi
+
 if [ -z "$REQUESTED_SCHEME" ]; then
   if [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
     REQUESTED_SCHEME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
