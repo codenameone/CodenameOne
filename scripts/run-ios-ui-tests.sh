@@ -355,6 +355,14 @@ if [ -z "$SIM_DESTINATION" ]; then
     xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
       > "$SHOW_DEST_LOG" 2>&1 || true
     if grep -q "not installed" "$SHOW_DEST_LOG"; then
+      if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
+        ri_log "Attempting to download missing iOS platform via xcodebuild -downloadPlatform iOS"
+        xcodebuild -downloadPlatform iOS || true
+        xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
+          > "$SHOW_DEST_LOG" 2>&1 || true
+      fi
+    fi
+    if grep -q "not installed" "$SHOW_DEST_LOG"; then
       ri_log "No eligible simulator destinations reported by xcodebuild. See $SHOW_DEST_LOG" >&2
       exit 3
     fi
