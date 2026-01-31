@@ -340,6 +340,13 @@ if [ -z "$SIM_DESTINATION" ]; then
     ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
   else
     ri_log "Simulator auto-selection did not return a destination"
+    SHOW_DEST_LOG="$ARTIFACTS_DIR/xcodebuild-showdestinations.log"
+    xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
+      > "$SHOW_DEST_LOG" 2>&1 || true
+    if grep -q "not installed" "$SHOW_DEST_LOG"; then
+      ri_log "No eligible simulator destinations reported by xcodebuild. See $SHOW_DEST_LOG" >&2
+      exit 3
+    fi
   fi
 fi
 if [ -z "$SIM_DESTINATION" ]; then
