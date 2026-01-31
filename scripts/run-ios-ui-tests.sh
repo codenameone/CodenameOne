@@ -84,15 +84,26 @@ mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 
 SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
+DOWNLOAD_PLATFORMS="${XCODE_DOWNLOAD_PLATFORMS:-false}"
+
+if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator" || ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
+  if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
+    ri_log "Attempting to download missing iOS platform via xcodebuild -downloadPlatform iOS"
+    xcodebuild -downloadPlatform iOS || true
+    SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+    RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
+  fi
+fi
+
 if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator"; then
-  ri_log "No iOS simulator SDKs detected in Xcode. Install the iOS platform in Xcode > Settings > Components." >&2
+  ri_log "No iOS simulator SDKs detected in Xcode. Install the iOS platform in Xcode > Settings > Components (or set XCODE_DOWNLOAD_PLATFORMS=true)." >&2
   printf '%s\n' "$SDK_LIST" > "$ARTIFACTS_DIR/xcodebuild-showsdks.log"
   exit 3
 fi
 
-RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
 if ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
-  ri_log "No available iOS simulator runtimes detected. Install an iOS simulator runtime in Xcode > Settings > Components." >&2
+  ri_log "No available iOS simulator runtimes detected. Install an iOS simulator runtime in Xcode > Settings > Components (or set XCODE_DOWNLOAD_PLATFORMS=true)." >&2
   printf '%s\n' "$RUNTIME_LIST" > "$ARTIFACTS_DIR/simctl-runtimes.log"
   exit 3
 fi
