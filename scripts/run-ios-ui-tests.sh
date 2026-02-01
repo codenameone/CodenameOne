@@ -86,6 +86,7 @@ TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
 RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
 DOWNLOAD_PLATFORMS="${XCODE_DOWNLOAD_PLATFORMS:-false}"
+ri_log "XCODE_DOWNLOAD_PLATFORMS=${DOWNLOAD_PLATFORMS}"
 
 if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator" || ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
   if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
@@ -93,6 +94,8 @@ if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator" || ! printf '%s\n' "$
     xcodebuild -downloadPlatform iOS || true
     SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
     RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
+  else
+    ri_log "Missing simulator SDKs/runtimes detected. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
   fi
 fi
 
@@ -360,6 +363,8 @@ if [ -z "$SIM_DESTINATION" ]; then
         xcodebuild -downloadPlatform iOS || true
         xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
           > "$SHOW_DEST_LOG" 2>&1 || true
+      else
+        ri_log "Destinations report missing platforms. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
       fi
     fi
     if grep -q "not installed" "$SHOW_DEST_LOG"; then
