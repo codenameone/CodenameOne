@@ -314,6 +314,11 @@ jacoco {
     classDirectories.setFrom(files(javaClasses, kotlinClasses, aarTrees).asFileTree.matching {
         include 'com/codename1/impl/android/**'
     })
+    classDirectories.from({
+        configurations.debugRuntimeClasspath
+            .filter { it.name.endsWith('.jar') }
+            .collect { zipTree(it) }
+    })
 
     sourceDirectories.setFrom(files("src/main/java"))
 
@@ -324,10 +329,6 @@ jacoco {
             if (existing.isEmpty()) {
                 throw new GradleException("No Jacoco coverage data found. Ensure connectedDebugAndroidTest runs with coverage enabled.")
             }
-            def runtimeJars = configurations.debugRuntimeClasspath.filter { it.name.endsWith('.jar') }.collect { zipTree(it) }
-            classDirectories.setFrom(files(javaClasses, kotlinClasses, aarTrees, runtimeJars).asFileTree.matching {
-                include 'com/codename1/impl/android/**'
-            })
             logger.lifecycle("Jacoco coverage inputs: ${existing}")
         }
 }
