@@ -283,7 +283,7 @@ public class IPhoneBuilder extends Executor {
         disableUIWebView = enableWKWebView && "true".equals(request.getArg("ios.noUIWebView", "true"));
 
         boolean bicodeHandle = true;
-        xcodebuild = "xcodebuild";
+        xcodebuild = resolveXcodebuild();
         xcodeVersion = getXcodeVersion(xcodebuild);
         if (xcodeVersion <= 0) {
             xcodeVersion = 10;
@@ -2592,6 +2592,51 @@ public class IPhoneBuilder extends Executor {
             } catch (Throwable ex){}
         }
         return defaultVal;
+    }
+
+    private String resolveXcodebuild() {
+        String developerDir = System.getenv("DEVELOPER_DIR");
+        if (developerDir != null && developerDir.length() > 0) {
+            File candidate = new File(developerDir, "usr/bin/xcodebuild");
+            if (candidate.exists()) {
+                log("Using xcodebuild from DEVELOPER_DIR: " + candidate.getAbsolutePath());
+                return candidate.getAbsolutePath();
+            }
+        }
+
+        String xcodeApp = System.getenv("XCODE_APP");
+        if (xcodeApp != null && xcodeApp.length() > 0) {
+            File candidate = new File(xcodeApp, "Contents/Developer/usr/bin/xcodebuild");
+            if (candidate.exists()) {
+                log("Using xcodebuild from XCODE_APP: " + candidate.getAbsolutePath());
+                return candidate.getAbsolutePath();
+            }
+        }
+
+        File xcrun = new File("/usr/bin/xcrun");
+        if (xcrun.exists()) {
+            try {
+                String resolved = execString(tmpFile, xcrun.getAbsolutePath(), "-f", "xcodebuild");
+                if (resolved != null) {
+                    resolved = resolved.trim();
+                }
+                if (resolved != null && resolved.length() > 0) {
+                    log("Using xcodebuild resolved by xcrun: " + resolved);
+                    return resolved;
+                }
+            } catch (Exception ex) {
+                debug("xcrun failed to resolve xcodebuild: " + ex.getMessage());
+            }
+        }
+
+        File usrBin = new File("/usr/bin/xcodebuild");
+        if (usrBin.exists()) {
+            log("Using xcodebuild at /usr/bin/xcodebuild");
+            return usrBin.getAbsolutePath();
+        }
+
+        log("Using xcodebuild from PATH");
+        return "xcodebuild";
     }
     
 

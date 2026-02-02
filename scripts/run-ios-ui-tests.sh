@@ -83,6 +83,38 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 
+SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
+DOWNLOAD_PLATFORMS="${XCODE_DOWNLOAD_PLATFORMS:-}"
+if [ -z "$DOWNLOAD_PLATFORMS" ] && [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
+  DOWNLOAD_PLATFORMS="true"
+fi
+DOWNLOAD_PLATFORMS="${DOWNLOAD_PLATFORMS:-false}"
+ri_log "XCODE_DOWNLOAD_PLATFORMS=${DOWNLOAD_PLATFORMS}"
+
+if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator" || ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
+  if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
+    ri_log "Attempting to download missing iOS platform via xcodebuild -downloadPlatform iOS"
+    xcodebuild -downloadPlatform iOS || true
+    SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+    RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
+  else
+    ri_log "Missing simulator SDKs/runtimes detected. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
+  fi
+fi
+
+if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator"; then
+  ri_log "No iOS simulator SDKs detected in Xcode. Install the iOS platform in Xcode > Settings > Components (or set XCODE_DOWNLOAD_PLATFORMS=true)." >&2
+  printf '%s\n' "$SDK_LIST" > "$ARTIFACTS_DIR/xcodebuild-showsdks.log"
+  exit 3
+fi
+
+if ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
+  ri_log "No available iOS simulator runtimes detected. Install an iOS simulator runtime in Xcode > Settings > Components (or set XCODE_DOWNLOAD_PLATFORMS=true)." >&2
+  printf '%s\n' "$RUNTIME_LIST" > "$ARTIFACTS_DIR/simctl-runtimes.log"
+  exit 3
+fi
+
 if [ -z "$REQUESTED_SCHEME" ]; then
   if [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
     REQUESTED_SCHEME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
@@ -119,7 +151,12 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-MAX_SIM_OS_MAJOR=20
+SIM_SDK_VERSION="$(xcodebuild -showsdks 2>/dev/null | awk '/iphonesimulator/ {print $NF}' | tail -n 1 | sed 's/iphonesimulator//')"
+SIM_SDK_MAJOR="${SIM_SDK_VERSION%%.*}"
+case "$SIM_SDK_MAJOR" in
+  ''|*[!0-9]*) SIM_SDK_MAJOR=20 ;;
+esac
+MAX_SIM_OS_MAJOR="$SIM_SDK_MAJOR"
 
 trim_whitespace() {
   local value="$1"
@@ -304,7 +341,7 @@ fallback_sim_destination() {
       [ -n "$current_version" ] && best_line="$best_line,OS=$current_version"
       best_line="$best_line,name=$name"
     fi
-  done < <(xcrun simctl list devices 2>/dev/null)
+  done < <(xcrun simctl list devices available 2>/dev/null)
 
   if [ -n "$best_line" ]; then
     printf '%s\n' "$best_line"
@@ -321,6 +358,23 @@ if [ -z "$SIM_DESTINATION" ]; then
     ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
   else
     ri_log "Simulator auto-selection did not return a destination"
+    SHOW_DEST_LOG="$ARTIFACTS_DIR/xcodebuild-showdestinations.log"
+    xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
+      > "$SHOW_DEST_LOG" 2>&1 || true
+    if grep -q "not installed" "$SHOW_DEST_LOG"; then
+      if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
+        ri_log "Attempting to download missing iOS platform via xcodebuild -downloadPlatform iOS"
+        xcodebuild -downloadPlatform iOS || true
+        xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
+          > "$SHOW_DEST_LOG" 2>&1 || true
+      else
+        ri_log "Destinations report missing platforms. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
+      fi
+    fi
+    if grep -q "not installed" "$SHOW_DEST_LOG"; then
+      ri_log "No eligible simulator destinations reported by xcodebuild. See $SHOW_DEST_LOG" >&2
+      exit 3
+    fi
   fi
 fi
 if [ -z "$SIM_DESTINATION" ]; then
@@ -436,7 +490,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
           resolved_id="$(trim_whitespace "$id_part")"
           break
         fi
-      done < <(xcrun simctl list devices 2>/dev/null)
+      done < <(xcrun simctl list devices available 2>/dev/null)
       SIM_DEVICE_ID="$resolved_id"
     fi
   fi
