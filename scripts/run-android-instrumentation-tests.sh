@@ -140,9 +140,9 @@ LOGCAT_PID=$!
 sleep 2
 
 GRADLEW="./gradlew"
-GRADLE_CMD=("$GRADLEW" --stacktrace --info --no-daemon connectedDebugAndroidTest)
+GRADLE_CMD=("$GRADLEW" --stacktrace --info --warning-mode all --no-daemon connectedDebugAndroidTest)
 GRADLE_LOG="$ARTIFACTS_DIR/connectedDebugAndroidTest-gradle.log"
-ANDROID_TEST_REPORT_DIR="scripts/hellocodenameone/android/target/hellocodenameone-android-1.0-SNAPSHOT-android-source/app/build/reports/androidTests/connected"
+ANDROID_TEST_REPORT_DIR="$GRADLE_PROJECT_DIR/app/build/reports/androidTests/connected"
 ANDROID_TEST_REPORT_DEST="$ARTIFACTS_DIR/android-test-report"
 
 ra_log "Executing connectedDebugAndroidTest via Gradle"
@@ -234,6 +234,7 @@ ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
 cn1ss_print_log "$TEST_LOG"
 
+declare -a FAILED_TESTS=()
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"
   if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
@@ -248,7 +249,8 @@ for test in "${TEST_NAMES[@]}"; do
       rm -f "$preview_dest" 2>/dev/null || true
     fi
   else
-    ra_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
+    ra_log "ERROR: Failed to extract/decode CN1SS payload for test '$test'"
+    FAILED_TESTS+=("$test")
     RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
     if cn1ss_extract_base64 "$TEST_LOG" "$test" > "$RAW_B64_OUT" 2>/dev/null; then
       if [ -s "$RAW_B64_OUT" ]; then
@@ -256,7 +258,7 @@ for test in "${TEST_NAMES[@]}"; do
         ra_log "Partial base64 saved at: $RAW_B64_OUT"
       fi
     fi
-    exit 12
+    continue
   fi
 done
 
@@ -292,6 +294,12 @@ cn1ss_process_and_report \
   "$ARTIFACTS_DIR" \
   "${COMPARE_ENTRIES[@]}"
 comment_rc=$?
+
+# Surface any decode failures after report generation.
+if [ "${#FAILED_TESTS[@]}" -gt 0 ]; then
+  ra_log "ERROR: CN1SS decode failures for tests: ${FAILED_TESTS[*]}"
+  comment_rc=12
+fi
 
 # Copy useful artifacts for GH Actions
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
