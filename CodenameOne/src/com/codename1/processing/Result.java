@@ -190,11 +190,11 @@ public final class Result {
      *
      * <pre>
      * ConnectionRequest request = new ConnectionRequest() {
-     * 	protected void readResponse(InputStream input) throws IOException {
-     * 		Result evaluator = Result.fromContent(input, Result.JSON);
-     * 		// ... evaluate the result here
+     *     protected void readResponse(InputStream input) throws IOException {
+     *         Result evaluator = Result.fromContent(input, Result.JSON);
+     *         // ... evaluate the result here
      *    }
-     * 	// ... etc
+     *     // ... etc
      * };
      * </pre>
      *
@@ -231,11 +231,11 @@ public final class Result {
      *
      * <pre>
      * ConnectionRequest request = new ConnectionRequest() {
-     * 	protected void readResponse(InputStream input) throws IOException {
-     * 		Result evaluator = Result.fromContent(input, Result.JSON);
-     * 		// ... evaluate the result here
+     *     protected void readResponse(InputStream input) throws IOException {
+     *         Result evaluator = Result.fromContent(input, Result.JSON);
+     *         // ... evaluate the result here
      *    }
-     * 	// ... etc
+     *     // ... etc
      * };
      * </pre>
      *
@@ -661,7 +661,7 @@ public final class Result {
      *
      * <pre>
      * String types[] = result
-     * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+     *         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
      * </pre>
      *
      * @param path Path expression to evaluate
@@ -721,7 +721,7 @@ public final class Result {
      *
      * <pre>
      * String types[] = result
-     * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+     *         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
      * </pre>
      *
      * @param path Path expression to evaluate
@@ -751,7 +751,7 @@ public final class Result {
      * Get an array of values from the requested path.
      * <pre>
      * String types[] = result
-     * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+     *         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
      * </pre>
      *
      * @param path Path expression to evaluate
@@ -781,7 +781,7 @@ public final class Result {
      * Get an array of values from the requested path.
      * <pre>
      * String types[] = result
-     * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+     *         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
      * </pre>
      *
      * @param path Path expression to evaluate
@@ -807,7 +807,7 @@ public final class Result {
      * Get an array of values from the requested path.
      * <pre>
      * String types[] = result
-     * 		.getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+     *         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
      * </pre>
      *
      * @param path Path expression to evaluate

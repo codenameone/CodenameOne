@@ -55,12 +55,12 @@ final class InfCodes {
     static final private int LEN = 1;    // i: get length/literal/eob next
     static final private int LENEXT = 2; // i: getting length extra (have base)
     static final private int DIST = 3;   // i: get distance next
-    static final private int DISTEXT = 4;// i: getting distance extra
+    static final private int DISTEXT = 4; // i: getting distance extra
     static final private int COPY = 5;   // o: copying bytes in window, waiting for space
     static final private int LIT = 6;    // o: got literal, waiting for output space
     static final private int WASH = 7;   // o: got eob, possibly still output waiting
     static final private int END = 8;    // x: got eob and all data flushed
-    static final private int BADCODE = 9;// x: got error
+    static final private int BADCODE = 9; // x: got error
     private final ZStream z;
     private final InfBlocks s;
     int mode;      // current inflate_codes mode

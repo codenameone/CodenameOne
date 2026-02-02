@@ -79,7 +79,7 @@ public class PerspectiveCamera extends Camera {
         currTransform.concatenate(perspectiveT);
         float zState = 0f;
         float cameraZ = -zNear - w * 0.5f * zState;
-        float cameraX = (float) -dw / 2;//-x-w/2;
+        float cameraX = (float) -dw / 2; //-x-w/2;
         float cameraY = -y - h * 0.5f;
         currTransform.translate(cameraX, cameraY, cameraZ);
 

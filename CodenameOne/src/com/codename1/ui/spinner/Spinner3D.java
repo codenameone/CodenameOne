@@ -141,7 +141,7 @@ class Spinner3D extends Container implements InternalPickerWidget {
     }
 
     private static boolean usePerspective() {
-        return false;//Transform.isPerspectiveSupported();
+        return false; //Transform.isPerspectiveSupported();
     }
 
     /**

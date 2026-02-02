@@ -285,7 +285,7 @@ public final class ConstraintParser {
             }
         }
 
-//		lc = (LC) serializeTest(lc);
+//        lc = (LC) serializeTest(lc);
         return lc;
     }
 
@@ -352,7 +352,7 @@ public final class ConstraintParser {
         AC ac = new AC();
         ac.setConstaints(colSpecs);
 
-//		ac = (AC) serializeTest(ac);
+//        ac = (AC) serializeTest(ac);
         return ac;
     }
 
@@ -387,7 +387,7 @@ public final class ConstraintParser {
 
                 if ("fill".equals(part)) {
                     dimConstraint.setFill(true);
-//					 dimConstraint.setAlign(null);   // Can not have both fill and alignment (changed for 3.5 since it can have "growy 0")
+//                     dimConstraint.setAlign(null);   // Can not have both fill and alignment (changed for 3.5 since it can have "growy 0")
                     continue;
                 }
 
@@ -436,7 +436,7 @@ public final class ConstraintParser {
                 if (c == 'a') {
                     ix = startsWithLenient(part, "align", 2, true);
                     if (ix > -1) {
-//						if (dimConstraint.isFill() == false)    // Swallow, but ignore if fill is set. (changed for 3.5 since it can have "growy 0")
+//                        if (dimConstraint.isFill() == false)    // Swallow, but ignore if fill is set. (changed for 3.5 since it can have "growy 0")
                         dimConstraint.setAlign(parseUnitValueOrAlign(part.substring(ix).trim(), isCols, null));
                         continue;
                     }
@@ -444,7 +444,7 @@ public final class ConstraintParser {
 
                 UnitValue align = parseAlignKeywords(part, isCols);
                 if (align != null) {
-//					if (dimConstraint.isFill() == false)    // Swallow, but ignore if fill is set. (changed for 3.5 since it can have "growy 0")
+//                    if (dimConstraint.isFill() == false)    // Swallow, but ignore if fill is set. (changed for 3.5 since it can have "growy 0")
                     dimConstraint.setAlign(align);
                     continue;
                 }
@@ -1594,38 +1594,38 @@ public final class ConstraintParser {
         return s != null ? s.trim().toLowerCase() : "";
     }
 
-//	/** Tests to serialize and deserialize the object with both XMLEncoder/Decoder and through Serializable
-//	 * @param o The object to serialize
-//	 * @return The same object after a tri through the process.
-//	 */
-//	public static final Object serializeTest(Object o)
-//	{
-//		try {
-//			ByteArrayOutputStream barr = new ByteArrayOutputStream();
-//			XMLEncoder enc = new XMLEncoder(barr);
-//			enc.writeObject(o);
-//			enc.close();
+//    /** Tests to serialize and deserialize the object with both XMLEncoder/Decoder and through Serializable
+//     * @param o The object to serialize
+//     * @return The same object after a tri through the process.
+//     */
+//    public static final Object serializeTest(Object o)
+//    {
+//        try {
+//            ByteArrayOutputStream barr = new ByteArrayOutputStream();
+//            XMLEncoder enc = new XMLEncoder(barr);
+//            enc.writeObject(o);
+//            enc.close();
 //
-//			XMLDecoder dec = new XMLDecoder(new ByteArrayInputStream(barr.toByteArray()));
-//			o = dec.readObject();
-//			dec.close();
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//		}
+//            XMLDecoder dec = new XMLDecoder(new ByteArrayInputStream(barr.toByteArray()));
+//            o = dec.readObject();
+//            dec.close();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
 //
-//		try {
-//			ByteArrayOutputStream barr = new ByteArrayOutputStream();
-//			ObjectOutputStream oos = new ObjectOutputStream(barr);
-//			oos.writeObject(o);
-//			oos.close();
+//        try {
+//            ByteArrayOutputStream barr = new ByteArrayOutputStream();
+//            ObjectOutputStream oos = new ObjectOutputStream(barr);
+//            oos.writeObject(o);
+//            oos.close();
 //
-//			ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(barr.toByteArray()));
-//			o = ois.readObject();
-//			ois.close();
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//		}
+//            ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(barr.toByteArray()));
+//            o = ois.readObject();
+//            ois.close();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
 //
-//		return o;
-//	}
+//        return o;
+//    }
 }

@@ -42,7 +42,7 @@ package com.codename1.ui.layouts.mig;
  * <pre>
  * {@code
  * if (adjacentComp == null || adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.TOP)
- * 	  return null;
+ *       return null;
  *
  * boolean isHor = (adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.RIGHT);
  *

@@ -25,6 +25,7 @@
 package com.codename1.io;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.l10n.ParseException;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -1401,8 +1402,8 @@ public class ConnectionRequest implements IOProgressListener {
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat(format);
                 return sdf.parse(date);
-            } catch (Throwable t) {
-                Log.e(t);
+            } catch (ParseException t) { // NOPMD EmptyCatchBlock
+                // swallow the exception
             }
         }
         return null;

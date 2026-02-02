@@ -365,7 +365,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             case Component.BOTTOM:
                 return coord + parentDim - elemDim;
             //case Component.LEFT: case Component.TOP:
-            //	return coord;
+            //    return coord;
             default:
                 return coord;
         }
@@ -749,7 +749,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         }
 
         Style s = getStyle();
-        int padLeft = s.getPaddingLeft(isRTL());//s.getPaddingLeftNoRTL();
+        int padLeft = s.getPaddingLeft(isRTL()); //s.getPaddingLeftNoRTL();
         int padRight = s.getPaddingRight(isRTL());
         int padTop = s.getPaddingTop();
         int padBot = s.getPaddingBottom();
@@ -991,8 +991,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      */
     @Override
     public String[] getPropertyNames() {
-        return new String[]{
-                "value",};
+        return new String[] {"value"};
     }
 
     /**
@@ -1026,8 +1025,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      */
     @Override
     public Class[] getPropertyTypes() {
-        return new Class[]{
-                Boolean.class,};
+        return new Class[] { Boolean.class };
     }
 
     /**

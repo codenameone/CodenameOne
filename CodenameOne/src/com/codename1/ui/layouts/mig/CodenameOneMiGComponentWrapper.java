@@ -139,15 +139,15 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     public final float getPixelUnitFactor(boolean isHor) {
         switch (PlatformDefaults.getLogicalPixelBase()) {
             case PlatformDefaults.BASE_FONT_SIZE:
-				/*Font font = c.getFont();
-				FontMetrics fm = c.getFontMetrics(font != null ? font : SUBST_FONT);
-				Point.Float p = FM_MAP.get(fm);
-				if (p == null) {
-					Rectangle2D r = fm.getStringBounds("X", c.getGraphics());
-					p = new Point.Float(((float) r.getWidth()) / 6f, ((float) r.getHeight()) / 13.27734375f);
-					FM_MAP.put(fm, p);
-				}
-				return isHor ? p.x : p.y;*/
+                /*Font font = c.getFont();
+                FontMetrics fm = c.getFontMetrics(font != null ? font : SUBST_FONT);
+                Point.Float p = FM_MAP.get(fm);
+                if (p == null) {
+                    Rectangle2D r = fm.getStringBounds("X", c.getGraphics());
+                    p = new Point.Float(((float) r.getWidth()) / 6f, ((float) r.getHeight()) / 13.27734375f);
+                    FM_MAP.put(fm, p);
+                }
+                return isHor ? p.x : p.y;*/
                 return isHor ? ((float) SUBST_FONT.charWidth('X')) / 6f : ((float) SUBST_FONT.getHeight() / 13.27734375f);
 
             case PlatformDefaults.BASE_SCALE_FACTOR:
@@ -295,24 +295,24 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
 
     @Override
     public final void paintDebugOutline(boolean showVisualPadding) {
-		/*if (c.isShowing() == false)
-			return;
+        /*if (c.isShowing() == false)
+            return;
 
-		Graphics2D g = (Graphics2D) c.getGraphics();
-		if (g == null)
-			return;
+        Graphics2D g = (Graphics2D) c.getGraphics();
+        if (g == null)
+            return;
 
-		g.setPaint(DB_COMP_OUTLINE);
-		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 10f, new float[] {2f, 4f}, 0));
-		g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+        g.setPaint(DB_COMP_OUTLINE);
+        g.setStroke(new BasicStroke(1f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 10f, new float[] {2f, 4f}, 0));
+        g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
 
-		if (showVisualPadding && isVisualPaddingEnabled()) {
-			int[] padding = getVisualPadding();
-			if (padding != null) {
-				g.setColor(Color.GREEN);
-				g.drawRect(padding[1], padding[0], (getWidth() - 1) - (padding[1] + padding[3]), (getHeight() - 1) - (padding[0] + padding[2]));
-			}
-		}*/
+        if (showVisualPadding && isVisualPaddingEnabled()) {
+            int[] padding = getVisualPadding();
+            if (padding != null) {
+                g.setColor(Color.GREEN);
+                g.drawRect(padding[1], padding[0], (getWidth() - 1) - (padding[1] + padding[3]), (getHeight() - 1) - (padding[0] + padding[2]));
+            }
+        }*/
     }
 
     @Override
