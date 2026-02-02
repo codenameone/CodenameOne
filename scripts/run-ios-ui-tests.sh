@@ -85,7 +85,11 @@ TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 
 SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
 RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
-DOWNLOAD_PLATFORMS="${XCODE_DOWNLOAD_PLATFORMS:-false}"
+DOWNLOAD_PLATFORMS="${XCODE_DOWNLOAD_PLATFORMS:-}"
+if [ -z "$DOWNLOAD_PLATFORMS" ] && [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
+  DOWNLOAD_PLATFORMS="true"
+fi
+DOWNLOAD_PLATFORMS="${DOWNLOAD_PLATFORMS:-false}"
 ri_log "XCODE_DOWNLOAD_PLATFORMS=${DOWNLOAD_PLATFORMS}"
 
 if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator" || ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
