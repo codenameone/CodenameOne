@@ -54,9 +54,11 @@ import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 
 import javafx.scene.web.WebEngine;
+import javafx.scene.web.PopupFeatures;
 //import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
+import javafx.util.Callback;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -89,6 +91,7 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
     private AdjustmentListener adjustmentListener;
     private BrowserComponent browserComp;
     private boolean transparent;
+    private boolean followTargetBlank = true;
     
     /**
      * A bridge to inject java methods into the webview.
@@ -343,6 +346,17 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
                 }
             }
             
+        });
+
+        self.web.getEngine().setCreatePopupHandler(new Callback<PopupFeatures, WebEngine>() {
+            @Override
+            public WebEngine call(PopupFeatures features) {
+                SEBrowserComponent self = weakSelf.get();
+                if (self == null || !self.followTargetBlank) {
+                    return null;
+                }
+                return self.web.getEngine();
+            }
         });
         
         self.web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
@@ -840,6 +854,9 @@ public class SEBrowserComponent extends PeerComponent implements IBrowserCompone
     public void setProperty(String key, Object value) {
         if(key.equalsIgnoreCase("User-Agent")) {
             //web.getEngine().setUserAgent((String)value);
+        }
+        if (BrowserComponent.BROWSER_PROPERTY_FOLLOW_TARGET_BLANK.equals(key)) {
+            followTargetBlank = Boolean.TRUE.equals(value);
         }
     }
 

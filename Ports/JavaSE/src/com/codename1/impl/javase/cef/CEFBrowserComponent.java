@@ -455,6 +455,9 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         if(key.equalsIgnoreCase("User-Agent")) {
             //panel.getBrowser().getClient().
         }
+        if (BrowserComponent.BROWSER_PROPERTY_FOLLOW_TARGET_BLANK.equals(key)) {
+            panel.setFollowTargetBlank(Boolean.TRUE.equals(value));
+        }
     }
 
     @Override

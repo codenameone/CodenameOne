@@ -27,6 +27,7 @@
 #include "com_codename1_ui_BrowserComponent.h"
 #include "xmlvm.h"
 #import "CodenameOne_GLViewController.h"
+#import <objc/runtime.h>
 
 #ifdef CN1_USE_JAVASCRIPTCORE
 #import <JavaScriptCore/JSContext.h>
@@ -91,6 +92,14 @@ extern int connections;
 #endif
 
 #ifdef ENABLE_WKWEBVIEW
+- (BOOL)shouldFollowTargetBlank:(id)webView {
+    NSNumber *value = objc_getAssociatedObject(webView, @selector(cn1FollowTargetBlank));
+    if (value == nil) {
+        return YES;
+    }
+    return [value boolValue];
+}
+
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
          connections--;
      if(connections < 1) {
@@ -110,7 +119,12 @@ extern int connections;
     //NSLog(@"Firing navigation callback: %@", navigationAction.request.URL.absoluteString );
     JAVA_BOOLEAN result = com_codename1_ui_BrowserComponent_fireBrowserNavigationCallbacks___java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG navigationAction.request.URL.absoluteString.UTF8String));
     if(result) {
-        decisionHandler(WKNavigationActionPolicyAllow);
+        if (navigationAction.targetFrame == nil && [self shouldFollowTargetBlank:webView]) {
+            [webView loadRequest:navigationAction.request];
+            decisionHandler(WKNavigationActionPolicyCancel);
+        } else {
+            decisionHandler(WKNavigationActionPolicyAllow);
+        }
         com_codename1_impl_ios_IOSImplementation_fireWebViewDidStartLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG navigationAction.request.URL.absoluteString.UTF8String));
     } else {
         decisionHandler(WKNavigationActionPolicyCancel);
