@@ -318,7 +318,7 @@ jacoco {
     classDirectories.from({
         configurations.debugRuntimeClasspath
             .filter { it.name.endsWith('.jar') }
-            .collect { zipTree(it) }
+            .collect { zipTree(it).matching { exclude '**/kotlin/coroutines/jvm/internal/**' } }
     })
 
     sourceDirectories.setFrom(files("src/main/java"))
