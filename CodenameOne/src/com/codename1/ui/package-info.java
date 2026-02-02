@@ -1,0 +1,425 @@
+/**
+ * <p>
+ *     Main widget package containing the component/container "composite" similar
+ *     both in terminology and design to Swing/AWT.
+ * </p>
+ * <h2>Component/Container Relationship</h2>
+ * <p>
+ *     Containers can be nested one within the other to form elaborate UI's. Containers use
+ *     {@link com.codename1.ui.layouts} to arrange the components within. This is important
+ *     as it allows a container can adapt to changing resolution, DPI, orientation, font size etc.
+ * </p>
+ * <img alt="Component/Container Relationship Diagram"
+ *      src="https://www.codenameone.com/img/developer-guide/component-uml.png"/>
+ * <p>
+ *     A container doesn't implicitly reflow its elements and in that regard follows the direction of AWT/Swing. As
+ *     a result the layout can be animated to create a flowing effect for UI changes. This also provides improved
+ *     performance as a bonus. See this sample of {@code Container} animation:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
+ *
+ * <p>
+ *     You can learn more about layout managers {@link com.codename1.ui.layouts here} and about
+ *     event handling {@link com.codename1.ui.events here}.
+ * </p>
+ *
+ * <h2>Component Gallery</h2>
+ * <p>
+ *     The component gallery below isn't complete or exhaustive but it should give you a sense of the
+ *     types of widgets available within Codename One in a glance.
+ * </p>
+ *
+ *
+ * <div class="img">
+ *     <h3>AutoCompleteTextField</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-autocomplete.png" target="_blank">
+ *         <img alt="Simple usage of auto complete"
+ *              src="https://www.codenameone.com/img/thumb/components-autocomplete.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.AutoCompleteTextField} provides suggestions as you type into the text
+ *         field
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>BrowserComponent</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-browsercomponent.png" target="_blank">
+ *         <img alt="Simple usage of BrowserComponent"
+ *              src="https://www.codenameone.com/img/thumb/components-browsercomponent.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.BrowserComponent} allows us to embed an OS native browser into the app and
+ *         connect to its JavaScript runtime!
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Button</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-button.png" target="_blank">
+ *         <img alt="Simple Button" src="https://www.codenameone.com/img/thumb/components-button.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Button} allows us to bind events to a click</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Link Button</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-link-button.png" target="_blank">
+ *         <img alt="Hyperlink Button" src="https://www.codenameone.com/img/thumb/components-link-button.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Button} can also be used as a hyperlink</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Calendar</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-calendar.png" target="_blank">
+ *         <img alt="Default calendar look" src="https://www.codenameone.com/img/thumb/components-calendar.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Calendar} presents a visual date picker. Notice that we recommend using
+ *         the
+ *         {@link com.codename1.ui.spinner.Picker} class which is superior when running on the device for most use cases.
+ *     </div>
+ * </div>
+ *
+ *
+ * <div class="img">
+ *     <h3>CheckBox</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" target="_blank">
+ *         <img alt="Sample usage of CheckBox/RadioButton/ButtonGroup"
+ *              src="https://www.codenameone.com/img/thumb/components-radiobutton-checkbox.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.CheckBox} provides a check flag to tick on/off.
+ *         {@link com.codename1.ui.RadioButton} provides an exclusive check marking that only applies to one radio within
+ *         the group.
+ *         Both can also appear as toggle buttons
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>ComboBox</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-combobox.png" target="_blank">
+ *         <img alt="Rich ComboBox" src="https://www.codenameone.com/img/thumb/components-combobox.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.ComboBox} is a list with a single visible entry that can popup the full
+ *         list. Notice that we recommend using the
+ *         {@link com.codename1.ui.spinner.Picker} class which is superior when running on the device for most use cases
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Command</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-toolbar.png" target="_blank">
+ *         <img alt="Simple usage of Toolbar" src="https://www.codenameone.com/img/thumb/components-toolbar.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Command} &amp; {@link com.codename1.ui.Toolbar} provide deep customization
+ *         of the title area and allow us to place elements in the side menu (hamburger), overflow menu etc.
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>ComponentGroup</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-componentgroup.png" target="_blank">
+ *         <img alt="Sample ComponentGroup Grouping"
+ *              src="https://www.codenameone.com/img/thumb/components-componentgroup.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.ComponentGroup} allows us to group components together in a a group and
+ *         manipulate
+ *         their UIID's.
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Dialog</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-dialog-modal-south.png" target="_blank">
+ *         <img alt="Dialog South" src="https://www.codenameone.com/img/thumb/components-dialog-modal-south.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Dialog} allows us to notify/ask the user in a modal/modless way.</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>InfiniteContainer</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" target="_blank">
+ *         <img alt="Sample usage of infinite scroll adapter"
+ *              src="https://www.codenameone.com/img/thumb/components-infinitescrolladapter.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.InfiniteContainer} &amp; {@link
+ *         com.codename1.components.InfiniteScrollAdapter}
+ *         implement a {@link com.codename1.ui.Container} that can dynamically fetch more data
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Label</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-label-text-position.png" target="_blank">
+ *         <img alt="Label text positioning"
+ *              src="https://www.codenameone.com/img/thumb/components-label-text-position.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Label} displays text and/or icons to the user</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>List</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-generic-list-cell-renderer.png" target="_blank">
+ *         <img alt="Sample of using the generic list cell renderer"
+ *              src="https://www.codenameone.com/img/thumb/components-generic-list-cell-renderer.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.List} a list of items, this is a rather elaborate component to work with!
+ *         We often
+ *         recommend just using {@link com.codename1.ui.Container}, {@link com.codename1.ui.InfiniteContainer} or
+ *         {@link com.codename1.components.InfiniteScrollAdapter}
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>MultiList</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/graphics-urlimage-multilist.png" target="_blank">
+ *         <img alt="MultiList and model in action"
+ *              src="https://www.codenameone.com/img/thumb/graphics-urlimage-multilist.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.list.MultiList} a list that is a bit simpler to work with than List {@link
+ *         com.codename1.ui.List} although
+ *         our recommendation to use something else still applies
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Slider</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-slider.png" target="_blank">
+ *         <img alt="Sample Slider" src="https://www.codenameone.com/img/thumb/components-slider.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Slider} allows us to indicate progress or allows the user to drag a bar to
+ *         indicate
+ *         volume (as in quantity)
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>SwipeableContainer</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-swipablecontainer.png" target="_blank">
+ *         <img alt="Swipeable Container" src="https://www.codenameone.com/img/thumb/components-swipablecontainer.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.SwipeableContainer} enables side swipe gesture to expose additional
+ *         functionality
+ *     </div>
+ * </div>
+ *
+ *
+ * <div class="img">
+ *     <h3>Tabs</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-tabs.png" target="_blank">
+ *         <img alt="Simple usage of Tabs" src="https://www.codenameone.com/img/thumb/components-tabs.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Tabs} places components/containers into tabbable entries, allows swiping
+ *         between choices thru touch
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Carousel</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-tabs-swipe1.png" target="_blank">
+ *         <img alt="Tabs carousel page 1" src="https://www.codenameone.com/img/thumb/components-tabs-swipe1.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.Tabs} can also be used as a swipe carousel</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>TextArea/Field</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-text-component.png" target="_blank">
+ *         <img alt="Text field input sample" src="https://www.codenameone.com/img/thumb/components-text-component.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.TextArea} &amp; {@link com.codename1.ui.TextField} allow for user input
+ *         via
+ *         the keyboard (virtual or otherwise)
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>TextComponent</h3>
+ *     <a href="https://www.codenameone.com/img/blog/pixel-perfect-text-field-android-codenameone-font.png"
+ *        target="_blank">
+ *         <img alt="Text field input sample"
+ *              src="https://www.codenameone.com/img/developer-guide/components-textcomponent.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.TextComponent} &amp; {@link com.codename1.ui.PickerComponent} wrap the
+ *         text field and picker respectively and adapt them better to iOS/Android conventions
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Table</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png" target="_blank">
+ *         <img alt="Table with customize cells using the pinstripe effect"
+ *              src="https://www.codenameone.com/img/thumb/components-table-pinstripe.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.table.Table} displays optionally editable tabular data to the user</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Tree</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" target="_blank">
+ *         <img alt="Tree with XML data" src="https://www.codenameone.com/img/thumb/components-tree-xml.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.tree.Tree} displays data in a tree like hierarchy</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>ChartComponent</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/range_bar_chart.png" target="_blank">
+ *         <img alt="Chart Component" src="https://www.codenameone.com/img/thumb/range_bar_chart.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.charts.ChartComponent} can embed a wide range of visualization aids and
+ *         animations into your app
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>ImageViewer</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png" target="_blank">
+ *         <img alt="Image viewer with dynamic URL fetching model"
+ *              src="https://www.codenameone.com/img/thumb/components-imageviewer-dynamic.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.ImageViewer} swipe, pinch to zoom and pan images</div>
+ * </div>
+ *
+ *
+ * <div class="img">
+ *     <h3>InfiniteProgress</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/infinite-progress.png" target="_blank">
+ *         <img alt="InfiniteProgress" src="https://www.codenameone.com/img/thumb/infinite-progress.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.InfiniteProgress} provides a constantly spinning component</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>InteractionDialog</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-interaction-dialog.png" target="_blank">
+ *         <img alt="InteractionDialog Sample"
+ *              src="https://www.codenameone.com/img/thumb/components-interaction-dialog.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.InteractionDialog} an "always on top" {@link
+ *         com.codename1.ui.Dialog}
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>MediaPlayer</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" target="_blank">
+ *         <img alt="Media player sample" src="https://www.codenameone.com/img/thumb/components-mediaplayer.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.MediaPlayer} allows playing media including video coupled with the
+ *         {@link com.codename1.media.MediaManager}
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>MultiButton</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-multibutton.png" target="_blank">
+ *         <img alt="MultiButton usages Sample" src="https://www.codenameone.com/img/thumb/components-multibutton.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.MultiButton} is much more than a button</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>OnOffSwitch</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-onoffswitch.png" target="_blank">
+ *         <img alt="The looks of the on-off switch"
+ *              src="https://www.codenameone.com/img/thumb/components-onoffswitch.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.OnOffSwitch} allows us to toggle a state similar to the {@link
+ *         com.codename1.ui.CheckBox}
+ *         but with a more modern look
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>ShareButton</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-sharebutton-android.png" target="_blank">
+ *         <img alt="Share on the device" src="https://www.codenameone.com/img/thumb/components-sharebutton-android.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.ShareButton} provides native "social share" functionality</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>SpanLabel</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-spanlabel.png" target="_blank">
+ *         <img alt="SpanLabel Sample" src="https://www.codenameone.com/img/thumb/components-spanlabel.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.SpanLabel} a text label that "seamlessly" breaks lines</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>SpanButton</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-spanbutton.png" target="_blank">
+ *         <img alt="SpanButton Sample" src="https://www.codenameone.com/img/thumb/components-spanbutton.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.SpanButton} a button that "seamlessly" breaks lines</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Picker (Date)</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-picker-date-android.png" target="_blank">
+ *         <img alt="Android native date picker"
+ *              src="https://www.codenameone.com/img/thumb/components-picker-date-android.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.spinner.Picker} allows us to show an OS native picker UI (Date Picker)
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Picker (Time)</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-picker-time-android.png" target="_blank">
+ *         <img alt="Android native time picker"
+ *              src="https://www.codenameone.com/img/thumb/components-picker-time-android.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.ui.spinner.Picker} allows us to show an OS native picker UI (Time Picker)
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>ToastBar</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-statusbar.png" target="_blank">
+ *         <img alt="Android native time picker" src="https://www.codenameone.com/img/thumb/components-statusbar.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.ToastBar} shows a non-obtrusive notice on the bottom of the {@code
+ *         Form}
+ *     </div>
+ * </div>
+ *
+ *
+ * <div class="img">
+ *     <h3>SignatureComponent</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-signature2.png" target="_blank">
+ *         <img alt="Signature Component" src="https://www.codenameone.com/img/thumb/components-signature2.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.SignatureComponent} shows a dialog that allows the user to "sign"
+ *         using the touch screen
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>Accordion</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-accordion.png" target="_blank">
+ *         <img alt="Accordion Component" src="https://www.codenameone.com/img/thumb/components-accordion.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.Accordion} displays collapsible content panels</div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>FloatingHint</h3>
+ *     <a href="https://www.codenameone.com/img/developer-guide/components-floatinghint.png" target="_blank">
+ *         <img alt="FloatingHint Component" src="https://www.codenameone.com/img/thumb/components-floatinghint.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.FloatingHint} animates the text field hint into a label on top of
+ *         the text field and visa versa
+ *     </div>
+ * </div>
+ *
+ * <div class="img">
+ *     <h3>FloatingActionButton</h3>
+ *     <a href="http://www.codenameone.com/img/blog/floating-action.png" target="_blank">
+ *         <img alt="FloatingActionButton Component" src="https://www.codenameone.com/img/thumb/floating-action.png">
+ *     </a>
+ *     <div class="desc">{@link com.codename1.components.FloatingActionButton} hovers over the UI presenting a default
+ *         action
+ *     </div>
+ * </div>
+ */
+package com.codename1.ui;

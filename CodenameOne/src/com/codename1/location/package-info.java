@@ -1,0 +1,29 @@
+/* 
+    Document   : package
+    Created on : Oct 11, 2007, 10:38:26 AM
+    Author     : Shai Almog
+*/
+
+/**
+ * <p>
+ *     Abstraction of location services (GPS/Geofencing etc.) providing user global positioning and monitoring over
+ *     such changes both in the foreground and background.
+ * </p>
+ *
+ * <p>
+ *     Trivial one time usage of location data can look like this sample:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5c2f411e1687793409d5.js"></script>
+ *
+ * <p>
+ *     You can also track location in the foreground using API calls like this:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/9dc822cf80cc8bf3a6cc.js"></script>
+ *
+ * <p>
+ *     Geofencing allows tracking whether a user entered a specific region, this can work when the app is completely
+ *     in the background and is very efficient in terms of battery life:
+ * </p>
+ * <script src="https://gist.github.com/shannah/a5592313da97e085822120af16518874.js"></script>
+ */
+package com.codename1.location;
