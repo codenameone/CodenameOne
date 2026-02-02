@@ -303,6 +303,7 @@ jacoco {
             '**/BuildConfig.*',
             '**/Manifest*.*',
             '**/*Test*.*',
+            '**/kotlin/coroutines/jvm/internal/**',
             '**/androidx/**/*',
             '**/com/google/**/*'
     ]
