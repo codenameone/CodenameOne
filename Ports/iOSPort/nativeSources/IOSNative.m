@@ -28,6 +28,7 @@
 #include "xmlvm.h"
 #include "java_lang_String.h"
 #import "CN1ES2compat.h"
+#import <objc/runtime.h>
 
 #ifndef NEW_CODENAME_ONE_VM
 #include "xmlvm-util.h"
@@ -2482,6 +2483,18 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(CN1_THREAD_STATE_MULTI_A
 #ifndef NO_UIWEBVIEW
 UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
 #endif
+static void cn1_setBrowserFollowTargetBlank(id webView, BOOL follow) {
+    objc_setAssociatedObject(webView, @selector(cn1FollowTargetBlank), [NSNumber numberWithBool:follow], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+static BOOL cn1_shouldFollowTargetBlank(id webView) {
+    NSNumber *value = objc_getAssociatedObject(webView, @selector(cn1FollowTargetBlank));
+    if (value == nil) {
+        return YES;
+    }
+    return [value boolValue];
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
 #ifndef NO_UIWEBVIEW
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -2493,6 +2506,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Ob
         com_codename1_impl_ios_IOSNative_createBrowserComponent.delegate = del;
         com_codename1_impl_ios_IOSNative_createBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
         [com_codename1_impl_ios_IOSNative_createBrowserComponent setAllowsInlineMediaPlayback:YES];
+        cn1_setBrowserFollowTargetBlank(com_codename1_impl_ios_IOSNative_createBrowserComponent, YES);
 #ifndef CN1_USE_ARC
         [com_codename1_impl_ios_IOSNative_createBrowserComponent retain];
 #endif
@@ -2536,6 +2550,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
+            cn1_setBrowserFollowTargetBlank(com_codename1_impl_ios_IOSNative_createWKBrowserComponent, YES);
 
             if (getBooleanClientProperty(CN1_THREAD_GET_STATE_PASS_ARG obj, @"BrowserComponent.ios.debug")) {
                 com_codename1_impl_ios_IOSNative_createWKBrowserComponent.inspectable = YES;
@@ -2596,6 +2611,24 @@ void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_Strin
         POOL_END();
     });
 #endif
+}
+
+void com_codename1_impl_ios_IOSNative_setBrowserFollowTargetBlank___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN follow) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if (isWKWebView(peer)) {
+#ifdef supportsWKWebKit
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
+            cn1_setBrowserFollowTargetBlank(w, follow);
+#endif
+        } else {
+#ifndef NO_UIWEBVIEW
+            UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            cn1_setBrowserFollowTargetBlank(w, follow);
+#endif
+        }
+        POOL_END();
+    });
 }
 
 

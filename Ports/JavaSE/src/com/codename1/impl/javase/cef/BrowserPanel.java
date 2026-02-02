@@ -84,6 +84,7 @@ public abstract class BrowserPanel extends CN1JPanel {
     //private CEFPeerComponentBuffer buffer_;
     private boolean browserFocus_ = true;
     private Runnable readyCallback;
+    private boolean followTargetBlank = true;
     //private static AppHandler appHandler_;
     //private BrowserComponent browserComponent;
     
@@ -426,6 +427,18 @@ public abstract class BrowserPanel extends CN1JPanel {
         final WeakReference<BrowserPanel> selfRef = new WeakReference<BrowserPanel>(p);
         return new CefLifeSpanHandlerAdapter() {
             @Override
+            public boolean onBeforePopup(CefBrowser browser, CefFrame frame, String targetUrl, String targetFrameName) {
+                BrowserPanel self = selfRef.get();
+                if (self == null || !self.followTargetBlank) {
+                    return false;
+                }
+                if (targetUrl != null) {
+                    browser.loadURL(targetUrl);
+                }
+                return true;
+            }
+
+            @Override
             public void onAfterCreated(CefBrowser browser) {
                 BrowserPanel self = selfRef.get();
                 if (self == null) {
@@ -464,6 +477,14 @@ public abstract class BrowserPanel extends CN1JPanel {
                 }
             }
         };
+    }
+
+    public void setFollowTargetBlank(boolean followTargetBlank) {
+        this.followTargetBlank = followTargetBlank;
+    }
+
+    public boolean isFollowTargetBlank() {
+        return followTargetBlank;
     }
     
     public void setBrowser(CefBrowser browser) {

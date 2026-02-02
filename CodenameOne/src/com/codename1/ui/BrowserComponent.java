@@ -85,6 +85,11 @@ import java.util.Vector;
  */
 public class BrowserComponent extends Container {
     /**
+     * Browser property key to control whether links with {@code target="_blank"} or {@code target="_new"}
+     * should be followed in the current browser view. Defaults to {@code true}.
+     */
+    public static final String BROWSER_PROPERTY_FOLLOW_TARGET_BLANK = "BrowserComponent.followTargetBlank";
+    /**
      * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
      */
     public static final String onStart = "onStart";

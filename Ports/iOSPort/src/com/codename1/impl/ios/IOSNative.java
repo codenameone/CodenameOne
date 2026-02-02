@@ -213,6 +213,7 @@ public final class IOSNative {
     native void setBrowserURL(long browserPeer, String url, String[] keys, String[] values);
     
     native void setBrowserUserAgent(long browserPeer, String ua);
+    native void setBrowserFollowTargetBlank(long browserPeer, boolean follow);
     
     native void browserBack(long browserPeer);
     native void browserStop(long browserPeer);

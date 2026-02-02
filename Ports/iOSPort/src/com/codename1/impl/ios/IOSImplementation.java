@@ -6893,6 +6893,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.setBrowserUserAgent(datePickerResult, (String)value);
             return;
         }
+        if (BrowserComponent.BROWSER_PROPERTY_FOLLOW_TARGET_BLANK.equals(key)) {
+            nativeInstance.setBrowserFollowTargetBlank(get(browserPeer), Boolean.TRUE.equals(value));
+        }
     }
 
     /**
@@ -9536,4 +9539,3 @@ public class IOSImplementation extends CodenameOneImplementation {
         IOSNative.announceForAccessibility(text);
     }
 }
-
