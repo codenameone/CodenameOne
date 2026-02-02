@@ -1,0 +1,49 @@
+name: Build JavaDocs
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - main
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+jobs:
+  build-javadocs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Capture Java 25 path
+        run: echo "JDK_25_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Build JavaDocs
+        run: ./.github/scripts/build_javadocs.sh
+
+      - name: Verify JavaDocs archive
+        run: test -f CodenameOne/javadocs.zip
+
+      - name: Upload JavaDocs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodenameOne-javadocs
+          path: CodenameOne/javadocs.zip
+
+      - name: Attach JavaDocs to release
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            CodenameOne/javadocs.zip

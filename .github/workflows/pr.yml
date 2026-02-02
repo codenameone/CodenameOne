@@ -262,34 +262,7 @@ jobs:
 
       - name: Build JavaDocs
         if: matrix.java-version == 8
-        run: |
-          cd CodenameOne
-          mkdir -p build
-          mkdir -p build/tempJavaSources
-          mkdir -p dist
-          mkdir -p dist/javadoc
-          # Skip JavaDocSourceEmbed due to gist access issues in CI
-          cp -r src/* build/tempJavaSources/
-          # Provide a minimal ImplementationFactory stub for Javadoc type resolution on JDK 25.
-          cat > build/tempJavaSources/com/codename1/impl/ImplementationFactory.java <<'EOF'
-          package com.codename1.impl;
-
-          public class ImplementationFactory {
-              public static ImplementationFactory getInstance() {
-                  return null;
-              }
-
-              public Object createImplementation() {
-                  return null;
-              }
-          }
-          EOF
-          # Suppress doclint noise on modern JDKs (e.g., Java 25) while keeping output consistent.
-          # Exclude CLDC11 java.* stubs to avoid module conflicts on modern JDKs.
-          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" -not -path "../Ports/CLDC11/src/java/*" | /usr/bin/xargs javadoc --allow-script-in-comments --release 8 -exclude com.codename1.impl -Xdoclint:none -quiet -protected -d dist/javadoc -windowtitle "Codename One API" || true
-          cd dist/javadoc
-          zip -r ../../javadocs.zip *
-          cd ..
+        run: ./.github/scripts/build_javadocs.sh
 
       - name: Restore Java 8 after JavaDocs
         if: matrix.java-version == 8
