@@ -82,10 +82,10 @@
  * <p>If a document is ordered, you might want to select nodes by their position, for example:</p>
  * <script src="https://gist.github.com/codenameone/36174cb1e0db7539f46f.js"></script>
  *
- * <p>It is also possible to select parent nodes, by using the �..' expression. For example:</p>
+ * <p>It is also possible to select parent nodes, by using the '..' expression. For example:</p>
  * <script src="https://gist.github.com/codenameone/dac601cd4ce442e7d082.js"></script>
  *
- * <p>Above, we globally find a lastname element with a value of �Hewitt', then grab the parent node of
+ * <p>Above, we globally find a lastname element with a value of 'Hewitt', then grab the parent node of
  *     lastname which happens to be the player node, then grab the id attribute from the player node.
  *     Alternatively, you could get the same result from the following simpler statement:</p>
  *

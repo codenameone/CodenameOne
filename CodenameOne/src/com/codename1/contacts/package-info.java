@@ -3,7 +3,7 @@
  *     Provides access to the contacts list from the device address book
  * </p>
  * <p>
- *     The contacts API provides us with the means to query the phone�s address book, delete elements from
+ *     The contacts API provides us with the means to query the phone's address book, delete elements from
  *     it and create new entries into it.
  * </p>
  * <p>
