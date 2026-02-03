@@ -239,4 +239,57 @@ SUMMARY_FILE="$ARTIFACTS_DIR/summary.txt"
 
 jd_log "Desktop device-runner artifacts stored in $ARTIFACTS_DIR"
 
-exit $SIM_EXIT_CODE
+SCREENSHOT_REF_DIR_BASE="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/android/screenshots}"
+SCREENSHOT_REF_DIR="$SCREENSHOT_REF_DIR_BASE"
+if [ -n "${CN1SS_ANDROID_BASELINE:-}" ]; then
+  SCREENSHOT_REF_DIR="$CN1SS_ANDROID_BASELINE"
+else
+  baseline_variant=""
+  if [ "$JAVA_VERSION_MAJOR" -ge 21 ]; then
+    baseline_variant="21"
+  elif [ "$JAVA_VERSION_MAJOR" -ge 17 ]; then
+    baseline_variant="17"
+  fi
+  if [ -n "$baseline_variant" ] && [ -d "$SCREENSHOT_REF_DIR_BASE/$baseline_variant" ]; then
+    SCREENSHOT_REF_DIR="$SCREENSHOT_REF_DIR_BASE/$baseline_variant"
+  fi
+fi
+jd_log "Using screenshot baseline directory: $SCREENSHOT_REF_DIR"
+
+COMPARE_ENTRIES=()
+for test in "${TEST_NAMES[@]}"; do
+  png_dest="$SCREENSHOT_DIR/${test}.png"
+  if [ -f "$png_dest" ]; then
+    COMPARE_ENTRIES+=("${test}=${png_dest}")
+  fi
+done
+
+COMPARE_JSON="$ARTIFACTS_DIR/screenshot-compare.json"
+SUMMARY_FILE="$ARTIFACTS_DIR/screenshot-summary.txt"
+COMMENT_FILE="$ARTIFACTS_DIR/screenshot-comment.md"
+
+export CN1SS_PREVIEW_DIR="$PREVIEW_DIR"
+export CN1SS_COMMENT_MARKER="<!-- CN1SS_JAVASE_COMMENT -->"
+export CN1SS_COMMENT_LOG_PREFIX="[run-javase-device-tests]"
+export CN1SS_PREVIEW_SUBDIR="javase"
+
+if [ "${#COMPARE_ENTRIES[@]}" -gt 0 ]; then
+  cn1ss_process_and_report \
+    "Java SE screenshot updates" \
+    "$COMPARE_JSON" \
+    "$SUMMARY_FILE" \
+    "$COMMENT_FILE" \
+    "$SCREENSHOT_REF_DIR" \
+    "$PREVIEW_DIR" \
+    "$ARTIFACTS_DIR" \
+    "${COMPARE_ENTRIES[@]}"
+  compare_rc=$?
+else
+  compare_rc=0
+fi
+
+if [ "$SIM_EXIT_CODE" -ne 0 ] && [ "$compare_rc" -eq 0 ]; then
+  exit "$SIM_EXIT_CODE"
+fi
+
+exit "$compare_rc"
