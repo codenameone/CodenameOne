@@ -3608,6 +3608,14 @@ public class AndroidGradleBuilder extends Executor {
             compileSdkVersion = "34";
             supportLibVersion = "28";
         }
+        if (buildToolsVersion.startsWith("35")) {
+            compileSdkVersion = "35";
+            supportLibVersion = "28";
+        }
+        if (buildToolsVersion.startsWith("36")) {
+            compileSdkVersion = "36";
+            supportLibVersion = "28";
+        }
         jcenter =
                 "      google()\n" +
                         "     jcenter()\n" +
@@ -3801,6 +3809,11 @@ public class AndroidGradleBuilder extends Executor {
         if (useAndroidX) {
             gradlePropertiesObject.setProperty("android.useAndroidX", "true");
             gradlePropertiesObject.setProperty("android.enableJetifier", "true");
+        }
+        Integer compileSdkInt = parseSdkInt(compileSdkVersion);
+        if (compileSdkInt != null && compileSdkInt >= 35) {
+            gradlePropertiesObject.setProperty("android.suppressUnsupportedCompileSdk", String.valueOf(compileSdkInt));
+            gradlePropertiesObject.setProperty("android.experimental.androidTest.useUnifiedTestPlatform", "false");
         }
 
         // Configure R8 optimization mode to prevent reflection issues
@@ -4534,6 +4547,21 @@ public class AndroidGradleBuilder extends Executor {
                 }
                 playServiceVersions.put(playServiceKey, playServiceValue);
             }
+        }
+    }
+
+    private Integer parseSdkInt(String value) {
+        if (value == null) {
+            return null;
+        }
+        String digits = value.replaceAll("\\D", "");
+        if (digits.isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
 
