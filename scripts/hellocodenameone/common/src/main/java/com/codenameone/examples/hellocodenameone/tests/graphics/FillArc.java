@@ -10,7 +10,12 @@ public class FillArc extends AbstractGraphicsScreenshotTest {
         g.setColor(0xffffff);
         for (int iter = 0 ; iter < bounds.getWidth() / 2 ; iter++) {
             nextColor(g);
-            g.fillArc(bounds.getX() + iter, bounds.getY() + iter, bounds.getX() + bounds.getWidth() - iter, bounds.getY() + bounds.getHeight() + iter, iter, 180);
+            int width = bounds.getWidth() - (iter * 2);
+            int height = bounds.getHeight() - (iter * 2);
+            if (width <= 0 || height <= 0) {
+                break;
+            }
+            g.fillArc(bounds.getX() + iter, bounds.getY() + iter, width, height, iter, 180);
         }
     }
 
