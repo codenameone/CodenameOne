@@ -129,8 +129,8 @@ public final class StreamCharacterIterator implements CharacterIterator {
         int i = n;
         while (--i >= 0) {
             c = is.read();
-            if (c < 0) // EOF
-            {
+            if (c < 0) {
+                // EOF
                 closed = true;
                 break;
             }

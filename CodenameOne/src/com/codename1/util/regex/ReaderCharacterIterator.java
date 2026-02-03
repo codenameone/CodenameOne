@@ -130,8 +130,8 @@ public final class ReaderCharacterIterator implements CharacterIterator {
 
         do {
             read = reader.read(c);
-            if (read < 0) // EOF
-            {
+            if (read < 0) {
+                // EOF
                 closed = true;
                 break;
             }

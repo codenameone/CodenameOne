@@ -688,8 +688,7 @@ public abstract class Purchase {
                     && r.getPurchaseDate().getTime() <= publishDate.getTime()
                     && r.getExpiryDate().getTime() >= publishDate.getTime()
                     && (r.getCancellationDate() == null
-                    || r.getCancellationDate().getTime() >= publishDate.getTime()
-            )) {
+                    || r.getCancellationDate().getTime() >= publishDate.getTime())) {
                 // Exact match in range.
                 return r;
             }

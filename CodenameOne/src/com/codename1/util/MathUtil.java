@@ -51,8 +51,8 @@ public abstract class MathUtil {
     private static final double pio2_hi = 1.57079632679489655800e+00, /* 0x3FF921FB, 0x54442D18 */
             pio2_lo = 6.12323399573676603587e-17, /* 0x3C91A626, 0x33145C07 */
             pio4_hi = 7.85398163397448278999e-01, /* 0x3FE921FB, 0x54442D18 */
-    /* coefficient for R(x^2) */
-    pS0 = 1.66666666666666657415e-01, /* 0x3FC55555, 0x55555555 */
+            /* coefficient for R(x^2) */
+            pS0 = 1.66666666666666657415e-01, /* 0x3FC55555, 0x55555555 */
             pS1 = -3.25565818622400915405e-01, /* 0xBFD4D612, 0x03EB6F7D */
             pS2 = 2.01212532134862925881e-01, /* 0x3FC9C155, 0x0E884455 */
             pS3 = -4.00555345006794114027e-02, /* 0xBFA48228, 0xB5688F3B */
@@ -823,8 +823,7 @@ public abstract class MathUtil {
         j += (n << 20);
         if ((j >> 20) <= 0) {
             z = scalb(z, n); /* subnormal output */
-        } else //__HI(z) = j;
-        {
+        } else { //__HI(z) = j;
             z = Double.longBitsToDouble(((long) j << HI_SHIFT) | (Double.doubleToLongBits(z) & LO_MASK));
         }
         return s * z;

@@ -260,8 +260,8 @@ public final class LayoutUtil {
                     float totWeight = 0f;
                     Float[] resizeWeight = new Float[sizes.length];
                     for (int i = 0; i < sizes.length; i++) {
-                        if (sizes[i] == null)   // if no min/pref/max size at all do not grow or shrink.
-                        {
+                        if (sizes[i] == null) {
+                            // if no min/pref/max size at all do not grow or shrink.
                             continue;
                         }
 

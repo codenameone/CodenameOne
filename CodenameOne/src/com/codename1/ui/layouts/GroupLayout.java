@@ -1431,8 +1431,7 @@ public class GroupLayout extends Layout {
         void setSize(int axis, int origin, int size) {
             super.setSize(axis, origin, size);
             if (size == UNSET) {
-                for (int counter = springs.size() - 1; counter >= 0;
-                     counter--) {
+                for (int counter = springs.size() - 1; counter >= 0; counter--) {
                     getSpring(counter).setSize(axis, origin, size);
                 }
             } else {
@@ -1893,8 +1892,7 @@ public class GroupLayout extends Layout {
         void setValidSize(int axis, int origin, int size) {
             int pref = getPreferredSize(axis);
             if (size == pref) {
-                for (int counter = 0, max = springs.size(); counter < max;
-                     counter++) {
+                for (int counter = 0, max = springs.size(); counter < max; counter++) {
                     Spring spring = getSpring(counter);
                     int springPref = spring.getPreferredSize(axis);
                     spring.setSize(axis, origin, springPref);

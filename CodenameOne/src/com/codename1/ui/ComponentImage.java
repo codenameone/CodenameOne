@@ -345,5 +345,4 @@ public class ComponentImage extends Image {
 
     }
 
-
 }

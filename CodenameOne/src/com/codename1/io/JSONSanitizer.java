@@ -479,69 +479,10 @@ final class JSONSanitizer {
                             break token_loop;
                         }
 
-                        // Strip trailing comma to convert {"a":0,} -> {"a":0}
-                        // and [1,2,3,] -> [1,2,3,]
-                        switch (state) {
-                            case BEFORE_VALUE:
-                                insert(i, "null");
-                                break;
-                            case BEFORE_ELEMENT:
-                            case BEFORE_KEY:
-                                elideTrailingComma(i);
-                                break;
-                            case AFTER_KEY:
-                                insert(i, ":null");
-                                break;
-                            case START_MAP:
-                            case START_ARRAY:
-                            case AFTER_ELEMENT:
-                            case AFTER_VALUE:
-                                break;
-                        }
-
-                        --bracketDepth;
-                        char closeBracket = isMap[bracketDepth] ? '}' : ']';
-                        if (ch != closeBracket) {
-                            replace(i, i + 1, closeBracket);
-                        }
-                        state = bracketDepth == 0 || !isMap[bracketDepth - 1]
-                                ? State.AFTER_ELEMENT : State.AFTER_VALUE;
+                        state = processClosingSquareBracket(state, i, ch);
                         break;
                     case ',':
-                        if (bracketDepth == 0) {
-                            throw new RuntimeException("Unbracketed comma");
-                        }
-                        // Convert comma elisions like [1,,3] to [1,null,3].
-                        // [1,,3] in JS is an array that has no element at index 1
-                        // according to the "in" operator so accessing index 1 will
-                        // yield the special value "undefined" which is equivalent to
-                        // JS's "null" value according to "==".
-                        switch (state) {
-                            // Normal
-                            case AFTER_ELEMENT:
-                                state = State.BEFORE_ELEMENT;
-                                break;
-                            case AFTER_VALUE:
-                                state = State.BEFORE_KEY;
-                                break;
-                            // Array elision.
-                            case START_ARRAY:
-                            case BEFORE_ELEMENT:
-                                insert(i, "null");
-                                state = State.BEFORE_ELEMENT;
-                                break;
-                            // Ignore
-                            case START_MAP:
-                            case BEFORE_KEY:
-                            case AFTER_KEY:
-                                elide(i, i + 1);
-                                break;
-                            // Supply missing value.
-                            case BEFORE_VALUE:
-                                insert(i, "null");
-                                state = State.BEFORE_KEY;
-                                break;
-                        }
+                        state = processComma(state, i);
                         break;
 
                     case ':':
@@ -553,39 +494,7 @@ final class JSONSanitizer {
                         break;
 
                     case '/':
-                        // Skip over JS-style comments since people like inserting them into
-                        // data files and getting huffy with Crockford when he says no to
-                        // versioning JSON to allow ignorable tokens.
-                        int end = i + 1;
-                        if (i + 1 < n) {
-                            switch (jsonish.charAt(i + 1)) {
-                                case '/':
-                                    end = n;  // Worst case.
-                                    for (int j = i + 2; j < n; ++j) {
-                                        char cch = jsonish.charAt(j);
-                                        if (cch == '\n' || cch == '\r'
-                                                || cch == '\u2028' || cch == '\u2029') {
-                                            end = j + 1;
-                                            break;
-                                        }
-                                    }
-                                    break;
-                                case '*':
-                                    end = n;
-                                    if (i + 3 < n) {
-                                        for (int j = i + 2;
-                                             (j = jsonish.indexOf('/', j + 1)) >= 0; ) { //NOPMD AssignmentInOperand
-                                            if (jsonish.charAt(j - 1) == '*') {
-                                                end = j + 1;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    break;
-                            }
-                        }
-                        elide(i, end);
-                        i = end - 1;
+                        i = processSlash(i, n);
                         break;
 
                     default:
@@ -707,6 +616,117 @@ final class JSONSanitizer {
                 sanitizedJson.append(isMap[--bracketDepth] ? '}' : ']');
             }
         }
+    }
+
+    private int processSlash(int i, int n) {
+        // Skip over JS-style comments since people like inserting them into
+        // data files and getting huffy with Crockford when he says no to
+        // versioning JSON to allow ignorable tokens.
+        int end = i + 1;
+        if (i + 1 < n) {
+            switch (jsonish.charAt(i + 1)) {
+                case '/':
+                    end = n;  // Worst case.
+                    for (int j = i + 2; j < n; ++j) {
+                        char cch = jsonish.charAt(j);
+                        if (cch == '\n' || cch == '\r'
+                                || cch == '\u2028' || cch == '\u2029') {
+                            end = j + 1;
+                            break;
+                        }
+                    }
+                    break;
+                case '*':
+                    end = findStarEnd(i, n);
+                    break;
+                default:
+                    break;
+            }
+        }
+        elide(i, end);
+        i = end - 1;
+        return i;
+    }
+
+    private int findStarEnd(int i, int n) {
+        if (i + 3 < n) {
+            for (int j = i + 2; (j = jsonish.indexOf('/', j + 1)) >= 0; ) { //NOPMD AssignmentInOperand
+                if (jsonish.charAt(j - 1) == '*') {
+                    n = j + 1;
+                    break;
+                }
+            }
+        }
+        return n;
+    }
+
+    private State processComma(State state, int i) {
+        if (bracketDepth == 0) {
+            throw new RuntimeException("Unbracketed comma");
+        }
+        // Convert comma elisions like [1,,3] to [1,null,3].
+        // [1,,3] in JS is an array that has no element at index 1
+        // according to the "in" operator so accessing index 1 will
+        // yield the special value "undefined" which is equivalent to
+        // JS's "null" value according to "==".
+        switch (state) {
+            // Normal
+            case AFTER_ELEMENT:
+                state = State.BEFORE_ELEMENT;
+                break;
+            case AFTER_VALUE:
+                state = State.BEFORE_KEY;
+                break;
+            // Array elision.
+            case START_ARRAY:
+            case BEFORE_ELEMENT:
+                insert(i, "null");
+                state = State.BEFORE_ELEMENT;
+                break;
+            // Ignore
+            case START_MAP:
+            case BEFORE_KEY:
+            case AFTER_KEY:
+                elide(i, i + 1);
+                break;
+            // Supply missing value.
+            case BEFORE_VALUE:
+                insert(i, "null");
+                state = State.BEFORE_KEY;
+                break;
+        }
+        return state;
+    }
+
+    private State processClosingSquareBracket(State state, int i, char ch) {
+        // Strip trailing comma to convert {"a":0,} -> {"a":0}
+        // and [1,2,3,] -> [1,2,3,]
+        switch (state) {
+            case BEFORE_VALUE:
+                insert(i, "null");
+                break;
+            case BEFORE_ELEMENT:
+            case BEFORE_KEY:
+                elideTrailingComma(i);
+                break;
+            case AFTER_KEY:
+                insert(i, ":null");
+                break;
+            case START_MAP:
+            case START_ARRAY:
+            case AFTER_ELEMENT:
+            case AFTER_VALUE:
+                break;
+        }
+
+        --bracketDepth;
+        char closeBracket = isMap[bracketDepth] ? '}' : ']';
+        if (ch != closeBracket) {
+            replace(i, i + 1, closeBracket);
+        }
+        state = bracketDepth == 0 || !isMap[bracketDepth - 1]
+                ? State.AFTER_ELEMENT : State.AFTER_VALUE;
+        return state;
     }
 
     /**

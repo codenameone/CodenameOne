@@ -206,10 +206,12 @@ public final class MigLayout extends Layout {
         if (constr == null || constr instanceof String) {
             constr = ConstraintParser.prepare((String) constr);
             lc = ConstraintParser.parseLayoutConstraint((String) constr);
-        } else if (constr instanceof LC) {
-            lc = (LC) constr;
         } else {
-            throw new IllegalArgumentException("Illegal constraint type: " + constr.getClass());
+            if (constr instanceof LC) {
+                lc = (LC) constr;
+            } else {
+                throw new IllegalArgumentException("Illegal constraint type: " + constr.getClass());
+            }
         }
         layoutConstraints = constr;
         dirty = true;
