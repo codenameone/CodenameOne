@@ -272,6 +272,8 @@ export CN1SS_PREVIEW_DIR="$PREVIEW_DIR"
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_JAVASE_COMMENT -->"
 export CN1SS_COMMENT_LOG_PREFIX="[run-javase-device-tests]"
 export CN1SS_PREVIEW_SUBDIR="javase"
+export CN1SS_MAX_CHANNEL_DELTA="${CN1SS_MAX_CHANNEL_DELTA:-4}"
+export CN1SS_MAX_MISMATCH_PERCENT="${CN1SS_MAX_MISMATCH_PERCENT:-0.25}"
 
 if [ "${#COMPARE_ENTRIES[@]}" -gt 0 ]; then
   cn1ss_process_and_report \

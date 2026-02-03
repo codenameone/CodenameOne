@@ -41,7 +41,9 @@ public class ProcessScreenshots {
                 arguments.referenceDir,
                 arguments.actualEntries,
                 arguments.emitBase64,
-                arguments.previewDir
+                arguments.previewDir,
+                arguments.maxChannelDelta,
+                arguments.maxMismatchPercent
         );
         String json = JsonUtil.stringify(payload);
         System.out.print(json);
@@ -51,7 +53,9 @@ public class ProcessScreenshots {
             Path referenceDir,
             List<Map.Entry<String, Path>> actualEntries,
             boolean emitBase64,
-            Path previewDir
+            Path previewDir,
+            int maxChannelDelta,
+            double maxMismatchPercent
     ) throws IOException {
         List<Map<String, Object>> results = new ArrayList<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
@@ -75,7 +79,7 @@ public class ProcessScreenshots {
                 try {
                     PNGImage actual = loadPngWithRetry(actualPath);
                     PNGImage expected = loadPngWithRetry(expectedPath);
-                    Map<String, Object> outcome = compareImages(expected, actual);
+                    Map<String, Object> outcome = compareImages(expected, actual, maxChannelDelta, maxMismatchPercent);
                     if (Boolean.TRUE.equals(outcome.get("equal"))) {
                         record.put("status", "equal");
                     } else {
@@ -318,19 +322,58 @@ public class ProcessScreenshots {
         return Math.max(0, Math.min(255, value));
     }
 
-    private static Map<String, Object> compareImages(PNGImage expected, PNGImage actual) {
+    private static Map<String, Object> compareImages(PNGImage expected, PNGImage actual, int maxChannelDelta, double maxMismatchPercent) {
         boolean equal = expected.width == actual.width
                 && expected.height == actual.height
                 && expected.bitDepth == actual.bitDepth
                 && expected.colorType == actual.colorType
                 && java.util.Arrays.equals(expected.pixels, actual.pixels);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("equal", equal);
         result.put("width", actual.width);
         result.put("height", actual.height);
         result.put("bit_depth", actual.bitDepth);
         result.put("color_type", actual.colorType);
+        if (!equal && maxChannelDelta > 0 && maxMismatchPercent >= 0 && expected.width == actual.width && expected.height == actual.height) {
+            int totalPixels = actual.width * actual.height;
+            int mismatchCount = countMismatchedPixels(expected, actual, maxChannelDelta);
+            double mismatchPercent = totalPixels == 0 ? 0d : (mismatchCount * 100d) / totalPixels;
+            result.put("mismatch_count", mismatchCount);
+            result.put("mismatch_percent", mismatchPercent);
+            result.put("max_channel_delta", maxChannelDelta);
+            result.put("max_mismatch_percent", maxMismatchPercent);
+            equal = mismatchPercent <= maxMismatchPercent;
+        }
+        result.put("equal", equal);
         return result;
+    }
+
+    private static int countMismatchedPixels(PNGImage expected, PNGImage actual, int maxChannelDelta) {
+        int[] expectedRgb = toRgbArray(expected);
+        int[] actualRgb = toRgbArray(actual);
+        int mismatched = 0;
+        for (int i = 0; i < expectedRgb.length; i++) {
+            int e = expectedRgb[i];
+            int a = actualRgb[i];
+            int er = (e >> 16) & 0xff;
+            int eg = (e >> 8) & 0xff;
+            int eb = e & 0xff;
+            int ar = (a >> 16) & 0xff;
+            int ag = (a >> 8) & 0xff;
+            int ab = a & 0xff;
+            if (Math.abs(er - ar) > maxChannelDelta
+                    || Math.abs(eg - ag) > maxChannelDelta
+                    || Math.abs(eb - ab) > maxChannelDelta) {
+                mismatched++;
+            }
+        }
+        return mismatched;
+    }
+
+    private static int[] toRgbArray(PNGImage image) {
+        BufferedImage rgbImage = toRgbImage(image);
+        int[] pixels = new int[image.width * image.height];
+        rgbImage.getRGB(0, 0, image.width, image.height, pixels, 0, image.width);
+        return pixels;
     }
 
     private static PNGImage loadPngWithRetry(Path path) throws IOException {
@@ -666,18 +709,25 @@ public class ProcessScreenshots {
         final List<Map.Entry<String, Path>> actualEntries;
         final boolean emitBase64;
         final Path previewDir;
+        final int maxChannelDelta;
+        final double maxMismatchPercent;
 
-        private Arguments(Path referenceDir, List<Map.Entry<String, Path>> actualEntries, boolean emitBase64, Path previewDir) {
+        private Arguments(Path referenceDir, List<Map.Entry<String, Path>> actualEntries, boolean emitBase64, Path previewDir,
+                          int maxChannelDelta, double maxMismatchPercent) {
             this.referenceDir = referenceDir;
             this.actualEntries = actualEntries;
             this.emitBase64 = emitBase64;
             this.previewDir = previewDir;
+            this.maxChannelDelta = maxChannelDelta;
+            this.maxMismatchPercent = maxMismatchPercent;
         }
 
         static Arguments parse(String[] args) {
             Path reference = null;
             boolean emitBase64 = false;
             Path previewDir = null;
+            int maxChannelDelta = 0;
+            double maxMismatchPercent = 0d;
             List<Map.Entry<String, Path>> actuals = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
@@ -712,6 +762,26 @@ public class ProcessScreenshots {
                         Path path = Path.of(value.substring(idx + 1));
                         actuals.add(Map.entry(name, path));
                     }
+                    case "--max-channel-delta" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --max-channel-delta");
+                            return null;
+                        }
+                        maxChannelDelta = parseIntArg("--max-channel-delta", args[i]);
+                        if (maxChannelDelta < 0) {
+                            return null;
+                        }
+                    }
+                    case "--max-mismatch-percent" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --max-mismatch-percent");
+                            return null;
+                        }
+                        maxMismatchPercent = parseDoubleArg("--max-mismatch-percent", args[i]);
+                        if (maxMismatchPercent < 0) {
+                            return null;
+                        }
+                    }
                     default -> {
                         System.err.println("Unknown argument: " + arg);
                         return null;
@@ -722,7 +792,25 @@ public class ProcessScreenshots {
                 System.err.println("--reference-dir is required");
                 return null;
             }
-            return new Arguments(reference, actuals, emitBase64, previewDir);
+            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent);
+        }
+
+        private static int parseIntArg(String flag, String value) {
+            try {
+                return Integer.parseInt(value);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid integer for " + flag + ": " + value);
+                return -1;
+            }
+        }
+
+        private static double parseDoubleArg(String flag, String value) {
+            try {
+                return Double.parseDouble(value);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid number for " + flag + ": " + value);
+                return -1d;
+            }
         }
     }
 }

@@ -330,6 +330,12 @@ cn1ss_process_and_report() {
 
   # Run ProcessScreenshots
   local -a compare_args=("--reference-dir" "$ref_dir" "--emit-base64" "--preview-dir" "$preview_dir")
+  if [ -n "${CN1SS_MAX_CHANNEL_DELTA:-}" ]; then
+    compare_args+=("--max-channel-delta" "${CN1SS_MAX_CHANNEL_DELTA}")
+  fi
+  if [ -n "${CN1SS_MAX_MISMATCH_PERCENT:-}" ]; then
+    compare_args+=("--max-mismatch-percent" "${CN1SS_MAX_MISMATCH_PERCENT}")
+  fi
   for entry in "${actual_entries[@]}"; do
     compare_args+=("--actual" "$entry")
   done
