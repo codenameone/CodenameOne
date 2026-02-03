@@ -1,0 +1,13 @@
+/**
+ * <p>
+ *     A legacy banner Ads API. This has been replaced by more modern approaches mainly thru <a
+ *         href="https://www.codenameone.com/cn1libs.html">cn1libs</a>.
+ * </p>
+ * <p>
+ *     Currently inner-active ads Network is supported
+ *     please refer to
+ *     <a href="http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne">inner-active</a>
+ *     for more information
+ * </p>
+ */
+package com.codename1.ads;
