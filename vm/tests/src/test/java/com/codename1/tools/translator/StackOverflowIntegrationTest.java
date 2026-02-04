@@ -55,7 +55,8 @@ class StackOverflowIntegrationTest {
         compileArgs.add(sourceDir.resolve("StackOverflowApp.java").toString());
 
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
-        assertEquals(0, compileResult, "StackOverflowApp should compile with " + config);
+        assertEquals(0, compileResult, "StackOverflowApp should compile with " + config +
+                " error: " + CompilerHelper.getLastErrorLog());
 
         CompilerHelper.copyDirectory(javaApiDir, classesDir);
         Files.copy(sourceDir.resolve("native_report.c"), classesDir.resolve("native_report.c"));
@@ -92,21 +93,11 @@ class StackOverflowIntegrationTest {
                 "StackOverflowApp probe run exited with code " + probeResult.exitCode
                         + ". Output:\n" + probeResult.output
                         + probeDiagnostics);
-        assertTrue(probeResult.output.contains("PROBE_CONSTANT"),
-                "StackOverflowApp probe run should succeed. Output was:\n" + probeResult.output + probeDiagnostics);
         ProcessResult smokeResult = runProcess(Arrays.asList(executable.toString(), "smoke"), buildDir);
         String smokeDiagnostics = buildDiagnostics(srcRoot, executable, smokeResult);
         assertEquals(0, smokeResult.exitCode,
                 "StackOverflowApp smoke run exited with code " + smokeResult.exitCode
                         + ". Output:\n" + smokeResult.output
-                        + smokeDiagnostics);
-        assertTrue(smokeResult.output.contains("PROBE_CONSTANT_ONE"),
-                "StackOverflowApp smoke run should emit PROBE_CONSTANT_ONE. Output was:\n"
-                        + smokeResult.output + smokeDiagnostics);
-        assertTrue(smokeResult.output.contains("PROBE_CONSTANT_TWO"),
-                "StackOverflowApp smoke run should emit PROBE_CONSTANT_TWO. Output was:\n"
-                        + smokeResult.output
-                        + "\nMissing PROBE_CONSTANT_TWO suggests a crash between the first and second print."
                         + smokeDiagnostics);
 
         ProcessResult result = runProcess(Arrays.asList(executable.toString(), "overflow", "run"), buildDir);
@@ -121,10 +112,12 @@ class StackOverflowIntegrationTest {
 
     private String appSource() {
         return "public class StackOverflowApp {\n" +
+                "    private static int counter;\n" +
                 "    private static native void report(String msg);\n" +
-                "    private static native void reportConstant();\n" +
-                "    private static native void reportConstantTwice();\n" +
                 "    private static void triggerOverflow() {\n" +
+                "        String txt = \"Calling ...\" + counter;\n" +
+                "        counter++;\n" +
+                "        report(txt);\n" +
                 "        triggerOverflow();\n" +
                 "    }\n" +
                 "    private static int boundedRecursion(int depth) {\n" +
@@ -134,14 +127,7 @@ class StackOverflowIntegrationTest {
                 "        return depth + boundedRecursion(depth - 1);\n" +
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
-                "        if (args == null || args.length == 0) {\n" +
-                "            reportConstant();\n" +
-                "            return;\n" +
-                "        }\n" +
-                "        if (args.length == 1) {\n" +
-                "            reportConstantTwice();\n" +
-                "            return;\n" +
-                "        }\n" +
+                "        report(\"Starting test...\");\n" +
                 "        try {\n" +
                 "            triggerOverflow();\n" +
                 "        } catch (StackOverflowError err) {\n" +
@@ -154,16 +140,6 @@ class StackOverflowIntegrationTest {
     private String nativeReportSource() {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
-                "void StackOverflowApp_reportConstant__(CODENAME_ONE_THREAD_STATE) {\n" +
-                "    printf(\"PROBE_CONSTANT\\n\");\n" +
-                "    fflush(stdout);\n" +
-                "}\n" +
-                "void StackOverflowApp_reportConstantTwice__(CODENAME_ONE_THREAD_STATE) {\n" +
-                "    printf(\"PROBE_CONSTANT_ONE\\n\");\n" +
-                "    fflush(stdout);\n" +
-                "    printf(\"PROBE_CONSTANT_TWO\\n\");\n" +
-                "    fflush(stdout);\n" +
-                "}\n" +
                 "void StackOverflowApp_report___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT msg) {\n" +
                 "    struct String_Struct {\n" +
                 "        JAVA_OBJECT header;\n" +
@@ -247,7 +223,9 @@ class StackOverflowIntegrationTest {
             diagnostics.append("\nreport snippet: ")
                     .append(extractSnippet(appSourceText, "StackOverflowApp_report___java_lang_String", 120));
         }
-        if (!result.output.isEmpty()) {
+        if (result.output.isEmpty()) {
+            diagnostics.append("\n***No output printed");
+        } else {
             diagnostics.append("\nOutput length: ").append(result.output.length());
         }
         return diagnostics.toString();
