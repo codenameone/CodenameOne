@@ -218,6 +218,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             life = (Lifecycle)m;
         }
         VideoCaptureConstraints.init(new IOSVideoCaptureConstraintsCompiler());
+        if("true".equals(Display.getInstance().getProperty("DisableScreenshots", ""))) {
+            nativeInstance.setDisableScreenshots(true);
+        }
     }
 
     public void setThreadPriority(Thread t, int p) {
