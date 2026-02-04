@@ -482,12 +482,13 @@ public class Component implements Animation, StyleListener, Editable {
     /**
      * The width of the component when the {@link #cachedShadowImage} was created.
      */
-    private int cachedShadowWidth,
+    private int cachedShadowWidth;
 
     /**
      * The height of the component when the  {@link #cachedShadowImage} was created.
      */
-    cachedShadowHeight;
+    private int cachedShadowHeight;
+
     /**
      * Flag to indicate whether the component has elevation.
      */

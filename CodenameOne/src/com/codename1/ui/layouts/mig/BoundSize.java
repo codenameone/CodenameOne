@@ -71,8 +71,8 @@ public class BoundSize {
      * @param max          The maximum size. May be <code>null</code>.
      * @param createString The string used to create the BoundsSize.
      */
-    public BoundSize(UnitValue min, UnitValue preferred, UnitValue max, String createString)    // Bound to old delegate!!!!!
-    {
+    public BoundSize(UnitValue min, UnitValue preferred, UnitValue max, String createString) {
+        // Bound to old delegate!!!!!
         this(min, preferred, max, false, createString);
     }
 

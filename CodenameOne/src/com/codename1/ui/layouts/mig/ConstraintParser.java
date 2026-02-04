@@ -1425,8 +1425,8 @@ public final class ConstraintParser {
      * found.
      */
     private static int startsWithLenient(String s, String match, int minChars, boolean acceptTrailing) {
-        if (s.charAt(0) != match.charAt(0)) // Fast sanity check.
-        {
+        if (s.charAt(0) != match.charAt(0)) {
+            // Fast sanity check.
             return -1;
         }
 
@@ -1442,8 +1442,8 @@ public final class ConstraintParser {
         int mSz = match.length();
         int sIx = 0;
         for (int mIx = 0; mIx < mSz; sIx++, mIx++) {
-            while (sIx < sSz && (s.charAt(sIx) == ' ' || s.charAt(sIx) == '_')) // Disregard spaces and _
-            {
+            while (sIx < sSz && (s.charAt(sIx) == ' ' || s.charAt(sIx) == '_')) {
+                // Disregard spaces and _
                 sIx++;
             }
 

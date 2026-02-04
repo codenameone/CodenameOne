@@ -1040,8 +1040,8 @@ public final class Grid {
 
     @SuppressWarnings("unchecked")
     private static synchronized void putSizesAndIndexes(Object parComp, int[] sizes, int[] ixArr, boolean isRows) {
-        if (PARENT_ROWCOL_SIZES_MAP == null) // Lazy since only if designing in IDEs
-        {
+        if (PARENT_ROWCOL_SIZES_MAP == null) {
+            // Lazy since only if designing in IDEs
             PARENT_ROWCOL_SIZES_MAP = new HashMap[]{new HashMap<Object, int[][]>(4), new HashMap<Object, int[][]>(4)};
         }
 
@@ -1057,8 +1057,8 @@ public final class Grid {
     }
 
     private static synchronized void saveGrid(ComponentWrapper parComp, LinkedHashMap<Integer, Cell> grid) {
-        if (PARENT_GRIDPOS_MAP == null) // Lazy since only if designing in IDEs
-        {
+        if (PARENT_GRIDPOS_MAP == null) {
+            // Lazy since only if designing in IDEs
             PARENT_GRIDPOS_MAP = new HashMap<Object, ArrayList<WeakCell>>(4);
         }
 
@@ -1635,8 +1635,8 @@ public final class Grid {
             if (stUV != null) {
                 st = stUV.getPixels(stUV.getUnit() == UnitValue.ALIGN ? sz : refSize, container, cw.comp);
 
-                if (endUV != null) // if (endUV == null && cw.cc.isBoundsIsGrid() == true)
-                {
+                if (endUV != null) {
+                    // if (endUV == null && cw.cc.isBoundsIsGrid() == true)
                     sz = Math.min(Math.max((isHor ? (cw.x + cw.w) : (cw.y + cw.h)) - st, minSz), maxSz);
                 }
             }
@@ -1842,8 +1842,7 @@ public final class Grid {
                                 }
 
                                 bnd = size[LayoutUtil.MIN];
-                                if (bnd > s) // Includes s == LayoutUtil.NOT_SET since < 0.
-                                {
+                                if (bnd > s) { // Includes s == LayoutUtil.NOT_SET since < 0.
                                     s = bnd;
                                 }
                             }

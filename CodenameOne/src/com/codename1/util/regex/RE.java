@@ -917,8 +917,8 @@ public class RE {
                             if ((RECharacter.isLetterOrDigit(cLast) == RECharacter.isLetterOrDigit(cNext)) == (opdata == E_BOUND)) {
                                 return -1;
                             }
+                            break;
                         }
-                        break;
 
                         // Alpha-numeric, digit, space, javaLetter, javaLetterOrDigit
                         case E_ALNUM:
@@ -1099,16 +1099,15 @@ public class RE {
                         }
                         break;
 
-                        case POSIX_CLASS_XDIGIT: // JWL - bugbug??
-                        {
+                        case POSIX_CLASS_XDIGIT: { // JWL - bugbug??
                             boolean isXDigit = ((search.charAt(idx) >= '0' && search.charAt(idx) <= '9') ||
                                     (search.charAt(idx) >= 'a' && search.charAt(idx) <= 'f') ||
                                     (search.charAt(idx) >= 'A' && search.charAt(idx) <= 'F'));
                             if (!isXDigit) {
                                 return -1;
                             }
+                            break;
                         }
-                        break;
 
                         case POSIX_CLASS_JSTART:
                             if (!RECharacter.isJavaIdentifierStart(search.charAt(idx))) {

@@ -220,13 +220,11 @@ public final class UnitValue {
     private transient String linkId = null; // Should be final, but initializes in a sub method.
 
     // Pixel
-    public UnitValue(float value)  // If hor/ver does not matter.
-    {
+    public UnitValue(float value) { // If hor/ver does not matter.
         this(value, null, PIXEL, true, STATIC, null, null, value + "px");
     }
 
-    public UnitValue(float value, int unit, String createString)  // If hor/ver does not matter.
-    {
+    public UnitValue(float value, int unit, String createString) { // If hor/ver does not matter.
         this(value, null, unit, true, STATIC, null, null, createString);
     }
 
@@ -498,8 +496,7 @@ public final class UnitValue {
             return isHor ? SPX : SPY;
         }
 
-        if (lookup(0, null, null) != UnitConverter.UNABLE)    // To test so we can fail fast
-        {
+        if (lookup(0, null, null) != UnitConverter.UNABLE) {   // To test so we can fail fast
             return LOOKUP;
         }
 

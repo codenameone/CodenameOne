@@ -59,8 +59,8 @@ final class ResizeConstraint {
 
     int shrinkPrio = 100;
 
-    public ResizeConstraint()   // For Externalizable
-    {
+    // For Externalizable
+    public ResizeConstraint() {
     }
 
     ResizeConstraint(int shrinkPrio, Float shrinkWeight, int growPrio, Float growWeight) {

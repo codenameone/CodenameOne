@@ -50,56 +50,56 @@ import java.util.Set;
  * @deprecated For internal use only.
  */
 public class Node {
-    public final Property<Double, Node>
-            /**
-             * The scale to apply to the node, along the x-axis.
-             */
-            scaleX,
+    /**
+     * The scale to apply to the node, along the x-axis.
+     */
+    public final Property<Double, Node> scaleX;
 
     /**
      * The scale to apply to the node along the y-axis.
      */
-    scaleY,
+    public final Property<Double, Node> scaleY;
+
     /**
      * The scale to apply to the node along the z-axis.
      */
-    scaleZ,
+    public final Property<Double, Node> scaleZ;
 
     /**
      * X-coordinate in the Scene-graph where node should be rendered.
      */
-    layoutX,
+    public final Property<Double, Node> layoutX;
 
     /**
      * Y-coordinate in the scene graph where node should be rendered.
      */
-    layoutY,
+    public final Property<Double, Node> layoutY;
 
     /**
      * Z-coordinate in the scene graph where node should be rendered.
      */
-    layoutZ,
+    public final Property<Double, Node> layoutZ;
 
     /**
      * X-translation to apply to the node.
      */
-    translateX,
+    public final Property<Double, Node> translateX;
 
 
     /**
      * Y-translation to apply to the node.
      */
-    translateY,
+    public final Property<Double, Node> translateY;
 
     /**
      * Z-translation to apply to the node.
      */
-    translateZ,
+    public final Property<Double, Node> translateZ;
 
     /**
      * Rotation to apply to the node.  In degrees.  Node is always rotated around its center.
      */
-    rotate,
+    public final Property<Double, Node> rotate;
 
     /**
      * The depth of the coordinate at which the renderer should paint itself.
@@ -109,9 +109,9 @@ public class Node {
      * {@link #localCanvasZ} to something other than 0 since the node will be rotated at its
      * center point.
      */
-    localCanvasZ,
+    public final Property<Double, Node> localCanvasZ;
 
-    opacity;
+    public final Property<Double, Node> opacity;
     /**
      * The rotation axis around which rotations should be performed. (0, 0, 1) results in a rotation
      * around the z-axis, (1, 0, 0) results in a rotation around the x-axis, and (0, 1, 0) a rotation
