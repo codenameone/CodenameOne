@@ -932,6 +932,10 @@ public class IPhoneBuilder extends Executor {
         if(request.getArg("ios.newStorageLocation", "true").equals("true")) {
             newStorage = "        Display.getInstance().setProperty(\"iosNewStorage\", \"true\");\n";
         }
+        String disableScreenshots = "";
+        if (request.getArg("ios.disableScreenshots", "false").equalsIgnoreCase("true")) {
+            disableScreenshots = "        Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
+        }
 
         String didEnterBackground =  "        stopped = true;\n"
                 + "        final long bgTask = com.codename1.impl.ios.IOSImplementation.beginBackgroundTask();\n"
@@ -967,6 +971,7 @@ public class IPhoneBuilder extends Executor {
                     + "        Display.getInstance().setProperty(\"AppVersion\", APPLICATION_VERSION);\n"
                     + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
                     + newStorage
+                    + disableScreenshots
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect

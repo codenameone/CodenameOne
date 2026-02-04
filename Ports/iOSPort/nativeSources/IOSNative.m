@@ -116,6 +116,76 @@ extern int popoverSupported();
 #endif
 #endif
 
+// iOS doesn't allow blocking a static screenshot, but it does expose a flag
+// that tells us when the screen is being captured (recorded or mirrored). We
+// use that signal to temporarily cover the app view with a black overlay.
+static BOOL cn1_disableScreenshots = NO;
+static UIView *cn1ScreenCaptureView = nil;
+static id cn1ScreenCaptureObserver = nil;
+
+static UIView *cn1_screenCaptureContainer() {
+    // Prefer the GL view controller's view. Fall back to the key window so
+    // we can still cover the app if the controller isn't ready yet.
+    UIView *container = [[CodenameOne_GLViewController instance] view];
+    if (container == nil) {
+        container = [UIApplication sharedApplication].keyWindow;
+        if (container == nil && [[UIApplication sharedApplication].windows count] > 0) {
+            container = [[UIApplication sharedApplication].windows objectAtIndex:0];
+        }
+    }
+    return container;
+}
+
+static void cn1_updateScreenCaptureBlocker() {
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+    // Compile-time guard: screen-capture detection APIs were introduced in iOS 11.
+    // This keeps older SDKs building cleanly without referencing unavailable symbols.
+    if (!cn1_disableScreenshots) {
+        if (cn1ScreenCaptureView != nil) {
+            [cn1ScreenCaptureView removeFromSuperview];
+            cn1ScreenCaptureView = nil;
+        }
+        return;
+    }
+    if (![[UIScreen mainScreen] respondsToSelector:@selector(isCaptured)]) {
+        // Runtime guard: if running on an older iOS version, just skip.
+        return;
+    }
+    BOOL captured = NO;
+    if (@available(iOS 11.0, *)) {
+        captured = [UIScreen mainScreen].isCaptured;
+    }
+    if (captured) {
+        // If screen capture is active, hide the UI behind an overlay view.
+        UIView *container = cn1_screenCaptureContainer();
+        if (container == nil) {
+            return;
+        }
+        if (cn1ScreenCaptureView == nil) {
+            cn1ScreenCaptureView = [[UIView alloc] initWithFrame:container.bounds];
+            cn1ScreenCaptureView.backgroundColor = [UIColor blackColor];
+            cn1ScreenCaptureView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            cn1ScreenCaptureView.userInteractionEnabled = NO;
+        }
+        if (cn1ScreenCaptureView.superview != container) {
+            [cn1ScreenCaptureView removeFromSuperview];
+            [container addSubview:cn1ScreenCaptureView];
+        } else {
+            cn1ScreenCaptureView.frame = container.bounds;
+        }
+    } else if (cn1ScreenCaptureView != nil) {
+        [cn1ScreenCaptureView removeFromSuperview];
+        cn1ScreenCaptureView = nil;
+    }
+#else
+    // Older SDKs don't have the screen-capture APIs. Nothing to do.
+    if (cn1ScreenCaptureView != nil) {
+        [cn1ScreenCaptureView removeFromSuperview];
+        cn1ScreenCaptureView = nil;
+    }
+#endif
+}
+
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
  JAVA_OBJECT fromNSString(NSString* str)
  {
@@ -2022,6 +2092,37 @@ void com_codename1_impl_ios_IOSNative_unlockScreen__(CN1_THREAD_STATE_MULTI_ARG 
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         [UIApplication sharedApplication].idleTimerDisabled = NO;
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_setDisableScreenshots___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN disable)
+{
+    BOOL shouldDisable = disable ? YES : NO;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        cn1_disableScreenshots = shouldDisable;
+        if (cn1ScreenCaptureObserver != nil) {
+            [[NSNotificationCenter defaultCenter] removeObserver:cn1ScreenCaptureObserver];
+            cn1ScreenCaptureObserver = nil;
+        }
+        if (cn1ScreenCaptureView != nil) {
+            [cn1ScreenCaptureView removeFromSuperview];
+            cn1ScreenCaptureView = nil;
+        }
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+        if (cn1_disableScreenshots && [[UIScreen mainScreen] respondsToSelector:@selector(isCaptured)]) {
+            if (@available(iOS 11.0, *)) {
+                // Listen for capture state changes so we can add/remove the overlay.
+                cn1ScreenCaptureObserver = [[NSNotificationCenter defaultCenter] addObserverForName:UIScreenCapturedDidChangeNotification
+                                                                                            object:[UIScreen mainScreen]
+                                                                                             queue:[NSOperationQueue mainQueue]
+                                                                                        usingBlock:^(NSNotification *notification) {
+                    cn1_updateScreenCaptureBlocker();
+                }];
+            }
+        }
+#endif
+        // Ensure the overlay reflects the current capture state immediately.
+        cn1_updateScreenCaptureBlocker();
     });
 }
 

@@ -157,6 +157,7 @@ public final class IOSNative {
     native void unlockOrientation();
     native void lockScreen();
     native void unlockScreen();
+    native void setDisableScreenshots(boolean disable);
 
     native void vibrate(int duration);
 

@@ -133,7 +133,9 @@ This is useful as it prevents the encrypted preferences from colliding with the 
 
 One of the common security features some apps expect is the ability to block a screenshot. In the past apps like snapchat required that you touch the screen to view a photo to block the ability to grab a screenshot (on iOS). This no longer works...
 
-Blocking screenshots is an Android specific feature that can't be implemented on iOS. This is implemented by classifying the app window as secure and you can do that via the build hint `android.disableScreenshots=true`. Once that is added screenshots should no longer work for the app, this might impact other things as well such as the task view which will no longer show the screenshot either.
+Blocking screenshots is implemented by classifying the app window as secure on Android. You can enable this via the build hint `android.disableScreenshots=true`. Once that is added screenshots should no longer work for the app, this might impact other things as well such as the task view which will no longer show the screenshot either.
+
+On iOS, you cannot prevent a user from taking a static screenshot, but you can block screen capture/recording while it is active. This uses `UIScreen.isCaptured` and its change notification to hide the app contents while a capture session is active. Enable this behavior with the build hint `ios.disableScreenshots=true`.
 
 === Blocking Copy & Paste
 
