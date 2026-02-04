@@ -149,7 +149,7 @@ class TBigDecimal {
                     1000000000000000L,
                     10000000000000000L,
                     100000000000000000L,
-                    1000000000000000000L,};
+                    1000000000000000000L};
     private static final long[] LONG_FIVE_POW = new long[]
             {1L,
                     5L,
@@ -178,7 +178,7 @@ class TBigDecimal {
                     59604644775390625L,
                     298023223876953125L,
                     1490116119384765625L,
-                    7450580596923828125L,};
+                    7450580596923828125L};
     private static final int[] LONG_FIVE_POW_BIT_LENGTH = new int[LONG_FIVE_POW.length];
     private static final int[] LONG_TEN_POW_BIT_LENGTH = new int[LONG_TEN_POW.length];
     private static final int BI_SCALED_BY_ZERO_LENGTH = 11;
@@ -1026,7 +1026,8 @@ class TBigDecimal {
         } else if (diffScale > 0) {
             // case s1 > s2 : [(u1 + u2) * 10 ^ (s1 - s2) , s1]
             return addAndMult10(this, augend, diffScale);
-        } else {// case s2 > s1 : [(u2 + u1) * 10 ^ (s2 - s1) , s2]
+        } else {
+            // case s2 > s1 : [(u2 + u1) * 10 ^ (s2 - s1) , s2]
             return addAndMult10(augend, this, -diffScale);
         }
     }
@@ -1057,7 +1058,8 @@ class TBigDecimal {
         } else if (augend.aproxPrecision() < -diffScale - 1) {
             larger = this;
             smaller = augend;
-        } else {// No optimization is done
+        } else {
+            // No optimization is done
             return add(augend).round(mc);
         }
         if (mc.getPrecision() >= larger.aproxPrecision()) {
@@ -1116,7 +1118,8 @@ class TBigDecimal {
             }
             return new TBigDecimal(this.getUnscaledValue().subtract(
                     TMultiplication.multiplyByTenPow(subtrahend.getUnscaledValue(), diffScale)), this.scale);
-        } else {// case s2 > s1 : [ u1 * 10 ^ (s2 - s1) - u2 , s2 ]
+        } else {
+            // case s2 > s1 : [ u1 * 10 ^ (s2 - s1) - u2 , s2 ]
             diffScale = -diffScale;
             if (diffScale < LONG_TEN_POW.length &&
                     Math.max(this.bitLength + LONG_TEN_POW_BIT_LENGTH[diffScale], subtrahend.bitLength) + 1 < 64) {
@@ -1499,7 +1502,8 @@ class TBigDecimal {
             powerOfTen = TMultiplication.powerOf10(newScale);
             integralValue = getUnscaledValue().divide(divisor.getUnscaledValue().multiply(powerOfTen));
             integralValue = integralValue.multiply(powerOfTen);
-        } else {// (newScale < 0)
+        } else {
+            // (newScale < 0)
             powerOfTen = TMultiplication.powerOf10(-newScale);
             integralValue = getUnscaledValue().multiply(powerOfTen).divide(divisor.getUnscaledValue());
             // To strip trailing zeros approximating to the preferred scale
@@ -1569,7 +1573,8 @@ class TBigDecimal {
             newScale = Math.min(diffScale, Math.max(mcPrecision - quotPrecision + 1, 0));
             // To calculate: (u1 / (u2 * 10^(s1-s2)) * 10^newScale
             quotAndRem[0] = quotAndRem[0].multiply(TMultiplication.powerOf10(newScale));
-        } else {// CASE s2 > s1:
+        } else {
+            // CASE s2 > s1:
             /* To calculate the minimum power of ten, such that the quotient
              *   (u1 * 10^exp) / u2   has at least 'mc.precision()' digits. */
             long exp = Math.min(-diffScale, Math.max((long) mcPrecision - diffPrecision, 0));
@@ -1919,7 +1924,8 @@ class TBigDecimal {
                 doubleUnsc = smallValue;
             }
             decimalDigits += MathUtil.log10(Math.abs(doubleUnsc));
-        } else {// (bitLength >= 1024)
+        } else {
+            // (bitLength >= 1024)
             /* To calculate the precision for large numbers
              * Note that: 2 ^(bitlength() - 1) <= intVal < 10 ^(precision()) */
             decimalDigits += (bitLength - 1) * LOG10_2;
@@ -2203,7 +2209,8 @@ class TBigDecimal {
                 return thisSign;
             } else if (diffPrecision < diffScale - 1) {
                 return -thisSign;
-            } else {// thisSign == val.signum()  and  diffPrecision is aprox. diffScale
+            } else {
+                // thisSign == val.signum()  and  diffPrecision is aprox. diffScale
                 TBigInteger thisUnscaled = this.getUnscaledValue();
                 TBigInteger valUnscaled = val.getUnscaledValue();
                 // If any of both precision is bigger, append zeros to the shorter one
@@ -2453,7 +2460,8 @@ class TBigDecimal {
                 result.append('.');
                 result.append(intStr.substring(delta));
             }
-        } else {// (scale <= 0)
+        } else {
+            // (scale <= 0)
             result.append(intStr.substring(begin));
             // To append trailing zeros
             for (; delta < -CH_ZEROS.length; delta += CH_ZEROS.length) {
@@ -2475,7 +2483,8 @@ class TBigDecimal {
             return getUnscaledValue();
         } else if (scale < 0) {
             return getUnscaledValue().multiply(TMultiplication.powerOf10(-(long) scale));
-        } else {// (scale > 0)
+        } else {
+            // (scale > 0)
             return getUnscaledValue().divide(TMultiplication.powerOf10(scale));
         }
     }
@@ -2493,7 +2502,8 @@ class TBigDecimal {
             return getUnscaledValue();
         } else if (scale < 0) {
             return getUnscaledValue().multiply(TMultiplication.powerOf10(-(long) scale));
-        } else {// (scale > 0)
+        } else {
+            // (scale > 0)
             TBigInteger[] integerAndFraction;
             // An optimization before do a heavy division
             if ((scale > aproxPrecision()) || (scale > getUnscaledValue().getLowestSetBit())) {
@@ -2669,7 +2679,8 @@ class TBigDecimal {
         if (scale <= 0) {
             // mantisa = abs(u) * 10^s
             mantisa = mantisa.multiply(TMultiplication.powerOf10(-scale));
-        } else {// (scale > 0)
+        } else {
+            // (scale > 0)
             TBigInteger[] quotAndRem;
             TBigInteger powerOfTen = TMultiplication.powerOf10(scale);
             int k = 100 - (int) powerOfTwo;
@@ -2692,7 +2703,8 @@ class TBigDecimal {
         }
         lowestSetBit = mantisa.getLowestSetBit();
         discardedSize = mantisa.bitLength() - 54;
-        if (discardedSize > 0) {// (n > 54)
+        if (discardedSize > 0) {
+            // (n > 54)
             // mantisa = (abs(u) * 10^s) >> (n - 54)
             bits = mantisa.shiftRight(discardedSize).longValue();
             tempBits = bits;
@@ -2701,7 +2713,8 @@ class TBigDecimal {
                     || ((bits & 3) == 3)) {
                 bits += 2;
             }
-        } else {// (n <= 54)
+        } else {
+            // (n <= 54)
             // mantisa = (abs(u) * 10^s) << (54 - n)
             bits = mantisa.longValue() << -discardedSize;
             tempBits = bits;
@@ -2716,16 +2729,20 @@ class TBigDecimal {
             bits >>= 1;
             // exponent = 2^(s-n+53+bias)
             exponent += discardedSize;
-        } else {// #bits = 54
+        } else {
+            // #bits = 54
             bits >>= 2;
             exponent += discardedSize + 1;
         }
         // To test if the 53-bits number fits in 'double'
-        if (exponent > 2046) {// (exponent - bias > 1023)
+        if (exponent > 2046) {
+            // (exponent - bias > 1023)
             return (sign * Double.POSITIVE_INFINITY);
-        } else if (exponent <= 0) {// (exponent - bias <= -1023)
+        } else if (exponent <= 0) {
+            // (exponent - bias <= -1023)
             // Denormalized numbers (having exponent == 0)
-            if (exponent < -53) {// exponent - bias < -1076
+            if (exponent < -53) {
+                // exponent - bias < -1076
                 return (sign * 0.0d);
             }
             // -1076 <= exponent - bias <= -1023

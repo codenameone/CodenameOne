@@ -119,11 +119,12 @@ public class REProgram {
                         int lenAtom = instruction[RE.nodeSize + RE.offsetOpdata];
                         this.prefix = new char[lenAtom];
                         System.arraycopy(instruction, RE.nodeSize * 2, prefix, 0, lenAtom);
-                    }
-                    // the branch starts with a BOL
-                    else if (nextOp == RE.OP_BOL) {
-                        // then set the flag indicating that BOL is present
-                        this.flags |= OPT_HASBOL;
+                    } else {
+                        if (nextOp == RE.OP_BOL) {
+                            // the branch starts with a BOL
+                            // then set the flag indicating that BOL is present
+                            this.flags |= OPT_HASBOL;
+                        }
                     }
                 }
             }

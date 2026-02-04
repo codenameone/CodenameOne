@@ -1424,8 +1424,9 @@ public class Image implements ActionSource {
      * use scaled(int, int) instead
      */
     public void scale(int width, int height) {
+        //resize image
         image = Display.impl.scale(image, width, height);
-    }//resize image
+    }
 
     boolean scaleArray(int srcWidth, int srcHeight, int height, int width, int[] currentArray, int[] destinationArray) {
         // Horizontal Resize

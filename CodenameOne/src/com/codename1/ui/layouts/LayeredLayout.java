@@ -2746,7 +2746,7 @@ public class LayeredLayout extends Layout {
              * @param right  The right "x" coordinate within the parent container from which insets are measured.
              * @return
              */
-            private int calcBaseValue(int top, int left, int bottom, int right) {//, int paddingTop, int paddingLeft, int paddingBottom, int paddingRight) {
+            private int calcBaseValue(int top, int left, int bottom, int right) { //, int paddingTop, int paddingLeft, int paddingBottom, int paddingRight) {
                 int h = bottom - top;
                 int w = right - left;
                 int baseValue = 0;

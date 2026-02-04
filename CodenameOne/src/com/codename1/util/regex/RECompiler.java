@@ -1228,29 +1228,29 @@ public class RECompiler {
                 // Min-max is subsumed by minRange[i]-maxRange[i]
                 if (min >= minRange[i] && max <= maxRange[i]) {
                     return;
-                }
-
-                // Min-max subsumes minRange[i]-maxRange[i]
-                else if (min <= minRange[i] && max >= maxRange[i]) {
-                    delete(i);
-                    merge(min, max);
-                    return;
-                }
-
-                // Min is in the range, but max is outside
-                else if (min >= minRange[i] && min <= maxRange[i]) {
-                    min = minRange[i];
-                    delete(i);
-                    merge(min, max);
-                    return;
-                }
-
-                // Max is in the range, but min is outside
-                else if (max >= minRange[i] && max <= maxRange[i]) {
-                    max = maxRange[i];
-                    delete(i);
-                    merge(min, max);
-                    return;
+                } else {
+                    // Min-max subsumes minRange[i]-maxRange[i]
+                    if (min <= minRange[i] && max >= maxRange[i]) {
+                        delete(i);
+                        merge(min, max);
+                        return;
+                    } else {
+                        // Min is in the range, but max is outside
+                        if (min >= minRange[i] && min <= maxRange[i]) {
+                            min = minRange[i];
+                            delete(i);
+                            merge(min, max);
+                            return;
+                        } else {
+                            // Max is in the range, but min is outside
+                            if (max >= minRange[i] && max <= maxRange[i]) {
+                                max = maxRange[i];
+                                delete(i);
+                                merge(min, max);
+                                return;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1282,32 +1282,32 @@ public class RECompiler {
                 if (minRange[i] >= min && maxRange[i] <= max) {
                     delete(i);
                     return;
-                }
-
-                // min-max is subsumed by minRange[i]-maxRange[i]
-                else if (min >= minRange[i] && max <= maxRange[i]) {
-                    int minr = minRange[i];
-                    int maxr = maxRange[i];
-                    delete(i);
-                    if (minr < min) {
-                        merge(minr, min - 1);
+                } else {
+                    // min-max is subsumed by minRange[i]-maxRange[i]
+                    if (min >= minRange[i] && max <= maxRange[i]) {
+                        int minr = minRange[i];
+                        int maxr = maxRange[i];
+                        delete(i);
+                        if (minr < min) {
+                            merge(minr, min - 1);
+                        }
+                        if (max < maxr) {
+                            merge(max + 1, maxr);
+                        }
+                        return;
+                    } else {
+                        // minRange is in the range, but maxRange is outside
+                        if (minRange[i] >= min && minRange[i] <= max) {
+                            minRange[i] = max + 1;
+                            return;
+                        } else {
+                            // maxRange is in the range, but minRange is outside
+                            if (maxRange[i] >= min && maxRange[i] <= max) {
+                                maxRange[i] = min - 1;
+                                return;
+                            }
+                        }
                     }
-                    if (max < maxr) {
-                        merge(max + 1, maxr);
-                    }
-                    return;
-                }
-
-                // minRange is in the range, but maxRange is outside
-                else if (minRange[i] >= min && minRange[i] <= max) {
-                    minRange[i] = max + 1;
-                    return;
-                }
-
-                // maxRange is in the range, but minRange is outside
-                else if (maxRange[i] >= min && maxRange[i] <= max) {
-                    maxRange[i] = min - 1;
-                    return;
                 }
             }
         }

@@ -492,7 +492,8 @@ final class TMultiplication {
             return multiplyByPositiveInt(val, fivePows[exp]);
         } else if (exp < bigFivePows.length) {
             return val.multiply(bigFivePows[exp]);
-        } else {// Large powers of five
+        } else {
+            // Large powers of five
             return val.multiply(bigFivePows[1].pow(exp));
         }
     }

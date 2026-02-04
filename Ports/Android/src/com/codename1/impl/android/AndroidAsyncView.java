@@ -418,23 +418,13 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
             // This is a race condition that sometimes occurs
             // Rather than add synchronized here (which may have performance implications)
             // we'll just "give up" and issue a repaint.
-            Log.p("NOTICE: Hit concurrent modification race condition in flushGraphics.  Skipping flush, and issuing another repaint.");
-            Log.e(ex);
-            Display.getInstance().callSerially(new Runnable() {
-
-                @Override
-                public void run() {
-                    Form f = Display.getInstance().getCurrent();
-                    if (f != null) {
-                        f.repaint();
-                    }
-                }
-                
-            });
+            handlePaintLoopException(ex, "NOTICE: Hit concurrent modification race condition in flushGraphics.  Skipping flush, and issuing another repaint.");
+            return;
+        } catch (ArrayIndexOutOfBoundsException arrayIndexOutOfBoundsException) {
+            handlePaintLoopException(arrayIndexOutOfBoundsException, "NOTICE: Hit array index out of bounds in flushGraphics.  Skipping flush, and issuing another repaint.");
             return;
         }
 
-        int children = getChildCount();
         if (rect == null) {
             postInvalidate();
         } else {
@@ -443,6 +433,20 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         graphics.setClip(0, 0, cn1View.width, cn1View.height);
         graphics.setAlpha(255);
         graphics.setColor(0);
+    }
+
+    private void handlePaintLoopException(Exception ex, String message) {
+        Log.p(message);
+        Log.e(ex);
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = Display.getInstance().getCurrent();
+                if (f != null) {
+                    f.repaint();
+                }
+            }
+        });
     }
 
     @Override
