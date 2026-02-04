@@ -247,9 +247,9 @@ public abstract class MathUtil {
      * compiler will convert from decimal to binary accurately enough
      * to produce the hexadecimal values shown.
      */
-    private static final double[] bp = {1.0, 1.5,};
-    private static final double[] dp_h = {0.0, 5.84962487220764160156e-01,}; /* 0x3FE2B803, 0x40000000 */
-    private static final double[] dp_l = {0.0, 1.35003920212974897128e-08,}; /* 0x3E4CFDEB, 0x43CFD006 */
+    private static final double[] bp = {1.0, 1.5};
+    private static final double[] dp_h = {0.0, 5.84962487220764160156e-01}; /* 0x3FE2B803, 0x40000000 */
+    private static final double[] dp_l = {0.0, 1.35003920212974897128e-08}; /* 0x3E4CFDEB, 0x43CFD006 */
     private static final double/* poly coefs for (3/2)*(log(x)-2s-2/3*s**3 */
             L1 = 5.99999999999994648725e-01; /* 0x3FE33333, 0x33333303 */
     private static final double L2 = 4.28571428578550184252e-01; /* 0x3FDB6DB6, 0xDB6FABFF */
@@ -446,7 +446,7 @@ public abstract class MathUtil {
             yl += ((long) k << (20 + HI_SHIFT)); /* add k to y's exponent */
             return Double.longBitsToDouble(yl);
         } else {
-            yl += ((long) (k + 1000) << (20 + HI_SHIFT));/* add k to y's exponent */
+            yl += ((long) (k + 1000) << (20 + HI_SHIFT)); /* add k to y's exponent */
             return Double.longBitsToDouble(yl) * twom1000;
         }
     }
@@ -666,7 +666,7 @@ public abstract class MathUtil {
 
         s = one; /* s (sign of result -ve**odd) = -1 else = 1 */
         if ((n | (yisint - 1)) == 0) {
-            s = -one;/* (-ve)**(odd int) */
+            s = -one; /* (-ve)**(odd int) */
         }
 
         /* |y| is huge */
@@ -877,7 +877,7 @@ public abstract class MathUtil {
         }
         if (ix < 0x3fe00000) { /* |x| < 0.5 */
             if (ix <= 0x3c600000) {
-                return pio2_hi + pio2_lo;/*if|x|<2**-57*/
+                return pio2_hi + pio2_lo; /*if|x|<2**-57*/
             }
             z = x * x;
             p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
@@ -955,7 +955,7 @@ public abstract class MathUtil {
             return 1.0;   /* asin(|x|>1) is NaN */
         } else if (ix < 0x3fe00000) { /* |x|<0.5 */
             if (ix < 0x3e400000) {   /* if |x| < 2**-27 */
-                return x;/* return x with inexact if x!=0*/
+                return x; /* return x with inexact if x!=0*/
             } else {
                 t = x * x;
                 p = t * (pS0 + t * (pS1 + t * (pS2 + t * (pS3 + t * (pS4 + t * pS5)))));
@@ -1014,7 +1014,7 @@ public abstract class MathUtil {
         }
         if (ix < 0x3fdc0000) {  /* |x| < 0.4375 */
             if (ix < 0x3e200000) {  /* |x| < 2^-29 */
-                return x;/* return x with inexact if x!=0*/
+                return x; /* return x with inexact if x!=0*/
             }
             id = -1;
         } else {
@@ -1113,9 +1113,9 @@ public abstract class MathUtil {
                 case 1:
                     return y;   /* atan(+-0,+anything)=+-0 */
                 case 2:
-                    return pi + tiny;/* atan(+0,-anything) = pi */
+                    return pi + tiny; /* atan(+0,-anything) = pi */
                 case 3:
-                    return -pi - tiny;/* atan(-0,-anything) =-pi */
+                    return -pi - tiny; /* atan(-0,-anything) =-pi */
                 default:
                     break;
             }
@@ -1130,13 +1130,13 @@ public abstract class MathUtil {
             if (iy == 0x7ff00000) {
                 switch (m) {
                     case 0:
-                        return pi_o_4 + tiny;/* atan(+INF,+INF) */
+                        return pi_o_4 + tiny; /* atan(+INF,+INF) */
                     case 1:
-                        return -pi_o_4 - tiny;/* atan(-INF,+INF) */
+                        return -pi_o_4 - tiny; /* atan(-INF,+INF) */
                     case 2:
-                        return 3.0 * pi_o_4 + tiny;/*atan(+INF,-INF)*/
+                        return 3.0 * pi_o_4 + tiny; /*atan(+INF,-INF)*/
                     case 3:
-                        return -3.0 * pi_o_4 - tiny;/*atan(-INF,-INF)*/
+                        return -3.0 * pi_o_4 - tiny; /*atan(-INF,-INF)*/
                     default:
                         break;
                 }
@@ -1175,9 +1175,9 @@ public abstract class MathUtil {
             case 1:
                 return -z; /* atan(-,+) */
             case 2:
-                return pi - (z - pi_lo);/* atan(+,-) */
+                return pi - (z - pi_lo); /* atan(+,-) */
             default: /* case 3 */
-                return (z - pi_lo) - pi;/* atan(-,-) */
+                return (z - pi_lo) - pi; /* atan(-,-) */
         }
     }
 

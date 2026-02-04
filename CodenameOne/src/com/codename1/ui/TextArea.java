@@ -1241,8 +1241,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 rowText = new String(text, from, spaceIndex - from);
                 from = spaceIndex + 1;
 
-            } // if there is no space from minCharactersInRow to limit need to search backwards
-            else {
+            } else {
+                // if there is no space from minCharactersInRow to limit need to search backwards
                 for (i = to; spaceIndex == -1 && i >= from; i--) {
                     char chr = text[i];
                     if (chr == ' ' || chr == '\n' || chr == '\t') {

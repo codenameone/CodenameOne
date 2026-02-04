@@ -59,7 +59,8 @@ final class TPrimality {
     private static final int[][] offsetPrimes = {null, null, {0, 2}, {2, 2}, {4, 2}, {6, 5}, {11, 7},
             {18, 13}, {31, 23}, {54, 43}, {97, 75}};
 
-    static {// To initialize the dual table of BigInteger primes
+    static {
+        // To initialize the dual table of BigInteger primes
         for (int i = 0; i < primes.length; i++) {
             BIprimes[i] = TBigInteger.valueOf(primes[i]);
         }
@@ -163,7 +164,8 @@ final class TPrimality {
         TBigInteger n = new TBigInteger(1, last, new int[last]);
 
         last--;
-        do {// To fill the array with random integers
+        do {
+            // To fill the array with random integers
             for (int i = 0; i < n.numberLength; i++) {
                 n.digits[i] = rnd.nextInt();
             }
@@ -237,11 +239,12 @@ final class TPrimality {
             // To generate a witness 'x', first it use the primes of table
             if (i < primes.length) {
                 x = BIprimes[i];
-            } else {/*
-             * It generates random witness only if it's necesssary. Note
-             * that all methods would call Miller-Rabin with t <= 50 so
-             * this part is only to do more robust the algorithm
-             */
+            } else {
+                /*
+                 * It generates random witness only if it's necesssary. Note
+                 * that all methods would call Miller-Rabin with t <= 50 so
+                 * this part is only to do more robust the algorithm
+                 */
                 do {
                     x = new TBigInteger(bitLength, rnd);
                 } while ((x.compareTo(n) >= TBigInteger.EQUALS) || (x.sign == 0) || x.isOne());

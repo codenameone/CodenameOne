@@ -104,7 +104,8 @@ final class TBitLevel {
             for (; i < val.numberLength; i++) {
                 bCount += TBigDecimal.bitCount(val.digits[i]);
             }
-        } else {// (sign < 0)
+        } else {
+            // (sign < 0)
             // this digit absorbs the carry
             bCount += TBigDecimal.bitCount(-val.digits[i]);
             for (i++; i < val.numberLength; i++) {
@@ -366,7 +367,8 @@ final class TBitLevel {
                     }
                 }
             }
-        } else {// case where val is positive
+        } else {
+            // case where val is positive
             resDigits[intCount] ^= bitNumber;
         }
         TBigInteger result = new TBigInteger(resSign, resLength, resDigits);

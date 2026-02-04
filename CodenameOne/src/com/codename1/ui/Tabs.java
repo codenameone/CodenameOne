@@ -987,7 +987,7 @@ public class Tabs extends Container {
             super.addComponent(BorderLayout.SOUTH, tabsContainer);
         } else if (tabPlacement == LEFT) {
             super.addComponent(BorderLayout.WEST, tabsContainer);
-        } else {// RIGHT
+        } else { // RIGHT
             super.addComponent(BorderLayout.EAST, tabsContainer);
         }
 
@@ -1216,7 +1216,7 @@ public class Tabs extends Container {
             }
             tabsContainer.setScrollableX(true);
             tabsContainer.setScrollableY(false);
-        } else {// LEFT Or RIGHT
+        } else { // LEFT Or RIGHT
             if (tabsGridLayout) {
                 tabsContainer.setLayout(new GridLayout(Math.max(1, getTabCount()), 1));
             } else {

@@ -783,7 +783,7 @@ public final class Grid {
             ResizeConstraint[] resConstr = new ResizeConstraint[]{
                     cw.isPushGap(isHor, true) ? GAP_RC_CONST_PUSH : GAP_RC_CONST,
                     cDc.resize,
-                    cw.isPushGap(isHor, false) ? GAP_RC_CONST_PUSH : GAP_RC_CONST,};
+                    cw.isPushGap(isHor, false) ? GAP_RC_CONST_PUSH : GAP_RC_CONST};
 
             int[][] sz = new int[][]{
                     cw.getGaps(isHor, true), cw.getSizes(isHor), cw.getGaps(isHor, false)

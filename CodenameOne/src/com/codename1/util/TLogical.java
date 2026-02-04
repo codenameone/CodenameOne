@@ -65,7 +65,8 @@ final class TLogical {
                 }
             }
             // Here a carry 1 was generated
-        } else {// (val.sign < 0)
+        } else {
+            // (val.sign < 0)
             // ~val = -val - 1
             for (i = 0; val.digits[i] == 0; i++) {
                 resDigits[i] = -1;
@@ -587,7 +588,8 @@ final class TLogical {
                 resDigits[i] = negative.digits[i] - 1;
             }
             i++;
-        } else {// iNeg == iPos
+        } else {
+            // iNeg == iPos
             // Applying two complement to negative and to result
             i = iPos;
             resDigits[i] = -(-negative.digits[i] | positive.digits[i]);

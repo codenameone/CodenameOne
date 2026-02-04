@@ -453,8 +453,8 @@ public class DateUtil {
         // Seconds
         if (seconds <= 60) {
             return "Just now";
-        } //Minutes
-        else {
+        } else {
+            //Minutes
             int minutes = (int) Math.round(seconds / 60.0d);
 
             if (minutes <= 60) {
@@ -463,8 +463,8 @@ public class DateUtil {
                 } else {
                     return minutes + " minutes ago";
                 }
-            } //Hours
-            else {
+            } else {
+                //Hours
                 int hours = (int) Math.round(seconds / 3600.0d);
                 if (hours <= 24) {
                     if (hours == 1) {
@@ -472,8 +472,8 @@ public class DateUtil {
                     } else {
                         return hours + " hours ago";
                     }
-                } //Days
-                else {
+                } else {
+                    //Days
                     int days = (int) Math.round(seconds / 86400.0d);
                     if (days <= 7) {
                         if (days == 1) {
@@ -481,8 +481,8 @@ public class DateUtil {
                         } else {
                             return days + " days ago";
                         }
-                    } //Weeks
-                    else {
+                    } else {
+                        //Weeks
                         int weeks = (int) Math.round(seconds / 604800.0d);
                         if (weeks <= 4.3) {
                             if (weeks == 1) {
@@ -490,8 +490,8 @@ public class DateUtil {
                             } else {
                                 return weeks + " weeks ago";
                             }
-                        } //Months
-                        else {
+                        } else {
+                            //Months
                             int months = (int) Math.round(seconds / 2600640.0d);
                             if (months <= 12) {
                                 if (months == 1) {
@@ -499,8 +499,8 @@ public class DateUtil {
                                 } else {
                                     return months + " months ago";
                                 }
-                            } //Years
-                            else {
+                            } else {
+                                //Years
                                 int years = (int) Math.round(seconds / 31207680.0d);
                                 if (years == 1) {
                                     return "1 year ago";

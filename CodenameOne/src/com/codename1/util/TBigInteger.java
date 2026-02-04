@@ -333,7 +333,8 @@ class TBigInteger {
             return MINUS_ONE;
         } else if (val <= 10) {
             return SMALL_VALUES[(int) val];
-        } else {// (val > 10)
+        } else {
+            // (val > 10)
             return new TBigInteger(1, val);
         }
     }
