@@ -230,81 +230,29 @@ def parse_jacoco() -> Tuple[Optional[float], List[CoverageEntry]]:
 
 
 def parse_spotbugs() -> Tuple[Optional[AnalysisReport], bool, Optional[str]]:
-    report_path: Optional[Path] = None
+    report_paths: List[Path] = []
     for target_dir in TARGET_DIRS:
         for candidate in ("spotbugsXml.xml", "spotbugs.xml"):
             path = target_dir / candidate
             if path.exists():
-                report_path = path
+                report_paths.append(path)
                 break
-        if report_path is not None:
-            break
-    if report_path is None:
+    if not report_paths:
         return None, False, None
-    try:
-        root = ET.parse(report_path).getroot()
-    except ET.ParseError as error:
-        return None, True, f"unable to parse {report_path.name}: {error}"
     severities = {"High": 0, "Normal": 0, "Low": 0}
     findings: List[Finding] = []
-    bug_instances = root.findall("BugInstance")
-    if bug_instances:
-        for bug in bug_instances:
-            priority = bug.attrib.get("priority")
-            if priority == "1":
-                severity = "High"
-            elif priority == "2":
-                severity = "Normal"
-            else:
-                severity = "Low"
-            severities[severity] += 1
-            message = _clean_message(
-                bug.attrib.get("message")
-                or bug.findtext("LongMessage")
-                or bug.findtext("ShortMessage")
-            )
-            bug_type = bug.attrib.get("type")
-            source_line = bug.find(".//SourceLine[@primary='true']")
-            if source_line is None:
-                source_line = bug.find(".//SourceLine")
-            if source_line is not None:
-                source_path = source_line.attrib.get("sourcepath")
-                line = (
-                    bug.attrib.get("lineNumber")
-                    or source_line.attrib.get("start")
-                    or source_line.attrib.get("end")
-                )
-            else:
-                source_path = None
-                line = bug.attrib.get("lineNumber")
-            path_rel = _relative_path(source_path) if source_path else None
-            if path_rel:
-                location = path_rel
-                if line:
-                    location = f"{location}:{line}"
-            else:
-                class_elem = bug.find("Class")
-                class_name = class_elem.attrib.get("classname") if class_elem is not None else bug.attrib.get("type")
-                location = class_name or "Unknown"
-                if line:
-                    location = f"{location}:{line}"
-            findings.append(
-                Finding(
-                    severity=severity,
-                    location=location,
-                    message=message or bug_type or "Issue detected",
-                    rule=bug_type,
-                    path=path_rel,
-                    line=_safe_int(line),
-                )
-            )
-    else:
-        for file_elem in root.findall("file"):
-            class_name = file_elem.attrib.get("classname") or file_elem.attrib.get("name")
-            source_path = file_elem.attrib.get("sourcepath") or file_elem.attrib.get("name")
-            if not source_path and class_name:
-                source_path = class_name.replace(".", "/") + ".java"
-            for bug in file_elem.findall("BugInstance"):
+    errors: List[str] = []
+    parsed_any = False
+    for report_path in report_paths:
+        try:
+            root = ET.parse(report_path).getroot()
+        except ET.ParseError as error:
+            errors.append(f"unable to parse {report_path.name}: {error}")
+            continue
+        parsed_any = True
+        bug_instances = root.findall("BugInstance")
+        if bug_instances:
+            for bug in bug_instances:
                 priority = bug.attrib.get("priority")
                 if priority == "1":
                     severity = "High"
@@ -314,18 +262,35 @@ def parse_spotbugs() -> Tuple[Optional[AnalysisReport], bool, Optional[str]]:
                     severity = "Low"
                 severities[severity] += 1
                 message = _clean_message(
-                    bug.findtext("ShortMessage")
+                    bug.attrib.get("message")
                     or bug.findtext("LongMessage")
-                    or bug.attrib.get("message")
+                    or bug.findtext("ShortMessage")
                 )
                 bug_type = bug.attrib.get("type")
-                line = bug.attrib.get("lineNumber")
-                path_rel = _relative_path(source_path) if source_path else None
-                location_base = path_rel or class_name or "Unknown"
-                if line:
-                    location = f"{location_base}:{line}"
+                source_line = bug.find(".//SourceLine[@primary='true']")
+                if source_line is None:
+                    source_line = bug.find(".//SourceLine")
+                if source_line is not None:
+                    source_path = source_line.attrib.get("sourcepath")
+                    line = (
+                        bug.attrib.get("lineNumber")
+                        or source_line.attrib.get("start")
+                        or source_line.attrib.get("end")
+                    )
                 else:
-                    location = location_base
+                    source_path = None
+                    line = bug.attrib.get("lineNumber")
+                path_rel = _relative_path(source_path) if source_path else None
+                if path_rel:
+                    location = path_rel
+                    if line:
+                        location = f"{location}:{line}"
+                else:
+                    class_elem = bug.find("Class")
+                    class_name = class_elem.attrib.get("classname") if class_elem is not None else bug.attrib.get("type")
+                    location = class_name or "Unknown"
+                    if line:
+                        location = f"{location}:{line}"
                 findings.append(
                     Finding(
                         severity=severity,
@@ -336,9 +301,52 @@ def parse_spotbugs() -> Tuple[Optional[AnalysisReport], bool, Optional[str]]:
                         line=_safe_int(line),
                     )
                 )
+        else:
+            for file_elem in root.findall("file"):
+                class_name = file_elem.attrib.get("classname") or file_elem.attrib.get("name")
+                source_path = file_elem.attrib.get("sourcepath") or file_elem.attrib.get("name")
+                if not source_path and class_name:
+                    source_path = class_name.replace(".", "/") + ".java"
+                for bug in file_elem.findall("BugInstance"):
+                    priority = bug.attrib.get("priority")
+                    if priority == "1":
+                        severity = "High"
+                    elif priority == "2":
+                        severity = "Normal"
+                    else:
+                        severity = "Low"
+                    severities[severity] += 1
+                    message = _clean_message(
+                        bug.findtext("ShortMessage")
+                        or bug.findtext("LongMessage")
+                        or bug.attrib.get("message")
+                    )
+                    bug_type = bug.attrib.get("type")
+                    line = bug.attrib.get("lineNumber")
+                    path_rel = _relative_path(source_path) if source_path else None
+                    location_base = path_rel or class_name or "Unknown"
+                    if line:
+                        location = f"{location_base}:{line}"
+                    else:
+                        location = location_base
+                    findings.append(
+                        Finding(
+                            severity=severity,
+                            location=location,
+                            message=message or bug_type or "Issue detected",
+                            rule=bug_type,
+                            path=path_rel,
+                            line=_safe_int(line),
+                        )
+                    )
+    if not parsed_any:
+        error_message = errors[0] if errors else "unable to parse SpotBugs report"
+        return None, True, error_message
     if findings:
         severity_order = {"High": 0, "Normal": 1, "Low": 2}
-        findings.sort(key=lambda item: (severity_order.get(item.severity, 99)))
+        findings.sort(
+            key=lambda item: (severity_order.get(item.severity, 99), item.location)
+        )
     return AnalysisReport(totals=severities, findings=findings), True, None
 
 
