@@ -79,7 +79,6 @@ class CleanTargetIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
 
         Path srcRoot = distDir.resolve("HelloCleanApp-src");
-        patchCn1Globals(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
@@ -180,20 +179,6 @@ class CleanTargetIntegrationTest {
         assertEquals(0, exit, "Command failed: " + String.join(" ", command) + "\nOutput:\n" + output);
         return output;
     }
-
-    static void patchCn1Globals(Path srcRoot) throws IOException {
-        Path cn1Globals = srcRoot.resolve("cn1_globals.h");
-        String content = new String(Files.readAllBytes(cn1Globals), StandardCharsets.UTF_8);
-        if (!content.contains("@class NSString;")) {
-            content = content.replace("#ifdef __OBJC__\n", "#ifdef __OBJC__\n@class NSString;\n");
-            Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
-        }
-        if (!content.contains("#include <string.h>")) {
-            content = content.replace("#include <stdlib.h>\n", "#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n#include <limits.h>\n");
-            Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
-        }
-    }
-
 
     static String helloWorldSource() {
         return "public class HelloWorld {\n" +

@@ -75,10 +75,6 @@ class ReadWriteLockIntegrationTest {
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists));
 
-        Path srcRoot = distDir.resolve("ReadWriteLockTestApp-src");
-        CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
-        ensureReentrantReadWriteLockHeader(srcRoot);
-
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
@@ -191,18 +187,4 @@ class ReadWriteLockIntegrationTest {
     }
 
 
-    private void ensureReentrantReadWriteLockHeader(Path srcRoot) throws java.io.IOException {
-        Path header = srcRoot.resolve("java_util_concurrent_locks_ReentrantReadWriteLock.h");
-        if (!Files.exists(header)) {
-            return;
-        }
-        String content = new String(Files.readAllBytes(header), StandardCharsets.UTF_8);
-        if (content.contains("virtual_java_util_concurrent_locks_ReentrantReadWriteLock_readLock")) {
-            return;
-        }
-        String additions = "JAVA_OBJECT virtual_java_util_concurrent_locks_ReentrantReadWriteLock_readLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject);\n" +
-                "JAVA_OBJECT virtual_java_util_concurrent_locks_ReentrantReadWriteLock_writeLock___R_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject);\n";
-        content = content.replace("#endif\n", additions + "#endif\n");
-        Files.write(header, content.getBytes(StandardCharsets.UTF_8));
-    }
 }

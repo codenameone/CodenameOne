@@ -111,7 +111,6 @@ class BytecodeInstructionIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project for the optimized sample");
 
         Path srcRoot = distDir.resolve("CustomBytecodeApp-src");
-        CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
 
         Path generatedSource = findGeneratedSource(srcRoot);
         String generatedCode = new String(Files.readAllBytes(generatedSource), StandardCharsets.UTF_8);
@@ -262,7 +261,6 @@ class BytecodeInstructionIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project for Invoke/Ldc sample");
 
         Path srcRoot = distDir.resolve("InvokeLdcLocalVars-src");
-        CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
 
         Path generatedSource = findGeneratedSource(srcRoot, "InvokeLdcLocalVarsApp");
         String generatedCode = new String(Files.readAllBytes(generatedSource), StandardCharsets.UTF_8);

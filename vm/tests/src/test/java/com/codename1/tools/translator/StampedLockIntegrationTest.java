@@ -75,9 +75,6 @@ class StampedLockIntegrationTest {
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists));
 
-        Path srcRoot = distDir.resolve("StampedLockTestApp-src");
-        CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
-
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
