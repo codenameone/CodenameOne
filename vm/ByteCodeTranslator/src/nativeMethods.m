@@ -503,7 +503,7 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
 
 JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
     if (get_field_java_lang_Throwable_stack(__cn1ThisObject) == JAVA_NULL) {
-        set_field_java_lang_Throwable_stack(threadStateData, java_lang_Throwable_getStack___R_java_lang_String(threadStateData, __cn1ThisObject), __cn1ThisObject);
+        set_field_java_lang_Throwable_stack(java_lang_Throwable_getStack___R_java_lang_String(threadStateData, __cn1ThisObject), __cn1ThisObject);
     }
     
 }
@@ -1781,7 +1781,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODE
     }
     JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)value)->data;
     d[len] = __cn1Arg1;
-    set_field_java_lang_StringBuilder_count(threadStateData, len+1, __cn1ThisObject);
+    set_field_java_lang_StringBuilder_count(len+1, __cn1ThisObject);
     finishedNativeAllocations();
     return __cn1ThisObject;
 }
