@@ -89,11 +89,7 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
                 return null;
             });
             if (res != null) {
-                if (res instanceof MojoExecutionException) {
-                    throw (MojoFailureException) res;
-                } else {
-                    throw new MojoFailureException("Failed to compile RAD views:" + res.getMessage(), res);
-                }
+                throw new MojoFailureException("Failed to compile RAD views:" + res.getMessage(), res);
             }
 
         }
