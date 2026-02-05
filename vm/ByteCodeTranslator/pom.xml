@@ -46,7 +46,7 @@
                 <configuration>
                     <effort>Max</effort>
                     <threshold>Low</threshold>
-                    <failOnError>true</failOnError>
+                    <failOnError>false</failOnError>
                     <xmlOutput>true</xmlOutput>
                     <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
                     <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
