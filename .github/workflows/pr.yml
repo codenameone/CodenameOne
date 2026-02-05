@@ -93,10 +93,23 @@ jobs:
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl codenameone-maven-plugin -am -Plocal-dev-javase test
+      - name: Run SpotBugs for ports and Maven plugin
+        if: ${{ matrix.java-version == 8 }}
+        working-directory: maven
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          mvn -B -DskipTests=true \
+            -Dcn1.binaries="${CN1_BINARIES}" \
+            -Pcompile-android \
+            -pl android,ios,codenameone-maven-plugin -am verify
+      - name: Run SpotBugs for ByteCodeTranslator
+        if: ${{ matrix.java-version == 8 }}
+        run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml verify
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -109,10 +122,20 @@ jobs:
           mkdir -p quality-artifacts/static-analysis
           mkdir -p quality-artifacts/coverage
           shopt -s nullglob
-          for path in maven/core-unittests/target/spotbugsXml.xml maven/core-unittests/target/spotbugs.xml; do
-            if [ -f "$path" ]; then
-              cp "$path" quality-artifacts/static-analysis/
-            fi
+          for entry in \
+            "core-unittests:maven/core-unittests/target" \
+            "android:maven/android/target" \
+            "ios:maven/ios/target" \
+            "bytecode-translator:vm/ByteCodeTranslator/target" \
+            "maven-plugin:maven/codenameone-maven-plugin/target"; do
+            label="${entry%%:*}"
+            dir="${entry#*:}"
+            for filename in spotbugsXml.xml spotbugs.xml; do
+              if [ -f "${dir}/${filename}" ]; then
+                cp "${dir}/${filename}" "quality-artifacts/static-analysis/spotbugs-${label}.xml"
+                break
+              fi
+            done
           done
           if [ -f maven/core-unittests/target/pmd.xml ]; then
             cp maven/core-unittests/target/pmd.xml quality-artifacts/static-analysis/
@@ -206,7 +229,7 @@ jobs:
       - name: Generate quality report summary
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
