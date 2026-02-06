@@ -34,78 +34,60 @@ import static com.codename1.ui.Component.LEFT;
 import static com.codename1.ui.Component.RIGHT;
 import static com.codename1.ui.Component.TOP;
 
-/**
- * <p>A border that can be configured using a limited subset of CSS directives.  This
- * class is designed as a stop-gap to deal with common CSS style patterns that aren't
- * well-covered by existing borders.  As time goes on this class will be enhanced to
- * support more CSS styles.  At present, it is used by the CSS compiler for compound borders.
- * E.g. If one side has a different border style, color, or thickness than other sides.</p>
- *
- * <p>The follow types of borders are well-supported with this class:</p>
- *
- * <ul>
- * <li>border-radius - can support different x and y radii for each corner.</li>
- * <li>border-width - can support different widths for each side.</li>
- * <li>border-color - can support different colors for each side</li>
- * <li>background-color</li>
- * </ul>
- *
- * <p>This class also supports background images and gradients, but these are not well-tested
- * and are not currently used by the CSS compiler.</p>
- *
- * @author shannah
- * @since 7.0
- */
+/// A border that can be configured using a limited subset of CSS directives.  This
+/// class is designed as a stop-gap to deal with common CSS style patterns that aren't
+/// well-covered by existing borders.  As time goes on this class will be enhanced to
+/// support more CSS styles.  At present, it is used by the CSS compiler for compound borders.
+/// E.g. If one side has a different border style, color, or thickness than other sides.
+///
+/// The follow types of borders are well-supported with this class:
+///
+/// - border-radius - can support different x and y radii for each corner.
+///
+/// - border-width - can support different widths for each side.
+///
+/// - border-color - can support different colors for each side
+///
+/// - background-color
+///
+/// This class also supports background images and gradients, but these are not well-tested
+/// and are not currently used by the CSS compiler.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public class CSSBorder extends Border {
-    /**
-     * Constant indicating no-repeat for background images.
-     */
+    /// Constant indicating no-repeat for background images.
     public static final byte REPEAT_NONE = 0;
 
-    /**
-     * Constant indicating repeating on both x and y for background images.
-     */
+    /// Constant indicating repeating on both x and y for background images.
     public static final byte REPEAT_BOTH = 1;
 
-    /**
-     * Constant indicating repeat-x for background images.
-     */
+    /// Constant indicating repeat-x for background images.
     public static final byte REPEAT_X = 2;
 
-    /**
-     * Constant indicating repeat-y for background images.
-     */
+    /// Constant indicating repeat-y for background images.
     public static final byte REPEAT_Y = 3;
 
-    /**
-     * Constant indicating background-position top.
-     */
+    /// Constant indicating background-position top.
     public static final byte VPOSITION_TOP = 0;
 
-    /**
-     * Constant indicating background-position bottom.
-     */
+    /// Constant indicating background-position bottom.
     public static final byte VPOSITION_BOTTOM = 1;
 
-    /**
-     * Constant indicating background-position center.
-     */
+    /// Constant indicating background-position center.
     public static final byte VPOSITION_CENTER = 2;
     public static final byte VPOSITION_OTHER = 99;
 
-    /**
-     * Constant indicating background-position left.
-     */
+    /// Constant indicating background-position left.
     public static final byte HPOSITION_LEFT = 0;
 
-    /**
-     * Constant indicating background-position right.
-     */
+    /// Constant indicating background-position right.
     public static final byte HPOSITION_RIGHT = 1;
 
-    /**
-     * Constant indicating background-position center (horizontal).
-     */
+    /// Constant indicating background-position center (horizontal).
     public static final byte HPOSITION_CENTER = 2;
     public static final byte HPOSITION_OTHER = 99;
 
@@ -115,46 +97,28 @@ public class CSSBorder extends Border {
     public static final byte SIZE_COVER = 2;
     public static final byte SIZE_OTHER = 99;
 
-    /**
-     * Constant for border-style none
-     */
+    /// Constant for border-style none
     public static final byte STYLE_NONE = 0;
 
-    /**
-     * Constant for border-style hidden
-     */
+    /// Constant for border-style hidden
     public static final byte STYLE_HIDDEN = 1;
 
-    /**
-     * Constant for border-style dotted
-     */
+    /// Constant for border-style dotted
     public static final byte STYLE_DOTTED = 2;
 
 
-    /**
-     * Constant for border-style dashed
-     */
+    /// Constant for border-style dashed
     public static final byte STYLE_DASHED = 3;
 
-    /**
-     * Constant for border-style solid
-     */
+    /// Constant for border-style solid
     public static final byte STYLE_SOLID = 4;
-    /**
-     * Constant for unit px
-     */
+    /// Constant for unit px
     public static final byte UNIT_PIXELS = 0;
-    /**
-     * Constant for unit mm
-     */
+    /// Constant for unit mm
     public static final byte UNIT_MM = 2;
-    /**
-     * Constant for unit %
-     */
+    /// Constant for unit %
     public static final byte UNIT_PERCENT = 1;
-    /**
-     * Constant for unit em
-     */
+    /// Constant for unit em
     public static final byte UNIT_EM = 4;
     private static final Map<String, Decorator> decorators = new HashMap<String, Decorator>();
     private static final Map<String, Byte> STYLE_MAP = createStyleMap();
@@ -238,73 +202,88 @@ public class CSSBorder extends Border {
     private BorderRadius borderRadius;
     private Rectangle2D contentRect;
 
-    /**
-     * Creates a new empty CSS border.
-     */
+    /// Creates a new empty CSS border.
     public CSSBorder() {
         res = Resources.getGlobalResources();
     }
 
 
-    /**
-     * Creates an empty border.
-     *
-     * @param res Theme resource file from which images can be referenced.
-     */
+    /// Creates an empty border.
+    ///
+    /// #### Parameters
+    ///
+    /// - `res`: Theme resource file from which images can be referenced.
     public CSSBorder(Resources res) {
         this.res = res;
     }
 
-    /**
-     * Creates a new CSS border with the provided CSS styles.  This currenlty only supports a subset of CSS.  The following
-     * properties are currently supported:
-     *
-     * <p>
-     * <ul>
-     * <li>background-color</li>
-     * <li>background-image</li>
-     * <li>background-position</li>
-     * <li>background-repeat</li>
-     * <li>border-color</li>
-     * <li>border-radius</li>
-     * <li>border-stroke</li>
-     * <li>border-style</li>
-     * <li>border-width</li>
-     * <li>border-image</li>
-     * </ul>
-     * </p>
-     *
-     * @param css CSS to parse.
-     * @throws IllegalArgumentException If it fails to parse the style.
-     */
+    /// Creates a new CSS border with the provided CSS styles.  This currenlty only supports a subset of CSS.  The following
+    /// properties are currently supported:
+    ///
+    /// - background-color
+    ///
+    /// - background-image
+    ///
+    /// - background-position
+    ///
+    /// - background-repeat
+    ///
+    /// - border-color
+    ///
+    /// - border-radius
+    ///
+    /// - border-stroke
+    ///
+    /// - border-style
+    ///
+    /// - border-width
+    ///
+    /// - border-image
+    ///
+    /// #### Parameters
+    ///
+    /// - `css`: CSS to parse.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: If it fails to parse the style.
     public CSSBorder(String css) {
         this(Resources.getGlobalResources(), css);
 
     }
 
-    /**
-     * Creates a new CSS border with the provided CSS styles.  This currenlty only supports a subset of CSS.  The following
-     * properties are currently supported:
-     *
-     * <p>
-     * <ul>
-     * <li>background-color</li>
-     * <li>background-image</li>
-     * <li>background-position</li>
-     * <li>background-repeat</li>
-     * <li>border-color</li>
-     * <li>border-radius</li>
-     * <li>border-stroke</li>
-     * <li>border-style</li>
-     * <li>border-width</li>
-     * <li>border-image</li>
-     * </ul>
-     * </p>
-     *
-     * @param res Theme resource file from which images can be loaded.
-     * @param css CSS to parse.
-     * @throws IllegalArgumentException If it fails to parse the style.
-     */
+    /// Creates a new CSS border with the provided CSS styles.  This currenlty only supports a subset of CSS.  The following
+    /// properties are currently supported:
+    ///
+    /// - background-color
+    ///
+    /// - background-image
+    ///
+    /// - background-position
+    ///
+    /// - background-repeat
+    ///
+    /// - border-color
+    ///
+    /// - border-radius
+    ///
+    /// - border-stroke
+    ///
+    /// - border-style
+    ///
+    /// - border-width
+    ///
+    /// - border-image
+    ///
+    /// #### Parameters
+    ///
+    /// - `res`: Theme resource file from which images can be loaded.
+    ///
+    /// - `css`: CSS to parse.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: If it fails to parse the style.
     public CSSBorder(Resources res, String css) {
         this.res = res;
         String[] parts = Util.split(css, ";");
@@ -398,11 +377,11 @@ public class CSSBorder extends Border {
         return System.identityHashCode(this);
     }
 
-    /**
-     * Converts this border to a CSS string.
-     *
-     * @return CSS string for this border.
-     */
+    /// Converts this border to a CSS string.
+    ///
+    /// #### Returns
+    ///
+    /// CSS string for this border.
     public String toCSSString() {
         StringBuilder sb = new StringBuilder();
         if (backgroundColor != null) {
@@ -473,15 +452,17 @@ public class CSSBorder extends Border {
         return borderRadius != null && borderRadius.hasNonZeroRadius();
     }
 
-    /**
-     * Since borders are drawn inside the bounds of components - this differs from HTML.  We
-     * need to be able to find the inner content bounds of the component so that we have room to
-     * draw shadows, etc..
-     *
-     * @param outerWidth
-     * @param outerHeight
-     * @param rect        Out param
-     */
+    /// Since borders are drawn inside the bounds of components - this differs from HTML.  We
+    /// need to be able to find the inner content bounds of the component so that we have room to
+    /// draw shadows, etc..
+    ///
+    /// #### Parameters
+    ///
+    /// - `outerWidth`
+    ///
+    /// - `outerHeight`
+    ///
+    /// - `rect`: Out param
     private void calculateContentRect(int outerWidth, int outerHeight, Rectangle2D rect) {
         int paddingLeft = 0;
         int paddingRight = 0;
@@ -639,17 +620,13 @@ public class CSSBorder extends Border {
         return stroke[TOP].equals(stroke[BOTTOM]) && stroke[LEFT].equals(stroke[RIGHT]) && stroke[TOP].equals(stroke[LEFT]);
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public boolean isBackgroundPainter() {
         return true;
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public void paintBorderBackground(Graphics g, Component c) {
         if (borderImage != null) {
@@ -805,9 +782,7 @@ public class CSSBorder extends Border {
 
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public int getMinimumHeight() {
         if (borderImage != null) {
@@ -817,9 +792,7 @@ public class CSSBorder extends Border {
         return super.getMinimumHeight(); //To change body of generated methods, choose Tools | Templates.
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public int getMinimumWidth() {
         if (borderImage != null) {
@@ -828,49 +801,80 @@ public class CSSBorder extends Border {
         return super.getMinimumWidth();
     }
 
-    /**
-     * Creates a 9-piece image border.
-     *
-     * <p>Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.</p>
-     * <p>If a border image is set for the CSS border, it will override all other border types, and will result in only the 9-piece
-     * border being rendered.</p>
-     *
-     * @param borderImage The border image.
-     * @param slicePoints The slice points.  Accepts 1 - 4 values:
-     *                    <ul>
-     *                       <li>1 value = all sides</li>
-     *                       <li>2 values = vertical horizontal</li>
-     *                       <li>3 values = top horizontal bottom</li>
-     *                       <li>4 values = top right bottom left</li>
-     *                    </ul>
-     * @return Self for chaining.
-     * @see #borderImageWithName(java.lang.String, double...)
-     * @since 7.0
-     */
+    /// Creates a 9-piece image border.
+    ///
+    /// Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.
+    ///
+    /// If a border image is set for the CSS border, it will override all other border types, and will result in only the 9-piece
+    /// border being rendered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `borderImage`: The border image.
+    ///
+    /// - `slicePoints`: @param slicePoints The slice points.  Accepts 1 - 4 values:
+    ///
+    ///
+    ///
+    /// - 1 value = all sides
+    ///
+    /// - 2 values = vertical horizontal
+    ///
+    /// - 3 values = top horizontal bottom
+    ///
+    /// - 4 values = top right bottom left
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #borderImageWithName(java.lang.String, double...)
     public CSSBorder borderImage(Image borderImage, double... slicePoints) {
         this.borderImage = new BorderImage(res, borderImage, slicePoints);
         return this;
     }
 
-    /**
-     * Adds a 9-piece image border using the provided image name, which should exist in the
-     * theme resource file.
-     * <p>Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.</p>
-     * <p>If a border image is set for the CSS border, it will override all other border types, and will result in only the 9-piece
-     * border being rendered.</p>
-     *
-     * @param borderImageName The image name.
-     * @param slicePoints     The slice points.  Accepts 1 - 4 values:
-     *                        <ul>
-     *                           <li>1 value = all sides</li>
-     *                           <li>2 values = vertical horizontal</li>
-     *                           <li>3 values = top horizontal bottom</li>
-     *                           <li>4 values = top right bottom left</li>
-     *                        </ul>
-     * @return Self for chaining.
-     * @see #borderImage(com.codename1.ui.Image, double...)
-     * @since 7.0
-     */
+    /// Adds a 9-piece image border using the provided image name, which should exist in the
+    /// theme resource file.
+    ///
+    /// Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.
+    ///
+    /// If a border image is set for the CSS border, it will override all other border types, and will result in only the 9-piece
+    /// border being rendered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `borderImageName`: The image name.
+    ///
+    /// - `slicePoints`: @param slicePoints     The slice points.  Accepts 1 - 4 values:
+    ///
+    ///
+    ///
+    /// - 1 value = all sides
+    ///
+    /// - 2 values = vertical horizontal
+    ///
+    /// - 3 values = top horizontal bottom
+    ///
+    /// - 4 values = top right bottom left
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #borderImage(com.codename1.ui.Image, double...)
     public CSSBorder borderImageWithName(String borderImageName, double... slicePoints) {
         this.borderImage = new BorderImage(res, borderImageName, slicePoints);
         return this;
@@ -955,23 +959,21 @@ public class CSSBorder extends Border {
         }
     }
 
-    /**
-     * Sets the border radius for rounded corners.
-     *
-     * @param radius
-     * @return
-     */
+    /// Sets the border radius for rounded corners.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radius`
     public CSSBorder borderRadius(String radius) {
         borderRadius = new BorderRadius(radius);
         return this;
     }
 
-    /**
-     * Sets the border stroke.
-     *
-     * @param strokeStrs
-     * @return
-     */
+    /// Sets the border stroke.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeStrs`
     public CSSBorder borderStroke(String... strokeStrs) {
         this.stroke = new BorderStroke[4];
         int len = strokeStrs.length;
@@ -1002,12 +1004,15 @@ public class CSSBorder extends Border {
 
     }
 
-    /**
-     * Sets the border colors.
-     *
-     * @param colors The colors.  1 value sets all borders.  2 sets top/bottom, left/right.  3 sets top, left/right, bottom.  4 sets top, right, bottom, left.
-     * @return Self for chaining.
-     */
+    /// Sets the border colors.
+    ///
+    /// #### Parameters
+    ///
+    /// - `colors`: The colors.  1 value sets all borders.  2 sets top/bottom, left/right.  3 sets top, left/right, bottom.  4 sets top, right, bottom, left.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public CSSBorder borderColor(String... colors) {
         if (this.stroke == null) {
             return this.borderStroke("solid").borderColor(colors);
@@ -1038,12 +1043,15 @@ public class CSSBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the border widths.
-     *
-     * @param widths The widths. 1 value sets all borders.  2 sets top/bottom, left/right.  3 sets top, left/right, bottom.  4 sets top, right, bottom, left.
-     * @return Self for chaining.
-     */
+    /// Sets the border widths.
+    ///
+    /// #### Parameters
+    ///
+    /// - `widths`: The widths. 1 value sets all borders.  2 sets top/bottom, left/right.  3 sets top, left/right, bottom.  4 sets top, right, bottom, left.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public CSSBorder borderWidth(String... widths) {
         if (this.stroke == null) {
             return this.borderStroke("solid").borderWidth(widths);
@@ -1080,12 +1088,15 @@ public class CSSBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the border styles.  Supported styles: none, hidden, dotted, dashed, solid.
-     *
-     * @param styles The border styles.  1 value sets all borders.  2 sets top/bottom, left/right.  3 sets top, left/right, bottom.  4 sets top, right, bottom, left.
-     * @return Self for chaining.
-     */
+    /// Sets the border styles.  Supported styles: none, hidden, dotted, dashed, solid.
+    ///
+    /// #### Parameters
+    ///
+    /// - `styles`: The border styles.  1 value sets all borders.  2 sets top/bottom, left/right.  3 sets top, left/right, bottom.  4 sets top, right, bottom, left.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public CSSBorder borderStyle(String... styles) {
         try {
             if (stroke == null) {
@@ -1131,23 +1142,29 @@ public class CSSBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the background color of the border.
-     *
-     * @param color A color string.
-     * @return Self for chaining.
-     */
+    /// Sets the background color of the border.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: A color string.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public CSSBorder backgroundColor(String color) {
         backgroundColor = Color.parse(color);
         return this;
     }
 
-    /**
-     * Adds one or more background images from a CSS background-image property.
-     *
-     * @param cssDirective The value of the background-image property.
-     * @return Self for chaining.
-     */
+    /// Adds one or more background images from a CSS background-image property.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cssDirective`: The value of the background-image property.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public CSSBorder backgroundImage(String cssDirective) {
         String[] parts = Util.split(cssDirective, ",");
         List<Image> imgs = new ArrayList<Image>();
@@ -1180,12 +1197,15 @@ public class CSSBorder extends Border {
 
     }
 
-    /**
-     * Sets the background image of the border.
-     *
-     * @param images Images to use as background images.
-     * @return Self for chaining.
-     */
+    /// Sets the background image of the border.
+    ///
+    /// #### Parameters
+    ///
+    /// - `images`: Images to use as background images.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public CSSBorder backgroundImage(Image... images) {
         int len = images.length;
         if (backgroundImages == null) {
@@ -1211,12 +1231,15 @@ public class CSSBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the background-repeat for the background images.
-     *
-     * @param repeat Repeat options for respective background images.
-     * @return Self for chaining.
-     */
+    /// Sets the background-repeat for the background images.
+    ///
+    /// #### Parameters
+    ///
+    /// - `repeat`: Repeat options for respective background images.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public CSSBorder backgroundRepeat(String... repeat) {
         int len = repeat.length;
         if (len == 1 && repeat[0].indexOf(",") != -1) {
@@ -1241,12 +1264,15 @@ public class CSSBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the background position.
-     *
-     * @param pos The background positions of background images.
-     * @return Self for chaining.
-     */
+    /// Sets the background position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: The background positions of background images.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public CSSBorder backgroundPosition(String... pos) {
 
         int len = pos.length;

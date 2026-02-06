@@ -19,58 +19,57 @@
  */
 package com.codename1.maps;
 
-/**
- * This class represents a projection type.
- * a Projection has the ability to translate a WGS84 Coordinate to a
- * projected Coordinate.
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This class represents a projection type.
+/// a Projection has the ability to translate a WGS84 Coordinate to a
+/// projected Coordinate.
+///
+/// @author Roman Kamyk
 public abstract class Projection {
 
     private final BoundingBox extent;
 
-    /**
-     * Creates a projection to the given bounding box
-     *
-     * @param extent the bounding box of this projection
-     */
+    /// Creates a projection to the given bounding box
+    ///
+    /// #### Parameters
+    ///
+    /// - `extent`: the bounding box of this projection
     protected Projection(BoundingBox extent) {
         this.extent = extent;
     }
 
-    /**
-     * Gets the projection bounding box
-     *
-     * @return bounding box
-     */
+    /// Gets the projection bounding box
+    ///
+    /// #### Returns
+    ///
+    /// bounding box
     public BoundingBox extent() {
         return extent;
     }
 
-    /**
-     * Converts a given WGS84 coordinate to a projection coordinate
-     *
-     * @param wgs84
-     * @return
-     */
+    /// Converts a given WGS84 coordinate to a projection coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `wgs84`
     public abstract Coord fromWGS84(Coord wgs84);
 
-    /**
-     * Converts a projected coordinate to a WGS84 coordinate
-     *
-     * @param projection
-     * @return
-     */
+    /// Converts a projected coordinate to a WGS84 coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `projection`
     public abstract Coord toWGS84(Coord projection);
 
-    /**
-     * a utility method that converts an array of WGS84 coordinate to the
-     * projection coordinates system.
-     *
-     * @param coords an array to converts
-     * @return a converted array
-     */
+    /// a utility method that converts an array of WGS84 coordinate to the
+    /// projection coordinates system.
+    ///
+    /// #### Parameters
+    ///
+    /// - `coords`: an array to converts
+    ///
+    /// #### Returns
+    ///
+    /// a converted array
     public final Coord[] fromWGS84(Coord[] coords) {
         Coord[] newCoords = new Coord[coords.length];
         int length = coords.length;
@@ -80,22 +79,28 @@ public abstract class Projection {
         return newCoords;
     }
 
-    /**
-     * Converts a WGS84 bounding box to the projection system bounding box
-     *
-     * @param bbox bounding box too convert
-     * @return a converted bounding box
-     */
+    /// Converts a WGS84 bounding box to the projection system bounding box
+    ///
+    /// #### Parameters
+    ///
+    /// - `bbox`: bounding box too convert
+    ///
+    /// #### Returns
+    ///
+    /// a converted bounding box
     public final BoundingBox fromWGS84(BoundingBox bbox) {
         return new BoundingBox(fromWGS84(bbox.getSouthWest()), fromWGS84(bbox.getNorthEast()));
     }
 
-    /**
-     * Converts a projected bounding box to a WGS84 bounding box
-     *
-     * @param bbox bounding box too convert
-     * @return a converted bounding box
-     */
+    /// Converts a projected bounding box to a WGS84 bounding box
+    ///
+    /// #### Parameters
+    ///
+    /// - `bbox`: bounding box too convert
+    ///
+    /// #### Returns
+    ///
+    /// a converted bounding box
     public final BoundingBox toWGS84(BoundingBox bbox) {
         return new BoundingBox(toWGS84(bbox.getSouthWest()), toWGS84(bbox.getNorthEast()));
     }

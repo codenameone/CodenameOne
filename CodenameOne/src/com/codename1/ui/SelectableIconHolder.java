@@ -22,89 +22,102 @@
  */
 package com.codename1.ui;
 
-/**
- * An interface that is implemented by "selectable" components that hold icons, such as {@link Button},
- * {@link SpanButton}, {@link MultiButton}, etc...  This interface includes
- * methods for managing different icons for different component states (e.g. pressed, disabled, etc..).
- *
- * @author shannah
- * @since 7.0
- */
+/// An interface that is implemented by "selectable" components that hold icons, such as `Button`,
+/// `SpanButton`, `MultiButton`, etc...  This interface includes
+/// methods for managing different icons for different component states (e.g. pressed, disabled, etc..).
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public interface SelectableIconHolder extends IconHolder {
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * rolled over state
-     *
-     * @return icon used
-     * @see Button#STATE_ROLLOVER
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// rolled over state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    ///
+    /// #### See also
+    ///
+    /// - Button#STATE_ROLLOVER
     Image getRolloverIcon();
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * rolled over state
-     *
-     * @param rolloverIcon icon to use
-     * @see Button#STATE_ROLLOVER
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// rolled over state
+    ///
+    /// #### Parameters
+    ///
+    /// - `rolloverIcon`: icon to use
+    ///
+    /// #### See also
+    ///
+    /// - Button#STATE_ROLLOVER
     void setRolloverIcon(Image rolloverIcon);
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * pressed state
-     *
-     * @return icon used
-     * @see Button#STATE_PRESSED
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    ///
+    /// #### See also
+    ///
+    /// - Button#STATE_PRESSED
     Image getPressedIcon();
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * pressed state
-     *
-     * @param pressedIcon icon used
-     * @see Button#STATE_PRESSED
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state
+    ///
+    /// #### Parameters
+    ///
+    /// - `pressedIcon`: icon used
+    ///
+    /// #### See also
+    ///
+    /// - Button#STATE_PRESSED
     void setPressedIcon(Image pressedIcon);
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * the disabled state
-     *
-     * @return icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// the disabled state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
     Image getDisabledIcon();
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * the disabled state
-     *
-     * @param disabledIcon icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// the disabled state
+    ///
+    /// #### Parameters
+    ///
+    /// - `disabledIcon`: icon used
     void setDisabledIcon(Image disabledIcon);
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * pressed state and is selected. This is ONLY applicable to toggle buttons
-     *
-     * @return icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state and is selected. This is ONLY applicable to toggle buttons
+    ///
+    /// #### Returns
+    ///
+    /// icon used
     Image getRolloverPressedIcon();
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * pressed state and is selected. This is ONLY applicable to toggle buttons
-     *
-     * @param rolloverPressedIcon icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state and is selected. This is ONLY applicable to toggle buttons
+    ///
+    /// #### Parameters
+    ///
+    /// - `rolloverPressedIcon`: icon used
     void setRolloverPressedIcon(Image rolloverPressedIcon);
 
-    /**
-     * Returns the icon for the button based on its current state
-     *
-     * @return the button icon based on its current state
-     */
+    /// Returns the icon for the button based on its current state
+    ///
+    /// #### Returns
+    ///
+    /// the button icon based on its current state
     Image getIconFromState();
 
 }

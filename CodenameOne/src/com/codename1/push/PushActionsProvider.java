@@ -23,26 +23,25 @@
 package com.codename1.push;
 
 
-/**
- * This callback interface is invoked when a push notification with a "category" is received
- * by the application. If the main class of the application implements
- * {@link #getPushActionCategories() }, then the user may be presented with a set of options/actions
- * on the push notification.  The selected action ID would be made available inside the {@link PushCallback#push(java.lang.String) }
- * callback via the {@link PushContent#getActionId() } method.
- *
- * @author Steve Hannah
- */
+/// This callback interface is invoked when a push notification with a "category" is received
+/// by the application. If the main class of the application implements
+/// `#getPushActionCategories()`, then the user may be presented with a set of options/actions
+/// on the push notification.  The selected action ID would be made available inside the `PushCallback#push(java.lang.String)`
+/// callback via the `PushContent#getActionId()` method.
+///
+/// @author Steve Hannah
 public interface PushActionsProvider {
 
-    /**
-     * Returns the available categories for push notifications that this app responds to.  If the app
-     * receives a push notification with a "category" designation matching the {@link PushActionCategory#getId() } of
-     * one of these categories, then the actions in that category will be presented to the user as options (on supported platforms).
-     * <p>If the user selects one of these actions, their choice will be made available inside the {@link PushCallback#push(java.lang.String) }
-     * callback via the {@link PushContent#getActionId() } method.</p>
-     *
-     * @return Array of action categories supported by the app.
-     */
+    /// Returns the available categories for push notifications that this app responds to.  If the app
+    /// receives a push notification with a "category" designation matching the `PushActionCategory#getId()` of
+    /// one of these categories, then the actions in that category will be presented to the user as options (on supported platforms).
+    ///
+    /// If the user selects one of these actions, their choice will be made available inside the `PushCallback#push(java.lang.String)`
+    /// callback via the `PushContent#getActionId()` method.
+    ///
+    /// #### Returns
+    ///
+    /// Array of action categories supported by the app.
     PushActionCategory[] getPushActionCategories();
 
 

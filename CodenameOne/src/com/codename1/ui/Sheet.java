@@ -38,91 +38,80 @@ import com.codename1.ui.util.EventDispatcher;
 
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * A light-weight dialog that slides up from the bottom of the screen on mobile devices.
- * Sheets include a "title" bar, with a back/close button, a title label, and a "commands container" ({@link #getCommandsContainer() })
- * which allows you to insert your own custom components (usually buttons) in the upper right.
- *
- * <p>Custom content should be placed inside the content pane which can be retrieved via {@link #getContentPane() }</p>
- *
- * <h3>Usage</h3>
- *
- * <p>The general usage is to create new Sheet instance (or subclass), then call {@link #show() }
- * to make it appear over the current form.  If a different sheet that is currently being displayed, then
- * calling {@link #show() } will replace it.</p>
- *
- * <h4>Inter-Sheet Navigation</h4>
- *
- * <p>The {@link #Sheet(com.codename1.ui.Sheet, java.lang.String) } constructor can take another
- * Sheet object as a parameter, which will act as a "parent" sheet ({@link #getParentSheet() }.  If the parent
- * sheet is not null, then {@literal this} sheet will have a "Back" button instead of a "Close" button.  THe
- * "Back" button will navigate back to the parent sheet.</p>
- *
- * <p>When navigating between sheets, the sheet will be resized with a smooth slide animation to the preferred
- * height of the destination sheet.</p>
- *
- * <p><strong>Example</strong></p>
- *
- * <p><pre>{@code
- *  public void start() {
- * if(current != null){
- * current.show();
- * return;
- * }
- * Form hi = new Form("Hi World", new BorderLayout());
- *
- *
- * Button b = new Button("Open Sheet");
- * b.addActionListener(e-&gt;{
- * new MySheet(null).show();
- *
- *
- * });
- * hi.add(BorderLayout.NORTH, b);
- * hi.show();
- * }
- *
- * private class MySheet extends Sheet {
- * MySheet(Sheet parent) {
- * super(parent, "My Sheet");
- * Container cnt = getContentPane();
- * cnt.setLayout(BoxLayout.y());
- * Button gotoSheet2 = new Button("Goto Sheet 2");
- * gotoSheet2.addActionListener(e-&gt;{
- * new MySheet2(this).show(300);
- * });
- * cnt.add(gotoSheet2);
- * for (String t : new String[]{"Red", "Green", "Blue", "Orange"}) {
- * cnt.add(new Label(t));
- * }
- * }
- * }
- *
- * private class MySheet2 extends Sheet {
- * MySheet2(Sheet parent) {
- * super(parent, "Sheet 2");
- * Container cnt = getContentPane();
- * cnt.setLayout(BoxLayout.y());
- * cnt.setScrollableY(true);
- * for (int i=0; i&lt;2; i++) {
- * for (String t : new String[]{"Red", "Green", "Blue", "Orange"}) {
- * cnt.add(new Label(t));
- * }
- * }
- * }
- * }
- *
- * }</pre></p>
- *
- * <h4>Video Sample</h4>
- *
- * <p><a href="https://youtu.be/3okEj_JW3-k">Screen cast of the SheetSample demo</a></p>
- * <p>View source for this sample <a href="https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/SheetSample">here</a>.
- * This sample can be run directly in the <a href="https://github.com/codenameone/CodenameOne/tree/master/Samples/">SampleRunner</a>.</p>
- *
- * @author shannah
- * @since 7.0
- */
+/// A light-weight dialog that slides up from the bottom of the screen on mobile devices.
+/// Sheets include a "title" bar, with a back/close button, a title label, and a "commands container" (`#getCommandsContainer()`)
+/// which allows you to insert your own custom components (usually buttons) in the upper right.
+///
+/// Custom content should be placed inside the content pane which can be retrieved via `#getContentPane()`
+///
+/// Usage
+///
+/// The general usage is to create new Sheet instance (or subclass), then call `#show()`
+/// to make it appear over the current form.  If a different sheet that is currently being displayed, then
+/// calling `#show()` will replace it.
+///
+/// Inter-Sheet Navigation
+///
+/// The `java.lang.String)` constructor can take another
+/// Sheet object as a parameter, which will act as a "parent" sheet (`#getParentSheet()`.  If the parent
+/// sheet is not null, then this sheet will have a "Back" button instead of a "Close" button.  THe
+/// "Back" button will navigate back to the parent sheet.
+///
+/// When navigating between sheets, the sheet will be resized with a smooth slide animation to the preferred
+/// height of the destination sheet.
+///
+/// **Example**
+///
+/// ```java
+/// `public void start() {
+/// if(current != null){
+/// current.show();
+/// return;`
+/// Form hi = new Form("Hi World", new BorderLayout());
+///
+/// Button b = new Button("Open Sheet");
+/// b.addActionListener(e->{
+/// new MySheet(null).show();
+///
+/// });
+/// hi.add(BorderLayout.NORTH, b);
+/// hi.show();
+/// }
+///
+/// private class MySheet extends Sheet {
+/// MySheet(Sheet parent) {
+/// super(parent, "My Sheet");
+/// Container cnt = getContentPane();
+/// cnt.setLayout(BoxLayout.y());
+/// Button gotoSheet2 = new Button("Goto Sheet 2");
+/// gotoSheet2.addActionListener(e->{
+/// new MySheet2(this).show(300);
+/// });
+/// cnt.add(gotoSheet2);
+/// for (String t : new String[]{"Red", "Green", "Blue", "Orange"}) {
+/// cnt.add(new Label(t));
+/// }
+/// }
+/// }
+///
+/// private class MySheet2 extends Sheet {
+/// MySheet2(Sheet parent) {
+/// super(parent, "Sheet 2");
+/// Container cnt = getContentPane();
+/// cnt.setLayout(BoxLayout.y());
+/// cnt.setScrollableY(true);
+/// for (int i=0; iVideo Sample
+///
+/// [Screen cast of the SheetSample demo](https://youtu.be/3okEj_JW3-k)
+///
+/// View source for this sample [here](https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/SheetSample).
+/// This sample can be run directly in the [SampleRunner](https://github.com/codenameone/CodenameOne/tree/master/Samples/).
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public class Sheet extends Container {
     private static final int N = 0;
     private static final int S = 1;
@@ -162,49 +151,52 @@ public class Sheet extends Container {
 
     };
     private boolean allowClose = true;
-    /**
-     * The position on the screen where the sheet is displayed on phones.
-     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
-     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
-     *
-     * @see #setPosition(java.lang.String)
-     * @see #setPosition(java.lang.String, java.lang.String)
-     */
+    /// The position on the screen where the sheet is displayed on phones.
+    /// One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    /// `BorderLayout#WEST`. `Default is {@link BorderLayout#SOUTH`.
+    ///
+    /// #### See also
+    ///
+    /// - #setPosition(java.lang.String)
+    ///
+    /// - #setPosition(java.lang.String, java.lang.String)
     private String position = BorderLayout.SOUTH;
-    /**
-     * The position on the screen where the sheet is displayed on tablets.
-     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
-     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
-     *
-     * @see #setPosition(java.lang.String)
-     * @see #setPosition(java.lang.String, java.lang.String)
-     */
+    /// The position on the screen where the sheet is displayed on tablets.
+    /// One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    /// `BorderLayout#WEST`. `Default is {@link BorderLayout#SOUTH`.
+    ///
+    /// #### See also
+    ///
+    /// - #setPosition(java.lang.String)
+    ///
+    /// - #setPosition(java.lang.String, java.lang.String)
     private String tabletPosition = position;
-    /**
-     * Original padding values to prevent accumulation when showing the sheet multiple times.
-     * These are set the first time the sheet is shown and used as the base for safe area calculations.
-     */
+    /// Original padding values to prevent accumulation when showing the sheet multiple times.
+    /// These are set the first time the sheet is shown and used as the base for safe area calculations.
     private int[] originalPadding = null;
     private Form form;
 
-    /**
-     * Creates a new sheet with the specified parent and title.
-     *
-     * @param parent Optional parent sheet.  If non-null, then this sheet will have a "back" button instead of a "close" button.  The "back" button will return to the parent sheet.
-     * @param title  The title to display in the title bar of the sheet.
-     */
+    /// Creates a new sheet with the specified parent and title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: Optional parent sheet.  If non-null, then this sheet will have a "back" button instead of a "close" button.  The "back" button will return to the parent sheet.
+    ///
+    /// - `title`: The title to display in the title bar of the sheet.
     public Sheet(Sheet parent, String title) {
         this(parent, title, "Sheet");
     }
 
-    /**
-     * Creates a new sheet with the specified parent and title.
-     *
-     * @param parent Optional parent sheet.  If non-null, then this sheet will have a "back" button instead of a "close" button.  The "back" button will return to the parent sheet.
-     * @param title  The title to display in the title bar of the sheet.
-     * @param uiid   Optional UIID for the sheet.  If non-null, then the Sheet's uiid will be {@literal uiid}, the title label's UIID will be {@literal uiid + "Title"},
-     *               the title bar's UIID will be {@literal uiid + "TitleBar"}, and the back/close button's UIID will be {@literal uiid + "BackButton"}.
-     */
+    /// Creates a new sheet with the specified parent and title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: Optional parent sheet.  If non-null, then this sheet will have a "back" button instead of a "close" button.  The "back" button will return to the parent sheet.
+    ///
+    /// - `title`: The title to display in the title bar of the sheet.
+    ///
+    /// - `uiid`: @param uiid   Optional UIID for the sheet.  If non-null, then the Sheet's uiid will be uiid, the title label's UIID will be uiid + "Title",
+    ///               the title bar's UIID will be uiid + "TitleBar", and the back/close button's UIID will be uiid + "BackButton".
     public Sheet(Sheet parent, String title, String uiid) {
         if (parent != null) {
             allowClose = parent.allowClose;
@@ -228,12 +220,15 @@ public class Sheet extends Container {
 
     }
 
-    /**
-     * Gets the current sheet on the current form or null if no sheet is currently being displayed.
-     *
-     * @return The current sheet or null.
-     * @since 7.0
-     */
+    /// Gets the current sheet on the current form or null if no sheet is currently being displayed.
+    ///
+    /// #### Returns
+    ///
+    /// The current sheet or null.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static Sheet getCurrentSheet() {
         if (CN.getCurrentForm() == null) {
             return null;
@@ -250,13 +245,19 @@ public class Sheet extends Container {
         return null;
     }
 
-    /**
-     * Finds Sheet containing this component if it is currently part of a Sheet.
-     *
-     * @param cmp The component to check.
-     * @return The sheet containing the component, or null if it is not on a sheet.
-     * @since 7.0
-     */
+    /// Finds Sheet containing this component if it is currently part of a Sheet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to check.
+    ///
+    /// #### Returns
+    ///
+    /// The sheet containing the component, or null if it is not on a sheet.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static Sheet findContainingSheet(Component cmp) {
         Container parent = cmp.getParent();
         while (parent != null) {
@@ -268,26 +269,29 @@ public class Sheet extends Container {
         return null;
     }
 
-    /**
-     * Checks whether the user is allowed to close this sheet.
-     *
-     * @return True if user can close the sheet.
-     */
+    /// Checks whether the user is allowed to close this sheet.
+    ///
+    /// #### Returns
+    ///
+    /// True if user can close the sheet.
     public boolean isAllowClose() {
         return allowClose;
     }
 
-    /**
-     * Sets whether the user is able to close this sheet.  Default is true.  If you set
-     * this value to false, then there will be no close button, and pressing outside of the sheet
-     * will have no effect.
-     *
-     * <p>Child sheets will assume the settings of the parent.  The back button will still work,
-     * but the top level sheet will not include a close button.</p>
-     *
-     * @param allowClose True to allow user to close the sheet.  False to prevent it.
-     * @since 7.0
-     */
+    /// Sets whether the user is able to close this sheet.  Default is true.  If you set
+    /// this value to false, then there will be no close button, and pressing outside of the sheet
+    /// will have no effect.
+    ///
+    /// Child sheets will assume the settings of the parent.  The back button will still work,
+    /// but the top level sheet will not include a close button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowClose`: True to allow user to close the sheet.  False to prevent it.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setAllowClose(boolean allowClose) {
         if (allowClose != this.allowClose) {
             this.allowClose = allowClose;
@@ -303,37 +307,29 @@ public class Sheet extends Container {
         }
     }
 
-    /**
-     * Gets the content pane of the sheet.  All sheet content should be added to the content pane
-     * and not directly to the sheet.
-     *
-     * @return The content pane.
-     */
+    /// Gets the content pane of the sheet.  All sheet content should be added to the content pane
+    /// and not directly to the sheet.
+    ///
+    /// #### Returns
+    ///
+    /// The content pane.
     public Container getContentPane() {
         return contentPane;
     }
 
-    /**
-     * Hides the back button.
-     */
+    /// Hides the back button.
     public void hideBackButton() {
         backButton.setVisible(false);
     }
 
-    /**
-     * Shows the back button.
-     */
+    /// Shows the back button.
     public void showBackButton() {
         backButton.setVisible(true);
     }
 
-    /**
-     * Gets the container that is rendered on the top right bar of the sheet.  Use this
-     * to add buttons and other content you wish to appear in the title bar.  Best not to
-     * overload this with too many things.
-     *
-     * @return
-     */
+    /// Gets the container that is rendered on the top right bar of the sheet.  Use this
+    /// to add buttons and other content you wish to appear in the title bar.  Best not to
+    /// overload this with too many things.
     public Container getCommandsContainer() {
         return commandsContainer;
     }
@@ -356,24 +352,27 @@ public class Sheet extends Container {
 
     }
 
-    /**
-     * Shows the sheet with the default (300ms) transition duration.
-     *
-     * @see #show(int)
-     */
+    /// Shows the sheet with the default (300ms) transition duration.
+    ///
+    /// #### See also
+    ///
+    /// - #show(int)
     public void show() {
         show(DEFAULT_TRANSITION_DURATION);
     }
 
-    /**
-     * Shows the sheet over the current form using a slide-up transition with given duration in milliseconds.
-     *
-     * <p>If another sheet is currently being shown, then this will replace that sheet, and use an appropriate slide
-     * animation to adjust the size.</p>
-     *
-     * @param duration The duration of the slide transition in milliseconds.
-     * @see #show()
-     */
+    /// Shows the sheet over the current form using a slide-up transition with given duration in milliseconds.
+    ///
+    /// If another sheet is currently being shown, then this will replace that sheet, and use an appropriate slide
+    /// animation to adjust the size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: The duration of the slide transition in milliseconds.
+    ///
+    /// #### See also
+    ///
+    /// - #show()
     public void show(final int duration) {
 
         // We need to add some margin to the title  to prevent overlap with the
@@ -517,14 +516,15 @@ public class Sheet extends Container {
         }
     }
 
-    /**
-     * Gets the position where the Sheet is to be displayed.
-     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
-     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
-     *
-     * @see #setPosition(java.lang.String)
-     * @see #setPosition(java.lang.String, java.lang.String)
-     */
+    /// Gets the position where the Sheet is to be displayed.
+    /// One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    /// `BorderLayout#WEST`. `Default is {@link BorderLayout#SOUTH`.
+    ///
+    /// #### See also
+    ///
+    /// - #setPosition(java.lang.String)
+    ///
+    /// - #setPosition(java.lang.String, java.lang.String)
     public String getPosition() {
         if (CN.isTablet()) {
             return tabletPosition;
@@ -532,17 +532,24 @@ public class Sheet extends Container {
         return position;
     }
 
-    /**
-     * Sets the position where the Sheet is to be displayed.
-     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
-     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
-     *
-     * @param position One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
-     *                 {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
-     * @see #setPosition(java.lang.String)
-     * @see #setPosition(java.lang.String, java.lang.String)
-     * @since 7.0
-     */
+    /// Sets the position where the Sheet is to be displayed.
+    /// One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    /// `BorderLayout#WEST`. `Default is {@link BorderLayout#SOUTH`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: @param position One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    ///                 `BorderLayout#WEST`. {@link BorderLayout#EAST.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setPosition(java.lang.String)
+    ///
+    /// - #setPosition(java.lang.String, java.lang.String)
     public void setPosition(String position) {
         if (CN.isTablet()) {
             if (!position.equals(tabletPosition)) {
@@ -620,19 +627,25 @@ public class Sheet extends Container {
 
     }
 
-    /**
-     * Sets the position where the Sheet is to be displayed.
-     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
-     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
-     *
-     * @param phonePosition  Position to use on a phone (i.e. non-tablet). One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
-     *                       {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
-     * @param tabletPosition Position to use on a tablet and desktop. One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
-     *                       {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
-     * @see #setPosition(java.lang.String)
-     * @see #setPosition(java.lang.String, java.lang.String)
-     * @since 7.0
-     */
+    /// Sets the position where the Sheet is to be displayed.
+    /// One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    /// `BorderLayout#WEST`. `Default is {@link BorderLayout#SOUTH`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `phonePosition`: @param phonePosition  Position to use on a phone (i.e. non-tablet). One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    ///                       `BorderLayout#WEST`. `@param tabletPosition Position to use on a tablet and desktop. One of {@link BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    ///                       `BorderLayout#WEST`. {@link BorderLayout#EAST.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setPosition(java.lang.String)
+    ///
+    /// - #setPosition(java.lang.String, java.lang.String)
     public void setPosition(String phonePosition, String tabletPosition) {
         boolean changed = false;
         if (CN.isTablet() && !tabletPosition.equals(this.tabletPosition)) {
@@ -647,13 +660,12 @@ public class Sheet extends Container {
         }
     }
 
-    /**
-     * Gets X-coordinate of the sheet when it is hidden off-screen.  This will be different
-     * depending on the position of the sheet.
-     *
-     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
-     * @return
-     */
+    /// Gets X-coordinate of the sheet when it is hidden off-screen.  This will be different
+    /// depending on the position of the sheet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: The container in the FormLayeredPane where the sheet is to be rendered.
     private int getHiddenX(Container cnt) {
         switch (getPositionInt()) {
             case S:
@@ -670,13 +682,12 @@ public class Sheet extends Container {
         }
     }
 
-    /**
-     * Gets Y-coordinate of the sheet when it is hidden off-screen.  This will be different
-     * depending on the position of the sheet.
-     *
-     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
-     * @return
-     */
+    /// Gets Y-coordinate of the sheet when it is hidden off-screen.  This will be different
+    /// depending on the position of the sheet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: The container in the FormLayeredPane where the sheet is to be rendered.
     private int getHiddenY(Container cnt) {
         switch (getPositionInt()) {
             case S:
@@ -692,14 +703,13 @@ public class Sheet extends Container {
         }
     }
 
-    /**
-     * Gets the preferred width of the sheet.  Will depend on where it is rendered.  If position is CENTER,
-     * then the preferred width will be the natural preferred width of the sheet.  But NORTH or SOUTH,
-     * the preferred width will be the full container width.
-     *
-     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
-     * @return
-     */
+    /// Gets the preferred width of the sheet.  Will depend on where it is rendered.  If position is CENTER,
+    /// then the preferred width will be the natural preferred width of the sheet.  But NORTH or SOUTH,
+    /// the preferred width will be the full container width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: The container in the FormLayeredPane where the sheet is to be rendered.
     private int getPreferredW(Container cnt) {
         switch (getPositionInt()) {
             case N:
@@ -734,14 +744,13 @@ public class Sheet extends Container {
         return S;
     }
 
-    /**
-     * Gets the preferred height of the sheet.  Will depend on where it is rendered.  If position is CENTER, NORTH, or SOUTH
-     * then the preferred height will be the natural preferred width of the sheet.  But WEST or EAST,
-     * the preferred height will be the full container height.
-     *
-     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
-     * @return
-     */
+    /// Gets the preferred height of the sheet.  Will depend on where it is rendered.  If position is CENTER, NORTH, or SOUTH
+    /// then the preferred height will be the natural preferred width of the sheet.  But WEST or EAST,
+    /// the preferred height will be the full container height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: The container in the FormLayeredPane where the sheet is to be rendered.
     private int getPreferredH(Container cnt) {
         switch (getPositionInt()) {
             case W:
@@ -752,22 +761,22 @@ public class Sheet extends Container {
         }
     }
 
-    /**
-     * Goes back to the parent sheet with a default (300ms) slide animation.  If there
-     * is no parent sheet, then this will close the sheet.
-     *
-     * @see #back(int)
-     */
+    /// Goes back to the parent sheet with a default (300ms) slide animation.  If there
+    /// is no parent sheet, then this will close the sheet.
+    ///
+    /// #### See also
+    ///
+    /// - #back(int)
     public void back() {
         back(DEFAULT_TRANSITION_DURATION);
     }
 
-    /**
-     * Goes back to the parent sheet with a slide animation of given duration.  If there
-     * is no parent sheet, then this will close the sheet.
-     *
-     * @param duration Duration of the slide transition in milliseconds.
-     */
+    /// Goes back to the parent sheet with a slide animation of given duration.  If there
+    /// is no parent sheet, then this will close the sheet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of the slide transition in milliseconds.
     public void back(int duration) {
         if (this.parentSheet != null) {
             fireBackEvent();
@@ -799,11 +808,11 @@ public class Sheet extends Container {
 
     }
 
-    /**
-     * Gets the parent sheet or null if there is none.
-     *
-     * @return The parent sheet or null.
-     */
+    /// Gets the parent sheet or null if there is none.
+    ///
+    /// #### Returns
+    ///
+    /// The parent sheet or null.
     public Sheet getParentSheet() {
         return parentSheet;
     }
@@ -826,13 +835,19 @@ public class Sheet extends Container {
         super.deinitialize();
     }
 
-    /**
-     * Checks if the current sheet is an ancestor sheet of the given sheet.
-     *
-     * @param sheet The sheet to check
-     * @return True if the current sheet is an ancestor of sheet.
-     * @since 7.0
-     */
+    /// Checks if the current sheet is an ancestor sheet of the given sheet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sheet`: The sheet to check
+    ///
+    /// #### Returns
+    ///
+    /// True if the current sheet is an ancestor of sheet.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public boolean isAncestorSheetOf(Sheet sheet) {
         sheet = sheet.getParentSheet();
         if (sheet == this) { //NOPMD CompareObjectsWithEquals
@@ -844,25 +859,28 @@ public class Sheet extends Container {
         }
     }
 
-    /**
-     * Adds listener notified when the sheet is closed.  This event is only fired
-     * when the sheet is closed without the possibility of being reopened.  E.g. if a
-     * child sheet is opened (causing this sheet to be hidden), the close event won't be
-     * fired until either that child sheet is hidden (without going back),
-     * or the sheet itself is hidden, or goes back.
-     *
-     * @param l
-     * @since 7.0
-     */
+    /// Adds listener notified when the sheet is closed.  This event is only fired
+    /// when the sheet is closed without the possibility of being reopened.  E.g. if a
+    /// child sheet is opened (causing this sheet to be hidden), the close event won't be
+    /// fired until either that child sheet is hidden (without going back),
+    /// or the sheet itself is hidden, or goes back.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void addCloseListener(ActionListener l) {
         closeListeners.addListener(l);
     }
 
-    /**
-     * Removes a close listener.
-     *
-     * @param l The close listener
-     */
+    /// Removes a close listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: The close listener
     public void removeCloseListener(ActionListener l) {
         closeListeners.removeListener(l);
     }
@@ -874,22 +892,25 @@ public class Sheet extends Container {
         }
     }
 
-    /**
-     * Adds listener to be notified when user goes back to the parent.  This is not
-     * fired if the sheet is simply closed.  Only if the "back" button is pressed,
-     *
-     * @param l Listener
-     * @since 7.0
-     */
+    /// Adds listener to be notified when user goes back to the parent.  This is not
+    /// fired if the sheet is simply closed.  Only if the "back" button is pressed,
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: Listener
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void addBackListener(ActionListener l) {
         backListeners.addListener(l);
     }
 
-    /**
-     * Removes a back listener.
-     *
-     * @param l The close listener
-     */
+    /// Removes a back listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: The close listener
     public void removeBackListener(ActionListener l) {
         backListeners.removeListener(l);
     }

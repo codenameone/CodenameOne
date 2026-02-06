@@ -27,53 +27,42 @@ package com.codename1.charts.transitions;
 import com.codename1.charts.ChartComponent;
 import com.codename1.charts.models.XYSeries;
 
-/**
- * A transition for enabling animations between different values in an XYSeries.
- *
- * @author shannah
- */
+/// A transition for enabling animations between different values in an XYSeries.
+///
+/// @author shannah
 public class XYSeriesTransition extends SeriesTransition {
 
 
-    /**
-     * The subject series.
-     */
+    /// The subject series.
     private final XYSeries series;
 
-    /**
-     * The buffer series where values are set before they are finally applied
-     * to the series during the animation.
-     */
+    /// The buffer series where values are set before they are finally applied
+    /// to the series during the animation.
     private XYSeries cachedSeries;
 
-    /**
-     * Start values for the series in the transition.
-     */
+    /// Start values for the series in the transition.
     private XYSeries startVals;
 
-    /**
-     * End values for the series in the transition.
-     */
+    /// End values for the series in the transition.
     private XYSeries endVals;
 
 
-    /**
-     * Creates a new transition on the given chart and associated series.  The
-     * series should be one of the series rendered by the given chart.
-     *
-     * @param chart  The ChartComponent that is being used to render the series.
-     * @param series The series whose data you wish to animate.
-     */
+    /// Creates a new transition on the given chart and associated series.  The
+    /// series should be one of the series rendered by the given chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `chart`: The ChartComponent that is being used to render the series.
+    ///
+    /// - `series`: The series whose data you wish to animate.
     public XYSeriesTransition(ChartComponent chart, XYSeries series) {
         super(chart);
         this.series = series;
     }
 
-    /**
-     * Initializes the transition.  This can be overridden by subclasses to
-     * provide their own functionality to be executed just before the transition
-     * occurs.
-     */
+    /// Initializes the transition.  This can be overridden by subclasses to
+    /// provide their own functionality to be executed just before the transition
+    /// occurs.
     @Override
     public void initTransition() {
         super.initTransition();
@@ -102,9 +91,7 @@ public class XYSeriesTransition extends SeriesTransition {
         }
     }
 
-    /**
-     * Cleans up after the transition is complete.
-     */
+    /// Cleans up after the transition is complete.
     @Override
     protected void cleanup() {
         super.cleanup();
@@ -114,11 +101,11 @@ public class XYSeriesTransition extends SeriesTransition {
     }
 
 
-    /**
-     * Updates the series and renderer at the given progress position (0 to 100).
-     *
-     * @param progress The progress position in the motion. (0-100).
-     */
+    /// Updates the series and renderer at the given progress position (0 to 100).
+    ///
+    /// #### Parameters
+    ///
+    /// - `progress`: The progress position in the motion. (0-100).
     @Override
     protected void update(int progress) {
         double dProgress = progress;
@@ -148,13 +135,9 @@ public class XYSeriesTransition extends SeriesTransition {
 
     }
 
-    /**
-     * Gets the "buffer" series where values can be set.  Any values set on the
-     * buffer will be applied to the target series during the course of the
-     * transition.
-     *
-     * @return
-     */
+    /// Gets the "buffer" series where values can be set.  Any values set on the
+    /// buffer will be applied to the target series during the course of the
+    /// transition.
     public XYSeries getBuffer() {
         if (cachedSeries == null) {
             cachedSeries = new XYSeries(series.getTitle(), series.getScaleNumber());
@@ -162,20 +145,16 @@ public class XYSeriesTransition extends SeriesTransition {
         return cachedSeries;
     }
 
-    /**
-     * Sets the buffer/cache series to be used.
-     *
-     * @param buffer
-     */
+    /// Sets the buffer/cache series to be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `buffer`
     void setBuffer(XYSeries buffer) {
         this.cachedSeries = buffer;
     }
 
-    /**
-     * Gets the series whose values are to be animated by this transition.
-     *
-     * @return
-     */
+    /// Gets the series whose values are to be animated by this transition.
     public XYSeries getSeries() {
         return series;
     }

@@ -56,26 +56,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-/**
- * Maps the properties that are in a class/object and provides access to them so tools such as ORM
- * can implicitly access them for us. This class also holds the class level meta-data for a specific property
- * or class. It also provides utility level tools e.g. toString implementation etc.
- *
- * @author Shai Almog
- */
+/// Maps the properties that are in a class/object and provides access to them so tools such as ORM
+/// can implicitly access them for us. This class also holds the class level meta-data for a specific property
+/// or class. It also provides utility level tools e.g. toString implementation etc.
+///
+/// @author Shai Almog
 public class PropertyIndex implements Iterable<PropertyBase> {
     private static final Map<String, HashMap<String, Object>> metadata = new LinkedHashMap<String, HashMap<String, Object>>();
     private final PropertyBase[] properties;
     private final String name;
     PropertyBusinessObject parent;
 
-    /**
-     * The constructor is essential for a proper property business object
-     *
-     * @param parent     the parent object instance
-     * @param name       the name of the parent class
-     * @param properties the list of properties in the object
-     */
+    /// The constructor is essential for a proper property business object
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the parent object instance
+    ///
+    /// - `name`: the name of the parent class
+    ///
+    /// - `properties`: the list of properties in the object
     public PropertyIndex(PropertyBusinessObject parent, String name, PropertyBase... properties) {
         this.properties = properties;
         this.parent = parent;
@@ -85,12 +85,13 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
-     *
-     * @param name the name of the storage file
-     * @param objs a list of business objects
-     */
+    /// Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the storage file
+    ///
+    /// - `objs`: a list of business objects
     public static void storeJSONList(String name, List<? extends PropertyBusinessObject> objs) {
         OutputStream os = null; //NOPMD CloseResource
         try {
@@ -104,12 +105,15 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Creates a JSON string, containing the list of property business objects
-     *
-     * @param objs a list of business objects
-     * @return the JSON string
-     */
+    /// Creates a JSON string, containing the list of property business objects
+    ///
+    /// #### Parameters
+    ///
+    /// - `objs`: a list of business objects
+    ///
+    /// #### Returns
+    ///
+    /// the JSON string
     public static String toJSONList(List<? extends PropertyBusinessObject> objs) {
         StringBuilder b = new StringBuilder("[");
         boolean first = true;
@@ -125,21 +129,24 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return b.toString();
     }
 
-    /**
-     * The name of the parent business object
-     *
-     * @return a unique name for the parent
-     */
+    /// The name of the parent business object
+    ///
+    /// #### Returns
+    ///
+    /// a unique name for the parent
     public String getName() {
         return name;
     }
 
-    /**
-     * Returns a property by its name
-     *
-     * @param name the name of the property (case sensitive)
-     * @return the property or null
-     */
+    /// Returns a property by its name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property (case sensitive)
+    ///
+    /// #### Returns
+    ///
+    /// the property or null
     public PropertyBase get(String name) {
         for (PropertyBase p : properties) {
             if (p.getName().equals(name)) {
@@ -149,12 +156,15 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return null;
     }
 
-    /**
-     * Returns a property by its name regardless of case sensitivity for the name
-     *
-     * @param name the name of the property (case insensitive)
-     * @return the property or null
-     */
+    /// Returns a property by its name regardless of case sensitivity for the name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property (case insensitive)
+    ///
+    /// #### Returns
+    ///
+    /// the property or null
     public PropertyBase getIgnoreCase(String name) {
         for (PropertyBase p : properties) {
             if (p.getName().equalsIgnoreCase(name)) {
@@ -164,30 +174,33 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return null;
     }
 
-    /**
-     * Allows us to get an individual property within the object instance
-     *
-     * @param i the index of the property
-     * @return the property instance
-     */
+    /// Allows us to get an individual property within the object instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the index of the property
+    ///
+    /// #### Returns
+    ///
+    /// the property instance
     public PropertyBase get(int i) {
         return properties[i];
     }
 
-    /**
-     * The number of properties in the class
-     *
-     * @return number of properties in the class
-     */
+    /// The number of properties in the class
+    ///
+    /// #### Returns
+    ///
+    /// number of properties in the class
     public int getSize() {
         return properties.length;
     }
 
-    /**
-     * Allows us to traverse the properties with a for-each statement
-     *
-     * @return an iterator instance
-     */
+    /// Allows us to traverse the properties with a for-each statement
+    ///
+    /// #### Returns
+    ///
+    /// an iterator instance
     @Override
     public Iterator<PropertyBase> iterator() {
         return new Iterator<PropertyBase>() {
@@ -221,22 +234,26 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return m;
     }
 
-    /**
-     * Allows us to fetch class meta data not to be confused with standard properties
-     *
-     * @param meta the meta data unique name
-     * @return the object instance
-     */
+    /// Allows us to fetch class meta data not to be confused with standard properties
+    ///
+    /// #### Parameters
+    ///
+    /// - `meta`: the meta data unique name
+    ///
+    /// #### Returns
+    ///
+    /// the object instance
     public Object getMetaDataOfClass(String meta) {
         return getProps().get(meta);
     }
 
-    /**
-     * Sets class specific metadata
-     *
-     * @param meta the name of the meta data
-     * @param o    object value for the meta data
-     */
+    /// Sets class specific metadata
+    ///
+    /// #### Parameters
+    ///
+    /// - `meta`: the name of the meta data
+    ///
+    /// - `o`: object value for the meta data
     public void putMetaDataOfClass(String meta, Object o) {
         if (o == null) {
             getProps().remove(meta);
@@ -245,22 +262,25 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Returns a user readable printout of the property values which is useful for debugging
-     *
-     * @return user readable printout of the property values which is useful for debugging
-     */
+    /// Returns a user readable printout of the property values which is useful for debugging
+    ///
+    /// #### Returns
+    ///
+    /// user readable printout of the property values which is useful for debugging
     @Override
     public String toString() {
         return toString(true);
     }
 
-    /**
-     * Returns a user readable printout of the property values which is useful for debugging
-     *
-     * @param includeNewline true to indicate that newline characters should be included
-     * @return user readable printout of the property values which is useful for debugging
-     */
+    /// Returns a user readable printout of the property values which is useful for debugging
+    ///
+    /// #### Parameters
+    ///
+    /// - `includeNewline`: true to indicate that newline characters should be included
+    ///
+    /// #### Returns
+    ///
+    /// user readable printout of the property values which is useful for debugging
     public String toString(boolean includeNewline) {
         StringBuilder b = new StringBuilder(name);
         b.append(" : {");
@@ -279,11 +299,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return b.toString();
     }
 
-    /**
-     * This is useful for JSON parsing, it allows converting JSON map data to objects
-     *
-     * @param m the map
-     */
+    /// This is useful for JSON parsing, it allows converting JSON map data to objects
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the map
     public void populateFromMap(Map<String, Object> m) {
         populateFromMap(m, null);
     }
@@ -306,13 +326,17 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return al;
     }
 
-    /**
-     * Sets one of the builtin simple objects into a property
-     *
-     * @param p   the property base
-     * @param val the object value
-     * @return true if successful
-     */
+    /// Sets one of the builtin simple objects into a property
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property base
+    ///
+    /// - `val`: the object value
+    ///
+    /// #### Returns
+    ///
+    /// true if successful
     public boolean setSimpleObject(PropertyBase p, Object val) {
         if (val == null) {
             p.setImpl(null);
@@ -361,12 +385,13 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return false;
     }
 
-    /**
-     * This is useful for JSON parsing, it allows converting JSON map data to objects
-     *
-     * @param m             the map
-     * @param recursiveType when running into map types we create this object type
-     */
+    /// This is useful for JSON parsing, it allows converting JSON map data to objects
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the map
+    ///
+    /// - `recursiveType`: when running into map types we create this object type
     public void populateFromMap(Map<String, Object> m, Class<? extends PropertyBusinessObject> recursiveType) {
         try {
             for (PropertyBase p : this) {
@@ -508,20 +533,20 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * This is useful in converting a property object to JSON
-     *
-     * @return a map representation of the properties
-     */
+    /// This is useful in converting a property object to JSON
+    ///
+    /// #### Returns
+    ///
+    /// a map representation of the properties
     public Map<String, Object> toMapRepresentation() {
         return toMapRepresentationImpl("mapExclude");
     }
 
-    /**
-     * This is useful in converting a property object to JSON
-     *
-     * @return a map representation of the properties
-     */
+    /// This is useful in converting a property object to JSON
+    ///
+    /// #### Returns
+    ///
+    /// a map representation of the properties
     private Map<String, Object> toMapRepresentationImpl(String excludeFlag) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         for (PropertyBase p : this) {
@@ -557,42 +582,43 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return m;
     }
 
-    /**
-     * Converts the object to a JSON representation
-     *
-     * @return a JSON String
-     */
+    /// Converts the object to a JSON representation
+    ///
+    /// #### Returns
+    ///
+    /// a JSON String
     public String toJSON() {
         return Result.fromContent(toMapRepresentationImpl("jsonExclude")).toString();
     }
 
-    /**
-     * Returns an element object mapping to the current object hierarchy similar
-     * to the map object
-     *
-     * @return an XML parser element
-     */
+    /// Returns an element object mapping to the current object hierarchy similar
+    /// to the map object
+    ///
+    /// #### Returns
+    ///
+    /// an XML parser element
     public Element asElement() {
         return new PropertyXMLElement(this);
     }
 
-    /**
-     * Converts the object to an XML representation
-     *
-     * @return an XML String
-     */
+    /// Converts the object to an XML representation
+    ///
+    /// #### Returns
+    ///
+    /// an XML String
     public String toXML() {
         XMLWriter w = new XMLWriter(true);
         return w.toXML(asElement());
     }
 
-    /**
-     * Toggles whether a given property should act as a text element for this
-     * object
-     *
-     * @param p the property that should act as a text element
-     * @param t true to activate the text element false to remove it
-     */
+    /// Toggles whether a given property should act as a text element for this
+    /// object
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property that should act as a text element
+    ///
+    /// - `t`: true to activate the text element false to remove it
     public void setXmlTextElement(PropertyBase p, boolean t) {
         if (t) {
             p.putClientProperty("xmlTextElement", Boolean.TRUE);
@@ -601,23 +627,26 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Toggles whether a given property should act as a text element for this
-     * object
-     *
-     * @param p the property
-     * @return true if this is a text element
-     */
+    /// Toggles whether a given property should act as a text element for this
+    /// object
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a text element
     public boolean isXmlTextElement(PropertyBase p) {
         Boolean b = (Boolean) p.getClientProperty("xmlTextElement");
         return b != null && b.booleanValue();
     }
 
-    /**
-     * Returns the property that contains the XML text e.g. {@code <xmltag>property value</xmltag>}
-     *
-     * @return the property representing text XML or null if no such property was set
-     */
+    /// Returns the property that contains the XML text e.g. `property value`
+    ///
+    /// #### Returns
+    ///
+    /// the property representing text XML or null if no such property was set
     public PropertyBase getXmlTextElement() {
         for (PropertyBase b : this) {
             if (isXmlTextElement(b)) {
@@ -627,11 +656,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return null;
     }
 
-    /**
-     * Converts the XML element to this object hierarchy
-     *
-     * @param e the element
-     */
+    /// Converts the XML element to this object hierarchy
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the element
     public void fromXml(Element e) {
         Hashtable atts = e.getAttributes();
         if (atts != null) {
@@ -674,12 +703,12 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * This method works similarly to a constructor, it accepts the values for the properties in the order
-     * they appear within the index
-     *
-     * @param values values of properties in the order they appear in the index
-     */
+    /// This method works similarly to a constructor, it accepts the values for the properties in the order
+    /// they appear within the index
+    ///
+    /// #### Parameters
+    ///
+    /// - `values`: values of properties in the order they appear in the index
     public void init(Object... values) {
         int offset = 0;
         for (PropertyBase pb : properties) {
@@ -696,11 +725,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
-     *
-     * @param name the name of the storage file
-     */
+    /// Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the storage file
     public void storeJSON(String name) {
         OutputStream os = null; //NOPMD CloseResource
         try {
@@ -714,12 +743,15 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Loads JSON containing a list of property objects of this type
-     *
-     * @param name the name of the storage
-     * @return list of property objects matching this type
-     */
+    /// Loads JSON containing a list of property objects of this type
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the storage
+    ///
+    /// #### Returns
+    ///
+    /// list of property objects matching this type
     public <X extends PropertyBusinessObject> List<X> loadJSONList(String name) {
         InputStream is = null; //NOPMD CloseResource
         try {
@@ -737,12 +769,15 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Loads JSON containing a list of property objects of this type
-     *
-     * @param stream the input stream
-     * @return list of property objects matching this type
-     */
+    /// Loads JSON containing a list of property objects of this type
+    ///
+    /// #### Parameters
+    ///
+    /// - `stream`: the input stream
+    ///
+    /// #### Returns
+    ///
+    /// list of property objects matching this type
     public <X extends PropertyBusinessObject> List<X> loadJSONList(InputStream stream)
             throws IOException {
         JSONParser jp = new JSONParser();
@@ -759,11 +794,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return response;
     }
 
-    /**
-     * Creates a new instance of the parent class
-     *
-     * @return an instance of the parent class or null if this failed
-     */
+    /// Creates a new instance of the parent class
+    ///
+    /// #### Returns
+    ///
+    /// an instance of the parent class or null if this failed
     public PropertyBusinessObject newInstance() {
         try {
             return (PropertyBusinessObject) parent.getClass().newInstance();
@@ -773,11 +808,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Populates the object from a JSON string
-     *
-     * @param jsonString the JSON String
-     */
+    /// Populates the object from a JSON string
+    ///
+    /// #### Parameters
+    ///
+    /// - `jsonString`: the JSON String
     public void fromJSON(String jsonString) {
         StringReader r = null; //NOPMD CloseResource
         try {
@@ -794,13 +829,13 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Loads JSON for the object from storage with the given name if it exists. If the storage
-     * file doesn't exist getResources() will be used to find a default JSON file in the root
-     * of the package
-     *
-     * @param name the name of the storage
-     */
+    /// Loads JSON for the object from storage with the given name if it exists. If the storage
+    /// file doesn't exist getResources() will be used to find a default JSON file in the root
+    /// of the package
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the storage
     public void loadJSON(String name) {
         InputStream is = null; //NOPMD CloseResource
         try {
@@ -823,11 +858,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Loads JSON for the object from the given input stream
-     *
-     * @param stream the input stream containing the JSON file
-     */
+    /// Loads JSON for the object from the given input stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `stream`: the input stream containing the JSON file
     public void loadJSON(InputStream stream) throws IOException {
         JSONParser jp = new JSONParser();
         jp.setUseBooleanInstance(true);
@@ -835,12 +870,15 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         populateFromMap(jp.parseJSON(new InputStreamReader(stream, "UTF-8")), parent.getClass());
     }
 
-    /**
-     * Returns true if the given object equals the property index
-     *
-     * @param o the object
-     * @return true if equals
-     */
+    /// Returns true if the given object equals the property index
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object
+    ///
+    /// #### Returns
+    ///
+    /// true if equals
     @Override
     public boolean equals(Object o) {
         if (o instanceof PropertyIndex) {
@@ -865,11 +903,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return false;
     }
 
-    /**
-     * The hashcode of the object
-     *
-     * @return a composite of the hashcodes of the properties
-     */
+    /// The hashcode of the object
+    ///
+    /// #### Returns
+    ///
+    /// a composite of the hashcodes of the properties
     @Override
     public int hashCode() {
         int value = 0;
@@ -885,12 +923,13 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         return value;
     }
 
-    /**
-     * Allows us to exclude a specific property from the toJSON process
-     *
-     * @param pb      the property
-     * @param exclude true to exclude and false to reinclude
-     */
+    /// Allows us to exclude a specific property from the toJSON process
+    ///
+    /// #### Parameters
+    ///
+    /// - `pb`: the property
+    ///
+    /// - `exclude`: true to exclude and false to reinclude
     public void setExcludeFromJSON(PropertyBase pb, boolean exclude) {
         if (exclude) {
             pb.putClientProperty("jsonExclude", Boolean.TRUE);
@@ -899,23 +938,27 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Indicates whether the given property is excluded from the {@link #toMapRepresentation()}
-     * method output
-     *
-     * @param pb the property
-     * @return true if the property is excluded and false otherwise
-     */
+    /// Indicates whether the given property is excluded from the `#toMapRepresentation()`
+    /// method output
+    ///
+    /// #### Parameters
+    ///
+    /// - `pb`: the property
+    ///
+    /// #### Returns
+    ///
+    /// true if the property is excluded and false otherwise
     public boolean isExcludeFromMap(PropertyBase pb) {
         return pb.getClientProperty("mapExclude") != null;
     }
 
-    /**
-     * Allows us to exclude a specific property from the {@link #toMapRepresentation()} process
-     *
-     * @param pb      the property
-     * @param exclude true to exclude and false to reinclude
-     */
+    /// Allows us to exclude a specific property from the `#toMapRepresentation()` process
+    ///
+    /// #### Parameters
+    ///
+    /// - `pb`: the property
+    ///
+    /// - `exclude`: true to exclude and false to reinclude
     public void setExcludeFromMap(PropertyBase pb, boolean exclude) {
         if (exclude) {
             pb.putClientProperty("mapExclude", Boolean.TRUE);
@@ -924,30 +967,31 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         }
     }
 
-    /**
-     * Indicates whether the given property is excluded from the {@link #toJSON()} method output
-     *
-     * @param pb the property
-     * @return true if the property is excluded and false otherwise
-     */
+    /// Indicates whether the given property is excluded from the `#toJSON()` method output
+    ///
+    /// #### Parameters
+    ///
+    /// - `pb`: the property
+    ///
+    /// #### Returns
+    ///
+    /// true if the property is excluded and false otherwise
     public boolean isExcludeFromJSON(PropertyBase pb) {
         return pb.getClientProperty("jsonExclude") != null;
     }
 
-    /**
-     * Invoking this method will allow a property object to be serialized seamlessly
-     */
+    /// Invoking this method will allow a property object to be serialized seamlessly
     public void registerExternalizable() {
         Util.register(getName(), parent.getClass());
     }
 
-    /**
-     * Returns an externalizable object for serialization of this business object, unlike regular
-     * externalizables this implementation is robust to changes, additions and removals of
-     * properties
-     *
-     * @return an externalizable instance
-     */
+    /// Returns an externalizable object for serialization of this business object, unlike regular
+    /// externalizables this implementation is robust to changes, additions and removals of
+    /// properties
+    ///
+    /// #### Returns
+    ///
+    /// an externalizable instance
     public Externalizable asExternalizable() {
         return new Externalizable() {
             @Override

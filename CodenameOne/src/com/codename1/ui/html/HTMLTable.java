@@ -27,41 +27,43 @@ import com.codename1.ui.Component;
 import com.codename1.ui.table.Table;
 import com.codename1.ui.table.TableLayout.Constraint;
 
-/**
- * HTMLTable extends Codename One's Table and overrides some it's rendering and constaints methods do adapt to HTMLTableModel
- *
- * @author Ofir Leitner
- */
+/// HTMLTable extends Codename One's Table and overrides some it's rendering and constaints methods do adapt to HTMLTableModel
+///
+/// @author Ofir Leitner
 class HTMLTable extends Table {
 
-    /**
-     * Constant denoting that only inner borders rows should be drawn, only when seperating between table segments
-     * The groups/segments feature is not available to Table, but is available internally to HTMLTable
-     */
+    /// Constant denoting that only inner borders rows should be drawn, only when seperating between table segments
+    /// The groups/segments feature is not available to Table, but is available internally to HTMLTable
     static final int INNER_BORDERS_GROUPS = 4;
     boolean innerBorderGroups; // Denotes that the inner border mode is groups
 
-    /**
-     * Constructs an HTMLTAble with the given model, which has to be HTMLTableModel
-     *
-     * @param model The HTMLTableModel for this Table
-     */
+    /// Constructs an HTMLTAble with the given model, which has to be HTMLTableModel
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: The HTMLTableModel for this Table
     HTMLTable(HTMLTableModel model) {
         super(model, false);
         setCollapseBorder(false); //default for HTML tables
         setUIIDFinal("HTMLTable");
     }
 
-    /**
-     * This method is overriden to return the component that is contained in the HTMLTableModel
-     * (Since our model contains the actual component and does not store data that can be rendered using toString we can't use the original createCell method)
-     *
-     * @param value    the new value object
-     * @param row      row number, -1 for the header rows
-     * @param column   column number
-     * @param editable true if the cell is editable
-     * @return cell component instance
-     */
+    /// This method is overriden to return the component that is contained in the HTMLTableModel
+    /// (Since our model contains the actual component and does not store data that can be rendered using toString we can't use the original createCell method)
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the new value object
+    ///
+    /// - `row`: row number, -1 for the header rows
+    ///
+    /// - `column`: column number
+    ///
+    /// - `editable`: true if the cell is editable
+    ///
+    /// #### Returns
+    ///
+    /// cell component instance
     @Override
     protected Component createCell(Object value, int row, int column, boolean editable) {
         Component cmp = null;
@@ -81,14 +83,19 @@ class HTMLTable extends Table {
         return cmp;
     }
 
-    /**
-     * This method is overriden to fetch the constraints from the associated HTMLTableModel and converts it to TableLayout.Constraint
-     *
-     * @param value  the value of the cell
-     * @param row    the table row
-     * @param column the table column
-     * @return the table constraint
-     */
+    /// This method is overriden to fetch the constraints from the associated HTMLTableModel and converts it to TableLayout.Constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value of the cell
+    ///
+    /// - `row`: the table row
+    ///
+    /// - `column`: the table column
+    ///
+    /// #### Returns
+    ///
+    /// the table constraint
     @Override
     protected Constraint createCellConstraint(Object value, int row, int column) {
         CellConstraint cConstraint = ((HTMLTableModel) getModel()).getConstraint(value);
@@ -106,9 +113,7 @@ class HTMLTable extends Table {
         return constraint;
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     protected boolean shouldDrawInnerBorderAfterRow(int row) {
         if (innerBorderGroups) {
@@ -118,11 +123,11 @@ class HTMLTable extends Table {
         }
     }
 
-    /**
-     * Overrides Table.setInnerBorderMode to accept also the INNER_BORDER_GROUPS constant that implement the 'groups' value for the 'rules' attribute on the 'table' tag.
-     *
-     * @param innerBorder The inner border mode, one of the INNER_BORDER_* constants
-     */
+    /// Overrides Table.setInnerBorderMode to accept also the INNER_BORDER_GROUPS constant that implement the 'groups' value for the 'rules' attribute on the 'table' tag.
+    ///
+    /// #### Parameters
+    ///
+    /// - `innerBorder`: The inner border mode, one of the INNER_BORDER_* constants
     @Override
     public void setInnerBorderMode(int innerBorder) {
         if (innerBorder == INNER_BORDERS_GROUPS) {

@@ -1,150 +1,151 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.models;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A series for the multiple category charts like the doughnut.
- */
+/// A series for the multiple category charts like the doughnut.
 public class MultipleCategorySeries {
-    /**
-     * The series title.
-     */
+    /// The series title.
     private final String mTitle;
-    /**
-     * The series local keys.
-     */
+    /// The series local keys.
     private final List<String> mCategories = new ArrayList<String>();
-    /**
-     * The series name.
-     */
+    /// The series name.
     private final List<String[]> mTitles = new ArrayList<String[]>();
-    /**
-     * The series values.
-     */
+    /// The series values.
     private final List<double[]> mValues = new ArrayList<double[]>();
 
-    /**
-     * Builds a new category series.
-     *
-     * @param title the series title
-     */
+    /// Builds a new category series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the series title
     public MultipleCategorySeries(String title) {
         mTitle = title;
     }
 
-    /**
-     * Adds a new value to the series
-     *
-     * @param titles the titles to be used as labels
-     * @param values the new value
-     */
+    /// Adds a new value to the series
+    ///
+    /// #### Parameters
+    ///
+    /// - `titles`: the titles to be used as labels
+    ///
+    /// - `values`: the new value
     public void add(String[] titles, double[] values) {
         add(mCategories.size() + "", titles, values);
     }
 
-    /**
-     * Adds a new value to the series.
-     *
-     * @param category the category name
-     * @param titles   the titles to be used as labels
-     * @param values   the new value
-     */
+    /// Adds a new value to the series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `category`: the category name
+    ///
+    /// - `titles`: the titles to be used as labels
+    ///
+    /// - `values`: the new value
     public void add(String category, String[] titles, double[] values) {
         mCategories.add(category);
         mTitles.add(titles);
         mValues.add(values);
     }
 
-    /**
-     * Removes an existing value from the series.
-     *
-     * @param index the index in the series of the value to remove
-     */
+    /// Removes an existing value from the series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index in the series of the value to remove
     public void remove(int index) {
         mCategories.remove(index);
         mTitles.remove(index);
         mValues.remove(index);
     }
 
-    /**
-     * Removes all the existing values from the series.
-     */
+    /// Removes all the existing values from the series.
     public void clear() {
         mCategories.clear();
         mTitles.clear();
         mValues.clear();
     }
 
-    /**
-     * Returns the values at the specified index.
-     *
-     * @param index the index
-     * @return the value at the index
-     */
+    /// Returns the values at the specified index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the value at the index
     public double[] getValues(int index) {
         return mValues.get(index);
     }
 
-    /**
-     * Returns the category name at the specified index.
-     *
-     * @param index the index
-     * @return the category name at the index
-     */
+    /// Returns the category name at the specified index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the category name at the index
     public String getCategory(int index) {
         return mCategories.get(index);
     }
 
-    /**
-     * Returns the categories count.
-     *
-     * @return the categories count
-     */
+    /// Returns the categories count.
+    ///
+    /// #### Returns
+    ///
+    /// the categories count
     public int getCategoriesCount() {
         return mCategories.size();
     }
 
-    /**
-     * Returns the series item count.
-     *
-     * @param index the index
-     * @return the series item count
-     */
+    /// Returns the series item count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the series item count
     public int getItemCount(int index) {
         return mValues.get(index).length;
     }
 
-    /**
-     * Returns the series titles.
-     *
-     * @param index the index
-     * @return the series titles
-     */
+    /// Returns the series titles.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the series titles
     public String[] getTitles(int index) {
         return mTitles.get(index);
     }
 
-    /**
-     * Transforms the category series to an XY series.
-     *
-     * @return the XY series
-     */
+    /// Transforms the category series to an XY series.
+    ///
+    /// #### Returns
+    ///
+    /// the XY series
     public XYSeries toXYSeries() {
         return new XYSeries(mTitle);
     }

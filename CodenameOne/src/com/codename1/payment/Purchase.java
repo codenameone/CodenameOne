@@ -35,20 +35,19 @@ import java.util.Date;
 import java.util.List;
 
 
-/**
- * Represents the status of in-app-purchase goods, this class provides information
- * about products purchased by a user as well as the ability to purchase additional
- * products. There are generally two types of payment systems: Manual and managed.
- * In manual payments we pay a specific amount in a specific currency  while with managed
- * payment systems we work against a product catalog defined in the server.
- * <p>In-app-purchase API's rely on managed server based products, other payment systems
- * use the manual approach. An application dealing with virtual goods must support both
- * since not all devices feature in-app-purchase API's. An application dealing with physical
- * goods &amp; services must use the latter according to the TOS of current in-app-purchase
- * solutions.
- *
- * @author Shai Almog
- */
+/// Represents the status of in-app-purchase goods, this class provides information
+/// about products purchased by a user as well as the ability to purchase additional
+/// products. There are generally two types of payment systems: Manual and managed.
+/// In manual payments we pay a specific amount in a specific currency  while with managed
+/// payment systems we work against a product catalog defined in the server.
+///
+/// In-app-purchase API's rely on managed server based products, other payment systems
+/// use the manual approach. An application dealing with virtual goods must support both
+/// since not all devices feature in-app-purchase API's. An application dealing with physical
+/// goods & services must use the latter according to the TOS of current in-app-purchase
+/// solutions.
+///
+/// @author Shai Almog
 public abstract class Purchase {
     private static final String RECEIPTS_KEY = "CN1SubscriptionsData.dat";
     private static final String RECEIPTS_REFRESH_TIME_KEY = "CN1SubscriptionsDataRefreshTime.dat";
@@ -56,28 +55,29 @@ public abstract class Purchase {
     private static final Object PENDING_PURCHASE_LOCK = new Object();
     private static final Object synchronizationLock = new Object();
     private static final Object receiptsLock = new Object();
-    /**
-     * Boolean flag to prevent {@link #synchronizeReceipts(long, com.codename1.util.SuccessCallback) }
-     * re-entry.
-     */
+    /// Boolean flag to prevent `com.codename1.util.SuccessCallback)`
+    /// re-entry.
     private static boolean syncInProgress;
-    /**
-     * Flag to prevent {@link #loadReceipts(long, com.codename1.util.SuccessCallback)} re-entry.
-     */
+    /// Flag to prevent `com.codename1.util.SuccessCallback)` re-entry.
     private static boolean loadInProgress;
     private static List<SuccessCallback<Boolean>> synchronizeReceiptsCallbacks;
     private ReceiptStore receiptStore;
     private List<Receipt> receipts;
     private Date receiptsRefreshTime;
 
-    /**
-     * Posts a receipt to be added to the receipt store.
-     *
-     * @param sku           The sku of the product
-     * @param transactionId The transaction ID
-     * @param datePurchased The date of the purchase.
-     * @deprecated For internal implementation use only.
-     */
+    /// Posts a receipt to be added to the receipt store.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: The sku of the product
+    ///
+    /// - `transactionId`: The transaction ID
+    ///
+    /// - `datePurchased`: The date of the purchase.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal implementation use only.
     public static void postReceipt(String storeCode, String sku, String transactionId, long datePurchased, String orderData) {
 
         Receipt r = new Receipt();
@@ -94,20 +94,20 @@ public abstract class Purchase {
 
     }
 
-    /**
-     * Returns the native OS purchase implementation if applicable, if unavailable this
-     * method will try to fallback to a custom purchase implementation and failing that
-     * will return null
-     *
-     * @return instance of the purchase class or null
-     */
+    /// Returns the native OS purchase implementation if applicable, if unavailable this
+    /// method will try to fallback to a custom purchase implementation and failing that
+    /// will return null
+    ///
+    /// #### Returns
+    ///
+    /// instance of the purchase class or null
     public static Purchase getInAppPurchase() {
         return Display.getInstance().getInAppPurchase();
     }
 
-    /**
-     * @deprecated use the version that takes no arguments
-     */
+    /// #### Deprecated
+    ///
+    /// use the version that takes no arguments
     public static Purchase getInAppPurchase(boolean d) {
         return Display.getInstance().getInAppPurchase();
     }
@@ -116,22 +116,22 @@ public abstract class Purchase {
         return receiptStore;
     }
 
-    /**
-     * Installs a given receipt store to handle receipt management
-     *
-     * @param store
-     */
+    /// Installs a given receipt store to handle receipt management
+    ///
+    /// #### Parameters
+    ///
+    /// - `store`
     public final void setReceiptStore(ReceiptStore store) {
         receiptStore = store;
     }
 
-    /**
-     * Gets all of the receipts for this app.  Note:  You should periodically
-     * reload the receipts from the server to make sure that the user
-     * hasn't canceled a receipt or renewed one.
-     *
-     * @return List of receipts for purchases this app.
-     */
+    /// Gets all of the receipts for this app.  Note:  You should periodically
+    /// reload the receipts from the server to make sure that the user
+    /// hasn't canceled a receipt or renewed one.
+    ///
+    /// #### Returns
+    ///
+    /// List of receipts for purchases this app.
     public final List<Receipt> getReceipts() {
         synchronized (receiptsLock) {
             if (receipts == null) {
@@ -153,11 +153,11 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Sets the list of receipts.
-     *
-     * @param data
-     */
+    /// Sets the list of receipts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`
     private void setReceipts(List<Receipt> data) {
         synchronized (receiptsLock) {
             receipts = new ArrayList<Receipt>();
@@ -166,12 +166,15 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Gets all of the receipts for the specified skus.
-     *
-     * @param skus The skus for which to get receipts.
-     * @return All receipts for the given skus.
-     */
+    /// Gets all of the receipts for the specified skus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `skus`: The skus for which to get receipts.
+    ///
+    /// #### Returns
+    ///
+    /// All receipts for the given skus.
     public final Receipt[] getReceipts(String... skus) {
         List<Receipt> out = new ArrayList<Receipt>();
         List<String> lSkus = Arrays.asList(skus);
@@ -183,11 +186,7 @@ public abstract class Purchase {
         return out.toArray(new Receipt[out.size()]);
     }
 
-    /**
-     * Gets the time that receipts were last refreshed.
-     *
-     * @return
-     */
+    /// Gets the time that receipts were last refreshed.
     private Date getReceiptsRefreshTime() {
         synchronized (receiptsLock) {
             if (receiptsRefreshTime == null) {
@@ -201,11 +200,11 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Updates the last refresh time for receipts.
-     *
-     * @param time
-     */
+    /// Updates the last refresh time for receipts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`
     private void setReceiptsRefreshTime(Date time) {
         synchronized (receiptsLock) {
             receiptsRefreshTime = time;
@@ -213,142 +212,183 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Indicates whether the purchasing platform supports manual payments which
-     * are just payments of a specific amount of money.
-     *
-     * @return true if manual payments are supported
-     */
+    /// Indicates whether the purchasing platform supports manual payments which
+    /// are just payments of a specific amount of money.
+    ///
+    /// #### Returns
+    ///
+    /// true if manual payments are supported
     public boolean isManualPaymentSupported() {
         return false;
     }
 
-    /**
-     * Indicates whether the purchasing platform supports managed payments which
-     * work by picking products that are handled by the servers/OS of the platform vendor.
-     *
-     * @return true if managed payments are supported
-     */
+    /// Indicates whether the purchasing platform supports managed payments which
+    /// work by picking products that are handled by the servers/OS of the platform vendor.
+    ///
+    /// #### Returns
+    ///
+    /// true if managed payments are supported
     public boolean isManagedPaymentSupported() {
         return false;
     }
 
-    /**
-     * Performs payment of a specific amount based on the manual payment API, notice that
-     * this doesn't use the in-app-purchase functionality of the device!
-     *
-     * @param amount   the amount to pay
-     * @param currency the three letter currency type
-     * @return a token representing the pending transaction which will be matched
-     * when receiving a callback from the platform or a null if the payment has
-     * failed or was canceled
-     * @throws RuntimeException This method is a part of the manual payments API and will fail if
-     *                          isManualPaymentSupported() returns false
-     */
+    /// Performs payment of a specific amount based on the manual payment API, notice that
+    /// this doesn't use the in-app-purchase functionality of the device!
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: the amount to pay
+    ///
+    /// - `currency`: the three letter currency type
+    ///
+    /// #### Returns
+    ///
+    /// @return a token representing the pending transaction which will be matched
+    /// when receiving a callback from the platform or a null if the payment has
+    /// failed or was canceled
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the manual payments API and will fail if
+    ///                          isManualPaymentSupported() returns false
     public String pay(double amount, String currency) {
         throw new RuntimeException("Unsupported");
     }
 
-    /**
-     * Performs payment of a specific amount based on the manual payment API, notice that
-     * this doesn't use the in-app-purchase functionality of the device!
-     *
-     * @param amount        the amount to pay
-     * @param currency      the three letter currency type
-     * @param invoiceNumber application specific invoice number
-     * @return a token representing the pending transaction which will be matched
-     * when receiving a callback from the platform or a null if the payment has
-     * failed or was canceled
-     * @throws RuntimeException This method is a part of the manual payments API and will fail if
-     *                          isManualPaymentSupported() returns false
-     */
+    /// Performs payment of a specific amount based on the manual payment API, notice that
+    /// this doesn't use the in-app-purchase functionality of the device!
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: the amount to pay
+    ///
+    /// - `currency`: the three letter currency type
+    ///
+    /// - `invoiceNumber`: application specific invoice number
+    ///
+    /// #### Returns
+    ///
+    /// @return a token representing the pending transaction which will be matched
+    /// when receiving a callback from the platform or a null if the payment has
+    /// failed or was canceled
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the manual payments API and will fail if
+    ///                          isManualPaymentSupported() returns false
     public String pay(double amount, String currency, String invoiceNumber) {
         return pay(amount, currency);
     }
 
-    /**
-     * Indicates whether the payment platform supports things such as "item listing" or
-     * requires that items be coded into the system. iOS provides listing and pricing
-     * where Android expects developers to redirect into the Play application for
-     * application details.
-     *
-     * @return true if the OS supports this behavior
-     */
+    /// Indicates whether the payment platform supports things such as "item listing" or
+    /// requires that items be coded into the system. iOS provides listing and pricing
+    /// where Android expects developers to redirect into the Play application for
+    /// application details.
+    ///
+    /// #### Returns
+    ///
+    /// true if the OS supports this behavior
     public boolean isItemListingSupported() {
         return false;
     }
 
-    /**
-     * Returns the product list for the given SKU array
-     *
-     * @param skus the ids for the specific products
-     * @return the product instances
-     * @throws RuntimeException This method is a part of the managed payments API and will fail if
-     *                          isManagedPaymentSupported() returns false
-     * @throws RuntimeException This method works only if isItemListingSupported() returns true
-     */
+    /// Returns the product list for the given SKU array
+    ///
+    /// #### Parameters
+    ///
+    /// - `skus`: the ids for the specific products
+    ///
+    /// #### Returns
+    ///
+    /// the product instances
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    ///                          isManagedPaymentSupported() returns false
+    ///
+    /// - `RuntimeException`: This method works only if isItemListingSupported() returns true
     public Product[] getProducts(String[] skus) {
         throw new RuntimeException("Unsupported");
     }
 
-    /**
-     * Returns true if the given SKU was purchased in the past, notice this method might not
-     * work as expected for Unmanaged/consumable products which can be purchased multiple
-     * times.  In addition, this will only return true if the product was purchased (or
-     * has been restored) on the current device.
-     *
-     * @param sku the id of the product
-     * @return true if the product was purchased
-     * @throws RuntimeException This method is a part of the managed payments API and will fail if
-     *                          isManagedPaymentSupported() returns false
-     */
+    /// Returns true if the given SKU was purchased in the past, notice this method might not
+    /// work as expected for Unmanaged/consumable products which can be purchased multiple
+    /// times.  In addition, this will only return true if the product was purchased (or
+    /// has been restored) on the current device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the id of the product
+    ///
+    /// #### Returns
+    ///
+    /// true if the product was purchased
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    ///                          isManagedPaymentSupported() returns false
     public boolean wasPurchased(String sku) {
         throw new RuntimeException("Unsupported");
     }
 
-    /**
-     * Begins the purchase process for the given SKU
-     *
-     * <p>On Android you *must* use {@link #subscribe(java.lang.String) } for play store subscription products instead of this method.  You cannot use {@link #purchase(java.lang.String) }.  On iOS
-     * there is no difference between {@link #subscribe(java.lang.String) } and {@link #purchase(java.lang.String) }, so if you are simulating subscriptions
-     * on iOS using auto-renewables, you are better to use {@link #subscribe(java.lang.String) } as this will work correctly on both Android
-     * and iOS.</p>
-     *
-     * @param sku the SKU with which to perform the purchase process
-     * @throws RuntimeException This method is a part of the managed payments API and will fail if
-     *                          isManagedPaymentSupported() returns false
-     */
+    /// Begins the purchase process for the given SKU
+    ///
+    /// On Android you *must* use `#subscribe(java.lang.String)` for play store subscription products instead of this method.  You cannot use `#purchase(java.lang.String)`.  On iOS
+    /// there is no difference between `#subscribe(java.lang.String)` and `#purchase(java.lang.String)`, so if you are simulating subscriptions
+    /// on iOS using auto-renewables, you are better to use `#subscribe(java.lang.String)` as this will work correctly on both Android
+    /// and iOS.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    ///                          isManagedPaymentSupported() returns false
     public void purchase(String sku) {
         throw new RuntimeException("Unsupported");
     }
 
-    /**
-     * Begins the purchase process for the given SKU using a provided promotional offer.
-     *
-     * <p>Promotional offers are currently only supported on iOS.  See <a href="https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc">Apple's documentation</a></p>
-     *
-     * @param sku              the SKU with which to perform the purchase process
-     * @param promotionalOffer The promotional offer.
-     * @throws RuntimeException This method is a part of the managed payments API and will fail if
-     *                          isManagedPaymentSupported() returns false
-     * @see ApplePromotionalOffer
-     */
+    /// Begins the purchase process for the given SKU using a provided promotional offer.
+    ///
+    /// Promotional offers are currently only supported on iOS.  See [Apple's documentation](https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc)
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// - `promotionalOffer`: The promotional offer.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    ///                          isManagedPaymentSupported() returns false
+    ///
+    /// #### See also
+    ///
+    /// - ApplePromotionalOffer
     public void purchase(String sku, PromotionalOffer promotionalOffer) {
         throw new RuntimeException("Unsupported");
     }
 
-    /**
-     * Begins subscribe process for the given subscription SKU
-     *
-     * <p>On Android you *must* use this method for play store subscription products.  You cannot use {@link #purchase(java.lang.String) }.  On iOS
-     * there is no difference between {@link #subscribe(java.lang.String) } and {@link #purchase(java.lang.String) }, so if you are simulating subscriptions
-     * on iOS using auto-renewables, you are better to use {@link #subscribe(java.lang.String) } as this will work correctly on both Android
-     * and iOS.</p>
-     *
-     * @param sku the SKU with which to perform the purchase process
-     * @throws RuntimeException This method is a part of the managed payments API and will fail if
-     *                          isManagedPaymentSupported() returns false
-     */
+    /// Begins subscribe process for the given subscription SKU
+    ///
+    /// On Android you *must* use this method for play store subscription products.  You cannot use `#purchase(java.lang.String)`.  On iOS
+    /// there is no difference between `#subscribe(java.lang.String)` and `#purchase(java.lang.String)`, so if you are simulating subscriptions
+    /// on iOS using auto-renewables, you are better to use `#subscribe(java.lang.String)` as this will work correctly on both Android
+    /// and iOS.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    ///                          isManagedPaymentSupported() returns false
     public void subscribe(String sku) {
         if (receiptStore != null) {
             purchase(sku);
@@ -357,17 +397,24 @@ public abstract class Purchase {
         throw new RuntimeException("Unsupported");
     }
 
-    /**
-     * Begins subscribe process for the given subscription SKU using a provided promotional offer.
-     *
-     * <p>Promotional offers are currently only supported on iOS.  See <a href="https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc">Apple's documentation</a></p>
-     *
-     * @param sku              the SKU with which to perform the purchase process
-     * @param promotionalOffer The promotional offer.
-     * @throws RuntimeException This method is a part of the managed payments API and will fail if
-     *                          isManagedPaymentSupported() returns false
-     * @see ApplePromotionalOffer
-     */
+    /// Begins subscribe process for the given subscription SKU using a provided promotional offer.
+    ///
+    /// Promotional offers are currently only supported on iOS.  See [Apple's documentation](https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc)
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// - `promotionalOffer`: The promotional offer.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    ///                          isManagedPaymentSupported() returns false
+    ///
+    /// #### See also
+    ///
+    /// - ApplePromotionalOffer
     public void subscribe(String sku, PromotionalOffer promotionalOffer) {
         if (receiptStore != null) {
             purchase(sku, promotionalOffer);
@@ -376,25 +423,28 @@ public abstract class Purchase {
         throw new RuntimeException("Unsupported");
     }
 
-    /**
-     * Cancels the subscription to a given SKU
-     *
-     * @param sku the SKU with which to perform the purchase process
-     * @throws RuntimeException This method is a part of the managed payments API and will fail if
-     *                          isManagedPaymentSupported() returns false
-     */
+    /// Cancels the subscription to a given SKU
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    ///                          isManagedPaymentSupported() returns false
     public void unsubscribe(String sku) {
         throw new RuntimeException("Unsupported");
     }
 
-    /**
-     * Gets a list of purchases that haven't yet been sent to the server.  You can
-     * use this for diagnostic and debugging purposes periodically in the app to
-     * make sure there aren't a queue of purchases that aren't getting submitted
-     * to the server.
-     *
-     * @return List of receipts that haven't been sent to the server.
-     */
+    /// Gets a list of purchases that haven't yet been sent to the server.  You can
+    /// use this for diagnostic and debugging purposes periodically in the app to
+    /// make sure there aren't a queue of purchases that aren't getting submitted
+    /// to the server.
+    ///
+    /// #### Returns
+    ///
+    /// List of receipts that haven't been sent to the server.
     @SuppressWarnings("unchecked")
     public List<Receipt> getPendingPurchases() {
         synchronized (PENDING_PURCHASE_LOCK) {
@@ -408,11 +458,11 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Adds a receipt to be pushed to the server.
-     *
-     * @param receipt the receipt
-     */
+    /// Adds a receipt to be pushed to the server.
+    ///
+    /// #### Parameters
+    ///
+    /// - `receipt`: the receipt
     private void addPendingPurchase(Receipt receipt) {
         synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
@@ -422,12 +472,15 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Removes a receipt from pending purchases.
-     *
-     * @param transactionId the transaction id
-     * @return the removed receipt
-     */
+    /// Removes a receipt from pending purchases.
+    ///
+    /// #### Parameters
+    ///
+    /// - `transactionId`: the transaction id
+    ///
+    /// #### Returns
+    ///
+    /// the removed receipt
     private Receipt removePendingPurchase(String transactionId) {
         synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
@@ -470,14 +523,15 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Synchronize with receipt store.  This will try to submit any pending purchases
-     * to the receipt store, and then reload receipts from the receipt store
-     *
-     * @param ifOlderThanMs Only fetch receipts if they haven't been fetched in {@code ifOlderThanMs} milliseconds.
-     * @param callback      Callback called when sync is done.  Will be passed true if all pending purchases were successfully
-     *                      submitted to the receipt store AND receipts were successfully loaded.
-     */
+    /// Synchronize with receipt store.  This will try to submit any pending purchases
+    /// to the receipt store, and then reload receipts from the receipt store
+    ///
+    /// #### Parameters
+    ///
+    /// - `ifOlderThanMs`: Only fetch receipts if they haven't been fetched in `ifOlderThanMs` milliseconds.
+    ///
+    /// - `callback`: @param callback      Callback called when sync is done.  Will be passed true if all pending purchases were successfully
+    ///                      submitted to the receipt store AND receipts were successfully loaded.
     public final void synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
         synchronized (synchronizationLock) {
             if (callback != null) {
@@ -531,11 +585,11 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Posts a receipt to be added to the receipt store.
-     *
-     * @param r The receipt to post.
-     */
+    /// Posts a receipt to be added to the receipt store.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: The receipt to post.
     private void postReceipt(Receipt r) {
         addPendingPurchase(r);
         Display.getInstance().callSerially(new Runnable() {
@@ -546,12 +600,15 @@ public abstract class Purchase {
         });
     }
 
-    /**
-     * Synchronize receipts and wait for the sync to complete before proceeding.
-     *
-     * @param ifOlderThanMs Only re-fetch if it hasn't been reloaded in this number of milliseconds.
-     * @return True if the synchronization succeeds.  False otherwise.
-     */
+    /// Synchronize receipts and wait for the sync to complete before proceeding.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ifOlderThanMs`: Only re-fetch if it hasn't been reloaded in this number of milliseconds.
+    ///
+    /// #### Returns
+    ///
+    /// True if the synchronization succeeds.  False otherwise.
     public final boolean synchronizeReceiptsSync(long ifOlderThanMs) {
         final boolean[] complete = new boolean[1];
         final boolean[] success = new boolean[1];
@@ -563,17 +620,18 @@ public abstract class Purchase {
         return success[0];
     }
 
-    /**
-     * Fetches receipts from the IAP service so that we know we are dealing
-     * with current data.  This method should be called before checking a
-     * subscription expiry date so that any changes the user has made in the
-     * store is reflected here (e.g. cancelling or renewing subscription).
-     *
-     * @param ifOlderThanMs Update is only performed if more than {@code ifOlderThanMs} milliseconds has elapsed
-     *                      since the last successful fetch.
-     * @param callback      Callback called when request is complete.  Passed {@code true} if
-     *                      the data was successfully fetched.  {@code false} otherwise.
-     */
+    /// Fetches receipts from the IAP service so that we know we are dealing
+    /// with current data.  This method should be called before checking a
+    /// subscription expiry date so that any changes the user has made in the
+    /// store is reflected here (e.g. cancelling or renewing subscription).
+    ///
+    /// #### Parameters
+    ///
+    /// - `ifOlderThanMs`: @param ifOlderThanMs Update is only performed if more than `ifOlderThanMs` milliseconds has elapsed
+    ///                      since the last successful fetch.
+    ///
+    /// - `callback`: @param callback      Callback called when request is complete.  Passed `true` if
+    ///                      the data was successfully fetched.  `false` otherwise.
     private void loadReceipts(long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
         if (loadInProgress) {
             Log.p("Did not load receipts because another load is in progress");
@@ -616,13 +674,17 @@ public abstract class Purchase {
         }
     }
 
-    /**
-     * Gets the latest expiry date for a set of SKUs as reflected by a set of receipts.
-     *
-     * @param receipts Receipts to check against.
-     * @param skus     The set of skus we are checking for.
-     * @return The expiry date for a set of skus
-     */
+    /// Gets the latest expiry date for a set of SKUs as reflected by a set of receipts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `receipts`: Receipts to check against.
+    ///
+    /// - `skus`: The set of skus we are checking for.
+    ///
+    /// #### Returns
+    ///
+    /// The expiry date for a set of skus
     private Date getExpiryDate(Receipt[] receipts, String... skus) {
         Date expiryDate = new Date(0L);
         List<String> lSkus = Arrays.asList(skus);
@@ -641,39 +703,42 @@ public abstract class Purchase {
         return expiryDate;
     }
 
-    /**
-     * Gets the expiry date for a set of skus.
-     *
-     * @param skus The skus to check.  The latest expiry date of the set will be used.
-     * @return The expiry date for a set of skus.
-     */
+    /// Gets the expiry date for a set of skus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `skus`: The skus to check.  The latest expiry date of the set will be used.
+    ///
+    /// #### Returns
+    ///
+    /// The expiry date for a set of skus.
     public final Date getExpiryDate(String... skus) {
         return getExpiryDate(getReceipts(skus), skus);
     }
 
-    /**
-     * Checks to see if the user is currently subscribed to any of the given skus.  A user
-     * is deemed to be subscribed if {@link #getExpiryDate(java.lang.String...)} returns a date
-     * later than now.
-     *
-     * @param skus Set of skus to check.
-     * @return
-     */
+    /// Checks to see if the user is currently subscribed to any of the given skus.  A user
+    /// is deemed to be subscribed if `#getExpiryDate(java.lang.String...)` returns a date
+    /// later than now.
+    ///
+    /// #### Parameters
+    ///
+    /// - `skus`: Set of skus to check.
     public final boolean isSubscribed(String... skus) {
         Date exp = getExpiryDate(skus);
         return exp != null && exp.getTime() >= System.currentTimeMillis();
     }
 
-    /**
-     * Given the {@code publishDate} for an item, this returns the effective receipt that
-     * relates to that item.  This will either be a receipt with {@code purchaseDate <= publishDate <= expiryDate} or
-     * the earliest receipt with {@code publishDate < purchaseDate},  or null if no receipts
-     *
-     * @param receipts
-     * @param publishDate
-     * @param skus
-     * @return
-     */
+    /// Given the `publishDate` for an item, this returns the effective receipt that
+    /// relates to that item.  This will either be a receipt with `purchaseDate <= publishDate <= expiryDate` or
+    /// the earliest receipt with `publishDate < purchaseDate`,  or null if no receipts
+    ///
+    /// #### Parameters
+    ///
+    /// - `receipts`
+    ///
+    /// - `publishDate`
+    ///
+    /// - `skus`
     private Receipt getFirstReceiptExpiringAfter(Receipt[] receipts, Date publishDate, String... skus) {
         List<String> lSkus = Arrays.asList(skus);
         Receipt effectiveReceipt = null;
@@ -708,103 +773,116 @@ public abstract class Purchase {
         return effectiveReceipt;
     }
 
-    /**
-     * Gets the first receipt that expires after the specified date for the provided
-     * skus.
-     *
-     * @param dt
-     * @param skus
-     * @return
-     */
+    /// Gets the first receipt that expires after the specified date for the provided
+    /// skus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dt`
+    ///
+    /// - `skus`
     public Receipt getFirstReceiptExpiringAfter(Date dt, String... skus) {
         return getFirstReceiptExpiringAfter(getReceipts(skus), dt, skus);
     }
 
-    /**
-     * Indicates whether refunding is possible when the SKU is purchased
-     *
-     * @param sku the sku
-     * @return true if the SKU can be refunded
-     */
+    /// Indicates whether refunding is possible when the SKU is purchased
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the sku
+    ///
+    /// #### Returns
+    ///
+    /// true if the SKU can be refunded
     public boolean isRefundable(String sku) {
         return false;
     }
 
-    /**
-     * Tries to refund the given SKU if applicable in the current market/product
-     *
-     * @param sku the id for the product
-     */
+    /// Tries to refund the given SKU if applicable in the current market/product
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the id for the product
     public void refund(String sku) {
     }
 
-    /**
-     * Returns true if the subscription API is supported in this platform
-     *
-     * @return true if the subscription API is supported in this platform
-     */
+    /// Returns true if the subscription API is supported in this platform
+    ///
+    /// #### Returns
+    ///
+    /// true if the subscription API is supported in this platform
     public boolean isSubscriptionSupported() {
         return false;
     }
 
-    /**
-     * Some platforms support subscribing but don't support unsubscribe
-     *
-     * @return true if the subscription API allows for unsubscribe
-     * @deprecated use {@link #isManageSubscriptionsSupported()} instead
-     */
+    /// Some platforms support subscribing but don't support unsubscribe
+    ///
+    /// #### Returns
+    ///
+    /// true if the subscription API allows for unsubscribe
+    ///
+    /// #### Deprecated
+    ///
+    /// use `#isManageSubscriptionsSupported()` instead
     public boolean isUnsubscribeSupported() {
         return isSubscriptionSupported();
     }
 
-    /**
-     * Indicates whether a purchase restore button is supported by the OS
-     *
-     * @return true if you can invoke the restore method
-     */
+    /// Indicates whether a purchase restore button is supported by the OS
+    ///
+    /// #### Returns
+    ///
+    /// true if you can invoke the restore method
     public boolean isRestoreSupported() {
         return false;
     }
 
-    /**
-     * Restores purchases if applicable, this will only work if isRestoreSupported() returns true
-     */
+    /// Restores purchases if applicable, this will only work if isRestoreSupported() returns true
     public void restore() {
     }
 
-    /**
-     * Checks to see if this platform supports the {@link #manageSubscriptions(java.lang.String) } method.
-     *
-     * @return True if the platform supports the {@link #manageSubscriptions(java.lang.String) } method.
-     * @since 6.0
-     */
+    /// Checks to see if this platform supports the `#manageSubscriptions(java.lang.String)` method.
+    ///
+    /// #### Returns
+    ///
+    /// True if the platform supports the `#manageSubscriptions(java.lang.String)` method.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public boolean isManageSubscriptionsSupported() {
         return false;
     }
 
-    /**
-     * Open the platform's UI for managing subscriptions.  Currently iOS and Android
-     * are the only platforms that support this.  Other platforms will simply display a dialog stating that
-     * it doesn't support this feature.  Use the {@link #isManageSubscriptionsSupported() } method to check
-     * if the platform supports this feature.
-     *
-     * @param sku Optional sku of product whose subscription you wish to manage.  If left {@literal null}, then
-     *            the general subscription management UI will be opened.  iOS doesn't support "deep-linking" directly to the
-     *            management for a particular sku, so this parameter is ignored there.  If included on Android, howerver,
-     *            it will open the UI for managing the specified sku.
-     * @since 6.0
-     */
+    /// Open the platform's UI for managing subscriptions.  Currently iOS and Android
+    /// are the only platforms that support this.  Other platforms will simply display a dialog stating that
+    /// it doesn't support this feature.  Use the `#isManageSubscriptionsSupported()` method to check
+    /// if the platform supports this feature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: @param sku Optional sku of product whose subscription you wish to manage.  If left null, then
+    ///            the general subscription management UI will be opened.  iOS doesn't support "deep-linking" directly to the
+    ///            management for a particular sku, so this parameter is ignored there.  If included on Android, howerver,
+    ///            it will open the UI for managing the specified sku.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public void manageSubscriptions(String sku) {
         Dialog.show("Not Supported", "This platform doesn't support in-app subscription management. ", "OK", null);
     }
 
-    /**
-     * Returns the store code associated with this in-app purchase object.
-     *
-     * @return The store code.  One of {@link Receipt#STORE_CODE_ITUNES}, {@link Receipt#STORE_CODE_PLAY}, {@link Receipt#STORE_CODE_SIMULATOR}, or
-     * {@link Receipt#STORE_CODE_WINDOWS}.
-     * @since 8.0
-     */
+    /// Returns the store code associated with this in-app purchase object.
+    ///
+    /// #### Returns
+    ///
+    /// @return The store code.  One of `Receipt#STORE_CODE_ITUNES`, `Receipt#STORE_CODE_PLAY`, `Receipt#STORE_CODE_SIMULATOR`, or
+    /// `Receipt#STORE_CODE_WINDOWS`.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public String getStoreCode() {
         return null;
     }

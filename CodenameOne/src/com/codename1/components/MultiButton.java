@@ -45,17 +45,51 @@ import java.util.StringTokenizer;
 
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * <p>A powerful button like component that allows multiple rows/and an icon to be added
- * every row/icon can have its own UIID. Internally the multi-button is a container with
- * a lead component. Up to 4 rows are supported.</p>
- *
- * <script src="https://gist.github.com/codenameone/c0991e96258f813df91e.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-multibutton.png" alt="MultiButton usages Sample" />
- *
- * @author Shai Almog
- * @see SpanButton
- */
+/// A powerful button like component that allows multiple rows/and an icon to be added
+/// every row/icon can have its own UIID. Internally the multi-button is a container with
+/// a lead component. Up to 4 rows are supported.
+///
+/// ```java
+/// MultiButton twoLinesNoIcon = new MultiButton("MultiButton");
+/// twoLinesNoIcon.setTextLine2("Line 2");
+/// MultiButton oneLineIconEmblem = new MultiButton("Icon + Emblem");
+/// oneLineIconEmblem.setIcon(icon);
+/// oneLineIconEmblem.setEmblem(emblem);
+/// MultiButton twoLinesIconEmblem = new MultiButton("Icon + Emblem");
+/// twoLinesIconEmblem.setIcon(icon);
+/// twoLinesIconEmblem.setEmblem(emblem);
+/// twoLinesIconEmblem.setTextLine2("Line 2");
+///
+/// MultiButton twoLinesIconEmblemHorizontal = new MultiButton("Icon + Emblem");
+/// twoLinesIconEmblemHorizontal.setIcon(icon);
+/// twoLinesIconEmblemHorizontal.setEmblem(emblem);
+/// twoLinesIconEmblemHorizontal.setTextLine2("Line 2 Horizontal");
+/// twoLinesIconEmblemHorizontal.setHorizontalLayout(true);
+///
+/// MultiButton twoLinesIconCheckBox = new MultiButton("CheckBox");
+/// twoLinesIconCheckBox.setIcon(icon);
+/// twoLinesIconCheckBox.setCheckBox(true);
+/// twoLinesIconCheckBox.setTextLine2("Line 2");
+///
+/// MultiButton fourLinesIcon = new MultiButton("With Icon");
+/// fourLinesIcon.setIcon(icon);
+/// fourLinesIcon.setTextLine2("Line 2");
+/// fourLinesIcon.setTextLine3("Line 3");
+/// fourLinesIcon.setTextLine4("Line 4");
+///
+/// hi.add(oneLineIconEmblem).
+///         add(twoLinesNoIcon).
+///         add(twoLinesIconEmblem).
+///         add(twoLinesIconEmblemHorizontal).
+///         add(twoLinesIconCheckBox).
+///         add(fourLinesIcon);
+/// ```
+///
+/// @author Shai Almog
+///
+/// #### See also
+///
+/// - SpanButton
 public class MultiButton extends Container implements ActionSource, SelectableIconHolder, TextHolder {
     private final Label firstRow = new Label("MultiButton");
     private final Label secondRow = new Label();
@@ -67,19 +101,17 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     private String group;
     private int gap;
 
-    /**
-     * Initializes a multibutton with the first line of text
-     *
-     * @param line1 first line of text
-     */
+    /// Initializes a multibutton with the first line of text
+    ///
+    /// #### Parameters
+    ///
+    /// - `line1`: first line of text
     public MultiButton(String line1) {
         this();
         setTextLine1(line1);
     }
 
-    /**
-     * Default constructor allowing the designer to create an instance of this class
-     */
+    /// Default constructor allowing the designer to create an instance of this class
     public MultiButton() {
         setLayout(new BorderLayout());
         setFocusable(true);
@@ -122,20 +154,16 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         icon.bindStateTo(emblem);
     }
 
-    /**
-     * Indicates if the lines are grouped together on this button
-     *
-     * @return
-     */
+    /// Indicates if the lines are grouped together on this button
     public boolean isLinesTogetherMode() {
         return firstRow.getParent() == secondRow.getParent(); //NOPMD CompareObjectsWithEquals
     }
 
-    /**
-     * Changes the layout so the lines of the button are grouped together
-     *
-     * @param l true to group the lines together
-     */
+    /// Changes the layout so the lines of the button are grouped together
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: true to group the lines together
     public void setLinesTogetherMode(boolean l) {
         if (l != isLinesTogetherMode()) {
             if (l) {
@@ -152,111 +180,111 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * Allows us to gain direct access to the icon component so we can set it directly without going
-     * via the other methods, this is especially useful for classes such as the ImageDownloadService
-     * which can then update the icon seamlessly.
-     *
-     * @return the component used internally to represent the icon
-     */
+    /// Allows us to gain direct access to the icon component so we can set it directly without going
+    /// via the other methods, this is especially useful for classes such as the ImageDownloadService
+    /// which can then update the icon seamlessly.
+    ///
+    /// #### Returns
+    ///
+    /// the component used internally to represent the icon
     public Label getIconComponent() {
         return icon;
     }
 
-    /**
-     * Adds an action listener
-     *
-     * @param al the action listener
-     */
+    /// Adds an action listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: the action listener
     @Override
     public void addActionListener(ActionListener al) {
         emblem.addActionListener(al);
     }
 
-    /**
-     * Removes an action listener
-     *
-     * @param al the action listener
-     */
+    /// Removes an action listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: the action listener
     @Override
     public void removeActionListener(ActionListener al) {
         emblem.removeActionListener(al);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @param l
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     @Override
     public void addLongPressListener(ActionListener l) {
         emblem.addLongPressListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param l
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     @Override
     public void removeLongPressListener(ActionListener l) {
         emblem.removeLongPressListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param l
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     @Override
     public void addPointerPressedListener(ActionListener l) {
         emblem.addPointerPressedListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param l
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     @Override
     public void removePointerPressedListener(ActionListener l) {
         emblem.removePointerPressedListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param l
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     @Override
     public void addPointerReleasedListener(ActionListener l) {
         emblem.addPointerReleasedListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param l
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     @Override
     public void removePointerReleasedListener(ActionListener l) {
         emblem.removePointerReleasedListener(l);
     }
 
-    /**
-     * Returns the command for the emblem
-     *
-     * @return the command instance
-     */
+    /// Returns the command for the emblem
+    ///
+    /// #### Returns
+    ///
+    /// the command instance
     public Command getCommand() {
         return emblem.getCommand();
     }
 
-    /**
-     * Sets the command for the component, it doesn't affe
-     *
-     * @param c the command
-     */
+    /// Sets the command for the component, it doesn't affe
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the command
     public void setCommand(Command c) {
         Image img = emblem.getIcon();
         emblem.setCommand(c);
@@ -264,20 +292,20 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         emblem.setText("");
     }
 
-    /**
-     * Returns true if this is a checkbox button
-     *
-     * @return true for a checkbox button
-     */
+    /// Returns true if this is a checkbox button
+    ///
+    /// #### Returns
+    ///
+    /// true for a checkbox button
     public boolean isCheckBox() {
         return emblem instanceof CheckBox;
     }
 
-    /**
-     * Turns the multi-button into a checkbox multi-button
-     *
-     * @param b true for a checkbox multi-button
-     */
+    /// Turns the multi-button into a checkbox multi-button
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true for a checkbox multi-button
     public void setCheckBox(boolean b) {
         if (b != isCheckBox()) {
             Container par = emblem.getParent();
@@ -311,20 +339,20 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * Returns true if this is a radio button
-     *
-     * @return true for a radio button
-     */
+    /// Returns true if this is a radio button
+    ///
+    /// #### Returns
+    ///
+    /// true for a radio button
     public boolean isRadioButton() {
         return emblem instanceof RadioButton;
     }
 
-    /**
-     * Turns the multi-button into a radio multi-button
-     *
-     * @param b true for a radio multi-button
-     */
+    /// Turns the multi-button into a radio multi-button
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true for a radio multi-button
     public void setRadioButton(boolean b) {
         if (b != isRadioButton()) {
             Container par = emblem.getParent();
@@ -357,20 +385,20 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * Returns true if the checkbox/radio button is selected
-     *
-     * @return true if the checkbox/radio button is selected
-     */
+    /// Returns true if the checkbox/radio button is selected
+    ///
+    /// #### Returns
+    ///
+    /// true if the checkbox/radio button is selected
     public boolean isSelected() {
         return (emblem instanceof RadioButton || emblem instanceof CheckBox) && emblem.isSelected();
     }
 
-    /**
-     * Toggles the selected state for the radio button/check box modes
-     *
-     * @param b true for checked false for unchecked
-     */
+    /// Toggles the selected state for the radio button/check box modes
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true for checked false for unchecked
     public void setSelected(boolean b) {
         if (emblem instanceof RadioButton) {
             ((RadioButton) emblem).setSelected(b);
@@ -381,20 +409,20 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * Indicates whether the first two labels are be side by side
-     *
-     * @return true if the first two labels are side by side
-     */
+    /// Indicates whether the first two labels are be side by side
+    ///
+    /// #### Returns
+    ///
+    /// true if the first two labels are side by side
     public boolean isHorizontalLayout() {
         return secondRow.getParent().getLayout() instanceof FlowLayout;
     }
 
-    /**
-     * Indicates the first two labels should be side by side
-     *
-     * @param b true to place the first two labels side by side
-     */
+    /// Indicates the first two labels should be side by side
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to place the first two labels side by side
     public void setHorizontalLayout(boolean b) {
         if (isHorizontalLayout() != b) {
             if (isHorizontalLayout()) {
@@ -413,22 +441,22 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * Inverts the order of the first two entries so the second line appears first.
-     * This only works in horizontal mode!
-     *
-     * @return true when the second row entry should be placed before the first entry
-     */
+    /// Inverts the order of the first two entries so the second line appears first.
+    /// This only works in horizontal mode!
+    ///
+    /// #### Returns
+    ///
+    /// true when the second row entry should be placed before the first entry
     public boolean isInvertFirstTwoEntries() {
         return invert;
     }
 
-    /**
-     * Inverts the order of the first two entries so the second line appears first.
-     * This only works in horizontal mode!
-     *
-     * @param b true to place the second row entry as the first entry
-     */
+    /// Inverts the order of the first two entries so the second line appears first.
+    /// This only works in horizontal mode!
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to place the second row entry as the first entry
     public void setInvertFirstTwoEntries(boolean b) {
         if (b != invert) {
             invert = b;
@@ -444,275 +472,275 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * Returns the content of the row
-     *
-     * @return the text
-     */
+    /// Returns the content of the row
+    ///
+    /// #### Returns
+    ///
+    /// the text
     public String getTextLine1() {
         return firstRow.getText();
     }
 
-    /**
-     * Sets the content of the row
-     *
-     * @param t text to set
-     */
+    /// Sets the content of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text to set
     public void setTextLine1(String t) {
         firstRow.setText(t);
     }
 
-    /**
-     * Returns the name of the row
-     *
-     * @return the name
-     */
+    /// Returns the name of the row
+    ///
+    /// #### Returns
+    ///
+    /// the name
     public String getNameLine1() {
         return firstRow.getName();
     }
 
-    /**
-     * Sets the name of the row (important for use in generic renderers)
-     *
-     * @param t name to set
-     */
+    /// Sets the name of the row (important for use in generic renderers)
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
     public void setNameLine1(String t) {
         firstRow.setName(t);
     }
 
-    /**
-     * Returns the UIID of the row
-     *
-     * @return the UIID
-     */
+    /// Returns the UIID of the row
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
     public String getUIIDLine1() {
         return firstRow.getUIID();
     }
 
-    /**
-     * Sets the UIID of the row
-     *
-     * @param t UIID to set
-     */
+    /// Sets the UIID of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
     public void setUIIDLine1(String t) {
         firstRow.setUIID(t);
     }
 
-    /**
-     * Returns the content of the row
-     *
-     * @return the text
-     */
+    /// Returns the content of the row
+    ///
+    /// #### Returns
+    ///
+    /// the text
     public String getTextLine2() {
         return secondRow.getText();
     }
 
-    /**
-     * Sets the content of the row
-     *
-     * @param t text to set
-     */
+    /// Sets the content of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text to set
     public void setTextLine2(String t) {
         secondRow.setText(t);
     }
 
-    /**
-     * Returns the name of the row
-     *
-     * @return the name
-     */
+    /// Returns the name of the row
+    ///
+    /// #### Returns
+    ///
+    /// the name
     public String getNameLine2() {
         return secondRow.getName();
     }
 
-    /**
-     * Sets the name of the row (important for use in generic renderers
-     *
-     * @param t name to set
-     */
+    /// Sets the name of the row (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
     public void setNameLine2(String t) {
         secondRow.setName(t);
     }
 
-    /**
-     * Returns the UIID of the row
-     *
-     * @return the UIID
-     */
+    /// Returns the UIID of the row
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
     public String getUIIDLine2() {
         return secondRow.getUIID();
     }
 
-    /**
-     * Sets the UIID of the row
-     *
-     * @param t UIID to set
-     */
+    /// Sets the UIID of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
     public void setUIIDLine2(String t) {
         secondRow.setUIID(t);
     }
 
-    /**
-     * Returns the content of the row
-     *
-     * @return the text
-     */
+    /// Returns the content of the row
+    ///
+    /// #### Returns
+    ///
+    /// the text
     public String getTextLine3() {
         return thirdRow.getText();
     }
 
-    /**
-     * Sets the content of the row
-     *
-     * @param t text to set
-     */
+    /// Sets the content of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text to set
     public void setTextLine3(String t) {
         thirdRow.setText(t);
     }
 
-    /**
-     * Returns the name of the row
-     *
-     * @return the name
-     */
+    /// Returns the name of the row
+    ///
+    /// #### Returns
+    ///
+    /// the name
     public String getNameLine3() {
         return thirdRow.getName();
     }
 
-    /**
-     * Sets the name of the row (important for use in generic renderers
-     *
-     * @param t name to set
-     */
+    /// Sets the name of the row (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
     public void setNameLine3(String t) {
         thirdRow.setName(t);
     }
 
-    /**
-     * Returns the UIID of the row
-     *
-     * @return the UIID
-     */
+    /// Returns the UIID of the row
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
     public String getUIIDLine3() {
         return thirdRow.getUIID();
     }
 
-    /**
-     * Sets the UIID of the row
-     *
-     * @param t UIID to set
-     */
+    /// Sets the UIID of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
     public void setUIIDLine3(String t) {
         thirdRow.setUIID(t);
     }
 
-    /**
-     * Returns the content of the row
-     *
-     * @return the text
-     */
+    /// Returns the content of the row
+    ///
+    /// #### Returns
+    ///
+    /// the text
     public String getTextLine4() {
         return forthRow.getText();
     }
 
-    /**
-     * Sets the content of the row
-     *
-     * @param t text to set
-     */
+    /// Sets the content of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text to set
     public void setTextLine4(String t) {
         forthRow.setText(t);
     }
 
-    /**
-     * Returns the name of the row
-     *
-     * @return the name
-     */
+    /// Returns the name of the row
+    ///
+    /// #### Returns
+    ///
+    /// the name
     public String getNameLine4() {
         return forthRow.getName();
     }
 
-    /**
-     * Sets the name of the row (important for use in generic renderers
-     *
-     * @param t name to set
-     */
+    /// Sets the name of the row (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
     public void setNameLine4(String t) {
         forthRow.setName(t);
     }
 
-    /**
-     * Returns the UIID of the row
-     *
-     * @return the UIID
-     */
+    /// Returns the UIID of the row
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
     public String getUIIDLine4() {
         return forthRow.getUIID();
     }
 
-    /**
-     * Sets the UIID of the row
-     *
-     * @param t UIID to set
-     */
+    /// Sets the UIID of the row
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
     public void setUIIDLine4(String t) {
         forthRow.setUIID(t);
     }
 
-    /**
-     * Returns the icon image
-     *
-     * @return the image instance
-     */
+    /// Returns the icon image
+    ///
+    /// #### Returns
+    ///
+    /// the image instance
     @Override
     public Image getIcon() {
         return icon.getIcon();
     }
 
-    /**
-     * Sets the icon
-     *
-     * @param i the icon
-     */
+    /// Sets the icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
     @Override
     public void setIcon(Image i) {
         icon.setIcon(i);
         updateGap();
     }
 
-    /**
-     * Returns the emblem image
-     *
-     * @return the image instance
-     */
+    /// Returns the emblem image
+    ///
+    /// #### Returns
+    ///
+    /// the image instance
     public Image getEmblem() {
         return emblem.getIcon();
     }
 
-    /**
-     * Sets the emblem
-     *
-     * @param i the icon
-     */
+    /// Sets the emblem
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
     public void setEmblem(Image i) {
         emblem.setIcon(i);
     }
 
-    /**
-     * Returns the icon position based on border layout constraints
-     *
-     * @return position either North/South/East/West
-     */
+    /// Returns the icon position based on border layout constraints
+    ///
+    /// #### Returns
+    ///
+    /// position either North/South/East/West
     public String getIconPosition() {
         return (String) getLayout().getComponentConstraint(icon.getParent());
     }
 
-    /**
-     * Sets the icon position based on border layout constraints
-     *
-     * @param t position either North/South/East/West
-     */
+    /// Sets the icon position based on border layout constraints
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: position either North/South/East/West
     public void setIconPosition(String t) {
         String ip = getEmblemPosition();
         if (ip != null && ip.equals(t)) {
@@ -727,20 +755,20 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         revalidateLater();
     }
 
-    /**
-     * Returns the emblem position based on border layout constraints
-     *
-     * @return position either North/South/East/West
-     */
+    /// Returns the emblem position based on border layout constraints
+    ///
+    /// #### Returns
+    ///
+    /// position either North/South/East/West
     public String getEmblemPosition() {
         return (String) getLayout().getComponentConstraint(emblem.getParent());
     }
 
-    /**
-     * Sets the emblem position based on border layout constraints
-     *
-     * @param t position either North/South/East/West
-     */
+    /// Sets the emblem position based on border layout constraints
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: position either North/South/East/West
     public void setEmblemPosition(String t) {
         String ip = getIconPosition();
         if (ip != null && ip.equals(t)) {
@@ -754,97 +782,103 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         revalidateLater();
     }
 
-    /**
-     * Returns the name of the icon
-     *
-     * @return the name
-     */
+    /// Returns the name of the icon
+    ///
+    /// #### Returns
+    ///
+    /// the name
     public String getIconName() {
         return icon.getName();
     }
 
-    /**
-     * Sets the name of the icon (important for use in generic renderers
-     *
-     * @param t name to set
-     */
+    /// Sets the name of the icon (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
     public void setIconName(String t) {
         icon.setName(t);
     }
 
-    /**
-     * Returns the UIID of the Icon
-     *
-     * @return the UIID
-     */
+    /// Returns the UIID of the Icon
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
     @Override
     public String getIconUIID() {
         return icon.getUIID();
     }
 
-    /**
-     * Sets the UIID of the icon
-     *
-     * @param t UIID to set
-     */
+    /// Sets the UIID of the icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
     @Override
     public void setIconUIID(String t) {
         icon.setUIID(t);
     }
 
-    /**
-     * Returns the name of the emblem
-     *
-     * @return the name
-     */
+    /// Returns the name of the emblem
+    ///
+    /// #### Returns
+    ///
+    /// the name
     public String getEmblemName() {
         return emblem.getName();
     }
 
-    /**
-     * Sets the name of the emblem (important for use in generic renderers
-     *
-     * @param t name to set
-     */
+    /// Sets the name of the emblem (important for use in generic renderers
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: name to set
     public void setEmblemName(String t) {
         emblem.setName(t);
     }
 
-    /**
-     * Returns the UIID of the Emblem
-     *
-     * @return the UIID
-     */
+    /// Returns the UIID of the Emblem
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
     public String getEmblemUIID() {
         return emblem.getUIID();
     }
 
-    /**
-     * Sets the UIID of the emblem
-     *
-     * @param t UIID to set
-     */
+    /// Sets the UIID of the emblem
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: UIID to set
     public void setEmblemUIID(String t) {
         emblem.setUIID(t);
     }
 
-    /**
-     * Gets all text in multibutton in a single string delimited by "\n" character.
-     *
-     * @return String with textLine1 to textLine4 delimited by "\n"
-     * @since 8.0
-     */
+    /// Gets all text in multibutton in a single string delimited by "\n" character.
+    ///
+    /// #### Returns
+    ///
+    /// String with textLine1 to textLine4 delimited by "\n"
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public String getTextLines() {
         return getTextLine1() + "\n" + getTextLine2() + "\n" + getTextLine3() + "\n" + getTextLine4();
     }
 
-    /**
-     * Sets textLine1, textLine2, textLine3, and textLine4 in single method with single string
-     * using "\n" as a delimiter.
-     *
-     * @param text The text to set.
-     * @since 8.0
-     */
+    /// Sets textLine1, textLine2, textLine3, and textLine4 in single method with single string
+    /// using "\n" as a delimiter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The text to set.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void setTextLines(String text) {
         //String currTextVal = btn.getText();
         String newTextVal0 = text;
@@ -933,27 +967,21 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * Returns the line 1 text
-     * {@inheritDoc}
-     */
+    /// Returns the line 1 text
+    /// {@inheritDoc}
     @Override
     public String getText() {
         return getTextLine1();
     }
 
-    /**
-     * Sets the line 1 text
-     * {@inheritDoc}
-     */
+    /// Sets the line 1 text
+    /// {@inheritDoc}
     @Override
     public void setText(String text) {
         setTextLine1(text);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{
@@ -965,9 +993,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
@@ -1001,9 +1027,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("line1".equals(name)) {
@@ -1105,9 +1129,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("line1".equals(name)) {
@@ -1221,20 +1243,20 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * Indicates the group for the radio button
-     *
-     * @return the group
-     */
+    /// Indicates the group for the radio button
+    ///
+    /// #### Returns
+    ///
+    /// the group
     public String getGroup() {
         return group;
     }
 
-    /**
-     * Indicates the group for the radio button
-     *
-     * @param group the group to set
-     */
+    /// Indicates the group for the radio button
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: the group to set
     public void setGroup(String group) {
         this.group = group;
         if (emblem instanceof RadioButton) {
@@ -1242,51 +1264,51 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * Sets the button group for a radio button mode multibutton
-     *
-     * @param bg the button group
-     */
+    /// Sets the button group for a radio button mode multibutton
+    ///
+    /// #### Parameters
+    ///
+    /// - `bg`: the button group
     public void setGroup(ButtonGroup bg) {
         bg.add((RadioButton) emblem);
     }
 
-    /**
-     * Set the mask name for the icon
-     *
-     * @return the maskName
-     */
+    /// Set the mask name for the icon
+    ///
+    /// #### Returns
+    ///
+    /// the maskName
     public String getMaskName() {
         return icon.getMaskName();
     }
 
-    /**
-     * The mask name for the icon
-     *
-     * @param maskName the maskName to set
-     */
+    /// The mask name for the icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `maskName`: the maskName to set
     public void setMaskName(String maskName) {
         icon.setMaskName(maskName);
     }
 
-    /**
-     * Indicates if text should be localized when set to the component, by default
-     * all text is localized so this allows disabling automatic localization for
-     * a specific component.
-     *
-     * @return the shouldLocalize value
-     */
+    /// Indicates if text should be localized when set to the component, by default
+    /// all text is localized so this allows disabling automatic localization for
+    /// a specific component.
+    ///
+    /// #### Returns
+    ///
+    /// the shouldLocalize value
     public boolean isShouldLocalize() {
         return firstRow.isShouldLocalize();
     }
 
-    /**
-     * Indicates if text should be localized when set to the component, by default
-     * all text is localized so this allows disabling automatic localization for
-     * a specific component.
-     *
-     * @param shouldLocalize the shouldLocalize to set
-     */
+    /// Indicates if text should be localized when set to the component, by default
+    /// all text is localized so this allows disabling automatic localization for
+    /// a specific component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shouldLocalize`: the shouldLocalize to set
     public void setShouldLocalize(boolean shouldLocalize) {
         firstRow.setShouldLocalize(shouldLocalize);
         secondRow.setShouldLocalize(shouldLocalize);
@@ -1294,21 +1316,21 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         forthRow.setShouldLocalize(shouldLocalize);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public int getGap() {
         return gap;
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setGap(int gap) {
         if (gap != this.gap) {
@@ -1317,11 +1339,11 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public int getTextPosition() {
         String iconPosition = getIconPosition();
@@ -1341,11 +1363,11 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setTextPosition(int textPosition) {
         switch (textPosition) {
@@ -1382,178 +1404,209 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     }
 
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Component getIconStyleComponent() {
         return icon;
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 8.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     @Override
     public void setMaterialIcon(char c, float size) {
         icon.setMaterialIcon(c, size);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 8.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     @Override
     public void setFontIcon(Font font, char c, float size) {
         icon.setFontIcon(font, c, size);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Image getRolloverIcon() {
         return icon.getRolloverIcon();
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setRolloverIcon(Image arg0) {
         icon.setRolloverIcon(arg0);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Image getPressedIcon() {
         return icon.getPressedIcon();
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setPressedIcon(Image arg0) {
         icon.setPressedIcon(arg0);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Image getDisabledIcon() {
         return icon.getDisabledIcon();
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setDisabledIcon(Image arg0) {
         icon.setDisabledIcon(arg0);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Image getRolloverPressedIcon() {
         return icon.getRolloverPressedIcon();
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setRolloverPressedIcon(Image icn) {
         icon.setRolloverPressedIcon(icn);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Image getIconFromState() {
         return icon.getIconFromState();
     }
 
-    /**
-     * Gets the text to be used in a badge on this label.
-     *
-     * @return the badge text to be used on this label.  May return if no text is set.
-     * @see #setBadgeText(java.lang.String)
-     * @see #setBadgeUIID(java.lang.String)
-     * @see #getBadgeStyleComponent()
-     * @since 8.0
-     */
+    /// Gets the text to be used in a badge on this label.
+    ///
+    /// #### Returns
+    ///
+    /// the badge text to be used on this label.  May return if no text is set.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #setBadgeText(java.lang.String)
+    ///
+    /// - #setBadgeUIID(java.lang.String)
+    ///
+    /// - #getBadgeStyleComponent()
     public String getBadgeText() {
         return icon.getBadgeText();
     }
 
-    /**
-     * Sets the badge text to be used on this label.  Badges are rendered in the
-     * upper right corner of the label inside round border.  The style of the badge can be
-     * configured using {@link #setBadgeUIID(java.lang.String) }, but the default style uses
-     * the "Badge" UIID, which, by default, uses white text on a red round border background.
-     *
-     * @param badgeText The text to include in the badge.   null or empty strings will result in the
-     *                  badge not being rendered.
-     * @see #getBadgeText()
-     * @see #getBadgeStyleComponent()
-     * @see #setBadgeUIID(java.lang.String)
-     * @since 8.0
-     */
+    /// Sets the badge text to be used on this label.  Badges are rendered in the
+    /// upper right corner of the label inside round border.  The style of the badge can be
+    /// configured using `#setBadgeUIID(java.lang.String)`, but the default style uses
+    /// the "Badge" UIID, which, by default, uses white text on a red round border background.
+    ///
+    /// #### Parameters
+    ///
+    /// - `badgeText`: @param badgeText The text to include in the badge.   null or empty strings will result in the
+    ///                  badge not being rendered.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #getBadgeText()
+    ///
+    /// - #getBadgeStyleComponent()
+    ///
+    /// - #setBadgeUIID(java.lang.String)
     public void setBadgeText(String badgeText) {
         icon.setBadgeText(badgeText);
     }
 
-    /**
-     * Sets the style that should be used for rendering badges.  By default it will use
-     * the "Badge" UIID, which rendered 1.5mm white text on a red round border.
-     *
-     * @param badgeUIID The UIID to use for the badge.
-     * @see #setBadgeText(java.lang.String)
-     * @see #getBadgeStyleComponent()
-     * @since 8.0
-     */
+    /// Sets the style that should be used for rendering badges.  By default it will use
+    /// the "Badge" UIID, which rendered 1.5mm white text on a red round border.
+    ///
+    /// #### Parameters
+    ///
+    /// - `badgeUIID`: The UIID to use for the badge.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #setBadgeText(java.lang.String)
+    ///
+    /// - #getBadgeStyleComponent()
     public void setBadgeUIID(String badgeUIID) {
         icon.setBadgeUIID(badgeUIID);
     }
 
-    /**
-     * Gets a component that can be used for the style of the badge.
-     *
-     * @return The component whose style can be used to style the badge.  May return null if none set.
-     * @see #setBadgeText(java.lang.String)
-     * @see #setBadgeUIID(java.lang.String)
-     * @see #getBadgeText()
-     * @since 8.0
-     */
+    /// Gets a component that can be used for the style of the badge.
+    ///
+    /// #### Returns
+    ///
+    /// The component whose style can be used to style the badge.  May return null if none set.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #setBadgeText(java.lang.String)
+    ///
+    /// - #setBadgeUIID(java.lang.String)
+    ///
+    /// - #getBadgeText()
     public Component getBadgeStyleComponent() {
         return icon.getBadgeStyleComponent();
     }

@@ -32,32 +32,44 @@ import com.codename1.ui.events.ActionListener;
 
 import java.util.Vector;
 
-/**
- * <p>Binds a {@link com.codename1.ui.Slider} to network progress events so it shows the progress of
- * the current {@link com.codename1.io.ConnectionRequest}</p>
- * <p>Important note: every time that a connectionRequest is retried with the .retry() method, SliderBridge.bindProgress(cr, progress) must be invoked again.</p>
- * <script src="https://gist.github.com/codenameone/051bfa054fd3024c8292.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/network-sliderbridge.png" alt="SliderBridge progress for downloading the image in the slow network mode" />
- *
- * @author Shai Almog
- */
+/// Binds a `com.codename1.ui.Slider` to network progress events so it shows the progress of
+/// the current `com.codename1.io.ConnectionRequest`
+///
+/// Important note: every time that a connectionRequest is retried with the .retry() method, SliderBridge.bindProgress(cr, progress) must be invoked again.
+///
+/// ```java
+/// Form hi = new Form("Download Progress", new BorderLayout());
+/// Slider progress = new Slider();
+/// Button download = new Button("Download");
+/// download.addActionListener((e) -> {
+///     ConnectionRequest cr = new ConnectionRequest("https://www.codenameone.com/img/blog/new_icon.png", false);
+///     SliderBridge.bindProgress(cr, progress);
+///     NetworkManager.getInstance().addToQueueAndWait(cr);
+///     if(cr.getResponseCode() == 200) {
+///         hi.add(BorderLayout.CENTER, new ScaleImageLabel(EncodedImage.create(cr.getResponseData())));
+///         hi.revalidate();
+///     }
+/// });
+/// hi.add(BorderLayout.SOUTH, progress).add(BorderLayout.NORTH, download);
+/// hi.show();
+/// ```
+///
+/// @author Shai Almog
 public class SliderBridge extends Slider {
     private ConnectionRequest[] sources;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public SliderBridge() {
         bindProgress((ConnectionRequest[]) null, this);
     }
 
-    /**
-     * Displays progress only for the source object, every other object in the queue
-     * before completion will produce an infinite progress. After 100% the progress will
-     * no longer move.
-     *
-     * @param source the request whose progress should be followed
-     */
+    /// Displays progress only for the source object, every other object in the queue
+    /// before completion will produce an infinite progress. After 100% the progress will
+    /// no longer move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the request whose progress should be followed
     public SliderBridge(ConnectionRequest source) {
         if (source != null) {
             sources = new ConnectionRequest[]{source};
@@ -65,22 +77,23 @@ public class SliderBridge extends Slider {
         bindProgress(sources, this);
     }
 
-    /**
-     * Allows displaying progress of multiple requests being sent
-     *
-     * @param sources the requests whose progress should be followed
-     */
+    /// Allows displaying progress of multiple requests being sent
+    ///
+    /// #### Parameters
+    ///
+    /// - `sources`: the requests whose progress should be followed
     public SliderBridge(ConnectionRequest[] sources) {
         this.sources = sources;
         bindProgress(sources, this);
     }
 
-    /**
-     * Allows binding progress to an arbitrary slider
-     *
-     * @param source the source connection request
-     * @param s      the slider
-     */
+    /// Allows binding progress to an arbitrary slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the source connection request
+    ///
+    /// - `s`: the slider
     public static void bindProgress(final ConnectionRequest source, final Slider s) {
         if (source == null) {
             bindProgress((ConnectionRequest[]) null, s);
@@ -89,12 +102,13 @@ public class SliderBridge extends Slider {
         }
     }
 
-    /**
-     * Allows binding progress to an arbitrary slider
-     *
-     * @param sources the source connection request (null for all network activity)
-     * @param s       the slider
-     */
+    /// Allows binding progress to an arbitrary slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `sources`: the source connection request (null for all network activity)
+    ///
+    /// - `s`: the slider
     public static void bindProgress(final ConnectionRequest[] sources, final Slider s) {
         Vector v = null;
         int portions = 100;
@@ -112,9 +126,7 @@ public class SliderBridge extends Slider {
             private float currentLength;
             private int soFar;
 
-            /**
-             * {@inheritDoc}
-             */
+            /// {@inheritDoc}
             @Override
             public void actionPerformed(ActionEvent evt) {
                 // PMD Fix (CollapsibleIfStatements): Collapse the nested source checks into one conditional.

@@ -23,19 +23,18 @@
  */
 package com.codename1.ui.events;
 
-/**
- * Invoked to indicate a selection change in the list model
- *
- * @author Chen Fishbein
- */
+/// Invoked to indicate a selection change in the list model
+///
+/// @author Chen Fishbein
 public interface SelectionListener {
 
-    /**
-     * Indicates the selection changed in the underlying list model
-     *
-     * @param oldSelected old selected index in list model
-     * @param newSelected new selected index in list model
-     */
+    /// Indicates the selection changed in the underlying list model
+    ///
+    /// #### Parameters
+    ///
+    /// - `oldSelected`: old selected index in list model
+    ///
+    /// - `newSelected`: new selected index in list model
     void selectionChanged(int oldSelected, int newSelected);
 
 }

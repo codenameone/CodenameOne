@@ -27,40 +27,42 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Encapsulates a category for push notifications.  If a push notification specifies a category, and the
- * app's main class implements {@link PushActionsProvider}, then the push notification will provide a
- * set of buttons to select among the actions available for that category.  If the user selects an
- * action in the push notification, their choice will be made available inside the {@link PushCallback#push(java.lang.String) }
- * method via the {@link PushContent#getActionId() } method.
- *
- * <p>Applications that wish to support actions must implement {@link PushActionsProvider} in its main class.  The {@link PushActionsProvider#getPushActionCategories() }
- * implementation defines all of the categories that are available for push notifications.</p>
- *
- * @author shannah
- */
+/// Encapsulates a category for push notifications.  If a push notification specifies a category, and the
+/// app's main class implements `PushActionsProvider`, then the push notification will provide a
+/// set of buttons to select among the actions available for that category.  If the user selects an
+/// action in the push notification, their choice will be made available inside the `PushCallback#push(java.lang.String)`
+/// method via the `PushContent#getActionId()` method.
+///
+/// Applications that wish to support actions must implement `PushActionsProvider` in its main class.  The `PushActionsProvider#getPushActionCategories()`
+/// implementation defines all of the categories that are available for push notifications.
+///
+/// @author shannah
 public class PushActionCategory {
     private final String id;
     private final List<PushAction> actions;
 
-    /**
-     * Creates a category with the specified actions.
-     *
-     * @param id      The ID of the category.  Should correspond with the "category" of a push notification.
-     * @param actions The actions that are available for this category.
-     */
+    /// Creates a category with the specified actions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The ID of the category.  Should correspond with the "category" of a push notification.
+    ///
+    /// - `actions`: The actions that are available for this category.
     public PushActionCategory(String id, PushAction... actions) {
         this.actions = new java.util.ArrayList<PushAction>();
         this.id = id;
         this.actions.addAll(Arrays.asList(actions));
     }
 
-    /**
-     * Convenience method to return all of the actions in the provided categories.
-     *
-     * @param categories The categories from which to get actions.
-     * @return List of actions in all of the provided categories.
-     */
+    /// Convenience method to return all of the actions in the provided categories.
+    ///
+    /// #### Parameters
+    ///
+    /// - `categories`: The categories from which to get actions.
+    ///
+    /// #### Returns
+    ///
+    /// List of actions in all of the provided categories.
     public static PushAction[] getAllActions(PushActionCategory... categories) {
         Set<PushAction> actions = new HashSet<PushAction>();
         for (PushActionCategory cat : categories) {
@@ -70,22 +72,21 @@ public class PushActionCategory {
 
     }
 
-    /**
-     * Gets the actions in this category.  These actions will be manifested as buttons in push notifications
-     * directed at this category.
-     *
-     * @return
-     */
+    /// Gets the actions in this category.  These actions will be manifested as buttons in push notifications
+    /// directed at this category.
     public PushAction[] getActions() {
         return actions.toArray(new PushAction[actions.size()]);
     }
 
-    /**
-     * Gets the ID of the category.  This corresponds with the category of a push notification.
-     *
-     * @return the id
-     * @see PushContent#getCategory()
-     */
+    /// Gets the ID of the category.  This corresponds with the category of a push notification.
+    ///
+    /// #### Returns
+    ///
+    /// the id
+    ///
+    /// #### See also
+    ///
+    /// - PushContent#getCategory()
     public String getId() {
         return id;
     }

@@ -36,13 +36,11 @@ import java.util.Date;
 
 import static com.codename1.ui.CN.convertToPixels;
 
-/**
- * The date and time spinner extends the time spinner by allowing to pick a specific day as well
- * <p>
- * Used by Picker in lightweight mode.
- *
- * @author Steve Hannah
- */
+/// The date and time spinner extends the time spinner by allowing to pick a specific day as well
+///
+/// Used by Picker in lightweight mode.
+///
+/// @author Steve Hannah
 class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private final Date today = new Date();
     private final int off;
@@ -55,9 +53,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private boolean markToday = true;
     private boolean includeYear;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public DateTimeSpinner3D(int minuteStep) {
         off = 0;
         initSpinner(minuteStep);
@@ -116,9 +112,9 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the currentDate
-     */
+    /// #### Returns
+    ///
+    /// the currentDate
     public Date getCurrentDate() {
         if (date != null) {
             Date dt = (Date) date.getValue();
@@ -139,9 +135,9 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         return currentDate;
     }
 
-    /**
-     * @param currentDate the currentDate to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentDate`: the currentDate to set
     public void setCurrentDate(Date currentDate) {
         this.currentDate = currentDate;
         if (date != null) {
@@ -165,16 +161,16 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     }
 
 
-    /**
-     * @return the startDate
-     */
+    /// #### Returns
+    ///
+    /// the startDate
     public Date getStartDate() {
         return startDate;
     }
 
-    /**
-     * @param startDate the startDate to set
-     */
+    /// #### Parameters
+    ///
+    /// - `startDate`: the startDate to set
     public void setStartDate(Date startDate) {
         this.startDate = startDate;
         rebuildDate();
@@ -187,56 +183,62 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the endDate
-     */
+    /// #### Returns
+    ///
+    /// the endDate
     public Date getEndDate() {
         return endDate;
     }
 
-    /**
-     * @param endDate the endDate to set
-     */
+    /// #### Parameters
+    ///
+    /// - `endDate`: the endDate to set
     public void setEndDate(Date endDate) {
         this.endDate = endDate;
         rebuildDate();
     }
 
-    /**
-     * @return the markToday
-     */
+    /// #### Returns
+    ///
+    /// the markToday
     public boolean isMarkToday() {
         return markToday;
     }
 
-    /**
-     * @param markToday the markToday to set
-     */
+    /// #### Parameters
+    ///
+    /// - `markToday`: the markToday to set
     public void setMarkToday(boolean markToday) {
         this.markToday = markToday;
     }
 
-    /**
-     * @return the includeYear
-     */
+    /// #### Returns
+    ///
+    /// the includeYear
     public boolean isIncludeYear() {
         return includeYear;
     }
 
-    /**
-     * @param includeYear the includeYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `includeYear`: the includeYear to set
     public void setIncludeYear(boolean includeYear) {
         this.includeYear = includeYear;
     }
 
-    /**
-     * Checks if time is shown in 12 hour format with AM/PM selector.
-     *
-     * @return True if time is in 12 hour format.  False otherwise.
-     * @see #setShowMeridiem(boolean)
-     * @since 6.0
-     */
+    /// Checks if time is shown in 12 hour format with AM/PM selector.
+    ///
+    /// #### Returns
+    ///
+    /// True if time is in 12 hour format.  False otherwise.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #setShowMeridiem(boolean)
     public boolean isShowMeridiem() {
         if (time == null) {
             return false;
@@ -244,13 +246,19 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         return time.isShowMeridiem();
     }
 
-    /**
-     * Sets whether the time spinner should show times 12 hour format with an AM/PM selector.
-     *
-     * @param showMeridiem True to show times in 12 hour format (the default).  False to show in 24 hour format.
-     * @see #isShowMeridiem()
-     * @since 6.0
-     */
+    /// Sets whether the time spinner should show times 12 hour format with an AM/PM selector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `showMeridiem`: True to show times in 12 hour format (the default).  False to show in 24 hour format.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #isShowMeridiem()
     public void setShowMeridiem(boolean showMeridiem) {
         if (time == null) {
             return;
@@ -258,16 +266,24 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         time.setShowMeridiem(showMeridiem);
     }
 
-    /**
-     * Sets the hour range to show for the time selector.  Setting the range will automatically switch
-     * the time to 24 hour format.
-     *
-     * @param min The minimum hour to display (0-24).  -1 for no limit.
-     * @param max The max hour to display (0-24).  -1 for no limit.
-     * @see #getMinHour()
-     * @see #getMaxHour()
-     * @since 6.0
-     */
+    /// Sets the hour range to show for the time selector.  Setting the range will automatically switch
+    /// the time to 24 hour format.
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: The minimum hour to display (0-24).  -1 for no limit.
+    ///
+    /// - `max`: The max hour to display (0-24).  -1 for no limit.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #getMinHour()
+    ///
+    /// - #getMaxHour()
     public void setHourRange(int min, int max) {
         if (time == null) {
             return;
@@ -279,14 +295,21 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
 
     }
 
-    /**
-     * Gets the minimum hour to display.  Default -1 (for no limit).
-     *
-     * @return Min hour (0-24) or -1 for no limit.
-     * @see #getMaxHour()
-     * @see #setHourRange(int, int)
-     * @since 6.0
-     */
+    /// Gets the minimum hour to display.  Default -1 (for no limit).
+    ///
+    /// #### Returns
+    ///
+    /// Min hour (0-24) or -1 for no limit.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #getMaxHour()
+    ///
+    /// - #setHourRange(int, int)
     public int getMinHour() {
         if (time == null) {
             return -1;
@@ -294,14 +317,21 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         return time.getMinHour();
     }
 
-    /**
-     * Gets the maximum hour to display.  Default -1 (for no limit).
-     *
-     * @return Max hour (0-24) or -1 for no limit.
-     * @see #getMinHour()
-     * @see #setHourRange(int, int)
-     * @since 6.0
-     */
+    /// Gets the maximum hour to display.  Default -1 (for no limit).
+    ///
+    /// #### Returns
+    ///
+    /// Max hour (0-24) or -1 for no limit.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #getMinHour()
+    ///
+    /// - #setHourRange(int, int)
     public int getMaxHour() {
         if (time == null) {
             return -1;
@@ -309,27 +339,21 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         return time.getMaxHour();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem",
                 "currentDate", "startDate", "endDate", "markToday", "includeYear"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class,
                 Date.class, Date.class, Date.class, Boolean.class, Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("currentDate".equals(name)) {
@@ -350,9 +374,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
         return super.getPropertyValue(name);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("currentDate".equals(name)) {

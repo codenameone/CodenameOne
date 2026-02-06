@@ -23,18 +23,19 @@
 
 package com.codename1.util;
 
-/**
- * Useful when passing a value that might not exist to a function, e.g. when we
- * pass a form that we might need to construct dynamically later on.
- *
- * @author Shai Almog
- */
+/// Useful when passing a value that might not exist to a function, e.g. when we
+/// pass a form that we might need to construct dynamically later on.
+///
+/// @author Shai Almog
 public interface LazyValue<T> {
-    /**
-     * Returns the actual value
-     *
-     * @param args optional arguments for the creation of the lazy value
-     * @return the value
-     */
+    /// Returns the actual value
+    ///
+    /// #### Parameters
+    ///
+    /// - `args`: optional arguments for the creation of the lazy value
+    ///
+    /// #### Returns
+    ///
+    /// the value
     T get(Object... args);
 }

@@ -36,13 +36,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * This class provides a similar API to {@code URL} making it almost into a "drop in" replacement.
- * It is placed in a different package because it is incompatible to {@code URL} by definition.  It is useful
- * in getting some simple code to work without too many changes
- *
- * @author Shai Almog
- */
+/// This class provides a similar API to `URL` making it almost into a "drop in" replacement.
+/// It is placed in a different package because it is incompatible to `URL` by definition.  It is useful
+/// in getting some simple code to work without too many changes
+///
+/// @author Shai Almog
 public class URL {
     private final URI u;
 
@@ -184,13 +182,17 @@ public class URL {
 
         public abstract OutputStream getOutputStream() throws IOException;
 
-        /**
-         * Sets the request property, replacing existing property with same key, if it already exists.
-         *
-         * @param key   The key of the request property.
-         * @param value The value of the request property.
-         * @since 7.0
-         */
+        /// Sets the request property, replacing existing property with same key, if it already exists.
+        ///
+        /// #### Parameters
+        ///
+        /// - `key`: The key of the request property.
+        ///
+        /// - `value`: The value of the request property.
+        ///
+        /// #### Since
+        ///
+        /// 7.0
         public void setRequestProperty(String key,
                                        String value) {
             properties.put(key, value);

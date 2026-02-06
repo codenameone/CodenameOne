@@ -25,13 +25,11 @@ package com.codename1.properties;
 
 import com.codename1.io.Preferences;
 
-/**
- * Binds an object to the {@link com.codename1.io.Preferences} API for automatic persistent storage.
- * You can use this API like the builder pattern by using the create method and chaining it with setters until
- * bind is invoked.
- *
- * @author Shai Almog
- */
+/// Binds an object to the `com.codename1.io.Preferences` API for automatic persistent storage.
+/// You can use this API like the builder pattern by using the create method and chaining it with setters until
+/// bind is invoked.
+///
+/// @author Shai Almog
 public final class PreferencesObject {
     private PropertyBusinessObject bo;
     private String prefix;
@@ -40,12 +38,15 @@ public final class PreferencesObject {
     private PreferencesObject() {
     }
 
-    /**
-     * Creates a binding object, this method doesn't do anything until bind is invoked
-     *
-     * @param bo the business object this binding relates to
-     * @return the object controlling the binding
-     */
+    /// Creates a binding object, this method doesn't do anything until bind is invoked
+    ///
+    /// #### Parameters
+    ///
+    /// - `bo`: the business object this binding relates to
+    ///
+    /// #### Returns
+    ///
+    /// the object controlling the binding
     public static PreferencesObject create(PropertyBusinessObject bo) {
         PreferencesObject po = new PreferencesObject();
         po.bo = bo;
@@ -53,11 +54,11 @@ public final class PreferencesObject {
         return po;
     }
 
-    /**
-     * Binds the object so it's seamlessly stored in preferences
-     *
-     * @return this to enable builder pattern binding
-     */
+    /// Binds the object so it's seamlessly stored in preferences
+    ///
+    /// #### Returns
+    ///
+    /// this to enable builder pattern binding
     public PreferencesObject bind() {
         if (bo == null || bo.getPropertyIndex() == null) {
             return this;
@@ -116,12 +117,15 @@ public final class PreferencesObject {
         }
     }
 
-    /**
-     * Sets the prefix for the binding, by default the object name with a "." is the common prefix
-     *
-     * @param prefix a string that will prefix the name
-     * @return this to enable builder pattern binding
-     */
+    /// Sets the prefix for the binding, by default the object name with a "." is the common prefix
+    ///
+    /// #### Parameters
+    ///
+    /// - `prefix`: a string that will prefix the name
+    ///
+    /// #### Returns
+    ///
+    /// this to enable builder pattern binding
     public PreferencesObject setPrefix(String prefix) {
         checkBind();
 
@@ -130,13 +134,17 @@ public final class PreferencesObject {
         return this;
     }
 
-    /**
-     * Sets the name of the specific field not including the prefix, by default the property name is used
-     *
-     * @param pb   the property
-     * @param name the name for the property
-     * @return this to enable builder pattern binding
-     */
+    /// Sets the name of the specific field not including the prefix, by default the property name is used
+    ///
+    /// #### Parameters
+    ///
+    /// - `pb`: the property
+    ///
+    /// - `name`: the name for the property
+    ///
+    /// #### Returns
+    ///
+    /// this to enable builder pattern binding
     public PreferencesObject setName(PropertyBase pb, String name) {
         checkBind();
 

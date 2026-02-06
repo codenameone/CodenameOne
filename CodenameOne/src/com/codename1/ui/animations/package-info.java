@@ -4,11 +4,9 @@
     Author     : Shai Almog
 */
 
-/**
- * All components are animatable by potential and additional animations (unrelated
- * to a specific component) can be installed on the fly, transitions between
- * forms are also handled as part of this package. Animation thread handling
- * and painting is handled uniformly to avoid the complexity of threading and
- * its potential performance penalty on small devices.
- */
+/// All components are animatable by potential and additional animations (unrelated
+/// to a specific component) can be installed on the fly, transitions between
+/// forms are also handled as part of this package. Animation thread handling
+/// and painting is handled uniformly to avoid the complexity of threading and
+/// its potential performance penalty on small devices.
 package com.codename1.ui.animations;

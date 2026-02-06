@@ -23,11 +23,9 @@
 
 package com.codename1.util;
 
-/**
- * <p>Simple interface that allows asynchronous code to perform a parameterized callback
- * or failure in a similar way to GWT's callback interface.</p>
- *
- * @author Shai Almog
- */
+/// Simple interface that allows asynchronous code to perform a parameterized callback
+/// or failure in a similar way to GWT's callback interface.
+///
+/// @author Shai Almog
 public interface Callback<T> extends SuccessCallback<T>, FailureCallback<T> {
 }

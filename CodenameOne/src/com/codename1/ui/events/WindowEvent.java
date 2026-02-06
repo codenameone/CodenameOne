@@ -26,72 +26,58 @@ package com.codename1.ui.events;
 import com.codename1.ui.Display;
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * Describes a change in the native window hosting the Codename One display on
- * desktop platforms.
- */
+/// Describes a change in the native window hosting the Codename One display on
+/// desktop platforms.
 public class WindowEvent extends ActionEvent {
 
     private final Type type;
     private final Rectangle bounds;
-    /**
-     * Creates a new window event instance.
-     *
-     * @param source the display that generated the event
-     * @param type   the type of the window event
-     * @param bounds the bounds of the window, if known
-     */
+    /// Creates a new window event instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the display that generated the event
+    ///
+    /// - `type`: the type of the window event
+    ///
+    /// - `bounds`: the bounds of the window, if known
     public WindowEvent(Display source, Type type, Rectangle bounds) {
         super(source, ActionEvent.Type.Other);
         this.type = type;
         this.bounds = bounds;
     }
 
-    /**
-     * The type of window event.
-     *
-     * @return the event type
-     */
+    /// The type of window event.
+    ///
+    /// #### Returns
+    ///
+    /// the event type
     public Type getType() {
         return type;
     }
 
-    /**
-     * Returns the window bounds associated with this event.
-     *
-     * @return the window bounds or {@code null} if not provided
-     */
+    /// Returns the window bounds associated with this event.
+    ///
+    /// #### Returns
+    ///
+    /// the window bounds or `null` if not provided
     public Rectangle getBounds() {
         return bounds;
     }
 
-    /**
-     * The type of window change that occurred.
-     */
+    /// The type of window change that occurred.
     public enum Type {
-        /**
-         * The window became visible.
-         */
+        /// The window became visible.
         Shown,
-        /**
-         * The window is no longer visible.
-         */
+        /// The window is no longer visible.
         Hidden,
-        /**
-         * The window was minimized/iconified.
-         */
+        /// The window was minimized/iconified.
         Minimized,
-        /**
-         * The window was restored from a minimized/iconified state.
-         */
+        /// The window was restored from a minimized/iconified state.
         Restored,
-        /**
-         * The window was resized.
-         */
+        /// The window was resized.
         Resized,
-        /**
-         * The window was moved.
-         */
+        /// The window was moved.
         Moved
     }
 }

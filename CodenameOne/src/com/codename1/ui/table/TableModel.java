@@ -25,75 +25,86 @@ package com.codename1.ui.table;
 
 import com.codename1.ui.events.DataChangedListener;
 
-/**
- * The table and table model class are complimentry classes allowing the quick construction
- * of tabular data controls. The table model represents the data source according to which
- * the table is constructed.
- *
- * @author Shai Almog
- */
+/// The table and table model class are complimentry classes allowing the quick construction
+/// of tabular data controls. The table model represents the data source according to which
+/// the table is constructed.
+///
+/// @author Shai Almog
 public interface TableModel {
-    /**
-     * Returns the number of rows in the table
-     *
-     * @return the number of rows in the table
-     */
+    /// Returns the number of rows in the table
+    ///
+    /// #### Returns
+    ///
+    /// the number of rows in the table
     int getRowCount();
 
-    /**
-     * Returns the number of columns in the table
-     *
-     * @return the number of columns in the table
-     */
+    /// Returns the number of columns in the table
+    ///
+    /// #### Returns
+    ///
+    /// the number of columns in the table
     int getColumnCount();
 
-    /**
-     * Returns the name of the column at the given offset
-     *
-     * @param i the offset for the column name
-     * @return name to display at the top of the table
-     */
+    /// Returns the name of the column at the given offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the offset for the column name
+    ///
+    /// #### Returns
+    ///
+    /// name to display at the top of the table
     String getColumnName(int i);
 
-    /**
-     * Returns true if the cell at the given location is an editable cell
-     *
-     * @param row    the cell row
-     * @param column the cell column
-     * @return true if the cell at the given location is an editable cell
-     */
+    /// Returns true if the cell at the given location is an editable cell
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the cell row
+    ///
+    /// - `column`: the cell column
+    ///
+    /// #### Returns
+    ///
+    /// true if the cell at the given location is an editable cell
     boolean isCellEditable(int row, int column);
 
-    /**
-     * Returns the value of the cell at the given location
-     *
-     * @param row    the cell row
-     * @param column the cell column
-     * @return the value of the cell at the given location
-     */
+    /// Returns the value of the cell at the given location
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the cell row
+    ///
+    /// - `column`: the cell column
+    ///
+    /// #### Returns
+    ///
+    /// the value of the cell at the given location
     Object getValueAt(int row, int column);
 
-    /**
-     * Sets the value of the cell at the given location
-     *
-     * @param row    the cell row
-     * @param column the cell column
-     * @param o      the value of the cell at the given location
-     */
+    /// Sets the value of the cell at the given location
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the cell row
+    ///
+    /// - `column`: the cell column
+    ///
+    /// - `o`: the value of the cell at the given location
     void setValueAt(int row, int column, Object o);
 
-    /**
-     * Adds a listener to the data changed event
-     *
-     * @param d the new listener
-     */
+    /// Adds a listener to the data changed event
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the new listener
     void addDataChangeListener(DataChangedListener d);
 
-    /**
-     * Removes a listener to the data changed event
-     *
-     * @param d the listener to remove
-     */
+    /// Removes a listener to the data changed event
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener to remove
     void removeDataChangeListener(DataChangedListener d);
 
 }

@@ -46,140 +46,172 @@ import java.util.Vector;
 
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * Encapsulates an XML or JSON template for a UI component hierarchy.  The UI can be defined
- * using XML.  The XML is compiled into a view at runtime.  Custom components may be
- * injected into the template using special placeholder tags (i.e. tags where the tag
- * name begins with '$'.
- *
- * <h3>Supported Tags</h3>
- *
- * <ul>
- * <li><strong>border</strong> - A container with layout=BorderLayout</li>
- * <li><strong>y</strong> - A container with layout=BoxLayout Y</li>
- * <li><strong>x</strong> - A container with layout=BoxLayout X</li>
- * <li><strong>flow</strong> - A container with layout=FlowLayout</li>
- * <li><strong>layered</strong> - A container with layout=LayeredLayout</li>
- * <li><strong>grid</strong> - A container with layout=GridLayout.  Accepted attributes {@literal rows} and {@literal cols}</li>
- * <li><strong>table</strong> - A container with layout=TableLayout.  Accepted attributes {@literal rows} and {@literal cols}.  May have zero or more nested {@literal <tr>} tags.
- * <li><strong>label</strong> - A Label</li>
- * <li><strong>button</strong> - A button</li>
- * </ul>
- *
- * <h3>Layout Variant Tags</h3>
- *
- * <p>BorderLayout and BoxLayout include some variant tags to customize their behaviour also:</p>
- *
- * <ul>
- *  <li><strong>borderAbs, borderAbsolute</strong> - BorderLayout with center absolute behaviour.  This is the same as <code>&lt;border behavior='absolute'/&gt;</code></li>
- *  <li><strong>borderTotalBelow</strong> - BorderLayout with Total Below center behaviour. This is the same as <code>&lt;border behavior='totalBelow'/&gt;</code></li>
- *  <li><strong>yBottomLast, ybl</strong> - BoxLayout with Y_BOTTOM_LAST setting.</li>
- *  <li><strong>xNoGrow, xng</strong> - BoxLayout X with No Grow option.  This is the same as <code>&lt;x noGrow='true'/&gt;</code></li>
- * </ul>
- *
- * <h3>Supported Attributes</h3>
- *
- * <ul>
- * <li><strong>uiid</strong> - The UIID of the component.  I.e. {@link Component#getUIID() }</li>
- * <li><strong>id</strong> - The ID of the component so that it can be retrieved using {@link #findById(java.lang.String) }</li>
- * <li><strong>name</strong> - The name of the component (i.e. {@link Component#getName() }</li>
- * <li><strong>constraint</strong> - The layout constraint used for adding to
- * the parent. Supports north, south, east, west, center, when parent is
- * border</li>
- * <li><strong>rows</strong> - Used by grid only. Represents number of rows in
- * grid or table.</li>
- * <li><strong>cols</strong> - Used by grid only. Represents number of columns
- * in grid or table.</li>
- * <li><strong>behavior, behaviour</strong> - Used by Border Layout only.  Specifies the center behaviour.  Accepts values "scale", "absolute", and "totalBelow".</li>
- * <li><strong>noGrow</strong> - Used by <code>&lt;x&gt;</code> only.  Specifies that BoxLayout should be X_AXIS_NO_GROW.  Accepts values "true" and "false".</li>
- * <li><strong>bottomLast</strong> - Used by <code>&lt;y&gt;</code> only.  Specifies that BoxLayout should use Y_AXIS_BOTTOM_LAST option.  Accepts values "true" and "false"</li>
- * </ul>
- *
- * <h3>Example XML Notation</h3>
- * <pre>{@code
- * Form f = new Form("Test", new BorderLayout());
- * String tpl = "<border>"
- *     + "<border constraint='center'><border constraint='south'><$button constraint='east'/></border></border>"
- *     + "<$search constraint='south'/>"
- *     + "</border>";
- *
- * f.setFormBottomPaddingEditingMode(true);
- * TextField searchField = new TextField();
- * searchField.addActionListener(e->{
- *    Log.p("Search field action performed");
- * });
- * Button submit = new Button("Submit");
- * submit.addActionListener(e->{
- *     Log.p("Button action performed");
- * });
- *
- * UIFragment template = UIFragment.parseXML(tpl)
- *     .set("button", submit)
- *     .set("search", searchField);
- * f.add(BorderLayout.CENTER, template.getView());
- * f.show();
- * }</pre>
- *
- * <h3>JSON Notation</h3>
- *
- * <p>When trying to express a UI structure inside a Java String, the XML notation may be
- * a little bit verbose and cumbersome.  For this reason, there is an alternative JSON-based
- * notation that will allow you to express a UI structure more succinctly.</p>
- *
- * <p>A JSON object (i.e. curly braces) denotes a Container.  If this object includes properties
- * corresponding to the constraints of {@link BorderLayout} (e.g. center, east, west, north, south, or overlay), then
- * the container will use a {@link BorderLayout}, and the associated properties will represent its children
- * with the appropriate constraint.</p>
- *
- * <p>E.g.:</p>
- * <pre>{@code {center:'Center Label', south:'South Content'}}</pre>
- * <p>Will create a Container with labels in its {@link BorderLayout#CENTER} and {@link BorderLayout#SOUTH} positions.</p>
- * <p>To make things even more succinct, it supports single-character property keys for the BorderLayout constraint values.  E.g. The following
- * is equivalent to the previous example:</p>
- * <pre>{@code {c:'Center Label', s:'South Content'}}
- *
- * <p><strong>Other Layouts</strong>:</p>
- * <ul>
- *    <li><strong>Flow Layout</strong> - {@code {flow:[...]}}</li>
- *    <li><strong>Grid Layout</strong> - {@code {grid:[...], cols:3, rows:2}}</li>
- *    <li><strong>Box Layout X</strong> - {@code {x:[...]}}</li>
- *    <li><strong>Box Layout Y</strong> - {@code {y:[...]}}</li>
- *    <li><strong>Layered Layout</strong> - {@code {layered:[...]}}</li>
- *    <li><strong>Table Layout</strong> - {@code {table:[['A1', 'B1', 'C1'], ['A2', 'B2', 'C2'], ...]}}</li>
- * </ul>
- *
- * <p><strong>Layout Variants</strong></p>
- *
- * <p>BoxLayout and BorderLayout include variant shorthands to customize their behaviour.</p>
- *
- * <ul>
- *  <li><strong>xNoGrow, xng</strong> - Same as {@code {x:[...], noGrow:true}}</li>
- *  <li><strong>yBottomLast, ybl</strong> - Same as {@code {y:[...], bottomLast:true}}</li>
- *  <li><strong>centerAbsolute, centerAbs, ca</strong> - Same as {@code {center:[...], behavior:absolute}}</li>
- *  <li><strong>centerTotalBelow, ctb</strong> - Same as {@code {center:[...], behavior:totalBelow}}</li>
- * </ul>
- *
- * <p><strong>Embedding Placeholders/Parameters</strong></p>
- * <p>The notation for embedding placeholder components (which must be injected via {@link UIFragment#set(java.lang.String, com.codename1.ui.Component) }),
- * is similar to the XML equivalent.  Just place the parmeter name, prefixed with '$'.  E.g. </p>
- * <pre>{@code $submitButton}</pre>
- *
- *
- * <h3>Example JSON Notation</h3>
- *
- *
- * <pre>{@code
- * Component view = UIFragment.parseJSON("{n:['Hello', 'World', $checkbox], c:[y, {class:'MyTable', table:[['Username', $username], ['Password', $password]]}, {flow:['Some text'], align:center}], s:$submit}")
- *     .set("username", new TextField())
- *     .set("password", new TextField())
- *     .set("submit", new Button("Submit"))
- *     .set("checkbox", new CheckBox("Check Me"))
- *     .getView();
- * }</pre>
- *
- * @author shannah
- * @since 7.0
- */
+/// Encapsulates an XML or JSON template for a UI component hierarchy.  The UI can be defined
+/// using XML.  The XML is compiled into a view at runtime.  Custom components may be
+/// injected into the template using special placeholder tags (i.e. tags where the tag
+/// name begins with '$'.
+///
+/// Supported Tags
+///
+/// - **border** - A container with layout=BorderLayout
+///
+/// - **y** - A container with layout=BoxLayout Y
+///
+/// - **x** - A container with layout=BoxLayout X
+///
+/// - **flow** - A container with layout=FlowLayout
+///
+/// - **layered** - A container with layout=LayeredLayout
+///
+/// - **grid** - A container with layout=GridLayout.  Accepted attributes rows and cols
+///
+/// - **table** - A container with layout=TableLayout.  Accepted attributes rows and cols.  May have zero or more nested  tags.
+///
+/// - **label** - A Label
+///
+/// - **button** - A button
+///
+/// Layout Variant Tags
+///
+/// BorderLayout and BoxLayout include some variant tags to customize their behaviour also:
+///
+///
+/// - **borderAbs, borderAbsolute** - BorderLayout with center absolute behaviour.  This is the same as ``
+///
+/// - **borderTotalBelow** - BorderLayout with Total Below center behaviour. This is the same as ``
+///
+/// - **yBottomLast, ybl** - BoxLayout with Y_BOTTOM_LAST setting.
+///
+/// - **xNoGrow, xng** - BoxLayout X with No Grow option.  This is the same as ``
+///
+/// Supported Attributes
+///
+/// - **uiid** - The UIID of the component.  I.e. `Component#getUIID()`
+///
+/// - **id** - The ID of the component so that it can be retrieved using `#findById(java.lang.String)`
+///
+/// - **name** - The name of the component (i.e. `Component#getName()`
+///
+/// - **constraint** - The layout constraint used for adding to
+/// the parent. Supports north, south, east, west, center, when parent is
+/// border
+///
+/// - **rows** - Used by grid only. Represents number of rows in
+/// grid or table.
+///
+/// - **cols** - Used by grid only. Represents number of columns
+/// in grid or table.
+///
+/// - **behavior, behaviour** - Used by Border Layout only.  Specifies the center behaviour.  Accepts values "scale", "absolute", and "totalBelow".
+///
+/// - **noGrow** - Used by `` only.  Specifies that BoxLayout should be X_AXIS_NO_GROW.  Accepts values "true" and "false".
+///
+/// - **bottomLast** - Used by `` only.  Specifies that BoxLayout should use Y_AXIS_BOTTOM_LAST option.  Accepts values "true" and "false"
+///
+/// Example XML Notation
+///
+/// ```java
+/// `Form f = new Form("Test", new BorderLayout());
+/// String tpl = ""
+///     + ""
+///     + ""
+///     + "";
+///
+/// f.setFormBottomPaddingEditingMode(true);
+/// TextField searchField = new TextField();
+/// searchField.addActionListener(e->{
+///    Log.p("Search field action performed");`);
+/// Button submit = new Button("Submit");
+/// submit.addActionListener(e->{
+///     Log.p("Button action performed");
+/// });
+///
+/// UIFragment template = UIFragment.parseXML(tpl)
+///     .set("button", submit)
+///     .set("search", searchField);
+/// f.add(BorderLayout.CENTER, template.getView());
+/// f.show();
+/// }
+/// ```
+///
+/// JSON Notation
+///
+/// When trying to express a UI structure inside a Java String, the XML notation may be
+/// a little bit verbose and cumbersome.  For this reason, there is an alternative JSON-based
+/// notation that will allow you to express a UI structure more succinctly.
+///
+/// A JSON object (i.e. curly braces) denotes a Container.  If this object includes properties
+/// corresponding to the constraints of `BorderLayout` (e.g. center, east, west, north, south, or overlay), then
+/// the container will use a `BorderLayout`, and the associated properties will represent its children
+/// with the appropriate constraint.
+///
+/// E.g.:
+///
+/// ```java
+/// `{center:'Center Label', south:'South Content'`}
+/// ```
+///
+/// Will create a Container with labels in its `BorderLayout#CENTER` and `BorderLayout#SOUTH` positions.
+///
+/// To make things even more succinct, it supports single-character property keys for the BorderLayout constraint values.  E.g. The following
+/// is equivalent to the previous example:
+///
+/// ```java
+/// `{c:'Center Label', s:'South Content'`}
+///
+/// **Other Layouts**:
+///
+///
+/// - **Flow Layout** - `{flow:[...]`}
+///
+/// - **Grid Layout** - `{grid:[...], cols:3, rows:2`}
+///
+/// - **Box Layout X** - `{x:[...]`}
+///
+/// - **Box Layout Y** - `{y:[...]`}
+///
+/// - **Layered Layout** - `{layered:[...]`}
+///
+/// - **Table Layout** - `{table:[['A1', 'B1', 'C1'], ['A2', 'B2', 'C2'], ...]`}
+///
+/// **Layout Variants**
+///
+/// BoxLayout and BorderLayout include variant shorthands to customize their behaviour.
+///
+///
+/// - **xNoGrow, xng** - Same as `{x:[...], noGrow:true`}
+///
+/// - **yBottomLast, ybl** - Same as `{y:[...], bottomLast:true`}
+///
+/// - **centerAbsolute, centerAbs, ca** - Same as `{center:[...], behavior:absolute`}
+///
+/// - **centerTotalBelow, ctb** - Same as `{center:[...], behavior:totalBelow`}
+///
+/// **Embedding Placeholders/Parameters**
+///
+/// The notation for embedding placeholder components (which must be injected via `com.codename1.ui.Component)`),
+/// is similar to the XML equivalent.  Just place the parmeter name, prefixed with '$'.  E.g.
+///
+/// `$submitButton`
+/// ```
+///
+/// Example JSON Notation
+///
+/// ```java
+/// `Component view = UIFragment.parseJSON("{n:['Hello', 'World', $checkbox], c:[y, {class:'MyTable', table:[['Username', $username], ['Password', $password]]`, {flow:['Some text'], align:center}], s:$submit}")
+///     .set("username", new TextField())
+///     .set("password", new TextField())
+///     .set("submit", new Button("Submit"))
+///     .set("checkbox", new CheckBox("Check Me"))
+///     .getView();
+/// }
+/// ```
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public final class UIFragment {
 
 
@@ -199,12 +231,15 @@ public final class UIFragment {
         this.root = el;
     }
 
-    /**
-     * Parses input stream of XML into a Template
-     *
-     * @param input InputStream with XML content to parse
-     * @return The corresponding template, or a RuntimeException if parsing failed.
-     */
+    /// Parses input stream of XML into a Template
+    ///
+    /// #### Parameters
+    ///
+    /// - `input`: InputStream with XML content to parse
+    ///
+    /// #### Returns
+    ///
+    /// The corresponding template, or a RuntimeException if parsing failed.
     public static UIFragment parseXML(InputStream input) {
         try {
             XMLParser p = new XMLParser();
@@ -216,12 +251,15 @@ public final class UIFragment {
         }
     }
 
-    /**
-     * Parses XML string into a Template
-     *
-     * @param xml XML string describing a UI.
-     * @return The corresponding template, or a RuntimeException if parsing failed.
-     */
+    /// Parses XML string into a Template
+    ///
+    /// #### Parameters
+    ///
+    /// - `xml`: XML string describing a UI.
+    ///
+    /// #### Returns
+    ///
+    /// The corresponding template, or a RuntimeException if parsing failed.
     public static UIFragment parseXML(String xml) {
         try {
             XMLParser p = new XMLParser();
@@ -234,13 +272,15 @@ public final class UIFragment {
         }
     }
 
-    /**
-     * Parses a JSON string into a template.
-     *
-     * @param json A JSON string representing a UI hierarchy.
-     * @return
-     * @throws IOException
-     */
+    /// Parses a JSON string into a template.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: A JSON string representing a UI hierarchy.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public static UIFragment parseJSON(String json) {
         try {
             Element el = UINotationParser.parseJSONNotation(json);
@@ -261,11 +301,7 @@ public final class UIFragment {
         return false;
     }
 
-    /**
-     * Gets the view that is generated by this template.
-     *
-     * @return
-     */
+    /// Gets the view that is generated by this template.
     public Container getView() {
         if (view == null) {
             view = (Container) getFactory().newComponent(root);
@@ -364,14 +400,18 @@ public final class UIFragment {
 
     }
 
-    /**
-     * Sets a parameter component in this template.  Templates that include "parameter"
-     * tags will inject these parameters into the resulting view.
-     *
-     * @param paramName The name of the parameter.
-     * @param param     The component to inject into the template.
-     * @return Self for chaining.
-     */
+    /// Sets a parameter component in this template.  Templates that include "parameter"
+    /// tags will inject these parameters into the resulting view.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paramName`: The name of the parameter.
+    ///
+    /// - `param`: The component to inject into the template.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public UIFragment set(String paramName, Component param) {
         if (view != null) {
             reset();
@@ -383,77 +423,97 @@ public final class UIFragment {
         return this;
     }
 
-    /**
-     * Gets a component in the template by its ID.
-     *
-     * @param id The ID of the component.
-     * @return The component with matching ID.
-     */
+    /// Gets a component in the template by its ID.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The ID of the component.
+    ///
+    /// #### Returns
+    ///
+    /// The component with matching ID.
     public Component findById(String id) {
         getView();
         return index.get(id.toLowerCase());
     }
 
-    /**
-     * Gets the component factory that is currently set for this fragment.
-     *
-     * @return the factory
-     */
+    /// Gets the component factory that is currently set for this fragment.
+    ///
+    /// #### Returns
+    ///
+    /// the factory
     public ComponentFactory getFactory() {
         return factory;
     }
 
-    /**
-     * Sets the component factory to be used.
-     *
-     * @param factory the factory to set
-     * @return Self for chaining
-     */
+    /// Sets the component factory to be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `factory`: the factory to set
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining
     public UIFragment setFactory(ComponentFactory factory) {
         this.factory = factory;
         return this;
     }
 
-    /**
-     * A factory for converting XML elements to Components.
-     *
-     * @see #setFactory(com.codename1.ui.UIFragment.ComponentFactory)
-     * @see #getFactory()
-     */
+    /// A factory for converting XML elements to Components.
+    ///
+    /// #### See also
+    ///
+    /// - #setFactory(com.codename1.ui.UIFragment.ComponentFactory)
+    ///
+    /// - #getFactory()
     public interface ComponentFactory {
-        /**
-         * Creates a new component given its XML description.
-         *
-         * @param el The XML element
-         * @return A Component.
-         */
+        /// Creates a new component given its XML description.
+        ///
+        /// #### Parameters
+        ///
+        /// - `el`: The XML element
+        ///
+        /// #### Returns
+        ///
+        /// A Component.
         Component newComponent(Element el);
 
-        /**
-         * Creates a layout constraint for adding a child component to a parent component.
-         *
-         * @param parent   The parent component.
-         * @param parentEl The XML element for the parent component.
-         * @param child    The child component.
-         * @param childEl  The XML element for the child component.
-         * @return Layout constraint for adding to the parent component.
-         */
+        /// Creates a layout constraint for adding a child component to a parent component.
+        ///
+        /// #### Parameters
+        ///
+        /// - `parent`: The parent component.
+        ///
+        /// - `parentEl`: The XML element for the parent component.
+        ///
+        /// - `child`: The child component.
+        ///
+        /// - `childEl`: The XML element for the child component.
+        ///
+        /// #### Returns
+        ///
+        /// Layout constraint for adding to the parent component.
         Object newConstraint(Container parent, Element parentEl, Component child, Element childEl);
     }
 
-    /**
-     * Default component factory that is used in templates.  Supports the following tags:
-     * <ul>
-     * <li>y</li>
-     * <li>x</li>
-     * <li>flow</li>
-     * <li>layered</li>
-     * <li>border</li>
-     * <li>table</li>
-     * <li>label</li>
-     * <li>button</li>
-     * </ul>
-     */
+    /// Default component factory that is used in templates.  Supports the following tags:
+    ///
+    /// - y
+    ///
+    /// - x
+    ///
+    /// - flow
+    ///
+    /// - layered
+    ///
+    /// - border
+    ///
+    /// - table
+    ///
+    /// - label
+    ///
+    /// - button
     public static class DefaultComponentFactory implements ComponentFactory {
 
         private static int centerBehaviour(String behaviour) {

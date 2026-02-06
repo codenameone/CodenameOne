@@ -29,14 +29,58 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 
-/**
- * <p>Codename One port of the infamous GridBagLayout based on the Apache Harmony code. For new applications
- * we generally recommend a "native" Codename One layout such as {@link com.codename1.ui.table.TableLayout}
- * and recommend avoiding this layout. Its here for developers who are accustomed to it and need to port existing code.</p>
- *
- * <script src="https://gist.github.com/codenameone/6266580.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/gridbag-layout.png" alt="Sample gridbag layout usage" />
- */
+/// Codename One port of the infamous GridBagLayout based on the Apache Harmony code. For new applications
+/// we generally recommend a "native" Codename One layout such as `com.codename1.ui.table.TableLayout`
+/// and recommend avoiding this layout. Its here for developers who are accustomed to it and need to port existing code.
+///
+/// ```java
+/// Button button;
+/// hi.setLayout(new GridBagLayout());
+/// GridBagConstraints c = new GridBagConstraints();
+/// //natural height, maximum width
+/// c.fill = GridBagConstraints.HORIZONTAL;
+///
+/// button = new Button("Button 1");
+/// c.weightx = 0.5;
+/// c.fill = GridBagConstraints.HORIZONTAL;
+/// c.gridx = 0;
+/// c.gridy = 0;
+/// hi.addComponent(c, button);
+///
+/// button = new Button("Button 2");
+/// c.fill = GridBagConstraints.HORIZONTAL;
+/// c.weightx = 0.5;
+/// c.gridx = 1;
+/// c.gridy = 0;
+/// hi.addComponent(c, button);
+///
+/// button = new Button("Button 3");
+/// c.fill = GridBagConstraints.HORIZONTAL;
+/// c.weightx = 0.5;
+/// c.gridx = 2;
+/// c.gridy = 0;
+/// hi.addComponent(c, button);
+///
+/// button = new Button("Long-Named Button 4");
+/// c.fill = GridBagConstraints.HORIZONTAL;
+/// c.ipady = 40;      //make this component tall
+/// c.weightx = 0.0;
+/// c.gridwidth = 3;
+/// c.gridx = 0;
+/// c.gridy = 1;
+/// hi.addComponent(c, button);
+///
+/// button = new Button("5");
+/// c.fill = GridBagConstraints.HORIZONTAL;
+/// c.ipady = 0;       //reset to default
+/// c.weighty = 1.0;   //request any extra vertical space
+/// c.anchor = GridBagConstraints.PAGE_END; //bottom of space
+/// c.insets = new Insets(10,0,0,0);  //top padding
+/// c.gridx = 1;       //aligned with button 2
+/// c.gridwidth = 2;   //2 columns wide
+/// c.gridy = 2;       //third row
+/// hi.addComponent(c, button);
+/// ```
 public class GridBagLayout extends Layout {
     protected static final int MAXGRIDSIZE = 512;
 

@@ -28,37 +28,64 @@ import com.codename1.ui.List;
 
 import java.util.Hashtable;
 
-/**
- * <p>A list with a {@link com.codename1.components.MultiButton} renderer, <b>notice</b> that
- * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
- * discourage usage of lists</a>.. This simplifies the process of
- * working with the list and its model as the renderer comes pre-configured for common use cases.
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/b2ab6645db842d7b2750.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/graphics-urlimage-multilist.png" alt="MultiList and model in action" />
- *
- * @author Shai Almog
- */
+/// A list with a `com.codename1.components.MultiButton` renderer, **notice** that
+/// [we strongly discourage usage of lists](https://www.codenameone.com/blog/avoiding-lists.html).. This simplifies the process of
+/// working with the list and its model as the renderer comes pre-configured for common use cases.
+///
+/// ```java
+/// public void showForm() {
+///   Form hi = new Form("MultiList", new BorderLayout());
+///
+///   int mm = Display.getInstance().convertToPixels(3);
+///   EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(mm * 3, mm * 4, 0), false);
+///   Image icon1 = URLImage.createToStorage(placeholder, "icon1", "http://www.georgerrmartin.com/wp-content/uploads/2013/03/GOTMTI2.jpg");
+///   Image icon2 = URLImage.createToStorage(placeholder, "icon2", "http://www.georgerrmartin.com/wp-content/uploads/2012/08/clashofkings.jpg");
+///   Image icon3 = URLImage.createToStorage(placeholder, "icon3", "http://www.georgerrmartin.com/wp-content/uploads/2013/03/stormswordsMTI.jpg");
+///   Image icon4 = URLImage.createToStorage(placeholder, "icon4", "http://www.georgerrmartin.com/wp-content/uploads/2012/08/feastforcrows.jpg");
+///   Image icon5 = URLImage.createToStorage(placeholder, "icon5", "http://georgerrmartin.com/gallery/art/dragons05.jpg");
+///
+///   ArrayList> data = new ArrayList<>();
+///   data.add(createListEntry("A Game of Thrones", "1996", icon1));
+///   data.add(createListEntry("A Clash Of Kings", "1998", icon2));
+///   data.add(createListEntry("A Storm Of Swords", "2000", icon3));
+///   data.add(createListEntry("A Feast For Crows", "2005", icon4));
+///   data.add(createListEntry("A Dance With Dragons", "2011", icon5));
+///   data.add(createListEntry("The Winds of Winter", "2016 (please, please, please)", placeholder));
+///   data.add(createListEntry("A Dream of Spring", "Ugh", placeholder));
+///
+///   DefaultListModel> model = new DefaultListModel<>(data);
+///   MultiList ml = new MultiList(model);
+///   hi.add(BorderLayout.CENTER, ml);
+///   hi.show();
+/// }
+///
+/// private Map createListEntry(String name, String date, Image icon) {
+///   Map entry = new HashMap<>();
+///   entry.put("Line1", name);
+///   entry.put("Line2", date);
+///   entry.put("icon", icon);
+///   return entry;
+/// }
+/// ```
+///
+/// @author Shai Almog
 public class MultiList extends List {
     private final MultiButton sel;
     private final MultiButton unsel;
     private Image placeholder;
 
-    /**
-     * Constructor that accepts a model for the list
-     *
-     * @param model the model object to assign to the list
-     */
+    /// Constructor that accepts a model for the list
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model object to assign to the list
     public MultiList(ListModel model) {
         super(model);
         sel = new MultiButton();
         unsel = new MultiButton();
     }
 
-    /**
-     * Constructor for the GUI builder
-     */
+    /// Constructor for the GUI builder
     public MultiList() {
         super(new DefaultListModel(h("Entry 1", "more..."),
                 h("Entry 2", "more..."),
@@ -74,9 +101,7 @@ public class MultiList extends List {
         return h;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -93,27 +118,25 @@ public class MultiList extends List {
         }
     }
 
-    /**
-     * Allows developers to customize the properties of the selected multi-button in code
-     *
-     * @return the selected multi button
-     */
+    /// Allows developers to customize the properties of the selected multi-button in code
+    ///
+    /// #### Returns
+    ///
+    /// the selected multi button
     public MultiButton getSelectedButton() {
         return sel;
     }
 
-    /**
-     * Allows developers to customize the properties of the unselected multi-button in code
-     *
-     * @return the unselected multi button
-     */
+    /// Allows developers to customize the properties of the unselected multi-button in code
+    ///
+    /// #### Returns
+    ///
+    /// the unselected multi button
     public MultiButton getUnselectedButton() {
         return unsel;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{
@@ -125,9 +148,7 @@ public class MultiList extends List {
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
@@ -154,9 +175,7 @@ public class MultiList extends List {
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("placeholder".equals(name)) {
@@ -165,9 +184,7 @@ public class MultiList extends List {
         return unsel.getPropertyValue(name);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("placeholder".equals(name)) {

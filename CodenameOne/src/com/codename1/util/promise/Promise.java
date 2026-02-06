@@ -34,28 +34,31 @@ import java.util.LinkedList;
 
 import static com.codename1.ui.CN.invokeAndBlock;
 
-/**
- * An implementation of <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">Promise</a> for
- * use with Codename One applications.  Due to java reserved words, there are a few differences in this implementation:
- *
- * <ol>
- * <li>Instead of {@literal catch()}, we use {@literal except()}</li>
- * <li>Instead of {@literal finally()}, we use {@literal always()}</li>
- * </ol>
- *
- * <p>Since {@link #then(Functor, Functor) }, {@link #except(Functor) },
- * and {@link #always(Functor) } take Functors as parameters, which must have a return value, this implementation
- * provides convenience wrappers {@link #onSuccess(SuccessCallback) }, {@link #onFail(SuccessCallback) },
- * and {@link #onComplete(SuccessCallback) } which take {@link SuccessCallback} objects instead.  For simple cases,
- * these wrappers will be easier to use because you don't need to return a dummy {@literal null} at the end of the callback.</p>
- *
- * <p>For more complex cases, where the return value of one Functor is meant to be piped into the subsequent Functor, then the Functor
- * variants should be used.</p>
- *
- * @author shannah
- * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">MDN documentation for Promise</a>
- * @since 8.0
- */
+/// An implementation of [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) for
+/// use with Codename One applications.  Due to java reserved words, there are a few differences in this implementation:
+///
+/// - Instead of catch(), we use except()
+///
+/// - Instead of finally(), we use always()
+///
+/// Since `Functor)`, `#except(Functor)`,
+/// and `#always(Functor)` take Functors as parameters, which must have a return value, this implementation
+/// provides convenience wrappers `#onSuccess(SuccessCallback)`, `#onFail(SuccessCallback)`,
+/// and `#onComplete(SuccessCallback)` which take `SuccessCallback` objects instead.  For simple cases,
+/// these wrappers will be easier to use because you don't need to return a dummy null at the end of the callback.
+///
+/// For more complex cases, where the return value of one Functor is meant to be piped into the subsequent Functor, then the Functor
+/// variants should be used.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 8.0
+///
+/// #### See also
+///
+/// - [MDN documentation for Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
 public class Promise<T> {
 
     private final LinkedList<PromiseHandler> then = new LinkedList<PromiseHandler>();
@@ -68,13 +71,16 @@ public class Promise<T> {
     private T value;
 
 
-    /**
-     * Creates a new promise with the given executor function.  Works the same as Javascript equivalent.
-     *
-     * @param executor The executor function.  This is executed immediately, and should call either the passed {@literal resolve}
-     *                 or {@literal reject} functor to mark success or failure.
-     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise">MDN documentation for Promise</a>
-     */
+    /// Creates a new promise with the given executor function.  Works the same as Javascript equivalent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `executor`: @param executor The executor function.  This is executed immediately, and should call either the passed resolve
+    ///                 or reject functor to mark success or failure.
+    ///
+    /// #### See also
+    ///
+    /// - [MDN documentation for Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise)
     @Async.Schedule
     public Promise(ExecutorFunction executor) {
         resolve = new Functor<T, Object>() {
@@ -121,13 +127,15 @@ public class Promise<T> {
 
     }
 
-    /**
-     * The Promise.all() method takes an iterable of promises as an input, and returns a single Promise that resolves to an array of the results of the input promises. This returned promise will resolve when all of the input's promises have resolved, or if the input iterable contains no promises. It rejects immediately upon any of the input promises rejecting or non-promises throwing an error, and will reject with this first rejection message / error.
-     *
-     * @param promises
-     * @return
-     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all">See MDN documentation for all()</a>
-     */
+    /// The Promise.all() method takes an iterable of promises as an input, and returns a single Promise that resolves to an array of the results of the input promises. This returned promise will resolve when all of the input's promises have resolved, or if the input iterable contains no promises. It rejects immediately upon any of the input promises rejecting or non-promises throwing an error, and will reject with this first rejection message / error.
+    ///
+    /// #### Parameters
+    ///
+    /// - `promises`
+    ///
+    /// #### See also
+    ///
+    /// - [See MDN documentation for all()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all)
     public static Promise all(final Promise... promises) {
 
         return new Promise(new ExecutorFunction() {
@@ -167,26 +175,25 @@ public class Promise<T> {
         });
     }
 
-    /**
-     * <p>
-     * The Promise.allSettled() method returns a promise that resolves after all
-     * of the given promises have either fulfilled or rejected, with an array of
-     * objects that each describes the outcome of each promise.</p>
-     *
-     * <p>
-     * It is typically used when you have multiple asynchronous tasks that are
-     * not dependent on one another to complete successfully, or you'd always
-     * like to know the result of each promise.</p>
-     *
-     * <p>
-     * In comparison, the Promise returned by Promise.all() may be more
-     * appropriate if the tasks are dependent on each other / if you'd like to
-     * immediately reject upon any of them rejecting.</p>
-     *
-     * @param promises
-     * @return
-     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled">See MDN documentation for allSettled()</a>
-     */
+    /// The Promise.allSettled() method returns a promise that resolves after all
+    /// of the given promises have either fulfilled or rejected, with an array of
+    /// objects that each describes the outcome of each promise.
+    ///
+    /// It is typically used when you have multiple asynchronous tasks that are
+    /// not dependent on one another to complete successfully, or you'd always
+    /// like to know the result of each promise.
+    ///
+    /// In comparison, the Promise returned by Promise.all() may be more
+    /// appropriate if the tasks are dependent on each other / if you'd like to
+    /// immediately reject upon any of them rejecting.
+    ///
+    /// #### Parameters
+    ///
+    /// - `promises`
+    ///
+    /// #### See also
+    ///
+    /// - [See MDN documentation for allSettled()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled)
     public static Promise allSettled(final Promise... promises) {
         return new Promise(new ExecutorFunction() {
             @Override
@@ -251,15 +258,16 @@ public class Promise<T> {
         });
     }
 
-    /**
-     * Called when the promise is rejected or resolved to process all handler functions
-     * that were registered via {@link #then(Functor, Functor) },
-     * {@link #except(Functor) }, or {@link #always(Functor) }
-     *
-     * @param o        The value to pipe into the handler functors as an argument.
-     * @param resolved Whether the promise was resolved.  If {@literal true}, it will call the resolve
-     *                 handler.  If {@literal false}, it will call the reject handler.
-     */
+    /// Called when the promise is rejected or resolved to process all handler functions
+    /// that were registered via `Functor)`,
+    /// `#except(Functor)`, or `#always(Functor)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: The value to pipe into the handler functors as an argument.
+    ///
+    /// - `resolved`: @param resolved Whether the promise was resolved.  If true, it will call the resolve
+    ///                 handler.  If false, it will call the reject handler.
     @Async.Execute
     private void processThens(final Object o, final boolean resolved) {
         if (!CN.isEdt()) {
@@ -302,14 +310,14 @@ public class Promise<T> {
         }
     }
 
-    /**
-     * A wrapper for {@link #then(Functor, Functor) } that uses {@link SuccessCallback}
-     * instead of {@link Functor}.
-     *
-     * @param resolutionFunc Callback to run on resolution of promise.
-     * @param rejectionFunc  Callback to run on rejection of promise.
-     * @return
-     */
+    /// A wrapper for `Functor)` that uses `SuccessCallback`
+    /// instead of `Functor`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resolutionFunc`: Callback to run on resolution of promise.
+    ///
+    /// - `rejectionFunc`: Callback to run on rejection of promise.
     public Promise ready(final SuccessCallback<T> resolutionFunc, final SuccessCallback<Throwable> rejectionFunc) {
         return then(resolutionFunc == null ? null : new Functor<T, Object>() {
             @Override
@@ -326,72 +334,76 @@ public class Promise<T> {
         });
     }
 
-    /**
-     * A wrapper for {@link #then(Functor) } that uses {@link SuccessCallback} instead
-     * of {@link Functor}.
-     *
-     * @param resolutionFunc Callback called when project is fulfilled.
-     * @return
-     */
+    /// A wrapper for `#then(Functor)` that uses `SuccessCallback` instead
+    /// of `Functor`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resolutionFunc`: Callback called when project is fulfilled.
     public Promise onSuccess(SuccessCallback<T> resolutionFunc) {
         return ready(resolutionFunc, null);
     }
 
-    /**
-     * A wrapper for {@link #except(Functor) } that uses {@link SuccessCallback} instead
-     * of {@link Functor}.
-     *
-     * @param rejectionFunc
-     * @return
-     */
+    /// A wrapper for `#except(Functor)` that uses `SuccessCallback` instead
+    /// of `Functor`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rejectionFunc`
     public Promise onFail(SuccessCallback<Throwable> rejectionFunc) {
         return ready(null, rejectionFunc);
     }
 
-    /**
-     * A wrapper for {@link #always(Functor) } that uses {@link SuccessCallback} instead
-     * of {@link Functor}.
-     *
-     * @param handlerFunc
-     * @return
-     */
+    /// A wrapper for `#always(Functor)` that uses `SuccessCallback` instead
+    /// of `Functor`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handlerFunc`
     public Promise onComplete(SuccessCallback handlerFunc) {
         return ready(handlerFunc, handlerFunc);
     }
 
-    /**
-     * @param resolutionFunc
-     * @return
-     */
+    /// #### Parameters
+    ///
+    /// - `resolutionFunc`
     public Promise then(Functor<T, ?> resolutionFunc) {
         return then(resolutionFunc, null);
     }
 
-    /**
-     * The then() method returns a Promise. It takes up to two arguments: callback functions for the success and failure cases of the Promise.
-     *
-     * @param resolutionFunc A Function called if the Promise is fulfilled. This function has one argument, the fulfillment value. If it is null, it is internally replaced with an "Identity" function (it returns the received argument).
-     * @param rejectionFunc  A Function called if the Promise is rejected. This function has one argument, the rejection reason. If it is null, it is internally replaced with a "Thrower" function (it throws an error it received as argument).
-     * @return <p>Once a Promise is fulfilled or rejected, the respective handler function (resolutionFunc or rejectionFunc) will be called asynchronously (scheduled on the EDT). The behavior of the handler function follows a specific set of rules. If a handler function:</p>
-     * <dl>
-     * <dt>returns a value,</dt><dd> the promise returned by then gets resolved
-     * with the returned value as its value.</dd>
-     * <dt>doesn't return anything,</dt> <dd>the promise returned by then gets
-     * resolved with an undefined value.</dd>
-     * <dt>throws an error,</dt><dd> the promise returned by then gets rejected
-     * with the thrown error as its value.</dd>
-     * <dt>returns an already fulfilled promise</dt>, <dd>the promise returned
-     * by then gets fulfilled with that promise's value as its value.</dd>
-     * <dt>returns an already rejected promise,</dt> <dd>the promise returned by
-     * then gets rejected with that promise's value as its value.</dd>
-     * <dt>returns another pending promise object,</dt><dd> the
-     * resolution/rejection of the promise returned by then will be subsequent
-     * to the resolution/rejection of the promise returned by the handler. Also,
-     * the resolved value of the promise returned by then will be the same as
-     * the resolved value of the promise returned by the handler.</dd>
-     * </dl>
-     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then">See MDN documentation for then()</a>
-     */
+    /// The then() method returns a Promise. It takes up to two arguments: callback functions for the success and failure cases of the Promise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resolutionFunc`: A Function called if the Promise is fulfilled. This function has one argument, the fulfillment value. If it is null, it is internally replaced with an "Identity" function (it returns the received argument).
+    ///
+    /// - `rejectionFunc`: A Function called if the Promise is rejected. This function has one argument, the rejection reason. If it is null, it is internally replaced with a "Thrower" function (it throws an error it received as argument).
+    ///
+    /// #### Returns
+    ///
+    /// @return
+    ///
+    /// Once a Promise is fulfilled or rejected, the respective handler function (resolutionFunc or rejectionFunc) will be called asynchronously (scheduled on the EDT). The behavior of the handler function follows a specific set of rules. If a handler function:
+    ///
+    /// returns a value, the promise returned by then gets resolved
+    /// with the returned value as its value.
+    /// doesn't return anything, the promise returned by then gets
+    /// resolved with an undefined value.
+    /// throws an error, the promise returned by then gets rejected
+    /// with the thrown error as its value.
+    /// returns an already fulfilled promise, the promise returned
+    /// by then gets fulfilled with that promise's value as its value.
+    /// returns an already rejected promise, the promise returned by
+    /// then gets rejected with that promise's value as its value.
+    /// returns another pending promise object, the
+    /// resolution/rejection of the promise returned by then will be subsequent
+    /// to the resolution/rejection of the promise returned by the handler. Also,
+    /// the resolved value of the promise returned by then will be the same as
+    /// the resolved value of the promise returned by the handler.
+    ///
+    /// #### See also
+    ///
+    /// - [See MDN documentation for then()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then)
     public Promise then(Functor<T, ?> resolutionFunc, Functor<Throwable, ?> rejectionFunc) {
         if (resolutionFunc == null) {
             resolutionFunc = new Functor<T, Object>() {
@@ -428,53 +440,45 @@ public class Promise<T> {
         return handler.promise;
     }
 
-    /**
-     * Implementation of Promise.catch(). Named "except" because of Java reserved word..
-     *
-     * @param rejectionFunc Function called if promise is rejected.
-     * @return
-     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch">See MDN documentation for catch()</a>
-     */
+    /// Implementation of Promise.catch(). Named "except" because of Java reserved word..
+    ///
+    /// #### Parameters
+    ///
+    /// - `rejectionFunc`: Function called if promise is rejected.
+    ///
+    /// #### See also
+    ///
+    /// - [See MDN documentation for catch()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch)
     public Promise except(Functor<Throwable, ?> rejectionFunc) {
         return then(null, rejectionFunc);
     }
 
-    /**
-     * Implementation of Promise.finally().  Named "always" because of Java reserved word.
-     *
-     * @param handlerFunc
-     * @return
-     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally">See MDN documentation for finally()</a>
-     */
+    /// Implementation of Promise.finally().  Named "always" because of Java reserved word.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handlerFunc`
+    ///
+    /// #### See also
+    ///
+    /// - [See MDN documentation for finally()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally)
     public Promise always(Functor handlerFunc) {
         return then(handlerFunc, handlerFunc);
     }
 
-    /**
-     * Gets the return value once the promise is fulfilled.  If the promise isnt resolved, this just returns null.
-     *
-     * @return
-     */
+    /// Gets the return value once the promise is fulfilled.  If the promise isnt resolved, this just returns null.
     public T getValue() {
         return value;
     }
 
-    /**
-     * Returns the current state of the promise.
-     *
-     * @return
-     */
+    /// Returns the current state of the promise.
     public State getState() {
         return state;
     }
 
-    /**
-     * Uses invokeAndBlock to wait for this promise to be either resolved or rejected.
-     * This will throw an exception of type {@link AsyncResource.AsyncExecutionException} if the
-     * promise failed.  Otherwise it will return the resolved value.
-     *
-     * @return
-     */
+    /// Uses invokeAndBlock to wait for this promise to be either resolved or rejected.
+    /// This will throw an exception of type `AsyncResource.AsyncExecutionException` if the
+    /// promise failed.  Otherwise it will return the resolved value.
     public T await() {
         final boolean[] complete = new boolean[1];
         final Object[] out = new Object[1];
@@ -533,23 +537,15 @@ public class Promise<T> {
         return out;
     }
 
-    /**
-     * Encapsulates the state of a Promise.
-     */
+    /// Encapsulates the state of a Promise.
     public enum State {
-        /**
-         * initial state, neither fulfilled nor rejected.
-         */
+        /// initial state, neither fulfilled nor rejected.
         Pending,
 
-        /**
-         * the operation completed successfully.
-         */
+        /// the operation completed successfully.
         Fulfilled,
 
-        /**
-         * the operation failed.
-         */
+        /// the operation failed.
         Rejected
     }
 

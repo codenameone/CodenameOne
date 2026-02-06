@@ -31,15 +31,13 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 
-/**
- * A painter that draws the background of a component based on its CSS style
- * Unlike the regular CodenameOne bg painter, this also adds the following:
- * - Painting both a background color and a background image
- * - Tiling horizontally or vertically (or both)
- * - Background image position offset horizontal and vertical
- *
- * @author Ofir Leitner
- */
+/// A painter that draws the background of a component based on its CSS style
+/// Unlike the regular CodenameOne bg painter, this also adds the following:
+/// - Painting both a background color and a background image
+/// - Tiling horizontally or vertically (or both)
+/// - Background image position offset horizontal and vertical
+///
+/// @author Ofir Leitner
 class CSSBgPainter implements Painter {
     private final Component parent;
     int horizPos;
@@ -49,21 +47,22 @@ class CSSBgPainter implements Painter {
     boolean fixedX;
     private Component scrollableParent;
 
-    /**
-     * Construct a background painter for the given component
-     *
-     * @param the parent component
-     */
+    /// Construct a background painter for the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: parent component
     CSSBgPainter(Component parent) {
         this.parent = parent;
     }
 
-    /**
-     * Sets the horizontal/vertical position of the background image
-     *
-     * @param property CSSElement.CSS_BACKGROUND_POSITION_X or Y for horizontal/vertical
-     * @param pos      The position as a CSS length value
-     */
+    /// Sets the horizontal/vertical position of the background image
+    ///
+    /// #### Parameters
+    ///
+    /// - `property`: CSSElement.CSS_BACKGROUND_POSITION_X or Y for horizontal/vertical
+    ///
+    /// - `pos`: The position as a CSS length value
     void setPosition(int property, int pos) {
         boolean isPercentage = false;
         if ((pos & CSSElement.VAL_PERCENTAGE) != 0) {
@@ -77,43 +76,43 @@ class CSSBgPainter implements Painter {
         }
     }
 
-    /**
-     * Sets the horizontal position of the background image
-     *
-     * @param pos          The position either in pixels or percentage
-     * @param isPercentage if true then the numeric value give at 'pos' is actually percentages
-     */
+    /// Sets the horizontal position of the background image
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: The position either in pixels or percentage
+    ///
+    /// - `isPercentage`: if true then the numeric value give at 'pos' is actually percentages
     private void setHorizPosition(int pos, boolean isPercentage) {
         horizPos = pos;
         horizIsPercentage = isPercentage;
     }
 
-    /**
-     * Sets the vertical position of the background image
-     *
-     * @param pos          The position either in pixels or percentage
-     * @param isPercentage if true then the numeric value give at 'pos' is actually percentages
-     */
+    /// Sets the vertical position of the background image
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: The position either in pixels or percentage
+    ///
+    /// - `isPercentage`: if true then the numeric value give at 'pos' is actually percentages
     private void setVertPosition(int pos, boolean isPercentage) {
         vertPos = pos;
         vertIsPercentage = isPercentage;
     }
 
-    /**
-     * Sets this background to be fixed, which means it isn't affected by scrolling, but stays fixed in the back of the component it is applied on.
-     */
+    /// Sets this background to be fixed, which means it isn't affected by scrolling, but stays fixed in the back of the component it is applied on.
     void setFixed() {
         fixedX = true;
     }
 
-    /**
-     * Returns a parent container that is scrollable or null if no parent is
-     * scrollable.
-     * This was copied from Container.getScrollableParent (Which can't be used as it is private)
-     *
-     * @return a parent container that is scrollable or null if no parent is
-     * scrollable.
-     */
+    /// Returns a parent container that is scrollable or null if no parent is
+    /// scrollable.
+    /// This was copied from Container.getScrollableParent (Which can't be used as it is private)
+    ///
+    /// #### Returns
+    ///
+    /// @return a parent container that is scrollable or null if no parent is
+    /// scrollable.
     private Container getScrollableParent(Component parent) {
         Container cont;
         if (parent instanceof Container) {
@@ -130,9 +129,7 @@ class CSSBgPainter implements Painter {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     public void paint(Graphics g, Rectangle rect) {
@@ -204,13 +201,17 @@ class CSSBgPainter implements Painter {
 
     }
 
-    /**
-     * Calculates the starting drawing position for a certain dimension (horizontal/vertical) considering the given offset
-     *
-     * @param offset   The offset in the dimension
-     * @param imageDim The image dimension (width/height)
-     * @return The starting drawing position - 0 is the offset is 0 or a negative value if there is an offset
-     */
+    /// Calculates the starting drawing position for a certain dimension (horizontal/vertical) considering the given offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: The offset in the dimension
+    ///
+    /// - `imageDim`: The image dimension (width/height)
+    ///
+    /// #### Returns
+    ///
+    /// The starting drawing position - 0 is the offset is 0 or a negative value if there is an offset
     private int getTiledPosition(int offset, int imageDim) {
         if (offset != 0) {
             return offset % imageDim - imageDim;

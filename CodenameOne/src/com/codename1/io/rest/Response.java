@@ -23,11 +23,9 @@
  */
 package com.codename1.io.rest;
 
-/**
- * The http Response class
- *
- * @author Chen Fishbein
- */
+/// The http Response class
+///
+/// @author Chen Fishbein
 public class Response<T> {
     private final int responseCode;
     private final T responseData;
@@ -39,29 +37,29 @@ public class Response<T> {
         this.responseMessage = responseMessage;
     }
 
-    /**
-     * The http response data
-     *
-     * @return the data
-     */
+    /// The http response data
+    ///
+    /// #### Returns
+    ///
+    /// the data
     public T getResponseData() {
         return responseData;
     }
 
-    /**
-     * The http response code
-     *
-     * @return the code
-     */
+    /// The http response code
+    ///
+    /// #### Returns
+    ///
+    /// the code
     public int getResponseCode() {
         return responseCode;
     }
 
-    /**
-     * Returns the error message that accompanies the response
-     *
-     * @return the response
-     */
+    /// Returns the error message that accompanies the response
+    ///
+    /// #### Returns
+    ///
+    /// the response
     public String getResponseErrorMessage() {
         return responseMessage;
     }

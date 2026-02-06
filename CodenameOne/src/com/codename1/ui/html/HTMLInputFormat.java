@@ -30,23 +30,17 @@ import com.codename1.ui.plaf.UIManager;
 import java.util.Enumeration;
 import java.util.Vector;
 
-/**
- * This class implements HTML's input format restrictions.
- * These restrictions can be provided in the FORMAT attribute of the INPUT tag and are relevant for textfields.
- * However as the FORMAT tag was deprectaed it is more standard to supply them in the '-wap-input-format' of the input field CSS or Style.
- *
- * @author Ofir Leitner
- */
+/// This class implements HTML's input format restrictions.
+/// These restrictions can be provided in the FORMAT attribute of the INPUT tag and are relevant for textfields.
+/// However as the FORMAT tag was deprectaed it is more standard to supply them in the '-wap-input-format' of the input field CSS or Style.
+///
+/// @author Ofir Leitner
 final class HTMLInputFormat {
 
-    /**
-     * The allowed literals in an input format defintion
-     */
+    /// The allowed literals in an input format defintion
     private static final char[] literals = {'a', 'A', 'n', 'N', 'x', 'X', 'm', 'M'};
 
-    /**
-     * The matching allowed character set for each literal
-     */
+    /// The matching allowed character set for each literal
     private static final int[] literalConstraints =
             {FormatConstraint.TYPE_LOWERCASE | FormatConstraint.TYPE_SYMBOL,
                     FormatConstraint.TYPE_UPPERCASE | FormatConstraint.TYPE_SYMBOL,
@@ -62,11 +56,11 @@ final class HTMLInputFormat {
     private int maxLength;
 
 
-    /**
-     * A private constructor, to obtain an HTMLInputFormat object use HTMLInputFormat.getInputFormat
-     *
-     * @param formatString The string representing the format defintion (As taken from the HTML/CSS)
-     */
+    /// A private constructor, to obtain an HTMLInputFormat object use HTMLInputFormat.getInputFormat
+    ///
+    /// #### Parameters
+    ///
+    /// - `formatString`: The string representing the format defintion (As taken from the HTML/CSS)
     private HTMLInputFormat(String formatString) {
         String count = "";
         for (int i = 0; i < formatString.length(); i++) {
@@ -115,12 +109,15 @@ final class HTMLInputFormat {
         }
     }
 
-    /**
-     * This static method is used to create an HTMLInputFormat
-     *
-     * @param formatString The string representing the format defintion (As taken from the HTML/CSS)
-     * @return An HTMLInputFormat object containing all the constraints or null if there are none or if the string is invalid
-     */
+    /// This static method is used to create an HTMLInputFormat
+    ///
+    /// #### Parameters
+    ///
+    /// - `formatString`: The string representing the format defintion (As taken from the HTML/CSS)
+    ///
+    /// #### Returns
+    ///
+    /// An HTMLInputFormat object containing all the constraints or null if there are none or if the string is invalid
     static HTMLInputFormat getInputFormat(String formatString) {
         if (formatString == null) {
             return null;
@@ -137,14 +134,17 @@ final class HTMLInputFormat {
         }
     }
 
-    /**
-     * Applies the constrains represented by this object to the given TextArea.
-     * After invoking this method the returned TextArea should be used as restrictions are made sometimes on a new object.
-     * In case this is a TextField, this method will also set the input modes as needed.
-     *
-     * @param ta The TextArea to apply the constraints on.
-     * @return An instance of TextArea (Either the given one or a new one) with the constraints.
-     */
+    /// Applies the constrains represented by this object to the given TextArea.
+    /// After invoking this method the returned TextArea should be used as restrictions are made sometimes on a new object.
+    /// In case this is a TextField, this method will also set the input modes as needed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ta`: The TextArea to apply the constraints on.
+    ///
+    /// #### Returns
+    ///
+    /// An instance of TextArea (Either the given one or a new one) with the constraints.
     TextArea applyConstraints(TextArea ta) {
         int widestConstraint = 0;
         for (Enumeration e = formatConstraints.elements(); e.hasMoreElements(); ) {
@@ -196,12 +196,13 @@ final class HTMLInputFormat {
 
     }
 
-    /**
-     * Excludes the given input mode from the given TextField
-     *
-     * @param tf            The TextField to work on
-     * @param modeToExclude The mode to exclude
-     */
+    /// Excludes the given input mode from the given TextField
+    ///
+    /// #### Parameters
+    ///
+    /// - `tf`: The TextField to work on
+    ///
+    /// - `modeToExclude`: The mode to exclude
     private void excludeInputMode(TextField tf, String modeToExclude) {
         String[] curModes = tf.getInputModeOrder();
         String[] newModes = new String[curModes.length - 1];
@@ -219,12 +220,15 @@ final class HTMLInputFormat {
         tf.setInputModeOrder(newModes);
     }
 
-    /**
-     * Verifies that the given String conforms to the constraints represented by this object.
-     *
-     * @param str The string to verify
-     * @return true if the string is valid, false otherwise.
-     */
+    /// Verifies that the given String conforms to the constraints represented by this object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The string to verify
+    ///
+    /// #### Returns
+    ///
+    /// true if the string is valid, false otherwise.
     boolean verifyString(String str) {
         if ((str.length() > maxLength) || (str.length() < minLength)) {
             return false;
@@ -286,13 +290,17 @@ final class HTMLInputFormat {
         return true;
     }
 
-    /**
-     * Verifies the given character. THis method is used by verifyString on each char
-     *
-     * @param c          The char to verify
-     * @param constraint The constraint to verify againts
-     * @return true if the char conforms to the given constraint, false otherwise
-     */
+    /// Verifies the given character. THis method is used by verifyString on each char
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The char to verify
+    ///
+    /// - `constraint`: The constraint to verify againts
+    ///
+    /// #### Returns
+    ///
+    /// true if the char conforms to the given constraint, false otherwise
     private boolean verifyChar(char c, int constraint) {
         if (((constraint & FormatConstraint.TYPE_ANY) != 0) ||
                 (((constraint & FormatConstraint.TYPE_NUMERIC) != 0) && (c >= '0') && (c <= '9')) ||
@@ -313,11 +321,11 @@ final class HTMLInputFormat {
         return false;
     }
 
-    /**
-     * A printout of a user-friendly string describing the format
-     *
-     * @return a printout of a user-friendly string describing the format
-     */
+    /// A printout of a user-friendly string describing the format
+    ///
+    /// #### Returns
+    ///
+    /// a printout of a user-friendly string describing the format
     @Override
     public String toString() {
         StringBuilder str = new StringBuilder();
@@ -368,62 +376,47 @@ final class HTMLInputFormat {
 
     // Inner classes:
 
-    /**
-     * This class reprensents a single constraint on an input field
-     * The HTMLInputFormat breaks down the format string into 1 or more FormatConstraint objects
-     * <p>
-     * Each constraint is represented by a type and a count.
-     * The type indicated which typs of characters are allows and can be one or more of the TYPE_* constants ORed together.
-     * The count is either a number that indicates we allow up to this count or one of the COUNT_* constants (See below)
-     *
-     * @author Ofir Leitner
-     */
+    /// This class reprensents a single constraint on an input field
+    /// The HTMLInputFormat breaks down the format string into 1 or more FormatConstraint objects
+    ///
+    /// Each constraint is represented by a type and a count.
+    /// The type indicated which typs of characters are allows and can be one or more of the TYPE_* constants ORed together.
+    /// The count is either a number that indicates we allow up to this count or one of the COUNT_* constants (See below)
+    ///
+    /// @author Ofir Leitner
     static class FormatConstraint {
 
-        /**
-         * All lowercase english letters are allowed
-         */
+        /// All lowercase english letters are allowed
         static final int TYPE_LOWERCASE = 1;
 
-        /**
-         * All uppercase english letters are allowed
-         */
+        /// All uppercase english letters are allowed
         static final int TYPE_UPPERCASE = 2;
 
-        /**
-         * All numbers are allowed
-         */
+        /// All numbers are allowed
         static final int TYPE_NUMERIC = 4;
 
-        /**
-         * Symbols according to the TextField symbols table are allowed
-         */
+        /// Symbols according to the TextField symbols table are allowed
         static final int TYPE_SYMBOL = 8;
 
-        /**
-         * All characters are allowed
-         */
+        /// All characters are allowed
         static final int TYPE_ANY = 16;
 
-        /**
-         * A constant representing that there must be one and one only of this type
-         */
+        /// A constant representing that there must be one and one only of this type
         static final int COUNT_EXACTLY_ONE = Integer.MIN_VALUE;
 
-        /**
-         * A constant representing that there can be 0 or more of this type
-         */
+        /// A constant representing that there can be 0 or more of this type
         static final int COUNT_NO_LIMIT = Integer.MAX_VALUE;
 
         int type;
         int count;
 
-        /**
-         * The constructor which converts the count string into an integer or one of the COUNT_* constants above
-         *
-         * @param type     The constraint type (one or more of the TYPE_* constants ORed together)
-         * @param countStr A string representing the constraint count
-         */
+        /// The constructor which converts the count string into an integer or one of the COUNT_* constants above
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: The constraint type (one or more of the TYPE_* constants ORed together)
+        ///
+        /// - `countStr`: A string representing the constraint count
         FormatConstraint(int type, String countStr) {
             if ("*".equals(countStr)) {
                 count = COUNT_NO_LIMIT;
@@ -439,11 +432,11 @@ final class HTMLInputFormat {
             this.type = type;
         }
 
-        /**
-         * A printout of a user-friendly string describing this constraint
-         *
-         * @return a printout of a user-friendly string describing this constraint
-         */
+        /// A printout of a user-friendly string describing this constraint
+        ///
+        /// #### Returns
+        ///
+        /// a printout of a user-friendly string describing this constraint
         @Override
         public String toString() {
             StringBuilder str = new StringBuilder();

@@ -48,13 +48,14 @@ import java.util.Enumeration;
 import java.util.Vector;
 
 
-/**
- * All communication with the map and layers should be done in WGS84, it takes
- * care of coordinates transformation.
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- * @deprecated we highly recommend migrating to the native maps cn1lib
- */
+/// All communication with the map and layers should be done in WGS84, it takes
+/// care of coordinates transformation.
+///
+/// @author Roman Kamyk
+///
+/// #### Deprecated
+///
+/// we highly recommend migrating to the native maps cn1lib
 public class MapComponent extends Container {
 
     private static final Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
@@ -86,65 +87,73 @@ public class MapComponent extends Container {
     private int tapCount = 0;
     private ArrayList<MapListener> listeners;
 
-    /**
-     * Empty constructor creates a map with OpenStreetMapProvider on the Last
-     * known Location of the LocationManager
-     */
+    /// Empty constructor creates a map with OpenStreetMapProvider on the Last
+    /// known Location of the LocationManager
     public MapComponent() {
         this(new OpenStreetMapProvider());
     }
 
-    /**
-     * Constructor with a given provider
-     *
-     * @param provider map provider
-     */
+    /// Constructor with a given provider
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: map provider
     public MapComponent(MapProvider provider) {
         this(provider, (Coord) null, 4, true);
     }
 
-    /**
-     * Constructor
-     *
-     * @param provider       map provider
-     * @param centerPosition center position
-     * @param zoomLevel      zoom level
-     */
+    /// Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: map provider
+    ///
+    /// - `centerPosition`: center position
+    ///
+    /// - `zoomLevel`: zoom level
     public MapComponent(MapProvider provider, Location centerPosition, int zoomLevel) {
         this(provider, centerPosition, zoomLevel, true);
     }
 
-    /**
-     * Constructor
-     *
-     * @param provider       map provider
-     * @param centerPosition center position
-     * @param zoomLevel      zoom level
-     * @param cacheEnabled   is cache enabled
-     */
+    /// Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: map provider
+    ///
+    /// - `centerPosition`: center position
+    ///
+    /// - `zoomLevel`: zoom level
+    ///
+    /// - `cacheEnabled`: is cache enabled
     public MapComponent(MapProvider provider, Location centerPosition, int zoomLevel, boolean cacheEnabled) {
         this(provider, new Coord(centerPosition.getLatitude(), centerPosition.getLongitude()), zoomLevel, cacheEnabled);
     }
 
-    /**
-     * Constructor
-     *
-     * @param provider       map provider
-     * @param centerPosition center position
-     * @param zoomLevel      zoom level
-     */
+    /// Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: map provider
+    ///
+    /// - `centerPosition`: center position
+    ///
+    /// - `zoomLevel`: zoom level
     public MapComponent(MapProvider provider, Coord centerPosition, int zoomLevel) {
         this(provider, centerPosition, zoomLevel, true);
     }
 
-    /**
-     * Constructor
-     *
-     * @param provider       map provider
-     * @param centerPosition center position
-     * @param zoomLevel      zoom level
-     * @param cacheEnabled   is cache enabled
-     */
+    /// Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: map provider
+    ///
+    /// - `centerPosition`: center position
+    ///
+    /// - `zoomLevel`: zoom level
+    ///
+    /// - `cacheEnabled`: is cache enabled
     public MapComponent(MapProvider provider, Coord centerPosition, int zoomLevel, boolean cacheEnabled) {
         if (cacheEnabled) {
             _map = new CacheProviderProxy(provider);
@@ -200,15 +209,21 @@ public class MapComponent extends Container {
         drawMapPointer = UIManager.getInstance().isThemeConstant("drawMapPointerBool", false);
     }
 
-    /**
-     * Returns the distance between 2 points in meters
-     *
-     * @param latitude1
-     * @param longitude1
-     * @param latitude2
-     * @param longitude2
-     * @return distance in meters
-     */
+    /// Returns the distance between 2 points in meters
+    ///
+    /// #### Parameters
+    ///
+    /// - `latitude1`
+    ///
+    /// - `longitude1`
+    ///
+    /// - `latitude2`
+    ///
+    /// - `longitude2`
+    ///
+    /// #### Returns
+    ///
+    /// distance in meters
     public static long distance(double latitude1, double longitude1, double latitude2, double longitude2) {
         double latitudeSin = Math.sin(Math.toRadians(latitude2 - latitude1) / 2);
         double longitudeSin = Math.sin(Math.toRadians(longitude2 - longitude1) / 2);
@@ -218,9 +233,7 @@ public class MapComponent extends Container {
         return (long) (6378137 * c);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paintBackground(Graphics g) {
         super.paintBackground(g);
@@ -270,9 +283,7 @@ public class MapComponent extends Container {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void laidOut() {
         super.laidOut();
@@ -285,33 +296,25 @@ public class MapComponent extends Container {
         //super.repaint();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean shouldBlockSideSwipe() {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void focusGained() {
         setHandlesInput(true);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
@@ -331,9 +334,7 @@ public class MapComponent extends Container {
         super.repaint();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
@@ -342,9 +343,7 @@ public class MapComponent extends Container {
         draggedy = y;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int[] x, int[] y) {
         if (x.length > 1) {
@@ -398,9 +397,7 @@ public class MapComponent extends Container {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
@@ -512,13 +509,17 @@ public class MapComponent extends Container {
         fireMapListenerEvent();
     }
 
-    /**
-     * Gets the Coord location on the map from a x, y position.
-     *
-     * @param x X-coordinate
-     * @param y Y-coordinate
-     * @return a Coord Object.
-     */
+    /// Gets the Coord location on the map from a x, y position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: X-coordinate
+    ///
+    /// - `y`: Y-coordinate
+    ///
+    /// #### Returns
+    ///
+    /// a Coord Object.
     public Coord getCoordFromPosition(int x, int y) {
         x = x - getAbsoluteX();
         y = y - getAbsoluteY();
@@ -527,12 +528,15 @@ public class MapComponent extends Container {
         return _map.projection().toWGS84(c);
     }
 
-    /**
-     * Gets the screen coordinates of a specific Coord
-     *
-     * @param coord a lat,lon location
-     * @return the Point of the coordinate on the Map
-     */
+    /// Gets the screen coordinates of a specific Coord
+    ///
+    /// #### Parameters
+    ///
+    /// - `coord`: a lat,lon location
+    ///
+    /// #### Returns
+    ///
+    /// the Point of the coordinate on the Map
     public Point getPointFromCoord(Coord coord) {
         if (!coord.isProjected()) {
             coord = _map.projection().fromWGS84(coord);
@@ -540,9 +544,7 @@ public class MapComponent extends Container {
         return screenTile().pointPosition(coord);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int keyCode) {
         int oldZoom = _zoom;
@@ -594,9 +596,7 @@ public class MapComponent extends Container {
         g.translate(-getX(), -getY());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     private Tile screenTile() {
         Dimension componentDimension = new Dimension(getWidth(), getHeight());
         Coord southWest = _map.translate(_center, _zoom, -getWidth() / 2, -getHeight() / 2);
@@ -693,33 +693,35 @@ public class MapComponent extends Container {
         }
     }
 
-    /**
-     * Adds a layer to the map
-     *
-     * @param layer to add
-     */
+    /// Adds a layer to the map
+    ///
+    /// #### Parameters
+    ///
+    /// - `layer`: to add
     public void addLayer(Layer layer) {
         addLayer(layer, 0, _map.maxZoomLevel());
     }
 
-    /**
-     * Adds a layer to the map
-     *
-     * @param layer        to add
-     * @param minZoomLevel min zoom level of this Layer
-     * @param maxZoomLevel max zoom level of this Layer
-     */
+    /// Adds a layer to the map
+    ///
+    /// #### Parameters
+    ///
+    /// - `layer`: to add
+    ///
+    /// - `minZoomLevel`: min zoom level of this Layer
+    ///
+    /// - `maxZoomLevel`: max zoom level of this Layer
     public void addLayer(Layer layer, int minZoomLevel, int maxZoomLevel) {
         _layers.addElement(new LayerWithZoomLevels(layer, minZoomLevel, maxZoomLevel));
         refreshLayers = true;
         super.repaint();
     }
 
-    /**
-     * Removes a Layer from the map
-     *
-     * @param layer to remove
-     */
+    /// Removes a Layer from the map
+    ///
+    /// #### Parameters
+    ///
+    /// - `layer`: to remove
     public void removeLayer(Layer layer) {
         int length = _layers.size();
         int no;
@@ -733,41 +735,45 @@ public class MapComponent extends Container {
         super.repaint();
     }
 
-    /**
-     * Removes all layers from the map
-     */
+    /// Removes all layers from the map
     public void removeAllLayers() {
         _layers.removeAllElements();
         refreshLayers = true;
         super.repaint();
     }
 
-    /**
-     * Returns layers count
-     *
-     * @return The number of layers.
-     */
+    /// Returns layers count
+    ///
+    /// #### Returns
+    ///
+    /// The number of layers.
     public int getLayersConut() {
         return _layers.size();
     }
 
-    /**
-     * Returns Layer at index
-     *
-     * @param index the index of the layer
-     * @return The layer at the given index.
-     * @throws ArrayIndexOutOfBoundsException - if the index is out of range
-     *                                        (index &lt; 0 || index &gt;= size())
-     */
+    /// Returns Layer at index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index of the layer
+    ///
+    /// #### Returns
+    ///
+    /// The layer at the given index.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: @throws ArrayIndexOutOfBoundsException - if the index is out of range
+    ///                                        (index < 0 || index >= size())
     public Layer getLayerAt(int index) {
         return ((LayerWithZoomLevels) _layers.elementAt(index)).layer;
     }
 
-    /**
-     * Gets the map provider
-     *
-     * @return the map provider
-     */
+    /// Gets the map provider
+    ///
+    /// #### Returns
+    ///
+    /// the map provider
     public MapProvider getProvider() {
         return _map;
     }
@@ -779,9 +785,7 @@ public class MapComponent extends Container {
         super.repaint();
     }
 
-    /**
-     * move the map 25% left
-     */
+    /// move the map 25% left
     public void moveLeft() {
         Coord scale = _map.scale(_zoom);
         double partX = 1.0 * getWidth() / 4;
@@ -789,9 +793,7 @@ public class MapComponent extends Container {
         _needTiles = true;
     }
 
-    /**
-     * move the map 25% right
-     */
+    /// move the map 25% right
     public void moveRight() {
         Coord scale = _map.scale(_zoom);
         double partX = 1.0 * getWidth() / 4;
@@ -799,9 +801,7 @@ public class MapComponent extends Container {
         _needTiles = true;
     }
 
-    /**
-     * move the map 25% up
-     */
+    /// move the map 25% up
     public void moveUp() {
         Coord scale = _map.scale(_zoom);
         double partY = 1.0 * getHeight() / 4;
@@ -809,9 +809,7 @@ public class MapComponent extends Container {
         _needTiles = true;
     }
 
-    /**
-     * move the map 25% down
-     */
+    /// move the map 25% down
     public void moveDown() {
         Coord scale = _map.scale(_zoom);
         double partY = 1.0 * getHeight() / 4;
@@ -819,9 +817,7 @@ public class MapComponent extends Container {
         _needTiles = true;
     }
 
-    /**
-     * zoom in the map one level if possible
-     */
+    /// zoom in the map one level if possible
     public void zoomIn() {
         if (_zoom < _map.maxZoomLevel()) {
             _zoom += 1;
@@ -829,9 +825,7 @@ public class MapComponent extends Container {
         }
     }
 
-    /**
-     * zoom out the map one level if possible
-     */
+    /// zoom out the map one level if possible
     public void zoomOut() {
         if (_zoom > _map.minZoomLevel()) {
             _zoom -= 1;
@@ -839,12 +833,15 @@ public class MapComponent extends Container {
         }
     }
 
-    /**
-     * Zoom the map the the giving bounding box
-     *
-     * @param boundingBox to zoom to
-     * @throws IllegalArgumentException if the boundingBox is not wg84 format
-     */
+    /// Zoom the map the the giving bounding box
+    ///
+    /// #### Parameters
+    ///
+    /// - `boundingBox`: to zoom to
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the boundingBox is not wg84 format
     public void zoomTo(BoundingBox boundingBox) {
         if (boundingBox.projected()) {
             throw new IllegalArgumentException("boundingBox should be wg84 format");
@@ -864,14 +861,18 @@ public class MapComponent extends Container {
         super.repaint();
     }
 
-    /**
-     * Zoom map to the center of the given coordinate with the given zoom level
-     *
-     * @param coord     center map to this coordinate, coord should be in wg84
-     *                  format
-     * @param zoomLevel zoom map to this level;
-     * @throws IllegalArgumentException if the coord is not wg84 format
-     */
+    /// Zoom map to the center of the given coordinate with the given zoom level
+    ///
+    /// #### Parameters
+    ///
+    /// - `coord`: @param coord     center map to this coordinate, coord should be in wg84
+    ///                  format
+    ///
+    /// - `zoomLevel`: zoom map to this level;
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the coord is not wg84 format
     public void zoomTo(Coord coord, int zoomLevel) {
         if (coord.isProjected()) {
             throw new IllegalArgumentException("coord should be wg84 format");
@@ -882,9 +883,7 @@ public class MapComponent extends Container {
         super.repaint();
     }
 
-    /**
-     * zoom map to largest zoom while all Layers are contained
-     */
+    /// zoom map to largest zoom while all Layers are contained
     public void zoomToLayers() {
         BoundingBox bbox = null;
         Enumeration e = _layers.elements();
@@ -910,29 +909,29 @@ public class MapComponent extends Container {
         _needTiles = true;
     }
 
-    /**
-     * Gets the center location of the map in WGS84 format.
-     *
-     * @return Coordinate of center location of map.
-     */
+    /// Gets the center location of the map in WGS84 format.
+    ///
+    /// #### Returns
+    ///
+    /// Coordinate of center location of map.
     public Coord getCenter() {
         return _map.projection().toWGS84(_center);
     }
 
-    /**
-     * Returns the current zoom level of the map.
-     *
-     * @return zoom level
-     */
+    /// Returns the current zoom level of the map.
+    ///
+    /// #### Returns
+    ///
+    /// zoom level
     public int getZoomLevel() {
         return _zoom;
     }
 
-    /**
-     * Sets the current zoom level of the map.
-     *
-     * @param zoom Zoom level
-     */
+    /// Sets the current zoom level of the map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoom`: Zoom level
     public void setZoomLevel(int zoom) {
         if (zoom <= getMaxZoomLevel() && zoom >= getMinZoomLevel()) {
             _zoom = zoom;
@@ -944,103 +943,124 @@ public class MapComponent extends Container {
         }
     }
 
-    /**
-     * Returns the max zoom level of the map
-     *
-     * @return max zoom level
-     */
+    /// Returns the max zoom level of the map
+    ///
+    /// #### Returns
+    ///
+    /// max zoom level
     public int getMaxZoomLevel() {
         return _map.maxZoomLevel();
     }
 
-    /**
-     * Returns the min zoom level of the map
-     *
-     * @return min zoom level
-     */
+    /// Returns the min zoom level of the map
+    ///
+    /// #### Returns
+    ///
+    /// min zoom level
     public int getMinZoomLevel() {
         return _map.minZoomLevel();
     }
 
-    /**
-     * Gets the center of the map.
-     *
-     * @return Coord in WGS84
-     */
+    /// Gets the center of the map.
+    ///
+    /// #### Returns
+    ///
+    /// Coord in WGS84
     public Coord center() {
         return _map.projection().toWGS84(_center);
     }
 
-    /**
-     * Checks if key code is left keycode.
-     *
-     * @param keyCode The key-code to check.
-     * @return true if this is a left keycode
-     */
+    /// Checks if key code is left keycode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: The key-code to check.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a left keycode
     protected boolean isLeftKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
         return game == Display.GAME_LEFT;
     }
 
-    /**
-     * Returns true if this is a right keycode
-     *
-     * @param keyCode The key code to check
-     * @return true if this is a right keycode.
-     */
+    /// Returns true if this is a right keycode
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: The key code to check
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a right keycode.
     protected boolean isRightKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
         return game == Display.GAME_RIGHT;
     }
 
-    /**
-     * Returns true if this is a down keycode
-     *
-     * @param keyCode The key code to check.
-     * @return True if key code is down key.
-     */
+    /// Returns true if this is a down keycode
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: The key code to check.
+    ///
+    /// #### Returns
+    ///
+    /// True if key code is down key.
     protected boolean isDownKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
         return game == Display.GAME_DOWN;
     }
 
-    /**
-     * Returns true if this is a up keycode
-     *
-     * @param keyCode The key code to check.
-     * @return true if key code is up key.
-     */
+    /// Returns true if this is a up keycode
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: The key code to check.
+    ///
+    /// #### Returns
+    ///
+    /// true if key code is up key.
     protected boolean isUpKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
         return game == Display.GAME_UP;
     }
 
-    /**
-     * Returns true if this is a zoom in keycode
-     *
-     * @param keyCode The key code to check
-     * @return true if key code is zoom-in key.
-     */
+    /// Returns true if this is a zoom in keycode
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: The key code to check
+    ///
+    /// #### Returns
+    ///
+    /// true if key code is zoom-in key.
     protected boolean isZoomInKey(int keyCode) {
         return keyCode == '1';
     }
 
-    /**
-     * Returns true if this is a zoom out keycode
-     *
-     * @param keyCode The key code to check.
-     * @return true if the key code for the zoom-out key.
-     */
+    /// Returns true if this is a zoom out keycode
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: The key code to check.
+    ///
+    /// #### Returns
+    ///
+    /// true if the key code for the zoom-out key.
     protected boolean isZoomOutKey(int keyCode) {
         return keyCode == '3';
     }
 
-    /**
-     * Returns true if this is a zoom to layers keycode
-     *
-     * @param keyCode The key-code to check.
-     * @return true if the key code is for the zoom to layers key.
-     */
+    /// Returns true if this is a zoom to layers keycode
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: The key-code to check.
+    ///
+    /// #### Returns
+    ///
+    /// true if the key code is for the zoom to layers key.
     protected boolean isZoomToLayersKey(int keyCode) {
         return keyCode == '5';
     }
@@ -1072,11 +1092,11 @@ public class MapComponent extends Container {
         }
     }
 
-    /**
-     * Adds a listener to map panning/zooming
-     *
-     * @param listener the listener callback
-     */
+    /// Adds a listener to map panning/zooming
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener callback
     public void addMapListener(MapListener listener) {
         if (listeners == null) {
             listeners = new ArrayList<MapListener>();
@@ -1084,11 +1104,11 @@ public class MapComponent extends Container {
         listeners.add(listener);
     }
 
-    /**
-     * Removes the map listener callback
-     *
-     * @param listener the listener
-     */
+    /// Removes the map listener callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener
     public void removeMapListener(MapListener listener) {
         if (listeners == null) {
             return;
@@ -1096,25 +1116,19 @@ public class MapComponent extends Container {
         listeners.remove(listener);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"latitude", "longitude", "zoom"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Double.class, Double.class, Integer.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("latitude".equals(name)) {
@@ -1131,9 +1145,7 @@ public class MapComponent extends Container {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("latitude".equals(name)) {

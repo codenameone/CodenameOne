@@ -22,80 +22,83 @@
  */
 package com.codename1.ui.scene;
 
-/**
- * Encapsulates a point in 3D space.
- *
- * @author Steve Hannah
- * @deprecated For internal use only
- */
+/// Encapsulates a point in 3D space.
+///
+/// @author Steve Hannah
+///
+/// #### Deprecated
+///
+/// For internal use only
 public class Point3D {
     private double x;
     private double y;
     private double z;
 
-    /**
-     * Creates a new point.
-     *
-     * @param x The x-coord
-     * @param y The y-coord
-     * @param z The z-coord
-     */
+    /// Creates a new point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x-coord
+    ///
+    /// - `y`: The y-coord
+    ///
+    /// - `z`: The z-coord
     public Point3D(double x, double y, double z) {
         this.x = x;
         this.y = y;
         this.z = z;
     }
 
-    /**
-     * Gets x coordinate.
-     *
-     * @return the x
-     */
+    /// Gets x coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// the x
     public double getX() {
         return x;
     }
 
-    /**
-     * Sets the x coordinate
-     *
-     * @param x the x to set
-     */
+    /// Sets the x coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x to set
     public void setX(double x) {
         this.x = x;
     }
 
-    /**
-     * Gets the y-coordinate.
-     *
-     * @return the y
-     */
+    /// Gets the y-coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// the y
     public double getY() {
         return y;
     }
 
-    /**
-     * Sets the y coordinate.
-     *
-     * @param y the y to set
-     */
+    /// Sets the y coordinate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `y`: the y to set
     public void setY(double y) {
         this.y = y;
     }
 
-    /**
-     * Gets the z-coordinate.
-     *
-     * @return the z
-     */
+    /// Gets the z-coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// the z
     public double getZ() {
         return z;
     }
 
-    /**
-     * Sets the z-coordinate
-     *
-     * @param z the z to set
-     */
+    /// Sets the z-coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `z`: the z to set
     public void setZ(double z) {
         this.z = z;
     }

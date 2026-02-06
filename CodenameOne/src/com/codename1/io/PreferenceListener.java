@@ -22,19 +22,22 @@
  */
 package com.codename1.io;
 
-/**
- * Respond to changes to the Preferences
- *
- * @author Miguel Mu\u00f1oz
- * @see Preferences
- */
+/// Respond to changes to the Preferences
+///
+/// @author Miguel Mu\u00f1oz
+///
+/// #### See also
+///
+/// - Preferences
 public interface PreferenceListener {
-    /**
-     * Respond to a change in the Preference. This method is only called if the value has changed.
-     *
-     * @param pref         The preference key
-     * @param priorValue   The value prior to the change
-     * @param revisedValue The new value, which is guaranteed to be different from priorValue
-     */
+    /// Respond to a change in the Preference. This method is only called if the value has changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: The preference key
+    ///
+    /// - `priorValue`: The value prior to the change
+    ///
+    /// - `revisedValue`: The new value, which is guaranteed to be different from priorValue
     void preferenceChanged(String pref, Object priorValue, Object revisedValue);
 }

@@ -21,45 +21,49 @@ package com.codename1.maps;
 
 import java.util.Vector;
 
-/**
- * This class declares a bounding box of coordinates on the map.
- *
- * @author Roman Kamyk roman.kamyk@itiner.pl
- */
+/// This class declares a bounding box of coordinates on the map.
+///
+/// @author Roman Kamyk roman.kamyk@itiner.pl
 public class BoundingBox {
 
     private final Coord _southWest;
     private final Coord _northEast;
 
-    /**
-     * Creates a bounding box around a coordinate with a given radius.
-     *
-     * @param c    The coordinate at the center of the bounding box.
-     * @param rLat The latitude radius of the box (in degrees).
-     * @param rLng The longitude radius of the box (in degrees).
-     */
+    /// Creates a bounding box around a coordinate with a given radius.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The coordinate at the center of the bounding box.
+    ///
+    /// - `rLat`: The latitude radius of the box (in degrees).
+    ///
+    /// - `rLng`: The longitude radius of the box (in degrees).
     public BoundingBox(Coord c, double rLat, double rLng) {
         _southWest = new Coord(c.getLatitude() - rLat, c.getLongitude() - rLng);
         _northEast = new Coord(c.getLatitude() + rLat, c.getLongitude() + rLng);
     }
 
-    /**
-     * Constructor with 2 coordinates for south west and north east
-     *
-     * @param southWest coordinate
-     * @param northEast coordinate
-     */
+    /// Constructor with 2 coordinates for south west and north east
+    ///
+    /// #### Parameters
+    ///
+    /// - `southWest`: coordinate
+    ///
+    /// - `northEast`: coordinate
     public BoundingBox(Coord southWest, Coord northEast) {
         _southWest = southWest;
         _northEast = northEast;
     }
 
-    /**
-     * create a smallest bounding box that contains all of the given coordinates
-     *
-     * @param coords given coordinates to create a wrapping bounding box.
-     * @return a bounding box that contains all of the coordinates
-     */
+    /// create a smallest bounding box that contains all of the given coordinates
+    ///
+    /// #### Parameters
+    ///
+    /// - `coords`: given coordinates to create a wrapping bounding box.
+    ///
+    /// #### Returns
+    ///
+    /// a bounding box that contains all of the coordinates
     public static BoundingBox create(Coord[] coords) {
         if (coords.length <= 0) {
             throw new RuntimeException("There must be at least 1 coordinate.");
@@ -83,13 +87,16 @@ public class BoundingBox {
         return new BoundingBox(new Coord(south, west, projected), new Coord(north, east, projected));
     }
 
-    /**
-     * /**
-     * create a smallest bounding box that contains all of the given coordinates
-     *
-     * @param coords given coordinates to create a wrapping bounding box.
-     * @return a bounding box that contains all of the coordinates
-     */
+    /// /**
+    /// create a smallest bounding box that contains all of the given coordinates
+    ///
+    /// #### Parameters
+    ///
+    /// - `coords`: given coordinates to create a wrapping bounding box.
+    ///
+    /// #### Returns
+    ///
+    /// a bounding box that contains all of the coordinates
     public static BoundingBox create(Vector coords) {
         int length = coords.size();
         if (length <= 0) {
@@ -100,52 +107,45 @@ public class BoundingBox {
         return create(coordsArray);
     }
 
-    /**
-     * Gets the /south west coordinate
-     *
-     * @return
-     */
+    /// Gets the /south west coordinate
     public Coord getSouthWest() {
         return _southWest;
     }
 
-    /**
-     * Gets the north east coordinate
-     *
-     * @return
-     */
+    /// Gets the north east coordinate
     public Coord getNorthEast() {
         return _northEast;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "SW: " + _southWest + " NE: " + _northEast;
     }
 
-    /**
-     * @return The difference between SE and NW getLongitude in degrees.
-     */
+    /// #### Returns
+    ///
+    /// The difference between SE and NW getLongitude in degrees.
     public double latitudeDifference() {
         return _northEast.getLatitude() - _southWest.getLatitude();
     }
 
-    /**
-     * @return The difference between SE and NW latitudes in degrees.
-     */
+    /// #### Returns
+    ///
+    /// The difference between SE and NW latitudes in degrees.
     public double longitudeDifference() {
         return _northEast.getLongitude() - _southWest.getLongitude();
     }
 
-    /**
-     * indicates if the given coordinate is inside the counding box
-     *
-     * @param cur coordinate to check
-     * @return true if the given coordinate is contained in the bounding box
-     */
+    /// indicates if the given coordinate is inside the counding box
+    ///
+    /// #### Parameters
+    ///
+    /// - `cur`: coordinate to check
+    ///
+    /// #### Returns
+    ///
+    /// true if the given coordinate is contained in the bounding box
     public boolean contains(Coord cur) {
         double latitude = cur.getLatitude();
         if (latitude > getNorthEast().getLatitude() || latitude < getSouthWest().getLatitude()) {
@@ -155,9 +155,7 @@ public class BoundingBox {
         return (longitude >= getSouthWest().getLongitude()) && (longitude <= getNorthEast().getLongitude());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object other) {
         if (!(other instanceof BoundingBox)) {
@@ -167,9 +165,7 @@ public class BoundingBox {
         return _southWest.equals(o._southWest) && _northEast.equals(o._northEast);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         int hash = 5;
@@ -178,13 +174,16 @@ public class BoundingBox {
         return hash;
     }
 
-    /**
-     * create a new bounding box that extends this bounding box with the given
-     * bounding box
-     *
-     * @param other a bounding box that needs to extends the current bounding box
-     * @return a new bounding box that was extended from the current and the other
-     */
+    /// create a new bounding box that extends this bounding box with the given
+    /// bounding box
+    ///
+    /// #### Parameters
+    ///
+    /// - `other`: a bounding box that needs to extends the current bounding box
+    ///
+    /// #### Returns
+    ///
+    /// a new bounding box that was extended from the current and the other
     public BoundingBox extend(BoundingBox other) {
         double north = Math.max(getNorthEast().getLatitude(), other.getNorthEast().getLatitude());
         double east = Math.max(getNorthEast().getLongitude(), other.getNorthEast().getLongitude());
@@ -193,11 +192,11 @@ public class BoundingBox {
         return new BoundingBox(new Coord(south, west, projected()), new Coord(north, east, projected()));
     }
 
-    /**
-     * Indicates if this bounding box is isProjected
-     *
-     * @return true if it's a isProjected bounding box
-     */
+    /// Indicates if this bounding box is isProjected
+    ///
+    /// #### Returns
+    ///
+    /// true if it's a isProjected bounding box
     public boolean projected() {
         return _southWest.isProjected();
     }

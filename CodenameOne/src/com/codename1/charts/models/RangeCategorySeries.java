@@ -1,109 +1,110 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.models;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A series for the range category charts like the range bar.
- */
+/// A series for the range category charts like the range bar.
 public class RangeCategorySeries extends CategorySeries {
-    /**
-     * The series values.
-     */
+    /// The series values.
     private final List<Double> mMaxValues = new ArrayList<Double>();
 
-    /**
-     * Builds a new category series.
-     *
-     * @param title the series title
-     */
+    /// Builds a new category series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the series title
     public RangeCategorySeries(String title) {
         super(title);
     }
 
-    /**
-     * Adds new values to the series
-     *
-     * @param minValue the new minimum value
-     * @param maxValue the new maximum value
-     */
+    /// Adds new values to the series
+    ///
+    /// #### Parameters
+    ///
+    /// - `minValue`: the new minimum value
+    ///
+    /// - `maxValue`: the new maximum value
     public synchronized void add(double minValue, double maxValue) {
         super.add(minValue);
         mMaxValues.add(maxValue);
     }
 
-    /**
-     * Adds new values to the series.
-     *
-     * @param category the category
-     * @param minValue the new minimum value
-     * @param maxValue the new maximum value
-     */
+    /// Adds new values to the series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `category`: the category
+    ///
+    /// - `minValue`: the new minimum value
+    ///
+    /// - `maxValue`: the new maximum value
     public synchronized void add(String category, double minValue, double maxValue) {
         super.add(category, minValue);
         mMaxValues.add(maxValue);
     }
 
-    /**
-     * Removes existing values from the series.
-     *
-     * @param index the index in the series of the values to remove
-     */
+    /// Removes existing values from the series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index in the series of the values to remove
     @Override
     public synchronized void remove(int index) {
         super.remove(index);
         mMaxValues.remove(index);
     }
 
-    /**
-     * Removes all the existing values from the series.
-     */
+    /// Removes all the existing values from the series.
     @Override
     public synchronized void clear() {
         super.clear();
         mMaxValues.clear();
     }
 
-    /**
-     * Returns the minimum value at the specified index.
-     *
-     * @param index the index
-     * @return the minimum value at the index
-     */
+    /// Returns the minimum value at the specified index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the minimum value at the index
     public double getMinimumValue(int index) {
         return getValue(index);
     }
 
-    /**
-     * Returns the maximum value at the specified index.
-     *
-     * @param index the index
-     * @return the maximum value at the index
-     */
+    /// Returns the maximum value at the specified index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the maximum value at the index
     public double getMaximumValue(int index) {
         return mMaxValues.get(index);
     }
 
-    /**
-     * Transforms the range category series to an XY series.
-     *
-     * @return the XY series
-     */
+    /// Transforms the range category series to an XY series.
+    ///
+    /// #### Returns
+    ///
+    /// the XY series
     @Override
     public XYSeries toXYSeries() {
         XYSeries xySeries = new XYSeries(getTitle());

@@ -39,17 +39,27 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Vector;
 
-/**
- * <p>Handles event dispatching while guaranteeing that all events would
- * be fired properly on the EDT regardless of their source. This class handles listener
- * registration/removal in a safe and uniform way. </p>
- * <p>
- * To integrate this into your code you can use something like:
- * </p>
- * <script src="https://gist.github.com/codenameone/8abb07271bae62d0f81a.js"></script>
- *
- * @author Shai Almog
- */
+/// Handles event dispatching while guaranteeing that all events would
+/// be fired properly on the EDT regardless of their source. This class handles listener
+/// registration/removal in a safe and uniform way.
+///
+/// To integrate this into your code you can use something like:
+///
+/// ```java
+/// private final EventDispatcher listeners = new EventDispatcher();
+///
+/// public void addActionListener(ActionListener a) {
+///     listeners.addListener(a);
+/// }
+/// public void removeActionListener(ActionListener a) {
+///     listeners.removeListener(a);
+/// }
+/// private void fireEvent(ActionEvent ev) {
+///     listeners.fireActionEvent(ev);
+/// }
+/// ```
+///
+/// @author Shai Almog
 public class EventDispatcher {
 
     private static boolean fireStyleEventsOnNonEDT = false;
@@ -63,23 +73,23 @@ public class EventDispatcher {
     private boolean blocking = false;
     private ArrayList<Object> listeners;
 
-    /**
-     * When set to true, style events will be dispatched even from non-EDT threads.
-     * When set to false, when in non-EDT threads, style events will not be dispatched at all (And developer has to make sure changes will be reflected by calling revalidate after all the changes)
-     * <p>
-     * Default is false. Setting this to true results in a performance penalty, and it is better instead to simply aggregate events performed on non-EDT threads and when all are over - call revalidate on the relevant container.
-     *
-     * @param fire true to fire on non-EDT, false otherwise
-     */
+    /// When set to true, style events will be dispatched even from non-EDT threads.
+    /// When set to false, when in non-EDT threads, style events will not be dispatched at all (And developer has to make sure changes will be reflected by calling revalidate after all the changes)
+    ///
+    /// Default is false. Setting this to true results in a performance penalty, and it is better instead to simply aggregate events performed on non-EDT threads and when all are over - call revalidate on the relevant container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fire`: true to fire on non-EDT, false otherwise
     public static void setFireStyleEventsOnNonEDT(boolean fire) {
         fireStyleEventsOnNonEDT = fire;
     }
 
-    /**
-     * Add a listener to the dispatcher that would receive the events when they occurs
-     *
-     * @param listener a dispatcher listener to add
-     */
+    /// Add a listener to the dispatcher that would receive the events when they occurs
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: a dispatcher listener to add
     public synchronized void addListener(Object listener) {
         if (listener != null) {
             if (listeners == null) {
@@ -91,42 +101,46 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Returns the vector of the listeners
-     *
-     * @return the vector of listeners attached to the event dispatcher
-     * @deprecated use getListenerCollection instead, this method will now be VERY SLOW
-     */
+    /// Returns the vector of the listeners
+    ///
+    /// #### Returns
+    ///
+    /// the vector of listeners attached to the event dispatcher
+    ///
+    /// #### Deprecated
+    ///
+    /// use getListenerCollection instead, this method will now be VERY SLOW
     public Vector getListenerVector() {
         return new Vector(listeners);
     }
 
-    /**
-     * Returns the collection of the listeners
-     *
-     * @return the collection of listeners attached to the event dispatcher
-     */
+    /// Returns the collection of the listeners
+    ///
+    /// #### Returns
+    ///
+    /// the collection of listeners attached to the event dispatcher
     public Collection getListenerCollection() {
         return listeners;
     }
 
-    /**
-     * Remove the listener from the dispatcher
-     *
-     * @param listener a dispatcher listener to remove
-     */
+    /// Remove the listener from the dispatcher
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: a dispatcher listener to remove
     public synchronized void removeListener(Object listener) {
         if (listeners != null) {
             listeners.remove(listener);
         }
     }
 
-    /**
-     * Fires the event safely on the EDT without risk of concurrency errors
-     *
-     * @param index the index of the event
-     * @param type  the type of the event
-     */
+    /// Fires the event safely on the EDT without risk of concurrency errors
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index of the event
+    ///
+    /// - `type`: the type of the event
     public void fireDataChangeEvent(int index, int type) {
         if (listeners == null || listeners.isEmpty()) {
             return;
@@ -160,14 +174,17 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Fired when a property of the component changes to a new value
-     *
-     * @param source       the source component
-     * @param propertyName the name of the property
-     * @param oldValue     the old value of the property
-     * @param newValue     the new value for the property
-     */
+    /// Fired when a property of the component changes to a new value
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the source component
+    ///
+    /// - `propertyName`: the name of the property
+    ///
+    /// - `oldValue`: the old value of the property
+    ///
+    /// - `newValue`: the new value for the property
     public void fireBindTargetChange(Component source, String propertyName, Object oldValue, Object newValue) {
         if (listeners == null || listeners.isEmpty()) {
             return;
@@ -194,14 +211,17 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Fired when a property of the component changes to a new value
-     *
-     * @param source       the source component
-     * @param propertyName the name of the property
-     * @param oldValue     the old value of the property
-     * @param newValue     the new value for the property
-     */
+    /// Fired when a property of the component changes to a new value
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the source component
+    ///
+    /// - `propertyName`: the name of the property
+    ///
+    /// - `oldValue`: the old value of the property
+    ///
+    /// - `newValue`: the new value for the property
     private void fireBindTargetChangeSync(BindTarget[] arr, Component source, String propertyName, Object oldValue, Object newValue) {
         int alen = arr.length;
         for (int iter = 0; iter < alen; iter++) {
@@ -209,12 +229,13 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Fires the style change even to the listeners
-     *
-     * @param property the property name for the event
-     * @param source   the style firing the event
-     */
+    /// Fires the style change even to the listeners
+    ///
+    /// #### Parameters
+    ///
+    /// - `property`: the property name for the event
+    ///
+    /// - `source`: the style firing the event
     public void fireStyleChangeEvent(String property, Style source) {
         if (listeners == null || listeners.isEmpty()) {
             return;
@@ -243,9 +264,7 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Synchronious internal call for common code
-     */
+    /// Synchronious internal call for common code
     private void fireDataChangeSync(DataChangedListener[] array, int type, int index) {
         int alen = array.length;
         for (int iter = 0; iter < alen; iter++) {
@@ -253,9 +272,7 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Synchronious internal call for common code
-     */
+    /// Synchronious internal call for common code
     private void fireStyleChangeSync(StyleListener[] array, String property, Style source) {
         int alen = array.length;
         for (int iter = 0; iter < alen; iter++) {
@@ -263,9 +280,7 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Synchronious internal call for common code
-     */
+    /// Synchronious internal call for common code
     private void fireSelectionSync(SelectionListener[] array, int oldSelection, int newSelection) {
         int alen = array.length;
         for (int iter = 0; iter < alen; iter++) {
@@ -273,9 +288,7 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Synchronious internal call for common code
-     */
+    /// Synchronious internal call for common code
     private void fireScrollSync(ScrollListener[] array, int l, int t, int oldl, int oldt) {
         int alen = array.length;
         for (int iter = 0; iter < alen; iter++) {
@@ -283,11 +296,11 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Fires the event safely on the EDT without risk of concurrency errors
-     *
-     * @param ev the ActionEvent to fire to the listeners
-     */
+    /// Fires the event safely on the EDT without risk of concurrency errors
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the ActionEvent to fire to the listeners
     public void fireActionEvent(ActionEvent ev) {
         if (listeners == null || listeners.isEmpty()) {
             return;
@@ -322,12 +335,13 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Fires the event safely on the EDT without risk of concurrency errors
-     *
-     * @param oldSelection old selection
-     * @param newSelection new selection
-     */
+    /// Fires the event safely on the EDT without risk of concurrency errors
+    ///
+    /// #### Parameters
+    ///
+    /// - `oldSelection`: old selection
+    ///
+    /// - `newSelection`: new selection
     public void fireSelectionEvent(int oldSelection, int newSelection) {
         if (listeners == null || listeners.isEmpty()) {
             return;
@@ -361,9 +375,7 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Fires the event safely on the EDT without risk of concurrency errors
-     */
+    /// Fires the event safely on the EDT without risk of concurrency errors
     public void fireScrollEvent(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
         if (listeners == null || listeners.isEmpty()) {
             return;
@@ -397,9 +409,7 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Synchronous internal call for common code
-     */
+    /// Synchronous internal call for common code
     private void fireActionSync(ActionListener[] array, ActionEvent ev) {
         int alen = array.length;
         for (int iter = 0; iter < alen; iter++) {
@@ -409,11 +419,11 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Fires the event safely on the EDT without risk of concurrency errors
-     *
-     * @param c the Component that gets the focus event
-     */
+    /// Fires the event safely on the EDT without risk of concurrency errors
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the Component that gets the focus event
     public void fireFocus(Component c) {
         if (listeners == null || listeners.isEmpty()) {
             return;
@@ -451,9 +461,7 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Synchronous internal call for common code
-     */
+    /// Synchronous internal call for common code
     private void fireFocusSync(FocusListener[] array, Component c) {
         if (c.hasFocus()) {
             int alen = array.length;
@@ -468,35 +476,35 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Returns true if the event dispatcher has registered listeners
-     *
-     * @return true if the event dispatcher has registered listeners
-     */
+    /// Returns true if the event dispatcher has registered listeners
+    ///
+    /// #### Returns
+    ///
+    /// true if the event dispatcher has registered listeners
     public boolean hasListeners() {
         return listeners != null && !listeners.isEmpty();
     }
 
-    /**
-     * Indicates whether this dispatcher blocks when firing events or not, normally
-     * a dispatcher uses callSeriallyAndWait() to be 100% synchronous with event delivery
-     * however this method is very slow. By setting blocking to false the callSerially
-     * method is used which allows much faster execution for IO heavy operations.
-     *
-     * @return the blocking state
-     */
+    /// Indicates whether this dispatcher blocks when firing events or not, normally
+    /// a dispatcher uses callSeriallyAndWait() to be 100% synchronous with event delivery
+    /// however this method is very slow. By setting blocking to false the callSerially
+    /// method is used which allows much faster execution for IO heavy operations.
+    ///
+    /// #### Returns
+    ///
+    /// the blocking state
     public boolean isBlocking() {
         return blocking;
     }
 
-    /**
-     * Indicates whether this dispatcher blocks when firing events or not, normally
-     * a dispatcher uses callSeriallyAndWait() to be 100% synchronous with event delivery
-     * however this method is very slow. By setting blocking to false the callSerially
-     * method is used which allows much faster execution for IO heavy operations.
-     *
-     * @param blocking the blocking value
-     */
+    /// Indicates whether this dispatcher blocks when firing events or not, normally
+    /// a dispatcher uses callSeriallyAndWait() to be 100% synchronous with event delivery
+    /// however this method is very slow. By setting blocking to false the callSerially
+    /// method is used which allows much faster execution for IO heavy operations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `blocking`: the blocking value
     public void setBlocking(boolean blocking) {
         this.blocking = blocking;
     }
@@ -510,10 +518,8 @@ public class EventDispatcher {
             this.iPendingEvent = iPendingEvent;
         }
 
-        /**
-         * Do not invoke this method it handles the dispatching internally and serves
-         * as an implementation detail
-         */
+        /// Do not invoke this method it handles the dispatching internally and serves
+        /// as an implementation detail
         @Override
         public final void run() {
             // We might not be running during a suspend/resume cycle

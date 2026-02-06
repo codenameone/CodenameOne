@@ -34,23 +34,25 @@ import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * A {@code Properties} object is a {@code Hashtable} where the keys and values
- * must be {@code String}s. Each property can have a default
- * {@code Properties} list which specifies the default
- * values to be used when a given key is not found in this {@code Properties}
- * instance.
- *
- * <a name="character_encoding"><h3>Character Encoding</h3></a>
- * <p>Note that in some cases {@code Properties} uses ISO-8859-1 instead of UTF-8.
- * ISO-8859-1 is only capable of representing a tiny subset of Unicode.
- * Use either the {@code loadFromXML}/{@code storeToXML} methods (which use UTF-8 by
- * default) or the {@code load}/{@code store} overloads that take
- * an {@code OutputStreamWriter} (so you can supply a UTF-8 instance) instead.
- *
- * @see Hashtable
- * @see java.lang.System#getProperties
- */
+/// A `Properties` object is a `Hashtable` where the keys and values
+/// must be `String`s. Each property can have a default
+/// `Properties` list which specifies the default
+/// values to be used when a given key is not found in this `Properties`
+/// instance.
+///
+/// Character Encoding
+///
+/// Note that in some cases `Properties` uses ISO-8859-1 instead of UTF-8.
+/// ISO-8859-1 is only capable of representing a tiny subset of Unicode.
+/// Use either the `loadFromXML`/`storeToXML` methods (which use UTF-8 by
+/// default) or the `load`/`store` overloads that take
+/// an `OutputStreamWriter` (so you can supply a UTF-8 instance) instead.
+///
+/// #### See also
+///
+/// - Hashtable
+///
+/// - java.lang.System#getProperties
 public class Properties extends HashMap<String, String> {
 
     private static final int NONE = 0;
@@ -59,24 +61,20 @@ public class Properties extends HashMap<String, String> {
     private static final int CONTINUE = 3;
     private static final int KEY_DONE = 4;
     private static final int IGNORE = 5;
-    /**
-     * The default values for keys not found in this {@code Properties}
-     * instance.
-     */
+    /// The default values for keys not found in this `Properties`
+    /// instance.
     protected Properties defaults;
 
-    /**
-     * Constructs a new {@code Properties} object.
-     */
+    /// Constructs a new `Properties` object.
     public Properties() {
     }
 
-    /**
-     * Constructs a new {@code Properties} object using the specified default
-     * {@code Properties}.
-     *
-     * @param properties the default {@code Properties}.
-     */
+    /// Constructs a new `Properties` object using the specified default
+    /// `Properties`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `properties`: the default `Properties`.
     public Properties(Properties properties) {
         defaults = properties;
     }
@@ -122,14 +120,17 @@ public class Properties extends HashMap<String, String> {
         }
     }
 
-    /**
-     * Searches for the property with the specified name. If the property is not
-     * found, the default {@code Properties} are checked. If the property is not
-     * found in the default {@code Properties}, {@code null} is returned.
-     *
-     * @param name the name of the property to find.
-     * @return the named property value, or {@code null} if it can't be found.
-     */
+    /// Searches for the property with the specified name. If the property is not
+    /// found, the default `Properties` are checked. If the property is not
+    /// found in the default `Properties`, `null` is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property to find.
+    ///
+    /// #### Returns
+    ///
+    /// the named property value, or `null` if it can't be found.
     public String getProperty(String name) {
         Object result = super.get(name);
         String property = result instanceof String ? (String) result : null;
@@ -139,16 +140,20 @@ public class Properties extends HashMap<String, String> {
         return property;
     }
 
-    /**
-     * Searches for the property with the specified name. If the property is not
-     * found, it looks in the default {@code Properties}. If the property is not
-     * found in the default {@code Properties}, it returns the specified
-     * default.
-     *
-     * @param name         the name of the property to find.
-     * @param defaultValue the default value.
-     * @return the named property value.
-     */
+    /// Searches for the property with the specified name. If the property is not
+    /// found, it looks in the default `Properties`. If the property is not
+    /// found in the default `Properties`, it returns the specified
+    /// default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property to find.
+    ///
+    /// - `defaultValue`: the default value.
+    ///
+    /// #### Returns
+    ///
+    /// the named property value.
     public String getProperty(String name, String defaultValue) {
         Object result = super.get(name);
         String property = result instanceof String ? (String) result : null;
@@ -161,13 +166,16 @@ public class Properties extends HashMap<String, String> {
         return property;
     }
 
-    /**
-     * Loads properties from the specified {@code InputStream}, assumed to be ISO-8859-1.
-     * See "<a href="#character_encoding">Character Encoding</a>".
-     *
-     * @param in the {@code InputStream}
-     * @throws IOException
-     */
+    /// Loads properties from the specified `InputStream`, assumed to be ISO-8859-1.
+    /// See "[Character Encoding](#character_encoding)".
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the `InputStream`
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public synchronized void load(InputStream in) throws IOException {
         if (in == null) {
             throw new NullPointerException("in == null");
@@ -175,31 +183,40 @@ public class Properties extends HashMap<String, String> {
         load(new InputStreamReader(in, "UTF-8"));
     }
 
-    /**
-     * Loads properties from the specified {@code Reader}.
-     * The properties file is interpreted according to the following rules:
-     * <ul>
-     * <li>Empty lines are ignored.</li>
-     * <li>Lines starting with either a "#" or a "!" are comment lines and are
-     * ignored.</li>
-     * <li>A backslash at the end of the line escapes the following newline
-     * character ("\r", "\n", "\r\n"). If there's whitespace after the
-     * backslash it will just escape that whitespace instead of concatenating
-     * the lines. This does not apply to comment lines.</li>
-     * <li>A property line consists of the key, the space between the key and
-     * the value, and the value. The key goes up to the first whitespace, "=" or
-     * ":" that is not escaped. The space between the key and the value contains
-     * either one whitespace, one "=" or one ":" and any amount of additional
-     * whitespace before and after that character. The value starts with the
-     * first character after the space between the key and the value.</li>
-     * <li>Following escape sequences are recognized: "\ ", "\\", "\r", "\n",
-     * "\!", "\#", "\t", "\b", "\f", and "&#92;uXXXX" (unicode character).</li>
-     * </ul>
-     *
-     * @param in the {@code Reader}
-     * @throws IOException
-     * @since 1.6
-     */
+    /// Loads properties from the specified `Reader`.
+    /// The properties file is interpreted according to the following rules:
+    ///
+    /// - Empty lines are ignored.
+    ///
+    /// - Lines starting with either a "#" or a "!" are comment lines and are
+    /// ignored.
+    ///
+    /// - A backslash at the end of the line escapes the following newline
+    /// character ("\r", "\n", "\r\n"). If there's whitespace after the
+    /// backslash it will just escape that whitespace instead of concatenating
+    /// the lines. This does not apply to comment lines.
+    ///
+    /// - A property line consists of the key, the space between the key and
+    /// the value, and the value. The key goes up to the first whitespace, "=" or
+    /// ":" that is not escaped. The space between the key and the value contains
+    /// either one whitespace, one "=" or one ":" and any amount of additional
+    /// whitespace before and after that character. The value starts with the
+    /// first character after the space between the key and the value.
+    ///
+    /// - Following escape sequences are recognized: `\ `, `\\`, `\r`, `\n`,
+    /// `\!`, `\#`, `\t`, `\b`, `\f`, and `\uffff` (unicode character).
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the `Reader`
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    ///
+    /// #### Since
+    ///
+    /// 1.6
     @SuppressWarnings({"fallthrough", "PMD.SwitchStmtsShouldHaveDefault"})
     public synchronized void load(Reader in) throws IOException {
         if (in == null) {
@@ -371,22 +388,23 @@ public class Properties extends HashMap<String, String> {
         }
     }
 
-    /**
-     * Returns all of the property names (keys) in this {@code Properties} object.
-     */
+    /// Returns all of the property names (keys) in this `Properties` object.
     public Enumeration<?> propertyNames() {
         Hashtable<Object, Object> selected = new Hashtable<Object, Object>();
         selectProperties(selected, false);
         return selected.keys();
     }
 
-    /**
-     * Returns those property names (keys) in this {@code Properties} object for which
-     * both key and value are strings.
-     *
-     * @return a set of keys in the property list
-     * @since 1.6
-     */
+    /// Returns those property names (keys) in this `Properties` object for which
+    /// both key and value are strings.
+    ///
+    /// #### Returns
+    ///
+    /// a set of keys in the property list
+    ///
+    /// #### Since
+    ///
+    /// 1.6
     public Set<String> stringPropertyNames() {
         Hashtable<String, Object> stringProperties = new Hashtable<String, Object>();
         selectProperties(stringProperties, true);
@@ -409,20 +427,26 @@ public class Properties extends HashMap<String, String> {
         }
     }
 
-    /**
-     * Saves the mappings in this {@code Properties} to the specified {@code
-     * OutputStream}, putting the specified comment at the beginning. The output
-     * from this method is suitable for being read by the
-     * {@link #load(InputStream)} method.
-     *
-     * @param out     the {@code OutputStream} to write to.
-     * @param comment the comment to add at the beginning.
-     * @throws ClassCastException if the key or value of a mapping is not a
-     *                            String.
-     * @deprecated This method ignores any {@code IOException} thrown while
-     * writing -- use {@link #store} instead for better exception
-     * handling.
-     */
+    /// Saves the mappings in this `Properties` to the specified `OutputStream`, putting the specified comment at the beginning. The output
+    /// from this method is suitable for being read by the
+    /// `#load(InputStream)` method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the `OutputStream` to write to.
+    ///
+    /// - `comment`: the comment to add at the beginning.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException if the key or value of a mapping is not a
+    ///                            String.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated This method ignores any `IOException` thrown while
+    /// writing -- use `#store` instead for better exception
+    /// handling.
     @Deprecated
     @SuppressWarnings("PMD.EmptyCatchBlock")
     public void save(OutputStream out, String comment) {
@@ -432,41 +456,58 @@ public class Properties extends HashMap<String, String> {
         }
     }
 
-    /**
-     * Maps the specified key to the specified value. If the key already exists,
-     * the old value is replaced. The key and value cannot be {@code null}.
-     *
-     * @param name  the key.
-     * @param value the value.
-     * @return the old value mapped to the key, or {@code null}.
-     */
+    /// Maps the specified key to the specified value. If the key already exists,
+    /// the old value is replaced. The key and value cannot be `null`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the key.
+    ///
+    /// - `value`: the value.
+    ///
+    /// #### Returns
+    ///
+    /// the old value mapped to the key, or `null`.
     public Object setProperty(String name, String value) {
         return put(name, value);
     }
 
-    /**
-     * Stores properties to the specified {@code OutputStream}, using ISO-8859-1.
-     * See "<a href="#character_encoding">Character Encoding</a>".
-     *
-     * @param out     the {@code OutputStream}
-     * @param comment an optional comment to be written, or null
-     * @throws IOException
-     * @throws ClassCastException if a key or value is not a string
-     */
+    /// Stores properties to the specified `OutputStream`, using ISO-8859-1.
+    /// See "[Character Encoding](#character_encoding)".
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the `OutputStream`
+    ///
+    /// - `comment`: an optional comment to be written, or null
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    ///
+    /// - `ClassCastException`: if a key or value is not a string
     public synchronized void store(OutputStream out, String comment) throws IOException {
         store(new OutputStreamWriter(out, "UTF-8"), comment);
     }
 
-    /**
-     * Stores the mappings in this {@code Properties} object to {@code out},
-     * putting the specified comment at the beginning.
-     *
-     * @param writer  the {@code Writer}
-     * @param comment an optional comment to be written, or null
-     * @throws IOException
-     * @throws ClassCastException if a key or value is not a string
-     * @since 1.6
-     */
+    /// Stores the mappings in this `Properties` object to `out`,
+    /// putting the specified comment at the beginning.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writer`: the `Writer`
+    ///
+    /// - `comment`: an optional comment to be written, or null
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    ///
+    /// - `ClassCastException`: if a key or value is not a string
+    ///
+    /// #### Since
+    ///
+    /// 1.6
     public synchronized void store(Writer writer, String comment) throws IOException {
         if (comment != null && comment.length() > 0) {
             writer.write("#");

@@ -22,18 +22,24 @@
  */
 package com.codename1.ui;
 
-/**
- * Exception that is thrown if attempting to run invokeAndBlock while blocking is disabled.  This exception is thrown
- * by {@link Display#invokeAndBlock(java.lang.Runnable) } if blocking is currently disabled.  Blocking is
- * disabled on any code run inside the {@link Display#invokeWithoutBlocking(java.lang.Runnable) } method, which will propagate
- * this exception if {@link Display#invokeAndBlock(java.lang.Runnable) } throws this exception.
- *
- * @author shannah
- * @see Display#invokeWithoutBlocking(java.lang.Runnable)
- * @see Display#invokeAndBlock(java.lang.Runnable)
- * @see Display#invokeAndBlock(java.lang.Runnable, boolean)
- * @since 7.0
- */
+/// Exception that is thrown if attempting to run invokeAndBlock while blocking is disabled.  This exception is thrown
+/// by `Display#invokeAndBlock(java.lang.Runnable)` if blocking is currently disabled.  Blocking is
+/// disabled on any code run inside the `Display#invokeWithoutBlocking(java.lang.Runnable)` method, which will propagate
+/// this exception if `Display#invokeAndBlock(java.lang.Runnable)` throws this exception.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
+///
+/// #### See also
+///
+/// - Display#invokeWithoutBlocking(java.lang.Runnable)
+///
+/// - Display#invokeAndBlock(java.lang.Runnable)
+///
+/// - Display#invokeAndBlock(java.lang.Runnable, boolean)
 public class BlockingDisallowedException extends IllegalStateException {
     public BlockingDisallowedException() {
         super("Attempt to run invokeAndBlock while blocking is disabled.");

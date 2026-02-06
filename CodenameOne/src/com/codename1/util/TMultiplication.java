@@ -17,40 +17,28 @@
 
 package com.codename1.util;
 
-/**
- * Static library that provides all multiplication of {@link TBigInteger} methods.
- */
+/// Static library that provides all multiplication of `TBigInteger` methods.
 final class TMultiplication {
 
-    /**
-     * Break point in digits (number of {@code int} elements)
-     * between Karatsuba and Pencil and Paper multiply.
-     */
+    /// Break point in digits (number of `int` elements)
+    /// between Karatsuba and Pencil and Paper multiply.
     static final int whenUseKaratsuba = 63; // an heuristic value
-    /**
-     * An array with powers of ten that fit in the type {@code int}.
-     * ({@code 10^0,10^1,...,10^9})
-     */
+    /// An array with powers of ten that fit in the type `int`.
+    /// (`10^0,10^1,...,10^9`)
     static final int[] tenPows = {
             1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
     };
-    /**
-     * An array with powers of five that fit in the type {@code int}.
-     * ({@code 5^0,5^1,...,5^13})
-     */
+    /// An array with powers of five that fit in the type `int`.
+    /// (`5^0,5^1,...,5^13`)
     static final int[] fivePows = {
             1, 5, 25, 125, 625, 3125, 15625, 78125, 390625,
             1953125, 9765625, 48828125, 244140625, 1220703125
     };
-    /**
-     * An array with the first powers of ten in {@code BigInteger} version.
-     * ({@code 10^0,10^1,...,10^31})
-     */
+    /// An array with the first powers of ten in `BigInteger` version.
+    /// (`10^0,10^1,...,10^31`)
     static final TBigInteger[] bigTenPows = new TBigInteger[32];
-    /**
-     * An array with the first powers of five in {@code BigInteger} version.
-     * ({@code 5^0,5^1,...,5^31})
-     */
+    /// An array with the first powers of five in `BigInteger` version.
+    /// (`5^0,5^1,...,5^31`)
     static final TBigInteger[] bigFivePows = new TBigInteger[32];
 
     static {
@@ -69,38 +57,42 @@ final class TMultiplication {
     }
 
 
-    /**
-     * Just to denote that this class can't be instantiated.
-     */
+    /// Just to denote that this class can't be instantiated.
     private TMultiplication() {
     }
 
-    /**
-     * Performs a multiplication of two BigInteger and hides the algorithm used.
-     *
-     * @see TBigInteger#multiply(TBigInteger)
-     */
+    /// Performs a multiplication of two BigInteger and hides the algorithm used.
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#multiply(TBigInteger)
     static TBigInteger multiply(TBigInteger x, TBigInteger y) {
         return karatsuba(x, y);
     }
 
-    /**
-     * Performs the multiplication with the Karatsuba's algorithm.
-     * <b>Karatsuba's algorithm:</b>
-     * <tt>
-     * u = u<sub>1</sub> * B + u<sub>0</sub><br>
-     * v = v<sub>1</sub> * B + v<sub>0</sub><br>
-     * <p>
-     * <p>
-     * u*v = (u<sub>1</sub> * v<sub>1</sub>) * B<sub>2</sub> + ((u<sub>1</sub> - u<sub>0</sub>) * (v<sub>0</sub> - v<sub>1</sub>) + u<sub>1</sub> * v<sub>1</sub> +
-     * u<sub>0</sub> * v<sub>0</sub> ) * B + u<sub>0</sub> * v<sub>0</sub><br>
-     * </tt>
-     *
-     * @param op1 first factor of the product
-     * @param op2 second factor of the product
-     * @return {@code op1 * op2}
-     * @see #multiply(TBigInteger, TBigInteger)
-     */
+    /// Performs the multiplication with the Karatsuba's algorithm.
+    /// **Karatsuba's algorithm:**
+    ///
+    /// u = u1 * B + u0
+    ///
+    /// v = v1 * B + v0
+    ///
+    /// u*v = (u1 * v1) * B2 + ((u1 - u0) * (v0 - v1) + u1 * v1 +
+    /// u0 * v0 ) * B + u0 * v0
+    ///
+    /// #### Parameters
+    ///
+    /// - `op1`: first factor of the product
+    ///
+    /// - `op2`: second factor of the product
+    ///
+    /// #### Returns
+    ///
+    /// `op1 * op2`
+    ///
+    /// #### See also
+    ///
+    /// - #multiply(TBigInteger, TBigInteger)
     static TBigInteger karatsuba(TBigInteger op1, TBigInteger op2) {
         TBigInteger temp;
         if (op2.numberLength > op1.numberLength) {
@@ -133,93 +125,63 @@ final class TMultiplication {
         return upper.add(middle).add(lower);
     }
 
-    /**
-     * Multiplies two BigIntegers.
-     * Implements traditional scholar algorithm described by Knuth.
-     *
-     * <br><tt>
-     *         <table border="0">
-     * <tbody>
-     *
-     *
-     * <tr>
-     * <td align="center">A=</td>
-     * <td>a<sub>3</sub></td>
-     * <td>a<sub>2</sub></td>
-     * <td>a<sub>1</sub></td>
-     * <td>a<sub>0</sub></td>
-     * <td></td>
-     * <td></td>
-     * </tr>
-     *
-     * <tr>
-     * <td align="center">B=</td>
-     * <td></td>
-     * <td>b<sub>2</sub></td>
-     * <td>b<sub>1</sub></td>
-     * <td>b<sub>1</sub></td>
-     * <td></td>
-     * <td></td>
-     * </tr>
-     *
-     * <tr>
-     * <td></td>
-     * <td></td>
-     * <td></td>
-     * <td>b<sub>0</sub>*a<sub>3</sub></td>
-     * <td>b<sub>0</sub>*a<sub>2</sub></td>
-     * <td>b<sub>0</sub>*a<sub>1</sub></td>
-     * <td>b<sub>0</sub>*a<sub>0</sub></td>
-     * </tr>
-     *
-     * <tr>
-     * <td></td>
-     * <td></td>
-     * <td>b<sub>1</sub>*a<sub>3</sub></td>
-     * <td>b<sub>1</sub>*a<sub>2</sub></td>
-     * <td>b<sub>1</sub>*a1</td>
-     * <td>b<sub>1</sub>*a0</td>
-     * </tr>
-     *
-     * <tr>
-     * <td>+</td>
-     * <td>b<sub>2</sub>*a<sub>3</sub></td>
-     * <td>b<sub>2</sub>*a<sub>2</sub></td>
-     * <td>b<sub>2</sub>*a<sub>1</sub></td>
-     * <td>b<sub>2</sub>*a<sub>0</sub></td>
-     * </tr>
-     *
-     * <tr>
-     * <td></td>
-     * <td>______</td>
-     * <td>______</td>
-     * <td>______</td>
-     * <td>______</td>
-     * <td>______</td>
-     * <td>______</td>
-     * </tr>
-     *
-     * <tr>
-     *
-     * <td align="center">A*B=R=</td>
-     * <td align="center">r<sub>5</sub></td>
-     * <td align="center">r<sub>4</sub></td>
-     * <td align="center">r<sub>3</sub></td>
-     * <td align="center">r<sub>2</sub></td>
-     * <td align="center">r<sub>1</sub></td>
-     * <td align="center">r<sub>0</sub></td>
-     * <td></td>
-     * </tr>
-     *
-     * </tbody>
-     * </table>
-     *
-     * </tt>
-     *
-     * @param op1 first factor of the multiplication {@code  op1 >= 0}
-     * @param op2 second factor of the multiplication {@code  op2 >= 0}
-     * @return a {@code BigInteger} of value {@code  op1 * op2}
-     */
+    /// Multiplies two BigIntegers.
+    /// Implements traditional scholar algorithm described by Knuth.
+    ///
+    ///
+    ///
+    /// A=
+    /// a3
+    /// a2
+    /// a1
+    /// a0
+    ///
+    /// B=
+    ///
+    /// b2
+    /// b1
+    /// b1
+    ///
+    /// b0*a3
+    /// b0*a2
+    /// b0*a1
+    /// b0*a0
+    ///
+    /// b1*a3
+    /// b1*a2
+    /// b1*a1
+    /// b1*a0
+    ///
+    /// +
+    /// b2*a3
+    /// b2*a2
+    /// b2*a1
+    /// b2*a0
+    ///
+    /// ______
+    /// ______
+    /// ______
+    /// ______
+    /// ______
+    /// ______
+    ///
+    /// A*B=R=
+    /// r5
+    /// r4
+    /// r3
+    /// r2
+    /// r1
+    /// r0
+    ///
+    /// #### Parameters
+    ///
+    /// - `op1`: first factor of the multiplication `op1 >= 0`
+    ///
+    /// - `op2`: second factor of the multiplication `op2 >= 0`
+    ///
+    /// #### Returns
+    ///
+    /// a `BigInteger` of value `op1 * op2`
     static TBigInteger multiplyPAP(TBigInteger a, TBigInteger b) {
         // PRE: a >= b
         int aLen = a.numberLength;
@@ -277,15 +239,20 @@ final class TMultiplication {
         }
     }
 
-    /**
-     * Multiplies an array of integers by an integer value
-     * and saves the result in {@code res}.
-     *
-     * @param a      the array of integers
-     * @param aSize  the number of elements of intArray to be multiplied
-     * @param factor the multiplier
-     * @return the top digit of production
-     */
+    /// Multiplies an array of integers by an integer value
+    /// and saves the result in `res`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the array of integers
+    ///
+    /// - `aSize`: the number of elements of intArray to be multiplied
+    ///
+    /// - `factor`: the multiplier
+    ///
+    /// #### Returns
+    ///
+    /// the top digit of production
     private static int multiplyByInt(int[] res, int[] a, final int aSize, final int factor) {
         long carry = 0;
         for (int i = 0; i < aSize; i++) {
@@ -297,25 +264,34 @@ final class TMultiplication {
     }
 
 
-    /**
-     * Multiplies an array of integers by an integer value.
-     *
-     * @param a      the array of integers
-     * @param aSize  the number of elements of intArray to be multiplied
-     * @param factor the multiplier
-     * @return the top digit of production
-     */
+    /// Multiplies an array of integers by an integer value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the array of integers
+    ///
+    /// - `aSize`: the number of elements of intArray to be multiplied
+    ///
+    /// - `factor`: the multiplier
+    ///
+    /// #### Returns
+    ///
+    /// the top digit of production
     static int multiplyByInt(int[] a, final int aSize, final int factor) {
         return multiplyByInt(a, a, aSize, factor);
     }
 
-    /**
-     * Multiplies a number by a positive integer.
-     *
-     * @param val    an arbitrary {@code BigInteger}
-     * @param factor a positive {@code int} number
-     * @return {@code val * factor}
-     */
+    /// Multiplies a number by a positive integer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: an arbitrary `BigInteger`
+    ///
+    /// - `factor`: a positive `int` number
+    ///
+    /// #### Returns
+    ///
+    /// `val * factor`
     static TBigInteger multiplyByPositiveInt(TBigInteger val, int factor) {
         int resSign = val.sign;
         if (resSign == 0) {
@@ -365,12 +341,13 @@ final class TMultiplication {
         return res;
     }
 
-    /**
-     * Performs a<sup>2</sup>
-     *
-     * @param a    The number to square.
-     * @param aLen The length of the number to square.
-     */
+    /// Performs a2
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: The number to square.
+    ///
+    /// - `aLen`: The length of the number to square.
     static int[] square(int[] a, int aLen, int[] res) {
         long carry;
 
@@ -399,14 +376,18 @@ final class TMultiplication {
         return res;
     }
 
-    /**
-     * Multiplies a number by a power of ten.
-     * This method is used in {@code BigDecimal} class.
-     *
-     * @param val the number to be multiplied
-     * @param exp a positive {@code long} exponent
-     * @return {@code val * 10<sup>exp</sup>}
-     */
+    /// Multiplies a number by a power of ten.
+    /// This method is used in `BigDecimal` class.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: the number to be multiplied
+    ///
+    /// - `exp`: a positive `long` exponent
+    ///
+    /// #### Returns
+    ///
+    /// `val * 10exp`
     static TBigInteger multiplyByTenPow(TBigInteger val, long exp) {
         // PRE: exp >= 0
         return ((exp < tenPows.length)
@@ -414,14 +395,17 @@ final class TMultiplication {
                 : val.multiply(powerOf10(exp)));
     }
 
-    /**
-     * It calculates a power of ten, which exponent could be out of 32-bit range.
-     * Note that internally this method will be used in the worst case with
-     * an exponent equals to: {@code Integer.MAX_VALUE - Integer.MIN_VALUE}.
-     *
-     * @param exp the exponent of power of ten, it must be positive.
-     * @return a {@code BigInteger} with value {@code 10<sup>exp</sup>}.
-     */
+    /// It calculates a power of ten, which exponent could be out of 32-bit range.
+    /// Note that internally this method will be used in the worst case with
+    /// an exponent equals to: `Integer.MAX_VALUE - Integer.MIN_VALUE`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `exp`: the exponent of power of ten, it must be positive.
+    ///
+    /// #### Returns
+    ///
+    /// a `BigInteger` with value `10exp`.
     static TBigInteger powerOf10(long exp) {
         // PRE: exp >= 0
         int intExp = (int) exp;
@@ -478,14 +462,18 @@ final class TMultiplication {
         return res;
     }
 
-    /**
-     * Multiplies a number by a power of five.
-     * This method is used in {@code BigDecimal} class.
-     *
-     * @param val the number to be multiplied
-     * @param exp a positive {@code int} exponent
-     * @return {@code val * 5<sup>exp</sup>}
-     */
+    /// Multiplies a number by a power of five.
+    /// This method is used in `BigDecimal` class.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: the number to be multiplied
+    ///
+    /// - `exp`: a positive `int` exponent
+    ///
+    /// #### Returns
+    ///
+    /// `val * 5exp`
     static TBigInteger multiplyByFivePow(TBigInteger val, int exp) {
         // PRE: exp >= 0
         if (exp < fivePows.length) {
@@ -498,16 +486,22 @@ final class TMultiplication {
         }
     }
 
-    /**
-     * Computes the value unsigned ((uint)a*(uint)b + (uint)c + (uint)d). This
-     * method could improve the readability and performance of the code.
-     *
-     * @param a parameter 1
-     * @param b parameter 2
-     * @param c parameter 3
-     * @param d parameter 4
-     * @return value of expression
-     */
+    /// Computes the value unsigned ((uint)a*(uint)b + (uint)c + (uint)d). This
+    /// method could improve the readability and performance of the code.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: parameter 1
+    ///
+    /// - `b`: parameter 2
+    ///
+    /// - `c`: parameter 3
+    ///
+    /// - `d`: parameter 4
+    ///
+    /// #### Returns
+    ///
+    /// value of expression
     static long unsignedMultAddAdd(int a, int b, int c, int d) {
         return (a & 0xFFFFFFFFL) * (b & 0xFFFFFFFFL) + (c & 0xFFFFFFFFL) + (d & 0xFFFFFFFFL);
     }

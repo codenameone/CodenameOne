@@ -22,47 +22,42 @@
  */
 package com.codename1.ui.validation;
 
-/**
- * Creates a validation constraint based on minimum input length
- *
- * @author Shai Almog
- */
+/// Creates a validation constraint based on minimum input length
+///
+/// @author Shai Almog
 public class LengthConstraint implements Constraint {
     private final int length;
     private final String errorMessage;
 
-    /**
-     * Creates a new length constraint
-     *
-     * @param length       the length of the constraint
-     * @param errorMessage the default error message if the constraint fails
-     */
+    /// Creates a new length constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `length`: the length of the constraint
+    ///
+    /// - `errorMessage`: the default error message if the constraint fails
     public LengthConstraint(int length, String errorMessage) {
         this.length = length;
         this.errorMessage = errorMessage;
     }
 
 
-    /**
-     * Creates a new length constraint
-     *
-     * @param length the length of the constraint
-     */
+    /// Creates a new length constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `length`: the length of the constraint
     public LengthConstraint(int length) {
         this(length, null);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isValid(Object value) {
         return value != null && value.toString().length() >= length;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getDefaultFailMessage() {
         if (errorMessage == null) {

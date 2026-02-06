@@ -22,34 +22,34 @@
  */
 package com.codename1.ui;
 
-/**
- * A factory class for creating mutable images.  This can be used to override how
- * mutable images are generated.  You can use this to implement, for example, a LRU
- * cache for images so that they can be reused to conserve memory.
- *
- * <p>There is a default static image factory that can be assigned by calling:</p>
- * <pre>{@code
- * ImageFactory.setImageFactory(null, new ImageFactory() {
- *      public Image createImage(int w, int h, int bgColor) {
- *          // create an image
- *          // The Default would be just to call
- *          return Image.createImage(w, h, bgColor);
- *      }
- * });
- * }</pre>
- *
- * <p>You can also assign a factory whose scope is limited to a particular Form, Container,
- * or Component, by setting the context argument in {@code setImageFactory()}.</p>
- *
- * @author shannah
- * @since 8.0
- */
+/// A factory class for creating mutable images.  This can be used to override how
+/// mutable images are generated.  You can use this to implement, for example, a LRU
+/// cache for images so that they can be reused to conserve memory.
+///
+/// There is a default static image factory that can be assigned by calling:
+///
+/// ```java
+/// `ImageFactory.setImageFactory(null, new ImageFactory() {
+///      public Image createImage(int w, int h, int bgColor) {
+///          // create an image
+///          // The Default would be just to call
+///          return Image.createImage(w, h, bgColor);`
+/// });
+/// }
+/// ```
+///
+/// You can also assign a factory whose scope is limited to a particular Form, Container,
+/// or Component, by setting the context argument in `setImageFactory()`.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 8.0
 public abstract class ImageFactory {
     private static final String KEY = "$$IMAGE_FACTORY$$";
 
-    /**
-     * The default global image factory.
-     */
+    /// The default global image factory.
     private static ImageFactory defaultFactory = new ImageFactory() {
         @Override
         public Image createImage(int w, int h, int bgColor) {
@@ -58,18 +58,21 @@ public abstract class ImageFactory {
 
     };
 
-    /**
-     * Gets the image factory for a given component.  If the component
-     * doesn't have an ImageFactory assigned, then it will check the parent
-     * container, and its descendants, until it finds a Component with an ImageFactory.
-     *
-     * <p>If none of the component's descendants have an ImageFactory, then it will
-     * use the default global ImageFactory.</p>
-     *
-     * @param cmp The context from which to load the image factory.  Use {@literal null} to get the global
-     *            default factory.
-     * @return An image Factory
-     */
+    /// Gets the image factory for a given component.  If the component
+    /// doesn't have an ImageFactory assigned, then it will check the parent
+    /// container, and its descendants, until it finds a Component with an ImageFactory.
+    ///
+    /// If none of the component's descendants have an ImageFactory, then it will
+    /// use the default global ImageFactory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: @param cmp The context from which to load the image factory.  Use null to get the global
+    ///            default factory.
+    ///
+    /// #### Returns
+    ///
+    /// An image Factory
     public static ImageFactory getImageFactory(Component cmp) {
         if (cmp == null) {
             return defaultFactory;
@@ -82,14 +85,18 @@ public abstract class ImageFactory {
         return f;
     }
 
-    /**
-     * Sets the ImageFactory for the given component.
-     *
-     * @param cmp The component to set the ImageFactory for.  If this parameter is {@literal null}, then
-     *            this method will set the default global ImageFactory
-     * @param f   The ImageFactory to assign to the component.
-     * @return The previous image factory that was assigned to the component, or null if none was previously assigned.
-     */
+    /// Sets the ImageFactory for the given component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: @param cmp The component to set the ImageFactory for.  If this parameter is null, then
+    ///            this method will set the default global ImageFactory
+    ///
+    /// - `f`: The ImageFactory to assign to the component.
+    ///
+    /// #### Returns
+    ///
+    /// The previous image factory that was assigned to the component, or null if none was previously assigned.
     public static ImageFactory setImageFactory(Component cmp, ImageFactory f) {
         if (cmp != null) {
             ImageFactory old = (ImageFactory) cmp.getClientProperty(KEY);
@@ -102,15 +109,21 @@ public abstract class ImageFactory {
         }
     }
 
-    /**
-     * Creates an image using the factory at a given context.
-     *
-     * @param context The context where the ImageFactory should be loaded from.
-     * @param w       The width of the image to create.
-     * @param h       The height of the image to create.
-     * @param bgColor The background color of the image.
-     * @return A mutable Image.
-     */
+    /// Creates an image using the factory at a given context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `context`: The context where the ImageFactory should be loaded from.
+    ///
+    /// - `w`: The width of the image to create.
+    ///
+    /// - `h`: The height of the image to create.
+    ///
+    /// - `bgColor`: The background color of the image.
+    ///
+    /// #### Returns
+    ///
+    /// A mutable Image.
     public static Image createImage(Component context, int w, int h, int bgColor) {
         return getImageFactory(context).createImage(w, h, bgColor);
     }

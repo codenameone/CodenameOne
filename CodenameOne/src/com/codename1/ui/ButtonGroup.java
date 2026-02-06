@@ -29,55 +29,64 @@ import com.codename1.ui.events.ActionSource;
 
 import java.util.ArrayList;
 
-/**
- * <p>This class is used to create a multiple-exclusion scope for
- * {@link com.codename1.ui.RadioButton}.
- * Creating a set of {@link com.codename1.ui.RadioButton} components with the same {@code ButtonGroup} object
- * means that only one {@link com.codename1.ui.RadioButton} can be selected among those within
- * the specific {@code ButtonGroup}.</p>
- *
- * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
- *
- * @author Nir Shabi
- */
+/// This class is used to create a multiple-exclusion scope for
+/// `com.codename1.ui.RadioButton`.
+/// Creating a set of `com.codename1.ui.RadioButton` components with the same `ButtonGroup` object
+/// means that only one `com.codename1.ui.RadioButton` can be selected among those within
+/// the specific `ButtonGroup`.
+///
+/// ```java
+/// CheckBox cb1 = new CheckBox("CheckBox No Icon");
+/// cb1.setSelected(true);
+/// CheckBox cb2 = new CheckBox("CheckBox With Icon", icon);
+/// CheckBox cb3 = new CheckBox("CheckBox Opposite True", icon);
+/// CheckBox cb4 = new CheckBox("CheckBox Opposite False", icon);
+/// cb3.setOppositeSide(true);
+/// cb4.setOppositeSide(false);
+/// RadioButton rb1 = new RadioButton("Radio 1");
+/// RadioButton rb2 = new RadioButton("Radio 2");
+/// RadioButton rb3 = new RadioButton("Radio 3", icon);
+/// new ButtonGroup(rb1, rb2, rb3);
+/// rb2.setSelected(true);
+/// hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
+/// ```
+///
+/// @author Nir Shabi
 public class ButtonGroup implements ActionSource<ActionEvent> {
 
 
     private final ArrayList<RadioButton> buttons = new ArrayList<RadioButton>();
     private int selectedIndex = -1;
 
-    /**
-     * Creates a new instance of ButtonsGroup
-     */
+    /// Creates a new instance of ButtonsGroup
     public ButtonGroup() {
     }
 
-    /**
-     * Adds all the radio buttons to the group
-     *
-     * @param rb
-     */
+    /// Adds all the radio buttons to the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`
     public ButtonGroup(RadioButton... rb) {
         addAll(rb);
     }
 
-    /**
-     * Adds the RadioButtons to the group
-     *
-     * @param rb a RadioButtons to add
-     */
+    /// Adds the RadioButtons to the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: a RadioButtons to add
     public void addAll(RadioButton... rb) {
         for (RadioButton r : rb) {
             add(r);
         }
     }
 
-    /**
-     * Adds a RadioButton to the group
-     *
-     * @param rb a RadioButton to add
-     */
+    /// Adds a RadioButton to the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: a RadioButton to add
     public void add(RadioButton rb) {
         if (rb == null) {
             return;
@@ -91,11 +100,11 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
         }
     }
 
-    /**
-     * removes a RadioButton from the group
-     *
-     * @param rb a RadioButton to remove
-     */
+    /// removes a RadioButton from the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: a RadioButton to remove
     public void remove(RadioButton rb) {
         if (rb == null) {
             return;
@@ -107,9 +116,7 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
         rb.setButtonGroup(null);
     }
 
-    /**
-     * Clears the selection such that none of the buttons in the ButtonGroup are selected.
-     */
+    /// Clears the selection such that none of the buttons in the ButtonGroup are selected.
     public void clearSelection() {
         if (selectedIndex != -1) {
             if (selectedIndex < buttons.size()) {
@@ -120,47 +127,47 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
 
     }
 
-    /**
-     * Returns the number of buttons in the group.
-     *
-     * @return number of radio buttons in the group
-     */
+    /// Returns the number of buttons in the group.
+    ///
+    /// #### Returns
+    ///
+    /// number of radio buttons in the group
     public int getButtonCount() {
         return buttons.size();
     }
 
-    /**
-     * Returns whether a radio button in the group is selected.
-     *
-     * @return true if a selection was made in the radio button group
-     */
+    /// Returns whether a radio button in the group is selected.
+    ///
+    /// #### Returns
+    ///
+    /// true if a selection was made in the radio button group
     public boolean isSelected() {
         return selectedIndex != -1;
     }
 
-    /**
-     * Return the index of the selected button within the group
-     *
-     * @return the index of the selected button within the group
-     */
+    /// Return the index of the selected button within the group
+    ///
+    /// #### Returns
+    ///
+    /// the index of the selected button within the group
     public int getSelectedIndex() {
         return selectedIndex;
     }
 
-    /**
-     * Return the selected radio button within the group
-     *
-     * @return the selected radio button within the group
-     */
+    /// Return the selected radio button within the group
+    ///
+    /// #### Returns
+    ///
+    /// the selected radio button within the group
     public RadioButton getSelected() {
         return getRadioButton(selectedIndex);
     }
 
-    /**
-     * Selects the given radio button
-     *
-     * @param rb the radio button to set as selected
-     */
+    /// Selects the given radio button
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: the radio button to set as selected
     public void setSelected(RadioButton rb) {
         if (rb != null) {
             int index = buttons.indexOf(rb);
@@ -174,11 +181,11 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
         }
     }
 
-    /**
-     * Sets the selected Radio button by index
-     *
-     * @param index the index of the radio button to mark as selected
-     */
+    /// Sets the selected Radio button by index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index of the radio button to mark as selected
     public void setSelected(int index) {
         if (index < 0 || index >= getButtonCount()) {
             throw new IllegalArgumentException("Index out of bounds");
@@ -196,12 +203,15 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
         selectedIndex = index;
     }
 
-    /**
-     * Returns the radio button at the given group index
-     *
-     * @param index offset within the group starting with 0 and no larger than getButtonCount()
-     * @return the radio button instance
-     */
+    /// Returns the radio button at the given group index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: offset within the group starting with 0 and no larger than getButtonCount()
+    ///
+    /// #### Returns
+    ///
+    /// the radio button instance
     public RadioButton getRadioButton(int index) {
         if (index >= 0 && index < getButtonCount()) {
             return buttons.get(index);
@@ -209,11 +219,11 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
         return null;
     }
 
-    /**
-     * Adds an action listener to all the buttons in the group
-     *
-     * @param al the listener
-     */
+    /// Adds an action listener to all the buttons in the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: the listener
     @Override
     public void addActionListener(ActionListener<ActionEvent> al) {
         for (RadioButton rb : buttons) {
@@ -221,11 +231,11 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
         }
     }
 
-    /**
-     * Removes an action listener from all the buttons in the group
-     *
-     * @param al the listener
-     */
+    /// Removes an action listener from all the buttons in the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: the listener
     @Override
     public void removeActionListener(ActionListener<ActionEvent> al) {
         for (RadioButton rb : buttons) {

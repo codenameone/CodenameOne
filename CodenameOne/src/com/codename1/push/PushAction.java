@@ -22,12 +22,10 @@
  */
 package com.codename1.push;
 
-/**
- * Encapsulates a push notification action.  Available actions for a push notification are defined
- * by the {@link PushActionsProvider#getPushActionCategories() } implementation.
- *
- * @author Steve Hannah
- */
+/// Encapsulates a push notification action.  Available actions for a push notification are defined
+/// by the `PushActionsProvider#getPushActionCategories()` implementation.
+///
+/// @author Steve Hannah
 public class PushAction {
     private final String id;
     private final String title;
@@ -35,29 +33,35 @@ public class PushAction {
     private final String textInputPlaceholder;
     private final String textInputButtonText;
 
-    /**
-     * Creates a new push action
-     *
-     * @param id    The ID of the action.  This is the id that will be available in {@link PushContent#getActionId() } if the user
-     *              selected this action on the push notification.
-     * @param title The title of the action.  This is the button label in the push notification.
-     * @param icon  Icon for the action.  Not supported currently on most platforms.
-     */
+    /// Creates a new push action
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: @param id    The ID of the action.  This is the id that will be available in `PushContent#getActionId()` if the user
+    ///              selected this action on the push notification.
+    ///
+    /// - `title`: The title of the action.  This is the button label in the push notification.
+    ///
+    /// - `icon`: Icon for the action.  Not supported currently on most platforms.
     public PushAction(String id, String title, String icon) {
         this(id, title, icon, null, null);
 
     }
 
-    /**
-     * Creates a new push action
-     *
-     * @param id                   The ID of the action.  This is the id that will be available in {@link PushContent#getActionId() } if the user
-     *                             selected this action on the push notification.
-     * @param title                The title of the action.  This is the button label in the push notification.
-     * @param icon                 Icon for the action.  Not supported currently on most platforms.
-     * @param textInputPlaceholder Placeholder text to use for the text input field.
-     * @param textInputButtonText  Text to be used for the "reply" button in the text input field.
-     */
+    /// Creates a new push action
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: @param id                   The ID of the action.  This is the id that will be available in `PushContent#getActionId()` if the user
+    ///                             selected this action on the push notification.
+    ///
+    /// - `title`: The title of the action.  This is the button label in the push notification.
+    ///
+    /// - `icon`: Icon for the action.  Not supported currently on most platforms.
+    ///
+    /// - `textInputPlaceholder`: Placeholder text to use for the text input field.
+    ///
+    /// - `textInputButtonText`: Text to be used for the "reply" button in the text input field.
     public PushAction(String id, String title, String icon, String textInputPlaceholder, String textInputButtonText) {
         this.id = id;
         this.title = title;
@@ -67,71 +71,75 @@ public class PushAction {
 
     }
 
-    /**
-     * Creates a new push action
-     *
-     * @param id    The ID of the action.  This is the id that will be available in {@link PushContent#getActionId() } if the user
-     *              selected this action on the push notification.
-     * @param title The title of the action.  This is the button label in the push notification.
-     */
+    /// Creates a new push action
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: @param id    The ID of the action.  This is the id that will be available in `PushContent#getActionId()` if the user
+    ///              selected this action on the push notification.
+    ///
+    /// - `title`: The title of the action.  This is the button label in the push notification.
     public PushAction(String id, String title) {
         this(id, title, null);
     }
 
-    /**
-     * Creates a new push action
-     *
-     * @param title The title and id of the action.  This is the button label in the push notification.
-     */
+    /// Creates a new push action
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title and id of the action.  This is the button label in the push notification.
     public PushAction(String title) {
         this(title, title);
     }
 
-    /**
-     * Gets the ID of the action.  This is the value that will be made available inside the {@link PushCallback#push(java.lang.String) }
-     * method via {@link PushContent#getActionId() } if the user selects this action in a push notification.
-     *
-     * @return the id The ID of the action.
-     * @see PushContent#getActionId()
-     */
+    /// Gets the ID of the action.  This is the value that will be made available inside the `PushCallback#push(java.lang.String)`
+    /// method via `PushContent#getActionId()` if the user selects this action in a push notification.
+    ///
+    /// #### Returns
+    ///
+    /// the id The ID of the action.
+    ///
+    /// #### See also
+    ///
+    /// - PushContent#getActionId()
     public String getId() {
         return id;
     }
 
-    /**
-     * The title of the action.  This will be the label for the action's button in the push notification.
-     *
-     * @return the title The title of the action.
-     */
+    /// The title of the action.  This will be the label for the action's button in the push notification.
+    ///
+    /// #### Returns
+    ///
+    /// the title The title of the action.
     public String getTitle() {
         return title;
     }
 
-    /**
-     * The icon of the action.  Not supported yet on most platforms.
-     *
-     * @return the icon The icon for the action.
-     */
+    /// The icon of the action.  Not supported yet on most platforms.
+    ///
+    /// #### Returns
+    ///
+    /// the icon The icon for the action.
     public String getIcon() {
         return icon;
     }
 
-    /**
-     * The placeholder text to use for text input on this action.  Either {@link #textInputButtonText} or {@link #textInputPlaceholder}
-     * must be non-null for the action to include a text input.
-     *
-     * @return the textInputPlaceholder
-     */
+    /// The placeholder text to use for text input on this action.  Either `#textInputButtonText` or `#textInputPlaceholder`
+    /// must be non-null for the action to include a text input.
+    ///
+    /// #### Returns
+    ///
+    /// the textInputPlaceholder
     public String getTextInputPlaceholder() {
         return textInputPlaceholder;
     }
 
-    /**
-     * The button label for the "reply" button on the text input field.  Either {@link #textInputButtonText} or {@link #textInputPlaceholder}
-     * must be non-null for the action to include a text input.
-     *
-     * @return the textInputButtonText
-     */
+    /// The button label for the "reply" button on the text input field.  Either `#textInputButtonText` or `#textInputPlaceholder`
+    /// must be non-null for the action to include a text input.
+    ///
+    /// #### Returns
+    ///
+    /// the textInputButtonText
     public String getTextInputButtonText() {
         return textInputButtonText;
     }

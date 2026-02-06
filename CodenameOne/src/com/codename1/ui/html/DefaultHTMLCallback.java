@@ -30,108 +30,82 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 
-/**
- * This is a default implementation of HTMLCallback that basically doesn't do much but does keep the HTMLComponent work intact.
- * This class was created so developers will avoid pitfalls of HTMLCallback, as using the wrong return values.
- * <p>
- * Note that in any case an HTMLComponent doesn't have to use an HTMLCallback.
- *
- * @author Ofir Leitner
- */
+/// This is a default implementation of HTMLCallback that basically doesn't do much but does keep the HTMLComponent work intact.
+/// This class was created so developers will avoid pitfalls of HTMLCallback, as using the wrong return values.
+///
+/// Note that in any case an HTMLComponent doesn't have to use an HTMLCallback.
+///
+/// @author Ofir Leitner
 public class DefaultHTMLCallback implements HTMLCallback {
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void titleUpdated(HTMLComponent htmlC, String title) {
         // do nothing
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
         Log.p(description);
         return true; // Signals the parser to continue parsing despite of the error (if it is a recoverable error)
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
         // do nothing
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public String fieldSubmitted(HTMLComponent htmlC, TextArea ta, String actionURL, String id, String value, int type, String errorMsg) {
         return value; // Returns the same value
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public String getAutoComplete(HTMLComponent htmlC, String actionURL, String id) {
         return null; // i.e. no auto complete value was found
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public int getLinkProperties(HTMLComponent htmlC, String url) {
         return LINK_REGULAR; // Regular link - not visited and not forbidden
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public boolean linkClicked(HTMLComponent htmlC, String url) {
         return true;
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void actionPerformed(ActionEvent evt, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void focusGained(Component cmp, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void focusLost(Component cmp, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void selectionChanged(int oldSelected, int newSelected, HTMLComponent htmlC, List list, HTMLElement element) {
         // do nothing
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void dataChanged(int type, int index, HTMLComponent htmlC, TextField textField, HTMLElement element) {
         // do nothing

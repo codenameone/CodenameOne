@@ -23,33 +23,27 @@
 
 package com.codename1.properties;
 
-/**
- * This is the boolean specific version of property
- *
- * @author Shai Almog
- */
+/// This is the boolean specific version of property
+///
+/// @author Shai Almog
 public class BooleanProperty<K> extends Property<Boolean, K> {
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public BooleanProperty(String name) {
         super(name, Boolean.class);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public BooleanProperty(String name, Boolean value) {
         super(name, Boolean.class, value);
     }
 
 
-    /**
-     * Returns the value as a primitive, if the value is null/nullable this will fail...
-     *
-     * @return the numeric value
-     */
+    /// Returns the value as a primitive, if the value is null/nullable this will fail...
+    ///
+    /// #### Returns
+    ///
+    /// the numeric value
     public boolean getBoolean() {
         return get().booleanValue();
     }

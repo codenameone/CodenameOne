@@ -24,32 +24,41 @@ package com.codename1.ui;
 
 import com.codename1.ui.geom.Rectangle2D;
 
-/**
- * An interface for providing custom painting such as gradients.
- *
- * @author shannah
- * @see Graphics#setColor(com.codename1.ui.Paint)
- * @since 7.0
- */
+/// An interface for providing custom painting such as gradients.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
+///
+/// #### See also
+///
+/// - Graphics#setColor(com.codename1.ui.Paint)
 public interface Paint {
 
-    /**
-     * Paints in the given bounds.
-     *
-     * @param g      Graphics context to paint in.
-     * @param bounds Bounds to paint in.  User coordinates.
-     */
+    /// Paints in the given bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: Graphics context to paint in.
+    ///
+    /// - `bounds`: Bounds to paint in.  User coordinates.
     void paint(Graphics g, Rectangle2D bounds);
 
-    /**
-     * Paints in the given bounds.
-     *
-     * @param g Graphics context to paint in.
-     * @param x x coordinate.  User space.
-     * @param y y coordinate.  USer space.
-     * @param w width.  User space.
-     * @param h Hight.  User space.
-     */
+    /// Paints in the given bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: Graphics context to paint in.
+    ///
+    /// - `x`: x coordinate.  User space.
+    ///
+    /// - `y`: y coordinate.  USer space.
+    ///
+    /// - `w`: width.  User space.
+    ///
+    /// - `h`: Hight.  User space.
     void paint(Graphics g, double x, double y, double w, double h);
 
 }

@@ -28,129 +28,132 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 
 
-/**
- * LayoutStyle is used to determine how much space to place between components
- * during layout.  LayoutStyle can be obtained for two components, or for
- * a component relative to an edge of a parent container.  The amount of
- * space can vary depending upon whether or not the components are
- * logically grouped together (<code>RELATED</code>).
- * <p>
- * This class is primarily useful for JREs prior to 1.6.  In 1.6 API for this
- * was added to Swing.  When run on a JRE of 1.6 or greater this will call into
- * the appropriate methods in Swing.
- *
- * @version $Revision: 1.10 $
- */
+/// LayoutStyle is used to determine how much space to place between components
+/// during layout.  LayoutStyle can be obtained for two components, or for
+/// a component relative to an edge of a parent container.  The amount of
+/// space can vary depending upon whether or not the components are
+/// logically grouped together (`RELATED`).
+///
+/// This class is primarily useful for JREs prior to 1.6.  In 1.6 API for this
+/// was added to Swing.  When run on a JRE of 1.6 or greater this will call into
+/// the appropriate methods in Swing.
+///
+/// @version $Revision: 1.10 $
 public class LayoutStyle {
-    /**
-     * Possible argument to getPreferredGap.  Used to indicate the two components
-     * are grouped together.
-     */
+    /// Possible argument to getPreferredGap.  Used to indicate the two components
+    /// are grouped together.
     public static final int RELATED = 0;
-    /**
-     * Possible argument to getPreferredGap.  Used to indicate the two components
-     * are not grouped together.
-     */
+    /// Possible argument to getPreferredGap.  Used to indicate the two components
+    /// are not grouped together.
     public static final int UNRELATED = 1;
 
-    /**
-     * Possible argument to getPreferredGap.  Used to indicate the distance
-     * to indent a component is being requested.  To visually indicate
-     * a set of related components they will often times be horizontally
-     * indented, the <code>INDENT</code> constant for this.
-     * For example, to indent a check box relative to a label use this
-     * constant to <code>getPreferredGap</code>.
-     */
+    /// Possible argument to getPreferredGap.  Used to indicate the distance
+    /// to indent a component is being requested.  To visually indicate
+    /// a set of related components they will often times be horizontally
+    /// indented, the `INDENT` constant for this.
+    /// For example, to indent a check box relative to a label use this
+    /// constant to `getPreferredGap`.
     public static final int INDENT = 3;
 
     private static LayoutStyle layoutStyle = new LayoutStyle();
     //private static LookAndFeel laf;
 
-    /**
-     * Factory methods for obtaining the current <code>LayoutStyle</code>
-     * object appropriate for the current look and feel.
-     *
-     * @return the current LayoutStyle instance
-     */
+    /// Factory methods for obtaining the current `LayoutStyle`
+    /// object appropriate for the current look and feel.
+    ///
+    /// #### Returns
+    ///
+    /// the current LayoutStyle instance
     public static LayoutStyle getSharedInstance() {
         return layoutStyle;
     }
 
-    /**
-     * Sets the LayoutStyle instance to use for this look and feel.
-     * You generally don't need to invoke this, instead use the getter which
-     * will return the LayoutStyle appropriate for the current look and feel.
-     *
-     * @param layout the LayoutStyle to use; a value of null indicates
-     *               the default should be used
-     */
+    /// Sets the LayoutStyle instance to use for this look and feel.
+    /// You generally don't need to invoke this, instead use the getter which
+    /// will return the LayoutStyle appropriate for the current look and feel.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layout`: @param layout the LayoutStyle to use; a value of null indicates
+    ///               the default should be used
     public static void setSharedInstance(LayoutStyle layout) {
         layoutStyle = layout;
     }
 
-    /**
-     * Returns the amount of space to use between two components.
-     * The return value indicates the distance to place
-     * <code>component2</code> relative to <code>component1</code>.
-     * For example, the following returns the amount of space to place
-     * between <code>component2</code> and <code>component1</code>
-     * when <code>component2</code> is placed vertically above
-     * <code>component1</code>:
-     * <pre>
-     *   int gap = getPreferredGap(component1, component2,
-     *                             LayoutStyle.RELATED,
-     *                             SwingConstants.NORTH, parent);
-     * </pre>
-     * The <code>type</code> parameter indicates the type
-     * of gap being requested.  It can be one of the following values:
-     * <table>
-     * <tr><td><code>RELATED</code>
-     *     <td>If the two components will be contained in
-     *         the same parent and are showing similar logically related
-     *         items, use <code>RELATED</code>.
-     * <tr><td><code>UNRELATED</code>
-     *     <td>If the two components will be
-     *          contained in the same parent but show logically unrelated items
-     *          use <code>UNRELATED</code>.
-     * <tr><td><code>INDENT</code>
-     *     <td>Used to obtain the preferred distance to indent a component
-     *         relative to another.  For example, if you want to horizontally
-     *         indent a JCheckBox relative to a JLabel use <code>INDENT</code>.
-     *         This is only useful for the horizontal axis.
-     * </table>
-     * <p>
-     * It's important to note that some look and feels may not distinguish
-     * between <code>RELATED</code> and <code>UNRELATED</code>.
-     * <p>
-     * The return value is not intended to take into account the
-     * current size and position of <code>component2</code> or
-     * <code>component1</code>.  The return value may take into
-     * consideration various properties of the components.  For
-     * example, the space may vary based on font size, or the preferred
-     * size of the component.
-     *
-     * @param component1 the <code>JComponent</code>
-     *                   <code>component2</code> is being placed relative to
-     * @param component2 the <code>JComponent</code> being placed
-     * @param type       how the two components are being placed
-     * @param position   the position <code>component2</code> is being placed
-     *                   relative to <code>component1</code>; one of
-     *                   <code>SwingConstants.NORTH</code>,
-     *                   <code>SwingConstants.SOUTH</code>,
-     *                   <code>SwingConstants.EAST</code> or
-     *                   <code>SwingConstants.WEST</code>
-     * @param parent     the parent of <code>component2</code>; this may differ
-     *                   from the actual parent and may be null
-     * @return the amount of space to place between the two components
-     * @throws IllegalArgumentException if <code>position</code> is not
-     *                                  one of <code>SwingConstants.NORTH</code>,
-     *                                  <code>SwingConstants.SOUTH</code>,
-     *                                  <code>SwingConstants.EAST</code> or
-     *                                  <code>SwingConstants.WEST</code>; <code>type</code> not one
-     *                                  of <code>INDENT</code>, <code>RELATED</code>
-     *                                  or <code>UNRELATED</code>; or <code>component1</code> or
-     *                                  <code>component2</code> is null
-     */
+    /// Returns the amount of space to use between two components.
+    /// The return value indicates the distance to place
+    /// `component2` relative to `component1`.
+    /// For example, the following returns the amount of space to place
+    /// between `component2` and `component1`
+    /// when `component2` is placed vertically above
+    /// `component1`:
+    ///
+    /// ```java
+    ///   int gap = getPreferredGap(component1, component2,
+    ///                             LayoutStyle.RELATED,
+    ///                             SwingConstants.NORTH, parent);
+    /// ```
+    ///
+    /// The `type` parameter indicates the type
+    /// of gap being requested.  It can be one of the following values:
+    ///
+    /// `RELATED`
+    ///     If the two components will be contained in
+    ///         the same parent and are showing similar logically related
+    ///         items, use `RELATED`.
+    /// `UNRELATED`
+    ///     If the two components will be
+    ///          contained in the same parent but show logically unrelated items
+    ///          use `UNRELATED`.
+    /// `INDENT`
+    ///     Used to obtain the preferred distance to indent a component
+    ///         relative to another.  For example, if you want to horizontally
+    ///         indent a JCheckBox relative to a JLabel use `INDENT`.
+    ///         This is only useful for the horizontal axis.
+    ///
+    /// It's important to note that some look and feels may not distinguish
+    /// between `RELATED` and `UNRELATED`.
+    ///
+    /// The return value is not intended to take into account the
+    /// current size and position of `component2` or
+    /// `component1`.  The return value may take into
+    /// consideration various properties of the components.  For
+    /// example, the space may vary based on font size, or the preferred
+    /// size of the component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `component1`: @param component1 the `JComponent`
+    ///                   `component2` is being placed relative to
+    ///
+    /// - `component2`: the `JComponent` being placed
+    ///
+    /// - `type`: how the two components are being placed
+    ///
+    /// - `position`: @param position   the position `component2` is being placed
+    ///                   relative to `component1`; one of
+    ///                   `SwingConstants.NORTH`,
+    ///                   `SwingConstants.SOUTH`,
+    ///                   `SwingConstants.EAST` or
+    ///                   `SwingConstants.WEST`
+    ///
+    /// - `parent`: @param parent     the parent of `component2`; this may differ
+    ///                   from the actual parent and may be null
+    ///
+    /// #### Returns
+    ///
+    /// the amount of space to place between the two components
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `position` is not
+    ///                                  one of `SwingConstants.NORTH`,
+    ///                                  `SwingConstants.SOUTH`,
+    ///                                  `SwingConstants.EAST` or
+    ///                                  `SwingConstants.WEST`; `type` not one
+    ///                                  of `INDENT`, `RELATED`
+    ///                                  or `UNRELATED`; or `component1` or
+    ///                                  `component2` is null
     public int getPreferredGap(Component component1, Component component2,
                                int type, int position, Container parent) {
         if (position != GroupLayout.NORTH &&
@@ -179,28 +182,36 @@ public class LayoutStyle {
         throw new IllegalArgumentException("Invalid type");
     }
 
-    /**
-     * Returns the amount of space to position a component inside its
-     * parent.
-     *
-     * @param component the <code>Component</code> being positioned
-     * @param position  the position <code>component</code> is being placed
-     *                  relative to its parent; one of
-     *                  <code>SwingConstants.NORTH</code>,
-     *                  <code>SwingConstants.SOUTH</code>,
-     *                  <code>SwingConstants.EAST</code> or
-     *                  <code>SwingConstants.WEST</code>
-     * @param parent    the parent of <code>component</code>; this may differ
-     *                  from the actual parent and may be null
-     * @return the amount of space to place between the component and specified
-     * edge
-     * @throws IllegalArgumentException if <code>position</code> is not
-     *                                  one of <code>SwingConstants.NORTH</code>,
-     *                                  <code>SwingConstants.SOUTH</code>,
-     *                                  <code>SwingConstants.EAST</code> or
-     *                                  <code>SwingConstants.WEST</code>;
-     *                                  or <code>component</code> is null
-     */
+    /// Returns the amount of space to position a component inside its
+    /// parent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `component`: the `Component` being positioned
+    ///
+    /// - `position`: @param position  the position `component` is being placed
+    ///                  relative to its parent; one of
+    ///                  `SwingConstants.NORTH`,
+    ///                  `SwingConstants.SOUTH`,
+    ///                  `SwingConstants.EAST` or
+    ///                  `SwingConstants.WEST`
+    ///
+    /// - `parent`: @param parent    the parent of `component`; this may differ
+    ///                  from the actual parent and may be null
+    ///
+    /// #### Returns
+    ///
+    /// @return the amount of space to place between the component and specified
+    /// edge
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `position` is not
+    ///                                  one of `SwingConstants.NORTH`,
+    ///                                  `SwingConstants.SOUTH`,
+    ///                                  `SwingConstants.EAST` or
+    ///                                  `SwingConstants.WEST`;
+    ///                                  or `component` is null
     public int getContainerGap(Component component, int position,
                                Container parent) {
         if (position != GroupLayout.NORTH &&
@@ -215,18 +226,24 @@ public class LayoutStyle {
         return Display.getInstance().convertToPixels(2, true);
     }
 
-    /**
-     * For some look and feels check boxs and radio buttons have an empty
-     * border around them.  Look and feel guidelines generally don't include
-     * this space.  Use this method to subtract this space from the specified
-     * components.
-     *
-     * @param source   First component
-     * @param target   Second component
-     * @param position Position doing layout along.
-     * @param offset   Ideal offset, not including border/margin
-     * @return offset - border/margin around the component.
-     */
+    /// For some look and feels check boxs and radio buttons have an empty
+    /// border around them.  Look and feel guidelines generally don't include
+    /// this space.  Use this method to subtract this space from the specified
+    /// components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: First component
+    ///
+    /// - `target`: Second component
+    ///
+    /// - `position`: Position doing layout along.
+    ///
+    /// - `offset`: Ideal offset, not including border/margin
+    ///
+    /// #### Returns
+    ///
+    /// offset - border/margin around the component.
     int getCBRBPadding(Component source, Component target, int position,
                        int offset) {
         if (offset < 0) {
@@ -235,17 +252,22 @@ public class LayoutStyle {
         return offset;
     }
 
-    /**
-     * For some look and feels check boxs and radio buttons have an empty
-     * border around them.  Look and feel guidelines generally don't include
-     * this space.  Use this method to subtract this space from the specified
-     * components.
-     *
-     * @param source   Component
-     * @param position Position doing layout along.
-     * @param offset   Ideal offset, not including border/margin
-     * @return offset - border/margin around the component.
-     */
+    /// For some look and feels check boxs and radio buttons have an empty
+    /// border around them.  Look and feel guidelines generally don't include
+    /// this space.  Use this method to subtract this space from the specified
+    /// components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: Component
+    ///
+    /// - `position`: Position doing layout along.
+    ///
+    /// - `offset`: Ideal offset, not including border/margin
+    ///
+    /// #### Returns
+    ///
+    /// offset - border/margin around the component.
     int getCBRBPadding(Component source, int position, int offset) {
         return Math.max(offset, 0);
     }
@@ -308,11 +330,9 @@ public class LayoutStyle {
         return null;
     }*/
 
-    /**
-     * Returns the amount to indent the specified component if it's
-     * a JCheckBox or JRadioButton.  If the component is not a JCheckBox or
-     * JRadioButton, 0 will be returned.
-     */
+    /// Returns the amount to indent the specified component if it's
+    /// a JCheckBox or JRadioButton.  If the component is not a JCheckBox or
+    /// JRadioButton, 0 will be returned.
     int getButtonChildIndent(Component c, int position) {
         /*if ((c instanceof JRadioButton) || (c instanceof JCheckBox)) {
             AbstractButton button = (AbstractButton)c;

@@ -22,109 +22,88 @@
  */
 package com.codename1.media;
 
-/**
- * A base class that is meant to be overridden to implement functionality that
- * responds to the device's remote control for media playback.  This allows you
- * to tie into the media buttons on the lock screen for background media.
- * <p>Apps should implement their own subclass and register it with the app using
- * {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
- *
- * @author shannah
- * @since 7.0
- */
+/// A base class that is meant to be overridden to implement functionality that
+/// responds to the device's remote control for media playback.  This allows you
+/// to tie into the media buttons on the lock screen for background media.
+///
+/// Apps should implement their own subclass and register it with the app using
+/// `MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener)`
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public class RemoteControlListener {
 
-    /**
-     * Called when user presses play button on remote control.
-     */
+    /// Called when user presses play button on remote control.
     public void play() {
 
     }
 
-    /**
-     * Called when user presses the pause button on remote control.
-     */
+    /// Called when user presses the pause button on remote control.
     public void pause() {
 
     }
 
 
-    /**
-     * Called when user presses the toggle play/pause button on remote control.
-     */
+    /// Called when user presses the toggle play/pause button on remote control.
     public void togglePlayPause() {
 
     }
 
-    /**
-     * Called when user seeks to a position of the currently playing media
-     * on the remote control.
-     *
-     * @param pos
-     */
+    /// Called when user seeks to a position of the currently playing media
+    /// on the remote control.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`
     public void seekTo(long pos) {
 
     }
 
-    /**
-     * Called when user presses the "next" button on remote control.
-     */
+    /// Called when user presses the "next" button on remote control.
     public void skipToNext() {
 
     }
 
-    /**
-     * Called when user presses the "previous" button on remote control.
-     */
+    /// Called when user presses the "previous" button on remote control.
     public void skipToPrevious() {
 
     }
 
-    /**
-     * Called when user presses the "Stop" button on remote control.
-     */
+    /// Called when user presses the "Stop" button on remote control.
     public void stop() {
 
     }
 
-    /**
-     * Called when user presses the "fast forward" button on remote control.
-     */
+    /// Called when user presses the "fast forward" button on remote control.
     public void fastForward() {
 
     }
 
-    /**
-     * Called when user presses the "rewind" button on remote control.
-     */
+    /// Called when user presses the "rewind" button on remote control.
     public void rewind() {
 
     }
 
-    /**
-     * Is used by remote control to determine if the media is currently playing.
-     *
-     * @return
-     */
+    /// Is used by remote control to determine if the media is currently playing.
     public boolean isPlaying() {
         return false;
     }
 
-    /**
-     * Is called when the user adjusts the volume on the remote control
-     *
-     * @param leftVolume
-     * @param rightVolume
-     */
+    /// Is called when the user adjusts the volume on the remote control
+    ///
+    /// #### Parameters
+    ///
+    /// - `leftVolume`
+    ///
+    /// - `rightVolume`
     public void setVolume(float leftVolume, float rightVolume) {
 
     }
 
-    /**
-     * Should return the meta data about the currently playing media.
-     *
-     * @return
-     */
+    /// Should return the meta data about the currently playing media.
     public MediaMetaData getMetaData() {
         return null;
     }

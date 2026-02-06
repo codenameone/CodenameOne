@@ -17,15 +17,19 @@
 
 package com.codename1.util;
 
-/**
- * A modifiable {@link CharSequence sequence of characters} for use in creating
- * and modifying Strings. This class is intended as a base class for
- * {@link StringBuffer} and {@link StringBuilder}.
- *
- * @see StringBuffer
- * @see StringBuilder
- * @since 1.5
- */
+/// A modifiable `sequence of characters` for use in creating
+/// and modifying Strings. This class is intended as a base class for
+/// `StringBuffer` and `StringBuilder`.
+///
+/// #### Since
+///
+/// 1.5
+///
+/// #### See also
+///
+/// - StringBuffer
+///
+/// - StringBuilder
 abstract class AbstractStringBuilder {
 
     static final int INITIAL_CAPACITY = 16;
@@ -140,25 +144,35 @@ abstract class AbstractStringBuilder {
         count = newSize;
     }
 
-    /**
-     * Returns the number of characters that can be held without growing.
-     *
-     * @return the capacity
-     * @see #ensureCapacity
-     * @see #length
-     */
+    /// Returns the number of characters that can be held without growing.
+    ///
+    /// #### Returns
+    ///
+    /// the capacity
+    ///
+    /// #### See also
+    ///
+    /// - #ensureCapacity
+    ///
+    /// - #length
     public int capacity() {
         return value.length;
     }
 
-    /**
-     * Retrieves the character at the {@code index}.
-     *
-     * @param index the index of the character to retrieve.
-     * @return the char value.
-     * @throws IndexOutOfBoundsException if {@code index} is negative or greater than or equal to the
-     *                                   current {@link #length()}.
-     */
+    /// Retrieves the character at the `index`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index of the character to retrieve.
+    ///
+    /// #### Returns
+    ///
+    /// the char value.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than or equal to the
+    ///                                   current `#length()`.
     public char charAt(int index) {
         if (index < 0 || index >= count) {
             throw new StringIndexOutOfBoundsException(index);
@@ -197,17 +211,17 @@ abstract class AbstractStringBuilder {
         count--;
     }
 
-    /**
-     * Ensures that this object has a minimum capacity available before
-     * requiring the internal buffer to be enlarged. The general policy of this
-     * method is that if the {@code minimumCapacity} is larger than the current
-     * {@link #capacity()}, then the capacity will be increased to the largest
-     * value of either the {@code minimumCapacity} or the current capacity
-     * multiplied by two plus two. Although this is the general policy, there is
-     * no guarantee that the capacity will change.
-     *
-     * @param min the new minimum capacity to set.
-     */
+    /// Ensures that this object has a minimum capacity available before
+    /// requiring the internal buffer to be enlarged. The general policy of this
+    /// method is that if the `minimumCapacity` is larger than the current
+    /// `#capacity()`, then the capacity will be increased to the largest
+    /// value of either the `minimumCapacity` or the current capacity
+    /// multiplied by two plus two. Although this is the general policy, there is
+    /// no guarantee that the capacity will change.
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: the new minimum capacity to set.
     public void ensureCapacity(int min) {
         if (min > value.length) {
             int twice = (value.length << 1) + 2;
@@ -215,20 +229,26 @@ abstract class AbstractStringBuilder {
         }
     }
 
-    /**
-     * Copies the requested sequence of characters to the {@code char[]} passed
-     * starting at {@code destStart}.
-     *
-     * @param start     the inclusive start index of the characters to copy.
-     * @param end       the exclusive end index of the characters to copy.
-     * @param dest      the {@code char[]} to copy the characters to.
-     * @param destStart the inclusive start index of {@code dest} to begin copying to.
-     * @throws IndexOutOfBoundsException if the {@code start} is negative, the {@code destStart} is
-     *                                   negative, the {@code start} is greater than {@code end}, the
-     *                                   {@code end} is greater than the current {@link #length()} or
-     *                                   {@code destStart + end - begin} is greater than
-     *                                   {@code dest.length}.
-     */
+    /// Copies the requested sequence of characters to the `char[]` passed
+    /// starting at `destStart`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the inclusive start index of the characters to copy.
+    ///
+    /// - `end`: the exclusive end index of the characters to copy.
+    ///
+    /// - `dest`: the `char[]` to copy the characters to.
+    ///
+    /// - `destStart`: the inclusive start index of `dest` to begin copying to.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if the `start` is negative, the `destStart` is
+    ///                                   negative, the `start` is greater than `end`, the
+    ///                                   `end` is greater than the current `#length()` or
+    ///                                   `destStart + end - begin` is greater than
+    ///                                   `dest.length`.
     public void getChars(int start, int end, char[] dest, int destStart) {
         if (start > count || end > count || start > end) {
             throw new StringIndexOutOfBoundsException();
@@ -291,11 +311,11 @@ abstract class AbstractStringBuilder {
         }
     }
 
-    /**
-     * The current length.
-     *
-     * @return the number of characters contained in this instance.
-     */
+    /// The current length.
+    ///
+    /// #### Returns
+    ///
+    /// the number of characters contained in this instance.
     public int length() {
         return count;
     }
@@ -411,14 +431,18 @@ abstract class AbstractStringBuilder {
         }
     }
 
-    /**
-     * Sets the character at the {@code index}.
-     *
-     * @param index the zero-based index of the character to replace.
-     * @param ch    the character to set.
-     * @throws IndexOutOfBoundsException if {@code index} is negative or greater than or equal to the
-     *                                   current {@link #length()}.
-     */
+    /// Sets the character at the `index`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the zero-based index of the character to replace.
+    ///
+    /// - `ch`: the character to set.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than or equal to the
+    ///                                   current `#length()`.
     public void setCharAt(int index, char ch) {
         if (0 > index || index >= count) {
             throw new StringIndexOutOfBoundsException(index);
@@ -426,15 +450,21 @@ abstract class AbstractStringBuilder {
         value[index] = ch;
     }
 
-    /**
-     * Sets the current length to a new value. If the new length is larger than
-     * the current length, then the new characters at the end of this object
-     * will contain the {@code char} value of {@code \u0000}.
-     *
-     * @param length the new length of this StringBuffer.
-     * @throws IndexOutOfBoundsException if {@code length < 0}.
-     * @see #length
-     */
+    /// Sets the current length to a new value. If the new length is larger than
+    /// the current length, then the new characters at the end of this object
+    /// will contain the `char` value of `\u0000`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `length`: the new length of this StringBuffer.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `length < 0`.
+    ///
+    /// #### See also
+    ///
+    /// - #length
     public void setLength(int length) {
         if (length < 0) {
             throw new StringIndexOutOfBoundsException(length);
@@ -451,15 +481,21 @@ abstract class AbstractStringBuilder {
         count = length;
     }
 
-    /**
-     * Returns the String value of the subsequence from the {@code start} index
-     * to the current end.
-     *
-     * @param start the inclusive start index to begin the subsequence.
-     * @return a String containing the subsequence.
-     * @throws StringIndexOutOfBoundsException if {@code start} is negative or greater than the current
-     *                                         {@link #length()}.
-     */
+    /// Returns the String value of the subsequence from the `start` index
+    /// to the current end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the inclusive start index to begin the subsequence.
+    ///
+    /// #### Returns
+    ///
+    /// a String containing the subsequence.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `start` is negative or greater than the current
+    ///                                         `#length()`.
     public String substring(int start) {
         if (0 <= start && start <= count) {
             if (start == count) {
@@ -472,16 +508,23 @@ abstract class AbstractStringBuilder {
         throw new StringIndexOutOfBoundsException(start);
     }
 
-    /**
-     * Returns the String value of the subsequence from the {@code start} index
-     * to the {@code end} index.
-     *
-     * @param start the inclusive start index to begin the subsequence.
-     * @param end   the exclusive end index to end the subsequence.
-     * @return a String containing the subsequence.
-     * @throws StringIndexOutOfBoundsException if {@code start} is negative, greater than {@code end} or if
-     *                                         {@code end} is greater than the current {@link #length()}.
-     */
+    /// Returns the String value of the subsequence from the `start` index
+    /// to the `end` index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the inclusive start index to begin the subsequence.
+    ///
+    /// - `end`: the exclusive end index to end the subsequence.
+    ///
+    /// #### Returns
+    ///
+    /// a String containing the subsequence.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `start` is negative, greater than `end` or if
+    ///                                         `end` is greater than the current `#length()`.
     public String substring(int start, int end) {
         if (0 <= start && start <= end && end <= count) {
             if (start == end) {
@@ -494,11 +537,11 @@ abstract class AbstractStringBuilder {
         throw new StringIndexOutOfBoundsException();
     }
 
-    /**
-     * Returns the current String representation.
-     *
-     * @return a String containing the characters in this instance.
-     */
+    /// Returns the current String representation.
+    ///
+    /// #### Returns
+    ///
+    /// a String containing the characters in this instance.
     @Override
     public String toString() {
         if (count == 0) {
@@ -507,31 +550,50 @@ abstract class AbstractStringBuilder {
         return new String(value, 0, count);
     }
 
-    /**
-     * Searches for the first index of the specified character. The search for
-     * the character starts at the beginning and moves towards the end.
-     *
-     * @param string the string to find.
-     * @return the index of the specified character, -1 if the character isn't
-     * found.
-     * @see #lastIndexOf(String)
-     * @since 1.4
-     */
+    /// Searches for the first index of the specified character. The search for
+    /// the character starts at the beginning and moves towards the end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `string`: the string to find.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index of the specified character, -1 if the character isn't
+    /// found.
+    ///
+    /// #### Since
+    ///
+    /// 1.4
+    ///
+    /// #### See also
+    ///
+    /// - #lastIndexOf(String)
     public int indexOf(String string) {
         return indexOf(string, 0);
     }
 
-    /**
-     * Searches for the index of the specified character. The search for the
-     * character starts at the specified offset and moves towards the end.
-     *
-     * @param subString the string to find.
-     * @param start     the starting offset.
-     * @return the index of the specified character, -1 if the character isn't
-     * found
-     * @see #lastIndexOf(String, int)
-     * @since 1.4
-     */
+    /// Searches for the index of the specified character. The search for the
+    /// character starts at the specified offset and moves towards the end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `subString`: the string to find.
+    ///
+    /// - `start`: the starting offset.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index of the specified character, -1 if the character isn't
+    /// found
+    ///
+    /// #### Since
+    ///
+    /// 1.4
+    ///
+    /// #### See also
+    ///
+    /// - #lastIndexOf(String, int)
     public int indexOf(String subString, int start) {
         if (start < 0) {
             start = 0;
@@ -568,33 +630,58 @@ abstract class AbstractStringBuilder {
         return (start < count || start == 0) ? start : count;
     }
 
-    /**
-     * Searches for the last index of the specified character. The search for
-     * the character starts at the end and moves towards the beginning.
-     *
-     * @param string the string to find.
-     * @return the index of the specified character, -1 if the character isn't
-     * found.
-     * @throws NullPointerException if {@code string} is {@code null}.
-     * @see String#lastIndexOf(java.lang.String)
-     * @since 1.4
-     */
+    /// Searches for the last index of the specified character. The search for
+    /// the character starts at the end and moves towards the beginning.
+    ///
+    /// #### Parameters
+    ///
+    /// - `string`: the string to find.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index of the specified character, -1 if the character isn't
+    /// found.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `string` is `null`.
+    ///
+    /// #### Since
+    ///
+    /// 1.4
+    ///
+    /// #### See also
+    ///
+    /// - String#lastIndexOf(java.lang.String)
     public int lastIndexOf(String string) {
         return lastIndexOf(string, count);
     }
 
-    /**
-     * Searches for the index of the specified character. The search for the
-     * character starts at the specified offset and moves towards the beginning.
-     *
-     * @param subString the string to find.
-     * @param start     the starting offset.
-     * @return the index of the specified character, -1 if the character isn't
-     * found.
-     * @throws NullPointerException if {@code subString} is {@code null}.
-     * @see String#lastIndexOf(String, int)
-     * @since 1.4
-     */
+    /// Searches for the index of the specified character. The search for the
+    /// character starts at the specified offset and moves towards the beginning.
+    ///
+    /// #### Parameters
+    ///
+    /// - `subString`: the string to find.
+    ///
+    /// - `start`: the starting offset.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index of the specified character, -1 if the character isn't
+    /// found.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `subString` is `null`.
+    ///
+    /// #### Since
+    ///
+    /// 1.4
+    ///
+    /// #### See also
+    ///
+    /// - String#lastIndexOf(String, int)
     @SuppressWarnings("PMD.EmptyControlStatement")
     public int lastIndexOf(String subString, int start) {
         int subCount = subString.length();
@@ -635,12 +722,12 @@ abstract class AbstractStringBuilder {
         return -1;
     }
 
-    /**
-     * Trims off any extra capacity beyond the current length. Note, this method
-     * is NOT guaranteed to change the capacity of this object.
-     *
-     * @since 1.5
-     */
+    /// Trims off any extra capacity beyond the current length. Note, this method
+    /// is NOT guaranteed to change the capacity of this object.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public void trimToSize() {
         if (count < value.length) {
             char[] newValue = new char[count];
@@ -649,17 +736,30 @@ abstract class AbstractStringBuilder {
         }
     }
 
-    /**
-     * Retrieves the Unicode code point value at the {@code index}.
-     *
-     * @param index the index to the {@code char} code unit.
-     * @return the Unicode code point value.
-     * @throws IndexOutOfBoundsException if {@code index} is negative or greater than or equal to
-     *                                   {@link #length()}.
-     * @see Character
-     * @see Character#codePointAt(char[], int, int)
-     * @since 1.5
-     */
+    /// Retrieves the Unicode code point value at the `index`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index to the `char` code unit.
+    ///
+    /// #### Returns
+    ///
+    /// the Unicode code point value.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than or equal to
+    ///                                   `#length()`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - Character
+    ///
+    /// - Character#codePointAt(char[], int, int)
     public int codePointAt(int index) {
         if (index < 0 || index >= count) {
             throw new StringIndexOutOfBoundsException(index);
@@ -667,17 +767,30 @@ abstract class AbstractStringBuilder {
         return Character.codePointAt(value, index, count);
     }
 
-    /**
-     * Retrieves the Unicode code point value that precedes the {@code index}.
-     *
-     * @param index the index to the {@code char} code unit within this object.
-     * @return the Unicode code point value.
-     * @throws IndexOutOfBoundsException if {@code index} is less than 1 or greater than
-     *                                   {@link #length()}.
-     * @see Character
-     * @see Character#codePointBefore(char[], int, int)
-     * @since 1.5
-     */
+    /// Retrieves the Unicode code point value that precedes the `index`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index to the `char` code unit within this object.
+    ///
+    /// #### Returns
+    ///
+    /// the Unicode code point value.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is less than 1 or greater than
+    ///                                   `#length()`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - Character
+    ///
+    /// - Character#codePointBefore(char[], int, int)
     public int codePointBefore(int index) {
         if (index < 1 || index > count) {
             throw new StringIndexOutOfBoundsException(index);
@@ -685,20 +798,34 @@ abstract class AbstractStringBuilder {
         return Character.codePointBefore(value, index);
     }
 
-    /**
-     * Calculates the number of Unicode code points between {@code beginIndex}
-     * and {@code endIndex}.
-     *
-     * @param beginIndex the inclusive beginning index of the subsequence.
-     * @param endIndex   the exclusive end index of the subsequence.
-     * @return the number of Unicode code points in the subsequence.
-     * @throws IndexOutOfBoundsException if {@code beginIndex} is negative or greater than
-     *                                   {@code endIndex} or {@code endIndex} is greater than
-     *                                   {@link #length()}.
-     * @see Character
-     * @see Character#codePointCount(char[], int, int)
-     * @since 1.5
-     */
+    /// Calculates the number of Unicode code points between `beginIndex`
+    /// and `endIndex`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `beginIndex`: the inclusive beginning index of the subsequence.
+    ///
+    /// - `endIndex`: the exclusive end index of the subsequence.
+    ///
+    /// #### Returns
+    ///
+    /// the number of Unicode code points in the subsequence.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `beginIndex` is negative or greater than
+    ///                                   `endIndex` or `endIndex` is greater than
+    ///                                   `#length()`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - Character
+    ///
+    /// - Character#codePointCount(char[], int, int)
     public int codePointCount(int beginIndex, int endIndex) {
         if (beginIndex < 0 || endIndex > count || beginIndex > endIndex) {
             throw new StringIndexOutOfBoundsException();
@@ -707,22 +834,36 @@ abstract class AbstractStringBuilder {
                 - beginIndex);
     }
 
-    /**
-     * Returns the index that is offset {@code codePointOffset} code points from
-     * {@code index}.
-     *
-     * @param index           the index to calculate the offset from.
-     * @param codePointOffset the number of code points to count.
-     * @return the index that is {@code codePointOffset} code points away from
-     * index.
-     * @throws IndexOutOfBoundsException if {@code index} is negative or greater than
-     *                                   {@link #length()} or if there aren't enough code points
-     *                                   before or after {@code index} to match
-     *                                   {@code codePointOffset}.
-     * @see Character
-     * @see Character#offsetByCodePoints(char[], int, int, int, int)
-     * @since 1.5
-     */
+    /// Returns the index that is offset `codePointOffset` code points from
+    /// `index`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index to calculate the offset from.
+    ///
+    /// - `codePointOffset`: the number of code points to count.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index that is `codePointOffset` code points away from
+    /// index.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than
+    ///                                   `#length()` or if there aren't enough code points
+    ///                                   before or after `index` to match
+    ///                                   `codePointOffset`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - Character
+    ///
+    /// - Character#offsetByCodePoints(char[], int, int, int, int)
     public int offsetByCodePoints(int index, int codePointOffset) {
         return Character.offsetByCodePoints(value, 0, count, index,
                 codePointOffset);

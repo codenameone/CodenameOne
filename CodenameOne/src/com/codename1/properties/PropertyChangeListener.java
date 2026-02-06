@@ -23,16 +23,14 @@
 
 package com.codename1.properties;
 
-/**
- * Event callback interface, invoked when a property changed its value
- *
- * @author Shai Almog
- */
+/// Event callback interface, invoked when a property changed its value
+///
+/// @author Shai Almog
 public interface PropertyChangeListener<T, K> {
-    /**
-     * Event callback for the property change event
-     *
-     * @param p the property
-     */
+    /// Event callback for the property change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
     void propertyChanged(PropertyBase<T, K> p);
 }

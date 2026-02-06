@@ -29,16 +29,59 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.util.EventDispatcher;
 
-/**
- * <p>{@code SwipeableContainer} allows us to side swipe a component and expose underlying configuration
- * within it. This is useful for editing, ranking of elements within a set of components e.g. in the
- * sample code below we use a ranking widget and swiping to expose the elements:
- * </p>
- * <script src="https://gist.github.com/codenameone/d1c091a171fe97fdeb5f.js"></script>
- * <img src="https://www.codenameone.com/img/thumb/components-swipablecontainer.png" alt="Swipeable Container">
- *
- * @author Chen
- */
+/// `SwipeableContainer` allows us to side swipe a component and expose underlying configuration
+/// within it. This is useful for editing, ranking of elements within a set of components e.g. in the
+/// sample code below we use a ranking widget and swiping to expose the elements:
+///
+/// ```java
+/// public void showForm() {
+///   Form hi = new Form("Swipe", new BoxLayout(BoxLayout.Y_AXIS));
+///   hi.add(createRankWidget("A Game of Thrones", "1996")).
+///       add(createRankWidget("A Clash Of Kings", "1998")).
+///       add(createRankWidget("A Storm Of Swords", "2000")).
+///       add(createRankWidget("A Feast For Crows", "2005")).
+///       add(createRankWidget("A Dance With Dragons", "2011")).
+///       add(createRankWidget("The Winds of Winter", "TBD")).
+///       add(createRankWidget("A Dream of Spring", "TBD"));
+///   hi.show();
+/// }
+///
+/// public SwipeableContainer createRankWidget(String title, String year) {
+///     MultiButton button = new MultiButton(title);
+///     button.setTextLine2(year);
+///     return new SwipeableContainer(FlowLayout.encloseCenterMiddle(createStarRankSlider()),
+///             button);
+/// }
+///
+/// private void initStarRankStyle(Style s, Image star) {
+///     s.setBackgroundType(Style.BACKGROUND_IMAGE_TILE_BOTH);
+///     s.setBorder(Border.createEmpty());
+///     s.setBgImage(star);
+///     s.setBgTransparency(0);
+/// }
+///
+/// private Slider createStarRankSlider() {
+///     Slider starRank = new Slider();
+///     starRank.setEditable(true);
+///     starRank.setMinValue(0);
+///     starRank.setMaxValue(10);
+///     Font fnt = Font.createTrueTypeFont("native:MainLight", "native:MainLight").
+///             derive(Display.getInstance().convertToPixels(5, true), Font.STYLE_PLAIN);
+///     Style s = new Style(0xffff33, 0, fnt, (byte)0);
+///     Image fullStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, s).toImage();
+///     s.setOpacity(100);
+///     s.setFgColor(0);
+///     Image emptyStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, s).toImage();
+///     initStarRankStyle(starRank.getSliderEmptySelectedStyle(), emptyStar);
+///     initStarRankStyle(starRank.getSliderEmptyUnselectedStyle(), emptyStar);
+///     initStarRankStyle(starRank.getSliderFullSelectedStyle(), fullStar);
+///     initStarRankStyle(starRank.getSliderFullUnselectedStyle(), fullStar);
+///     starRank.setPreferredSize(new Dimension(fullStar.getWidth() * 5, fullStar.getHeight()));
+///     return starRank;
+/// }
+/// ```
+///
+/// @author Chen
 public class SwipeableContainer extends Container {
 
     private final EventDispatcher dispatcher = new EventDispatcher();
@@ -59,26 +102,29 @@ public class SwipeableContainer extends Container {
     private boolean waitForRelease;
     private SwipeableContainer previouslyOpened;
 
-    /**
-     * Simple Constructor
-     *
-     * @param bottomLeft the Component below the top, this Component is exposed
-     *                   when dragging the top to the right
-     * @param top        the component on top.
-     */
+    /// Simple Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `bottomLeft`: @param bottomLeft the Component below the top, this Component is exposed
+    ///                   when dragging the top to the right
+    ///
+    /// - `top`: the component on top.
     public SwipeableContainer(Component bottomLeft, Component top) {
         this(bottomLeft, null, top);
     }
 
-    /**
-     * Simple Constructor
-     *
-     * @param bottomLeft  the Component below the top, this Component is exposed
-     *                    when dragging the top to the right
-     * @param bottomRight the Component below the top, this Component is exposed
-     *                    when dragging the top to the Left
-     * @param top         the component on top.
-     */
+    /// Simple Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `bottomLeft`: @param bottomLeft  the Component below the top, this Component is exposed
+    ///                    when dragging the top to the right
+    ///
+    /// - `bottomRight`: @param bottomRight the Component below the top, this Component is exposed
+    ///                    when dragging the top to the Left
+    ///
+    /// - `top`: the component on top.
     public SwipeableContainer(Component bottomLeft, Component bottomRight, Component top) {
         setLayout(new LayeredLayout());
         bottomLeftWrapper = new Container(new BorderLayout());
@@ -104,9 +150,7 @@ public class SwipeableContainer extends Container {
         release = new SwipeListener(SwipeListener.RELEASE);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         waitForRelease = false;
@@ -119,9 +163,7 @@ public class SwipeableContainer extends Container {
         super.deinitialize();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -133,10 +175,8 @@ public class SwipeableContainer extends Container {
         }
     }
 
-    /**
-     * This method will open the top Component to the right if there is a Component
-     * to expose on the left.
-     */
+    /// This method will open the top Component to the right if there is a Component
+    /// to expose on the left.
     public void openToRight() {
         if (open || openedToRight) {
             return;
@@ -159,10 +199,8 @@ public class SwipeableContainer extends Container {
         open = true;
     }
 
-    /**
-     * This method will open the top Component to the left if there is a Component
-     * to expose on the right.
-     */
+    /// This method will open the top Component to the left if there is a Component
+    /// to expose on the right.
     public void openToLeft() {
         if (open || openedToLeft) {
             return;
@@ -185,9 +223,7 @@ public class SwipeableContainer extends Container {
         open = true;
     }
 
-    /**
-     * Close the top component if it is currently opened.
-     */
+    /// Close the top component if it is currently opened.
     public void close() {
         if (!open) {
             return;
@@ -245,37 +281,27 @@ public class SwipeableContainer extends Container {
         return false;
     }
 
-    /**
-     * Returns true if swipe is activated
-     */
+    /// Returns true if swipe is activated
     public boolean isSwipeActivated() {
         return swipeActivated;
     }
 
-    /**
-     * disable/enable dragging of the top Component
-     */
+    /// disable/enable dragging of the top Component
     public void setSwipeActivated(boolean swipeActivated) {
         this.swipeActivated = swipeActivated;
     }
 
-    /**
-     * Returns true if the top Component is currently opened
-     */
+    /// Returns true if the top Component is currently opened
     public boolean isOpen() {
         return open && (openedToRight || openedToLeft);
     }
 
-    /**
-     * Returns true if the top Component is opened to the right side
-     */
+    /// Returns true if the top Component is opened to the right side
     public boolean isOpenedToRight() {
         return openedToRight;
     }
 
-    /**
-     * Returns true if the top Component is opened to the left side
-     */
+    /// Returns true if the top Component is opened to the left side
     public boolean isOpenedToLeft() {
         return openedToLeft;
     }
@@ -288,49 +314,49 @@ public class SwipeableContainer extends Container {
     }
 
 
-    /**
-     * Adds a listener to the SwipeableContainer which will cause an event to
-     * dispatch once the SwipeableContainer is fully opened
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Adds a listener to the SwipeableContainer which will cause an event to
+    /// dispatch once the SwipeableContainer is fully opened
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     public void addSwipeOpenListener(ActionListener l) {
         dispatcher.addListener(l);
     }
 
-    /**
-     * Removes the given listener from the SwipeableContainer
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Removes the given listener from the SwipeableContainer
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     public void removeSwipeOpenListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
 
-    /**
-     * returns a previously opened SwipeableContainer that should be
-     * automatically closed when starting to open this one. Called as soon as
-     * this Swipeable starts opening. One approach is to override this method to
-     * return a previously opened SwipeableContainer Can be overridden to return
-     * a SwipeableContainer stored outside this container.
-     *
-     * @return an already open SwipeableContainer that will be closed when
-     * opening this one, or null if none
-     */
+    /// returns a previously opened SwipeableContainer that should be
+    /// automatically closed when starting to open this one. Called as soon as
+    /// this Swipeable starts opening. One approach is to override this method to
+    /// return a previously opened SwipeableContainer Can be overridden to return
+    /// a SwipeableContainer stored outside this container.
+    ///
+    /// #### Returns
+    ///
+    /// @return an already open SwipeableContainer that will be closed when
+    /// opening this one, or null if none
     public SwipeableContainer getPreviouslyOpened() {
         return previouslyOpened;
     }
 
-    /**
-     * set a previously open SwipeableContainer, it will be closed as soon as
-     * the user starts swiping this one. Be aware that with a long list of
-     * Swipeable containers it may be a better approach to store the previously
-     * opened outside the list and simply override getPreviouslyOpened to return
-     * it
-     *
-     * @param previouslyOpened an already open SwipeableContainer that will be
-     *                         closed if this one is opened
-     */
+    /// set a previously open SwipeableContainer, it will be closed as soon as
+    /// the user starts swiping this one. Be aware that with a long list of
+    /// Swipeable containers it may be a better approach to store the previously
+    /// opened outside the list and simply override getPreviouslyOpened to return
+    /// it
+    ///
+    /// #### Parameters
+    ///
+    /// - `previouslyOpened`: @param previouslyOpened an already open SwipeableContainer that will be
+    ///                         closed if this one is opened
     public void setPreviouslyOpened(SwipeableContainer previouslyOpened) {
         this.previouslyOpened = previouslyOpened;
     }

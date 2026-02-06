@@ -26,9 +26,7 @@ import java.util.Calendar;
 import java.util.Hashtable;
 import java.util.TimeZone;
 
-/**
- * @author Eric Coolman
- */
+/// @author Eric Coolman
 public class DateFormatSymbols implements Cloneable {
     public static final int ZONE_ID = 0;
     public static final int ZONE_LONGNAME = 1;
@@ -61,9 +59,7 @@ public class DateFormatSymbols implements Cloneable {
     private String[] shortWeekdays;
     private String[] eras;
 
-    /**
-     * Allows turning localization on/off defaults to localization
-     */
+    /// Allows turning localization on/off defaults to localization
     private boolean localized = true;
     private String[] platformLocalizedMonths;
     private String[] platformLocalizedShortMonths;
@@ -151,15 +147,19 @@ public class DateFormatSymbols implements Cloneable {
         zoneStrings = newZoneStrings;
     }
 
-    /**
-     * Adds a timezone mapping so that SimpleDateFormat can recognize abbreviated timezones.
-     *
-     * @param zoneId       The TimeZone ID.  E.g. America/New_York
-     * @param longName     The long name of the mapping.  E.g. Eastern Standard Time
-     * @param longNameDST  The long name of the mapping in daylight saving time.  E.g. Eastern Daylight Time
-     * @param shortName    The short name of the mapping.  E.g. EST
-     * @param shortNameDST The short name of the mapping in daylight saving time. E.g. EDT
-     */
+    /// Adds a timezone mapping so that SimpleDateFormat can recognize abbreviated timezones.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoneId`: The TimeZone ID.  E.g. America/New_York
+    ///
+    /// - `longName`: The long name of the mapping.  E.g. Eastern Standard Time
+    ///
+    /// - `longNameDST`: The long name of the mapping in daylight saving time.  E.g. Eastern Daylight Time
+    ///
+    /// - `shortName`: The short name of the mapping.  E.g. EST
+    ///
+    /// - `shortNameDST`: The short name of the mapping in daylight saving time. E.g. EDT
     public void addZoneMapping(String zoneId, String longName, String longNameDST, String shortName, String shortNameDST) {
         localized = true;
         Hashtable<String, String> h = getResourceBundle();
@@ -174,49 +174,65 @@ public class DateFormatSymbols implements Cloneable {
         h.put(L10N_ZONE_SHORTNAME_DST + zoneId, shortNameDST);
     }
 
-    /**
-     * Gets the short name of a given timezone.
-     *
-     * @param zoneId       The timezone ID.  E.g. America/Vancouver
-     * @param defaultValue A default value if no mapping is found.
-     * @return The short name of the timezone.  E.g. PST
-     */
+    /// Gets the short name of a given timezone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoneId`: The timezone ID.  E.g. America/Vancouver
+    ///
+    /// - `defaultValue`: A default value if no mapping is found.
+    ///
+    /// #### Returns
+    ///
+    /// The short name of the timezone.  E.g. PST
     public String getZoneShortName(String zoneId, String defaultValue) {
         zoneId = zoneId.toUpperCase();
         return getLocalizedValue(L10N_ZONE_SHORTNAME + zoneId, defaultValue);
     }
 
-    /**
-     * Gets the short name of a given timezone in daylight saving time.
-     *
-     * @param zoneId       The timezone ID.  E.g. America/Vancouver
-     * @param defaultValue A default value if no mapping is found.
-     * @return The short name of the timezone in daylight saving time.  E.g. PDT
-     */
+    /// Gets the short name of a given timezone in daylight saving time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoneId`: The timezone ID.  E.g. America/Vancouver
+    ///
+    /// - `defaultValue`: A default value if no mapping is found.
+    ///
+    /// #### Returns
+    ///
+    /// The short name of the timezone in daylight saving time.  E.g. PDT
     public String getZoneShortNameDST(String zoneId, String defaultValue) {
         zoneId = zoneId.toUpperCase();
         return getLocalizedValue(L10N_ZONE_SHORTNAME_DST + zoneId, defaultValue);
     }
 
-    /**
-     * Gets the long name of a given timezone.
-     *
-     * @param zoneId       The timezone ID.  E.g. America/Vancouver
-     * @param defaultValue A default value if no mapping is found.
-     * @return The short name of the timezone.  E.g. Pacific Standard Time
-     */
+    /// Gets the long name of a given timezone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoneId`: The timezone ID.  E.g. America/Vancouver
+    ///
+    /// - `defaultValue`: A default value if no mapping is found.
+    ///
+    /// #### Returns
+    ///
+    /// The short name of the timezone.  E.g. Pacific Standard Time
     public String getZoneLongName(String zoneId, String defaultValue) {
         zoneId = zoneId.toUpperCase();
         return getLocalizedValue(L10N_ZONE_LONGNAME + zoneId, defaultValue);
     }
 
-    /**
-     * Gets the long name of a given timezone in daylight saving time.
-     *
-     * @param zoneId       The timezone ID.  E.g. America/Vancouver
-     * @param defaultValue A default value if no mapping is found.
-     * @return The short name of the timezone.  E.g. Pacific Daylight Time
-     */
+    /// Gets the long name of a given timezone in daylight saving time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoneId`: The timezone ID.  E.g. America/Vancouver
+    ///
+    /// - `defaultValue`: A default value if no mapping is found.
+    ///
+    /// #### Returns
+    ///
+    /// The short name of the timezone.  E.g. Pacific Daylight Time
     public String getZoneLongNameDST(String zoneId, String defaultValue) {
         zoneId = zoneId.toUpperCase();
         return getLocalizedValue(L10N_ZONE_LONGNAME_DST + zoneId, defaultValue);
@@ -394,20 +410,20 @@ public class DateFormatSymbols implements Cloneable {
         return dfs;
     }
 
-    /**
-     * Allows turning localization on/off defaults to localization
-     *
-     * @return the localized
-     */
+    /// Allows turning localization on/off defaults to localization
+    ///
+    /// #### Returns
+    ///
+    /// the localized
     public boolean isLocalized() {
         return localized;
     }
 
-    /**
-     * Allows turning localization on/off defaults to localization
-     *
-     * @param localized the localized to set
-     */
+    /// Allows turning localization on/off defaults to localization
+    ///
+    /// #### Parameters
+    ///
+    /// - `localized`: the localized to set
     public void setLocalized(boolean localized) {
         this.localized = localized;
     }

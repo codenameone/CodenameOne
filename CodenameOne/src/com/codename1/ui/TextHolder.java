@@ -22,27 +22,28 @@
  */
 package com.codename1.ui;
 
-/**
- * An interface implemented by {@link Component} classes that can support
- * setting/getting text.  E.g. {@link Label}, {@link TextArea},
- * {@link SpanLabel}, {@link SpanButton}, etc..
- *
- * @author Shai Almog
- * @since 7.0
- */
+/// An interface implemented by `Component` classes that can support
+/// setting/getting text.  E.g. `Label`, `TextArea`,
+/// `SpanLabel`, `SpanButton`, etc..
+///
+/// @author Shai Almog
+///
+/// #### Since
+///
+/// 7.0
 public interface TextHolder {
-    /**
-     * The text of the component
-     *
-     * @return the text
-     */
+    /// The text of the component
+    ///
+    /// #### Returns
+    ///
+    /// the text
     String getText();
 
-    /**
-     * New text for the component
-     *
-     * @param text the text
-     */
+    /// New text for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text
     void setText(String text);
 
 }

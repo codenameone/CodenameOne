@@ -18,32 +18,34 @@
 package com.codename1.util;
 
 
-/**
- * Static library that provides all the <b>bit level</b> operations for
- * {@link TBigInteger}. The operations are:
- * <ul type="circle">
- * <li>Left Shifting</li>
- * <li>Right Shifting</li>
- * <li>Bit clearing</li>
- * <li>Bit setting</li>
- * <li>Bit counting</li>
- * <li>Bit testing</li>
- * <li>Getting of the lowest bit set</li>
- * </ul>
- * All operations are provided in immutable way, and some in both mutable and
- * immutable.
- */
+/// Static library that provides all the **bit level** operations for
+/// `TBigInteger`. The operations are:
+///
+/// - Left Shifting
+///
+/// - Right Shifting
+///
+/// - Bit clearing
+///
+/// - Bit setting
+///
+/// - Bit counting
+///
+/// - Bit testing
+///
+/// - Getting of the lowest bit set
+///
+/// All operations are provided in immutable way, and some in both mutable and
+/// immutable.
 final class TBitLevel {
 
-    /**
-     * Just to denote that this class can't be instantiated.
-     */
+    /// Just to denote that this class can't be instantiated.
     private TBitLevel() {
     }
 
-    /**
-     * @see TBigInteger#bitLength()
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#bitLength()
     static int bitLength(TBigInteger val) {
         if (val.sign == 0) {
             return 0;
@@ -89,9 +91,9 @@ final class TBitLevel {
         return n;
     }
 
-    /**
-     * @see TBigInteger#bitCount()
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#bitCount()
     static int bitCount(TBigInteger val) {
         int bCount = 0;
 
@@ -117,21 +119,22 @@ final class TBitLevel {
         return bCount;
     }
 
-    /**
-     * Performs a fast bit testing for positive numbers. The bit to to be tested
-     * must be in the range {@code [0, val.bitLength()-1]}
-     */
+    /// Performs a fast bit testing for positive numbers. The bit to to be tested
+    /// must be in the range `[0, val.bitLength()-1]`
     static boolean testBit(TBigInteger val, int n) {
         // PRE: 0 <= n < val.bitLength()
         return ((val.digits[n >> 5] & (1 << (n & 31))) != 0);
     }
 
-    /**
-     * Check if there are 1s in the lowest bits of this BigInteger
-     *
-     * @param numberOfBits the number of the lowest bits to check
-     * @return false if all bits are 0s, true otherwise
-     */
+    /// Check if there are 1s in the lowest bits of this BigInteger
+    ///
+    /// #### Parameters
+    ///
+    /// - `numberOfBits`: the number of the lowest bits to check
+    ///
+    /// #### Returns
+    ///
+    /// false if all bits are 0s, true otherwise
     static boolean nonZeroDroppedBits(int numberOfBits, int[] digits) {
         int intCount = numberOfBits >> 5;
         int bitCount = numberOfBits & 31;
@@ -142,9 +145,9 @@ final class TBitLevel {
         return ((i != intCount) || (digits[i] << (32 - bitCount) != 0));
     }
 
-    /**
-     * @see TBigInteger#shiftLeft(int)
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#shiftLeft(int)
     static TBigInteger shiftLeft(TBigInteger source, int count) {
         int intCount = count >> 5;
         count &= 31; // %= 32
@@ -157,9 +160,7 @@ final class TBitLevel {
         return result;
     }
 
-    /**
-     * Performs {@code val <<= count}.
-     */
+    /// Performs `val <<= count`.
     // val should have enough place (and one digit more)
     static void inplaceShiftLeft(TBigInteger val, int count) {
         int intCount = count >> 5; // count of integers
@@ -170,15 +171,18 @@ final class TBitLevel {
         val.unCache();
     }
 
-    /**
-     * Abstractly shifts left an array of integers in little endian (i.e. shift
-     * it right). Total shift distance in bits is intCount * 32 + count
-     *
-     * @param result   the destination array
-     * @param source   the source array
-     * @param intCount the shift distance in integers
-     * @param count    an additional shift distance in bits
-     */
+    /// Abstractly shifts left an array of integers in little endian (i.e. shift
+    /// it right). Total shift distance in bits is intCount * 32 + count
+    ///
+    /// #### Parameters
+    ///
+    /// - `result`: the destination array
+    ///
+    /// - `source`: the source array
+    ///
+    /// - `intCount`: the shift distance in integers
+    ///
+    /// - `count`: an additional shift distance in bits
     static void shiftLeft(int[] result, int[] source, int intCount, int count) {
         if (count == 0) {
             System.arraycopy(source, 0, result, intCount, result.length - intCount);
@@ -197,19 +201,21 @@ final class TBitLevel {
         }
     }
 
-    /**
-     * Shifts the source digits left one bit, creating a value whose magnitude
-     * is doubled.
-     *
-     * @param result an array of digits that will hold the computed result when
-     *               this method returns. The size of this array is
-     *               {@code srcLen + 1}, and the format is the same as
-     *               {@link TBigInteger#digits}.
-     * @param source the array of digits to shift left, in the same format as
-     *               {@link TBigInteger#digits}.
-     * @param srcLen the length of {@code source}; may be less than
-     *               {@code source.length}
-     */
+    /// Shifts the source digits left one bit, creating a value whose magnitude
+    /// is doubled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `result`: @param result an array of digits that will hold the computed result when
+    ///               this method returns. The size of this array is
+    ///               `srcLen + 1`, and the format is the same as
+    ///               `TBigInteger#digits`.
+    ///
+    /// - `source`: @param source the array of digits to shift left, in the same format as
+    ///               `TBigInteger#digits`.
+    ///
+    /// - `srcLen`: @param srcLen the length of `source`; may be less than
+    ///               `source.length`
     static void shiftLeftOneBit(int[] result, int[] source, int srcLen) {
         int carry = 0;
         for (int i = 0; i < srcLen; i++) {
@@ -232,9 +238,9 @@ final class TBitLevel {
         return result;
     }
 
-    /**
-     * @see TBigInteger#shiftRight(int)
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#shiftRight(int)
     static TBigInteger shiftRight(TBigInteger source, int count) {
         int intCount = count >> 5; // count of integers
         count &= 31; // count of remaining bits
@@ -267,9 +273,7 @@ final class TBitLevel {
         return result;
     }
 
-    /**
-     * Performs {@code val >>= count} where {@code val} is a positive number.
-     */
+    /// Performs `val >>= count` where `val` is a positive number.
     static void inplaceShiftRight(TBigInteger val, int count) {
         int sign = val.signum();
         if (count == 0 || val.signum() == 0) {
@@ -292,17 +296,24 @@ final class TBitLevel {
         val.unCache();
     }
 
-    /**
-     * Shifts right an array of integers. Total shift distance in bits is
-     * intCount * 32 + count.
-     *
-     * @param result    the destination array
-     * @param resultLen the destination array's length
-     * @param source    the source array
-     * @param intCount  the number of elements to be shifted
-     * @param count     the number of bits to be shifted
-     * @return dropped bit's are all zero (i.e. remaider is zero)
-     */
+    /// Shifts right an array of integers. Total shift distance in bits is
+    /// intCount * 32 + count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `result`: the destination array
+    ///
+    /// - `resultLen`: the destination array's length
+    ///
+    /// - `source`: the source array
+    ///
+    /// - `intCount`: the number of elements to be shifted
+    ///
+    /// - `count`: the number of bits to be shifted
+    ///
+    /// #### Returns
+    ///
+    /// dropped bit's are all zero (i.e. remaider is zero)
     static boolean shiftRight(int[] result, int resultLen, int[] source, int intCount, int count) {
         int i;
         boolean allZero = true;
@@ -323,14 +334,15 @@ final class TBitLevel {
         return allZero;
     }
 
-    /**
-     * Performs a flipBit on the BigInteger, returning a BigInteger with the the
-     * specified bit flipped.
-     *
-     * @param intCount  : the index of the element of the digits array where the
-     *                  operation will be performed
-     * @param bitNumber : the bit's position in the intCount element
-     */
+    /// Performs a flipBit on the BigInteger, returning a BigInteger with the the
+    /// specified bit flipped.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intCount`: @param intCount  : the index of the element of the digits array where the
+    ///                  operation will be performed
+    ///
+    /// - `bitNumber`: : the bit's position in the intCount element
     static TBigInteger flipBit(TBigInteger val, int n) {
         int resSign = (val.sign == 0) ? 1 : val.sign;
         int intCount = n >> 5;

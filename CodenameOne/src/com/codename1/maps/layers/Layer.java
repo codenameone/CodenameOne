@@ -26,33 +26,32 @@ import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Tile;
 import com.codename1.ui.Graphics;
 
-/**
- * a Layer interface.
- * Each Layer needs to ability to paint itself on the map
- *
- * @author Chen
- */
+/// a Layer interface.
+/// Each Layer needs to ability to paint itself on the map
+///
+/// @author Chen
 public interface Layer {
 
-    /**
-     * Paints the Layer on the given Graphics
-     *
-     * @param g          a Graphics Object to paint on
-     * @param screenTile the screen tile
-     */
+    /// Paints the Layer on the given Graphics
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: a Graphics Object to paint on
+    ///
+    /// - `screenTile`: the screen tile
     void paint(Graphics g, Tile screenTile);
 
-    /**
-     * The bounding box of this Layer
-     *
-     * @return the Layer bounding box
-     */
+    /// The bounding box of this Layer
+    ///
+    /// #### Returns
+    ///
+    /// the Layer bounding box
     BoundingBox boundingBox();
 
-    /**
-     * Gets the name of this Layer
-     *
-     * @return the name of this Layer
-     */
+    /// Gets the name of this Layer
+    ///
+    /// #### Returns
+    ///
+    /// the name of this Layer
     String getName();
 }

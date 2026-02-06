@@ -26,16 +26,12 @@ package com.codename1.ui;
 import java.util.Hashtable;
 
 
-/**
- * Implements a bitmap font that uses an image and sets of offsets to draw a font
- * with a given character set.
- *
- * @author Shai Almog
- */
+/// Implements a bitmap font that uses an image and sets of offsets to draw a font
+/// with a given character set.
+///
+/// @author Shai Almog
 class CustomFont extends Font {
-    /**
-     * Keep five colors in cache by default to allow faster selection colors
-     */
+    /// Keep five colors in cache by default to allow faster selection colors
     private static final int COLOR_CACHE_SIZE = 5;
     private final Hashtable colorCache = new Hashtable();
     private final String charsets;
@@ -43,35 +39,37 @@ class CustomFont extends Font {
     private final int imageHeight;
     // package protected for the resource editor
     Image cache;
-    /**
-     * The offset in which to cut the character from the bitmap
-     */
+    /// The offset in which to cut the character from the bitmap
     int[] cutOffsets;
-    /**
-     * The width of the character when drawing... this should not be confused with
-     * the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
-     * since a character can be "wider" and "seep" into the next region. This is
-     * especially true with italic characters all of which "lean" outside of their
-     * bounds.
-     */
+    /// The width of the character when drawing... this should not be confused with
+    /// the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+    /// since a character can be "wider" and "seep" into the next region. This is
+    /// especially true with italic characters all of which "lean" outside of their
+    /// bounds.
     int[] charWidth;
     private int color;
     private Object imageArrayRef;
 
 
-    /**
-     * Creates a bitmap font with the given arguments
-     *
-     * @param bitmap     a transparency map in red and black that indicates the characters
-     * @param cutOffsets character offsets matching the bitmap pixels and characters in the font
-     * @param charWidth  The width of the character when drawing... this should not be confused with
-     *                   the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
-     *                   since a character can be "wider" and "seep" into the next region. This is
-     *                   especially true with italic characters all of which "lean" outside of their
-     *                   bounds.
-     * @param charsets   the set of characters in the font
-     * @return a font object to draw bitmap fonts
-     */
+    /// Creates a bitmap font with the given arguments
+    ///
+    /// #### Parameters
+    ///
+    /// - `bitmap`: a transparency map in red and black that indicates the characters
+    ///
+    /// - `cutOffsets`: character offsets matching the bitmap pixels and characters in the font
+    ///
+    /// - `charWidth`: @param charWidth  The width of the character when drawing... this should not be confused with
+    ///                   the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+    ///                   since a character can be "wider" and "seep" into the next region. This is
+    ///                   especially true with italic characters all of which "lean" outside of their
+    ///                   bounds.
+    ///
+    /// - `charsets`: the set of characters in the font
+    ///
+    /// #### Returns
+    ///
+    /// a font object to draw bitmap fonts
     public CustomFont(Image bitmap, int[] cutOffsets, int[] charWidth, String charsets) {
         this.cutOffsets = cutOffsets;
         this.charWidth = charWidth;
@@ -103,9 +101,7 @@ class CustomFont extends Font {
         return a;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int charWidth(char ch) {
         int i = charsets.indexOf(ch);
@@ -115,9 +111,7 @@ class CustomFont extends Font {
         return charWidth[i];
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getHeight() {
         return imageHeight;
@@ -169,9 +163,7 @@ class CustomFont extends Font {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void drawChar(Graphics g, char character, int x, int y) {
         int clipX = g.getClipX();
@@ -194,9 +186,7 @@ class CustomFont extends Font {
         //g.popClip();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addContrast(byte value) {
         int[] imageArray = getImageArray();
@@ -210,15 +200,18 @@ class CustomFont extends Font {
         }
     }
 
-    /**
-     * Draw the given char array using the current font and color in the x,y
-     * coordinates
-     *
-     * @param g   the graphics object
-     * @param str the given string
-     * @param x   the x coordinate to draw the string
-     * @param y   the y coordinate to draw the string
-     */
+    /// Draw the given char array using the current font and color in the x,y
+    /// coordinates
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the graphics object
+    ///
+    /// - `str`: the given string
+    ///
+    /// - `x`: the x coordinate to draw the string
+    ///
+    /// - `y`: the y coordinate to draw the string
     @Override
     void drawString(Graphics g, String str, int x, int y) {
         if (Display.getInstance().isBidiAlgorithm()) {
@@ -256,16 +249,21 @@ class CustomFont extends Font {
         }
     }
 
-    /**
-     * Override this frequently used method for a slight performance boost...
-     *
-     * @param g      the component graphics
-     * @param data   the chars to draw
-     * @param offset the offset to draw the chars
-     * @param length the length of chars
-     * @param x      the x coordinate to draw the chars
-     * @param y      the y coordinate to draw the chars
-     */
+    /// Override this frequently used method for a slight performance boost...
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the component graphics
+    ///
+    /// - `data`: the chars to draw
+    ///
+    /// - `offset`: the offset to draw the chars
+    ///
+    /// - `length`: the length of chars
+    ///
+    /// - `x`: the x coordinate to draw the chars
+    ///
+    /// - `y`: the y coordinate to draw the chars
     @Override
     void drawChars(Graphics g, char[] data, int offset, int length, int x, int y) {
         if (Display.getInstance().isBidiAlgorithm()) {
@@ -306,17 +304,13 @@ class CustomFont extends Font {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getCharset() {
         return charsets;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int charsWidth(char[] ch, int offset, int length) {
         int retVal = 0;
@@ -327,17 +321,13 @@ class CustomFont extends Font {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int substringWidth(String str, int offset, int len) {
         return charsWidth(str.toCharArray(), offset, len);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int stringWidth(String str) {
         if (str == null || str.length() == 0) {
@@ -346,33 +336,25 @@ class CustomFont extends Font {
         return substringWidth(str, 0, str.length());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getFace() {
         return 0;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getSize() {
         return 0;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getStyle() {
         return 0;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         if (o == this) {

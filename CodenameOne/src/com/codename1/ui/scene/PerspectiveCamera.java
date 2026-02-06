@@ -29,10 +29,11 @@ import com.codename1.ui.Transform;
 
 import java.util.Arrays;
 
-/**
- * @author shannah
- * @deprecated Internal use only
- */
+/// @author shannah
+///
+/// #### Deprecated
+///
+/// Internal use only
 public class PerspectiveCamera extends Camera {
     public final Property<Double, Camera> verticalFieldOfView;
     private final Scene scene;

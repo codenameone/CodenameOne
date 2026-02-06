@@ -50,17 +50,18 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 
-/**
- * <p>A simple browser view that encapsulates a usable version of HTMLComponent or BrowserComponent and
- * automatically picks the right component for the platform preferring BrowserComponent whenever it
- * is supported.
- * </p>
- * <p>On Android this component might show a native progress indicator dialog. You can disable that functionality
- * using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.</p>
- *
- * @author Shai Almog
- * @deprecated Use{@link com.codename1.ui.BrowserComponent} instead. The original purpose of this class was to work as an interim solution for platforms where {@link com.codename1.ui.BrowserComponent} isn't supported however all currently supported platforms work with {@code BrowserComponent} so there is no real reason to use this class
- */
+/// A simple browser view that encapsulates a usable version of HTMLComponent or BrowserComponent and
+/// automatically picks the right component for the platform preferring BrowserComponent whenever it
+/// is supported.
+///
+/// On Android this component might show a native progress indicator dialog. You can disable that functionality
+/// using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// Use`com.codename1.ui.BrowserComponent` instead. The original purpose of this class was to work as an interim solution for platforms where `com.codename1.ui.BrowserComponent` isn't supported however all currently supported platforms work with `BrowserComponent` so there is no real reason to use this class
 public class WebBrowser extends Container {
 
     private Component internal;
@@ -68,19 +69,17 @@ public class WebBrowser extends Container {
     private String page;
     private Loading loading;
 
-    /**
-     * Constructor with a URL
-     *
-     * @param url the url
-     */
+    /// Constructor with a URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url
     public WebBrowser(String url) {
         this();
         setURL(url);
     }
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public WebBrowser() {
         super(new BorderLayout());
         try {
@@ -229,47 +228,52 @@ public class WebBrowser extends Container {
         addComponent(BorderLayout.CENTER, internal);
     }
 
-    /**
-     * This method creates a <a href="http://en.wikipedia.org/wiki/Data_URI_scheme">data URI</a>
-     * which allows developers creating HTML for local use to embed local images into the HTML by
-     * appending them as a URI. E.g. instead of referencing a file or URL just load the image data
-     * and place the contents of this string into the src attribute.
-     * <p>This is the easiest way to get an HTML with local images to work on all mobile platforms.
-     *
-     * @param data data of an image
-     * @param mime the mime type of the image e.g. image/png
-     * @return a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
-     */
+    /// This method creates a [data URI](http://en.wikipedia.org/wiki/Data_URI_scheme)
+    /// which allows developers creating HTML for local use to embed local images into the HTML by
+    /// appending them as a URI. E.g. instead of referencing a file or URL just load the image data
+    /// and place the contents of this string into the src attribute.
+    ///
+    /// This is the easiest way to get an HTML with local images to work on all mobile platforms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: data of an image
+    ///
+    /// - `mime`: the mime type of the image e.g. image/png
+    ///
+    /// #### Returns
+    ///
+    /// a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
     public static String createDataURI(byte[] data, String mime) {
         return "data:" + mime + ";base64," + Base64.encodeNoNewline(data);
     }
 
-    /**
-     * This is a callback method, this method is called before the url has been
-     * loaded
-     *
-     * @param url
-     */
+    /// This is a callback method, this method is called before the url has been
+    /// loaded
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`
     public void onStart(String url) {
     }
 
-    /**
-     * This is a callback method, this method is called after the url has been
-     * loaded
-     *
-     * @param url
-     */
+    /// This is a callback method, this method is called after the url has been
+    /// loaded
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`
     public void onLoad(String url) {
     }
 
-    /**
-     * The browser navigation callback interface allows handling a case where
-     * a URL invocation can be delegated to Java code. This allows binding
-     * Java side functionality to JavaScript functionality in the same
-     * way PhoneGap/Cordova work
-     *
-     * @return the callback interface
-     */
+    /// The browser navigation callback interface allows handling a case where
+    /// a URL invocation can be delegated to Java code. This allows binding
+    /// Java side functionality to JavaScript functionality in the same
+    /// way PhoneGap/Cordova work
+    ///
+    /// #### Returns
+    ///
+    /// the callback interface
     public BrowserNavigationCallback getBrowserNavigationCallback() {
         if (BrowserComponent.isNativeBrowserSupported()) {
             return ((BrowserComponent) this.getInternal()).getBrowserNavigationCallback();
@@ -278,45 +282,46 @@ public class WebBrowser extends Container {
         }
     }
 
-    /**
-     * Set the browser navigation callback which allows handling a case where
-     * a URL invocation can be delegated to Java code. This allows binding
-     * Java side functionality to JavaScript functionality in the same
-     * way PhoneGap/Cordova work
-     *
-     * @param callback the callback interface
-     */
+    /// Set the browser navigation callback which allows handling a case where
+    /// a URL invocation can be delegated to Java code. This allows binding
+    /// Java side functionality to JavaScript functionality in the same
+    /// way PhoneGap/Cordova work
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: the callback interface
     public void setBrowserNavigationCallback(BrowserNavigationCallback callback) {
         if (BrowserComponent.isNativeBrowserSupported()) {
             ((BrowserComponent) this.getInternal()).setBrowserNavigationCallback(callback);
         }
     }
 
-    /**
-     * This is a callback method to inform on an error.
-     *
-     * @param message
-     * @param errorCode
-     */
+    /// This is a callback method to inform on an error.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`
+    ///
+    /// - `errorCode`
     public void onError(String message, int errorCode) {
     }
 
-    /**
-     * Since the internal component can be either an HTMLComponent or a BrowserComponent one of them
-     * will be returned. If you are targeting modern smartphones only you can rely on this method
-     * returning a BrowserComponent instance.
-     *
-     * @return BrowserComponent or HTMLComponent
-     */
+    /// Since the internal component can be either an HTMLComponent or a BrowserComponent one of them
+    /// will be returned. If you are targeting modern smartphones only you can rely on this method
+    /// returning a BrowserComponent instance.
+    ///
+    /// #### Returns
+    ///
+    /// BrowserComponent or HTMLComponent
     public Component getInternal() {
         return internal;
     }
 
-    /**
-     * Returns the title for the browser page
-     *
-     * @return the title
-     */
+    /// Returns the title for the browser page
+    ///
+    /// #### Returns
+    ///
+    /// the title
     public String getTitle() {
         if (isNative) {
             return ((BrowserComponent) internal).getTitle();
@@ -325,11 +330,11 @@ public class WebBrowser extends Container {
         }
     }
 
-    /**
-     * The page URL
-     *
-     * @return the URL
-     */
+    /// The page URL
+    ///
+    /// #### Returns
+    ///
+    /// the URL
     public String getURL() {
         if (isNative) {
             return ((BrowserComponent) internal).getURL();
@@ -338,11 +343,11 @@ public class WebBrowser extends Container {
         }
     }
 
-    /**
-     * Sets the page URL, jar: URL's must be supported by the implementation
-     *
-     * @param url the URL
-     */
+    /// Sets the page URL, jar: URL's must be supported by the implementation
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
     public void setURL(String url) {
         if (isNative) {
             ((BrowserComponent) internal).setURL(url);
@@ -351,9 +356,7 @@ public class WebBrowser extends Container {
         }
     }
 
-    /**
-     * Reload the current page
-     */
+    /// Reload the current page
     public void reload() {
         if (isNative) {
             ((BrowserComponent) internal).reload();
@@ -362,9 +365,7 @@ public class WebBrowser extends Container {
         }
     }
 
-    /**
-     * Stop loading the current page
-     */
+    /// Stop loading the current page
     public void stop() {
         if (isNative) {
             ((BrowserComponent) internal).stop();
@@ -373,9 +374,7 @@ public class WebBrowser extends Container {
         }
     }
 
-    /**
-     * Release WebBrowser native resources.
-     */
+    /// Release WebBrowser native resources.
     public void destroy() {
         if (isNative) {
             // workaround for issue 827
@@ -385,12 +384,13 @@ public class WebBrowser extends Container {
         internal = null;
     }
 
-    /**
-     * Shows the given HTML in the native viewer
-     *
-     * @param html    HTML web page
-     * @param baseUrl base URL to associate with the HTML
-     */
+    /// Shows the given HTML in the native viewer
+    ///
+    /// #### Parameters
+    ///
+    /// - `html`: HTML web page
+    ///
+    /// - `baseUrl`: base URL to associate with the HTML
     public void setPage(String html, String baseUrl) {
         page = html;
         if (isNative) {
@@ -400,42 +400,34 @@ public class WebBrowser extends Container {
         }
     }
 
-    /**
-     * Returns the page set by getPage for the GUI builder
-     *
-     * @return the HTML page set manually
-     */
+    /// Returns the page set by getPage for the GUI builder
+    ///
+    /// #### Returns
+    ///
+    /// the HTML page set manually
     public String getPage() {
         return page;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"url", "html"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "String"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("url".equals(name)) {
@@ -447,9 +439,7 @@ public class WebBrowser extends Container {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("url".equals(name)) {

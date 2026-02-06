@@ -22,11 +22,9 @@
  */
 package com.codename1.contacts;
 
-/**
- * This class represents a Contact Address
- *
- * @author Chen
- */
+/// This class represents a Contact Address
+///
+/// @author Chen
 public class Address {
 
     private String streetAddress;
@@ -35,82 +33,52 @@ public class Address {
     private String postalCode;
     private String country;
 
-    /**
-     * Gets Address Country
-     *
-     * @return
-     */
+    /// Gets Address Country
     public String getCountry() {
         return country;
     }
 
-    /**
-     * Sets Address Country
-     */
+    /// Sets Address Country
     public void setCountry(String country) {
         this.country = country;
     }
 
-    /**
-     * Gets Address Locality
-     *
-     * @return
-     */
+    /// Gets Address Locality
     public String getLocality() {
         return locality;
     }
 
-    /**
-     * Sets Address Locality
-     */
+    /// Sets Address Locality
     public void setLocality(String locality) {
         this.locality = locality;
     }
 
-    /**
-     * Gets Address Postal Code
-     *
-     * @return
-     */
+    /// Gets Address Postal Code
     public String getPostalCode() {
         return postalCode;
     }
 
-    /**
-     * Sets Address Postal Code
-     */
+    /// Sets Address Postal Code
     public void setPostalCode(String postalCode) {
         this.postalCode = postalCode;
     }
 
-    /**
-     * Gets Address Region
-     *
-     * @return
-     */
+    /// Gets Address Region
     public String getRegion() {
         return region;
     }
 
-    /**
-     * Sets Address Region
-     */
+    /// Sets Address Region
     public void setRegion(String region) {
         this.region = region;
     }
 
-    /**
-     * Gets Address Street
-     *
-     * @return
-     */
+    /// Gets Address Street
     public String getStreetAddress() {
         return streetAddress;
     }
 
-    /**
-     * Sets Address street
-     */
+    /// Sets Address street
     public void setStreetAddress(String streetAddress) {
         this.streetAddress = streetAddress;
     }

@@ -10,36 +10,28 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Helper annotations for asynchronous computation.
- * Used for example in IntelliJ IDEA's debugger for async stacktraces feature.
- *
- * @author egor
- */
+/// Helper annotations for asynchronous computation.
+/// Used for example in IntelliJ IDEA's debugger for async stacktraces feature.
+///
+/// @author egor
 @SuppressWarnings("PMD.MissingStaticMethodInNonInstantiatableClass")
 public final class Async {
 
-    /**
-     * Prohibited default constructor.
-     */
+    /// Prohibited default constructor.
     private Async() {
         throw new AssertionError("Async should not be instantiated");
     }
 
-    /**
-     * Indicates that the marked method schedules async computation.
-     * Scheduled object is either {@code this}, or the annotated parameter value.
-     */
+    /// Indicates that the marked method schedules async computation.
+    /// Scheduled object is either `this`, or the annotated parameter value.
     @Retention(RetentionPolicy.CLASS)
     @Target({ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.PARAMETER})
     public @interface Schedule {
     }
 
-    /**
-     * Indicates that the marked method executes async computation.
-     * Executed object is either {@code this}, or the annotated parameter value.
-     * This object needs to match with the one annotated with {@link Schedule}
-     */
+    /// Indicates that the marked method executes async computation.
+    /// Executed object is either `this`, or the annotated parameter value.
+    /// This object needs to match with the one annotated with `Schedule`
     @Retention(RetentionPolicy.CLASS)
     @Target({ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.PARAMETER})
     public @interface Execute {

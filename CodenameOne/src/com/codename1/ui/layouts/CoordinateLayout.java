@@ -27,52 +27,50 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.geom.Dimension;
 
-/**
- * Allows laying out components based on absolute positions/sizes
- * that are adapted based on available space for the layout.
- * The layout
- *
- * @author Chen Fishbein
- * @deprecated the usage of this layout is strongly discouraged as elements will not adapt to the right position/size
- */
+/// Allows laying out components based on absolute positions/sizes
+/// that are adapted based on available space for the layout.
+/// The layout
+///
+/// @author Chen Fishbein
+///
+/// #### Deprecated
+///
+/// the usage of this layout is strongly discouraged as elements will not adapt to the right position/size
 public class CoordinateLayout extends Layout {
 
     private int width;
     private int height;
 
-    /**
-     * Allows creating a coordinate layouts that disables the scaling feature
-     */
+    /// Allows creating a coordinate layouts that disables the scaling feature
     public CoordinateLayout() {
         this.width = -1;
         this.height = -1;
     }
 
-    /**
-     * This constructor accepts the relative width and height used to define the
-     * aspect ratio of the Container
-     *
-     * @param width
-     * @param height
-     */
+    /// This constructor accepts the relative width and height used to define the
+    /// aspect ratio of the Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`
+    ///
+    /// - `height`
     public CoordinateLayout(int width, int height) {
         this.width = width;
         this.height = height;
     }
 
-    /**
-     * This constructor accepts the relative width and height used to define the
-     * aspect ratio of the Container
-     *
-     * @param d the width/height
-     */
+    /// This constructor accepts the relative width and height used to define the
+    /// aspect ratio of the Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the width/height
     public CoordinateLayout(Dimension d) {
         this(d.getWidth(), d.getHeight());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void layoutContainer(Container parent) {
         if (width < 0) {
@@ -96,9 +94,7 @@ public class CoordinateLayout extends Layout {
         height = parentH;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getPreferredSize(Container parent) {
         Dimension retVal = new Dimension();
@@ -112,9 +108,7 @@ public class CoordinateLayout extends Layout {
         return retVal;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isOverlapSupported() {
         return true;

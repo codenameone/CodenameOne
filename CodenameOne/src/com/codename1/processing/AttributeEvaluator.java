@@ -23,42 +23,38 @@
 package com.codename1.processing;
 
 
-/**
- * Private class, do not use
- * <p>
- * This evaluator handles expressions that involve an attribute. Examples:
- *
- * <code>
- * Get all players names that are from Canada
- * <p>
- * /tournament/player[@country='Canada']/name
- * <p>
- * Get all players names that have a country specified
- * <p>
- * /tournament/player[@country]/name
- * <p>
- * Get all players names that don't have a country specified
- * <p>
- * //player[@country=null]/name
- * <p>
- * Get the tax charged on all items over $5
- * <p>
- * //lineitem[@total > 5]/tax
- * <p>
- * Get the tax charged on all items under $5
- * <p>
- * //lineitem[@total < 5]/tax
- * </code>
- *
- * @author Eric Coolman
- */
+/// Private class, do not use
+///
+/// This evaluator handles expressions that involve an attribute. Examples:
+///
+/// `Get all players names that are from Canada
+///
+///  /tournament/player[@country='Canada']/name
+///
+///  Get all players names that have a country specified
+///
+///  /tournament/player[@country]/name
+///
+///  Get all players names that don't have a country specified
+///
+///  //player[@country=null]/name
+///
+///  Get the tax charged on all items over $5
+///
+///  //lineitem[@total > 5]/tax
+///
+///  Get the tax charged on all items under $5
+///
+///  //lineitem[@total < 5]/tax`
+///
+/// @author Eric Coolman
 class AttributeEvaluator extends AbstractEvaluator {
 
-    /**
-     * Construct with the full predicate expression.
-     *
-     * @param expr
-     */
+    /// Construct with the full predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `expr`
     protected AttributeEvaluator(String expr) {
         super(expr);
     }

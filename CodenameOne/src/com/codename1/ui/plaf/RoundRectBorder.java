@@ -33,21 +33,77 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * <p>Customizable rounded rectangle border that breaks down the border into customizable pieces.
- * <p>
- * The background is inherited from the parent UIID but stroke and shadow can be customized via user settings.
- * </p>
- * <p>
- * <strong>IMPORTANT:</strong> {@code RoundRectBorder} instances can't be reused
- * you would need to create a separate instance for each style object!
- * See <a href="https://github.com/codenameone/CodenameOne/issues/2578#issuecomment-429554441">this issue</a> for further details.
- * </p>
- * <script src="https://gist.github.com/codenameone/27bd5a15c7000118089d8037e2dd9367.js"></script>
- * <img src="https://www.codenameone.com/img/blog/round-rect-sample.png" alt="Round Rect Border" />
- *
- * @author Shai Almog
- */
+/// Customizable rounded rectangle border that breaks down the border into customizable pieces.
+///
+/// The background is inherited from the parent UIID but stroke and shadow can be customized via user settings.
+///
+/// **IMPORTANT:** `RoundRectBorder` instances can't be reused
+/// you would need to create a separate instance for each style object!
+/// See [this issue](https://github.com/codenameone/CodenameOne/issues/2578#issuecomment-429554441) for further details.
+///
+/// ```java
+/// Form hi = new Form("RoundRect", new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+///
+/// Button ok = new Button("OK");
+/// Button cancel = new Button("Cancel");
+///
+/// Label loginLabel = new Label("Login", "Container");
+/// loginLabel.getAllStyles().setAlignment(Component.CENTER);
+///
+/// Label passwordLabel = new Label("Password", "Container");
+/// passwordLabel.getAllStyles().setAlignment(Component.CENTER);
+///
+/// TextField login = new TextField("", "Login", 20, TextArea.ANY);
+/// TextField password = new TextField("", "Password", 20, TextArea.PASSWORD);
+/// Style loginStyle = login.getAllStyles();
+/// Stroke borderStroke = new Stroke(2, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1);
+/// loginStyle.setBorder(RoundRectBorder.create().
+///         strokeColor(0).
+///         strokeOpacity(120).
+///         stroke(borderStroke));
+/// loginStyle.setBgColor(0xffffff);
+/// loginStyle.setBgTransparency(255);
+/// loginStyle.setMarginUnit(Style.UNIT_TYPE_DIPS);
+/// loginStyle.setMargin(Component.BOTTOM, 3);
+/// Style passwordStyle = password.getAllStyles();
+/// passwordStyle.setBorder(RoundRectBorder.create().
+///         strokeColor(0).
+///         strokeOpacity(120).
+///         stroke(borderStroke));
+/// passwordStyle.setBgColor(0xffffff);
+/// passwordStyle.setBgTransparency(255);
+///
+/// Container box = BoxLayout.encloseY(
+///         loginLabel,
+///         login,
+///         passwordLabel,
+///         password,
+///             GridLayout.encloseIn(2, cancel, ok));
+///
+/// Button closeButton = new Button();
+/// Style closeStyle = closeButton.getAllStyles();
+/// closeStyle.setFgColor(0xffffff);
+/// closeStyle.setBgTransparency(0);
+/// closeStyle.setPaddingUnit(Style.UNIT_TYPE_DIPS);
+/// closeStyle.setPadding(3, 3, 3, 3);
+/// closeStyle.setBorder(RoundBorder.create().shadowOpacity(100));
+/// FontImage.setMaterialIcon(closeButton, FontImage.MATERIAL_CLOSE);
+///
+/// Container layers = LayeredLayout.encloseIn(box, FlowLayout.encloseRight(closeButton));
+/// Style boxStyle = box.getUnselectedStyle();
+/// boxStyle.setBgTransparency(255);
+/// boxStyle.setBgColor(0xeeeeee);
+/// boxStyle.setMarginUnit(Style.UNIT_TYPE_DIPS);
+/// boxStyle.setPaddingUnit(Style.UNIT_TYPE_DIPS);
+/// boxStyle.setMargin(4, 3, 3, 3);
+/// boxStyle.setPadding(2, 2, 2, 2);
+///
+/// hi.add(BorderLayout.CENTER, layers);
+///
+/// hi.show();
+/// ```
+///
+/// @author Shai Almog
 public final class RoundRectBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rrbcache";
     // these allow us to have more than one border per component in cache which is important for selected/unselected/pressed values
@@ -55,79 +111,55 @@ public final class RoundRectBorder extends Border {
     private final int instanceVal;
     private boolean useCache = true;
     private boolean dirty = true;
-    /**
-     * The color of the edge of the border if applicable
-     */
+    /// The color of the edge of the border if applicable
     private int strokeColor = 0;
-    /**
-     * The opacity of the edge of the border if applicable
-     */
+    /// The opacity of the edge of the border if applicable
     private int strokeOpacity = 255;
     private Stroke stroke;
-    /**
-     * Var to explicitly set the position of the arrow when tracking a component. Values
-     * between 0 and 1, with zero being the Top, and 1 being the bottom.  Default negative
-     * value indicates that it should just calculate the position as normal, suing the
-     * the provided tracking component bounds.
-     *
-     * @since 7.0
-     */
+    /// Var to explicitly set the position of the arrow when tracking a component. Values
+    /// between 0 and 1, with zero being the Top, and 1 being the bottom.  Default negative
+    /// value indicates that it should just calculate the position as normal, suing the
+    /// the provided tracking component bounds.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     private float trackComponentVerticalPosition = -1;
-    /**
-     * Var to explicitly set the position of the arrow when tracking a component. Values
-     * between 0 and 1, with zero being the left, and 1 being the right.  Default negative
-     * value indicates that it should just calculate the position as normal, suing the
-     * the provided tracking component bounds.
-     *
-     * @since 7.0
-     */
+    /// Var to explicitly set the position of the arrow when tracking a component. Values
+    /// between 0 and 1, with zero being the left, and 1 being the right.  Default negative
+    /// value indicates that it should just calculate the position as normal, suing the
+    /// the provided tracking component bounds.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     private float trackComponentHorizontalPosition = -1;
-    /**
-     * Var to explicitly set the position of the arrow when tracking a component. Acceptable
-     * values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, {@link Component#RIGHT}.
-     *
-     * @since 7.0
-     */
+    /// Var to explicitly set the position of the arrow when tracking a component. Acceptable
+    /// values `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`, `Component#RIGHT`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     private int trackComponentSide = -1;
-    /**
-     * The thickness of the edge of the border if applicable, 0 if no stroke is needed
-     */
+    /// The thickness of the edge of the border if applicable, 0 if no stroke is needed
     private float strokeThickness;
-    /**
-     * True if the thickness of the stroke is in millimeters
-     */
+    /// True if the thickness of the stroke is in millimeters
     private boolean strokeMM;
-    /**
-     * The spread of the shadow in millimeters
-     */
+    /// The spread of the shadow in millimeters
     private float shadowSpread;
-    /**
-     * The opacity of the shadow between 0 and 255
-     */
+    /// The opacity of the shadow between 0 and 255
     private int shadowOpacity = 0;
-    /**
-     * The color of the shadow as an RRGGBB color (no alpha)
-     */
+    /// The color of the shadow as an RRGGBB color (no alpha)
     private int shadowColor = 0;
-    /**
-     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
-     */
+    /// X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
     private float shadowX = 0.5f;
-    /**
-     * Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
-     */
+    /// Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
     private float shadowY = 0.5f;
-    /**
-     * The Gaussian blur size
-     */
+    /// The Gaussian blur size
     private float shadowBlur = 10;
-    /**
-     * The radius of the corners in millimeters
-     */
+    /// The radius of the corners in millimeters
     private float cornerRadius = 2;
-    /**
-     * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
-     */
+    /// True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
     private boolean bezierCorners;
     private boolean topLeft = true;
     private boolean topRight = true;
@@ -147,43 +179,55 @@ public final class RoundRectBorder extends Border {
         instanceVal = instanceCounter;
     }
 
-    /**
-     * Creates a flat border with styles derived from the component UIID
-     *
-     * @return a border instance
-     */
+    /// Creates a flat border with styles derived from the component UIID
+    ///
+    /// #### Returns
+    ///
+    /// a border instance
     public static RoundRectBorder create() {
         return new RoundRectBorder();
     }
 
-    /**
-     * Change the size of the arrow used for component tracking.
-     *
-     * @param size Size of arrow in millimeters.
-     * @return a border instance
-     * @since 7.0
-     */
+    /// Change the size of the arrow used for component tracking.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: Size of arrow in millimeters.
+    ///
+    /// #### Returns
+    ///
+    /// a border instance
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public RoundRectBorder arrowSize(float size) {
         this.arrowSize = size;
         return this;
     }
 
-    /**
-     * Change the size of the arrow used for component tracking.
-     *
-     * @param size Size of arrow in millimeters.
-     * @since 7.0
-     */
+    /// Change the size of the arrow used for component tracking.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: Size of arrow in millimeters.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setArrowSize(float size) {
         this.arrowSize = size;
     }
 
-    /**
-     * Sets the opacity of the stroke line around the border
-     *
-     * @param strokeOpacity the opacity from 0-255 where 255 is completely opaque
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the opacity of the stroke line around the border
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeOpacity`: the opacity from 0-255 where 255 is completely opaque
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder strokeOpacity(int strokeOpacity) {
         if (strokeOpacity != this.strokeOpacity) {
             this.strokeOpacity = strokeOpacity;
@@ -192,114 +236,146 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * Explicitly positions the arrow used for component tracking to a particular
-     * side of the border. This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
-     * Use in conjunction with {@link #trackComponentHorizontalPosition(float) }, and {@link #trackComponentHorizontalPosition}.
-     *
-     * @param side The side to place the tracking arrow on.  Values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT},
-     *             or {@link Component#BOTTOM}.  Set negative value for default behaviour, which is to just calculate the arrow position
-     *             based on the tracking component bounds.
-     * @return Self for chaining.
-     * @since 7.0
-     */
+    /// Explicitly positions the arrow used for component tracking to a particular
+    /// side of the border. This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component (`#setTrackComponent(com.codename1.ui.geom.Rectangle)`).
+    /// Use in conjunction with `#trackComponentHorizontalPosition(float)`, and `#trackComponentHorizontalPosition`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `side`: @param side The side to place the tracking arrow on.  Values `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`,
+    ///             or `Component#BOTTOM`.  Set negative value for default behaviour, which is to just calculate the arrow position
+    ///             based on the tracking component bounds.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public RoundRectBorder trackComponentSide(int side) {
         this.trackComponentSide = side;
         return this;
     }
 
-    /**
-     * Gets the side that the tracking component should be displayed on if using explicit placement.
-     *
-     * @return The side that the arrow should be rendered on. Values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, or a negative number to indicate that the position will be calculated based on the position of the tracking component.
-     * or {@link Component#BOTTOM}.
-     * @since 7.0
-     */
+    /// Gets the side that the tracking component should be displayed on if using explicit placement.
+    ///
+    /// #### Returns
+    ///
+    /// @return The side that the arrow should be rendered on. Values `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`, or a negative number to indicate that the position will be calculated based on the position of the tracking component.
+    /// or `Component#BOTTOM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public int getTrackComponentSide() {
         return trackComponentSide;
     }
 
-    /**
-     * Explicitly sets the vertical position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
-     *
-     * @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
-     *            default behaviour, which is to calculate the position based on the tracking component position.
-     * @return Self for chainging.
-     * @since 7.0
-     */
+    /// Explicitly sets the vertical position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component (`#setTrackComponent(com.codename1.ui.geom.Rectangle)`).
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
+    ///            default behaviour, which is to calculate the position based on the tracking component position.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chainging.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public RoundRectBorder trackComponentVerticalPosition(float pos) {
         this.trackComponentVerticalPosition = pos;
         return this;
     }
 
-    /**
-     * Gets the explicitly set vertical position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
-     *
-     * @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
-     * default behaviour, which is to calculate the position based on the tracking component position.
-     * @since 7.0
-     */
+    /// Gets the explicitly set vertical position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component (`#setTrackComponent(com.codename1.ui.geom.Rectangle)`).
+    ///
+    /// #### Returns
+    ///
+    /// @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
+    /// default behaviour, which is to calculate the position based on the tracking component position.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public float getTrackComponentVerticalPosition() {
         return trackComponentVerticalPosition;
     }
 
-    /**
-     * Explicitly sets the horizontal position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
-     *
-     * @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
-     *            default behaviour, which is to calculate the position based on the tracking component position.
-     * @return Self for chainging.
-     * @since 7.0
-     */
+    /// Explicitly sets the horizontal position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component (`#setTrackComponent(com.codename1.ui.geom.Rectangle)`).
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
+    ///            default behaviour, which is to calculate the position based on the tracking component position.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chainging.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public RoundRectBorder trackComponentHorizontalPosition(float pos) {
         this.trackComponentHorizontalPosition = pos;
         return this;
     }
 
-    /**
-     * Gets the explicitly set horizontal position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
-     *
-     * @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
-     * default behaviour, which is to calculate the position based on the tracking component position.
-     * @since 7.0
-     */
+    /// Gets the explicitly set horizontal position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component (`#setTrackComponent(com.codename1.ui.geom.Rectangle)`).
+    ///
+    /// #### Returns
+    ///
+    /// @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
+    /// default behaviour, which is to calculate the position based on the tracking component position.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public float getTrackComponentHorizontalPosition() {
         return trackComponentHorizontalPosition;
     }
 
-    /**
-     * Sets whether this RoundRectBorder instance should cache the border as a background image.
-     *
-     * <p>This setting is on by default, but can be turned off, as some older, low-memory devices may run into
-     * memory trouble if it is using a lot of RoundRectBorders.  Turn the cache off for low-memory devices.</p>
-     *
-     * <p><strong>NOTE:</strong> Using the cache is required for gaussian blur to work.  If cache is disabled,
-     * then gaussian blur settings will be ignored.</p>
-     *
-     * @param useCache True to cache the border as a mutable image on the Component.
-     * @return Self for chaining.
-     * @since 8.0
-     */
+    /// Sets whether this RoundRectBorder instance should cache the border as a background image.
+    ///
+    /// This setting is on by default, but can be turned off, as some older, low-memory devices may run into
+    /// memory trouble if it is using a lot of RoundRectBorders.  Turn the cache off for low-memory devices.
+    ///
+    /// **NOTE:** Using the cache is required for gaussian blur to work.  If cache is disabled,
+    /// then gaussian blur settings will be ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `useCache`: True to cache the border as a mutable image on the Component.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public RoundRectBorder useCache(boolean useCache) {
         this.useCache = useCache;
         return this;
     }
 
-    /**
-     * Checks whether this RoundRectBorder instance caches the border as a background image.
-     *
-     * @return
-     */
+    /// Checks whether this RoundRectBorder instance caches the border as a background image.
     public boolean isUseCache() {
         return this.useCache;
     }
 
-    /**
-     * Sets the stroke color of the border
-     *
-     * @param strokeColor the color
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the stroke color of the border
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeColor`: the color
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder strokeColor(int strokeColor) {
         if (strokeColor != this.strokeColor) {
             this.strokeColor = strokeColor;
@@ -308,12 +384,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the stroke of the border
-     *
-     * @param stroke the stroke object
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the stroke of the border
+    ///
+    /// #### Parameters
+    ///
+    /// - `stroke`: the stroke object
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder stroke(Stroke stroke) {
         if (stroke != null) {
             strokeThickness = stroke.getLineWidth();
@@ -324,13 +403,17 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the stroke of the border
-     *
-     * @param stroke the thickness of the stroke object
-     * @param mm     set to true to indicate the value is in millimeters, false indicates pixels
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the stroke of the border
+    ///
+    /// #### Parameters
+    ///
+    /// - `stroke`: the thickness of the stroke object
+    ///
+    /// - `mm`: set to true to indicate the value is in millimeters, false indicates pixels
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder stroke(float stroke, boolean mm) {
         strokeThickness = stroke;
         if (com.codename1.util.MathUtil.compare(strokeThickness, 0f) == 0) {
@@ -346,12 +429,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the spread of the shadow in millimeters i.e how much bigger is it than the actual border
-     *
-     * @param shadowSpread the amount in millimeters representing the size of the shadow
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the spread of the shadow in millimeters i.e how much bigger is it than the actual border
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowSpread`: the amount in millimeters representing the size of the shadow
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder shadowSpread(float shadowSpread) {
         if (com.codename1.util.MathUtil.compare(shadowSpread, this.shadowSpread) != 0) {
             this.shadowSpread = shadowSpread;
@@ -360,24 +446,30 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the spread in pixels of the shadow i.e how much bigger is it than the actual border
-     *
-     * @param shadowSpread the amount in pixels representing the size of the shadow
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the spread in pixels of the shadow i.e how much bigger is it than the actual border
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowSpread`: the amount in pixels representing the size of the shadow
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder shadowSpread(int shadowSpread) {
         this.shadowSpread = shadowSpread * 100f / Display.getInstance().convertToPixels(100f);
         dirty = true;
         return this;
     }
 
-    /**
-     * Sets the opacity of the shadow from 0 - 255 where 0 means no shadow and 255 means opaque black shadow
-     *
-     * @param shadowOpacity the opacity of the shadow
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the opacity of the shadow from 0 - 255 where 0 means no shadow and 255 means opaque black shadow
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowOpacity`: the opacity of the shadow
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder shadowOpacity(int shadowOpacity) {
         if (shadowOpacity != this.shadowOpacity) {
             this.shadowOpacity = shadowOpacity;
@@ -386,12 +478,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the color of the shadow as an RRGGBB color
-     *
-     * @param shadowColor the color of the shadow
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the color of the shadow as an RRGGBB color
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowColor`: the color of the shadow
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder shadowColor(int shadowColor) {
         if (shadowColor != this.shadowColor) {
             this.shadowColor = shadowColor;
@@ -400,12 +495,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * The position of the shadow on the X axis where 0.5f means the center and higher values draw it to the right side
-     *
-     * @param shadowX the position of the shadow between 0 - 1 where 0 equals left and 1 equals right
-     * @return border instance so these calls can be chained
-     */
+    /// The position of the shadow on the X axis where 0.5f means the center and higher values draw it to the right side
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowX`: the position of the shadow between 0 - 1 where 0 equals left and 1 equals right
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder shadowX(float shadowX) {
         if (com.codename1.util.MathUtil.compare(shadowX, this.shadowX) != 0) {
             this.shadowX = shadowX;
@@ -414,12 +512,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * The position of the shadow on the Y axis where 0.5f means the center and higher values draw it to the bottom
-     *
-     * @param shadowY the position of the shadow between 0 - 1 where 0 equals top and 1 equals bottom
-     * @return border instance so these calls can be chained
-     */
+    /// The position of the shadow on the Y axis where 0.5f means the center and higher values draw it to the bottom
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowY`: the position of the shadow between 0 - 1 where 0 equals top and 1 equals bottom
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder shadowY(float shadowY) {
         if (com.codename1.util.MathUtil.compare(shadowY, this.shadowY) != 0) {
             this.shadowY = shadowY;
@@ -428,12 +529,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * The blur on the shadow this is the standard Gaussian blur radius
-     *
-     * @param shadowBlur The blur on the shadow this is the standard Gaussian blur radius
-     * @return border instance so these calls can be chained
-     */
+    /// The blur on the shadow this is the standard Gaussian blur radius
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowBlur`: The blur on the shadow this is the standard Gaussian blur radius
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder shadowBlur(float shadowBlur) {
         if (com.codename1.util.MathUtil.compare(shadowBlur, this.shadowBlur) != 0) {
             this.shadowBlur = shadowBlur;
@@ -442,12 +546,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * The radius of the corners in millimeters
-     *
-     * @param cornerRadius the radius value
-     * @return border instance so these calls can be chained
-     */
+    /// The radius of the corners in millimeters
+    ///
+    /// #### Parameters
+    ///
+    /// - `cornerRadius`: the radius value
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder cornerRadius(float cornerRadius) {
         if (com.codename1.util.MathUtil.compare(cornerRadius, this.cornerRadius) != 0) {
             this.cornerRadius = cornerRadius;
@@ -456,12 +563,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * True if the corners are Bezier curves, otherwise the corners are drawn as a regular arc
-     *
-     * @param bezierCorners true if the corners use a bezier curve for drawing
-     * @return border instance so these calls can be chained
-     */
+    /// True if the corners are Bezier curves, otherwise the corners are drawn as a regular arc
+    ///
+    /// #### Parameters
+    ///
+    /// - `bezierCorners`: true if the corners use a bezier curve for drawing
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder bezierCorners(boolean bezierCorners) {
         if (bezierCorners != this.bezierCorners) {
             this.bezierCorners = bezierCorners;
@@ -470,12 +580,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * True to draw the top left corner rounded, false to draw it as a corner
-     *
-     * @param topLeft true for round false for sharp
-     * @return border instance so these calls can be chained
-     */
+    /// True to draw the top left corner rounded, false to draw it as a corner
+    ///
+    /// #### Parameters
+    ///
+    /// - `topLeft`: true for round false for sharp
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder topLeftMode(boolean topLeft) {
         if (topLeft != this.topLeft) {
             this.topLeft = topLeft;
@@ -485,12 +598,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * True to draw the top right corner rounded, false to draw it as a corner
-     *
-     * @param topRight true for round false for sharp
-     * @return border instance so these calls can be chained
-     */
+    /// True to draw the top right corner rounded, false to draw it as a corner
+    ///
+    /// #### Parameters
+    ///
+    /// - `topRight`: true for round false for sharp
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder topRightMode(boolean topRight) {
         if (topRight != this.topRight) {
             this.topRight = topRight;
@@ -499,12 +615,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * True to draw the bottom left corner rounded, false to draw it as a corner
-     *
-     * @param bottomLeft true for round false for sharp
-     * @return border instance so these calls can be chained
-     */
+    /// True to draw the bottom left corner rounded, false to draw it as a corner
+    ///
+    /// #### Parameters
+    ///
+    /// - `bottomLeft`: true for round false for sharp
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder bottomLeftMode(boolean bottomLeft) {
         if (bottomLeft != this.bottomLeft) {
             this.bottomLeft = bottomLeft;
@@ -513,12 +632,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * True to draw the bottom right corner rounded, false to draw it as a corner
-     *
-     * @param bottomRight true for round false for sharp
-     * @return border instance so these calls can be chained
-     */
+    /// True to draw the bottom right corner rounded, false to draw it as a corner
+    ///
+    /// #### Parameters
+    ///
+    /// - `bottomRight`: true for round false for sharp
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder bottomRightMode(boolean bottomRight) {
         if (bottomRight != this.bottomRight) {
             this.bottomRight = bottomRight;
@@ -527,12 +649,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
-     *
-     * @param topOnlyMode new value for top only mode
-     * @return border instance so these calls can be chained
-     */
+    /// Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `topOnlyMode`: new value for top only mode
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
         if (topOnlyMode) {
             topLeftMode(true);
@@ -547,12 +672,15 @@ public final class RoundRectBorder extends Border {
         return this;
     }
 
-    /**
-     * Special mode where only the bottom of the round rectangle is rounded and the top is a regular rectangle
-     *
-     * @param bottomOnlyMode new value for bottom only mode
-     * @return border instance so these calls can be chained
-     */
+    /// Special mode where only the bottom of the round rectangle is rounded and the top is a regular rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `bottomOnlyMode`: new value for bottom only mode
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
         if (bottomOnlyMode) {
             topLeftMode(false);
@@ -1013,130 +1141,130 @@ public final class RoundRectBorder extends Border {
         return true;
     }
 
-    /**
-     * The color of the edge of the border if applicable
-     *
-     * @return the strokeColor
-     */
+    /// The color of the edge of the border if applicable
+    ///
+    /// #### Returns
+    ///
+    /// the strokeColor
     public int getStrokeColor() {
         return strokeColor;
     }
 
-    /**
-     * The opacity of the edge of the border if applicable
-     *
-     * @return the strokeOpacity
-     */
+    /// The opacity of the edge of the border if applicable
+    ///
+    /// #### Returns
+    ///
+    /// the strokeOpacity
     public int getStrokeOpacity() {
         return strokeOpacity;
     }
 
-    /**
-     * The thickness of the edge of the border if applicable, 0 if no stroke is needed
-     *
-     * @return the strokeThickness
-     */
+    /// The thickness of the edge of the border if applicable, 0 if no stroke is needed
+    ///
+    /// #### Returns
+    ///
+    /// the strokeThickness
     public float getStrokeThickness() {
         return strokeThickness;
     }
 
-    /**
-     * True if the thickness of the stroke is in millimeters
-     *
-     * @return the strokeMM
-     */
+    /// True if the thickness of the stroke is in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// the strokeMM
     public boolean isStrokeMM() {
         return strokeMM;
     }
 
-    /**
-     * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
-     *
-     * @return true if the corners are a curve
-     */
+    /// True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
+    ///
+    /// #### Returns
+    ///
+    /// true if the corners are a curve
     public boolean isBezierCorners() {
         return bezierCorners;
     }
 
-    /**
-     * The spread of the shadow in pixels of millimeters
-     *
-     * @return the shadowSpread
-     */
+    /// The spread of the shadow in pixels of millimeters
+    ///
+    /// #### Returns
+    ///
+    /// the shadowSpread
     public float getShadowSpread() {
         return shadowSpread;
     }
 
-    /**
-     * The opacity of the shadow between 0 and 255
-     *
-     * @return the shadowOpacity
-     */
+    /// The opacity of the shadow between 0 and 255
+    ///
+    /// #### Returns
+    ///
+    /// the shadowOpacity
     public int getShadowOpacity() {
         return shadowOpacity;
     }
 
-    /**
-     * The color of the shadow as an RRGGBB color
-     *
-     * @return the shadowColor
-     */
+    /// The color of the shadow as an RRGGBB color
+    ///
+    /// #### Returns
+    ///
+    /// the shadowColor
     public int getShadowColor() {
         return shadowColor;
     }
 
-    /**
-     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
-     *
-     * @return the shadowX
-     */
+    /// X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
+    ///
+    /// #### Returns
+    ///
+    /// the shadowX
     public float getShadowX() {
         return shadowX;
     }
 
-    /**
-     * Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
-     *
-     * @return the shadowY
-     */
+    /// Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
+    ///
+    /// #### Returns
+    ///
+    /// the shadowY
     public float getShadowY() {
         return shadowY;
     }
 
-    /**
-     * The Gaussian blur size
-     *
-     * @return the shadowBlur
-     */
+    /// The Gaussian blur size
+    ///
+    /// #### Returns
+    ///
+    /// the shadowBlur
     public float getShadowBlur() {
         return shadowBlur;
     }
 
 
-    /**
-     * The radius of the corners in millimeters
-     *
-     * @return the radius
-     */
+    /// The radius of the corners in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// the radius
     public float getCornerRadius() {
         return cornerRadius;
     }
 
 
-    /**
-     * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
-     *
-     * @return whether this is the top only mode
-     */
+    /// Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
+    ///
+    /// #### Returns
+    ///
+    /// whether this is the top only mode
     public boolean isTopOnlyMode() {
         return topLeft && topRight && (!bottomLeft) && (!bottomRight);
     }
 
-    /**
-     * Special mode where only the bottom of the round rectangle is rounded and the top is a regular rectangle
-     *
-     * @return whether this is the bottom only mode
-     */
+    /// Special mode where only the bottom of the round rectangle is rounded and the top is a regular rectangle
+    ///
+    /// #### Returns
+    ///
+    /// whether this is the bottom only mode
     public boolean isBottomOnlyMode() {
         return (!topLeft) && (!topRight) && bottomLeft && bottomRight;
     }
@@ -1153,38 +1281,38 @@ public final class RoundRectBorder extends Border {
     }
 
 
-    /**
-     * Returns true if this border corner is round and false if it's square
-     *
-     * @return the topLeft value
-     */
+    /// Returns true if this border corner is round and false if it's square
+    ///
+    /// #### Returns
+    ///
+    /// the topLeft value
     public boolean isTopLeft() {
         return topLeft;
     }
 
-    /**
-     * Returns true if this border corner is round and false if it's square
-     *
-     * @return the topRight value
-     */
+    /// Returns true if this border corner is round and false if it's square
+    ///
+    /// #### Returns
+    ///
+    /// the topRight value
     public boolean isTopRight() {
         return topRight;
     }
 
-    /**
-     * Returns true if this border corner is round and false if it's square
-     *
-     * @return the bottomLeft value
-     */
+    /// Returns true if this border corner is round and false if it's square
+    ///
+    /// #### Returns
+    ///
+    /// the bottomLeft value
     public boolean isBottomLeft() {
         return bottomLeft;
     }
 
-    /**
-     * Returns true if this border corner is round and false if it's square
-     *
-     * @return the bottomRight value
-     */
+    /// Returns true if this border corner is round and false if it's square
+    ///
+    /// #### Returns
+    ///
+    /// the bottomRight value
     public boolean isBottomRight() {
         return bottomRight;
     }

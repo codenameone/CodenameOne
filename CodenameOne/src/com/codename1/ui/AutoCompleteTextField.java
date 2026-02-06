@@ -35,27 +35,78 @@ import com.codename1.ui.plaf.Style;
 
 import java.util.ArrayList;
 
-/**
- * <p>An editable {@link com.codename1.ui.TextField} with completion suggestions
- * that show up in a drop down menu while the user types in text. <br>
- * This class uses the "{@code TextField}" UIID by default as well as "{@code AutoCompletePopup}" &amp;
- * "{@code AutoCompleteList}" for the popup list details.<br>
- * The sample below shows the more trivial use case for this widget:
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/7e4dc757971e460e5823.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-autocomplete.png" alt="Simple usage of auto complete" />
- *
- * <p>
- * The following sample shows more dynamic usage of the class where the auto-complete model is mutated
- * based on webservice results.
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/6ac9cca810fc467ab15c192faf50907e.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/dynamic-autocomplete.png" alt="Dynamic autocomplete" />
- *
- * @author Chen
- */
+/// An editable `com.codename1.ui.TextField` with completion suggestions
+/// that show up in a drop down menu while the user types in text.
+///
+/// This class uses the "`TextField`" UIID by default as well as "`AutoCompletePopup`" &
+/// "`AutoCompleteList`" for the popup list details.
+///
+/// The sample below shows the more trivial use case for this widget:
+///
+/// ```java
+/// Form hi = new Form("Auto Complete", new BoxLayout(BoxLayout.Y_AXIS));
+/// AutoCompleteTextField ac = new AutoCompleteTextField("Short", "Shock", "Sholder", "Shrek");
+/// ac.setMinimumElementsShownInPopup(5);
+/// hi.add(ac);
+/// ```
+///
+/// The following sample shows more dynamic usage of the class where the auto-complete model is mutated
+/// based on webservice results.
+///
+/// ```java
+/// public void showForm() {
+///   final DefaultListModel options = new DefaultListModel<>();
+///   AutoCompleteTextField ac = new AutoCompleteTextField(options) {
+/// @Override
+///       protected boolean filter(String text) {
+///           if(text.length() == 0) {
+///               return false;
+///           }
+///           String[] l = searchLocations(text);
+///           if(l == null || l.length == 0) {
+///               return false;
+///           }
+///
+///           options.removeAll();
+///           for(String s : l) {
+///               options.addItem(s);
+///           }
+///           return true;
+///       }
+///
+///   };
+///   ac.setMinimumElementsShownInPopup(5);
+///   hi.add(ac);
+///   hi.add(new SpanLabel("This demo requires a valid google API key to be set below "
+///            + "you can get this key for the webservice (not the native key) by following the instructions here: "
+///            + "https://developers.google.com/places/web-service/get-api-key"));
+///   hi.add(apiKey);
+///   hi.getToolbar().addCommandToRightBar("Get Key", null, e -> Display.getInstance().execute("https://developers.google.com/places/web-service/get-api-key"));
+///   hi.show();
+/// }
+///
+/// TextField apiKey = new TextField();
+///
+/// String[] searchLocations(String text) {
+///     try {
+///         if(text.length() > 0) {
+///             ConnectionRequest r = new ConnectionRequest();
+///             r.setPost(false);
+///             r.setUrl("https://maps.googleapis.com/maps/api/place/autocomplete/json");
+///             r.addArgument("key", apiKey.getText());
+///             r.addArgument("input", text);
+///             NetworkManager.getInstance().addToQueueAndWait(r);
+///             Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), "UTF-8"));
+///             String[] res = Result.fromContent(result).getAsStringArray("//description");
+///             return res;
+///         }
+///     } catch(Exception err) {
+///         Log.e(err);
+///     }
+///     return null;
+/// }
+/// ```
+/// @author Chen
 public class AutoCompleteTextField extends TextField {
 
     public static final int POPUP_POSITION_AUTO = 0;
@@ -72,25 +123,23 @@ public class AutoCompleteTextField extends TextField {
     private String pickedText;
     private int minimumLength;
     private int popupPosition = POPUP_POSITION_AUTO;
-    /**
-     * The number of elements shown for the auto complete popup
-     */
+    /// The number of elements shown for the auto complete popup
     private int minimumElementsShownInPopup = -1;
 
-    /**
-     * Constructor with completion suggestions
-     *
-     * @param completion a String array of suggestion for completion
-     */
+    /// Constructor with completion suggestions
+    ///
+    /// #### Parameters
+    ///
+    /// - `completion`: a String array of suggestion for completion
     public AutoCompleteTextField(String... completion) {
         this(new DefaultListModel<String>(completion));
     }
 
-    /**
-     * Constructor with completion suggestions, filtering is automatic in this case
-     *
-     * @param listModel a list model containing potential string suggestions
-     */
+    /// Constructor with completion suggestions, filtering is automatic in this case
+    ///
+    /// #### Parameters
+    ///
+    /// - `listModel`: a list model containing potential string suggestions
     public AutoCompleteTextField(ListModel<String> listModel) {
         popup = new Container(new BoxLayout(BoxLayout.Y_AXIS)) {
 
@@ -128,17 +177,13 @@ public class AutoCompleteTextField extends TextField {
 
     }
 
-    /**
-     * The default constructor is useful for cases of filter subclasses overriding the
-     * getSuggestionModel value as well as for the GUI builder
-     */
+    /// The default constructor is useful for cases of filter subclasses overriding the
+    /// getSuggestionModel value as well as for the GUI builder
     public AutoCompleteTextField() {
         this(new DefaultListModel(""));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -153,9 +198,7 @@ public class AutoCompleteTextField extends TextField {
         });
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         super.deinitialize();
@@ -170,9 +213,7 @@ public class AutoCompleteTextField extends TextField {
         });
     }
 
-    /**
-     * Causes the popup UI to show
-     */
+    /// Causes the popup UI to show
     public void showPopup() {
         if (shouldShowPopup()) {
             pressInBounds = true;
@@ -189,9 +230,7 @@ public class AutoCompleteTextField extends TextField {
         super.setText(text);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setText(String text) {
         setTextImpl(text, false);
@@ -213,9 +252,7 @@ public class AutoCompleteTextField extends TextField {
         }
     }
 
-    /**
-     * In a case of an asynchronous filter this method can be invoked to refresh the completion list
-     */
+    /// In a case of an asynchronous filter this method can be invoked to refresh the completion list
     protected void updateFilterList() {
         Form f = getComponentForm();
         boolean v = filter.getSize() > 0 && getText().length() >= minimumLength;
@@ -249,12 +286,15 @@ public class AutoCompleteTextField extends TextField {
 
     }
 
-    /**
-     * Subclasses can override this method to perform more elaborate filter operations
-     *
-     * @param text the text to filter
-     * @return true if the filter has changed the list, false if it hasn't or is working asynchronously
-     */
+    /// Subclasses can override this method to perform more elaborate filter operations
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to filter
+    ///
+    /// #### Returns
+    ///
+    /// true if the filter has changed the list, false if it hasn't or is working asynchronously
     protected boolean filter(String text) {
         if (filter != null) {
             filter.filter(text);
@@ -292,27 +332,25 @@ public class AutoCompleteTextField extends TextField {
         return res;
     }
 
-    /**
-     * Returns the list model to show within the completion list
-     *
-     * @return the list model can be anything
-     */
+    /// Returns the list model to show within the completion list
+    ///
+    /// #### Returns
+    ///
+    /// the list model can be anything
     protected ListModel<String> getSuggestionModel() {
         return filter;
     }
 
-    /**
-     * Sets a custom renderer to the completion suggestions list.
-     *
-     * @param completionRenderer a ListCellRenderer for the suggestions List
-     */
+    /// Sets a custom renderer to the completion suggestions list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `completionRenderer`: a ListCellRenderer for the suggestions List
     public void setCompletionRenderer(ListCellRenderer completionRenderer) {
         this.completionRenderer = completionRenderer;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int k) {
         if (popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
@@ -325,9 +363,7 @@ public class AutoCompleteTextField extends TextField {
         super.keyPressed(k);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int k) {
         if (popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
@@ -357,24 +393,24 @@ public class AutoCompleteTextField extends TextField {
         }
     }
 
-    /**
-     * Adds an action listener that fires an event when an entry in the auto-complete list is selected.
-     * Notice that this method will only take effect when the popup is reshown, if it is invoked when
-     * a popup is already showing it will have no effect.
-     *
-     * @param a the listener
-     */
+    /// Adds an action listener that fires an event when an entry in the auto-complete list is selected.
+    /// Notice that this method will only take effect when the popup is reshown, if it is invoked when
+    /// a popup is already showing it will have no effect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the listener
     public void addListListener(ActionListener a) {
         listeners.add(a);
     }
 
-    /**
-     * Removes an action listener that fires an event when an entry in the auto-complete list is selected.
-     * Notice that this method will only take effect when the popup is reshown, if it is invoked when
-     * a popup is already showing it will have no effect.
-     *
-     * @param a the listener
-     */
+    /// Removes an action listener that fires an event when an entry in the auto-complete list is selected.
+    /// Notice that this method will only take effect when the popup is reshown, if it is invoked when
+    /// a popup is already showing it will have no effect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the listener
     public void removeListListener(ActionListener a) {
         listeners.remove(a);
     }
@@ -457,54 +493,54 @@ public class AutoCompleteTextField extends TextField {
         }
     }
 
-    /**
-     * Indicates the minimum length of text in the field in order for a popup to show
-     * the default is 0 where a popup is shown immediately for all text length if the number
-     * is 2 a popup will only appear when there are two characters or more.
-     *
-     * @return the minimumLength
-     */
+    /// Indicates the minimum length of text in the field in order for a popup to show
+    /// the default is 0 where a popup is shown immediately for all text length if the number
+    /// is 2 a popup will only appear when there are two characters or more.
+    ///
+    /// #### Returns
+    ///
+    /// the minimumLength
     public int getMinimumLength() {
         return minimumLength;
     }
 
-    /**
-     * Indicates the minimum length of text in the field in order for a popup to show
-     * the default is 0 where a popup is shown immediately for all text length if the number
-     * is 2 a popup will only appear when there are two characters or more.
-     *
-     * @param minimumLength the minimumLength to set
-     */
+    /// Indicates the minimum length of text in the field in order for a popup to show
+    /// the default is 0 where a popup is shown immediately for all text length if the number
+    /// is 2 a popup will only appear when there are two characters or more.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimumLength`: the minimumLength to set
     public void setMinimumLength(int minimumLength) {
         this.minimumLength = minimumLength;
     }
 
-    /**
-     * The number of elements shown for the auto complete popup
-     *
-     * @return the minimumElementsShownInPopup
-     */
+    /// The number of elements shown for the auto complete popup
+    ///
+    /// #### Returns
+    ///
+    /// the minimumElementsShownInPopup
     public int getMinimumElementsShownInPopup() {
         return minimumElementsShownInPopup;
     }
 
-    /**
-     * The number of elements shown for the auto complete popup
-     *
-     * @param minimumElementsShownInPopup the minimumElementsShownInPopup to set
-     */
+    /// The number of elements shown for the auto complete popup
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimumElementsShownInPopup`: the minimumElementsShownInPopup to set
     public void setMinimumElementsShownInPopup(int minimumElementsShownInPopup) {
         this.minimumElementsShownInPopup = minimumElementsShownInPopup;
     }
 
-    /**
-     * Set the autocomplete popup position in respect of the text field;
-     * POPUP_POSITION_AUTO is the default and it means that the popup is placed
-     * according to the available space.
-     *
-     * @param popupPosition on of POPUP_POSITION_AUTO, POPUP_POSITION_OVER,
-     *                      POPUP_POSITION_UNDER
-     */
+    /// Set the autocomplete popup position in respect of the text field;
+    /// POPUP_POSITION_AUTO is the default and it means that the popup is placed
+    /// according to the available space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `popupPosition`: @param popupPosition on of POPUP_POSITION_AUTO, POPUP_POSITION_OVER,
+    ///                      POPUP_POSITION_UNDER
     public void setPopupPosition(int popupPosition) {
         this.popupPosition = popupPosition;
     }
@@ -536,42 +572,34 @@ public class AutoCompleteTextField extends TextField {
         return popupHeight;
     }
 
-    /**
-     * Callback that allows subclasses to block the popup from showing
-     *
-     * @return true to allow the popup if applicable, false to block it
-     */
+    /// Callback that allows subclasses to block the popup from showing
+    ///
+    /// #### Returns
+    ///
+    /// true to allow the popup if applicable, false to block it
     protected boolean shouldShowPopup() {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"completion"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String[]"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("completion".equals(name)) {
@@ -580,11 +608,11 @@ public class AutoCompleteTextField extends TextField {
         return null;
     }
 
-    /**
-     * Returns the completion values
-     *
-     * @return array of completion entries
-     */
+    /// Returns the completion values
+    ///
+    /// #### Returns
+    ///
+    /// array of completion entries
     public String[] getCompletion() {
         String[] r = new String[filter.getUnderlying().getSize()];
         int rlen = r.length;
@@ -594,18 +622,16 @@ public class AutoCompleteTextField extends TextField {
         return r;
     }
 
-    /**
-     * Sets the completion values
-     *
-     * @param completion the completion values
-     */
+    /// Sets the completion values
+    ///
+    /// #### Parameters
+    ///
+    /// - `completion`: the completion values
     public void setCompletion(String... completion) {
         filter = new FilterProxyListModel<String>(new DefaultListModel<String>(completion));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("completion".equals(name)) {
@@ -615,20 +641,20 @@ public class AutoCompleteTextField extends TextField {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * When enabled this makes the filter check that the string starts with rather than within the index
-     *
-     * @return the startsWithMode
-     */
+    /// When enabled this makes the filter check that the string starts with rather than within the index
+    ///
+    /// #### Returns
+    ///
+    /// the startsWithMode
     public boolean isStartsWithMode() {
         return filter.isStartsWithMode();
     }
 
-    /**
-     * When enabled this makes the filter check that the string starts with rather than within the index
-     *
-     * @param startsWithMode the startsWithMode to set
-     */
+    /// When enabled this makes the filter check that the string starts with rather than within the index
+    ///
+    /// #### Parameters
+    ///
+    /// - `startsWithMode`: the startsWithMode to set
     public void setStartsWithMode(boolean startsWithMode) {
         filter.setStartsWithMode(startsWithMode);
     }

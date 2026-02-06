@@ -30,17 +30,13 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 
-/**
- * Base class for spinners
- *
- * @author Shai Almog
- */
+/// Base class for spinners
+///
+/// @author Shai Almog
 public abstract class BaseSpinner extends Container {
     private Style overlayStyle;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public BaseSpinner() {
         super(new BoxLayout(BoxLayout.X_AXIS));
         setUIIDFinal("SpinnerWrapper");
@@ -48,9 +44,7 @@ public abstract class BaseSpinner extends Container {
         installDefaultPainter(overlayStyle);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         if (!isInitialized()) {
@@ -64,9 +58,7 @@ public abstract class BaseSpinner extends Container {
         return d;
     }
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -77,9 +69,7 @@ public abstract class BaseSpinner extends Container {
     void initSpinner() {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -93,9 +83,7 @@ public abstract class BaseSpinner extends Container {
         return l;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void paintGlass(Graphics g) {
         super.paintGlass(g);

@@ -30,49 +30,37 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Helper weak hash map substitute
- *
- * @author Shai Almog
- */
+/// Helper weak hash map substitute
+///
+/// @author Shai Almog
 public class WeakHashMap<K, V> implements Map<K, V> {
     private final HashMap<K, Object> map = new HashMap<K, Object>();
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int size() {
         return map.size();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isEmpty() {
         return map.isEmpty();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean containsKey(Object key) {
         return map.containsKey(key);
     }
 
-    /**
-     * This method is unsupported in the weak hash map
-     */
+    /// This method is unsupported in the weak hash map
     @Override
     public boolean containsValue(Object value) {
         throw new RuntimeException();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public V get(Object key) {
         Object o = map.get(key);
@@ -82,18 +70,14 @@ public class WeakHashMap<K, V> implements Map<K, V> {
         return (V) Display.getInstance().extractHardRef(o);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public V put(K key, V value) {
         map.put(key, Display.getInstance().createSoftWeakRef(value));
         return value;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public V remove(Object key) {
         Object o = map.remove(key);
@@ -103,9 +87,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
         return (V) Display.getInstance().extractHardRef(o);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void putAll(Map<? extends K, ? extends V> m) {
         for (Map.Entry<? extends K, ? extends V> entry : m.entrySet()) {
@@ -113,33 +95,25 @@ public class WeakHashMap<K, V> implements Map<K, V> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void clear() {
         map.clear();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Set<K> keySet() {
         return map.keySet();
     }
 
-    /**
-     * Unsupported operation
-     */
+    /// Unsupported operation
     @Override
     public Collection<V> values() {
         throw new RuntimeException();
     }
 
-    /**
-     * Unsupported operation
-     */
+    /// Unsupported operation
     @Override
     public Set<Entry<K, V>> entrySet() {
         throw new RuntimeException();

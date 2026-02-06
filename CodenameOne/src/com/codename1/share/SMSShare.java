@@ -43,16 +43,12 @@ import com.codename1.ui.util.Resources;
 import java.io.IOException;
 import java.util.Hashtable;
 
-/**
- * SMS Sharing service
- *
- * @author Chen
- */
+/// SMS Sharing service
+///
+/// @author Chen
 public class SMSShare extends ShareService {
 
-    /**
-     * Default Constructor
-     */
+    /// Default Constructor
     public SMSShare() {
         super("SMS", null);
     }
@@ -68,9 +64,7 @@ public class SMSShare extends ShareService {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void share(final String toShare) {
         final Form currentForm = Display.getInstance().getCurrent();
@@ -160,9 +154,7 @@ public class SMSShare extends ShareService {
         return new GenericListCellRenderer(sel, unsel);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean canShareImage() {
         return false;

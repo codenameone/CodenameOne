@@ -23,20 +23,21 @@
 package com.codename1.ui;
 
 
-/**
- * Represents a virtual input device that may need to be closed/disposed, providing a way  Widgets that
- * require exclusive access to the user's input (but perhaps not all of the user interactions with the app)
- * need to provide a way for the form to dispose of it when a new input device needs to be displayed.
- *
- * <p>Examples of virtual input devices include the virtual keyboard and the Picker.</p>
- *
- * <p>VirtualInputDevices should implement the {@link #close() } method to safely dispose of itself.  Before displaying
- * the input device to the screen, it should call {@link Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice) }
- * which will execute the {@link #close() } method of the the current input device.</p>
- *
- * @author Steve Hannah
- * @see Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
- */
+/// Represents a virtual input device that may need to be closed/disposed, providing a way  Widgets that
+/// require exclusive access to the user's input (but perhaps not all of the user interactions with the app)
+/// need to provide a way for the form to dispose of it when a new input device needs to be displayed.
+///
+/// Examples of virtual input devices include the virtual keyboard and the Picker.
+///
+/// VirtualInputDevices should implement the `#close()` method to safely dispose of itself.  Before displaying
+/// the input device to the screen, it should call `Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)`
+/// which will execute the `#close()` method of the the current input device.
+///
+/// @author Steve Hannah
+///
+/// #### See also
+///
+/// - Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
 public interface VirtualInputDevice extends AutoCloseable {
 
 }

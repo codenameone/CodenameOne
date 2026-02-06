@@ -25,11 +25,9 @@ package com.codename1.io.gzip;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * Simple version of filter input stream
- *
- * @author Shai Almog
- */
+/// Simple version of filter input stream
+///
+/// @author Shai Almog
 public class FilterInputStream extends InputStream {
     protected InputStream in;
 

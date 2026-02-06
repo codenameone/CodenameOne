@@ -32,28 +32,22 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * This is an abstract Ads Service.
- * Each supported Ad network needs to extend this Service and to implement
- * the initService method
- *
- * @author Chen Fishbein
- */
+/// This is an abstract Ads Service.
+/// Each supported Ad network needs to extend this Service and to implement
+/// the initService method
+///
+/// @author Chen Fishbein
 public abstract class AdsService extends ConnectionRequest {
 
     private static Class service = InnerActive.class;
     private String currentAd;
     private boolean initialized = false;
 
-    /**
-     * Empty constructor
-     */
+    /// Empty constructor
     protected AdsService() {
     }
 
-    /**
-     * Creates a new AdsService to be used by the Ads Component
-     */
+    /// Creates a new AdsService to be used by the Ads Component
     public static AdsService createAdsService() {
         try {
             return (AdsService) service.newInstance();
@@ -66,18 +60,16 @@ public abstract class AdsService extends ConnectionRequest {
 
     }
 
-    /**
-     * Sets the provider of the ads service.
-     *
-     * @param provider this class needs to extend the AdsService class
-     */
+    /// Sets the provider of the ads service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: this class needs to extend the AdsService class
     public static void setAdsProvider(Class provider) {
         service = provider;
     }
 
-    /**
-     * Initialize the ads service.
-     */
+    /// Initialize the ads service.
     public void initialize(Ads adsComponent) {
         if (!initialized) {
             initService(adsComponent);
@@ -85,28 +77,20 @@ public abstract class AdsService extends ConnectionRequest {
         }
     }
 
-    /**
-     * init the service requests.
-     */
+    /// init the service requests.
     public abstract void initService(Ads adsComponent);
 
-    /**
-     * Returns the last requested ad
-     */
+    /// Returns the last requested ad
     public String getCurrentAd() {
         return currentAd;
     }
 
-    /**
-     * Schedule this service on the Network thread and executes the request
-     */
+    /// Schedule this service on the Network thread and executes the request
     public void requestAd() {
         NetworkManager.getInstance().addToQueue(this);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void readResponse(InputStream input) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -124,35 +108,29 @@ public abstract class AdsService extends ConnectionRequest {
         }
     }
 
-    /**
-     * This a callback method to inform to the service the Ad is displayed
-     *
-     * @param cmp
-     */
+    /// This a callback method to inform to the service the Ad is displayed
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`
     public void onAdDisplay(HTMLComponent cmp) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void handleErrorResponseCode(int code, String message) {
         //do nothing, ads failure should not interfere with application flow
         System.err.println("error=" + code + " " + message);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void handleRuntimeException(RuntimeException err) {
         //do nothing, ads failure should not interfere with application flow
         err.printStackTrace();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void handleException(Exception err) {
         //do nothing, ads failure should not interfere with application flow

@@ -32,48 +32,62 @@ import com.codename1.ui.table.TableLayout;
 
 import java.util.ArrayList;
 
-/**
- * <p>This is a special case layout specifically designed for {@link com.codename1.ui.InputComponent}.
- * When the  on top mode of text layout is used this layout acts exactly like a table layout and uses the
- * given constraints. When this mode is false it uses a regular box Y layout mode and orders the elements one
- * on top of the other.</p>
- * <p>One important difference between this layout and the default table layout is that the vertical alignment
- * here is set to {@code TOP} so the error label below doesn't break component alignment if two components
- * are on the same row and only one has an error message.
- * </p>
- * <p>
- * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
- * validation errors
- * </p>
- * <script src="https://gist.github.com/codenameone/5a28c7944aeab7d8ae6b26dc81690238.js"></script>
- * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-ios.png" alt="Running on iOS" />
- * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-android.png" alt="Running on Android" />
- * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-error-handling-blank.png" alt="Android validation errors" />
- *
- * @author Shai Almog
- */
+/// This is a special case layout specifically designed for `com.codename1.ui.InputComponent`.
+/// When the  on top mode of text layout is used this layout acts exactly like a table layout and uses the
+/// given constraints. When this mode is false it uses a regular box Y layout mode and orders the elements one
+/// on top of the other.
+///
+/// One important difference between this layout and the default table layout is that the vertical alignment
+/// here is set to `TOP` so the error label below doesn't break component alignment if two components
+/// are on the same row and only one has an error message.
+///
+/// The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
+/// validation errors
+///
+/// ```java
+/// TextModeLayout tl = new TextModeLayout(3, 2);
+/// Form f = new Form("Pixel Perfect", tl);
+///
+/// TextComponent title = new TextComponent().label("Title");
+/// TextComponent price = new TextComponent().label("Price");
+/// TextComponent location = new TextComponent().label("Location");
+/// PickerComponent date = PickerComponent.createDate(new Date()).label("Date");
+/// TextComponent description = new TextComponent().label("Description").multiline(true);
+///
+/// Validator val = new Validator();
+/// val.addConstraint(title, new LengthConstraint(2));
+/// val.addConstraint(price, new NumericConstraint(true));
+///
+/// f.add(tl.createConstraint().widthPercentage(60), title);
+/// f.add(tl.createConstraint().widthPercentage(40), date);
+/// f.add(location);
+/// f.add(price);
+/// f.add(tl.createConstraint().horizontalSpan(2), description);
+/// f.setEditOnShow(title.getField());
+///
+/// f.show();
+/// ```
+///
+/// @author Shai Almog
 public class TextModeLayout extends Layout {
-    /**
-     * The underlying table layout can be used freely to create constraints on the fly
-     */
+    /// The underlying table layout can be used freely to create constraints on the fly
     public final TableLayout table;
     private final Layout actual;
 
-    /**
-     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
-     * method on the text components in a BoxY layout scenario
-     */
+    /// Automatically invokes the `com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)`
+    /// method on the text components in a BoxY layout scenario
     private boolean autoGrouping = true;
 
     private int lastComponentCount = 0;
 
-    /**
-     * The constructor works like the standard table layout constructor and will behave as such with the on
-     * top mode
-     *
-     * @param rows    the number of rows
-     * @param columns the number of columns;
-     */
+    /// The constructor works like the standard table layout constructor and will behave as such with the on
+    /// top mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: the number of columns;
     public TextModeLayout(int rows, int columns) {
         table = new TableLayout(rows, columns);
         table.setGrowHorizontally(true);
@@ -84,9 +98,7 @@ public class TextModeLayout extends Layout {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
         if (actual == table) { //NOPMD CompareObjectsWithEquals
@@ -98,57 +110,43 @@ public class TextModeLayout extends Layout {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object cloneConstraint(Object constraint) {
         return actual.cloneConstraint(constraint);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getComponentConstraint(Component comp) {
         return actual.getComponentConstraint(comp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isConstraintTracking() {
         return actual.isConstraintTracking();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isOverlapSupported() {
         return actual.isOverlapSupported();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean obscuresPotential(Container parent) {
         return actual.obscuresPotential(parent);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeLayoutComponent(Component comp) {
         actual.removeLayoutComponent(comp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void layoutContainer(Container parent) {
         if (autoGrouping && actual != table && lastComponentCount != parent.getComponentCount()) { //NOPMD CompareObjectsWithEquals
@@ -168,70 +166,76 @@ public class TextModeLayout extends Layout {
         actual.layoutContainer(parent);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getPreferredSize(Container parent) {
         return actual.getPreferredSize(parent);
     }
 
-    /**
-     * Creates a new Constraint instance to add to the layout
-     *
-     * @return the default constraint
-     */
+    /// Creates a new Constraint instance to add to the layout
+    ///
+    /// #### Returns
+    ///
+    /// the default constraint
     public TableLayout.Constraint createConstraint() {
         return table.createConstraint().verticalAlign(Component.TOP);
     }
 
-    /**
-     * Creates a new Constraint instance to add to the layout
-     *
-     * @return the default constraint
-     */
+    /// Creates a new Constraint instance to add to the layout
+    ///
+    /// #### Returns
+    ///
+    /// the default constraint
     public TableLayout.Constraint cc() {
         return table.createConstraint().verticalAlign(Component.TOP);
     }
 
-    /**
-     * Creates a new Constraint instance to add to the layout
-     *
-     * @param row    the row for the table starting with 0
-     * @param column the column for the table starting with 0
-     * @return the new constraint
-     */
+    /// Creates a new Constraint instance to add to the layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row for the table starting with 0
+    ///
+    /// - `column`: the column for the table starting with 0
+    ///
+    /// #### Returns
+    ///
+    /// the new constraint
     public TableLayout.Constraint createConstraint(int row, int column) {
         return table.createConstraint(row, column).verticalAlign(Component.TOP);
     }
 
-    /**
-     * Creates a new Constraint instance to add to the layout
-     *
-     * @param row    the row for the table starting with 0
-     * @param column the column for the table starting with 0
-     * @return the default constraint
-     */
+    /// Creates a new Constraint instance to add to the layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row for the table starting with 0
+    ///
+    /// - `column`: the column for the table starting with 0
+    ///
+    /// #### Returns
+    ///
+    /// the default constraint
     public TableLayout.Constraint cc(int row, int column) {
         return table.createConstraint(row, column).verticalAlign(Component.TOP);
     }
 
-    /**
-     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
-     * method on the text components in a BoxY layout scenario
-     *
-     * @return the autoGrouping
-     */
+    /// Automatically invokes the `com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)`
+    /// method on the text components in a BoxY layout scenario
+    ///
+    /// #### Returns
+    ///
+    /// the autoGrouping
     public boolean isAutoGrouping() {
         return autoGrouping;
     }
 
-    /**
-     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
-     * method on the text components in a BoxY layout scenario
-     *
-     * @param autoGrouping the autoGrouping to set
-     */
+    /// Automatically invokes the `com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)`
+    /// method on the text components in a BoxY layout scenario
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoGrouping`: the autoGrouping to set
     public void setAutoGrouping(boolean autoGrouping) {
         this.autoGrouping = autoGrouping;
     }

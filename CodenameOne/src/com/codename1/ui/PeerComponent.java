@@ -25,38 +25,36 @@ package com.codename1.ui;
 
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * A peer component is essentially a "dummy" Codename One component used to calculate the position
- * of the actual native platform specific component. The behavior of a peer component is
- * very platform specific, it is meant for platforms where a native component can be
- * integrated with a Codename One component.
- * Codename One features such as glass pane, z-ordering, dialogs &amp; menus might not work
- * as expected in all situations where peer components are involved. E.g. a peer component
- * might hide itself when a menu/dialog is shown and recreate itself when it is hidden/disposed.
- *
- * @author Shai Almog
- */
+/// A peer component is essentially a "dummy" Codename One component used to calculate the position
+/// of the actual native platform specific component. The behavior of a peer component is
+/// very platform specific, it is meant for platforms where a native component can be
+/// integrated with a Codename One component.
+/// Codename One features such as glass pane, z-ordering, dialogs & menus might not work
+/// as expected in all situations where peer components are involved. E.g. a peer component
+/// might hide itself when a menu/dialog is shown and recreate itself when it is hidden/disposed.
+///
+/// @author Shai Almog
 public class PeerComponent extends Component {
     private final Rectangle lastPos = new Rectangle(-1, -1, -1, -1);
     private Object nativePeer;
     private Image peerImage;
 
-    /**
-     * This constructor is used by the platform implementation to create instances
-     * of this class use the static create method.
-     *
-     * @param nativePeer the native platform specific peer component.
-     */
+    /// This constructor is used by the platform implementation to create instances
+    /// of this class use the static create method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativePeer`: the native platform specific peer component.
     protected PeerComponent(Object nativePeer) {
         setGrabsPointerEvents(true);
         this.nativePeer = nativePeer;
     }
 
-    /**
-     * Use this method to encapsulate a native UI object
-     *
-     * @param nativePeer the native platform specific peer component.
-     */
+    /// Use this method to encapsulate a native UI object
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativePeer`: the native platform specific peer component.
     public static PeerComponent create(Object nativePeer) {
         if (nativePeer == null) {
             return null;
@@ -64,14 +62,14 @@ public class PeerComponent extends Component {
         return Display.impl.createNativePeer(nativePeer);
     }
 
-    /**
-     * The peer image is drawn when the component doesn't exist or during transition
-     * a placeholder image can be placed in the beginning to show something while
-     * the peer is being created asynchronously. This image might be replaced by
-     * an internal image representing the actual content of the peer
-     *
-     * @return an image
-     */
+    /// The peer image is drawn when the component doesn't exist or during transition
+    /// a placeholder image can be placed in the beginning to show something while
+    /// the peer is being created asynchronously. This image might be replaced by
+    /// an internal image representing the actual content of the peer
+    ///
+    /// #### Returns
+    ///
+    /// an image
     protected Image getPeerImage() {
         if (peerImage == null) {
             peerImage = generatePeerImage();
@@ -79,42 +77,42 @@ public class PeerComponent extends Component {
         return peerImage;
     }
 
-    /**
-     * The peer image is drawn when the component doesn't exist or during transition
-     * a placeholder image can be placed in the beginning to show something while
-     * the peer is being created asynchronously. This image might be replaced by
-     * an internal image representing the actual content of the peer
-     *
-     * @param i the peer image
-     */
+    /// The peer image is drawn when the component doesn't exist or during transition
+    /// a placeholder image can be placed in the beginning to show something while
+    /// the peer is being created asynchronously. This image might be replaced by
+    /// an internal image representing the actual content of the peer
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the peer image
     protected void setPeerImage(Image i) {
         peerImage = i;
     }
 
-    /**
-     * The native implementation should implement this method to generate a native peer
-     * image representing the component
-     *
-     * @return a screenshot of the component
-     */
+    /// The native implementation should implement this method to generate a native peer
+    /// image representing the component
+    ///
+    /// #### Returns
+    ///
+    /// a screenshot of the component
     protected Image generatePeerImage() {
         return null;
     }
 
-    /**
-     * Subclasses should return true here if the peer image should be rendered instead of the actual peer
-     *
-     * @return true to render the peer image
-     */
+    /// Subclasses should return true here if the peer image should be rendered instead of the actual peer
+    ///
+    /// #### Returns
+    ///
+    /// true to render the peer image
     protected boolean shouldRenderPeerImage() {
         return false;
     }
 
-    /**
-     * Returns the native peer instance
-     *
-     * @return the native peer
-     */
+    /// Returns the native peer instance
+    ///
+    /// #### Returns
+    ///
+    /// the native peer
     public Object getNativePeer() {
         return nativePeer;
     }
@@ -123,63 +121,47 @@ public class PeerComponent extends Component {
         this.nativePeer = nativePeer;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         Form.activePeerCount--;
         super.deinitialize();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireClicked() {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         Form.activePeerCount++;
         super.initComponent();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int keyCode) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyRepeated(int keyCode) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         onPositionSizeChangeImpl();
@@ -213,135 +195,101 @@ public class PeerComponent extends Component {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void onParentPositionChange() {
         onPositionSizeChangeImpl();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void paintBackground(Graphics g) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paintBackgrounds(Graphics g) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void paintBorder(Graphics g) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void paintScrollbarX(Graphics g) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void paintScrollbarY(Graphics g) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void paintScrollbars(Graphics g) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int[] x, int[] y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerHover(int[] x, int[] y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerHoverReleased(int[] x, int[] y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerPressed(int[] x, int[] y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int[] x, int[] y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
     }
 
-    /**
-     * Updates the size of the component from the native widget
-     */
+    /// Updates the size of the component from the native widget
     public void invalidate() {
         setShouldCalcPreferredSize(true);
         getComponentForm().revalidate();
     }
 
-    /**
-     * Callback useful for sublclasses that need to track the change in size/position
-     * of the component (notice that this might be invoked too many times for a single change)!
-     */
+    /// Callback useful for sublclasses that need to track the change in size/position
+    /// of the component (notice that this might be invoked too many times for a single change)!
     protected void onPositionSizeChange() {
     }
 
-    /**
-     * An optional callback for peers indicating that the peer is now rendered as part of
-     * a transition or some other state and is thus not truly visible. In this case the
-     * peer should either make itself invisible or render itself as an image instead of
-     * natively
-     *
-     * @param l true to enable lightweight mode, false to disable it
-     */
+    /// An optional callback for peers indicating that the peer is now rendered as part of
+    /// a transition or some other state and is thus not truly visible. In this case the
+    /// peer should either make itself invisible or render itself as an image instead of
+    /// natively
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: true to enable lightweight mode, false to disable it
     @Override
     protected void setLightweightMode(boolean l) {
     }

@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -26,19 +24,15 @@ import com.codename1.charts.renderers.XYSeriesRenderer;
 import java.util.List;
 
 
-/**
- * Extends {@link BarChart} to support values that represent ranges rather than
- * single points. Each bar is drawn from the lower value to the upper value in
- * the dataset.
- * <p>
- * Use this chart with an {@link XYMultipleSeriesDataset} containing
- * {@link XYSeries} instances where consecutive entries form the minimum/maximum
- * pair for a category.
- */
+/// Extends `BarChart` to support values that represent ranges rather than
+/// single points. Each bar is drawn from the lower value to the upper value in
+/// the dataset.
+///
+/// Use this chart with an `XYMultipleSeriesDataset` containing
+/// `XYSeries` instances where consecutive entries form the minimum/maximum
+/// pair for a category.
 public class RangeBarChart extends BarChart {
-    /**
-     * The chart type.
-     */
+    /// The chart type.
     public static final String TYPE = "RangeBar";
 
     RangeBarChart() {
@@ -48,28 +42,36 @@ public class RangeBarChart extends BarChart {
         super(type);
     }
 
-    /**
-     * Builds a new range bar chart instance.
-     *
-     * @param dataset  the multiple series dataset
-     * @param renderer the multiple series renderer
-     * @param type     the range bar chart type
-     */
+    /// Builds a new range bar chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the multiple series dataset
+    ///
+    /// - `renderer`: the multiple series renderer
+    ///
+    /// - `type`: the range bar chart type
     public RangeBarChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer, Type type) {
         super(dataset, renderer, type);
     }
 
-    /**
-     * The graphical representation of a series.
-     *
-     * @param canvas         the canvas to paint to
-     * @param paint          the paint to be used for drawing
-     * @param points         the array of points to be used for drawing the series
-     * @param seriesRenderer the series renderer
-     * @param yAxisValue     the minimum value of the y axis
-     * @param seriesIndex    the index of the series currently being drawn
-     * @param startIndex     the start index of the rendering points
-     */
+    /// The graphical representation of a series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesRenderer`: the series renderer
+    ///
+    /// - `yAxisValue`: the minimum value of the y axis
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points,
                            XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
@@ -95,17 +97,23 @@ public class RangeBarChart extends BarChart {
         paint.setColor(seriesRenderer.getColor());
     }
 
-    /**
-     * The graphical representation of the series values as text.
-     *
-     * @param canvas      the canvas to paint to
-     * @param series      the series to be painted
-     * @param renderer    the series renderer
-     * @param paint       the paint to be used for drawing
-     * @param points      the array of points to be used for drawing the series
-     * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex  the start index of the rendering points
-     */
+    /// The graphical representation of the series values as text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `series`: the series to be painted
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
     @Override
     protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
                                        Paint paint, List<Float> points, int seriesIndex, int startIndex) {
@@ -139,21 +147,21 @@ public class RangeBarChart extends BarChart {
         }
     }
 
-    /**
-     * Returns the value of a constant used to calculate the half-distance.
-     *
-     * @return the constant value
-     */
+    /// Returns the value of a constant used to calculate the half-distance.
+    ///
+    /// #### Returns
+    ///
+    /// the constant value
     @Override
     protected float getCoeficient() {
         return 0.5f;
     }
 
-    /**
-     * Returns the chart type identifier.
-     *
-     * @return the chart type
-     */
+    /// Returns the chart type identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the chart type
     @Override
     public String getChartType() {
         return TYPE;

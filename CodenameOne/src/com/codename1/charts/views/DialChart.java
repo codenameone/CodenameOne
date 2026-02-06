@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -26,45 +24,45 @@ import com.codename1.charts.util.MathHelper;
 import com.codename1.ui.Component;
 
 
-/**
- * Presents values from a {@link CategorySeries} as gauges on a dial.
- * <p>
- * Configure the dial appearance via a {@link DialRenderer} and supply both the
- * dataset and renderer to the constructor. Dial charts are typically wrapped in
- * a {@link com.codename1.charts.ChartComponent} so they can be placed inside
- * regular Codename One layouts.
- */
+/// Presents values from a `CategorySeries` as gauges on a dial.
+///
+/// Configure the dial appearance via a `DialRenderer` and supply both the
+/// dataset and renderer to the constructor. Dial charts are typically wrapped in
+/// a `com.codename1.charts.ChartComponent` so they can be placed inside
+/// regular Codename One layouts.
 public class DialChart extends RoundChart {
-    /**
-     * The radius of the needle.
-     */
+    /// The radius of the needle.
     private static final int NEEDLE_RADIUS = 10;
-    /**
-     * The series renderer.
-     */
+    /// The series renderer.
     private final DialRenderer mRenderer;
 
-    /**
-     * Builds a new dial chart instance.
-     *
-     * @param dataset  the series dataset
-     * @param renderer the dial renderer
-     */
+    /// Builds a new dial chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the series dataset
+    ///
+    /// - `renderer`: the dial renderer
     public DialChart(CategorySeries dataset, DialRenderer renderer) {
         super(dataset, renderer);
         mRenderer = renderer;
     }
 
-    /**
-     * The graphical representation of the dial chart.
-     *
-     * @param canvas the canvas to paint to
-     * @param x      the top left x value of the view to draw to
-     * @param y      the top left y value of the view to draw to
-     * @param width  the width of the view to draw to
-     * @param height the height of the view to draw to
-     * @param paint  the paint
-     */
+    /// The graphical representation of the dial chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `height`: the height of the view to draw to
+    ///
+    /// - `paint`: the paint
     @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
         paint.setAntiAlias(mRenderer.isAntialiasing());
@@ -144,16 +142,23 @@ public class DialChart extends RoundChart {
         drawTitle(canvas, x, y, width, paint);
     }
 
-    /**
-     * Returns the angle for a specific chart value.
-     *
-     * @param value    the chart value
-     * @param minAngle the minimum chart angle value
-     * @param maxAngle the maximum chart angle value
-     * @param min      the minimum chart value
-     * @param max      the maximum chart value
-     * @return the angle
-     */
+    /// Returns the angle for a specific chart value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the chart value
+    ///
+    /// - `minAngle`: the minimum chart angle value
+    ///
+    /// - `maxAngle`: the maximum chart angle value
+    ///
+    /// - `min`: the minimum chart value
+    ///
+    /// - `max`: the maximum chart value
+    ///
+    /// #### Returns
+    ///
+    /// the angle
     private double getAngleForValue(double value, double minAngle, double maxAngle, double min,
                                     double max) {
         double angleDiff = maxAngle - minAngle;
@@ -161,23 +166,37 @@ public class DialChart extends RoundChart {
         return Math.toRadians(minAngle + (value - min) * angleDiff / diff);
     }
 
-    /**
-     * Draws the chart tick lines.
-     *
-     * @param canvas      the canvas
-     * @param min         the minimum chart value
-     * @param max         the maximum chart value
-     * @param minAngle    the minimum chart angle value
-     * @param maxAngle    the maximum chart angle value
-     * @param centerX     the center x value
-     * @param centerY     the center y value
-     * @param longRadius  the long radius
-     * @param shortRadius the short radius
-     * @param ticks       the tick spacing
-     * @param paint       the paint settings
-     * @param labels      paint the labels
-     * @return the angle
-     */
+    /// Draws the chart tick lines.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `min`: the minimum chart value
+    ///
+    /// - `max`: the maximum chart value
+    ///
+    /// - `minAngle`: the minimum chart angle value
+    ///
+    /// - `maxAngle`: the maximum chart angle value
+    ///
+    /// - `centerX`: the center x value
+    ///
+    /// - `centerY`: the center y value
+    ///
+    /// - `longRadius`: the long radius
+    ///
+    /// - `shortRadius`: the short radius
+    ///
+    /// - `ticks`: the tick spacing
+    ///
+    /// - `paint`: the paint settings
+    ///
+    /// - `labels`: paint the labels
+    ///
+    /// #### Returns
+    ///
+    /// the angle
     private void drawTicks(Canvas canvas, double min, double max, double minAngle, double maxAngle,
                            int centerX, int centerY, double longRadius, double shortRadius, double ticks, Paint paint,
                            boolean labels) {
@@ -204,18 +223,27 @@ public class DialChart extends RoundChart {
         }
     }
 
-    /**
-     * Returns the angle for a specific chart value.
-     *
-     * @param canvas  the canvas
-     * @param angle   the needle angle value
-     * @param centerX the center x value
-     * @param centerY the center y value
-     * @param radius  the radius
-     * @param arrow   if a needle or an arrow to be painted
-     * @param paint   the paint settings
-     * @return the angle
-     */
+    /// Returns the angle for a specific chart value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `angle`: the needle angle value
+    ///
+    /// - `centerX`: the center x value
+    ///
+    /// - `centerY`: the center y value
+    ///
+    /// - `radius`: the radius
+    ///
+    /// - `arrow`: if a needle or an arrow to be painted
+    ///
+    /// - `paint`: the paint settings
+    ///
+    /// #### Returns
+    ///
+    /// the angle
     private void drawNeedle(Canvas canvas, double angle, int centerX, int centerY, double radius,
                             boolean arrow, Paint paint) {
         double diff = Math.toRadians(90);

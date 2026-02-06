@@ -22,27 +22,25 @@
  */
 package com.codename1.location;
 
-/**
- * This is a Listener to the Locations events see
- * LocationManager.setLocationListener
- */
+/// This is a Listener to the Locations events see
+/// LocationManager.setLocationListener
 public interface LocationListener {
 
-    /**
-     * This method is been called by the system when Location is being updated
-     *
-     * @param location a Location Object
-     */
+    /// This method is been called by the system when Location is being updated
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: a Location Object
     void locationUpdated(Location location);
 
-    /**
-     * This method is been called by the system when the provider state has
-     * being Changed
-     *
-     * @param newState a new state one of the following:
-     *                 LocationManager.AVAILABLE, LocationManager.OUT_OF_SERVICE or
-     *                 LocationManager.TEMPORARILY_UNAVAILABLE
-     */
+    /// This method is been called by the system when the provider state has
+    /// being Changed
+    ///
+    /// #### Parameters
+    ///
+    /// - `newState`: @param newState a new state one of the following:
+    ///                 LocationManager.AVAILABLE, LocationManager.OUT_OF_SERVICE or
+    ///                 LocationManager.TEMPORARILY_UNAVAILABLE
     void providerStateChanged(int newState);
 
 }

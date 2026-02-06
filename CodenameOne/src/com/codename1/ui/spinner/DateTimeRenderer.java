@@ -31,13 +31,14 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Map;
 
-/**
- * A renderer that can represent values for Date and time, time is represented as an integer
- * for seconds since midnight. This is formatted accordingly by the renderer
- *
- * @author Shai Almog
- * @deprecated use Picker instead
- */
+/// A renderer that can represent values for Date and time, time is represented as an integer
+/// for seconds since midnight. This is formatted accordingly by the renderer
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
 final class DateTimeRenderer extends SpinnerRenderer<Object> {
     static final String[] MONTHS = {
             "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -57,12 +58,13 @@ final class DateTimeRenderer extends SpinnerRenderer<Object> {
     private DateTimeRenderer() {
     }
 
-    /**
-     * Construct a time renderer
-     *
-     * @param twentyFourHours show the value as 24 hour values or AM/PM
-     * @param showSeconds     show the value of the seconds as well or hide it
-     */
+    /// Construct a time renderer
+    ///
+    /// #### Parameters
+    ///
+    /// - `twentyFourHours`: show the value as 24 hour values or AM/PM
+    ///
+    /// - `showSeconds`: show the value of the seconds as well or hide it
     public static DateTimeRenderer createTimeRenderer(boolean twentyFourHours, boolean showSeconds) {
         DateTimeRenderer d = new DateTimeRenderer();
         d.twentyFourHours = twentyFourHours;
@@ -70,12 +72,13 @@ final class DateTimeRenderer extends SpinnerRenderer<Object> {
         return d;
     }
 
-    /**
-     * Constructs a date renderer
-     *
-     * @param separatorChar char separating the entries within the renderer such as /, - etc.
-     * @param format        the date, one of the constant values in this class
-     */
+    /// Constructs a date renderer
+    ///
+    /// #### Parameters
+    ///
+    /// - `separatorChar`: char separating the entries within the renderer such as /, - etc.
+    ///
+    /// - `format`: the date, one of the constant values in this class
     public static DateTimeRenderer createDateRenderer(char separatorChar, int format) {
         DateTimeRenderer d = new DateTimeRenderer();
         d.date = true;
@@ -103,9 +106,7 @@ final class DateTimeRenderer extends SpinnerRenderer<Object> {
         return "" + i;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
         if (value instanceof String) {
@@ -213,9 +214,9 @@ final class DateTimeRenderer extends SpinnerRenderer<Object> {
         return text;
     }
 
-    /**
-     * @return the twentyFourHours
-     */
+    /// #### Returns
+    ///
+    /// the twentyFourHours
     public boolean isTwentyFourHours() {
         return twentyFourHours;
     }

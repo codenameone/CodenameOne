@@ -1,72 +1,63 @@
-/**
- * Copyright 2012 Kamran Zafar
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright 2012 Kamran Zafar
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
-/**
- * The original source has been modified by Paul Williams.
- */
+/// The original source has been modified by Paul Williams.
 
 package com.codename1.io.tar;
 
-/**
- * Header
- *
- * <pre>
- * Offset  Size     Field
- * 0       100      File name
- * 100     8        File mode
- * 108     8        Owner's numeric user ID
- * 116     8        Group's numeric user ID
- * 124     12       File size in bytes
- * 136     12       Last modification time in numeric Unix time format
- * 148     8        Checksum for header block
- * 156     1        Link indicator (file type)
- * 157     100      Name of linked file
- * </pre>
- * <p>
- * <p>
- * File Types
- *
- * <pre>
- * Value        Meaning
- * '0'          Normal file
- * (ASCII NUL)  Normal file (now obsolete)
- * '1'          Hard link
- * '2'          Symbolic link
- * '3'          Character special
- * '4'          Block special
- * '5'          Directory
- * '6'          FIFO
- * '7'          Contigous
- * </pre>
- * <p>
- * <p>
- * <p>
- * Ustar header
- *
- * <pre>
- * Offset  Size    Field
- * 257     6       UStar indicator "ustar"
- * 263     2       UStar version "00"
- * 265     32      Owner user name
- * 297     32      Owner group name
- * 329     8       Device major number
- * 337     8       Device minor number
- * 345     155     Filename prefix
- * </pre>
- */
+/// Header
+///
+/// ```java
+/// Offset  Size     Field
+/// 0       100      File name
+/// 100     8        File mode
+/// 108     8        Owner's numeric user ID
+/// 116     8        Group's numeric user ID
+/// 124     12       File size in bytes
+/// 136     12       Last modification time in numeric Unix time format
+/// 148     8        Checksum for header block
+/// 156     1        Link indicator (file type)
+/// 157     100      Name of linked file
+/// ```
+///
+/// File Types
+///
+/// ```java
+/// Value        Meaning
+/// '0'          Normal file
+/// (ASCII NUL)  Normal file (now obsolete)
+/// '1'          Hard link
+/// '2'          Symbolic link
+/// '3'          Character special
+/// '4'          Block special
+/// '5'          Directory
+/// '6'          FIFO
+/// '7'          Contigous
+/// ```
+///
+/// Ustar header
+///
+/// ```java
+/// Offset  Size    Field
+/// 257     6       UStar indicator "ustar"
+/// 263     2       UStar version "00"
+/// 265     32      Owner user name
+/// 297     32      Owner group name
+/// 329     8       Device major number
+/// 337     8       Device minor number
+/// 345     155     Filename prefix
+/// ```
 
 public class TarHeader {
 
@@ -99,14 +90,10 @@ public class TarHeader {
      */
 
     public static final int MAGICLEN = 8;
-    /**
-     * The magic tag representing a POSIX tar archive.
-     */
+    /// The magic tag representing a POSIX tar archive.
     public static final String TMAGIC = "ustar";
 
-    /**
-     * The magic tag representing a GNU tar archive.
-     */
+    /// The magic tag representing a GNU tar archive.
     public static final String GNU_TMAGIC = "ustar  ";
 
     public static final int UNAMELEN = 32;
@@ -157,15 +144,21 @@ public class TarHeader {
         this.groupName = new StringBuffer();
     }
 
-    /**
-     * Parse an entry name from a header buffer.
-     *
-     * @param name
-     * @param header The header buffer from which to parse.
-     * @param offset The offset into the buffer from which to parse.
-     * @param length The number of header bytes to parse.
-     * @return The header's entry name.
-     */
+    /// Parse an entry name from a header buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`
+    ///
+    /// - `header`: The header buffer from which to parse.
+    ///
+    /// - `offset`: The offset into the buffer from which to parse.
+    ///
+    /// - `length`: The number of header bytes to parse.
+    ///
+    /// #### Returns
+    ///
+    /// The header's entry name.
     public static StringBuffer parseName(byte[] header, int offset, int length) {
         StringBuffer result = new StringBuffer(length);
 
@@ -180,15 +173,21 @@ public class TarHeader {
         return result;
     }
 
-    /**
-     * Determine the number of bytes in an entry name.
-     *
-     * @param name
-     * @param header The header buffer from which to parse.
-     * @param offset The offset into the buffer from which to parse.
-     * @param length The number of header bytes to parse.
-     * @return The number of bytes in a header's entry name.
-     */
+    /// Determine the number of bytes in an entry name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`
+    ///
+    /// - `header`: The header buffer from which to parse.
+    ///
+    /// - `offset`: The offset into the buffer from which to parse.
+    ///
+    /// - `length`: The number of header bytes to parse.
+    ///
+    /// #### Returns
+    ///
+    /// The number of bytes in a header's entry name.
     public static int getNameBytes(StringBuffer name, byte[] buf, int offset, int length) {
         int i;
 

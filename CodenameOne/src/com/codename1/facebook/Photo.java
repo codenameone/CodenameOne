@@ -26,12 +26,10 @@ package com.codename1.facebook;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * This class represents a Facebook Photo Object
- * http://developers.facebook.com/docs/reference/api/photo/
- *
- * @author Chen Fishbein
- */
+/// This class represents a Facebook Photo Object
+/// http://developers.facebook.com/docs/reference/api/photo/
+///
+/// @author Chen Fishbein
 public class Photo extends FBObject {
 
     private final User from = new User();
@@ -47,158 +45,160 @@ public class Photo extends FBObject {
     private Vector images;
     private Vector comments;
 
-    /**
-     * Empty Contructor
-     */
+    /// Empty Contructor
     public Photo() {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public Photo(Hashtable props) {
         super(props);
         init(props);
     }
 
-    /**
-     * Get created_time
-     *
-     * @return created_time
-     * @deprecated Use {@link #getCreatedTime()}.
-     */
+    /// Get created_time
+    ///
+    /// #### Returns
+    ///
+    /// created_time
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#getCreatedTime()`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public String getCreated_time() {
         return getCreatedTime();
     }
 
-    /**
-     * Get created time.
-     *
-     * @return created time
-     */
+    /// Get created time.
+    ///
+    /// #### Returns
+    ///
+    /// created time
     public String getCreatedTime() {
         return created_time;
     }
 
-    /**
-     * Get from
-     *
-     * @return from
-     */
+    /// Get from
+    ///
+    /// #### Returns
+    ///
+    /// from
     public User getFrom() {
         return from;
     }
 
-    /**
-     * Get height
-     *
-     * @return height
-     */
+    /// Get height
+    ///
+    /// #### Returns
+    ///
+    /// height
     public int getHeight() {
         return height;
     }
 
-    /**
-     * Get iconUrl
-     *
-     * @return iconUrl
-     */
+    /// Get iconUrl
+    ///
+    /// #### Returns
+    ///
+    /// iconUrl
     public String getIconUrl() {
         return iconUrl;
     }
 
-    /**
-     * Get link
-     *
-     * @return link
-     */
+    /// Get link
+    ///
+    /// #### Returns
+    ///
+    /// link
     public String getLink() {
         return link;
     }
 
-    /**
-     * Get pictureUrl
-     *
-     * @return pictureUrl
-     */
+    /// Get pictureUrl
+    ///
+    /// #### Returns
+    ///
+    /// pictureUrl
     public String getPictureUrl() {
         return pictureUrl;
     }
 
-    /**
-     * Get position
-     *
-     * @return position
-     */
+    /// Get position
+    ///
+    /// #### Returns
+    ///
+    /// position
     public int getPosition() {
         return position;
     }
 
-    /**
-     * Get sourceUrl
-     *
-     * @return sourceUrl
-     */
+    /// Get sourceUrl
+    ///
+    /// #### Returns
+    ///
+    /// sourceUrl
     public String getSourceUrl() {
         return sourceUrl;
     }
 
-    /**
-     * Get updated_time
-     *
-     * @return updated_time
-     * @deprecated Use {@link #getUpdatedTime()}.
-     */
+    /// Get updated_time
+    ///
+    /// #### Returns
+    ///
+    /// updated_time
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#getUpdatedTime()`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public String getUpdated_time() {
         return getUpdatedTime();
     }
 
-    /**
-     * Get updated time.
-     *
-     * @return updated time
-     */
+    /// Get updated time.
+    ///
+    /// #### Returns
+    ///
+    /// updated time
     public String getUpdatedTime() {
         return updated_time;
     }
 
-    /**
-     * Get width
-     *
-     * @return width
-     */
+    /// Get width
+    ///
+    /// #### Returns
+    ///
+    /// width
     public int getWidth() {
         return width;
     }
 
-    /**
-     * Get images vector where each entry is a String of a url
-     *
-     * @return images
-     */
+    /// Get images vector where each entry is a String of a url
+    ///
+    /// #### Returns
+    ///
+    /// images
     public Vector getImages() {
         return images;
     }
 
-    /**
-     * Gets the comments on this Photos, where each
-     * entry is a Post Object
-     *
-     * @return a Vector of Post Objects
-     */
+    /// Gets the comments on this Photos, where each
+    /// entry is a Post Object
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Post Objects
     public Vector getComments() {
         return comments;
     }
 
-    /**
-     * copies the relevant values from the given hashtable
-     *
-     * @param props an hashtable to copy from
-     */
+    /// copies the relevant values from the given hashtable
+    ///
+    /// #### Parameters
+    ///
+    /// - `props`: an hashtable to copy from
     @Override
     public void copy(Hashtable props) {
         super.copy(props);
@@ -246,9 +246,7 @@ public class Photo extends FBObject {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         if (this == o) {

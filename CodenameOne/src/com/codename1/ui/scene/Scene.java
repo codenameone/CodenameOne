@@ -26,17 +26,16 @@ import com.codename1.properties.Property;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
 
-/**
- * A scene graph.  Supports 3D on platforms where {@link com.codename1.ui.Transform#isPerspectiveSupported() } is true (iOS and Android currently).
- *
- * @author Steve Hannah
- * @deprecated For internal use only
- */
+/// A scene graph.  Supports 3D on platforms where `com.codename1.ui.Transform#isPerspectiveSupported()` is true (iOS and Android currently).
+///
+/// @author Steve Hannah
+///
+/// #### Deprecated
+///
+/// For internal use only
 public class Scene extends Container {
     public final Property<Camera, Scene> camera;
-    /**
-     * The root node.
-     */
+    /// The root node.
     private Node root;
 
     public Scene() {
@@ -45,11 +44,11 @@ public class Scene extends Container {
     }
 
 
-    /**
-     * Set the root node.
-     *
-     * @param root The root node.
-     */
+    /// Set the root node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: The root node.
     public void setRoot(Node root) {
         if (this.root != null) {
             this.root.setScene(null);

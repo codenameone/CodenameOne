@@ -23,13 +23,14 @@
 package com.codename1.ui;
 
 
-/**
- * A utility wrapper that allows a Component to be used as an Image so that it can
- * be set as the icon for a Label or button.
- *
- * @author shannah
- * @since 8.0
- */
+/// A utility wrapper that allows a Component to be used as an Image so that it can
+/// be set as the icon for a Label or button.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 8.0
 public class ComponentImage extends Image {
 
     private final Component cmp;
@@ -42,13 +43,15 @@ public class ComponentImage extends Image {
     private double pulsingCurrStep = 0;
     private boolean animation;
 
-    /**
-     * Creates a new image that renders the given component.
-     *
-     * @param cmp The component to render.
-     * @param w   The width of the image.
-     * @param h   The height of the image.
-     */
+    /// Creates a new image that renders the given component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to render.
+    ///
+    /// - `w`: The width of the image.
+    ///
+    /// - `h`: The height of the image.
     public ComponentImage(Component cmp, int w, int h) {
         super(null);
         this.cmp = cmp;
@@ -56,12 +59,12 @@ public class ComponentImage extends Image {
         this.h = h;
     }
 
-    /**
-     * Creates a new image that renders the given component.  Uses the components current
-     * dimensions as the image width and height.
-     *
-     * @param cmp The component to render.
-     */
+    /// Creates a new image that renders the given component.  Uses the components current
+    /// dimensions as the image width and height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to render.
     ComponentImage(Component cmp) {
         super(null);
         this.cmp = cmp;
@@ -69,12 +72,13 @@ public class ComponentImage extends Image {
         h = cmp.getHeight();
     }
 
-    /**
-     * Creates a new image that renders an empty component.
-     *
-     * @param w The width of the image
-     * @param h The height of the image.
-     */
+    /// Creates a new image that renders an empty component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: The width of the image
+    ///
+    /// - `h`: The height of the image.
     ComponentImage(int w, int h) {
         super(null);
         cmp = new Label();
@@ -82,23 +86,22 @@ public class ComponentImage extends Image {
         this.h = h;
     }
 
-    /**
-     * Gets the wrapped component that is rendered by this image.
-     *
-     * @return
-     */
+    /// Gets the wrapped component that is rendered by this image.
     public Component getComponent() {
         return cmp;
     }
 
-    /**
-     * Enables a pulsing animation on the image.
-     *
-     * @param currStep The current step.
-     * @param stepSize The step size.
-     * @param minAlpha The min alpha
-     * @param maxAlpha The max alpha
-     */
+    /// Enables a pulsing animation on the image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `currStep`: The current step.
+    ///
+    /// - `stepSize`: The step size.
+    ///
+    /// - `minAlpha`: The min alpha
+    ///
+    /// - `maxAlpha`: The max alpha
     public void enablePulsingAnimation(double currStep, double stepSize, double minAlpha, double maxAlpha) {
         minAlpha = Math.min(1, Math.max(0, minAlpha));
         maxAlpha = Math.min(1, Math.max(0, maxAlpha));
@@ -109,49 +112,36 @@ public class ComponentImage extends Image {
         this.maxPulsingAlpha = maxAlpha;
     }
 
-    /**
-     * Disables the pulsing animation.
-     */
+    /// Disables the pulsing animation.
     public void disablePulsingAnimation() {
         pulsingAnimation = false;
 
     }
 
-    /**
-     * Checks if pulsing animation is enabled.
-     *
-     * @return
-     */
+    /// Checks if pulsing animation is enabled.
     public boolean isPulsingAnimationEnabled() {
         return pulsingAnimation;
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @return
-     */
+    /// {@inheritDoc }
     @Override
     public int getWidth() {
         return w;
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @return
-     */
+    /// {@inheritDoc }
     @Override
     public int getHeight() {
         return h;
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @param width
-     * @param height
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`
+    ///
+    /// - `height`
     @Override
     public void scale(int width, int height) {
         w = width;
@@ -166,55 +156,49 @@ public class ComponentImage extends Image {
         return out;
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @param mask
-     * @return
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Parameters
+    ///
+    /// - `mask`
     @Override
     public Image applyMask(Object mask) {
         return new ComponentImage(cmp, w, h);
     }
 
-    /**
-     * Checks if this is an animation.
-     *
-     * @return
-     */
+    /// Checks if this is an animation.
     @Override
     public boolean isAnimation() {
         return animation || pulsingAnimation;
     }
 
-    /**
-     * Sets whether this in an animation.
-     *
-     * @param anim True to make this an animated image
-     */
+    /// Sets whether this in an animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `anim`: True to make this an animated image
     public void setAnimation(boolean anim) {
         this.animation = anim;
     }
 
-    /**
-     * Overridden to always return true so that the paint() method is called
-     * on this image.
-     *
-     * @return
-     */
+    /// Overridden to always return true so that the paint() method is called
+    /// on this image.
     @Override
     public boolean requiresDrawImage() {
         return true;
     }
 
-    /**
-     * Draws the image.
-     *
-     * @param g              The graphics context
-     * @param nativeGraphics The native graphics context
-     * @param x              The x coordinate at which to draw the image.
-     * @param y              The y coordinate at which to draw the image.
-     */
+    /// Draws the image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics context
+    ///
+    /// - `nativeGraphics`: The native graphics context
+    ///
+    /// - `x`: The x coordinate at which to draw the image.
+    ///
+    /// - `y`: The y coordinate at which to draw the image.
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         int oldX = cmp.getX();
@@ -262,9 +246,7 @@ public class ComponentImage extends Image {
 
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         int oldW = this.w;
@@ -274,18 +256,14 @@ public class ComponentImage extends Image {
         this.h = oldH;
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public Image scaled(int width, int height) {
         return new ComponentImage(cmp, width, height);
     }
 
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public boolean animate() {
         if (pulsingAnimation) {
@@ -298,46 +276,34 @@ public class ComponentImage extends Image {
         return pulsingAnimation || animation;
     }
 
-    /**
-     * Converts to an encoded image.
-     *
-     * @return
-     */
+    /// Converts to an encoded image.
     public EncodedImage toEncodedImage() {
         return new EncodedWrapper();
     }
 
 
-    /**
-     * A wrapper for ComponentImage to convert it to an EncodedImage.
-     */
+    /// A wrapper for ComponentImage to convert it to an EncodedImage.
     public class EncodedWrapper extends EncodedImage {
 
         EncodedWrapper() {
             super(ComponentImage.this.getWidth(), ComponentImage.this.getHeight());
         }
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         public EncodedImage scaledEncoded(int width, int height) {
             return new ComponentImage(cmp, width, height).toEncodedImage();
 
         }
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         public Image scaled(int width, int height) {
             return new ComponentImage(cmp, width, height).toEncodedImage();
         }
 
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         protected Image getInternal() {
             return ComponentImage.this;

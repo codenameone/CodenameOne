@@ -52,242 +52,393 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * A tool to facilitate selection and manipulation of UI components as sets.  This uses fluent API style, similar
- * to jQuery to make it easy to find UI components and modify them as groups.
- *
- * <h3>Set Selection</h3>
- *
- * <p>Sets of components can either be created by explicitly adding components to the set, or by
- * providing a "selector" string that specifies how the set should be formed.  Some examples:</p>
- *
- * <ul>
- *   <li>{@code $("Label") }  - The set of all components on the current form with UIID="Label"</li>
- *   <li>{@code $("#AddressField") } - The set of components with name="AddressField"</li>
- *   <li>{@code $("TextField#AddressField") } - The set of components with UIID=TextField and Name=AddressField</li>
- *   <li>{@code $("Label, Button")} - Set of components in current form with UIID="Label" or UIID="Button"</li>
- *   <li>{@code $("Label", myContainer)} - Set of labels within the container {@code myContainer}</li>
- *   <li>{@code $("MyContainer *") } - All descendants of the container with UIID="MyContainer".  Will not include "MyContainer".</li>
- *   <li>{@code $("MyContainer > *") } - All children of of the container with UIID="MyContainer".</li>
- *   <li>{@code $("MyContainer > Label) } - All children with UIID=Label of container with UIID=MyContainer</li>
- *   <li>{@code $("Label").getParent() } - All parent components of labels in the current form.</li>
- * </ul>
- *
- * <h4>Tags</h4>
- *
- * <p>To make selection more flexible, you can "tag" components so that they can be easily targeted by a selector.
- * You can add tags to components using {@link #addTags(java.lang.String...) }, and remove them using {@link #removeTags(java.lang.String...) }.
- * Once you have tagged a component, it can be targeted quite easily using a selector.  Tags are specified in a selector with a {@literal .}
- * prefix.  E.g.:</p>
- *
- * <ul>
- *  <li>{@code $(".my-tag") } - The set of all components with tag "my-tag".</li>
- *  <li>{@code $("Label.my-tag") } - The set of all components with tag "my-tag" and UIID="Label"</li>
- *  <li>{@code $("Label.my-tag.myother-tag")} - The set of all components with tags "my-tag" and "myother-tag" and UIID="Label".  Matches only components that include all of those tags.</li>
- * </ul>
- *
- * <h3>Modifying Components in Set</h3>
- *
- * <p>While component selection alone in the ComponentSelector is quite powerful, the true power comes when
- * you start to operate on the entire set of components using the Fluent API of ComponentSelector.  ComponentSelector
- * includes wrapper methods for most of the mutator methods of {@link Component}, {@link Container}, and a few other common
- * component types.</p>
- *
- * <p>For example, the following two snippets are equivalent:</p>
- *
- * <pre>
- * {@code
- * for (Component c : $("Label")) {
- *     c.getStyle().setFgColor(0xff0000);
- * }
- * }
- * </pre>
- * <p>
- * and
- *
- * <pre>
- * {@code
- * $("Label").setFgColor(0xff0000);
- * }
- * </pre>
- *
- * <p>The second snippet is clearly easier to type and more compact.  But we can take it further.  The Fluent API
- * style allows you to chain together multiple method calls.  This even makes it desirable to operate on
- * single-element sets.  E.g.:</p>
- *
- * <pre>
- * {@code
- * Button myButton = $(new Button("Some text"))
- * .setUIID("Label")
- * .addTags("cell", "row-"+rowNum, "col-"+colNum, rowNum%2==0 ? "even":"odd")
- * .putClientProperty("row", rowNum)
- * .putClientProperty("col", colNum)
- * .asComponent(Button.class);
- * }
- * </pre>
- *
- * <p>
- * The above snippet wraps a new Button in a ComponentSelector, then uses the fluent API to apply several properties
- * to the button, before using {@link #asComponent()} to return the Button itself.
- * </p>
- *
- * <h3>API Overview</h3>
- *
- * <p>ComponentSelector includes a few different types of methods:</p>
- *
- * <ol>
- *   <li>Wrapper methods for {@link Component}, {@link Container}, etc... to operate on all applicable components in the set.</li>
- *   <li>Component Tree Traversal Methods to return other sets of components based on the current set.  E.g. {@link #find(java.lang.String) }, {@link #getParent()}, {@link #getComponentAt(int) },
- * {@link #closest(java.lang.String) }, {@link #nextSibling() }, {@link #prevSibling() }, {@link #parents(java.lang.String) },
- * {@link #getComponentForm() }, and many more.</li>
- *   <li>Effects. E.g. {@link #fadeIn() }, {@link #fadeOut() }, {@link #slideDown() }, {@link #slideUp() }, {@link #animateLayout(int) },
- * {@link #animateHierarchy(int) }, etc..</li>
- *   <li>Convenience methods to help with common tasks.  E.g. {@link #$(java.lang.Runnable) } as a short-hand for {@link Display#callSerially(java.lang.Runnable) }
- *   <li>Methods to implement {@link java.util.Set} because ComponentSelector is a set.</li>
- * </ol>
- *
- *
- * <h3>Effects</h3>
- *
- * <p>The following is an example form that demonstrates the use of ComponentSelector to
- * easily create effects on components in a form.</p>
- *
- * <p><script src="https://gist.github.com/shannah/536f852c3b7242a4d3106fc9e5b5d147.js"></script>
- * </p>
- *
- * <h3>Advanced Use of Tags</h3>
- *
- * <p>The following shows the use of tags to help with striping a table, and selecting rows
- * when clicked on.</p>
- *
- * <p><script src="https://gist.github.com/shannah/6da5728888e01abb54486a02b8c1a7c9.js"></script>
- * </p>
- *
- * <p>See full Demo App in this  <a href="https://github.com/shannah/cn1-component-selector-demo">Github Repo</a></p>
- *
- * <h3>Modifying Style Properties</h3>
- *
- * <p>Modifying styles deserves special mention because components have multiple {@link Style} objects associated with them.
- * {@link Component#getStyle() } returns the style of the component in its current state.  {@link Component#getPressedStyle() }
- * gets the pressed style of the component, {@link Component#getSelectedStyle() } get its selected style, etc..</p>
- *
- * <p>ComponentSelector wraps each of the {@literal getXXXStyle() } methods of {@link Component} with corresponding methods
- * that return proxy styles for all components in the set.  {@link #getStyle() } returns a proxy {@link Style} that proxies
- * all of the styles returned from each of the {@link Component#getStyle()} methods in the set.  {@link #getPressedStyle() } returns
- * a proxy for all of the pressed styles, etc..</p>
- *
- * <p>Example Modifying Text Color of All Buttons in a container when they are pressed only</p>
- *
- * <pre>
- * {@code
- * Style pressed = $("Button", myContainer).getPressedStyle();
- * pressed.setFgColor(0xff0000);
- * }
- * </pre>
- *
- * <p>A slightly more elegant pattern would be to use the {@link #selectPressedStyle() } method to set the default
- * style for mutations to "pressed".  Then we could use the fluent API of ComponentSelector to chain multiple style
- * mutations.  E.g.:
- * </p>
- *
- * <pre>
- * {@code
- * $("Button", myContainer)
- *     .selectPressedStyle()
- *     .setFgColor(0xffffff)
- *     .setBgColor(0x0)
- *     .setBgTransparency(255);
- * }
- * </pre>
- *
- * <p>A short-hand for this would be to add the {@literal :pressed} pseudo-class to the selector.  E.g.</p>
- *
- * <pre>
- * {@code
- * $("Button:pressed", myContainer)
- *     .setFgColor(0xffffff)
- *     .setBgColor(0x0)
- *     .setBgTransparency(255);
- * }
- * </pre>
- *
- * <p>The following style pseudo-classes are supported:</p>
- *
- * <ul>
- *    <li>{@literal :pressed} - Same as calling {@link #selectPressedStyle() }</li>
- *    <li>{@literal :selected} - Same as calling {@link #selectSelectedStyle() }</li>
- *    <li>{@literal :unselected} - Same as calling {@link #selectUnselectedStyle() }</li>
- *    <li>{@literal :all} - Same as calling {@link #selectAllStyles() }</li>
- *    <li>{@literal :*} - Alias for {@literal :all}</li>
- *    <li>{@literal :disabled} - Same as calling {@link #selectDisabledStyle() }</li>
- * </ul>
- *
- * <p>You can chain calls to {@literal selectedXXXStyle()}, enabling to chain together mutations of multiple different
- * style properties.  E.g  To change the pressed foreground color, and then change the selected foreground color, you could do:</p>
- *
- * <pre>
- * {@code
- * $("Button", myContainer)
- *    .selectPressedStyle()
- *    .setFgColor(0x0000ff)
- *    .selectSelectedStyle()
- *    .setFgColor(0x00ff00);
- * }
- * </pre>
- *
- * <h3>Filtering Sets</h3>
- *
- * <p>There are many ways to remove components from a set.  Obviously you can use the standard {@link java.util.Set } methods
- * to explicitly remove components from your set:</p>
- *
- * <pre>
- * {@code
- * ComponentSelector sel = $("Button").remove(myButton, true);
- *     // The set of all buttons on the current form, except myButton
- * }
- * </pre>
- * <p>
- * or
- *
- * <pre>
- * {@code
- * ComponentSelector sel = $("Button").removeAll($(".some-tag"), true);
- *    // The set of all buttons that do NOT contain the tag ".some-tag"
- * }
- * </pre>
- *
- * <p>You could also use the {@link #filter(com.codename1.ui.ComponentSelector.Filter) } to explicitly
- * declare which elements should be kept, and which should be discarded:</p>
- *
- * <pre>
- * {@code
- * ComponentSelector sel = $("Button").filter(c->{
- *     return c.isVisible();
- * });
- *     // The set of all buttons that are currently visible.
- * }
- * </pre>
- *
- * <h3>Tree Navigation</h3>
- *
- * <p>
- * One powerful aspect of working with sets of components is that you can generate very specific
- * sets of components using very simple queries.  Consider the following queries:</p>
- *
- * <ul>
- *     <li>{@code $(myButton1, myButton2).getParent()} - The set of parents of {@literal myButton1} and {@literal myButton2}.  If they have the
- * same parent, then this set will only contain a single element: the common parent container.   If they have different parents, then this
- * set will include both parent containers.</li>
- *     <li>{@code $(myButton).getParent().find(">TextField")} - The set of siblings of {@literal myButton} that have UIID=TextField</li>
- *     <li>{@code $(myButton).closest(".some-tag")} - The set containing the "nearest" parent container of {@literal myButton} that has
- * the tag ".some-tag".  If there are no matching components, then this will be an empty set.  This is formed by crawling up the tree
- * until it finds a matching component.  Works the same as jQuery's {@literal closest() } method.</li>
- *     <li>{@code $(".my-tag").getComponentAt(4)} - The set of 5th child components of containers with tag ".my-tag".</li>
- * </ul>
- *
- * @author shannah
- * @see <a href="https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html">jQuery/CSS Style Selectors for Codename One</a>
- */
+/// A tool to facilitate selection and manipulation of UI components as sets.  This uses fluent API style, similar
+/// to jQuery to make it easy to find UI components and modify them as groups.
+///
+/// Set Selection
+///
+/// Sets of components can either be created by explicitly adding components to the set, or by
+/// providing a "selector" string that specifies how the set should be formed.  Some examples:
+///
+///
+/// - `$("Label")`  - The set of all components on the current form with UIID="Label"
+///
+/// - `$("#AddressField")` - The set of components with name="AddressField"
+///
+/// - `$("TextField#AddressField")` - The set of components with UIID=TextField and Name=AddressField
+///
+/// - `$("Label, Button")` - Set of components in current form with UIID="Label" or UIID="Button"
+///
+/// - `$("Label", myContainer)` - Set of labels within the container `myContainer`
+///
+/// - `$("MyContainer *")` - All descendants of the container with UIID="MyContainer".  Will not include "MyContainer".
+///
+/// - `$("MyContainer > *")` - All children of of the container with UIID="MyContainer".
+///
+/// - `$("MyContainer > Label)` - All children with UIID=Label of container with UIID=MyContainer
+///
+/// - `$("Label").getParent()` - All parent components of labels in the current form.
+///
+/// Tags
+///
+/// To make selection more flexible, you can "tag" components so that they can be easily targeted by a selector.
+/// You can add tags to components using `#addTags(java.lang.String...)`, and remove them using `#removeTags(java.lang.String...)`.
+/// Once you have tagged a component, it can be targeted quite easily using a selector.  Tags are specified in a selector with a .
+/// prefix.  E.g.:
+///
+///
+/// - `$(".my-tag")` - The set of all components with tag "my-tag".
+///
+/// - `$("Label.my-tag")` - The set of all components with tag "my-tag" and UIID="Label"
+///
+/// - `$("Label.my-tag.myother-tag")` - The set of all components with tags "my-tag" and "myother-tag" and UIID="Label".  Matches only components that include all of those tags.
+///
+/// Modifying Components in Set
+///
+/// While component selection alone in the ComponentSelector is quite powerful, the true power comes when
+/// you start to operate on the entire set of components using the Fluent API of ComponentSelector.  ComponentSelector
+/// includes wrapper methods for most of the mutator methods of `Component`, `Container`, and a few other common
+/// component types.
+///
+/// For example, the following two snippets are equivalent:
+///
+/// ```java
+/// `for (Component c : $("Label")) {
+///     c.getStyle().setFgColor(0xff0000);`
+/// }
+/// ```
+///
+/// and
+///
+/// ```java
+/// `$("Label").setFgColor(0xff0000);`
+/// ```
+///
+/// The second snippet is clearly easier to type and more compact.  But we can take it further.  The Fluent API
+/// style allows you to chain together multiple method calls.  This even makes it desirable to operate on
+/// single-element sets.  E.g.:
+///
+/// ```java
+/// `Button myButton = $(new Button("Some text"))
+/// .setUIID("Label")
+/// .addTags("cell", "row-"+rowNum, "col-"+colNum, rowNum%2==0 ? "even":"odd")
+/// .putClientProperty("row", rowNum)
+/// .putClientProperty("col", colNum)
+/// .asComponent(Button.class);`
+/// ```
+///
+/// The above snippet wraps a new Button in a ComponentSelector, then uses the fluent API to apply several properties
+/// to the button, before using `#asComponent()` to return the Button itself.
+///
+/// API Overview
+///
+/// ComponentSelector includes a few different types of methods:
+///
+///
+/// - Wrapper methods for `Component`, `Container`, etc... to operate on all applicable components in the set.
+///
+/// - Component Tree Traversal Methods to return other sets of components based on the current set.  E.g. `#find(java.lang.String)`, `#getParent()`, `#getComponentAt(int)`,
+/// `#closest(java.lang.String)`, `#nextSibling()`, `#prevSibling()`, `#parents(java.lang.String)`,
+/// `#getComponentForm()`, and many more.
+///
+/// - Effects. E.g. `#fadeIn()`, `#fadeOut()`, `#slideDown()`, `#slideUp()`, `#animateLayout(int)`,
+/// `#animateHierarchy(int)`, etc..
+///
+/// - Convenience methods to help with common tasks.  E.g. `#$(java.lang.Runnable)` as a short-hand for `Display#callSerially(java.lang.Runnable)`
+///
+/// - Methods to implement `java.util.Set` because ComponentSelector is a set.
+///
+/// Effects
+///
+/// The following is an example form that demonstrates the use of ComponentSelector to
+/// easily create effects on components in a form.
+///
+/// ```java
+///     private void showEffectsForm() {
+///         Form f = new Form("Effects", new BorderLayout());
+///         applyToolbar(f);
+///         Button fadeInFadeOut = $(new Button("Fade"))
+///                 .setIcon(FontImage.MATERIAL_BLUR_ON, 4)
+///                 .addActionListener(e->{
+///                     $(e).getParent().find(">*").fadeOutAndWait(1000).fadeInAndWait(1000);
+///                 })
+///                 .asComponent(Button.class);
+///
+///
+///         Button slideUp = $(new Button("Slide Up"))
+///                 .setIcon(FontImage.MATERIAL_EXPAND_LESS)
+///                 .addActionListener(e->{
+///                     $(e).getParent().find(">*").slideUpAndWait(1000).slideDownAndWait(1000);
+///                 })
+///                 .asComponent(Button.class);
+///
+///
+///         Button replace = $(new Button("Replace Fade/Slide"))
+///                 .setIcon(FontImage.MATERIAL_REDEEM)
+///                 .addActionListener(e->{
+///                     $(e).getParent()
+///                             .find(">*")
+///                             .replaceAndWait(c->{
+///                                 return $(new Label("Replacement"))
+///                                         .putClientProperty("origComponent", c)
+///                                         .asComponent();
+///                             }, CommonTransitions.createFade(1000))
+///                             .replaceAndWait(c->{
+///                                 Component orig = (Component)c.getClientProperty("origComponent");
+///                                 if (orig != null) {
+///                                     c.putClientProperty("origComponent", null);
+///                                     return orig;
+///                                 }
+///                                 return c;
+///
+///                             }, CommonTransitions.createCover(CommonTransitions.SLIDE_HORIZONTAL, false, 1000));
+///
+///
+///                 })
+///                 .asComponent(Button.class);
+///
+///
+///         Button replaceFlip = $(new Button("Replace Flip"))
+///                 .setIcon(FontImage.MATERIAL_REDEEM)
+///                 .addActionListener(e->{
+///                     $(e).getParent()
+///                             .find(">*")
+///                             .replaceAndWait(c->{
+///                                 return $(new Label("Replacement"))
+///                                         .putClientProperty("origComponent", c)
+///                                         .asComponent();
+///                             },new FlipTransition(0xffffff, 1000))
+///                             .replaceAndWait(c->{
+///                                 Component orig = (Component)c.getClientProperty("origComponent");
+///                                 if (orig != null) {
+///                                     c.putClientProperty("origComponent", null);
+///                                     return orig;
+///                                 }
+///                                 return c;
+///
+///                             },new FlipTransition(0xffffff, 1000));
+///
+///
+///                 })
+///                 .asComponent(Button.class);
+///
+///         Container root = GridLayout.encloseIn(3, fadeInFadeOut, slideUp, replace, replaceFlip);
+///         f.addComponent(BorderLayout.CENTER, root);
+///         f.show();
+///     }
+/// ```
+///
+/// Advanced Use of Tags
+///
+/// The following shows the use of tags to help with striping a table, and selecting rows
+/// when clicked on.
+///
+/// ```java
+///     private void showTableDemo() {
+///         Form f = new Form("Table Demo", new BorderLayout());
+///         applyToolbar(f);
+///         CSVParser parser = new CSVParser();
+///         String[][] data = null;
+///         try {
+///             data =   parser.parse(Display.getInstance().getResourceAsStream(null, "/sample-data.csv"));
+///         } catch (Exception ex) {
+///             ex.printStackTrace();
+///         }
+///         if (data== null) {
+///             ToastBar.showMessage("Failed to parse sample data", FontImage.MATERIAL_INFO);
+///             return;
+///         }
+///         int numRows = data.length;
+///         int numCols = data[0].length;
+///         TableLayout tl = new TableLayout(numRows, numCols);
+///         Container table = new Container(tl);
+///         int rowNum = 0;
+///         int colNum = 0;
+///         for (String[] row : data) {
+///             colNum = 0;
+///             for (String cell : row) {
+///                 table.add(
+///                         tl.createConstraint(rowNum, colNum),
+///                         $(new Button(cell))
+///                                 .setUIID("Label")
+///                                 .addTags("cell", "row-"+rowNum, "col-"+colNum, rowNum%2==0 ? "even":"odd")
+///                                 .putClientProperty("row", rowNum)
+///                                 .putClientProperty("col", colNum)
+///                                 .asComponent()
+///
+///                 );
+///                 colNum++;
+///             }
+///             rowNum++;
+///         }
+///
+///
+///         $(".cell", table).setMargin(0).setPadding(0)
+///                 .addActionListener(e->{
+///                     // Action listener in each cell so that we can highlight the
+///                     // selected row
+///                     Component cell = (Component)e.getSource();
+///                     int row = (int)cell.getClientProperty("row");
+///                     int col = (int)cell.getClientProperty("col");
+///
+///                     // Restore the style of the previously selected row
+///                     // and remove the selected-row tag
+///                     $(e).getParent().find(">.selected-row")
+///                             .each(c->{
+///                                 // Restore the old style that we stored when we made
+///                                 // the row selected originally (see below)
+///                                 c.setUnselectedStyle((Style)c.getClientProperty("default-style"));
+///                             })
+///                             .removeTags("selected-row")
+///                             .getParent()
+///                             .repaint();
+///
+///                     // Now add the "selected-row" tag, and modify the styles
+///                     $(e).getParent().find(">.row-"+row).addTags("selected-row")
+///                             .each(c->{
+///                                 // Store the existing style so that we can
+///                                 // reapply it when the row becomes unselected
+///                                 Style oldStyle = new Style(c.getStyle());
+///                                 c.putClientProperty("default-style", oldStyle);
+///                             })
+///                             .setBgColor(0x89cff0)
+///                             .setFgColor(0xffffff)
+///                             .setBgTransparency(255)
+///                             .getParent()
+///                             .repaint();
+///                 });
+///
+///         // Add striping to the table  (make the even rows gray)
+///         $(".even", table)
+///             .setBgColor(0xcccccc)
+///             .setBgTransparency(255);
+///
+///
+///
+///
+///         f.addComponent(BorderLayout.CENTER, $(BoxLayout.encloseY(table)).setScrollableY(true).asComponent());
+///
+///         f.show();
+///     }
+/// ```
+///
+/// See full Demo App in this  [Github Repo](https://github.com/shannah/cn1-component-selector-demo)
+///
+/// Modifying Style Properties
+///
+/// Modifying styles deserves special mention because components have multiple `Style` objects associated with them.
+/// `Component#getStyle()` returns the style of the component in its current state.  `Component#getPressedStyle()`
+/// gets the pressed style of the component, `Component#getSelectedStyle()` get its selected style, etc..
+///
+/// ComponentSelector wraps each of the getXXXStyle() methods of `Component` with corresponding methods
+/// that return proxy styles for all components in the set.  `#getStyle()` returns a proxy `Style` that proxies
+/// all of the styles returned from each of the `Component#getStyle()` methods in the set.  `#getPressedStyle()` returns
+/// a proxy for all of the pressed styles, etc..
+///
+/// Example Modifying Text Color of All Buttons in a container when they are pressed only
+///
+/// ```java
+/// `Style pressed = $("Button", myContainer).getPressedStyle();
+/// pressed.setFgColor(0xff0000);`
+/// ```
+///
+/// A slightly more elegant pattern would be to use the `#selectPressedStyle()` method to set the default
+/// style for mutations to "pressed".  Then we could use the fluent API of ComponentSelector to chain multiple style
+/// mutations.  E.g.:
+///
+/// ```java
+/// `$("Button", myContainer)
+///     .selectPressedStyle()
+///     .setFgColor(0xffffff)
+///     .setBgColor(0x0)
+///     .setBgTransparency(255);`
+/// ```
+///
+/// A short-hand for this would be to add the :pressed pseudo-class to the selector.  E.g.
+///
+/// ```java
+/// `$("Button:pressed", myContainer)
+///     .setFgColor(0xffffff)
+///     .setBgColor(0x0)
+///     .setBgTransparency(255);`
+/// ```
+///
+/// The following style pseudo-classes are supported:
+///
+///
+/// - :pressed - Same as calling `#selectPressedStyle()`
+///
+/// - :selected - Same as calling `#selectSelectedStyle()`
+///
+/// - :unselected - Same as calling `#selectUnselectedStyle()`
+///
+/// - :all - Same as calling `#selectAllStyles()`
+///
+/// - :* - Alias for :all
+///
+/// - :disabled - Same as calling `#selectDisabledStyle()`
+///
+/// You can chain calls to selectedXXXStyle(), enabling to chain together mutations of multiple different
+/// style properties.  E.g  To change the pressed foreground color, and then change the selected foreground color, you could do:
+///
+/// ```java
+/// `$("Button", myContainer)
+///    .selectPressedStyle()
+///    .setFgColor(0x0000ff)
+///    .selectSelectedStyle()
+///    .setFgColor(0x00ff00);`
+/// ```
+///
+/// Filtering Sets
+///
+/// There are many ways to remove components from a set.  Obviously you can use the standard `java.util.Set` methods
+/// to explicitly remove components from your set:
+///
+/// ```java
+/// `ComponentSelector sel = $("Button").remove(myButton, true);
+///     // The set of all buttons on the current form, except myButton`
+/// ```
+///
+/// or
+///
+/// ```java
+/// `ComponentSelector sel = $("Button").removeAll($(".some-tag"), true);
+///    // The set of all buttons that do NOT contain the tag ".some-tag"`
+/// ```
+///
+/// You could also use the `#filter(com.codename1.ui.ComponentSelector.Filter)` to explicitly
+/// declare which elements should be kept, and which should be discarded:
+///
+/// ```java
+/// `ComponentSelector sel = $("Button").filter(c->{
+///     return c.isVisible();`);
+///     // The set of all buttons that are currently visible.
+/// }
+/// ```
+///
+/// Tree Navigation
+///
+/// One powerful aspect of working with sets of components is that you can generate very specific
+/// sets of components using very simple queries.  Consider the following queries:
+///
+///
+/// - `$(myButton1, myButton2).getParent()` - The set of parents of myButton1 and myButton2.  If they have the
+/// same parent, then this set will only contain a single element: the common parent container.   If they have different parents, then this
+/// set will include both parent containers.
+///
+/// - `$(myButton).getParent().find(">TextField")` - The set of siblings of myButton that have UIID=TextField
+///
+/// - `$(myButton).closest(".some-tag")` - The set containing the "nearest" parent container of myButton that has
+/// the tag ".some-tag".  If there are no matching components, then this will be an empty set.  This is formed by crawling up the tree
+/// until it finds a matching component.  Works the same as jQuery's closest() method.
+///
+/// - `$(".my-tag").getComponentAt(4)` - The set of 5th child components of containers with tag ".my-tag".
+///
+/// @author shannah
+///
+/// #### See also
+///
+/// - [jQuery/CSS Style Selectors for Codename One](https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html)
 public class ComponentSelector implements Iterable<Component>, Set<Component> {
     private static final String PROPERTY_TAG = "com.codename1.ui.ComponentSelector#tags";
     private static final int ALL_STYLES = 1;
@@ -309,28 +460,28 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     private int currentStyleType = 0;
 
 
-    /**
-     * Creates a component selector that wraps the provided components.  The provided
-     * components are treated as the "results" of this selector.  Not the roots.  However
-     * you can use {@link #find(java.lang.String) } to perform a query using this selector
-     * as the roots.
-     *
-     * @param cmps Components to add to this selector results.
-     */
+    /// Creates a component selector that wraps the provided components.  The provided
+    /// components are treated as the "results" of this selector.  Not the roots.  However
+    /// you can use `#find(java.lang.String)` to perform a query using this selector
+    /// as the roots.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: Components to add to this selector results.
     public ComponentSelector(Component... cmps) {
         this.roots = new LinkedHashSet<Component>();
         this.results = new LinkedHashSet<Component>();
         Collections.addAll(this.results, cmps);
     }
 
-    /**
-     * Creates a component selector that wraps the provided components.  The provided
-     * components are treated as the "results" of this selector.  Not the roots.  However
-     * you can use {@link #find(java.lang.String) } to perform a query using this selector
-     * as the roots.
-     *
-     * @param cmps Components to add to this selector results.
-     */
+    /// Creates a component selector that wraps the provided components.  The provided
+    /// components are treated as the "results" of this selector.  Not the roots.  However
+    /// you can use `#find(java.lang.String)` to perform a query using this selector
+    /// as the roots.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: Components to add to this selector results.
     public ComponentSelector(Set<Component> cmps) {
         this.roots = new LinkedHashSet<Component>();
         this.results = new LinkedHashSet<Component>();
@@ -338,14 +489,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     }
 
-    /**
-     * Creates a selector that will query the current form.  If there is no
-     * current form, then this selector will have no roots.
-     * <p>Generally it is better to provide a root explicitly using {@link ComponentSelector#ComponentSelector(java.lang.String, com.codename1.ui.Component...)
-     * to ensure that the selector has a tree to walk down.</p>
-     *
-     * @param selector The selector string.
-     */
+    /// Creates a selector that will query the current form.  If there is no
+    /// current form, then this selector will have no roots.
+    ///
+    /// Generally it is better to provide a root explicitly using {@link ComponentSelector#ComponentSelector(java.lang.String, com.codename1.ui.Component...)
+    /// to ensure that the selector has a tree to walk down.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: The selector string.
     public ComponentSelector(String selector) {
         this.roots = new LinkedHashSet<Component>();
         Form f = Display.getInstance().getCurrent();
@@ -357,74 +509,86 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         parse(selector);
     }
 
-    /**
-     * Creates a selector with the provided roots.  This will only search through the subtrees
-     * of the provided roots to find results that match the provided selector string.
-     *
-     * @param selector The selector string
-     * @param roots    The roots for this selector.
-     */
+    /// Creates a selector with the provided roots.  This will only search through the subtrees
+    /// of the provided roots to find results that match the provided selector string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: The selector string
+    ///
+    /// - `roots`: The roots for this selector.
     public ComponentSelector(String selector, Component... roots) {
         this.roots = new LinkedHashSet<Component>();
         Collections.addAll(this.roots, roots);
         parse(selector);
     }
 
-    /**
-     * Creates a selector with the provided roots.  This will only search through the subtrees
-     * of the provided roots to find results that match the provided selector string.
-     *
-     * @param selector The selector string
-     * @param roots    The roots for this selector.
-     */
+    /// Creates a selector with the provided roots.  This will only search through the subtrees
+    /// of the provided roots to find results that match the provided selector string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: The selector string
+    ///
+    /// - `roots`: The roots for this selector.
     public ComponentSelector(String selector, Collection<Component> roots) {
         this.roots = new LinkedHashSet<Component>();
         this.roots.addAll(roots);
         parse(selector);
     }
 
-    /**
-     * Wraps provided components in a ComponentSelector set.
-     *
-     * @param cmps Components to be includd in the set.
-     * @return ComponentSelector with specified components.
-     * @deprecated Use {@link #select(Component...)}.
-     */
+    /// Wraps provided components in a ComponentSelector set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: Components to be includd in the set.
+    ///
+    /// #### Returns
+    ///
+    /// ComponentSelector with specified components.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#select(Component...)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(Component... cmps) {
         return select(cmps);
     }
 
-    /**
-     * Alias of {@link #$(com.codename1.ui.Component...) }
-     *
-     * @param cmps
-     * @return
-     */
+    /// Alias of `#$(com.codename1.ui.Component...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`
     public static ComponentSelector select(Component... cmps) {
         return new ComponentSelector(cmps);
     }
 
-    /**
-     * Creates a ComponentInspector with the source component of the provided event.
-     *
-     * @param e The event whose source component is added to the set.
-     * @return A ComponentSelector with a single component - the source of the event.
-     * @deprecated Use {@link #select(ActionEvent)}.
-     */
+    /// Creates a ComponentInspector with the source component of the provided event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: The event whose source component is added to the set.
+    ///
+    /// #### Returns
+    ///
+    /// A ComponentSelector with a single component - the source of the event.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#select(ActionEvent)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(ActionEvent e) {
         return select(e);
     }
 
-    /**
-     * Alias of {@link #$(com.codename1.ui.events.ActionEvent) }
-     *
-     * @param e
-     * @return
-     */
+    /// Alias of `#$(com.codename1.ui.events.ActionEvent)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`
     public static ComponentSelector select(ActionEvent e) {
         Object src = e.getSource();
         if (src == null) {
@@ -435,126 +599,155 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector();
     }
 
-    /**
-     * Wraps {@link Display#callSerially(java.lang.Runnable) }
-     *
-     * @param r
-     * @return Empty ComponentSelector.
-     * @deprecated Use {@link #select(Runnable)}.
-     */
+    /// Wraps `Display#callSerially(java.lang.Runnable)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`
+    ///
+    /// #### Returns
+    ///
+    /// Empty ComponentSelector.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#select(Runnable)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(Runnable r) {
         return select(r);
     }
 
-    /**
-     * Alias of {@link #$(java.lang.Runnable) }
-     *
-     * @param r
-     * @return
-     */
+    /// Alias of `#$(java.lang.Runnable)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`
     public static ComponentSelector select(Runnable r) {
         Display.getInstance().callSerially(r);
         return new ComponentSelector();
     }
 
-    /**
-     * Creates a new ComponentSelector with the provided set of components.
-     *
-     * @param cmps The components to include in the set.
-     * @return ComponentSelector with provided components.
-     * @deprecated Use {@link #select(Set)}.
-     */
+    /// Creates a new ComponentSelector with the provided set of components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: The components to include in the set.
+    ///
+    /// #### Returns
+    ///
+    /// ComponentSelector with provided components.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#select(Set)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(Set<Component> cmps) {
         return select(cmps);
     }
 
-    /**
-     * Alias of {@link #$(java.util.Set) }
-     *
-     * @param cmps
-     * @return
-     */
+    /// Alias of `#$(java.util.Set)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`
     public static ComponentSelector select(Set<Component> cmps) {
         return new ComponentSelector(cmps);
     }
 
-    /**
-     * Creates a new ComponentSelector with the components matched by the provided selector.  The current form
-     * is used as the root for searches.  Will throw a runtime exception if there is no current form.
-     *
-     * @param selector A selector string that defines which components to include in the
-     *                 set.
-     * @return ComponentSelector with matching components.
-     * @deprecated Use {@link #select(String)}.
-     */
+    /// Creates a new ComponentSelector with the components matched by the provided selector.  The current form
+    /// is used as the root for searches.  Will throw a runtime exception if there is no current form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: @param selector A selector string that defines which components to include in the
+    ///                 set.
+    ///
+    /// #### Returns
+    ///
+    /// ComponentSelector with matching components.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#select(String)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(String selector) {
         return select(selector);
     }
 
-    /**
-     * Alias of {@link #$(java.lang.String) }
-     *
-     * @param selector
-     * @return
-     */
+    /// Alias of `#$(java.lang.String)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`
     public static ComponentSelector select(String selector) {
         return new ComponentSelector(selector);
     }
 
-    /**
-     * Creates a ComponentSelector with the components matched by the provided selector in the provided
-     * roots' subtrees.
-     *
-     * @param selector Selector string to define which components will be included in the set.
-     * @param roots    Roots for the selector to search.  Only components within the roots' subtrees will be included in the set.
-     * @return ComponentSelector with matching components.
-     * @deprecated Use {@link #select(String, Component...)}.
-     */
+    /// Creates a ComponentSelector with the components matched by the provided selector in the provided
+    /// roots' subtrees.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: Selector string to define which components will be included in the set.
+    ///
+    /// - `roots`: Roots for the selector to search.  Only components within the roots' subtrees will be included in the set.
+    ///
+    /// #### Returns
+    ///
+    /// ComponentSelector with matching components.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `Component...)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(String selector, Component... roots) {
         return select(selector, roots);
     }
 
-    /**
-     * Alias of {@link #$(java.lang.String, com.codename1.ui.Component...) }
-     *
-     * @param selector
-     * @param roots
-     * @return
-     */
+    /// Alias of `com.codename1.ui.Component...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`
+    ///
+    /// - `roots`
     public static ComponentSelector select(String selector, Component... roots) {
         return new ComponentSelector(selector, roots);
     }
 
-    /**
-     * Creates a ComponentSelector with the components matched by the provided selector in the provided
-     * roots' subtrees.
-     *
-     * @param selector Selector string to define which components will be included in the set.
-     * @param roots    Roots for the selector to search.  Only components within the roots' subtrees will be included in the set.
-     * @return ComponentSelector with matching components.
-     * @deprecated Use {@link #select(String, Collection)}.
-     */
+    /// Creates a ComponentSelector with the components matched by the provided selector in the provided
+    /// roots' subtrees.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: Selector string to define which components will be included in the set.
+    ///
+    /// - `roots`: Roots for the selector to search.  Only components within the roots' subtrees will be included in the set.
+    ///
+    /// #### Returns
+    ///
+    /// ComponentSelector with matching components.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `Collection)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(String selector, Collection<Component> roots) {
         return select(selector, roots);
     }
 
-    /**
-     * Alias of {@link #$(java.lang.String, java.util.Collection) }
-     *
-     * @param selector
-     * @param roots
-     * @return
-     */
+    /// Alias of `java.util.Collection)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`
+    ///
+    /// - `roots`
     public static ComponentSelector select(String selector, Collection<Component> roots) {
         return new ComponentSelector(selector, roots);
     }
@@ -595,12 +788,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         currentStyle = null;
     }
 
-    /**
-     * Applies the given callback to each component in the set.
-     *
-     * @param closure Callback which will be called once for each component in the set.
-     * @return Self for chaining.
-     */
+    /// Applies the given callback to each component in the set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `closure`: Callback which will be called once for each component in the set.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector each(ComponentClosure closure) {
         for (Component c : this) {
             closure.call(c);
@@ -608,14 +804,17 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Creates a new set based on the elements of the current set and a mapping function
-     * which defines the elements that should be in the new set.
-     *
-     * @param mapper The mapper which will be called once for each element in the set.  The return value
-     *               of the mapper function dictates which component should be included in the resulting set.
-     * @return A new set of components.
-     */
+    /// Creates a new set based on the elements of the current set and a mapping function
+    /// which defines the elements that should be in the new set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mapper`: @param mapper The mapper which will be called once for each element in the set.  The return value
+    ///               of the mapper function dictates which component should be included in the resulting set.
+    ///
+    /// #### Returns
+    ///
+    /// A new set of components.
     public ComponentSelector map(ComponentMapper mapper) {
         LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
@@ -627,13 +826,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Creates a new set of components formed by filtering the current set using a filter function.
-     *
-     * @param filter The filter function called for each element in the set.  If it returns true,
-     *               then the element is included in the resulting set.  If false, it will not be included.
-     * @return A new set with the results of the filter.
-     */
+    /// Creates a new set of components formed by filtering the current set using a filter function.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filter`: @param filter The filter function called for each element in the set.  If it returns true,
+    ///               then the element is included in the resulting set.  If false, it will not be included.
+    ///
+    /// #### Returns
+    ///
+    /// A new set with the results of the filter.
     public ComponentSelector filter(Filter filter) {
         LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
@@ -645,12 +847,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Filters the current found set against the given selector.
-     *
-     * @param selector The selector to filter the found set on.
-     * @return A new set of elements matching the selector.
-     */
+    /// Filters the current found set against the given selector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: The selector to filter the found set on.
+    ///
+    /// #### Returns
+    ///
+    /// A new set of elements matching the selector.
     public ComponentSelector filter(String selector) {
         ComponentSelector matcher = new ComponentSelector(selector, new Label());
         LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
@@ -662,13 +867,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return matcher.addAll(matches, true);
     }
 
-    /**
-     * Creates a new set of components consisting of all of the parents of components in this set.
-     * Only parent components matching the provided selector will be included in the set.
-     *
-     * @param selector Selector to filter the parent components.
-     * @return New set with parents of elements in current set.
-     */
+    /// Creates a new set of components consisting of all of the parents of components in this set.
+    /// Only parent components matching the provided selector will be included in the set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: Selector to filter the parent components.
+    ///
+    /// #### Returns
+    ///
+    /// New set with parents of elements in current set.
     public ComponentSelector parent(String selector) {
         ComponentSelector matcher = new ComponentSelector(selector, new Label());
         LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
@@ -681,13 +889,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return matcher.addAll(matches, true);
     }
 
-    /**
-     * Creates new set of components consisting of all of the ancestors of components in this set which
-     * match the provided selector.
-     *
-     * @param selector The selector to filter the ancestors.
-     * @return New set with ancestors of elements in current set.
-     */
+    /// Creates new set of components consisting of all of the ancestors of components in this set which
+    /// match the provided selector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: The selector to filter the ancestors.
+    ///
+    /// #### Returns
+    ///
+    /// New set with ancestors of elements in current set.
     public ComponentSelector parents(String selector) {
         ComponentSelector matcher = new ComponentSelector(selector, new Label());
         LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
@@ -704,13 +915,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return matcher.addAll(matches, true);
     }
 
-    /**
-     * Creates a new set of components consistng of all "closest" ancestors of components
-     * in this set which match the provided selector.
-     *
-     * @param selector The selector to use to match the nearest ancestor.
-     * @return New set with ancestors of components in current set.
-     */
+    /// Creates a new set of components consistng of all "closest" ancestors of components
+    /// in this set which match the provided selector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: The selector to use to match the nearest ancestor.
+    ///
+    /// #### Returns
+    ///
+    /// New set with ancestors of components in current set.
     public ComponentSelector closest(String selector) {
         ComponentSelector matcher = new ComponentSelector(selector, new Label());
         LinkedHashSet<Component> matches = new LinkedHashSet<Component>();
@@ -728,11 +942,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return matcher.addAll(matches, true);
     }
 
-    /**
-     * Creates new set consisting of the first child of each component in the current set.
-     *
-     * @return New set with first child of each component in current set.
-     */
+    /// Creates new set consisting of the first child of each component in the current set.
+    ///
+    /// #### Returns
+    ///
+    /// New set with first child of each component in current set.
     public ComponentSelector firstChild() {
         LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
@@ -746,11 +960,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Creates new set consisting of the last child of each component in the current set.
-     *
-     * @return New set with last child of each component in current set.
-     */
+    /// Creates new set consisting of the last child of each component in the current set.
+    ///
+    /// #### Returns
+    ///
+    /// New set with last child of each component in current set.
     public ComponentSelector lastChild() {
         LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
@@ -764,11 +978,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Creates set of "next" siblings of components in this set.
-     *
-     * @return New ComponentSelector with next siblings of this set.
-     */
+    /// Creates set of "next" siblings of components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// New ComponentSelector with next siblings of this set.
     public ComponentSelector nextSibling() {
         LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
@@ -783,11 +997,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Creates set of "previous" siblings of components in this set.
-     *
-     * @return New ComponentSelector with previous siblings of this set.
-     */
+    /// Creates set of "previous" siblings of components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// New ComponentSelector with previous siblings of this set.
     public ComponentSelector prevSibling() {
         LinkedHashSet<Component> out = new LinkedHashSet<Component>();
         for (Component c : this) {
@@ -802,16 +1016,24 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Animates this set of components, replacing any modified style properties of the
-     * destination style to the components.
-     *
-     * @param destStyle The style to apply to the components via animation.
-     * @param duration  The duration of the animation (ms)
-     * @param callback  Callback to call after animation is complete.
-     * @return Self for chaining
-     * @see Component#createStyleAnimation(java.lang.String, int)
-     */
+    /// Animates this set of components, replacing any modified style properties of the
+    /// destination style to the components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `destStyle`: The style to apply to the components via animation.
+    ///
+    /// - `duration`: The duration of the animation (ms)
+    ///
+    /// - `callback`: Callback to call after animation is complete.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining
+    ///
+    /// #### See also
+    ///
+    /// - Component#createStyleAnimation(java.lang.String, int)
     public ComponentSelector animateStyle(Style destStyle, int duration, final SuccessCallback<ComponentSelector> callback) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         AnimationManager mgr = null;
@@ -841,35 +1063,38 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Fade in this set of components.  Prior to calling this, the component visibility
-     * should be set to "false".    This uses the default duration of 500ms.
-     *
-     * @return Self for chaining.
-     */
+    /// Fade in this set of components.  Prior to calling this, the component visibility
+    /// should be set to "false".    This uses the default duration of 500ms.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector fadeIn() {
         return fadeIn(500);
     }
 
-    /**
-     * Fade in this set of components.  Prior to calling this, the component visibility
-     * should be set to "false".
-     *
-     * @param duration The duration of the fade in.
-     * @return Self for chaining.
-     */
+    /// Fade in this set of components.  Prior to calling this, the component visibility
+    /// should be set to "false".
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: The duration of the fade in.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector fadeIn(int duration) {
         return fadeIn(duration, null);
     }
 
-    /**
-     * Fade in this set of components.  Prior to calling this, the component visibility should
-     * be set to "false".
-     *
-     * @param duration The duration of the fade in.
-     * @param callback Callback to run when animation completes.
-     * @return
-     */
+    /// Fade in this set of components.  Prior to calling this, the component visibility should
+    /// be set to "false".
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: The duration of the fade in.
+    ///
+    /// - `callback`: Callback to run when animation completes.
     public ComponentSelector fadeIn(final int duration, final SuccessCallback<ComponentSelector> callback) {
         final String placeholderProperty = "com.codename1.ui.ComponentSelector#fadeOutPlaceholder";
 
@@ -962,21 +1187,24 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Fades in this component and blocks until animation is complete.
-     *
-     * @return Self for chaining.
-     */
+    /// Fades in this component and blocks until animation is complete.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector fadeInAndWait() {
         return fadeInAndWait(500);
     }
 
-    /**
-     * Fades in this component and blocks until animation is complete.
-     *
-     * @param duration The duration of the animation.
-     * @return Self for chaining.
-     */
+    /// Fades in this component and blocks until animation is complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: The duration of the animation.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector fadeInAndWait(final int duration) {
         final String placeholderProperty = "com.codename1.ui.ComponentSelector#fadeOutPlaceholder";
 
@@ -1048,12 +1276,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Returns true if the first component in this set is visible.
-     *
-     * @return True if first component in this set is visible.
-     * @see Component#isVisible()
-     */
+    /// Returns true if the first component in this set is visible.
+    ///
+    /// #### Returns
+    ///
+    /// True if first component in this set is visible.
+    ///
+    /// #### See also
+    ///
+    /// - Component#isVisible()
     public boolean isVisible() {
         Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
         if (iterator.hasNext()) {
@@ -1062,12 +1293,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return false;
     }
 
-    /**
-     * Wrapper for {@link Component#setVisible(boolean) }
-     *
-     * @param visible True to make all components in result set visible.  False for hidden.
-     * @return Self for chaining.
-     */
+    /// Wrapper for `Component#setVisible(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`: True to make all components in result set visible.  False for hidden.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector setVisible(boolean visible) {
         for (Component c : this) {
             c.setVisible(visible);
@@ -1075,12 +1309,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Returns true if first component in this set is hidden.
-     *
-     * @return True if first component in set is hidden.
-     * @see Component#isHidden()
-     */
+    /// Returns true if first component in this set is hidden.
+    ///
+    /// #### Returns
+    ///
+    /// True if first component in set is hidden.
+    ///
+    /// #### See also
+    ///
+    /// - Component#isHidden()
     public boolean isHidden() {
         Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
         if (iterator.hasNext()) {
@@ -1089,12 +1326,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return false;
     }
 
-    /**
-     * Wraps {@link Component#setHidden(boolean) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Component#setHidden(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setHidden(boolean b) {
         for (Component c : this) {
             c.setHidden(b);
@@ -1102,32 +1338,39 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Fades out components in this set.  Uses default duration of 500ms.
-     *
-     * @return Self for chaining.
-     */
+    /// Fades out components in this set.  Uses default duration of 500ms.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector fadeOut() {
         return fadeOut(500);
     }
 
-    /**
-     * Fades out components in this set.
-     *
-     * @param duration Duration of animation.
-     * @return Self for chaining.
-     */
+    /// Fades out components in this set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector fadeOut(int duration) {
         return fadeOut(duration, null);
     }
 
-    /**
-     * Fades out components in this set.
-     *
-     * @param duration Duration of animation.
-     * @param callback Callback to run when animation completes.
-     * @return Self for chaining.
-     */
+    /// Fades out components in this set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation.
+    ///
+    /// - `callback`: Callback to run when animation completes.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector fadeOut(int duration, final SuccessCallback<ComponentSelector> callback) {
         final String placeholderProperty = "com.codename1.ui.ComponentSelector#fadeOutPlaceholder";
 
@@ -1202,23 +1445,30 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Hide the matched components with a sliding motion.
-     *
-     * @param duration Duration of animation
-     * @return Self for chaining.
-     */
+    /// Hide the matched components with a sliding motion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector slideUp(int duration) {
         return slideUp(duration, null);
     }
 
-    /**
-     * Hide the matched elements with a sliding motion.
-     *
-     * @param duration Duration of animation.
-     * @param callback Callback to run when animation completes
-     * @return Self for chaining.
-     */
+    /// Hide the matched elements with a sliding motion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation.
+    ///
+    /// - `callback`: Callback to run when animation completes
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector slideUp(int duration, final SuccessCallback<ComponentSelector> callback) {
         final ArrayList<Component> animatedComponents = new ArrayList<Component>();
         for (Component c : this) {
@@ -1242,12 +1492,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Hide the matched elements with a sliding motion.  Blocks until animation is complete.
-     *
-     * @param duration Duration of animation.
-     * @return Self for chaining.
-     */
+    /// Hide the matched elements with a sliding motion.  Blocks until animation is complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector slideUpAndWait(int duration) {
         for (Component c : this) {
             c.setHeight(0);
@@ -1256,41 +1509,48 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Display the matched elements with a sliding motion.  Uses default duration of 500ms
-     *
-     * @return Self for chaining.
-     */
+    /// Display the matched elements with a sliding motion.  Uses default duration of 500ms
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector slideDown() {
         return slideDown(500);
     }
 
-    /**
-     * Hide the matched elements with a sliding motion.  Uses default duration of 500ms
-     *
-     * @return Self for chaining.
-     */
+    /// Hide the matched elements with a sliding motion.  Uses default duration of 500ms
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector slideUp() {
         return slideUp(500);
     }
 
-    /**
-     * Display the matched elements with a sliding motion.
-     *
-     * @param duration Duration of animation.
-     * @return Self for chaining.
-     */
+    /// Display the matched elements with a sliding motion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector slideDown(int duration) {
         return slideDown(duration, null);
     }
 
-    /**
-     * Display the matched elements with a sliding motion.
-     *
-     * @param duration Duration of animation.
-     * @param callback Callback to run when animation completes.
-     * @return Self for chaining.
-     */
+    /// Display the matched elements with a sliding motion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation.
+    ///
+    /// - `callback`: Callback to run when animation completes.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector slideDown(final int duration, final SuccessCallback<ComponentSelector> callback) {
         for (Component c : this) {
             c.setHeight(0);
@@ -1301,12 +1561,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Display the matched elements with a sliding motion. Blocks until animation is complete.
-     *
-     * @param duration Duration of animation.
-     * @return Self for chaining.
-     */
+    /// Display the matched elements with a sliding motion. Blocks until animation is complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector slideDownAndWait(final int duration) {
         for (Component c : this) {
             c.setHeight(0);
@@ -1317,12 +1580,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Hide the matched elements by fading them to transparent. Blocks thread until animation is complete.
-     *
-     * @param duration Duration of animation.
-     * @return Self for chaining.
-     */
+    /// Hide the matched elements by fading them to transparent. Blocks thread until animation is complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: Duration of animation.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector fadeOutAndWait(int duration) {
         final String placeholderProperty = "com.codename1.ui.ComponentSelector#fadeOutPlaceholder";
 
@@ -1377,32 +1643,39 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Replaces the matched components within respective parents with replacements defined by the provided mapper.  Replacements
-     * are replaced in the UI itself  (i.e. {@code c.getParent().replace(c, replacement)}) with an empty
-     * transition.
-     *
-     * @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
-     *               the input component, then no change is made for that component.  A null return value cause the component
-     *               to be removed from its parent.  Returning a Component results in that component replacing the original component
-     *               within its parent.
-     * @return A new ComponentSelector with the replacement components.
-     */
+    /// Replaces the matched components within respective parents with replacements defined by the provided mapper.  Replacements
+    /// are replaced in the UI itself  (i.e. `c.getParent().replace(c, replacement)`) with an empty
+    /// transition.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mapper`: @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
+    ///               the input component, then no change is made for that component.  A null return value cause the component
+    ///               to be removed from its parent.  Returning a Component results in that component replacing the original component
+    ///               within its parent.
+    ///
+    /// #### Returns
+    ///
+    /// A new ComponentSelector with the replacement components.
     public ComponentSelector replace(ComponentMapper mapper) {
         return replace(mapper, CommonTransitions.createEmpty());
     }
 
-    /**
-     * Replaces the matched components within respective parents with replacements defined by the provided mapper.  Replacements
-     * are replaced in the UI itself  (i.e. {@code c.getParent().replace(c, replacement)}) with the provided transition.
-     *
-     * @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
-     *               the input component, then no change is made for that component.  A null return value cause the component
-     *               to be removed from its parent.  Returning a Component results in that component replacing the original component
-     *               within its parent.
-     * @param t      Transition to use for replacements.
-     * @return A new ComponentSelector with the replacement components.
-     */
+    /// Replaces the matched components within respective parents with replacements defined by the provided mapper.  Replacements
+    /// are replaced in the UI itself  (i.e. `c.getParent().replace(c, replacement)`) with the provided transition.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mapper`: @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
+    ///               the input component, then no change is made for that component.  A null return value cause the component
+    ///               to be removed from its parent.  Returning a Component results in that component replacing the original component
+    ///               within its parent.
+    ///
+    /// - `t`: Transition to use for replacements.
+    ///
+    /// #### Returns
+    ///
+    /// A new ComponentSelector with the replacement components.
     public ComponentSelector replace(ComponentMapper mapper, Transition t) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         LinkedHashSet<Component> replacements = new LinkedHashSet<Component>();
@@ -1430,18 +1703,22 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     }
 
-    /**
-     * Replaces the matched components within respective parents with replacements defined by the provided mapper.  Replacements
-     * are replaced in the UI itself  (i.e. {@code c.getParent().replace(c, replacement)}) with the provided transition.
-     * Blocks the thread until the transition animation is complete.
-     *
-     * @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
-     *               the input component, then no change is made for that component.  A null return value cause the component
-     *               to be removed from its parent.  Returning a Component results in that component replacing the original component
-     *               within its parent.
-     * @param t
-     * @return A new ComponentSelector with the replacement components.
-     */
+    /// Replaces the matched components within respective parents with replacements defined by the provided mapper.  Replacements
+    /// are replaced in the UI itself  (i.e. `c.getParent().replace(c, replacement)`) with the provided transition.
+    /// Blocks the thread until the transition animation is complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mapper`: @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
+    ///               the input component, then no change is made for that component.  A null return value cause the component
+    ///               to be removed from its parent.  Returning a Component results in that component replacing the original component
+    ///               within its parent.
+    ///
+    /// - `t`
+    ///
+    /// #### Returns
+    ///
+    /// A new ComponentSelector with the replacement components.
     public ComponentSelector replaceAndWait(ComponentMapper mapper, Transition t) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         LinkedHashSet<Component> replacements = new LinkedHashSet<Component>();
@@ -1469,13 +1746,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(replacements);
     }
 
-    /**
-     * Uses the results of this selector as the roots to create a new selector with
-     * the provided selector string.
-     *
-     * @param selector The selector string.
-     * @return A new ComponentSelector with the results of the query.
-     */
+    /// Uses the results of this selector as the roots to create a new selector with
+    /// the provided selector string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: The selector string.
+    ///
+    /// #### Returns
+    ///
+    /// A new ComponentSelector with the results of the query.
     public ComponentSelector find(String selector) {
         return new ComponentSelector(selector, resultsImpl());
     }
@@ -1618,11 +1898,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     }
 
-    /**
-     * Returns the results of this selector.
-     *
-     * @return
-     */
+    /// Returns the results of this selector.
     @Override
     public Iterator<Component> iterator() {
         return resultsImpl().iterator();
@@ -1683,11 +1959,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return out;
     }
 
-    /**
-     * Gets a proxy style that wraps the result of {@link Component#getStyle() } of each component in set.
-     *
-     * @return
-     */
+    /// Gets a proxy style that wraps the result of `Component#getStyle()` of each component in set.
     public Style getStyle() {
         HashSet<Style> out = new HashSet<Style>();
         for (Component c : this) {
@@ -1696,32 +1968,33 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return Style.createProxyStyle(out.toArray(new Style[out.size()]));
     }
 
-    /**
-     * Gets a style object for the given component that can be used to modify the
-     * component's styles.  This takes into account any state-pseudo classes that
-     * were used to create this selector so that the style returned will be appropriate.
-     *
-     * <p>E.g. <pre>
-     * {@code
-     *
-     * ComponentSelector sel = new ComponentSelector("Button:pressed");
-     * Style style = sel.getStyle(sel.get(0));
-     *     // This should be equivalent to sel.get(0).getPressedStyle()
-     *
-     * sel = new ComponentSelector("Button");
-     * style = sel.getStyle(sel.get(0));
-     *     // This should be equivalent to sel.get(0).getAllStyles()
-     *
-     * sel = new ComponentSelector("Button:pressed, Button:selected");
-     * style = sel.getStyle(sel.get(0));
-     *     // This should be same as
-     *     // Style.createProxyStyle(sel.get(0).getPressedStyle(), sel.get(0).getSelectedStyle())
-     * }
-     * </pre>
-     *
-     * @param component The component whose style object we wish to obtain.
-     * @return A style object that will allow us to modify the style of the given component.
-     */
+    /// Gets a style object for the given component that can be used to modify the
+    /// component's styles.  This takes into account any state-pseudo classes that
+    /// were used to create this selector so that the style returned will be appropriate.
+    ///
+    /// E.g.
+    /// ```java
+    /// `ComponentSelector sel = new ComponentSelector("Button:pressed");
+    /// Style style = sel.getStyle(sel.get(0));
+    ///     // This should be equivalent to sel.get(0).getPressedStyle()
+    ///
+    /// sel = new ComponentSelector("Button");
+    /// style = sel.getStyle(sel.get(0));
+    ///     // This should be equivalent to sel.get(0).getAllStyles()
+    ///
+    /// sel = new ComponentSelector("Button:pressed, Button:selected");
+    /// style = sel.getStyle(sel.get(0));
+    ///     // This should be same as
+    ///     // Style.createProxyStyle(sel.get(0).getPressedStyle(), sel.get(0).getSelectedStyle())`
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `component`: The component whose style object we wish to obtain.
+    ///
+    /// #### Returns
+    ///
+    /// A style object that will allow us to modify the style of the given component.
     public Style getStyle(Component component) {
         switch (currentStyleType) {
             case SELECTED_STYLE:
@@ -1740,12 +2013,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     }
 
-    /**
-     * Returns a proxy style for all of the selected styles of the components in this set.
-     *
-     * @return Proxy style to easily change properties of the selected styles of all
-     * components in this set.
-     */
+    /// Returns a proxy style for all of the selected styles of the components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// @return Proxy style to easily change properties of the selected styles of all
+    /// components in this set.
     public Style getSelectedStyle() {
         ArrayList<Style> styles = new ArrayList<Style>();
         for (Component c : this) {
@@ -1754,13 +2027,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return Style.createProxyStyle(styles.toArray(new Style[styles.size()]));
     }
 
-    /**
-     * Sets selected style of all components in found set.
-     * Wraps {@link Component#setSelectedStyle(com.codename1.ui.plaf.Style) }
-     *
-     * @param style
-     * @return
-     */
+    /// Sets selected style of all components in found set.
+    /// Wraps `Component#setSelectedStyle(com.codename1.ui.plaf.Style)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`
     public ComponentSelector setSelectedStyle(Style style) {
         for (Component c : this) {
             c.setSelectedStyle(style);
@@ -1768,77 +2040,92 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets the current style to the selected style.  Style mutation methods called after
-     * calling this method will modify the components' "selected style".
-     *
-     * @return Self for chaining.
-     * @see Component#getSelectedStyle()
-     */
+    /// Sets the current style to the selected style.  Style mutation methods called after
+    /// calling this method will modify the components' "selected style".
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - Component#getSelectedStyle()
     public ComponentSelector selectSelectedStyle() {
         currentStyle = getSelectedStyle();
         currentStyleType = SELECTED_STYLE;
         return this;
     }
 
-    /**
-     * Sets the current style to the unselected style.  Style mutation methods called after
-     * calling this method will modify the components' "unselected style".
-     *
-     * @return Self for chaining.
-     * @see Component#getUnselectedStyle()
-     */
+    /// Sets the current style to the unselected style.  Style mutation methods called after
+    /// calling this method will modify the components' "unselected style".
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - Component#getUnselectedStyle()
     public ComponentSelector selectUnselectedStyle() {
         currentStyle = getUnselectedStyle();
         currentStyleType = UNSELECTED_STYLE;
         return this;
     }
 
-    /**
-     * Sets the current style to the pressed style.  Style mutation methods called after
-     * calling this method will modify the components' "pressed style".
-     *
-     * @return Self for chaining.
-     * @see Component#getPressedStyle()
-     */
+    /// Sets the current style to the pressed style.  Style mutation methods called after
+    /// calling this method will modify the components' "pressed style".
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - Component#getPressedStyle()
     public ComponentSelector selectPressedStyle() {
         currentStyle = getPressedStyle();
         currentStyleType = PRESSED_STYLE;
         return this;
     }
 
-    /**
-     * Sets the current style to the disabled style.  Style mutation methods called after
-     * calling this method will modify the components' "disabled style".
-     *
-     * @return Self for chaining.
-     * @see Component#getDisabledStyle()
-     */
+    /// Sets the current style to the disabled style.  Style mutation methods called after
+    /// calling this method will modify the components' "disabled style".
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - Component#getDisabledStyle()
     public ComponentSelector selectDisabledStyle() {
         currentStyle = getDisabledStyle();
         currentStyleType = DISABLED_STYLE;
         return this;
     }
 
-    /**
-     * Sets the current style to each component's ALL STYLES proxy style.  Style mutation methods called after
-     * calling this method will modify the components' "all styles" proxy style.
-     *
-     * @return Self for chaining.
-     * @see Component#getAllStyles()
-     */
+    /// Sets the current style to each component's ALL STYLES proxy style.  Style mutation methods called after
+    /// calling this method will modify the components' "all styles" proxy style.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - Component#getAllStyles()
     public ComponentSelector selectAllStyles() {
         currentStyle = getAllStyles();
         currentStyleType = ALL_STYLES;
         return this;
     }
 
-    /**
-     * Returns a proxy style for all of the unselected styles of the components in this set.
-     *
-     * @return Proxy style to easily change properties of the unselected styles of all
-     * components in this set.
-     */
+    /// Returns a proxy style for all of the unselected styles of the components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// @return Proxy style to easily change properties of the unselected styles of all
+    /// components in this set.
     public Style getUnselectedStyle() {
         ArrayList<Style> styles = new ArrayList<Style>();
         for (Component c : this) {
@@ -1847,13 +2134,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return Style.createProxyStyle(styles.toArray(new Style[styles.size()]));
     }
 
-    /**
-     * Sets unselected style of all components in found set.
-     * Wraps {@link Component#setUnselectedStyle(com.codename1.ui.plaf.Style) }
-     *
-     * @param style
-     * @return
-     */
+    /// Sets unselected style of all components in found set.
+    /// Wraps `Component#setUnselectedStyle(com.codename1.ui.plaf.Style)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`
     public ComponentSelector setUnselectedStyle(Style style) {
         for (Component c : this) {
             c.setUnselectedStyle(style);
@@ -1861,12 +2147,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Returns a proxy style for all of the pressed styles of the components in this set.
-     *
-     * @return Proxy style to easily change properties of the pressed styles of all
-     * components in this set.
-     */
+    /// Returns a proxy style for all of the pressed styles of the components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// @return Proxy style to easily change properties of the pressed styles of all
+    /// components in this set.
     public Style getPressedStyle() {
         ArrayList<Style> styles = new ArrayList<Style>();
         for (Component c : this) {
@@ -1875,13 +2161,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return Style.createProxyStyle(styles.toArray(new Style[styles.size()]));
     }
 
-    /**
-     * Sets pressed style of all components in found set.
-     * Wraps {@link Component#setPressedStyle(com.codename1.ui.plaf.Style) }
-     *
-     * @param style
-     * @return
-     */
+    /// Sets pressed style of all components in found set.
+    /// Wraps `Component#setPressedStyle(com.codename1.ui.plaf.Style)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`
     public ComponentSelector setPressedStyle(Style style) {
         for (Component c : this) {
             c.setPressedStyle(style);
@@ -1889,12 +2174,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Returns a proxy style for all of the disabled styles of the components in this set.
-     *
-     * @return Proxy style to easily change properties of the disabled styles of all
-     * components in this set.
-     */
+    /// Returns a proxy style for all of the disabled styles of the components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// @return Proxy style to easily change properties of the disabled styles of all
+    /// components in this set.
     public Style getDisabledStyle() {
         ArrayList<Style> styles = new ArrayList<Style>();
         for (Component c : this) {
@@ -1903,13 +2188,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return Style.createProxyStyle(styles.toArray(new Style[styles.size()]));
     }
 
-    /**
-     * Sets disabled style of all components in found set.
-     * Wraps {@link Component#setDisabledStyle(com.codename1.ui.plaf.Style) }
-     *
-     * @param style
-     * @return
-     */
+    /// Sets disabled style of all components in found set.
+    /// Wraps `Component#setDisabledStyle(com.codename1.ui.plaf.Style)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`
     public ComponentSelector setDisabledStyle(Style style) {
         for (Component c : this) {
             c.setDisabledStyle(style);
@@ -1917,12 +2201,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Returns a proxy style for all of the "all" styles of the components in this set.
-     *
-     * @return Proxy style to easily change properties of the "all" styles of all
-     * components in this set.
-     */
+    /// Returns a proxy style for all of the "all" styles of the components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// @return Proxy style to easily change properties of the "all" styles of all
+    /// components in this set.
     public Style getAllStyles() {
         ArrayList<Style> styles = new ArrayList<Style>();
         for (Component c : this) {
@@ -1931,77 +2215,74 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return Style.createProxyStyle(styles.toArray(new Style[styles.size()]));
     }
 
-    /**
-     * Returns number of results found.
-     *
-     * @return
-     */
+    /// Returns number of results found.
     @Override
     public int size() {
         return resultsImpl().size();
     }
 
-    /**
-     * @return True if there were no results.
-     */
+    /// #### Returns
+    ///
+    /// True if there were no results.
     @Override
     public boolean isEmpty() {
         return resultsImpl().isEmpty();
     }
 
-    /**
-     * Checks if an object is contained in result set.
-     *
-     * @param o
-     * @return
-     */
+    /// Checks if an object is contained in result set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`
     @Override
     public boolean contains(Object o) {
         return resultsImpl().contains(o);
     }
 
-    /**
-     * Returns results as an array.
-     *
-     * @return
-     */
+    /// Returns results as an array.
     @Override
     public Object[] toArray() {
         return resultsImpl().toArray();
     }
 
-    /**
-     * Returns results as an array.
-     *
-     * @param <T>
-     * @param a
-     * @return
-     */
+    /// Returns results as an array.
+    ///
+    /// @param
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`
     @Override
     public <T> T[] toArray(T[] a) {
         return resultsImpl().toArray(a);
     }
 
-    /**
-     * Explicitly adds a component to the result set.
-     *
-     * @param e
-     * @return True on success
-     */
+    /// Explicitly adds a component to the result set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`
+    ///
+    /// #### Returns
+    ///
+    /// True on success
     @Override
     public boolean add(Component e) {
         setDirty();
         return resultsImpl().add(e);
     }
 
-    /**
-     * Appends a child component to the first container in this set.  Same as calling
-     * {@link Container#add(com.codename1.ui.Component) } padding {@literal child} on first container
-     * in this set.
-     *
-     * @param child Component to add to container.
-     * @return Self for chaining.
-     */
+    /// Appends a child component to the first container in this set.  Same as calling
+    /// `Container#add(com.codename1.ui.Component)` padding child on first container
+    /// in this set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `child`: Component to add to container.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector append(Component child) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -2013,15 +2294,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Appends a child component to the first container in this set.  Same as calling
-     * {@link Container#add(java.lang.Object, com.codename1.ui.Component) } padding {@literal child} on first container
-     * in this set.
-     *
-     * @param constraint
-     * @param child
-     * @return
-     */
+    /// Appends a child component to the first container in this set.  Same as calling
+    /// `com.codename1.ui.Component)` padding child on first container
+    /// in this set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`
+    ///
+    /// - `child`
     public ComponentSelector append(Object constraint, Component child) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -2033,15 +2314,14 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Append a child element to each container in this set.  The {@literal mapper} callback
-     * will receive a Container as input (that is the parent to be added to), and should return
-     * a Component that is to be added to it.  If the mapper returns null, then nothing is
-     * added to that container.
-     *
-     * @param mapper
-     * @return
-     */
+    /// Append a child element to each container in this set.  The mapper callback
+    /// will receive a Container as input (that is the parent to be added to), and should return
+    /// a Component that is to be added to it.  If the mapper returns null, then nothing is
+    /// added to that container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mapper`
     public ComponentSelector append(ComponentMapper mapper) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -2054,16 +2334,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Append a child element to each container in this set.  The {@literal mapper} callback
-     * will receive a Container as input (that is the parent to be added to), and should return
-     * a Component that is to be added to it.  If the mapper returns null, then nothing is
-     * added to that container.
-     *
-     * @param constraint
-     * @param mapper
-     * @return
-     */
+    /// Append a child element to each container in this set.  The mapper callback
+    /// will receive a Container as input (that is the parent to be added to), and should return
+    /// a Component that is to be added to it.  If the mapper returns null, then nothing is
+    /// added to that container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`
+    ///
+    /// - `mapper`
     public ComponentSelector append(Object constraint, ComponentMapper mapper) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -2074,83 +2354,96 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Fluent API wrapper for {@link #add(com.codename1.ui.Component) }
-     *
-     * @param e     Component to add to set.
-     * @param chain Dummy argument so that this version would have a different signature than {@link Set#add(java.lang.Object) }
-     * @return Self for chaining.
-     */
+    /// Fluent API wrapper for `#add(com.codename1.ui.Component)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: Component to add to set.
+    ///
+    /// - `chain`: Dummy argument so that this version would have a different signature than `Set#add(java.lang.Object)`
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector add(Component e, boolean chain) {
         add(e);
         return this;
     }
 
-    /**
-     * Explicitly removes a component from the result set.
-     *
-     * @param o
-     * @return Self for chaining.
-     */
+    /// Explicitly removes a component from the result set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     @Override
     public boolean remove(Object o) {
         setDirty();
         return resultsImpl().remove(o);
     }
 
-    /**
-     * Fluent API wrapper for {@link #remove(java.lang.Object) }.
-     *
-     * @param o     The component to remove from set.
-     * @param chain Dummy argument so that this version would have a different signature than {@link Set#remove(java.lang.Object) }
-     * @return Self for chaining.
-     */
+    /// Fluent API wrapper for `#remove(java.lang.Object)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: The component to remove from set.
+    ///
+    /// - `chain`: Dummy argument so that this version would have a different signature than `Set#remove(java.lang.Object)`
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector remove(Object o, boolean chain) {
         remove(o);
         return this;
     }
 
-    /**
-     * Checks if the result set contains all of the components found in the provided
-     * collection.
-     *
-     * @param c
-     * @return
-     */
+    /// Checks if the result set contains all of the components found in the provided
+    /// collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`
     @Override
     public boolean containsAll(Collection<?> c) {
         return resultsImpl().containsAll(c);
     }
 
-    /**
-     * Adds all components in the given collection to the result set.
-     *
-     * @param c
-     * @return
-     */
+    /// Adds all components in the given collection to the result set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`
     @Override
     public boolean addAll(Collection<? extends Component> c) {
         setDirty();
         return resultsImpl().addAll(c);
     }
 
-    /**
-     * Fluent API wrapper for {@link #addAll(java.util.Collection) }.
-     *
-     * @param c     The set of components to add to this set.
-     * @param chain Dummy argument so that this version would have a different signature than {@link #addAll(java.util.Collection) }
-     * @return Self for chaining.
-     */
+    /// Fluent API wrapper for `#addAll(java.util.Collection)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The set of components to add to this set.
+    ///
+    /// - `chain`: Dummy argument so that this version would have a different signature than `#addAll(java.util.Collection)`
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector addAll(Collection<? extends Component> c, boolean chain) {
         addAll(c);
         return this;
     }
 
-    /**
-     * Returns the first component in this set.  This is useful for single component sets (e.g. {@code $(new Label()).setFgColor(0xff0000).asComponent() }).
-     *
-     * @return The first component in this set.
-     */
+    /// Returns the first component in this set.  This is useful for single component sets (e.g. `$(new Label()).setFgColor(0xff0000).asComponent()`).
+    ///
+    /// #### Returns
+    ///
+    /// The first component in this set.
     public Component asComponent() {
         Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
         if (iterator.hasNext()) {
@@ -2159,92 +2452,103 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return null;
     }
 
-    /**
-     * Returns the first component in this set.  This is useful for single component sets (e.g. {@code $(new Label()).setFgColor(0xff0000).asComponent(Label.class) }).
-     *
-     * @param <T>  The type of component to return
-     * @param type The type of component that is expected to be returned.
-     * @return The first component in this set.
-     */
+    /// Returns the first component in this set.  This is useful for single component sets (e.g. `$(new Label()).setFgColor(0xff0000).asComponent(Label.class)`).
+    ///
+    /// #### Parameters
+    ///
+    /// - `The`: type of component to return
+    ///
+    /// - `type`: The type of component that is expected to be returned.
+    ///
+    /// #### Returns
+    ///
+    /// The first component in this set.
     public <T extends Component> T asComponent(Class<T> type) {
         return (T) asComponent();
     }
 
-    /**
-     * Returns the components of this set as a List.  Note that order of elements is not maintained since
-     * ComponentSelector is a set (i.e. has no notion of element order).
-     *
-     * @return The components in this set as a list.
-     */
+    /// Returns the components of this set as a List.  Note that order of elements is not maintained since
+    /// ComponentSelector is a set (i.e. has no notion of element order).
+    ///
+    /// #### Returns
+    ///
+    /// The components in this set as a list.
     public java.util.List<Component> asList() {
         ArrayList<Component> out = new ArrayList<Component>();
         out.addAll(this);
         return out;
     }
 
-    /**
-     * Retains only elements of the result set that are contained in the provided collection.
-     *
-     * @param c
-     * @return
-     */
+    /// Retains only elements of the result set that are contained in the provided collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`
     @Override
     public boolean retainAll(Collection<?> c) {
         setDirty();
         return resultsImpl().retainAll(c);
     }
 
-    /**
-     * Fluent API wrapper for {@link #retainAll(java.util.Collection) }
-     *
-     * @param c     The collection to retain.
-     * @param chain Dummy arg.
-     * @return Self for chaining.
-     */
+    /// Fluent API wrapper for `#retainAll(java.util.Collection)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The collection to retain.
+    ///
+    /// - `chain`: Dummy arg.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector retainAll(Collection<?> c, boolean chain) {
         retainAll(c);
         return this;
     }
 
-    /**
-     * Removes all of the components in the provided collection from the result set.
-     *
-     * @param c
-     * @return
-     */
+    /// Removes all of the components in the provided collection from the result set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`
     @Override
     public boolean removeAll(Collection<?> c) {
         setDirty();
         return resultsImpl().removeAll(c);
     }
 
-    /**
-     * Fluent API wrapper for {@link #removeAll(java.util.Collection) }
-     *
-     * @param c     Collection with components to remove,
-     * @param chain Dummy arg.
-     * @return Self for chaining.
-     */
+    /// Fluent API wrapper for `#removeAll(java.util.Collection)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: Collection with components to remove,
+    ///
+    /// - `chain`: Dummy arg.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector removeAll(Collection<?> c, boolean chain) {
         removeAll(c);
         return this;
     }
 
-    /**
-     * Clears the result set.
-     */
+    /// Clears the result set.
     @Override
     public void clear() {
         setDirty();
         resultsImpl().clear();
     }
 
-    /**
-     * Fluent API wrapper for (@link #clear()}
-     *
-     * @param chain Dummy arg
-     * @return Self for chaining.
-     */
+    /// Fluent API wrapper for (@link #clear()}
+    ///
+    /// #### Parameters
+    ///
+    /// - `chain`: Dummy arg
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector clear(boolean chain) {
         clear();
         return this;
@@ -2255,12 +2559,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return "ComponentSelector{ name=" + name + ", uiid=" + uiid + ", tags=" + Arrays.toString(tags) + ", roots=" + roots + ", parent=" + parent + ", results = " + results + "}";
     }
 
-    /**
-     * Adds the given tags to all elements in the result set.
-     *
-     * @param tags Tags to add.
-     * @return Self for chaining.
-     */
+    /// Adds the given tags to all elements in the result set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tags`: Tags to add.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector addTags(String... tags) {
         for (Component c : this) {
 
@@ -2281,12 +2588,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes the given tags from all elements in the result set.
-     *
-     * @param tags
-     * @return
-     */
+    /// Removes the given tags from all elements in the result set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tags`
     public ComponentSelector removeTags(String... tags) {
         for (Component c : this) {
             String existing = (String) c.getClientProperty(PROPERTY_TAG);
@@ -2316,12 +2622,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Gets the set of all "parent" components of components in the result set.
-     *
-     * @return New Component selector with respective parents of the components in the
-     * current result set.
-     */
+    /// Gets the set of all "parent" components of components in the result set.
+    ///
+    /// #### Returns
+    ///
+    /// @return New Component selector with respective parents of the components in the
+    /// current result set.
     public ComponentSelector getParent() {
 
         HashSet<Component> parents = new HashSet<Component>();
@@ -2337,35 +2643,27 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     }
 
-    /**
-     * Wrapper for {@link Component#setSameWidth(com.codename1.ui.Component...) }.  Passes all
-     * components in the result set as parameters of this method, effectively making them all the
-     * same width.
-     *
-     * @return
-     */
+    /// Wrapper for `Component#setSameWidth(com.codename1.ui.Component...)`.  Passes all
+    /// components in the result set as parameters of this method, effectively making them all the
+    /// same width.
     public ComponentSelector setSameWidth() {
         Component.setSameWidth(toArray(new Component[size()]));
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setSameHeight(com.codename1.ui.Component...) }.  Passes all
-     * components in the result set as parameters of this method, effectively making them all the
-     * same height.
-     *
-     * @return
-     */
+    /// Wrapper for `Component#setSameHeight(com.codename1.ui.Component...)`.  Passes all
+    /// components in the result set as parameters of this method, effectively making them all the
+    /// same height.
     public ComponentSelector setSameHeight() {
         Component.setSameHeight(toArray(new Component[size()]));
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#clearClientProperties() }.
-     *
-     * @return Self for Chaining.
-     */
+    /// Wrapper for `Component#clearClientProperties()`.
+    ///
+    /// #### Returns
+    ///
+    /// Self for Chaining.
     public ComponentSelector clearClientProperties() {
         for (Component c : this) {
             c.clearClientProperties();
@@ -2373,13 +2671,17 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#putClientProperty(java.lang.String, java.lang.Object) }
-     *
-     * @param key   Property key
-     * @param value Property value
-     * @return Self for chaining.
-     */
+    /// Wrapper for `java.lang.Object)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: Property key
+    ///
+    /// - `value`: Property value
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector putClientProperty(String key, Object value) {
         for (Component c : this) {
             c.putClientProperty(key, value);
@@ -2388,12 +2690,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Gets a client property from the first component in the set.  Wraps {@link Component#getClientProperty(java.lang.String) }
-     *
-     * @param key The key of the client property to retrieve.
-     * @return The value of the client property.
-     */
+    /// Gets a client property from the first component in the set.  Wraps `Component#getClientProperty(java.lang.String)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: The key of the client property to retrieve.
+    ///
+    /// #### Returns
+    ///
+    /// The value of the client property.
     public Object getClientProperty(String key) {
         Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
         if (iterator.hasNext()) {
@@ -2402,12 +2707,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return null;
     }
 
-    /**
-     * Wrapper for {@link Component#setDirtyRegion(com.codename1.ui.geom.Rectangle) }
-     *
-     * @param rect Dirty region
-     * @return Self for chaining.
-     */
+    /// Wrapper for `Component#setDirtyRegion(com.codename1.ui.geom.Rectangle)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: Dirty region
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector setDirtyRegion(Rectangle rect) {
         for (Component c : this) {
             c.setDirtyRegion(rect);
@@ -2415,12 +2723,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setX(int) }
-     *
-     * @param x
-     * @return
-     */
+    /// Wrapper for `Component#setX(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
     public ComponentSelector setX(int x) {
         for (Component c : this) {
             c.setX(x);
@@ -2428,12 +2735,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setY(int) }
-     *
-     * @param y
-     * @return
-     */
+    /// Wrapper for `Component#setY(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `y`
     public ComponentSelector setY(int y) {
         for (Component c : this) {
             c.setY(y);
@@ -2441,12 +2747,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setWidth(int) }
-     *
-     * @param width
-     * @return
-     */
+    /// Wrapper for `Component#setWidth(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`
     public ComponentSelector setWidth(int width) {
         for (Component c : this) {
             c.setWidth(width);
@@ -2454,12 +2759,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setHeight(int) }
-     *
-     * @param height
-     * @return
-     */
+    /// Wrapper for `Component#setHeight(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `height`
     public ComponentSelector setHeight(int height) {
         for (Component c : this) {
             c.setHeight(height);
@@ -2467,12 +2771,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setPreferredSize(com.codename1.ui.geom.Dimension) }
-     *
-     * @param dim
-     * @return
-     */
+    /// Wrapper for `Component#setPreferredSize(com.codename1.ui.geom.Dimension)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `dim`
     public ComponentSelector setPreferredSize(Dimension dim) {
         for (Component c : this) {
             c.setPreferredSize(dim);
@@ -2480,12 +2783,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setPreferredH(int) }
-     *
-     * @param h
-     * @return
-     */
+    /// Wrapper for `Component#setPreferredH(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `h`
     public ComponentSelector setPreferredH(int h) {
         for (Component c : this) {
             c.setPreferredH(h);
@@ -2493,12 +2795,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setPreferredW(int) }
-     *
-     * @param w
-     * @return
-     */
+    /// Wrapper for `Component#setPreferredW(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`
     public ComponentSelector setPreferredW(int w) {
         for (Component c : this) {
             c.setPreferredW(w);
@@ -2506,12 +2807,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setScrollSize}
-     *
-     * @param size
-     * @return
-     */
+    /// Wrapper for `Component#setScrollSize`
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`
     public ComponentSelector setScrollSize(Dimension size) {
         for (Component c : this) {
             c.setScrollSize(size);
@@ -2519,12 +2819,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setSize(com.codename1.ui.geom.Dimension) }
-     *
-     * @param size
-     * @return
-     */
+    /// Wrapper for `Component#setSize(com.codename1.ui.geom.Dimension)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`
     public ComponentSelector setSize(Dimension size) {
         for (Component c : this) {
             c.setSize(size);
@@ -2532,12 +2831,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#setUIID(java.lang.String) }
-     *
-     * @param uiid
-     * @return
-     */
+    /// Wrapper for `Component#setUIID(java.lang.String)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`
     public ComponentSelector setUIID(String uiid) {
         for (Component c : this) {
             c.setUIID(uiid);
@@ -2545,12 +2843,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wrapper for {@link Component#remove() }.  This will remove all of the components
-     * in the current found set from their respective parents.
-     *
-     * @return
-     */
+    /// Wrapper for `Component#remove()`.  This will remove all of the components
+    /// in the current found set from their respective parents.
     public ComponentSelector remove() {
         for (Component c : this) {
             c.remove();
@@ -2558,12 +2852,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds a focus listener to all components in found set.  Wraps {@link Component#addFocusListener(com.codename1.ui.events.FocusListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Adds a focus listener to all components in found set.  Wraps `Component#addFocusListener(com.codename1.ui.events.FocusListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addFocusListener(FocusListener l) {
         for (Component c : this) {
             c.addFocusListener(l);
@@ -2571,12 +2864,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes focus listener from all components in found set.  Wraps {@link Component#removeFocusListener(com.codename1.ui.events.FocusListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Removes focus listener from all components in found set.  Wraps `Component#removeFocusListener(com.codename1.ui.events.FocusListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removeFocusListener(FocusListener l) {
         for (Component c : this) {
             c.removeFocusListener(l);
@@ -2584,12 +2876,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds scroll listener to all components in found set.  Wraps {@link Component#addScrollListener(com.codename1.ui.events.ScrollListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Adds scroll listener to all components in found set.  Wraps `Component#addScrollListener(com.codename1.ui.events.ScrollListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addScrollListener(ScrollListener l) {
         for (Component c : this) {
             c.addScrollListener(l);
@@ -2597,12 +2888,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes scroll listener from all components in found set. Wraps {@link Component#removeScrollListener(com.codename1.ui.events.ScrollListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Removes scroll listener from all components in found set. Wraps `Component#removeScrollListener(com.codename1.ui.events.ScrollListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removeScrollListener(ScrollListener l) {
         for (Component c : this) {
             c.removeScrollListener(l);
@@ -2610,12 +2900,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets select command text on all components in found set.  Wraps {@link Component#setSelectCommandText(java.lang.String) }
-     *
-     * @param text
-     * @return
-     */
+    /// Sets select command text on all components in found set.  Wraps `Component#setSelectCommandText(java.lang.String)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`
     public ComponentSelector setSelectCommandText(String text) {
         for (Component c : this) {
             c.setSelectCommandText(text);
@@ -2623,12 +2912,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setLabelForComponent(com.codename1.ui.Label) }
-     *
-     * @param l
-     * @return
-     */
+    /// Wraps `Component#setLabelForComponent(com.codename1.ui.Label)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector setLabelForComponent(Label l) {
         for (Component c : this) {
             c.setLabelForComponent(l);
@@ -2636,12 +2924,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#paintBackgrounds(com.codename1.ui.Graphics) }
-     *
-     * @param g
-     * @return
-     */
+    /// Wraps `Component#paintBackgrounds(com.codename1.ui.Graphics)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
     public ComponentSelector paintBackgrounds(Graphics g) {
         for (Component c : this) {
             c.paintBackgrounds(g);
@@ -2649,12 +2936,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#paintComponent(com.codename1.ui.Graphics) }
-     *
-     * @param g
-     * @return
-     */
+    /// Wraps `Component#paintComponent(com.codename1.ui.Graphics)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
     public ComponentSelector paintComponent(Graphics g) {
         for (Component c : this) {
             c.paintComponent(g);
@@ -2662,12 +2948,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#paint(com.codename1.ui.Graphics) }
-     *
-     * @param g
-     * @return
-     */
+    /// Wraps `Component#paint(com.codename1.ui.Graphics)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
     public ComponentSelector paint(Graphics g) {
         for (Component c : this) {
             c.paint(g);
@@ -2675,14 +2960,14 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Returns true if any of the components in the found set contains the provided coordinate.
-     * Wraps {@link Component#contains(int, int) }
-     *
-     * @param x
-     * @param y
-     * @return
-     */
+    /// Returns true if any of the components in the found set contains the provided coordinate.
+    /// Wraps `int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
+    ///
+    /// - `y`
     public boolean contains(int x, int y) {
         for (Component c : this) {
             if (c.contains(x, y)) {
@@ -2692,13 +2977,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return false;
     }
 
-    /**
-     * Sets all components in the found set focusability.
-     * Wraps {@link Component#setFocusable(boolean) }
-     *
-     * @param focus
-     * @return
-     */
+    /// Sets all components in the found set focusability.
+    /// Wraps `Component#setFocusable(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `focus`
     public ComponentSelector setFocusable(boolean focus) {
         for (Component c : this) {
             c.setFocusable(focus);
@@ -2706,11 +2990,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#repaint() }
-     *
-     * @return
-     */
+    /// Wraps `Component#repaint()`
     public ComponentSelector repaint() {
         for (Component c : this) {
             c.repaint();
@@ -2718,15 +2998,17 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#repaint(int, int, int, int) }
-     *
-     * @param x
-     * @param y
-     * @param w
-     * @param h
-     * @return
-     */
+    /// Wraps `int, int, int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
+    ///
+    /// - `y`
+    ///
+    /// - `w`
+    ///
+    /// - `h`
     public ComponentSelector repaint(int x, int y, int w, int h) {
         for (Component c : this) {
             c.repaint(x, y, w, h);
@@ -2734,12 +3016,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setScrollAnimationSpeed(int) }
-     *
-     * @param speed
-     * @return
-     */
+    /// Wraps `Component#setScrollAnimationSpeed(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `speed`
     public ComponentSelector setScrollAnimationSpeed(int speed) {
         for (Component c : this) {
             c.setScrollAnimationSpeed(speed);
@@ -2747,12 +3028,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setSmoothScrolling(boolean) }
-     *
-     * @param smooth
-     * @return
-     */
+    /// Wraps `Component#setSmoothScrolling(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `smooth`
     public ComponentSelector setSmoothScrolling(boolean smooth) {
         for (Component c : this) {
             c.setSmoothScrolling(smooth);
@@ -2760,12 +3040,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds a drop listener to all components in found set.  Wraps {@link Component#addDropListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Adds a drop listener to all components in found set.  Wraps `Component#addDropListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addDropListener(ActionListener l) {
         for (Component c : this) {
             c.addDropListener(l);
@@ -2773,13 +3052,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes a drop listener from all components in found set.
-     * Wraps {@link Component#removeDropListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Removes a drop listener from all components in found set.
+    /// Wraps `Component#removeDropListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removeDropListener(ActionListener l) {
         for (Component c : this) {
             c.removeDropListener(l);
@@ -2787,13 +3065,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds drag over listener to all components in found set.
-     * Wraps {@link Component#addDragOverListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Adds drag over listener to all components in found set.
+    /// Wraps `Component#addDragOverListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addDragOverListener(ActionListener l) {
         for (Component c : this) {
             c.addDragOverListener(l);
@@ -2801,13 +3078,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes drag over listener from all components in found set.
-     * Wraps {@link Component#removeDragOverListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Removes drag over listener from all components in found set.
+    /// Wraps `Component#removeDragOverListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removeDragOverListener(ActionListener l) {
         for (Component c : this) {
             c.removeDragOverListener(l);
@@ -2815,13 +3091,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds pointer pressed listener to all components in found set.
-     * Wraps {@link Component#addPointerPressedListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Adds pointer pressed listener to all components in found set.
+    /// Wraps `Component#addPointerPressedListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addPointerPressedListener(ActionListener l) {
         for (Component c : this) {
             c.addPointerPressedListener(l);
@@ -2829,13 +3104,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds long pointer pressed listener to all components in found set.
-     * Wraps {@link Component#addLongPressListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Adds long pointer pressed listener to all components in found set.
+    /// Wraps `Component#addLongPressListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addLongPressListener(ActionListener l) {
         for (Component c : this) {
             c.addLongPressListener(l);
@@ -2843,13 +3117,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes pointer pressed listener from all components in found set.
-     * Wraps {@link Component#removePointerPressedListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Removes pointer pressed listener from all components in found set.
+    /// Wraps `Component#removePointerPressedListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removePointerPressedListener(ActionListener l) {
         for (Component c : this) {
             c.removePointerPressedListener(l);
@@ -2857,13 +3130,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes long pointer pressed listener from all components in found set.
-     * Wraps {@link Component#removeLongPressListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Removes long pointer pressed listener from all components in found set.
+    /// Wraps `Component#removeLongPressListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removeLongPressListener(ActionListener l) {
         for (Component c : this) {
             c.removeLongPressListener(l);
@@ -2871,13 +3143,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds pointer released listener to all components in found set.
-     * Wraps {@link Component#addPointerReleasedListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Adds pointer released listener to all components in found set.
+    /// Wraps `Component#addPointerReleasedListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addPointerReleasedListener(ActionListener l) {
         for (Component c : this) {
             c.addPointerReleasedListener(l);
@@ -2885,13 +3156,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes pointer released listener from all components in found set.
-     * Wraps {@link Component#removePointerReleasedListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Removes pointer released listener from all components in found set.
+    /// Wraps `Component#removePointerReleasedListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removePointerReleasedListener(ActionListener l) {
         for (Component c : this) {
             c.removePointerReleasedListener(l);
@@ -2899,13 +3169,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds pointer dragged listener to all components in found set.
-     * Wraps {@link Component#addPointerDraggedListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Adds pointer dragged listener to all components in found set.
+    /// Wraps `Component#addPointerDraggedListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addPointerDraggedListener(ActionListener l) {
         for (Component c : this) {
             c.addPointerDraggedListener(l);
@@ -2913,13 +3182,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * REmoves pointer dragged listener from all components in found set.
-     * Wraps {@link Component#removePointerDraggedListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// REmoves pointer dragged listener from all components in found set.
+    /// Wraps `Component#removePointerDraggedListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removePointerDraggedListener(ActionListener l) {
         for (Component c : this) {
             c.removePointerDraggedListener(l);
@@ -2927,11 +3195,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#requestFocus()}
-     *
-     * @return
-     */
+    /// Wraps `Component#requestFocus()`
     public ComponentSelector requestFocus() {
         Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
         if (iterator.hasNext()) {
@@ -2940,11 +3204,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#refreshTheme()}
-     *
-     * @return
-     */
+    /// Wraps `Component#refreshTheme()`
     public ComponentSelector refreshTheme() {
         for (Component c : this) {
             c.refreshTheme();
@@ -2952,12 +3212,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#refreshTheme(boolean) }
-     *
-     * @param merge
-     * @return
-     */
+    /// Wraps `Component#refreshTheme(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `merge`
     public ComponentSelector refreshTheme(boolean merge) {
         for (Component c : this) {
             c.refreshTheme(merge);
@@ -2965,12 +3224,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setCellRenderer(boolean) }
-     *
-     * @param cell
-     * @return
-     */
+    /// Wraps `Component#setCellRenderer(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `cell`
     public ComponentSelector setCellRenderer(boolean cell) {
         for (Component c : this) {
             c.setCellRenderer(cell);
@@ -2978,12 +3236,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setScrollVisible(boolean) }
-     *
-     * @param vis
-     * @return
-     */
+    /// Wraps `Component#setScrollVisible(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `vis`
     public ComponentSelector setScrollVisible(boolean vis) {
         for (Component c : this) {
             c.setScrollVisible(vis);
@@ -2991,12 +3248,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setEnabled(boolean) }
-     *
-     * @param enabled
-     * @return
-     */
+    /// Wraps `Component#setEnabled(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`
     public ComponentSelector setEnabled(boolean enabled) {
         for (Component c : this) {
             c.setEnabled(enabled);
@@ -3004,12 +3260,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setName(java.lang.String) }
-     *
-     * @param name
-     * @return
-     */
+    /// Wraps `Component#setName(java.lang.String)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`
     public ComponentSelector setName(String name) {
         for (Component c : this) {
             c.setName(name);
@@ -3017,12 +3272,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setRTL(boolean) }
-     *
-     * @param rtl
-     * @return
-     */
+    /// Wraps `Component#setRTL(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`
     public ComponentSelector setRTL(boolean rtl) {
         for (Component c : this) {
             c.setRTL(rtl);
@@ -3030,12 +3284,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setTactileTouch(boolean) }
-     *
-     * @param t
-     * @return
-     */
+    /// Wraps `Component#setTactileTouch(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`
     public ComponentSelector setTactileTouch(boolean t) {
         for (Component c : this) {
             c.setTactileTouch(t);
@@ -3043,13 +3296,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setPropertyValue(java.lang.String, java.lang.Object) }
-     *
-     * @param key
-     * @param value
-     * @return
-     */
+    /// Wraps `java.lang.Object)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`
+    ///
+    /// - `value`
     public ComponentSelector setPropertyValue(String key, Object value) {
         for (Component c : this) {
             c.setPropertyValue(key, value);
@@ -3057,11 +3310,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#paintLockRelease() }
-     *
-     * @return
-     */
+    /// Wraps `Component#paintLockRelease()`
     public ComponentSelector paintLockRelease() {
         for (Component c : this) {
             c.paintLockRelease();
@@ -3069,12 +3318,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setSnapToGrid(boolean) }
-     *
-     * @param s
-     * @return
-     */
+    /// Wraps `Component#setSnapToGrid(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`
     public ComponentSelector setSnapToGrid(boolean s) {
         for (Component c : this) {
             c.setSnapToGrid(s);
@@ -3097,12 +3345,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setFlatten(boolean)}
-     *
-     * @param f
-     * @return
-     */
+    /// Wraps `Component#setFlatten(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`
     public ComponentSelector setFlatten(boolean f) {
         for (Component c : this) {
             c.setFlatten(f);
@@ -3110,12 +3357,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setTensileLength(int)}
-     *
-     * @param len
-     * @return
-     */
+    /// Wraps `Component#setTensileLength(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `len`
     public ComponentSelector setTensileLength(int len) {
         for (Component c : this) {
             c.setTensileLength(len);
@@ -3123,12 +3369,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setGrabsPointerEvents(boolean) }
-     *
-     * @param g
-     * @return
-     */
+    /// Wraps `Component#setGrabsPointerEvents(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
     public ComponentSelector setGrabsPointerEvents(boolean g) {
         for (Component c : this) {
             c.setGrabsPointerEvents(g);
@@ -3136,12 +3381,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setScrollOpacityChangeSpeed(int) }
-     *
-     * @param scrollOpacityChangeSpeed
-     * @return
-     */
+    /// Wraps `Component#setScrollOpacityChangeSpeed(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `scrollOpacityChangeSpeed`
     public ComponentSelector setScrollOpacityChangeSpeed(int scrollOpacityChangeSpeed) {
         for (Component c : this) {
             c.setScrollOpacityChangeSpeed(scrollOpacityChangeSpeed);
@@ -3149,12 +3393,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#growShrink(int) }
-     *
-     * @param duration
-     * @return
-     */
+    /// Wraps `Component#growShrink(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
     public ComponentSelector growShrink(int duration) {
         for (Component c : this) {
             c.growShrink(duration);
@@ -3162,12 +3405,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setDraggable(boolean) }
-     *
-     * @param draggable
-     * @return
-     */
+    /// Wraps `Component#setDraggable(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `draggable`
     public ComponentSelector setDraggable(boolean draggable) {
         for (Component c : this) {
             c.setDraggable(draggable);
@@ -3175,12 +3417,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setDropTarget(boolean) }
-     *
-     * @param target
-     * @return
-     */
+    /// Wraps `Component#setDropTarget(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`
     public ComponentSelector setDropTarget(boolean target) {
         for (Component c : this) {
             c.setDropTarget(target);
@@ -3188,12 +3429,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setHideInPortrait(boolean) }
-     *
-     * @param hide
-     * @return
-     */
+    /// Wraps `Component#setHideInPortrait(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `hide`
     public ComponentSelector setHideInPortait(boolean hide) {
         for (Component c : this) {
             c.setHideInPortrait(hide);
@@ -3201,13 +3441,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setHidden(boolean, boolean) }
-     *
-     * @param b
-     * @param changeMargin
-     * @return
-     */
+    /// Wraps `boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
+    ///
+    /// - `changeMargin`
     public ComponentSelector setHidden(boolean b, boolean changeMargin) {
         for (Component c : this) {
             c.setHidden(b, changeMargin);
@@ -3215,12 +3455,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Component#setComponentState(java.lang.Object) }
-     *
-     * @param state
-     * @return
-     */
+    /// Wraps `Component#setComponentState(java.lang.Object)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`
     public ComponentSelector setComponentState(Object state) {
         for (Component c : this) {
             c.setComponentState(state);
@@ -3228,12 +3467,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#setLeadComponent(com.codename1.ui.Component) }
-     *
-     * @param lead
-     * @return
-     */
+    /// Wraps `Container#setLeadComponent(com.codename1.ui.Component)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `lead`
     public ComponentSelector setLeadComponent(Component lead) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3244,12 +3482,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#setLayout(com.codename1.ui.layouts.Layout)  }
-     *
-     * @param layout
-     * @return
-     */
+    /// Wraps `Container#setLayout(com.codename1.ui.layouts.Layout)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `layout`
     public ComponentSelector setLayout(Layout layout) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3260,11 +3497,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#invalidate() }
-     *
-     * @return
-     */
+    /// Wraps `Container#invalidate()`
     public ComponentSelector invalidate() {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3276,12 +3509,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#setShouldCalcPreferredSize(boolean) }
-     *
-     * @param shouldCalcPreferredSize
-     * @return
-     */
+    /// Wraps `Container#setShouldCalcPreferredSize(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `shouldCalcPreferredSize`
     public ComponentSelector setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3293,12 +3525,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#applyRTL(boolean)  }
-     *
-     * @param rtl
-     * @return
-     */
+    /// Wraps `Container#applyRTL(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`
     public ComponentSelector applyRTL(boolean rtl) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3309,13 +3540,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * This removes all children from all containers in found set.  Not to be confused with {@link #clear()}, which
-     * removes components from the found set, but not from their respective parents.
-     * Wraps {@link Container#removeAll() }
-     *
-     * @return
-     */
+    /// This removes all children from all containers in found set.  Not to be confused with `#clear()`, which
+    /// removes components from the found set, but not from their respective parents.
+    /// Wraps `Container#removeAll()`
     public ComponentSelector removeAll() {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3325,11 +3552,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#revalidate()  }
-     *
-     * @return
-     */
+    /// Wraps `Container#revalidate()`
     public ComponentSelector revalidate() {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3339,11 +3562,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#forceRevalidate()  }
-     *
-     * @return
-     */
+    /// Wraps `Container#forceRevalidate()`
     public ComponentSelector forceRevalidate() {
 
         for (Component c : this) {
@@ -3354,11 +3573,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#layoutContainer()  }
-     *
-     * @return
-     */
+    /// Wraps `Container#layoutContainer()`
     public ComponentSelector layoutContainer() {
 
         for (Component c : this) {
@@ -3369,15 +3584,18 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * This returns a new ComponentSelector which includes a set of all results
-     * of calling {@link Container#getComponentAt(int) } on containers in this
-     * found set.  This effectively allows us to get all of the ith elements of all
-     * matched components.
-     *
-     * @param index
-     * @return New ComponentSelector with {@code index}th child of each container in the current found set.
-     */
+    /// This returns a new ComponentSelector which includes a set of all results
+    /// of calling `Container#getComponentAt(int)` on containers in this
+    /// found set.  This effectively allows us to get all of the ith elements of all
+    /// matched components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`
+    ///
+    /// #### Returns
+    ///
+    /// New ComponentSelector with `index`th child of each container in the current found set.
     public ComponentSelector getComponentAt(int index) {
         HashSet<Component> out = new HashSet<Component>();
         for (Component c : this) {
@@ -3391,14 +3609,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Returns true if any of the containers in the current found set contains
-     * the provided component in its subtree.
-     * Wraps {@link Container#contains(com.codename1.ui.Component) }
-     *
-     * @param cmp
-     * @return
-     */
+    /// Returns true if any of the containers in the current found set contains
+    /// the provided component in its subtree.
+    /// Wraps `Container#contains(com.codename1.ui.Component)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`
     public boolean containsInSubtree(Component cmp) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3411,12 +3628,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return false;
     }
 
-    /**
-     * Wraps {@link Container#scrollComponentToVisible(com.codename1.ui.Component) }
-     *
-     * @param cmp
-     * @return
-     */
+    /// Wraps `Container#scrollComponentToVisible(com.codename1.ui.Component)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`
     public ComponentSelector scrollComponentToVisible(Component cmp) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3426,14 +3642,18 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Returns new ComponentSelector with the set of all components returned from calling
-     * {@link Container#getComponentAt(int, int) } in the current found set.
-     *
-     * @param x
-     * @param y
-     * @return New ComponentSelector with components at the given coordinates.
-     */
+    /// Returns new ComponentSelector with the set of all components returned from calling
+    /// `int)` in the current found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
+    ///
+    /// - `y`
+    ///
+    /// #### Returns
+    ///
+    /// New ComponentSelector with components at the given coordinates.
     public ComponentSelector getComponentAt(int x, int y) {
         HashSet<Component> out = new HashSet<Component>();
         for (Component c : this) {
@@ -3447,12 +3667,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Wraps {@link Container#setScrollableX(boolean)  }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Container#setScrollableX(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setScrollableX(boolean b) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3462,12 +3681,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#setScrollableY(boolean)  }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Container#setScrollableY(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setScrollableY(boolean b) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3477,12 +3695,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#setScrollIncrement(int)  }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Container#setScrollIncrement(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setScrollIncrement(int b) {
         for (Component c : this) {
             if (c instanceof Container) {
@@ -3492,14 +3709,17 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Creates new ComponentSelector with the set of first focusable elements of
-     * each of the containers in the current result set.
-     *
-     * @return New component selector with first focusable element of each container in
-     * current found set.
-     * @see Container#findFirstFocusable()
-     */
+    /// Creates new ComponentSelector with the set of first focusable elements of
+    /// each of the containers in the current result set.
+    ///
+    /// #### Returns
+    ///
+    /// @return New component selector with first focusable element of each container in
+    /// current found set.
+    ///
+    /// #### See also
+    ///
+    /// - Container#findFirstFocusable()
     public ComponentSelector findFirstFocusable() {
         HashSet<Component> out = new HashSet<Component>();
         for (Component c : this) {
@@ -3513,12 +3733,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Wraps {@link Container#animateHierarchyAndWait(int) }.
-     *
-     * @param duration
-     * @return
-     */
+    /// Wraps `Container#animateHierarchyAndWait(int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
     public ComponentSelector animateHierarchyAndWait(int duration) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3533,23 +3752,22 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Animates the hierarchy of containers in this set.  Wraps {@link Container#animateHierarchy(int) }
-     *
-     * @param duration
-     * @return
-     */
+    /// Animates the hierarchy of containers in this set.  Wraps `Container#animateHierarchy(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
     public ComponentSelector animateHierarchy(int duration) {
         return animateHierarchy(duration, null);
     }
 
-    /**
-     * Wraps {@link Container#animateHierarchy(int) }.
-     *
-     * @param duration
-     * @param callback
-     * @return
-     */
+    /// Wraps `Container#animateHierarchy(int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `callback`
     public ComponentSelector animateHierarchy(int duration, final SuccessCallback<ComponentSelector> callback) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3571,13 +3789,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#animateHierarchyFadeAndWait(int, int) }.
-     *
-     * @param duration
-     * @param startingOpacity
-     * @return
-     */
+    /// Wraps `int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `startingOpacity`
     public ComponentSelector animateHierarchyFadeAndWait(int duration, int startingOpacity) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3592,25 +3810,30 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#animateHierarchyAndWait(int) }
-     *
-     * @param duration        The duration of the animation.
-     * @param startingOpacity The starting opacity.
-     * @return Self for chaining.
-     */
+    /// Wraps `Container#animateHierarchyAndWait(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: The duration of the animation.
+    ///
+    /// - `startingOpacity`: The starting opacity.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector animateHierarchyFade(int duration, int startingOpacity) {
         return animateHierarchyFade(duration, startingOpacity, null);
     }
 
-    /**
-     * Wraps {@link Container#animateHierarchyFade(int, int) }.
-     *
-     * @param duration
-     * @param startingOpacity
-     * @param callback
-     * @return
-     */
+    /// Wraps `int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `startingOpacity`
+    ///
+    /// - `callback`
     public ComponentSelector animateHierarchyFade(int duration, int startingOpacity, final SuccessCallback<ComponentSelector> callback) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3632,13 +3855,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#animateLayoutFadeAndWait(int, int) }.
-     *
-     * @param duration
-     * @param startingOpacity
-     * @return
-     */
+    /// Wraps `int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `startingOpacity`
     public ComponentSelector animateLayoutFadeAndWait(int duration, int startingOpacity) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3653,25 +3876,30 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Animates layout with fade on all containers in this set.  Wraps {@link Container#animateLayoutFade(int, int) }.
-     *
-     * @param duration
-     * @param startingOpacity
-     * @return Self for chaining.
-     */
+    /// Animates layout with fade on all containers in this set.  Wraps `int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `startingOpacity`
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector animateLayoutFade(int duration, int startingOpacity) {
         return animateLayoutFade(duration, startingOpacity, null);
     }
 
-    /**
-     * Wraps {@link Container#animateLayoutFade(int, int) }.
-     *
-     * @param duration
-     * @param startingOpacity
-     * @param callback
-     * @return
-     */
+    /// Wraps `int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `startingOpacity`
+    ///
+    /// - `callback`
     public ComponentSelector animateLayoutFade(int duration, int startingOpacity, final SuccessCallback<ComponentSelector> callback) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3695,23 +3923,22 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#animateLayout(int) }
-     *
-     * @param duration
-     * @return
-     */
+    /// Wraps `Container#animateLayout(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
     public ComponentSelector animateLayout(int duration) {
         return animateLayout(duration, null);
     }
 
-    /**
-     * Wraps {@link Container#animateLayout(int) }.
-     *
-     * @param duration
-     * @param callback
-     * @return
-     */
+    /// Wraps `Container#animateLayout(int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `callback`
     public ComponentSelector animateLayout(int duration, final SuccessCallback<ComponentSelector> callback) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3735,12 +3962,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#animateLayoutAndWait(int) }
-     *
-     * @param duration
-     * @return
-     */
+    /// Wraps `Container#animateLayoutAndWait(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
     public ComponentSelector animateLayoutAndWait(int duration) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3755,25 +3981,26 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#animateUnlayout(int, int, java.lang.Runnable) }
-     *
-     * @param duration
-     * @param opacity
-     * @return
-     */
+    /// Wraps `int, java.lang.Runnable)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `opacity`
     public ComponentSelector animateUnlayout(int duration, int opacity) {
         return animateUnlayout(duration, opacity, null);
     }
 
-    /**
-     * Wraps {@link Container#animateUnlayout(int, int, java.lang.Runnable) }
-     *
-     * @param duration
-     * @param opacity
-     * @param callback Callback to run when animation has completed.
-     * @return
-     */
+    /// Wraps `int, java.lang.Runnable)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `opacity`
+    ///
+    /// - `callback`: Callback to run when animation has completed.
     public ComponentSelector animateUnlayout(int duration, int opacity, final SuccessCallback<ComponentSelector> callback) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3796,13 +4023,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Container#animateUnlayoutAndWait(int, int) }
-     *
-     * @param duration
-     * @param opacity
-     * @return
-     */
+    /// Wraps `int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`
+    ///
+    /// - `opacity`
     public ComponentSelector animateUnlayoutAndWait(int duration, int opacity) {
         ArrayList<ComponentAnimation> animations = new ArrayList<ComponentAnimation>();
         for (Component c : this) {
@@ -3818,12 +4045,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Gets the AnimationManager for the components in this set.
-     *
-     * @return The AnimationManager for the components in this set.
-     * @see Component#getAnimationManager()
-     */
+    /// Gets the AnimationManager for the components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// The AnimationManager for the components in this set.
+    ///
+    /// #### See also
+    ///
+    /// - Component#getAnimationManager()
     public AnimationManager getAnimationManager() {
         for (Component c : this) {
             AnimationManager mgr = c.getAnimationManager();
@@ -3834,12 +4064,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return null;
     }
 
-    /**
-     * Gets the text on the first component in this set that supports this property.  Currently this works with
-     * Label, TextArea, SpanLabel, and SpanButtons, and subclasses thereof.
-     *
-     * @return
-     */
+    /// Gets the text on the first component in this set that supports this property.  Currently this works with
+    /// Label, TextArea, SpanLabel, and SpanButtons, and subclasses thereof.
     public String getText() {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -3855,13 +4081,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return null;
     }
 
-    /**
-     * Sets the text on all components in found set that support this.  Currently this works with
-     * Label, TextArea, SpanLabel, and SpanButtons, and subclasses thereof.
-     *
-     * @param text The text to set in the componnet.
-     * @return
-     */
+    /// Sets the text on all components in found set that support this.  Currently this works with
+    /// Label, TextArea, SpanLabel, and SpanButtons, and subclasses thereof.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The text to set in the componnet.
     public ComponentSelector setText(String text) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -3877,12 +4102,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets the icon for components in found set.  Only relevant to Labels, SpanLabels, and SpanButtons, and subclasses thereof.
-     *
-     * @param icon
-     * @return
-     */
+    /// Sets the icon for components in found set.  Only relevant to Labels, SpanLabels, and SpanButtons, and subclasses thereof.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`
     public ComponentSelector setIcon(Image icon) {
         for (Component c : this) {
             if (c instanceof IconHolder) {
@@ -3892,29 +4116,44 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets the icons of all elements in this set to a material icon.
-     *
-     * @param materialIcon Material icon charcode.
-     * @param style        The style for the icon.
-     * @param size         The size for the icon. (in mm)
-     * @return Self for chaining.
-     * @see FontImage#createMaterial(char, java.lang.String, float)
-     */
+    /// Sets the icons of all elements in this set to a material icon.
+    ///
+    /// #### Parameters
+    ///
+    /// - `materialIcon`: Material icon charcode.
+    ///
+    /// - `style`: The style for the icon.
+    ///
+    /// - `size`: The size for the icon. (in mm)
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - FontImage#createMaterial(char, java.lang.String, float)
     public ComponentSelector setIcon(char materialIcon, Style style, float size) {
         FontImage img = FontImage.createMaterial(materialIcon, style, size);
         return setIcon(img);
     }
 
-    /**
-     * Sets the icon of all elements in this set to a material icon.  This will use
-     * the foreground color of each label as the icon's foreground color.
-     *
-     * @param materialIcon The icon charcode.
-     * @param size         The size of the icon (in mm)
-     * @return Self for chaining
-     * @see FontImage#createMaterial(char, com.codename1.ui.plaf.Style, float)
-     */
+    /// Sets the icon of all elements in this set to a material icon.  This will use
+    /// the foreground color of each label as the icon's foreground color.
+    ///
+    /// #### Parameters
+    ///
+    /// - `materialIcon`: The icon charcode.
+    ///
+    /// - `size`: The size of the icon (in mm)
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining
+    ///
+    /// #### See also
+    ///
+    /// - FontImage#createMaterial(char, com.codename1.ui.plaf.Style, float)
     public ComponentSelector setIcon(char materialIcon, float size) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -3941,13 +4180,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     }
 
-    /**
-     * Sets the icon of all elements in this set to a material icon.  This will use
-     * the foreground color of the label.
-     *
-     * @param materialIcon The material icon charcode.
-     * @return Self for chaining.
-     */
+    /// Sets the icon of all elements in this set to a material icon.  This will use
+    /// the foreground color of the label.
+    ///
+    /// #### Parameters
+    ///
+    /// - `materialIcon`: The material icon charcode.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public ComponentSelector setIcon(char materialIcon) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -3976,11 +4218,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     }
 
-    /**
-     * Gets the set of all component forms from components in this set.
-     *
-     * @return New ComponentSelector with forms all components in this set.
-     */
+    /// Gets the set of all component forms from components in this set.
+    ///
+    /// #### Returns
+    ///
+    /// New ComponentSelector with forms all components in this set.
     public ComponentSelector getComponentForm() {
         HashSet<Component> out = new HashSet<Component>();
         for (Component c : this) {
@@ -3989,13 +4231,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return new ComponentSelector(out);
     }
 
-    /**
-     * Sets vertical alignment of text.
-     *
-     * @param valign
-     * @return
-     * @see Label#setVerticalAlignment(int)
-     */
+    /// Sets vertical alignment of text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `valign`
+    ///
+    /// #### See also
+    ///
+    /// - Label#setVerticalAlignment(int)
     public ComponentSelector setVerticalAlignment(int valign) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4005,13 +4249,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets text position of text.  Only relevant to labels.
-     *
-     * @param pos
-     * @return
-     * @see Label#setTextPosition(int)
-     */
+    /// Sets text position of text.  Only relevant to labels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`
+    ///
+    /// #### See also
+    ///
+    /// - Label#setTextPosition(int)
     public ComponentSelector setTextPosition(int pos) {
         for (Component c : this) {
             if (c instanceof IconHolder) {
@@ -4021,14 +4267,23 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets the Icon UIID of elements in found set.
-     *
-     * @param uiid The UIID for icons.
-     * @return Self for chaining.
-     * @see IconHolder#setIconUIID(java.lang.String)
-     * @since 7.0
-     */
+    /// Sets the Icon UIID of elements in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: The UIID for icons.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - IconHolder#setIconUIID(java.lang.String)
     public ComponentSelector setIconUIID(String uiid) {
         for (Component c : this) {
             if (c instanceof IconHolder) {
@@ -4038,13 +4293,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets gap.  Only relevant to labels.
-     *
-     * @param gap
-     * @return
-     * @see Label#setGap(int)
-     */
+    /// Sets gap.  Only relevant to labels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`
+    ///
+    /// #### See also
+    ///
+    /// - Label#setGap(int)
     public ComponentSelector setGap(int gap) {
         for (Component c : this) {
             if (c instanceof IconHolder) {
@@ -4054,13 +4311,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets shift text. Only relevant to labels.
-     *
-     * @param shift
-     * @return
-     * @see Label#setShiftText(int)
-     */
+    /// Sets shift text. Only relevant to labels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shift`
+    ///
+    /// #### See also
+    ///
+    /// - Label#setShiftText(int)
     public ComponentSelector setShiftText(int shift) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4070,13 +4329,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#startTicker(long, boolean) }
-     *
-     * @param delay
-     * @param rightToLeft
-     * @return
-     */
+    /// Wraps `boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `delay`
+    ///
+    /// - `rightToLeft`
     public ComponentSelector startTicker(long delay, boolean rightToLeft) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4086,11 +4345,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#stopTicker() }
-     *
-     * @return
-     */
+    /// Wraps `Label#stopTicker()`
     public ComponentSelector stopTicker() {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4100,12 +4355,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setTickerEnabled(boolean) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Label#setTickerEnabled(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setTickerEnabled(boolean b) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4115,12 +4369,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setEndsWith3Points(boolean) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Label#setEndsWith3Points(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setEndsWith3Points(boolean b) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4130,12 +4383,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setMask(java.lang.Object) }
-     *
-     * @param mask
-     * @return
-     */
+    /// Wraps `Label#setMask(java.lang.Object)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `mask`
     public ComponentSelector setMask(Object mask) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4145,12 +4397,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setMaskName(java.lang.String) }
-     *
-     * @param name
-     * @return
-     */
+    /// Wraps `Label#setMaskName(java.lang.String)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`
     public ComponentSelector setMaskName(String name) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4160,12 +4411,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setShouldLocalize(boolean) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Label#setShouldLocalize(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setShouldLocalize(boolean b) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4175,12 +4425,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setShiftMillimeters(int) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Label#setShiftMillimeters(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setShiftMillimeters(int b) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4190,12 +4439,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setShowEvenIfBlank(boolean) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Label#setShowEvenIfBlank(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setShowEvenIfBlank(boolean b) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4205,12 +4453,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setLegacyRenderer(boolean) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Label#setLegacyRenderer(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setLegacyRenderer(boolean b) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4220,12 +4467,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Label#setAutoSizeMode(boolean) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `Label#setAutoSizeMode(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setAutoSizeMode(boolean b) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -4235,12 +4481,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Button#setCommand(com.codename1.ui.Command) }
-     *
-     * @param cmd
-     * @return
-     */
+    /// Wraps `Button#setCommand(com.codename1.ui.Command)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`
     public ComponentSelector setCommand(Command cmd) {
         for (Component c : this) {
             if (c instanceof Button) {
@@ -4250,12 +4495,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Button#setRolloverPressedIcon(com.codename1.ui.Image) }
-     *
-     * @param icon
-     * @return
-     */
+    /// Wraps `Button#setRolloverPressedIcon(com.codename1.ui.Image)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`
     public ComponentSelector setRolloverPressedIcon(Image icon) {
         for (Component c : this) {
             if (c instanceof Button) {
@@ -4265,12 +4509,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Button#setRolloverIcon(com.codename1.ui.Image) }
-     *
-     * @param icon
-     * @return
-     */
+    /// Wraps `Button#setRolloverIcon(com.codename1.ui.Image)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`
     public ComponentSelector setRolloverIcon(Image icon) {
         for (Component c : this) {
             if (c instanceof Button) {
@@ -4280,12 +4523,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Button#setPressedIcon(com.codename1.ui.Image) }
-     *
-     * @param icon
-     * @return
-     */
+    /// Wraps `Button#setPressedIcon(com.codename1.ui.Image)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`
     public ComponentSelector setPressedIcon(Image icon) {
         for (Component c : this) {
             if (c instanceof Button) {
@@ -4295,12 +4537,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Button#setDisabledIcon(com.codename1.ui.Image) }
-     *
-     * @param icon
-     * @return
-     */
+    /// Wraps `Button#setDisabledIcon(com.codename1.ui.Image)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`
     public ComponentSelector setDisabledIcon(Image icon) {
         for (Component c : this) {
             if (c instanceof Button) {
@@ -4310,13 +4551,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Adds action listener to applicable components in found set.  Currently this will apply to
-     * Buttons, Lists, Sliders, TextAreas, OnOffSwitches, SpanButtons, and subclasses thereof.
-     *
-     * @param l
-     * @return
-     */
+    /// Adds action listener to applicable components in found set.  Currently this will apply to
+    /// Buttons, Lists, Sliders, TextAreas, OnOffSwitches, SpanButtons, and subclasses thereof.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addActionListener(ActionListener l) {
         for (Component c : this) {
             if (c instanceof ActionSource) {
@@ -4326,12 +4566,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Removes action listeners from components in set.
-     *
-     * @param l The listener to remove
-     * @since 7.0
-     */
+    /// Removes action listeners from components in set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: The listener to remove
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public ComponentSelector removeActionListener(ActionListener l) {
         for (Component c : this) {
             if (c instanceof ActionSource) {
@@ -4341,12 +4584,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link TextArea#setEditable(boolean) }
-     *
-     * @param b
-     * @return
-     */
+    /// Wraps `TextArea#setEditable(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
     public ComponentSelector setEditable(boolean b) {
         for (Component c : this) {
             if (c instanceof TextArea) {
@@ -4356,12 +4598,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link TextField#addDataChangedListener(com.codename1.ui.events.DataChangedListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Wraps `TextField#addDataChangedListener(com.codename1.ui.events.DataChangedListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector addDataChangedListener(DataChangedListener l) {
         for (Component c : this) {
             if (c instanceof TextField) {
@@ -4371,12 +4612,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link TextField#removeDataChangedListener(com.codename1.ui.events.DataChangedListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Wraps `TextField#removeDataChangedListener(com.codename1.ui.events.DataChangedListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector removeDataChangedListener(DataChangedListener l) {
         for (Component c : this) {
             if (c instanceof TextField) {
@@ -4386,12 +4626,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link TextField#setDoneListener(com.codename1.ui.events.ActionListener) }
-     *
-     * @param l
-     * @return
-     */
+    /// Wraps `TextField#setDoneListener(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public ComponentSelector setDoneListener(ActionListener l) {
         for (Component c : this) {
             if (c instanceof TextField) {
@@ -4401,24 +4640,32 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets padding to all sides of found set components in pixels.
-     *
-     * @param padding Padding in pixels
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets padding to all sides of found set components in pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `padding`: Padding in pixels
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setPadding(int padding) {
         return setPadding(padding, padding, padding, padding);
     }
 
-    /**
-     * Strips margin and padding from components in found set.
-     *
-     * @return Self for chaining.
-     * @see Style#stripMarginAndPadding()
-     * @since 7.0
-     */
+    /// Strips margin and padding from components in found set.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - Style#stripMarginAndPadding()
     public ComponentSelector stripMarginAndPadding() {
         Style s = currentStyle();
         s.stripMarginAndPadding();
@@ -4427,16 +4674,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     // Now for the style stuff
 
-    /**
-     * Sets padding to all components in found set.
-     *
-     * @param top    Top padding in pixels.
-     * @param right  Right padding in pixels
-     * @param bottom Bottom padding in pixels.
-     * @param left   Left padding in pixels.
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets padding to all components in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: Top padding in pixels.
+    ///
+    /// - `right`: Right padding in pixels
+    ///
+    /// - `bottom`: Bottom padding in pixels.
+    ///
+    /// - `left`: Left padding in pixels.
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setPadding(int top, int right, int bottom, int left) {
         Style s = currentStyle();
         s.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
@@ -4444,49 +4696,56 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets padding to all components in found set in millimeters.
-     *
-     * @param top    Top padding in mm.
-     * @param right  Right padding in mm
-     * @param bottom Bottom padding in mm.
-     * @param left   Left padding in mm.
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets padding to all components in found set in millimeters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: Top padding in mm.
+    ///
+    /// - `right`: Right padding in mm
+    ///
+    /// - `bottom`: Bottom padding in mm.
+    ///
+    /// - `left`: Left padding in mm.
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setPaddingMillimeters(float top, float right, float bottom, float left) {
         return setPadding(dip2px(top), dip2px(right), dip2px(bottom), dip2px(left));
     }
 
-    /**
-     * Sets padding in millimeters to all components in found set.
-     *
-     * @param topBottom Top and bottom padding in mm.
-     * @param leftRight Left and right padding in mm.
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets padding in millimeters to all components in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topBottom`: Top and bottom padding in mm.
+    ///
+    /// - `leftRight`: Left and right padding in mm.
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setPaddingMillimeters(float topBottom, float leftRight) {
         return setPaddingMillimeters(topBottom, leftRight, topBottom, leftRight);
     }
 
-    /**
-     * Sets padding to all components in found set.
-     *
-     * @param padding Padding applied to all sides in mm.
-     * @return
-     */
+    /// Sets padding to all components in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `padding`: Padding applied to all sides in mm.
     public ComponentSelector setPaddingMillimeters(float padding) {
         return setPaddingMillimeters(padding, padding);
     }
 
-    /**
-     * Sets padding on all components in found set.
-     *
-     * @param topBottom Top and bottom padding in pixels.
-     * @param leftRight Left and right padding in pixels.
-     * @return
-     */
+    /// Sets padding on all components in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topBottom`: Top and bottom padding in pixels.
+    ///
+    /// - `leftRight`: Left and right padding in pixels.
     public ComponentSelector setPadding(int topBottom, int leftRight) {
         return setPadding(topBottom, leftRight, topBottom, leftRight);
     }
@@ -4499,39 +4758,40 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return (int) Math.round((parent.getWidth() * percentage / 100));
     }
 
-    /**
-     * Sets the padding on all components in found set as a percentage of their respective
-     * parents' dimensions.  Horizontal padding is set as a percentage of parent width.  Vertical padding
-     * is set as a percentage of parent height.
-     *
-     * @param padding The padding expressed as a percent.
-     * @return
-     */
+    /// Sets the padding on all components in found set as a percentage of their respective
+    /// parents' dimensions.  Horizontal padding is set as a percentage of parent width.  Vertical padding
+    /// is set as a percentage of parent height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `padding`: The padding expressed as a percent.
     public ComponentSelector setPaddingPercent(double padding) {
         return setPaddingPercent(padding, padding, padding, padding);
 
     }
 
-    /**
-     * Sets padding on all components in found set as a percentage of their respective parents' dimensions.
-     *
-     * @param topBottom Top and bottom padding as percentage of parent heights.
-     * @param leftRight Left and right padding as percentage of parent widths.
-     * @return
-     */
+    /// Sets padding on all components in found set as a percentage of their respective parents' dimensions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topBottom`: Top and bottom padding as percentage of parent heights.
+    ///
+    /// - `leftRight`: Left and right padding as percentage of parent widths.
     public ComponentSelector setPaddingPercent(double topBottom, double leftRight) {
         return setPaddingPercent(topBottom, leftRight, topBottom, leftRight);
     }
 
-    /**
-     * Sets padding on all components in found set as a percentage of their respective parents' dimensions.
-     *
-     * @param top    Top padding as percentage of parent height.
-     * @param right  Right padding as percentage of parent width.
-     * @param bottom Bottom padding as percentage of parent height.
-     * @param left   Left padding as percentage of parent width.
-     * @return
-     */
+    /// Sets padding on all components in found set as a percentage of their respective parents' dimensions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: Top padding as percentage of parent height.
+    ///
+    /// - `right`: Right padding as percentage of parent width.
+    ///
+    /// - `bottom`: Bottom padding as percentage of parent height.
+    ///
+    /// - `left`: Left padding as percentage of parent width.
     public ComponentSelector setPaddingPercent(double top, double right, double bottom, double left) {
         for (Component c : this) {
 
@@ -4551,27 +4811,34 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets margin to all sides of found set components in pixels.
-     *
-     * @param margin Margin in pixels
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets margin to all sides of found set components in pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `margin`: Margin in pixels
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setMargin(int margin) {
         return setMargin(margin, margin, margin, margin);
     }
 
-    /**
-     * Sets margin to all components in found set.
-     *
-     * @param top    Top margin in pixels.
-     * @param right  Right margin in pixels
-     * @param bottom Bottom margin in pixels.
-     * @param left   Left margin in pixels.
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets margin to all components in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: Top margin in pixels.
+    ///
+    /// - `right`: Right margin in pixels
+    ///
+    /// - `bottom`: Bottom margin in pixels.
+    ///
+    /// - `left`: Left margin in pixels.
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setMargin(int top, int right, int bottom, int left) {
         Style s = currentStyle();
         s.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
@@ -4579,50 +4846,51 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets margin on all components in found set.
-     *
-     * @param topBottom Top and bottom margin in pixels.
-     * @param leftRight Left and right margin in pixels.
-     * @return
-     */
+    /// Sets margin on all components in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topBottom`: Top and bottom margin in pixels.
+    ///
+    /// - `leftRight`: Left and right margin in pixels.
     public ComponentSelector setMargin(int topBottom, int leftRight) {
         return setMargin(topBottom, leftRight, topBottom, leftRight);
     }
 
-    /**
-     * Sets the margin on all components in found set as a percentage of their respective
-     * parents' dimensions.  Horizontal margin is set as a percentage of parent width.  Vertical margin
-     * is set as a percentage of parent height.
-     *
-     * @param margin The margin expressed as a percent.
-     * @return
-     */
+    /// Sets the margin on all components in found set as a percentage of their respective
+    /// parents' dimensions.  Horizontal margin is set as a percentage of parent width.  Vertical margin
+    /// is set as a percentage of parent height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `margin`: The margin expressed as a percent.
     public ComponentSelector setMarginPercent(double margin) {
         return setMarginPercent(margin, margin, margin, margin);
 
     }
 
-    /**
-     * Sets margin on all components in found set as a percentage of their respective parents' dimensions.
-     *
-     * @param topBottom Top and bottom margin as percentage of parent heights.
-     * @param leftRight Left and right margin as percentage of parent widths.
-     * @return
-     */
+    /// Sets margin on all components in found set as a percentage of their respective parents' dimensions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topBottom`: Top and bottom margin as percentage of parent heights.
+    ///
+    /// - `leftRight`: Left and right margin as percentage of parent widths.
     public ComponentSelector setMarginPercent(double topBottom, double leftRight) {
         return setMarginPercent(topBottom, leftRight, topBottom, leftRight);
     }
 
-    /**
-     * Sets margin on all components in found set as a percentage of their respective parents' dimensions.
-     *
-     * @param top    Top margin as percentage of parent height.
-     * @param right  Right margin as percentage of parent width.
-     * @param bottom Bottom margin as percentage of parent height.
-     * @param left   Left margin as percentage of parent width.
-     * @return
-     */
+    /// Sets margin on all components in found set as a percentage of their respective parents' dimensions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: Top margin as percentage of parent height.
+    ///
+    /// - `right`: Right margin as percentage of parent width.
+    ///
+    /// - `bottom`: Bottom margin as percentage of parent height.
+    ///
+    /// - `left`: Left margin as percentage of parent width.
     public ComponentSelector setMarginPercent(double top, double right, double bottom, double left) {
         for (Component c : this) {
 
@@ -4641,49 +4909,56 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets margin to all components in found set in millimeters.
-     *
-     * @param top    Top margin in mm.
-     * @param right  Right margin in mm
-     * @param bottom Bottom margin in mm.
-     * @param left   Left margin in mm.
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets margin to all components in found set in millimeters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: Top margin in mm.
+    ///
+    /// - `right`: Right margin in mm
+    ///
+    /// - `bottom`: Bottom margin in mm.
+    ///
+    /// - `left`: Left margin in mm.
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setMarginMillimeters(float top, float right, float bottom, float left) {
         return setMargin(dip2px(top), dip2px(right), dip2px(bottom), dip2px(left));
     }
 
-    /**
-     * Sets margin in millimeters to all components in found set.
-     *
-     * @param topBottom Top and bottom margin in mm.
-     * @param leftRight Left and right margin in mm.
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets margin in millimeters to all components in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topBottom`: Top and bottom margin in mm.
+    ///
+    /// - `leftRight`: Left and right margin in mm.
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setMarginMillimeters(float topBottom, float leftRight) {
         return setMarginMillimeters(topBottom, leftRight, topBottom, leftRight);
     }
 
-    /**
-     * Sets margin to all components in found set.
-     *
-     * @param margin Margin applied to all sides in mm.
-     * @return
-     */
+    /// Sets margin to all components in found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `margin`: Margin applied to all sides in mm.
     public ComponentSelector setMarginMillimeters(float margin) {
         return setMarginMillimeters(margin, margin);
     }
 
-    /**
-     * Creates a proxy style to mutate the styles of all component styles in found set.
-     *
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     * @see Style#createProxyStyle(com.codename1.ui.plaf.Style...)
-     */
+    /// Creates a proxy style to mutate the styles of all component styles in found set.
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
+    ///
+    /// - Style#createProxyStyle(com.codename1.ui.plaf.Style...)
     public Style createProxyStyle() {
         HashSet<Style> styles = new HashSet<Style>();
         for (Component c : this) {
@@ -4692,14 +4967,17 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return Style.createProxyStyle(styles.toArray(new Style[styles.size()]));
     }
 
-    /**
-     * Merges style with all styles of components in current found set.
-     *
-     * @param style
-     * @return
-     * @see Style#merge(com.codename1.ui.plaf.Style)
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Merges style with all styles of components in current found set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`
+    ///
+    /// #### See also
+    ///
+    /// - Style#merge(com.codename1.ui.plaf.Style)
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector merge(Style style) {
         for (Component c : this) {
             getStyle(c).merge(style);
@@ -4707,290 +4985,336 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBgColor(int) }
-     *
-     * @param bgColor
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBgColor(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgColor`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBgColor(int bgColor) {
         currentStyle().setBgColor(bgColor);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setAlignment(int) }
-     *
-     * @param alignment
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setAlignment(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `alignment`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setAlignment(int alignment) {
         currentStyle().setAlignment(alignment);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBgImage(com.codename1.ui.Image)  }
-     *
-     * @param bgImage
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBgImage(com.codename1.ui.Image)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgImage`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBgImage(Image bgImage) {
         currentStyle().setBgImage(bgImage);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBackgroundType(byte)  }
-     *
-     * @param backgroundType
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBackgroundType(byte)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundType`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBackgroundType(byte backgroundType) {
         currentStyle().setBackgroundType(backgroundType);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBackgroundGradientStartColor(int) }
-     *
-     * @param startColor
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBackgroundGradientStartColor(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `startColor`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBackgroundGradientStartColor(int startColor) {
         currentStyle().setBackgroundGradientStartColor(startColor);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBackgroundGradientEndColor(int) (int) }
-     *
-     * @param endColor
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `endColor`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBackgroundGradientEndColor(int endColor) {
         currentStyle().setBackgroundGradientEndColor(endColor);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBackgroundGradientRelativeX(float) }
-     *
-     * @param x
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBackgroundGradientRelativeX(float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBackgroundGradientRelativeX(float x) {
         currentStyle().setBackgroundGradientRelativeX(x);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBackgroundGradientRelativeY(float)  }
-     *
-     * @param y
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBackgroundGradientRelativeY(float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `y`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBackgroundGradientRelativeY(float y) {
         currentStyle().setBackgroundGradientRelativeY(y);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBackgroundGradientRelativeSize(float)  }
-     *
-     * @param size
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBackgroundGradientRelativeSize(float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBackgroundGradientRelativeSize(float size) {
         currentStyle().setBackgroundGradientRelativeSize(size);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setFgColor(int)  }
-     *
-     * @param color
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setFgColor(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setFgColor(int color) {
         currentStyle().setFgColor(color);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setFont(com.codename1.ui.Font)  }
-     *
-     * @param f
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setFont(com.codename1.ui.Font)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setFont(Font f) {
         currentStyle().setFont(f);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setUnderline(boolean) }
-     *
-     * @param b
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setUnderline(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setUnderline(boolean b) {
         currentStyle().setUnderline(b);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#set3DText(boolean, boolean) }
-     *
-     * @param t
-     * @param raised
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`
+    ///
+    /// - `raised`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector set3DText(boolean t, boolean raised) {
         currentStyle().set3DText(t, raised);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#set3DTextNorth(boolean) }
-     *
-     * @param north
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#set3DTextNorth(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `north`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector set3DTextNorth(boolean north) {
         currentStyle().set3DTextNorth(north);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setOverline(boolean) }
-     *
-     * @param b
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setOverline(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setOverline(boolean b) {
         currentStyle().setOverline(b);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setStrikeThru(boolean)  }
-     *
-     * @param b
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setStrikeThru(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setStrikeThru(boolean b) {
         currentStyle().setStrikeThru(b);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setTextDecoration(int)  }
-     *
-     * @param textDecoration
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setTextDecoration(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `textDecoration`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setTextDecoration(int textDecoration) {
         currentStyle().setTextDecoration(textDecoration);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBgTransparency(byte) }
-     *
-     * @param bgTransparency
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBgTransparency(byte)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgTransparency`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBgTransparency(int bgTransparency) {
         currentStyle().setBgTransparency(bgTransparency);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setOpacity(int)  }
-     *
-     * @param opacity
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setOpacity(int)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `opacity`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setOpacity(int opacity) {
         currentStyle().setOpacity(opacity);
 
         return this;
     }
 
-    /**
-     * Wraps {@link Style#addStyleListener(com.codename1.ui.events.StyleListener) }
-     *
-     * @param l
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#addStyleListener(com.codename1.ui.events.StyleListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector addStyleListener(StyleListener l) {
         currentStyle().addStyleListener(l);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#removeStyleListener(com.codename1.ui.events.StyleListener)  }
-     *
-     * @param l
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#removeStyleListener(com.codename1.ui.events.StyleListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector removeStyleListener(StyleListener l) {
         currentStyle().removeStyleListener(l);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#removeListeners() }
-     *
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#removeListeners()`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector removeStyleListeners() {
         currentStyle().removeListeners();
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBorder(com.codename1.ui.plaf.Border)  }
-     *
-     * @param b
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBorder(com.codename1.ui.plaf.Border)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBorder(Border b) {
         currentStyle().setBorder(b);
         return this;
     }
 
-    /**
-     * Wraps {@link Style#setBgPainter(com.codename1.ui.Painter)  }
-     *
-     * @param bgPainter
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Wraps `Style#setBgPainter(com.codename1.ui.Painter)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgPainter`
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setBgPainter(Painter bgPainter) {
         currentStyle().setBgPainter(bgPainter);
         return this;
@@ -5011,13 +5335,15 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return Font.getDefaultFont().getHeight() * 1.6f;
     }
 
-    /**
-     * Sets the font size of all components in found set.  In pixels.
-     *
-     * @param size Font size in pixels.
-     * @return
-     * @see #getStyle(com.codename1.ui.Component)
-     */
+    /// Sets the font size of all components in found set.  In pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: Font size in pixels.
+    ///
+    /// #### See also
+    ///
+    /// - #getStyle(com.codename1.ui.Component)
     public ComponentSelector setFontSize(float size) {
         for (Component c : this) {
             Style style = getStyle(c);
@@ -5046,14 +5372,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets the material icon of all labels in the set.
-     *
-     * @param icon Material icon to set.  See {@link FontImage#setMaterialIcon(com.codename1.ui.Label, char) }
-     * @param size The icon size in millimeters.
-     * @return Self for chaining.
-     * @since 7.0
-     */
+    /// Sets the material icon of all labels in the set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: Material icon to set.  See `char)`
+    ///
+    /// - `size`: The icon size in millimeters.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public ComponentSelector setMaterialIcon(char icon, float size) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -5070,23 +5403,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Sets the font size of all components in found set.  In millimeters.
-     *
-     * @param sizeMM Font size in mm.
-     * @return
-     */
+    /// Sets the font size of all components in found set.  In millimeters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sizeMM`: Font size in mm.
     public ComponentSelector setFontSizeMillimeters(float sizeMM) {
         return setFontSize(dip2px(sizeMM));
     }
 
-    /**
-     * Sets the fonts size of all components in the found set as a percentage of the font
-     * size of the components' respective parents.
-     *
-     * @param sizePercentage Font size as a percentage of parent font size.
-     * @return
-     */
+    /// Sets the fonts size of all components in the found set as a percentage of the font
+    /// size of the components' respective parents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sizePercentage`: Font size as a percentage of parent font size.
     public ComponentSelector setFontSizePercent(double sizePercentage) {
         for (Component c : this) {
             Component parent = c.getParent();
@@ -5119,13 +5450,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
 
-    /**
-     * Returns a set with the first element of the current set, or an empty set if the
-     * current set is empty.
-     *
-     * @return A ComponentSelector with 0 or 1 element.
-     * @since 7.0
-     */
+    /// Returns a set with the first element of the current set, or an empty set if the
+    /// current set is empty.
+    ///
+    /// #### Returns
+    ///
+    /// A ComponentSelector with 0 or 1 element.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public ComponentSelector first() {
         if (!isEmpty()) {
             return new ComponentSelector(results.iterator().next());
@@ -5134,46 +5468,46 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         }
     }
 
-    /**
-     * Interface used for providing callbacks that receive a Component as input.
-     */
+    /// Interface used for providing callbacks that receive a Component as input.
     public interface ComponentClosure {
 
-        /**
-         * Callback to apply.
-         *
-         * @param c Component that is passed to the closure.
-         */
+        /// Callback to apply.
+        ///
+        /// #### Parameters
+        ///
+        /// - `c`: Component that is passed to the closure.
         void call(Component c);
     }
 
-    /**
-     * Interface used by {@link #map(com.codename1.ui.ComponentSelector.ComponentMapper) } to form a new set of
-     * components based on the components in one set.
-     */
+    /// Interface used by `#map(com.codename1.ui.ComponentSelector.ComponentMapper)` to form a new set of
+    /// components based on the components in one set.
     public interface ComponentMapper {
 
-        /**
-         * Maps component {@literal c } to a replacement component.
-         *
-         * @param c The source component.
-         * @return The component that should replace {@literal c} in the new set.
-         */
+        /// Maps component c to a replacement component.
+        ///
+        /// #### Parameters
+        ///
+        /// - `c`: The source component.
+        ///
+        /// #### Returns
+        ///
+        /// The component that should replace c in the new set.
         Component map(Component c);
     }
 
-    /**
-     * Interface used by {@link #filter(com.codename1.ui.ComponentSelector.Filter) } to form a new set of
-     * components based on the components in one set.
-     */
+    /// Interface used by `#filter(com.codename1.ui.ComponentSelector.Filter)` to form a new set of
+    /// components based on the components in one set.
     public interface Filter {
 
-        /**
-         * Determines whether component {@literal c} should be included in new set.
-         *
-         * @param c The component to test for inclusion in new set.
-         * @return True if {@literal c } should be included in new set.  False otherwise
-         */
+        /// Determines whether component c should be included in new set.
+        ///
+        /// #### Parameters
+        ///
+        /// - `c`: The component to test for inclusion in new set.
+        ///
+        /// #### Returns
+        ///
+        /// True if c should be included in new set.  False otherwise
         boolean filter(Component c);
     }
 

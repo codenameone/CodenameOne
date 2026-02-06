@@ -17,13 +17,11 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * This class serves as a aggregator of all the event listeners for all the active components within the HTML page.
- * It is in itself an ActionListener and a FocusListener, and it creates SelectionListeners and DataChangedListeners if needed.
- * Upon events it both updates the DOM if needed, and dispatches event methods on HTMLCallback
- *
- * @author Ofir Leitner
- */
+/// This class serves as a aggregator of all the event listeners for all the active components within the HTML page.
+/// It is in itself an ActionListener and a FocusListener, and it creates SelectionListeners and DataChangedListeners if needed.
+/// Upon events it both updates the DOM if needed, and dispatches event methods on HTMLCallback
+///
+/// @author Ofir Leitner
 class HTMLEventsListener implements ActionListener, FocusListener {
 
     Hashtable comps = new Hashtable();
@@ -34,12 +32,13 @@ class HTMLEventsListener implements ActionListener, FocusListener {
         this.htmlC = htmlC;
     }
 
-    /**
-     * Registeres the specified component/element duo to listen to all available events
-     *
-     * @param cmp     The actual component
-     * @param element The element representing the component
-     */
+    /// Registeres the specified component/element duo to listen to all available events
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The actual component
+    ///
+    /// - `element`: The element representing the component
     void registerComponent(final Component cmp, final HTMLElement element) {
         comps.put(cmp, element);
         cmp.addFocusListener(this);
@@ -78,9 +77,7 @@ class HTMLEventsListener implements ActionListener, FocusListener {
         }
     }
 
-    /**
-     * Deregisters all the listeners, happens before a new page is loaded
-     */
+    /// Deregisters all the listeners, happens before a new page is loaded
     void deregisterAll() {
         for (Enumeration e = comps.keys(); e.hasMoreElements(); ) {
             Component cmp = (Component) e.nextElement();
@@ -109,9 +106,7 @@ class HTMLEventsListener implements ActionListener, FocusListener {
 
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void actionPerformed(ActionEvent evt) {
         Object src = evt.getSource();
@@ -176,9 +171,7 @@ class HTMLEventsListener implements ActionListener, FocusListener {
         }
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void focusGained(Component cmp) {
         if (htmlC.getHTMLCallback() != null) {
@@ -186,9 +179,7 @@ class HTMLEventsListener implements ActionListener, FocusListener {
         }
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void focusLost(Component cmp) {
         if (htmlC.getHTMLCallback() != null) {

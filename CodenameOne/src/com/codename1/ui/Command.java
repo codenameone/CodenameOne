@@ -30,12 +30,10 @@ import com.codename1.ui.events.ActionListener;
 
 import java.util.HashMap;
 
-/**
- * The Command class provides a useful extension to the ActionListener
- * interface in cases where the same functionality may be accessed by several controls.
- *
- * @author Nir Shabi
- */
+/// The Command class provides a useful extension to the ActionListener
+/// interface in cases where the same functionality may be accessed by several controls.
+///
+/// @author Nir Shabi
 public class Command implements ActionListener<ActionEvent> {
     private boolean disposesDialog = true;
     private Image icon;
@@ -49,71 +47,78 @@ public class Command implements ActionListener<ActionEvent> {
     private float iconGapMM = -1;
     private float materialIconSize = -1;
 
-    /**
-     * Simplifies code dealing with commands allowing them to be used in switch statements
-     * more easily
-     */
+    /// Simplifies code dealing with commands allowing them to be used in switch statements
+    /// more easily
     private int commandId;
 
     private HashMap<String, Object> clientProperties;
 
-    /**
-     * Creates a new instance of Command
-     *
-     * @param command the string that will be placed on the Soft buttons\Menu
-     */
+    /// Creates a new instance of Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
     public Command(String command) {
         this.command = command;
     }
 
-    /**
-     * Creates a new instance of Command
-     *
-     * @param command the string that will be placed on the Soft buttons\Menu
-     * @param icon    the icon representing the command
-     */
+    /// Creates a new instance of Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `icon`: the icon representing the command
     public Command(String command, Image icon) {
         this.command = command;
         this.icon = icon;
     }
 
 
-    /**
-     * Creates a new instance of Command
-     *
-     * @param command the string that will be placed on the Soft buttons\Menu
-     * @param id      user defined ID for a command simplifying switch statement code
-     *                working with a command
-     */
+    /// Creates a new instance of Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `id`: @param id      user defined ID for a command simplifying switch statement code
+    ///                working with a command
     public Command(String command, int id) {
         this.command = command;
         this.commandId = id;
     }
 
-    /**
-     * Creates a new instance of Command
-     *
-     * @param command the string that will be placed on the Soft buttons\Menu
-     * @param icon    the icon representing the command
-     * @param id      user defined ID for a command simplifying switch statement code
-     *                working with a command
-     */
+    /// Creates a new instance of Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `icon`: the icon representing the command
+    ///
+    /// - `id`: @param id      user defined ID for a command simplifying switch statement code
+    ///                working with a command
     public Command(String command, Image icon, int id) {
         this.command = command;
         this.commandId = id;
         this.icon = icon;
     }
 
-    /**
-     * Creates a new command instance that encapsulates the action listener and details, the main
-     * value of this approach is in our ability to write commands using the shorthand lambda syntax
-     * of Java 8.
-     *
-     * @param name the name/title of the command
-     * @param icon the icon for the command
-     * @param ev   the even handler
-     * @return a newly created Command instance
-     */
+    /// Creates a new command instance that encapsulates the action listener and details, the main
+    /// value of this approach is in our ability to write commands using the shorthand lambda syntax
+    /// of Java 8.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name/title of the command
+    ///
+    /// - `icon`: the icon for the command
+    ///
+    /// - `ev`: the even handler
+    ///
+    /// #### Returns
+    ///
+    /// a newly created Command instance
     public static Command create(String name, Image icon, final ActionListener ev) {
         Command cmd = new Command(name) {
             @Override
@@ -125,17 +130,25 @@ public class Command implements ActionListener<ActionEvent> {
         return cmd;
     }
 
-    /**
-     * Creates a new command instance that encapsulates the action listener and details, the main
-     * value of this approach is in our ability to write commands using the shorthand lambda syntax
-     * of Java 8.
-     *
-     * @param name the name/title of the command
-     * @param icon the icon for the command
-     * @param ev   the even handler
-     * @return a newly created Command instance
-     * @since 6.0
-     */
+    /// Creates a new command instance that encapsulates the action listener and details, the main
+    /// value of this approach is in our ability to write commands using the shorthand lambda syntax
+    /// of Java 8.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name/title of the command
+    ///
+    /// - `icon`: the icon for the command
+    ///
+    /// - `ev`: the even handler
+    ///
+    /// #### Returns
+    ///
+    /// a newly created Command instance
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public static Command createMaterial(String name, char icon, final ActionListener ev) {
         Command cmd = new Command(name) {
             @Override
@@ -147,127 +160,130 @@ public class Command implements ActionListener<ActionEvent> {
         return cmd;
     }
 
-    /**
-     * Return the command ID
-     *
-     * @return the command ID
-     */
+    /// Return the command ID
+    ///
+    /// #### Returns
+    ///
+    /// the command ID
     public int getId() {
         return commandId;
     }
 
-    /**
-     * gets the Command Name
-     *
-     * @return the Command name
-     */
+    /// gets the Command Name
+    ///
+    /// #### Returns
+    ///
+    /// the Command name
     public String getCommandName() {
         return command;
     }
 
-    /**
-     * sets the Command name
-     *
-     * @param command
-     */
+    /// sets the Command name
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`
     public void setCommandName(String command) {
         this.command = command;
     }
 
-    /**
-     * Returns the icon representing the command
-     *
-     * @return an icon representing the command
-     */
+    /// Returns the icon representing the command
+    ///
+    /// #### Returns
+    ///
+    /// an icon representing the command
     public Image getIcon() {
         return icon;
     }
 
-    /**
-     * Sets the icon for the command
-     *
-     * @param icon the new icon
-     */
+    /// Sets the icon for the command
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the new icon
     public void setIcon(Image icon) {
         this.icon = icon;
     }
 
-    /**
-     * Returns a string representation of the object
-     *
-     * @return Returns a string representation of the object
-     */
+    /// Returns a string representation of the object
+    ///
+    /// #### Returns
+    ///
+    /// Returns a string representation of the object
     @Override
     public String toString() {
         return getCommandName();
     }
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * pressed state
-     *
-     * @return icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
     public Image getPressedIcon() {
         return pressedIcon;
     }
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * pressed state
-     *
-     * @param pressedIcon icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state
+    ///
+    /// #### Parameters
+    ///
+    /// - `pressedIcon`: icon used
     public void setPressedIcon(Image pressedIcon) {
         this.pressedIcon = pressedIcon;
     }
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * the disabled state
-     *
-     * @return icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// the disabled state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
     public Image getDisabledIcon() {
         return disabledIcon;
     }
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * the disabled state
-     *
-     * @param disabledIcon icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// the disabled state
+    ///
+    /// #### Parameters
+    ///
+    /// - `disabledIcon`: icon used
     public void setDisabledIcon(Image disabledIcon) {
         this.disabledIcon = disabledIcon;
     }
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * rolled over state
-     *
-     * @return icon used
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// rolled over state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
     public Image getRolloverIcon() {
         return rolloverIcon;
     }
 
-    /**
-     * Indicates the icon that is displayed on the button when the button is in
-     * rolled over state
-     *
-     * @param rolloverIcon icon to use
-     */
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// rolled over state
+    ///
+    /// #### Parameters
+    ///
+    /// - `rolloverIcon`: icon to use
     public void setRolloverIcon(Image rolloverIcon) {
         this.rolloverIcon = rolloverIcon;
     }
 
-    /**
-     * compare two commands
-     *
-     * @param obj a Command Object to compare
-     * @return true if the obj has the same command name
-     */
+    /// compare two commands
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: a Command Object to compare
+    ///
+    /// #### Returns
+    ///
+    /// true if the obj has the same command name
     @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof Command)) {
@@ -286,64 +302,63 @@ public class Command implements ActionListener<ActionEvent> {
         }
     }
 
-    /**
-     * Allows storing commands in a vector/hashtable
-     *
-     * @return unique hashcode for the command class
-     */
+    /// Allows storing commands in a vector/hashtable
+    ///
+    /// #### Returns
+    ///
+    /// unique hashcode for the command class
     @Override
     public int hashCode() {
         return getClass().hashCode() + commandId;
     }
 
-    /**
-     * This method is called when the soft button/Menu item is clicked
-     *
-     * @param evt the Event Object
-     */
+    /// This method is called when the soft button/Menu item is clicked
+    ///
+    /// #### Parameters
+    ///
+    /// - `evt`: the Event Object
     @Override
     public void actionPerformed(ActionEvent evt) {
     }
 
-    /**
-     * Indicates whether this command causes the dialog to dispose implicitly, defaults to true
-     */
+    /// Indicates whether this command causes the dialog to dispose implicitly, defaults to true
     public boolean isDisposesDialog() {
         return disposesDialog;
     }
 
-    /**
-     * Indicates whether this command causes the dialog to dispose implicitly, defaults to true
-     */
+    /// Indicates whether this command causes the dialog to dispose implicitly, defaults to true
     public void setDisposesDialog(boolean disposesDialog) {
         this.disposesDialog = disposesDialog;
     }
 
-    /**
-     * Allows disabling/enabling the command
-     *
-     * @return the enabled
-     */
+    /// Allows disabling/enabling the command
+    ///
+    /// #### Returns
+    ///
+    /// the enabled
     public boolean isEnabled() {
         return enabled;
     }
 
-    /**
-     * Allows disabling/enabling the command
-     *
-     * @param enabled the enabled to set
-     */
+    /// Allows disabling/enabling the command
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: the enabled to set
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
 
-    /**
-     * The client properties are a useful way to associate meta-data with a command
-     * without subclassing
-     *
-     * @param key an arbitrary user key
-     * @return an arbitrary user object
-     */
+    /// The client properties are a useful way to associate meta-data with a command
+    /// without subclassing
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: an arbitrary user key
+    ///
+    /// #### Returns
+    ///
+    /// an arbitrary user object
     public Object getClientProperty(String key) {
         if (clientProperties != null) {
             return clientProperties.get(key);
@@ -351,13 +366,14 @@ public class Command implements ActionListener<ActionEvent> {
         return null;
     }
 
-    /**
-     * The client properties are a useful way to associate meta-data with a command
-     * without sub classing
-     *
-     * @param key   an arbitrary user key
-     * @param value an arbitrary user object, null to remove
-     */
+    /// The client properties are a useful way to associate meta-data with a command
+    /// without sub classing
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: an arbitrary user key
+    ///
+    /// - `value`: an arbitrary user object, null to remove
     public void putClientProperty(String key, Object value) {
         if (clientProperties == null) {
             clientProperties = new HashMap<String, Object>();
@@ -369,62 +385,62 @@ public class Command implements ActionListener<ActionEvent> {
         }
     }
 
-    /**
-     * @return the materialIcon
-     */
+    /// #### Returns
+    ///
+    /// the materialIcon
     public char getMaterialIcon() {
         return materialIcon;
     }
 
-    /**
-     * @param materialIcon the materialIcon to set
-     */
+    /// #### Parameters
+    ///
+    /// - `materialIcon`: the materialIcon to set
     public void setMaterialIcon(char materialIcon) {
         this.materialIcon = materialIcon;
     }
 
-    /**
-     * The gap between the text and the icon in millimeters or -1 for default
-     *
-     * @return the iconGapMM
-     */
+    /// The gap between the text and the icon in millimeters or -1 for default
+    ///
+    /// #### Returns
+    ///
+    /// the iconGapMM
     public float getIconGapMM() {
         return iconGapMM;
     }
 
-    /**
-     * The gap between the text and the icon in millimeters or -1 for default
-     *
-     * @param iconGapMM the iconGapMM to set
-     */
+    /// The gap between the text and the icon in millimeters or -1 for default
+    ///
+    /// #### Parameters
+    ///
+    /// - `iconGapMM`: the iconGapMM to set
     public void setIconGapMM(float iconGapMM) {
         this.iconGapMM = iconGapMM;
     }
 
-    /**
-     * @return the materialIconSize
-     */
+    /// #### Returns
+    ///
+    /// the materialIconSize
     public float getMaterialIconSize() {
         return materialIconSize;
     }
 
-    /**
-     * @param materialIconSize the materialIconSize to set
-     */
+    /// #### Parameters
+    ///
+    /// - `materialIconSize`: the materialIconSize to set
     public void setMaterialIconSize(float materialIconSize) {
         this.materialIconSize = materialIconSize;
     }
 
-    /**
-     * @return the set iconFont or null if none defined (meaning for material icons instead of the system default MaterialDesign font
-     */
+    /// #### Returns
+    ///
+    /// the set iconFont or null if none defined (meaning for material icons instead of the system default MaterialDesign font
     public Font getIconFont() {
         return iconFont;
     }
 
-    /**
-     * @param iconFont use iconFont for material icons instead of the system default MaterialDesign font
-     */
+    /// #### Parameters
+    ///
+    /// - `iconFont`: use iconFont for material icons instead of the system default MaterialDesign font
     public void setIconFont(Font iconFont) {
         this.iconFont = iconFont;
     }

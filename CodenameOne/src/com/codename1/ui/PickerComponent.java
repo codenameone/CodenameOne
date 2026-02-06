@@ -27,38 +27,56 @@ import com.codename1.ui.spinner.Picker;
 
 import java.util.Date;
 
-/**
- * <p>A picker component similar to {@link com.codename1.ui.TextComponent} that adapts to native UI
- * conventions and leverages the {@link com.codename1.ui.spinner.Picker} API. See the docs for
- * {@link com.codename1.ui.InputComponent} for more options and coverage.</p>
- * <p>
- * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
- * validation errors
- * </p>
- * <script src="https://gist.github.com/codenameone/5a28c7944aeab7d8ae6b26dc81690238.js"></script>
- * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-ios.png" alt="Running on iOS" />
- * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-android.png" alt="Running on Android" />
- * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-error-handling-blank.png" alt="Android validation errors" />
- *
- * @author Shai Almog
- */
+/// A picker component similar to `com.codename1.ui.TextComponent` that adapts to native UI
+/// conventions and leverages the `com.codename1.ui.spinner.Picker` API. See the docs for
+/// `com.codename1.ui.InputComponent` for more options and coverage.
+///
+/// The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
+/// validation errors
+///
+/// ```java
+/// TextModeLayout tl = new TextModeLayout(3, 2);
+/// Form f = new Form("Pixel Perfect", tl);
+///
+/// TextComponent title = new TextComponent().label("Title");
+/// TextComponent price = new TextComponent().label("Price");
+/// TextComponent location = new TextComponent().label("Location");
+/// PickerComponent date = PickerComponent.createDate(new Date()).label("Date");
+/// TextComponent description = new TextComponent().label("Description").multiline(true);
+///
+/// Validator val = new Validator();
+/// val.addConstraint(title, new LengthConstraint(2));
+/// val.addConstraint(price, new NumericConstraint(true));
+///
+/// f.add(tl.createConstraint().widthPercentage(60), title);
+/// f.add(tl.createConstraint().widthPercentage(40), date);
+/// f.add(location);
+/// f.add(price);
+/// f.add(tl.createConstraint().horizontalSpan(2), description);
+/// f.setEditOnShow(title.getField());
+///
+/// f.show();
+/// ```
+///
+/// @author Shai Almog
 public class PickerComponent extends InputComponent {
     private final Picker picker = createPickerInstance();
 
-    /**
-     * Allows subclassing the picker component for customization
-     */
+    /// Allows subclassing the picker component for customization
     protected PickerComponent() {
         initInput();
         picker.setTickerEnabled(false);
     }
 
-    /**
-     * Creates a strings picker component
-     *
-     * @param values the values for the picker
-     * @return a strings version of the picker component
-     */
+    /// Creates a strings picker component
+    ///
+    /// #### Parameters
+    ///
+    /// - `values`: the values for the picker
+    ///
+    /// #### Returns
+    ///
+    /// a strings version of the picker component
     public static PickerComponent createStrings(String... values) {
         PickerComponent p = new PickerComponent();
         p.picker.setType(Display.PICKER_TYPE_STRINGS);
@@ -67,12 +85,15 @@ public class PickerComponent extends InputComponent {
         return p;
     }
 
-    /**
-     * Creates a date picker component
-     *
-     * @param date the initial date in the picker
-     * @return a date version of the picker component
-     */
+    /// Creates a date picker component
+    ///
+    /// #### Parameters
+    ///
+    /// - `date`: the initial date in the picker
+    ///
+    /// #### Returns
+    ///
+    /// a date version of the picker component
     public static PickerComponent createDate(Date date) {
         PickerComponent p = new PickerComponent();
         p.picker.setType(Display.PICKER_TYPE_DATE);
@@ -80,12 +101,15 @@ public class PickerComponent extends InputComponent {
         return p;
     }
 
-    /**
-     * Creates a date + time picker component
-     *
-     * @param date the initial date in the picker
-     * @return a date + time version of the picker component
-     */
+    /// Creates a date + time picker component
+    ///
+    /// #### Parameters
+    ///
+    /// - `date`: the initial date in the picker
+    ///
+    /// #### Returns
+    ///
+    /// a date + time version of the picker component
     public static PickerComponent createDateTime(Date date) {
         PickerComponent p = new PickerComponent();
         p.picker.setType(Display.PICKER_TYPE_DATE_AND_TIME);
@@ -93,12 +117,15 @@ public class PickerComponent extends InputComponent {
         return p;
     }
 
-    /**
-     * Creates a time picker component
-     *
-     * @param minutes minutes since midnight as a time of day
-     * @return a time version of the picker component
-     */
+    /// Creates a time picker component
+    ///
+    /// #### Parameters
+    ///
+    /// - `minutes`: minutes since midnight as a time of day
+    ///
+    /// #### Returns
+    ///
+    /// a time version of the picker component
     public static PickerComponent createTime(int minutes) {
         PickerComponent p = new PickerComponent();
         p.picker.setType(Display.PICKER_TYPE_TIME);
@@ -106,12 +133,15 @@ public class PickerComponent extends InputComponent {
         return p;
     }
 
-    /**
-     * Creates a duration minutes picker component
-     *
-     * @param ms the duration value in milliseconds
-     * @return a duration version of the picker component
-     */
+    /// Creates a duration minutes picker component
+    ///
+    /// #### Parameters
+    ///
+    /// - `ms`: the duration value in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// a duration version of the picker component
     public static PickerComponent createDurationMinutes(int ms) {
         PickerComponent p = new PickerComponent();
         p.picker.setType(Display.PICKER_TYPE_DURATION_MINUTES);
@@ -119,13 +149,17 @@ public class PickerComponent extends InputComponent {
         return p;
     }
 
-    /**
-     * Creates a duration hours + minutes picker component
-     *
-     * @param hours   the number of hours
-     * @param minutes the number of minutes
-     * @return a duration version of the picker component
-     */
+    /// Creates a duration hours + minutes picker component
+    ///
+    /// #### Parameters
+    ///
+    /// - `hours`: the number of hours
+    ///
+    /// - `minutes`: the number of minutes
+    ///
+    /// #### Returns
+    ///
+    /// a duration version of the picker component
     public static PickerComponent createDurationHoursMinutes(int hours, int minutes) {
         PickerComponent p = new PickerComponent();
         p.picker.setType(Display.PICKER_TYPE_DURATION_HOURS);
@@ -133,58 +167,50 @@ public class PickerComponent extends InputComponent {
         return p;
     }
 
-    /**
-     * Allows developers to subclass the Picker component instance to customize
-     * behaviors of the subclass
-     *
-     * @return the picker instance
-     */
+    /// Allows developers to subclass the Picker component instance to customize
+    /// behaviors of the subclass
+    ///
+    /// #### Returns
+    ///
+    /// the picker instance
     protected Picker createPickerInstance() {
         return new Picker();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public final Component getEditor() {
         return picker;
     }
 
-    /**
-     * Returns the picker instance
-     *
-     * @return the picker
-     */
+    /// Returns the picker instance
+    ///
+    /// #### Returns
+    ///
+    /// the picker
     public Picker getPicker() {
         return picker;
     }
 
-    /**
-     * Overridden for covariant return type
-     * {@inheritDoc}
-     */
+    /// Overridden for covariant return type
+    /// {@inheritDoc}
     @Override
     public PickerComponent onTopMode(boolean onTopMode) {
         super.onTopMode(onTopMode);
         return this;
     }
 
-    /**
-     * Overridden for covariant return type
-     * {@inheritDoc}
-     */
+    /// Overridden for covariant return type
+    /// {@inheritDoc}
     @Override
     public PickerComponent errorMessage(String errorMessage) {
         super.errorMessage(errorMessage);
         return this;
     }
 
-    /**
-     * Overridden for covariant return type
-     * {@inheritDoc}
-     * }
-     */
+    /// Overridden for covariant return type
+    /// {@inheritDoc}
+    /// }
     @Override
     public PickerComponent label(String text) {
         super.label(text);

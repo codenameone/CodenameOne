@@ -40,15 +40,11 @@ import java.util.TreeSet;
  *         Date: 2006-sep-08
  */
 
-/**
- * A utility class that has only static helper methods.
- */
+/// A utility class that has only static helper methods.
 public final class LayoutUtil {
-    /**
-     * A substitute value for aa really large value. Integer.MAX_VALUE is not used since that means a lot of defensive code
-     * for potential overflow must exist in many places. This value is large enough for being unreasonable yet it is hard to
-     * overflow.
-     */
+    /// A substitute value for aa really large value. Integer.MAX_VALUE is not used since that means a lot of defensive code
+    /// for potential overflow must exist in many places. This value is large enough for being unreasonable yet it is hard to
+    /// overflow.
     public static final int INF = (Integer.MAX_VALUE >> 10) - 100; // To reduce likelihood of overflow errors when calculating.
     // Index for the different sizes
     public static final int MIN = 0;
@@ -57,9 +53,7 @@ public final class LayoutUtil {
     public static final int HORIZONTAL = 0;
     public static final int VERTICAL = 1;
     public static final boolean HAS_BEANS = hasBeans();
-    /**
-     * Tag int for a value that in considered "not set". Used as "null" element in int arrays.
-     */
+    /// Tag int for a value that in considered "not set". Used as "null" element in int arrays.
     static final int NOT_SET = Integer.MIN_VALUE + 12346;   // Magic value...
     private static final IdentityHashMap<Object, Object> SER_MAP = new IdentityHashMap<Object, Object>(2);
     private static HashMap<Object, String> CR_MAP = null;
@@ -74,53 +68,61 @@ public final class LayoutUtil {
         return false;
     }
 
-    /**
-     * Returns the current version of MiG Layout.
-     *
-     * @return The current version of MiG Layout. E.g. "3.6.3" or "4.0"
-     */
+    /// Returns the current version of MiG Layout.
+    ///
+    /// #### Returns
+    ///
+    /// The current version of MiG Layout. E.g. "3.6.3" or "4.0"
     public static String getVersion() {
         return "5.0";
     }
 
-    /**
-     * If global debug should be on or off. If &gt; 0 then debug is turned on for all MigLayout
-     * instances.
-     *
-     * @return The current debug milliseconds.
-     * @see LC#setDebugMillis(int)
-     */
+    /// If global debug should be on or off. If > 0 then debug is turned on for all MigLayout
+    /// instances.
+    ///
+    /// #### Returns
+    ///
+    /// The current debug milliseconds.
+    ///
+    /// #### See also
+    ///
+    /// - LC#setDebugMillis(int)
     public static int getGlobalDebugMillis() {
         return globalDebugMillis;
     }
 
-    /**
-     * If global debug should be on or off. If &gt; 0 then debug is turned on for all MigLayout
-     * instances.
-     * <p>
-     * Note! This is a passive value and will be read by panels when the needed, which is normally
-     * when they repaint/layout.
-     *
-     * @param millis The new debug milliseconds. 0 turns of global debug and leaves debug up to every
-     *               individual panel.
-     * @see LC#setDebugMillis(int)
-     */
+    /// If global debug should be on or off. If > 0 then debug is turned on for all MigLayout
+    /// instances.
+    ///
+    /// Note! This is a passive value and will be read by panels when the needed, which is normally
+    /// when they repaint/layout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `millis`: @param millis The new debug milliseconds. 0 turns of global debug and leaves debug up to every
+    ///               individual panel.
+    ///
+    /// #### See also
+    ///
+    /// - LC#setDebugMillis(int)
     public static void setGlobalDebugMillis(int millis) {
         globalDebugMillis = millis;
     }
 
-    /**
-     * Sets if design time is turned on for a Container in {@link ContainerWrapper}.
-     *
-     * @param cw The container to set design time for. <code>null</code> is legal and can be used as
-     *           a key to turn on/off design time "in general". Note though that design time "in general" is
-     *           always on as long as there is at least one ContainerWrapper with design time.
-     *           <p>
-     *           <strong>If this method has not ever been called it will default to what
-     *           <code>Beans.isDesignTime()</code> returns.</strong> This means that if you call
-     *           this method you indicate that you will take responsibility for the design time value.
-     * @param b  <code>true</code> means design time on.
-     */
+    /// Sets if design time is turned on for a Container in `ContainerWrapper`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cw`: @param cw The container to set design time for. `null` is legal and can be used as
+    ///           a key to turn on/off design time "in general". Note though that design time "in general" is
+    ///           always on as long as there is at least one ContainerWrapper with design time.
+    ///
+    ///
+    ///           **If this method has not ever been called it will default to what
+    ///           `Beans.isDesignTime()` returns.** This means that if you call
+    ///           this method you indicate that you will take responsibility for the design time value.
+    ///
+    /// - `b`: `true` means design time on.
     @SuppressWarnings("PMD.NonThreadSafeSingleton")
     public static void setDesignTime(ContainerWrapper cw, boolean b) {
         if (DT_MAP == null) {
@@ -130,14 +132,17 @@ public final class LayoutUtil {
         DT_MAP.put((cw != null ? cw.getComponent() : null), b);
     }
 
-    /**
-     * Returns if design time is turned on for a Container in {@link ContainerWrapper}.
-     *
-     * @param cw The container to set design time for. <code>null</code> is legal will return <code>true</code>
-     *           if there is at least one <code>ContainerWrapper</code> (or <code>null</code>) that have design time
-     *           turned on.
-     * @return If design time is set for <code>cw</code>.
-     */
+    /// Returns if design time is turned on for a Container in `ContainerWrapper`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cw`: @param cw The container to set design time for. `null` is legal will return `true`
+    ///           if there is at least one `ContainerWrapper` (or `null`) that have design time
+    ///           turned on.
+    ///
+    /// #### Returns
+    ///
+    /// If design time is set for `cw`.
     public static boolean isDesignTime(ContainerWrapper cw) {
         if (DT_MAP == null) {
             return HAS_BEANS;
@@ -151,36 +156,37 @@ public final class LayoutUtil {
         return b != null && b;
     }
 
-    /**
-     * The size of an empty row or columns in a grid during design time.
-     *
-     * @return The number of pixels. Default is 15.
-     */
+    /// The size of an empty row or columns in a grid during design time.
+    ///
+    /// #### Returns
+    ///
+    /// The number of pixels. Default is 15.
     public static int getDesignTimeEmptySize() {
         return eSz;
     }
 
-    /**
-     * The size of an empty row or columns in a grid during design time.
-     *
-     * @param pixels The number of pixels. Default is 0 (it was 15 prior to v3.7.2, but since that meant different behaviour
-     *               under design time by default it was changed to be 0, same as non-design time). IDE vendors can still set it to 15 to
-     *               get the old behaviour.
-     */
+    /// The size of an empty row or columns in a grid during design time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pixels`: @param pixels The number of pixels. Default is 0 (it was 15 prior to v3.7.2, but since that meant different behaviour
+    ///               under design time by default it was changed to be 0, same as non-design time). IDE vendors can still set it to 15 to
+    ///               get the old behaviour.
     public static void setDesignTimeEmptySize(int pixels) {
         eSz = pixels;
     }
 
-    /**
-     * Associates <code>con</code> with the creation string <code>s</code>. The <code>con</code> object should
-     * probably have an equals method that compares identities or <code>con</code> objects that .equals() will only
-     * be able to have <b>one</b> creation string.
-     * <p>
-     * If {@link LayoutUtil#isDesignTime(ContainerWrapper)} returns <code>false</code> the method does nothing.
-     *
-     * @param con The object. if <code>null</code> the method does nothing.
-     * @param s   The creation string. if <code>null</code> the method does nothing.
-     */
+    /// Associates `con` with the creation string `s`. The `con` object should
+    /// probably have an equals method that compares identities or `con` objects that .equals() will only
+    /// be able to have **one** creation string.
+    ///
+    /// If `LayoutUtil#isDesignTime(ContainerWrapper)` returns `false` the method does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `con`: The object. if `null` the method does nothing.
+    ///
+    /// - `s`: The creation string. if `null` the method does nothing.
     @SuppressWarnings("PMD.NonThreadSafeSingleton")
     static void putCCString(Object con, String s) {
         if (s != null && con != null && isDesignTime(null)) {
@@ -192,13 +198,16 @@ public final class LayoutUtil {
         }
     }
 
-    /**
-     * Returns strings set with {@link #putCCString(Object, String)} or <code>null</code> if nothing is associated or
-     * {@link LayoutUtil#isDesignTime(ContainerWrapper)} returns <code>false</code>.
-     *
-     * @param con The constrain object.
-     * @return The creation string or <code>null</code> if nothing is registered with the <code>con</code> object.
-     */
+    /// Returns strings set with `String)` or `null` if nothing is associated or
+    /// `LayoutUtil#isDesignTime(ContainerWrapper)` returns `false`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `con`: The constrain object.
+    ///
+    /// #### Returns
+    ///
+    /// The creation string or `null` if nothing is registered with the `con` object.
     static String getCCString(Object con) {
         return CR_MAP != null ? CR_MAP.get(con) : null;
     }
@@ -207,20 +216,27 @@ public final class LayoutUtil {
         throw new IllegalStateException("setStoreConstraintData(true) must be set for strings to be saved.");
     }
 
-    /**
-     * Takes a number on min/preferred/max sizes and resize constraints and returns the calculated sizes which sum should add up to <code>bounds</code>. Whether the sum
-     * will actually equal <code>bounds</code> is dependent om the pref/max sizes and resize constraints.
-     *
-     * @param sizes          [ix],[MIN][PREF][MAX]. Grid.CompWrap.NOT_SET will be treated as N/A or 0. A "[MIN][PREF][MAX]" array with null elements will be interpreted as very flexible (no bounds)
-     *                       but if the array itself is null it will not get any size.
-     * @param resConstr      Elements can be <code>null</code> and the whole array can be <code>null</code>. <code>null</code> means that the size will not be flexible at all.
-     *                       Can have length less than <code>sizes</code> in which case the last element should be used for the elements missing.
-     * @param defPushWeights If there is no grow weight for a resConstr the corresponding value of this array is used.
-     *                       These forced resConstr will be grown last though and only if needed to fill to the bounds.
-     * @param startSizeType  The initial size to use. E.g. {@link net.miginfocom.layout.LayoutUtil#MIN}.
-     * @param bounds         To use for relative sizes.
-     * @return The sizes. Array length will match <code>sizes</code>.
-     */
+    /// Takes a number on min/preferred/max sizes and resize constraints and returns the calculated sizes which sum should add up to `bounds`. Whether the sum
+    /// will actually equal `bounds` is dependent om the pref/max sizes and resize constraints.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sizes`: @param sizes          [ix],[MIN][PREF][MAX]. Grid.CompWrap.NOT_SET will be treated as N/A or 0. A "[MIN][PREF][MAX]" array with null elements will be interpreted as very flexible (no bounds)
+    ///                       but if the array itself is null it will not get any size.
+    ///
+    /// - `resConstr`: @param resConstr      Elements can be `null` and the whole array can be `null`. `null` means that the size will not be flexible at all.
+    ///                       Can have length less than `sizes` in which case the last element should be used for the elements missing.
+    ///
+    /// - `defPushWeights`: @param defPushWeights If there is no grow weight for a resConstr the corresponding value of this array is used.
+    ///                       These forced resConstr will be grown last though and only if needed to fill to the bounds.
+    ///
+    /// - `startSizeType`: The initial size to use. E.g. `net.miginfocom.layout.LayoutUtil#MIN`.
+    ///
+    /// - `bounds`: To use for relative sizes.
+    ///
+    /// #### Returns
+    ///
+    /// The sizes. Array length will match `sizes`.
     static int[] calculateSerial(int[][] sizes, ResizeConstraint[] resConstr, Float[] defPushWeights, int startSizeType, int bounds) {
         float[] lengths = new float[sizes.length];    // heights/widths that are set
         float usedLength = 0.0f;
@@ -323,16 +339,21 @@ public final class LayoutUtil {
         return arr != null ? arr[ix < arr.length ? ix : arr.length - 1] : null;
     }
 
-    /**
-     * Returns the broken boundary if <code>sz</code> is outside the boundaries <code>lower</code> or <code>upper</code>. If both boundaries
-     * are broken, the lower one is returned. If <code>sz</code> is &lt; 0 then <code>new Float(0f)</code> is returned so that no sizes can be
-     * negative.
-     *
-     * @param sz    The size to check
-     * @param lower The lower boundary (or <code>null</code> fo no boundary).
-     * @param upper The upper boundary (or <code>null</code> fo no boundary).
-     * @return The broken boundary.
-     */
+    /// Returns the broken boundary if `sz` is outside the boundaries `lower` or `upper`. If both boundaries
+    /// are broken, the lower one is returned. If `sz` is < 0 then `new Float(0f)` is returned so that no sizes can be
+    /// negative.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sz`: The size to check
+    ///
+    /// - `lower`: The lower boundary (or `null` fo no boundary).
+    ///
+    /// - `upper`: The upper boundary (or `null` fo no boundary).
+    ///
+    /// #### Returns
+    ///
+    /// The broken boundary.
     private static int getBrokenBoundary(float sz, int lower, int upper) {
         if (lower != NOT_SET) {
             if (sz < lower) {
@@ -381,14 +402,18 @@ public final class LayoutUtil {
                 null);
     }
 
-    /**
-     * Returns if left-to-right orientation is used. If not set explicitly in the layout constraints the Locale
-     * of the <code>parent</code> is used.
-     *
-     * @param lc        The constraint if there is one. Can be <code>null</code>.
-     * @param container The parent that may be used to get the left-to-right if ffc does not specify this.
-     * @return If left-to-right orientation is currently used.
-     */
+    /// Returns if left-to-right orientation is used. If not set explicitly in the layout constraints the Locale
+    /// of the `parent` is used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lc`: The constraint if there is one. Can be `null`.
+    ///
+    /// - `container`: The parent that may be used to get the left-to-right if ffc does not specify this.
+    ///
+    /// #### Returns
+    ///
+    /// If left-to-right orientation is currently used.
     public static boolean isLeftToRight(LC lc, ContainerWrapper container) {
         if (lc != null && lc.getLeftToRight() != null) {
             return lc.getLeftToRight();
@@ -397,12 +422,15 @@ public final class LayoutUtil {
         return container == null || container.isLeftToRight();
     }
 
-    /**
-     * Round a number of float sizes into int sizes so that the total length match up
-     *
-     * @param sizes The sizes to round
-     * @return An array of equal length as <code>sizes</code>.
-     */
+    /// Round a number of float sizes into int sizes so that the total length match up
+    ///
+    /// #### Parameters
+    ///
+    /// - `sizes`: The sizes to round
+    ///
+    /// #### Returns
+    ///
+    /// An array of equal length as `sizes`.
     static int[] roundSizes(float[] sizes) {
         int[] retInts = new int[sizes.length];
         float posD = 0;
@@ -442,48 +470,60 @@ public final class LayoutUtil {
 //        return (pSize.height + padding) / 2 + baselineOffset;
 //    }
 
-    /**
-     * Safe equals. null == null, but null never equals anything else.
-     *
-     * @param o1 The first object. May be <code>null</code>.
-     * @param o2 The second object. May be <code>null</code>.
-     * @return Returns <code>true</code> if <code>o1</code> and <code>o2</code> are equal (using .equals()) or both are <code>null</code>.
-     */
+    /// Safe equals. null == null, but null never equals anything else.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o1`: The first object. May be `null`.
+    ///
+    /// - `o2`: The second object. May be `null`.
+    ///
+    /// #### Returns
+    ///
+    /// Returns `true` if `o1` and `o2` are equal (using .equals()) or both are `null`.
     @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
     static boolean equals(Object o1, Object o2) {
         return o1 == o2 || (o1 != null && o2 != null && o1.equals(o2)); //NOPMD CompareObjectsWithEquals
     }
 
-    /**
-     * Returns the inset for the side.
-     *
-     * @param side       top == 0, left == 1, bottom = 2, right = 3.
-     * @param getDefault If <code>true</code> the default insets will get retrieved if <code>lc</code> has none set.
-     * @return The inset for the side. Never <code>null</code>.
-     */
+    /// Returns the inset for the side.
+    ///
+    /// #### Parameters
+    ///
+    /// - `side`: top == 0, left == 1, bottom = 2, right = 3.
+    ///
+    /// - `getDefault`: If `true` the default insets will get retrieved if `lc` has none set.
+    ///
+    /// #### Returns
+    ///
+    /// The inset for the side. Never `null`.
     static UnitValue getInsets(LC lc, int side, boolean getDefault) {
         UnitValue[] i = lc.getInsets();
         return (i != null && i[side] != null) ? i[side] : (getDefault ? PlatformDefaults.getPanelInsets(side) : UnitValue.ZERO);
     }
 
-    /**
-     * Sets the serialized object and associates it with <code>caller</code>.
-     *
-     * @param caller The object created <code>o</code>
-     * @param o      The just serialized object.
-     */
+    /// Sets the serialized object and associates it with `caller`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `caller`: The object created `o`
+    ///
+    /// - `o`: The just serialized object.
     public static void setSerializedObject(Object caller, Object o) {
         synchronized (SER_MAP) {
             SER_MAP.put(caller, o);
         }
     }
 
-    /**
-     * Returns the serialized object that are associated with <code>caller</code>. It also removes it from the list.
-     *
-     * @param caller The original creator of the object.
-     * @return The object.
-     */
+    /// Returns the serialized object that are associated with `caller`. It also removes it from the list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `caller`: The original creator of the object.
+    ///
+    /// #### Returns
+    ///
+    /// The object.
     public static Object getSerializedObject(Object caller) {
         synchronized (SER_MAP) {
             return SER_MAP.remove(caller);

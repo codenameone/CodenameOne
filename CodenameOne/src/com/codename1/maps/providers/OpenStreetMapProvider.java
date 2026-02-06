@@ -22,31 +22,23 @@ package com.codename1.maps.providers;
 import com.codename1.maps.Mercator;
 import com.codename1.ui.geom.Dimension;
 
-/**
- * This is an OpenStreetMap Provider http://www.openstreetmap.org/
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This is an OpenStreetMap Provider http://www.openstreetmap.org/
+///
+/// @author Roman Kamyk
 public class OpenStreetMapProvider extends TiledProvider {
 
-    /**
-     * Empty Constructor
-     */
+    /// Empty Constructor
     public OpenStreetMapProvider() {
         super("http://tile.openstreetmap.org", new Mercator(), new Dimension(256, 256));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String attribution() {
         return "(c) OpenStreetMap (and) contributors, CC-BY-SA";
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int maxZoomLevel() {
         return 18;

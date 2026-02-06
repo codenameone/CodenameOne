@@ -41,47 +41,34 @@ import com.codename1.ui.plaf.UIManager;
 import java.util.Calendar;
 import java.util.Date;
 
-/**
- * A spinner allows us to select a numeric, date or time value using the arrow keys
- * in a similar way to a list or a combo box.
- *
- * @author Shai Almog
- * @deprecated use Picker instead
- */
+/// A spinner allows us to select a numeric, date or time value using the arrow keys
+/// in a similar way to a list or a combo box.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
 class Spinner extends List {
-    /**
-     * Value for create date renderer represnting Day-Month-4 Digit Year
-     */
+    /// Value for create date renderer represnting Day-Month-4 Digit Year
     public static final int DATE_FORMAT_DD_MM_YYYY = 1;
 
-    /**
-     * Value for create date renderer represnting Month-Day-4 Digit Year
-     */
+    /// Value for create date renderer represnting Month-Day-4 Digit Year
     public static final int DATE_FORMAT_MM_DD_YYYY = 2;
 
-    /**
-     * Value for create date renderer represnting Day-Month-2 Digit Year
-     */
+    /// Value for create date renderer represnting Day-Month-2 Digit Year
     public static final int DATE_FORMAT_DD_MM_YY = 11;
 
-    /**
-     * Value for create date renderer represnting Month-Day-2 Digit Year
-     */
+    /// Value for create date renderer represnting Month-Day-2 Digit Year
     public static final int DATE_FORMAT_MM_DD_YY = 12;
 
-    /**
-     * Value for create date renderer represnting Day Of Week, Month, Day
-     */
+    /// Value for create date renderer represnting Day Of Week, Month, Day
     public static final int DATE_FORMAT_DOW_MON_DD = 13;
 
-    /**
-     * Value for create date renderer represnting Day Of Week, Month, Day, Year
-     */
+    /// Value for create date renderer represnting Day Of Week, Month, Day, Year
     public static final int DATE_FORMAT_DOW_MON_DD_YY = 14;
 
-    /**
-     * The image appearing on the side of the spinner widget to indicate its "spinnability"
-     */
+    /// The image appearing on the side of the spinner widget to indicate its "spinnability"
     private static Image spinnerHandle;
     private static int inputSkipDelay = 2000;
     private final TextField quickType = new TextField();
@@ -90,11 +77,11 @@ class Spinner extends List {
     private boolean monthFirst;
     private int currentInputAlign = LEFT;
 
-    /**
-     * Creates a new spinner instance with the given spinner model
-     *
-     * @param spinner model such as SpinnerDateModel or SpinnerNumberModel
-     */
+    /// Creates a new spinner instance with the given spinner model
+    ///
+    /// #### Parameters
+    ///
+    /// - `spinner`: model such as SpinnerDateModel or SpinnerNumberModel
     Spinner(ListModel model, ListCellRenderer rendererInstance) {
         super(model);
         ios7Mode = UIManager.getInstance().isThemeConstant("ios7SpinnerBool", false);
@@ -126,67 +113,106 @@ class Spinner extends List {
 
     }
 
-    /**
-     * Creates a new time spinner instance, time is an integer represented in seconds
-     * since mindnight
-     *
-     * @param min             lowest value allowed in seconds since midnight
-     * @param max             maximum value allowed in seconds since midnight
-     * @param currentValue    the starting value in seconds since midnight
-     * @param step            increments in the spinner (in seconds)
-     * @param twentyFourHours show the value as 24 hour values or AM/PM
-     * @param showSeconds     show the value of the seconds as well or hide it
-     * @return new spinner instance
-     * @deprecated use TimeSpinner
-     */
+    /// Creates a new time spinner instance, time is an integer represented in seconds
+    /// since mindnight
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: lowest value allowed in seconds since midnight
+    ///
+    /// - `max`: maximum value allowed in seconds since midnight
+    ///
+    /// - `currentValue`: the starting value in seconds since midnight
+    ///
+    /// - `step`: increments in the spinner (in seconds)
+    ///
+    /// - `twentyFourHours`: show the value as 24 hour values or AM/PM
+    ///
+    /// - `showSeconds`: show the value of the seconds as well or hide it
+    ///
+    /// #### Returns
+    ///
+    /// new spinner instance
+    ///
+    /// #### Deprecated
+    ///
+    /// use TimeSpinner
     public static Spinner createTime(int min, int max, int currentValue, int step, boolean twentyFourHours, boolean showSeconds) {
         return new Spinner(new SpinnerNumberModel(min, max, currentValue, step),
                 DateTimeRenderer.createTimeRenderer(twentyFourHours, showSeconds));
     }
 
-    /**
-     * Creates a new date spinner instance
-     *
-     * @param min           lowest value allowed
-     * @param max           maximum value allowed
-     * @param currentValue  the starting value for the mode
-     * @param separatorChar character to separate the entries during rendering
-     * @param format        formatting type for the field
-     * @return new spinner instance
-     * @deprecated use DateSpinner
-     */
+    /// Creates a new date spinner instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: lowest value allowed
+    ///
+    /// - `max`: maximum value allowed
+    ///
+    /// - `currentValue`: the starting value for the mode
+    ///
+    /// - `separatorChar`: character to separate the entries during rendering
+    ///
+    /// - `format`: formatting type for the field
+    ///
+    /// #### Returns
+    ///
+    /// new spinner instance
+    ///
+    /// #### Deprecated
+    ///
+    /// use DateSpinner
     public static Spinner createDate(long min, long max, long currentValue, char separatorChar, int format) {
         Spinner s = new Spinner(new SpinnerDateModel(min, max, currentValue), DateTimeRenderer.createDateRenderer(separatorChar, format));
         s.monthFirst = format == DATE_FORMAT_MM_DD_YY || format == DATE_FORMAT_MM_DD_YYYY;
         return s;
     }
 
-    /**
-     * Creates a new numeric spinner instance
-     *
-     * @param min          lowest value allowed
-     * @param max          maximum value allowed
-     * @param currentValue the starting value for the mode
-     * @param step         the value by which we increment the entries in the model
-     * @return new spinner instance
-     * @deprecated use NumericSpinner
-     */
+    /// Creates a new numeric spinner instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: lowest value allowed
+    ///
+    /// - `max`: maximum value allowed
+    ///
+    /// - `currentValue`: the starting value for the mode
+    ///
+    /// - `step`: the value by which we increment the entries in the model
+    ///
+    /// #### Returns
+    ///
+    /// new spinner instance
+    ///
+    /// #### Deprecated
+    ///
+    /// use NumericSpinner
     public static Spinner create(int min, int max, int currentValue, int step) {
         Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step, 0), new SpinnerRenderer<Object>());
         s.setRenderingPrototype(Integer.valueOf(max * 10));
         return s;
     }
 
-    /**
-     * Creates a new numeric spinner instance
-     *
-     * @param min          lowest value allowed
-     * @param max          maximum value allowed
-     * @param currentValue the starting value for the mode
-     * @param step         the value by which we increment the entries in the model
-     * @return new spinner instance
-     * @deprecated use NumericSpinner
-     */
+    /// Creates a new numeric spinner instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: lowest value allowed
+    ///
+    /// - `max`: maximum value allowed
+    ///
+    /// - `currentValue`: the starting value for the mode
+    ///
+    /// - `step`: the value by which we increment the entries in the model
+    ///
+    /// #### Returns
+    ///
+    /// new spinner instance
+    ///
+    /// #### Deprecated
+    ///
+    /// use NumericSpinner
     public static Spinner create(double min, double max, double currentValue, double step) {
         Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new SpinnerRenderer<Object>() {
             @Override
@@ -210,45 +236,43 @@ class Spinner extends List {
         return s;
     }
 
-    /**
-     * The image appearing on the side of the spinner widget to indicate its "spinnability"
-     *
-     * @return the spinnerHandle
-     */
+    /// The image appearing on the side of the spinner widget to indicate its "spinnability"
+    ///
+    /// #### Returns
+    ///
+    /// the spinnerHandle
     public static Image getSpinnerHandle() {
         return spinnerHandle;
     }
 
-    /**
-     * The image appearing on the side of the spinner widget to indicate its "spinnability"
-     *
-     * @param aSpinnerHandle the spinnerHandle to set
-     */
+    /// The image appearing on the side of the spinner widget to indicate its "spinnability"
+    ///
+    /// #### Parameters
+    ///
+    /// - `aSpinnerHandle`: the spinnerHandle to set
     public static void setSpinnerHandle(Image aSpinnerHandle) {
         spinnerHandle = aSpinnerHandle;
     }
 
-    /**
-     * Indicates the time after which the skip input area for entering spinner values manually will disappear
-     *
-     * @return the inputSkipDelay
-     */
+    /// Indicates the time after which the skip input area for entering spinner values manually will disappear
+    ///
+    /// #### Returns
+    ///
+    /// the inputSkipDelay
     public static int getInputSkipDelay() {
         return inputSkipDelay;
     }
 
-    /**
-     * Indicates the time after which the skip input area for entering spinner values manually will disappear
-     *
-     * @param aInputSkipDelay the time for disappearing
-     */
+    /// Indicates the time after which the skip input area for entering spinner values manually will disappear
+    ///
+    /// #### Parameters
+    ///
+    /// - `aInputSkipDelay`: the time for disappearing
     public static void setInputSkipDelay(int aInputSkipDelay) {
         inputSkipDelay = aInputSkipDelay;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isStickyDrag() {
         return true;
@@ -274,9 +298,7 @@ class Spinner extends List {
         setRTL(r);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         getComponentForm().registerAnimated(this);
@@ -284,25 +306,19 @@ class Spinner extends List {
         setIgnoreFocusComponentWhenUnfocused(!n);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         getComponentForm().deregisterAnimated(this);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcScrollSize() {
         return super.calcPreferredSize();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         int boxWidth = 0;
@@ -349,9 +365,7 @@ class Spinner extends List {
         return d;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int code) {
         int game = Display.getInstance().getGameAction(code);
@@ -363,11 +377,11 @@ class Spinner extends List {
         }
     }
 
-    /**
-     * Returns the value of the spinner to a number or a date based on the spinner type
-     *
-     * @return a number or a date
-     */
+    /// Returns the value of the spinner to a number or a date based on the spinner type
+    ///
+    /// #### Returns
+    ///
+    /// a number or a date
     public Object getValue() {
         ListModel m = getModel();
         if (m instanceof SpinnerDateModel) {
@@ -376,11 +390,11 @@ class Spinner extends List {
         return ((SpinnerNumberModel) m).getValue();
     }
 
-    /**
-     * Set the value of the spinner to a number or a date based on the spinner type
-     *
-     * @param o a number or a date
-     */
+    /// Set the value of the spinner to a number or a date based on the spinner type
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: a number or a date
     public void setValue(Object o) {
         ListModel m = getModel();
         if (m instanceof SpinnerDateModel) {
@@ -401,9 +415,7 @@ class Spinner extends List {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int code) {
         int game = Display.getInstance().getGameAction(code);
@@ -564,9 +576,7 @@ class Spinner extends List {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         super.paint(g);
@@ -601,9 +611,7 @@ class Spinner extends List {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         boolean val = super.animate();
@@ -619,9 +627,7 @@ class Spinner extends List {
         return val;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean shouldRenderSelection() {
         if (!isIgnoreFocusComponentWhenUnfocused()) {

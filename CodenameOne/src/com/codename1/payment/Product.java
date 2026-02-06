@@ -22,69 +22,67 @@
  */
 package com.codename1.payment;
 
-/**
- * Represents a product within the system
- *
- * @author Shai Almog
- */
+/// Represents a product within the system
+///
+/// @author Shai Almog
 public class Product {
     private String displayName;
     private String description;
     private String localizedPrice;
     private String sku;
 
-    /**
-     * @return the displayName
-     */
+    /// #### Returns
+    ///
+    /// the displayName
     public String getDisplayName() {
         return displayName;
     }
 
-    /**
-     * @param displayName the displayName to set
-     */
+    /// #### Parameters
+    ///
+    /// - `displayName`: the displayName to set
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
     }
 
-    /**
-     * @return the description
-     */
+    /// #### Returns
+    ///
+    /// the description
     public String getDescription() {
         return description;
     }
 
-    /**
-     * @param description the description to set
-     */
+    /// #### Parameters
+    ///
+    /// - `description`: the description to set
     public void setDescription(String description) {
         this.description = description;
     }
 
-    /**
-     * @return the localizedPrice
-     */
+    /// #### Returns
+    ///
+    /// the localizedPrice
     public String getLocalizedPrice() {
         return localizedPrice;
     }
 
-    /**
-     * @param localizedPrice the localizedPrice to set
-     */
+    /// #### Parameters
+    ///
+    /// - `localizedPrice`: the localizedPrice to set
     public void setLocalizedPrice(String localizedPrice) {
         this.localizedPrice = localizedPrice;
     }
 
-    /**
-     * @return the sku
-     */
+    /// #### Returns
+    ///
+    /// the sku
     public String getSku() {
         return sku;
     }
 
-    /**
-     * @param sku the sku to set
-     */
+    /// #### Parameters
+    ///
+    /// - `sku`: the sku to set
     public void setSku(String sku) {
         this.sku = sku;
     }

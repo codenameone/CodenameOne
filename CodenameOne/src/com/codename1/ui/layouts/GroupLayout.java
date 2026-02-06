@@ -32,150 +32,142 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
-/**
- * GroupLayout is a LayoutManager that hierarchically groups components to
- * achieve common, and not so common, layouts.  Grouping is done by instances
- * of the Group class.  GroupLayout supports two types of groups:
- * <table>
- *   <tr><td valign=top>Sequential:<td>A sequential group positions its child
- *           elements sequentially, one after another.
- *   <tr><td valign=top>Parallel:<td>A parallel group positions its child
- *           elements in the same space on top of each other.  Parallel groups
- *           can also align the child elements along their baseline.
- * </table>
- * Each Group can contain any number of child groups, Components or gaps.
- * GroupLayout treats each axis independently.  That is, there is a group
- * representing the horizontal axis, and a separate group representing the
- * vertical axis.  The horizontal group is responsible for setting the x
- * and width of its contents, where as the vertical group is responsible for
- * setting the y and height of its contents.
- * <p>
- * The following code builds a simple layout consisting of two labels in
- * one column, followed by two textfields in the next column:
- * <pre>
- *   Container panel = ...;
- *   GroupLayout layout = new GroupLayout(panel);
- *   panel.setLayout(layout);
- *   layout.setAutocreateGaps(true);
- *   layout.setAutocreateContainerGaps(true);
- *   GroupLayout.SequentialGroup hGroup = layout.createSequentialGroup();
- *   hGroup.add(layout.createParallelGroup().add(label1).add(label2)).
- *          add(layout.createParallelGroup().add(tf1).add(tf2));
- *   layout.setHorizontalGroup(hGroup);
- *   GroupLayout.SequentialGroup vGroup = layout.createSequentialGroup();
- *   vGroup.add(layout.createParallelGroup(GroupLayout.BASELINE).add(label1).add(tf1)).
- *          add(layout.createParallelGroup(GroupLayout.BASELINE).add(label2).add(tf2));
- *   layout.setVerticalGroup(vGroup);
- * </pre>
- * <p>
- * This layout consists of the following:
- * <ul><li>The horizontal axis consists of a sequential group containing two
- *         parallel groups.  The first parallel group consists of the labels,
- *         with the second parallel group consisting of the text fields.
- *     <li>The vertical axis similarly consists of a sequential group
- *         containing two parallel groups.  The parallel groups align their
- *         contents along the baseline.  The first parallel group consists
- *         of the first label and text field, and the second group consists
- *         of the second label and text field.
- * </ul>
- * There are a couple of things to notice in this code:
- * <ul>
- *   <li>You need not explicitly add the components to the container, this
- *       is indirectly done by using one of the <code>add</code> methods.
- *   <li>The various <code>add</code> methods of <code>Groups</code> return
- *       themselves.  This allows for easy chaining of invocations.  For
- *       example, <code>group.add(label1).add(label2);</code> is equivalent to
- *       <code>group.add(label1);group.add(label2);</code>.
- *   <li>There are no public constructors for the Groups, instead
- *       use the create methods of <code>GroupLayout</code>.
- * </ul>
- * GroupLayout offer the ability to automatically insert the appropriate gap
- * between components.  This can be turned on using the
- * <code>setAutocreateGaps()</code> method.  Similarly you can use
- * the <code>setAutocreateContainerGaps()</code> method to insert gaps
- * between the components and the container.
- *
- * @author Tomas Pavek
- * @author Jan Stola
- * @author Scott Violet
- * @author Shai Almog
- * @version $Revision: 1.25 $
- */
+/// GroupLayout is a LayoutManager that hierarchically groups components to
+/// achieve common, and not so common, layouts.  Grouping is done by instances
+/// of the Group class.  GroupLayout supports two types of groups:
+///
+///   Sequential:A sequential group positions its child
+///           elements sequentially, one after another.
+///   Parallel:A parallel group positions its child
+///           elements in the same space on top of each other.  Parallel groups
+///           can also align the child elements along their baseline.
+///
+/// Each Group can contain any number of child groups, Components or gaps.
+/// GroupLayout treats each axis independently.  That is, there is a group
+/// representing the horizontal axis, and a separate group representing the
+/// vertical axis.  The horizontal group is responsible for setting the x
+/// and width of its contents, where as the vertical group is responsible for
+/// setting the y and height of its contents.
+///
+/// The following code builds a simple layout consisting of two labels in
+/// one column, followed by two textfields in the next column:
+///
+/// ```java
+///   Container panel = ...;
+///   GroupLayout layout = new GroupLayout(panel);
+///   panel.setLayout(layout);
+///   layout.setAutocreateGaps(true);
+///   layout.setAutocreateContainerGaps(true);
+///   GroupLayout.SequentialGroup hGroup = layout.createSequentialGroup();
+///   hGroup.add(layout.createParallelGroup().add(label1).add(label2)).
+///          add(layout.createParallelGroup().add(tf1).add(tf2));
+///   layout.setHorizontalGroup(hGroup);
+///   GroupLayout.SequentialGroup vGroup = layout.createSequentialGroup();
+///   vGroup.add(layout.createParallelGroup(GroupLayout.BASELINE).add(label1).add(tf1)).
+///          add(layout.createParallelGroup(GroupLayout.BASELINE).add(label2).add(tf2));
+///   layout.setVerticalGroup(vGroup);
+/// ```
+///
+/// This layout consists of the following:
+///
+/// - The horizontal axis consists of a sequential group containing two
+///         parallel groups.  The first parallel group consists of the labels,
+///         with the second parallel group consisting of the text fields.
+///
+/// - The vertical axis similarly consists of a sequential group
+///         containing two parallel groups.  The parallel groups align their
+///         contents along the baseline.  The first parallel group consists
+///         of the first label and text field, and the second group consists
+///         of the second label and text field.
+///
+/// There are a couple of things to notice in this code:
+///
+///
+/// - You need not explicitly add the components to the container, this
+///       is indirectly done by using one of the `add` methods.
+///
+/// - The various `add` methods of `Groups` return
+///       themselves.  This allows for easy chaining of invocations.  For
+///       example, `group.add(label1).add(label2);` is equivalent to
+///       `group.add(label1);group.add(label2);`.
+///
+/// - There are no public constructors for the Groups, instead
+///       use the create methods of `GroupLayout`.
+///
+/// GroupLayout offer the ability to automatically insert the appropriate gap
+/// between components.  This can be turned on using the
+/// `setAutocreateGaps()` method.  Similarly you can use
+/// the `setAutocreateContainerGaps()` method to insert gaps
+/// between the components and the container.
+///
+/// @author Tomas Pavek
+/// @author Jan Stola
+/// @author Scott Violet
+/// @author Shai Almog
+/// @version $Revision: 1.25 $
 public class GroupLayout extends Layout {
-    /**
-     * Compass-direction North (up).
-     */
+    /// Compass-direction North (up).
     public static final int NORTH = 1;
 
-    /**
-     * Compass-direction east (right).
-     */
+    /// Compass-direction east (right).
     public static final int EAST = 3;
 
-    /**
-     * Compass-direction south (down).
-     */
+    /// Compass-direction south (down).
     public static final int SOUTH = 5;
 
-    /**
-     * Compass-direction west (left).
-     */
+    /// Compass-direction west (left).
     public static final int WEST = 7;
-    /**
-     * Possible argument when linking sizes of components.  Specifies the
-     * the two component should share the same size along the horizontal
-     * axis.
-     *
-     * @see #linkSize(Component[], int)
-     */
+    /// Possible argument when linking sizes of components.  Specifies the
+    /// the two component should share the same size along the horizontal
+    /// axis.
+    ///
+    /// #### See also
+    ///
+    /// - #linkSize(Component[], int)
     public static final int HORIZONTAL = 1;
-    /**
-     * Possible argument when linking sizes of components.  Specifies the
-     * the two component should share the same size along the vertical
-     * axis.
-     *
-     * @see #linkSize(Component[], int)
-     */
+    /// Possible argument when linking sizes of components.  Specifies the
+    /// the two component should share the same size along the vertical
+    /// axis.
+    ///
+    /// #### See also
+    ///
+    /// - #linkSize(Component[], int)
     public static final int VERTICAL = 2;
-    /**
-     * Possible alignment type.  Indicates the elements should be
-     * aligned to the origin.  For the horizontal axis with a left to
-     * right orientation this means aligned to the left.
-     *
-     * @see #createParallelGroup(int)
-     */
+    /// Possible alignment type.  Indicates the elements should be
+    /// aligned to the origin.  For the horizontal axis with a left to
+    /// right orientation this means aligned to the left.
+    ///
+    /// #### See also
+    ///
+    /// - #createParallelGroup(int)
     public static final int LEADING = 1;
-    /**
-     * Possible alignment type.  Indicates the elements should be
-     * aligned to the end.  For the horizontal axis with a left to
-     * right orientation this means aligned to the right.
-     *
-     * @see #createParallelGroup(int)
-     */
+    /// Possible alignment type.  Indicates the elements should be
+    /// aligned to the end.  For the horizontal axis with a left to
+    /// right orientation this means aligned to the right.
+    ///
+    /// #### See also
+    ///
+    /// - #createParallelGroup(int)
     public static final int TRAILING = 2;
-    /**
-     * Possible alignment type.  Indicates the elements should centered in
-     * the spaced provided.
-     *
-     * @see #createParallelGroup(int)
-     */
+    /// Possible alignment type.  Indicates the elements should centered in
+    /// the spaced provided.
+    ///
+    /// #### See also
+    ///
+    /// - #createParallelGroup(int)
     public static final int CENTER = 4;
-    /**
-     * Possible alignment type.  Indicates the elements should aligned along
-     * their baseline.
-     *
-     * @see #createParallelGroup(int)
-     */
+    /// Possible alignment type.  Indicates the elements should aligned along
+    /// their baseline.
+    ///
+    /// #### See also
+    ///
+    /// - #createParallelGroup(int)
     public static final int BASELINE = 3;
-    /**
-     * Possible value for the add methods that takes a Component.
-     * Indicates the size from the component should be used.
-     */
+    /// Possible value for the add methods that takes a Component.
+    /// Indicates the size from the component should be used.
     public static final int DEFAULT_SIZE = -1;
-    /**
-     * Possible value for the add methods that takes a Component.
-     * Indicates the preferred size should be used.
-     */
+    /// Possible value for the add methods that takes a Component.
+    /// Indicates the preferred size should be used.
     public static final int PREFERRED_SIZE = -2;
     // Used in size calculations
     private static final int MIN_SIZE = 0;
@@ -198,15 +190,11 @@ public class GroupLayout extends Layout {
     // Whether or not we automatically try and create the preferred
     // padding between containers
     private boolean autocreateContainerPadding;
-    /**
-     * Group responsible for layout along the horizontal axis.  This is NOT
-     * the user specified group, use getHorizontalGroup to dig that out.
-     */
+    /// Group responsible for layout along the horizontal axis.  This is NOT
+    /// the user specified group, use getHorizontalGroup to dig that out.
     private Group horizontalGroup;
-    /**
-     * Group responsible for layout along the vertical axis.  This is NOT
-     * the user specified group, use getVerticalGroup to dig that out.
-     */
+    /// Group responsible for layout along the vertical axis.  This is NOT
+    /// the user specified group, use getVerticalGroup to dig that out.
     private Group verticalGroup;
     // Indicates Springs have changed in some way since last change.
     private boolean springsChanged;
@@ -217,24 +205,23 @@ public class GroupLayout extends Layout {
     // Whether or not any preferred padding (or container padding) springs exist
     private boolean hasPreferredPaddingSprings;
 
-    /**
-     * The LayoutStyle instance to use, if null the sharedInstance is used.
-     */
+    /// The LayoutStyle instance to use, if null the sharedInstance is used.
     private LayoutStyle layoutStyle;
 
-    /**
-     * If true, components that are not visible are treated as though they
-     * aren't there.
-     */
+    /// If true, components that are not visible are treated as though they
+    /// aren't there.
     private boolean honorsVisibility;
 
 
-    /**
-     * Creates a GroupLayout for the specified Container.
-     *
-     * @param host the Container to layout
-     * @throws IllegalArgumentException if host is null
-     */
+    /// Creates a GroupLayout for the specified Container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the Container to layout
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if host is null
     public GroupLayout(Container host) {
         if (host == null) {
             throw new IllegalArgumentException("Container must be non-null");
@@ -278,9 +265,7 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Simple copy constructor for ArrayList
-     */
+    /// Simple copy constructor for ArrayList
     private static ArrayList create(ArrayList v) {
         int size = v.size();
         ArrayList vec = new ArrayList(size);
@@ -290,9 +275,7 @@ public class GroupLayout extends Layout {
         return vec;
     }
 
-    /**
-     * Adds all ArrayList elements from source to dest
-     */
+    /// Adds all ArrayList elements from source to dest
     private static void addAll(ArrayList dest, ArrayList source) {
         int size = source.size();
         for (int iter = 0; iter < size; iter++) {
@@ -300,37 +283,40 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Returns whether component visibility is considered when sizing and
-     * positioning components.
-     *
-     * @return whether component visibility is considered when sizing and
-     * positioning components
-     */
+    /// Returns whether component visibility is considered when sizing and
+    /// positioning components.
+    ///
+    /// #### Returns
+    ///
+    /// @return whether component visibility is considered when sizing and
+    /// positioning components
     public boolean getHonorsVisibility() {
         return honorsVisibility;
     }
 
-    /**
-     * Sets whether component visibility is considered when sizing and
-     * positioning components. A value of <code>true</code> indicates that
-     * non-visible components should not be treated as part of the
-     * layout. A value of <code>false</code> indicates that components should be
-     * positioned and sized regardless of visibility.
-     * <p>
-     * A value of <code>false</code> is useful when the visibility of components
-     * is dynamically adjusted and you don't want surrounding components and
-     * the sizing to change.
-     * <p>
-     * The specified value is used for components that do not have an
-     * explicit visibility specified.
-     * <p>
-     * The default is <code>true</code>.
-     *
-     * @param honorsVisibility whether component visibility is considered when
-     *                         sizing and positioning components
-     * @see #setHonorsVisibility(Component, Boolean)
-     */
+    /// Sets whether component visibility is considered when sizing and
+    /// positioning components. A value of `true` indicates that
+    /// non-visible components should not be treated as part of the
+    /// layout. A value of `false` indicates that components should be
+    /// positioned and sized regardless of visibility.
+    ///
+    /// A value of `false` is useful when the visibility of components
+    /// is dynamically adjusted and you don't want surrounding components and
+    /// the sizing to change.
+    ///
+    /// The specified value is used for components that do not have an
+    /// explicit visibility specified.
+    ///
+    /// The default is `true`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `honorsVisibility`: @param honorsVisibility whether component visibility is considered when
+    ///                         sizing and positioning components
+    ///
+    /// #### See also
+    ///
+    /// - #setHonorsVisibility(Component, Boolean)
     public void setHonorsVisibility(boolean honorsVisibility) {
         if (this.honorsVisibility != honorsVisibility) {
             this.honorsVisibility = honorsVisibility;
@@ -340,26 +326,32 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Sets whether the component's visibility is considered for
-     * sizing and positioning. A value of <code>Boolean.TRUE</code>
-     * indicates that if <code>component</code> is not visible it should
-     * not be treated as part of the layout. A value of <code>false</code>
-     * indicates that <code>component</code> is positioned and sized
-     * regardless of it's visibility.  A value of <code>null</code>
-     * indicates the value specified by the single argument method <code>
-     * setHonorsVisibility</code> should be used.
-     * <p>
-     * If <code>component</code> is not a child of the <code>Container</code> this
-     * <code>GroupLayout</code> is managing, it will be added to the
-     * <code>Container</code>.
-     *
-     * @param component        the component
-     * @param honorsVisibility whether <code>component</code>'s visibility should be
-     *                         considered for sizing and positioning
-     * @throws IllegalArgumentException if <code>component</code> is <code>null</code>
-     * @see #setHonorsVisibility(boolean)
-     */
+    /// Sets whether the component's visibility is considered for
+    /// sizing and positioning. A value of `Boolean.TRUE`
+    /// indicates that if `component` is not visible it should
+    /// not be treated as part of the layout. A value of `false`
+    /// indicates that `component` is positioned and sized
+    /// regardless of it's visibility.  A value of `null`
+    /// indicates the value specified by the single argument method `setHonorsVisibility` should be used.
+    ///
+    /// If `component` is not a child of the `Container` this
+    /// `GroupLayout` is managing, it will be added to the
+    /// `Container`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `component`: the component
+    ///
+    /// - `honorsVisibility`: @param honorsVisibility whether `component`'s visibility should be
+    ///                         considered for sizing and positioning
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `component` is `null`
+    ///
+    /// #### See also
+    ///
+    /// - #setHonorsVisibility(boolean)
     public void setHonorsVisibility(Component component,
                                     Boolean honorsVisibility) {
         if (component == null) {
@@ -371,12 +363,12 @@ public class GroupLayout extends Layout {
         invalidateHost();
     }
 
-    /**
-     * Returns a textual description of this GroupLayout.  The return value
-     * is intended for debugging purposes only.
-     *
-     * @return textual description of this GroupLayout
-     **/
+    /// Returns a textual description of this GroupLayout.  The return value
+    /// is intended for debugging purposes only.
+    ///
+    /// #### Returns
+    ///
+    /// textual description of this GroupLayout
     @Override
     public String toString() {
         if (springsChanged) {
@@ -423,25 +415,25 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Returns true if gaps between components are automatically be created.
-     *
-     * @return true if gaps between components should automatically be created
-     */
+    /// Returns true if gaps between components are automatically be created.
+    ///
+    /// #### Returns
+    ///
+    /// true if gaps between components should automatically be created
     public boolean getAutocreateGaps() {
         return autocreatePadding;
     }
 
-    /**
-     * Sets whether or not a gap between components
-     * should automatically be created.  For example, if this is true
-     * and you add two components to a <code>SequentialGroup</code> a
-     * gap between the two will automatically be created.  The default
-     * is false.
-     *
-     * @param autocreatePadding whether or not to automatically created a gap
-     *                          between components and the container
-     */
+    /// Sets whether or not a gap between components
+    /// should automatically be created.  For example, if this is true
+    /// and you add two components to a `SequentialGroup` a
+    /// gap between the two will automatically be created.  The default
+    /// is false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `autocreatePadding`: @param autocreatePadding whether or not to automatically created a gap
+    ///                          between components and the container
     public void setAutocreateGaps(boolean autocreatePadding) {
         if (this.autocreatePadding != autocreatePadding) {
             this.autocreatePadding = autocreatePadding;
@@ -449,26 +441,26 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Returns whether or not gaps between the container and the
-     * first/last components should automatically be created. The default
-     * is false.
-     *
-     * @return whether or not the gaps between the container and the
-     * first/last components should automatically be created
-     */
+    /// Returns whether or not gaps between the container and the
+    /// first/last components should automatically be created. The default
+    /// is false.
+    ///
+    /// #### Returns
+    ///
+    /// @return whether or not the gaps between the container and the
+    /// first/last components should automatically be created
     public boolean getAutocreateContainerGaps() {
         return autocreateContainerPadding;
     }
 
-    /**
-     * Sets whether or not gaps between the container and the first/last
-     * components should automatically be created. The default
-     * is false.
-     *
-     * @param autocreatePadding whether or not to automatically create
-     *                          gaps between the container and first/last components.
-     */
+    /// Sets whether or not gaps between the container and the first/last
+    /// components should automatically be created. The default
+    /// is false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `autocreatePadding`: @param autocreatePadding whether or not to automatically create
+    ///                          gaps between the container and first/last components.
     public void setAutocreateContainerGaps(boolean autocreatePadding) {
         if (autocreatePadding != autocreateContainerPadding) {
             autocreateContainerPadding = autocreatePadding;
@@ -478,13 +470,13 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Returns the <code>Group</code> that is responsible for
-     * layout along the horizontal axis.
-     *
-     * @return <code>ParallelGroup</code> responsible for layout along
-     * the horizontal axis.
-     */
+    /// Returns the `Group` that is responsible for
+    /// layout along the horizontal axis.
+    ///
+    /// #### Returns
+    ///
+    /// @return `ParallelGroup` responsible for layout along
+    /// the horizontal axis.
     public Group getHorizontalGroup() {
         int index = 0;
         if (horizontalGroup.springs.size() > 1) {
@@ -493,14 +485,17 @@ public class GroupLayout extends Layout {
         return (Group) horizontalGroup.springs.get(index);
     }
 
-    /**
-     * Sets the <code>Group</code> that is responsible for
-     * layout along the horizontal axis.
-     *
-     * @param group <code>Group</code> responsible for layout along
-     *              the horizontal axis
-     * @throws IllegalArgumentException if group is null
-     */
+    /// Sets the `Group` that is responsible for
+    /// layout along the horizontal axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: @param group `Group` responsible for layout along
+    ///              the horizontal axis
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if group is null
     public void setHorizontalGroup(Group group) {
         if (group == null) {
             throw new IllegalArgumentException("Group must be non-null");
@@ -509,13 +504,13 @@ public class GroupLayout extends Layout {
         invalidateHost();
     }
 
-    /**
-     * Returns the <code>ParallelGroup</code> that is responsible for
-     * layout along the vertical axis.
-     *
-     * @return <code>ParallelGroup</code> responsible for layout along
-     * the vertical axis.
-     */
+    /// Returns the `ParallelGroup` that is responsible for
+    /// layout along the vertical axis.
+    ///
+    /// #### Returns
+    ///
+    /// @return `ParallelGroup` responsible for layout along
+    /// the vertical axis.
     public Group getVerticalGroup() {
         int index = 0;
         if (verticalGroup.springs.size() > 1) {
@@ -524,14 +519,17 @@ public class GroupLayout extends Layout {
         return (Group) verticalGroup.springs.get(index);
     }
 
-    /**
-     * Sets the <code>Group</code> that is responsible for
-     * layout along the vertical axis.
-     *
-     * @param group <code>Group</code> responsible for layout along
-     *              the vertical axis.
-     * @throws IllegalArgumentException if group is null.
-     */
+    /// Sets the `Group` that is responsible for
+    /// layout along the vertical axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: @param group `Group` responsible for layout along
+    ///              the vertical axis.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if group is null.
     public void setVerticalGroup(Group group) {
         if (group == null) {
             throw new IllegalArgumentException("Group must be non-null");
@@ -540,11 +538,9 @@ public class GroupLayout extends Layout {
         invalidateHost();
     }
 
-    /**
-     * Wraps the user specified group in a sequential group.  If
-     * container gaps should be generate the necessary springs are
-     * added.
-     */
+    /// Wraps the user specified group in a sequential group.  If
+    /// container gaps should be generate the necessary springs are
+    /// added.
     private Group createTopLevelGroup(Group specifiedGroup) {
         SequentialGroup group = createSequentialGroup();
         if (getAutocreateContainerGaps()) {
@@ -557,66 +553,82 @@ public class GroupLayout extends Layout {
         return group;
     }
 
-    /**
-     * Creates and returns a <code>SequentialGroup</code>.
-     *
-     * @return a new <code>SequentialGroup</code>
-     */
+    /// Creates and returns a `SequentialGroup`.
+    ///
+    /// #### Returns
+    ///
+    /// a new `SequentialGroup`
     public SequentialGroup createSequentialGroup() {
         return new SequentialGroup();
     }
 
-    /**
-     * Creates and returns a <code>ParallelGroup</code> with a
-     * <code>LEADING</code> alignment.  This is a cover method for the more
-     * general <code>createParallelGroup(int)</code> method.
-     *
-     * @return a new ParallelGroup
-     * @see #createParallelGroup(int)
-     */
+    /// Creates and returns a `ParallelGroup` with a
+    /// `LEADING` alignment.  This is a cover method for the more
+    /// general `createParallelGroup(int)` method.
+    ///
+    /// #### Returns
+    ///
+    /// a new ParallelGroup
+    ///
+    /// #### See also
+    ///
+    /// - #createParallelGroup(int)
     public ParallelGroup createParallelGroup() {
         return createParallelGroup(LEADING);
     }
 
-    /**
-     * Creates and returns an <code>ParallelGroup</code>.  The alignment
-     * specifies how children elements should be positioned when the
-     * the parallel group is given more space than necessary.  For example,
-     * if a ParallelGroup with an alignment of TRAILING is given 100 pixels
-     * and a child only needs 50 pixels, the child will be positioned at the
-     * position 50.
-     *
-     * @param alignment alignment for the elements of the Group, one
-     *                  of <code>LEADING</code>, <code>TRAILING</code>,
-     *                  <code>CENTER</code> or <code>BASELINE</code>.
-     * @return a new <code>ParallelGroup</code>
-     * @throws IllegalArgumentException if alignment is not one of
-     *                                  <code>LEADING</code>, <code>TRAILING</code>,
-     *                                  <code>CENTER</code> or <code>BASELINE</code>
-     */
+    /// Creates and returns an `ParallelGroup`.  The alignment
+    /// specifies how children elements should be positioned when the
+    /// the parallel group is given more space than necessary.  For example,
+    /// if a ParallelGroup with an alignment of TRAILING is given 100 pixels
+    /// and a child only needs 50 pixels, the child will be positioned at the
+    /// position 50.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alignment`: @param alignment alignment for the elements of the Group, one
+    ///                  of `LEADING`, `TRAILING`,
+    ///                  `CENTER` or `BASELINE`.
+    ///
+    /// #### Returns
+    ///
+    /// a new `ParallelGroup`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if alignment is not one of
+    ///                                  `LEADING`, `TRAILING`,
+    ///                                  `CENTER` or `BASELINE`
     public ParallelGroup createParallelGroup(int alignment) {
         return createParallelGroup(alignment, true);
     }
 
-    /**
-     * Creates and returns an <code>ParallelGroup</code>.  The alignment
-     * specifies how children elements should be positioned when the
-     * the parallel group is given more space than necessary.  For example,
-     * if a ParallelGroup with an alignment of TRAILING is given 100 pixels
-     * and a child only needs 50 pixels, the child will be positioned at the
-     * position 50.
-     *
-     * @param alignment alignment for the elements of the Group, one
-     *                  of <code>LEADING</code>, <code>TRAILING</code>,
-     *                  <code>CENTER</code> or <code>BASELINE</code>.
-     * @param resizable whether or not the group is resizable.  If the group
-     *                  is not resizable the min/max size will be the same as the
-     *                  preferred.
-     * @return a new <code>ParallelGroup</code>
-     * @throws IllegalArgumentException if alignment is not one of
-     *                                  <code>LEADING</code>, <code>TRAILING</code>,
-     *                                  <code>CENTER</code> or <code>BASELINE</code>
-     */
+    /// Creates and returns an `ParallelGroup`.  The alignment
+    /// specifies how children elements should be positioned when the
+    /// the parallel group is given more space than necessary.  For example,
+    /// if a ParallelGroup with an alignment of TRAILING is given 100 pixels
+    /// and a child only needs 50 pixels, the child will be positioned at the
+    /// position 50.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alignment`: @param alignment alignment for the elements of the Group, one
+    ///                  of `LEADING`, `TRAILING`,
+    ///                  `CENTER` or `BASELINE`.
+    ///
+    /// - `resizable`: @param resizable whether or not the group is resizable.  If the group
+    ///                  is not resizable the min/max size will be the same as the
+    ///                  preferred.
+    ///
+    /// #### Returns
+    ///
+    /// a new `ParallelGroup`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if alignment is not one of
+    ///                                  `LEADING`, `TRAILING`,
+    ///                                  `CENTER` or `BASELINE`
     public ParallelGroup createParallelGroup(int alignment, boolean resizable) {
         if (alignment == BASELINE) {
             return new BaselineGroup(resizable);
@@ -624,52 +636,68 @@ public class GroupLayout extends Layout {
         return new ParallelGroup(alignment, resizable);
     }
 
-    /**
-     * Creates and returns a <code>ParallelGroup</code> that aligns it's
-     * elements along the baseline.
-     *
-     * @param resizable           whether the group is resizable
-     * @param anchorBaselineToTop whether the baseline is anchored to
-     *                            the top or bottom of the group
-     * @return parallel group
-     * @see #createBaselineGroup
-     * @see ParallelGroup
-     */
+    /// Creates and returns a `ParallelGroup` that aligns it's
+    /// elements along the baseline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resizable`: whether the group is resizable
+    ///
+    /// - `anchorBaselineToTop`: @param anchorBaselineToTop whether the baseline is anchored to
+    ///                            the top or bottom of the group
+    ///
+    /// #### Returns
+    ///
+    /// parallel group
+    ///
+    /// #### See also
+    ///
+    /// - #createBaselineGroup
+    ///
+    /// - ParallelGroup
     public ParallelGroup createBaselineGroup(boolean resizable,
                                              boolean anchorBaselineToTop) {
         return new BaselineGroup(resizable, anchorBaselineToTop);
     }
 
-    /**
-     * Forces the set of components to have the same size.
-     * This can be used multiple times to force
-     * any number of components to share the same size.
-     * <p>
-     * Linked Components are not be resizable.
-     *
-     * @param components Components to force to have same size.
-     * @throws IllegalArgumentException if <code>components</code> is
-     *                                  null, or contains null.
-     */
+    /// Forces the set of components to have the same size.
+    /// This can be used multiple times to force
+    /// any number of components to share the same size.
+    ///
+    /// Linked Components are not be resizable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `components`: Components to force to have same size.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `components` is
+    ///                                  null, or contains null.
     public void linkSize(Component[] components) {
         linkSize(components, HORIZONTAL | VERTICAL);
     }
 
-    /**
-     * Forces the set of components to have the same size.
-     * This can be used multiple times to force
-     * any number of components to share the same size.
-     * <p>
-     * Linked Components are not be resizable.
-     *
-     * @param components Components to force to have same size.
-     * @param axis       Axis to bind size, one of HORIZONTAL, VERTICAL or
-     *                   HORIZONTAL | VERTICAL
-     * @throws IllegalArgumentException if <code>components</code> is
-     *                                  null, or contains null.
-     * @throws IllegalArgumentException if <code>axis</code> does not
-     *                                  contain <code>HORIZONTAL</code> or <code>VERTICAL</code>
-     */
+    /// Forces the set of components to have the same size.
+    /// This can be used multiple times to force
+    /// any number of components to share the same size.
+    ///
+    /// Linked Components are not be resizable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `components`: Components to force to have same size.
+    ///
+    /// - `axis`: @param axis       Axis to bind size, one of HORIZONTAL, VERTICAL or
+    ///                   HORIZONTAL | VERTICAL
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `components` is
+    ///                                  null, or contains null.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `axis` does not
+    ///                                  contain `HORIZONTAL` or `VERTICAL`
     public void linkSize(Component[] components, int axis) {
         if (components == null) {
             throw new IllegalArgumentException("Components must be non-null");
@@ -706,15 +734,19 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Removes an existing component replacing it with the specified component.
-     *
-     * @param existingComponent the Component that should be removed and
-     *                          replaced with newComponent
-     * @param newComponent      the Component to put in existingComponents place
-     * @throws IllegalArgumentException is either of the Components are null or
-     *                                  if existingComponent is not being managed by this layout manager
-     */
+    /// Removes an existing component replacing it with the specified component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `existingComponent`: @param existingComponent the Component that should be removed and
+    ///                          replaced with newComponent
+    ///
+    /// - `newComponent`: the Component to put in existingComponents place
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException is either of the Components are null or
+    ///                                  if existingComponent is not being managed by this layout manager
     public void replace(Component existingComponent, Component newComponent) {
         if (existingComponent == null || newComponent == null) {
             throw new IllegalArgumentException("Components must be non-null");
@@ -739,21 +771,21 @@ public class GroupLayout extends Layout {
         invalidateHost();
     }
 
-    /**
-     * Returns the LayoutStyle instance to use
-     *
-     * @return the LayoutStyle instance to use
-     */
+    /// Returns the LayoutStyle instance to use
+    ///
+    /// #### Returns
+    ///
+    /// the LayoutStyle instance to use
     public LayoutStyle getLayoutStyle() {
         return layoutStyle;
     }
 
-    /**
-     * Sets the LayoutStyle this GroupLayout is to use. A value of null can
-     * be used to indicate the shared instance of LayoutStyle should be used.
-     *
-     * @param layoutStyle the LayoutStyle to use
-     */
+    /// Sets the LayoutStyle this GroupLayout is to use. A value of null can
+    /// be used to indicate the shared instance of LayoutStyle should be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutStyle`: the LayoutStyle to use
     public void setLayoutStyle(LayoutStyle layoutStyle) {
         this.layoutStyle = layoutStyle;
         invalidateHost();
@@ -773,16 +805,23 @@ public class GroupLayout extends Layout {
     }
 
 
-    /**
-     * Returns the minimum size for the specified container.
-     *
-     * @param parent the container to return size for
-     * @throws IllegalArgumentException if <code>parent</code> is not
-     *         the same <code>Container</code> that this was created with
-     * @throws IllegalStateException if any of the components added to
-     *         this layout are not in both a horizontal and vertical group
-     * @see java.awt.Container#getMinimumSize
-     */
+    /// Returns the minimum size for the specified container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the container to return size for
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
+    ///         the same `Container` that this was created with
+    ///
+    /// - `IllegalStateException`: @throws IllegalStateException if any of the components added to
+    ///         this layout are not in both a horizontal and vertical group
+    ///
+    /// #### See also
+    ///
+    /// - java.awt.Container#getMinimumSize
     /*public Dimension minimumLayoutSize(Container parent) {
         checkParent(parent);
         prepare(MIN_SIZE);
@@ -790,15 +829,18 @@ public class GroupLayout extends Layout {
                 verticalGroup.getMinimumSize(VERTICAL));
     }*/
 
-    /**
-     * Notification that a <code>Component</code> has been removed from
-     * the parent container.  You should not invoke this method
-     * directly, instead invoke <code>removeComponent</code> on the parent
-     * <code>Container</code>.
-     *
-     * @param component the component to be removed
-     * @see Container#removeComponent
-     */
+    /// Notification that a `Component` has been removed from
+    /// the parent container.  You should not invoke this method
+    /// directly, instead invoke `removeComponent` on the parent
+    /// `Container`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `component`: the component to be removed
+    ///
+    /// #### See also
+    ///
+    /// - Container#removeComponent
     @Override
     public void removeLayoutComponent(Component component) {
         ComponentInfo info = (ComponentInfo) componentInfos.remove(component);
@@ -809,16 +851,23 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Returns the maximum size for the specified container.
-     *
-     * @param parent the container to return size for
-     * @throws IllegalArgumentException if <code>parent</code> is not
-     *         the same <code>Container</code> that this was created with
-     * @throws IllegalStateException if any of the components added to
-     *         this layout are not in both a horizontal and vertical group
-     * @see java.awt.Container#getMaximumSize
-     */
+    /// Returns the maximum size for the specified container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the container to return size for
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
+    ///         the same `Container` that this was created with
+    ///
+    /// - `IllegalStateException`: @throws IllegalStateException if any of the components added to
+    ///         this layout are not in both a horizontal and vertical group
+    ///
+    /// #### See also
+    ///
+    /// - java.awt.Container#getMaximumSize
     /*public Dimension maximumLayoutSize(Container parent) {
         checkParent(parent);
         prepare(MAX_SIZE);
@@ -826,18 +875,24 @@ public class GroupLayout extends Layout {
                 verticalGroup.getMaximumSize(VERTICAL));
     }*/
 
-    /**
-     * Returns the alignment along the x axis.  This specifies how
-     * the component would like to be aligned relative to other
-     * components.  The value should be a number between 0 and 1
-     * where 0 represents alignment along the origin, 1 is aligned
-     * the furthest away from the origin, 0.5 is centered, etc.
-     *
-     * @param parent Container hosting this LayoutManager
-     * @throws IllegalArgumentException if <code>parent</code> is not
-     *         the same <code>Container</code> that this was created with
-     * @return alignment
-     */
+    /// Returns the alignment along the x axis.  This specifies how
+    /// the component would like to be aligned relative to other
+    /// components.  The value should be a number between 0 and 1
+    /// where 0 represents alignment along the origin, 1 is aligned
+    /// the furthest away from the origin, 0.5 is centered, etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: Container hosting this LayoutManager
+    ///
+    /// #### Returns
+    ///
+    /// alignment
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
+    ///         the same `Container` that this was created with
     /*public float getLayoutAlignmentX(Container parent) {
         checkParent(parent);
         return .5f;
@@ -860,16 +915,23 @@ public class GroupLayout extends Layout {
         return .5f;
     }*/
 
-    /**
-     * Returns the preferred size for the specified container.
-     *
-     * @param parent the container to return size for
-     * @throws IllegalArgumentException if <code>parent</code> is not
-     *                                  the same <code>Container</code> that this was created with
-     * @throws IllegalStateException    if any of the components added to
-     *                                  this layout are not in both a horizontal and vertical group
-     * @see Container#getPreferredSize
-     */
+    /// Returns the preferred size for the specified container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the container to return size for
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
+    ///                                  the same `Container` that this was created with
+    ///
+    /// - `IllegalStateException`: @throws IllegalStateException    if any of the components added to
+    ///                                  this layout are not in both a horizontal and vertical group
+    ///
+    /// #### See also
+    ///
+    /// - Container#getPreferredSize
     @Override
     public Dimension getPreferredSize(Container parent) {
         checkParent(parent);
@@ -878,13 +940,16 @@ public class GroupLayout extends Layout {
                 verticalGroup.getPreferredSize(VERTICAL));
     }
 
-    /**
-     * Lays out the specified container.
-     *
-     * @param parent the container to be laid out
-     * @throws IllegalStateException if any of the components added to
-     *                               this layout are not in both a horizontal and vertical group
-     */
+    /// Lays out the specified container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the container to be laid out
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: @throws IllegalStateException if any of the components added to
+    ///                               this layout are not in both a horizontal and vertical group
     @Override
     public void layoutContainer(Container parent) {
         // Step 1: Prepare for layout.
@@ -916,14 +981,17 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Invalidates the layout, indicating that if the layout manager
-     * has cached information it should be discarded.
-     *
-     * @param parent Container hosting this LayoutManager
-     * @throws IllegalArgumentException if <code>parent</code> is not
-     *                                  the same <code>Container</code> that this was created with
-     */
+    /// Invalidates the layout, indicating that if the layout manager
+    /// has cached information it should be discarded.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: Container hosting this LayoutManager
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
+    ///                                  the same `Container` that this was created with
     /*public void invalidateLayout(Container parent) {
         checkParent(parent);
         // invalidateLayout is called from Container.invalidate, which
@@ -1043,9 +1111,7 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Returns the <code>ComponentInfo</code> for the specified Component.
-     */
+    /// Returns the `ComponentInfo` for the specified Component.
     private ComponentInfo getComponentInfo(Component component) {
         ComponentInfo info = (ComponentInfo) componentInfos.get(component);
         if (info == null) {
@@ -1058,12 +1124,10 @@ public class GroupLayout extends Layout {
         return info;
     }
 
-    /**
-     * Adjusts the autopadding springs for the horizontal and vertical
-     * groups.  If <code>insert</code> is true this will insert auto padding
-     * springs, otherwise this will only adjust the springs that
-     * comprise auto preferred padding springs.
-     */
+    /// Adjusts the autopadding springs for the horizontal and vertical
+    /// groups.  If `insert` is true this will insert auto padding
+    /// springs, otherwise this will only adjust the springs that
+    /// comprise auto preferred padding springs.
     private void insertAutopadding(boolean insert) {
         horizontalGroup.insertAutopadding(HORIZONTAL, new ArrayList(1),
                 new ArrayList(1), new ArrayList(1), new ArrayList(1), insert);
@@ -1071,10 +1135,8 @@ public class GroupLayout extends Layout {
                 new ArrayList(1), new ArrayList(1), new ArrayList(1), insert);
     }
 
-    /**
-     * Returns true if the two Components have a common ParallelGroup ancestor
-     * along the particular axis.
-     */
+    /// Returns true if the two Components have a common ParallelGroup ancestor
+    /// along the particular axis.
     private boolean areParallelSiblings(Component source, Component target,
                                         int axis) {
         ComponentInfo sourceInfo = getComponentInfo(source);
@@ -1119,9 +1181,7 @@ public class GroupLayout extends Layout {
         //return host.getComponentOrientation().isLeftToRight();
     }
 
-    /**
-     * Used in figuring out how much space to give resizable springs.
-     */
+    /// Used in figuring out how much space to give resizable springs.
     private static final class SpringDelta {
         // Original index.
         public final int index;
@@ -1144,10 +1204,8 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Represents two springs that should have autopadding inserted between
-     * them.
-     */
+    /// Represents two springs that should have autopadding inserted between
+    /// them.
     private final static class AutopaddingMatch {
         public final ComponentSpring source;
         public final ComponentSpring target;
@@ -1233,14 +1291,12 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Spring consists of a range: min, pref and max a value some where in
-     * the middle of that and a location.  Subclasses must override
-     * methods to get the min/max/pref and will likely want to override
-     * the <code>setSize</code> method.  Spring automatically caches the
-     * min/max/pref.  If the min/pref/max has internally changes, or needs
-     * to be updated you must invoked clear.
-     */
+    /// Spring consists of a range: min, pref and max a value some where in
+    /// the middle of that and a location.  Subclasses must override
+    /// methods to get the min/max/pref and will likely want to override
+    /// the `setSize` method.  Spring automatically caches the
+    /// min/max/pref.  If the min/pref/max has internally changes, or needs
+    /// to be updated you must invoked clear.
     abstract class Spring {
         private int size;
         private int min;
@@ -1254,40 +1310,45 @@ public class GroupLayout extends Layout {
             min = pref = max = UNSET;
         }
 
-        /**
-         * Calculates and returns the minimum size.
-         *
-         * @param axis the axis of layout; one of HORIZONTAL or VERTICAL
-         * @return the minimum size
-         */
+        /// Calculates and returns the minimum size.
+        ///
+        /// #### Parameters
+        ///
+        /// - `axis`: the axis of layout; one of HORIZONTAL or VERTICAL
+        ///
+        /// #### Returns
+        ///
+        /// the minimum size
         abstract int calculateMinimumSize(int axis);
 
-        /**
-         * Calculates and returns the preferred size.
-         *
-         * @param axis the axis of layout; one of HORIZONTAL or VERTICAL
-         * @return the preferred size
-         */
+        /// Calculates and returns the preferred size.
+        ///
+        /// #### Parameters
+        ///
+        /// - `axis`: the axis of layout; one of HORIZONTAL or VERTICAL
+        ///
+        /// #### Returns
+        ///
+        /// the preferred size
         abstract int calculatePreferredSize(int axis);
 
-        /**
-         * Calculates and returns the minimum size.
-         *
-         * @param axis the axis of layout; one of HORIZONTAL or VERTICAL
-         * @return the minimum size
-         */
+        /// Calculates and returns the minimum size.
+        ///
+        /// #### Parameters
+        ///
+        /// - `axis`: the axis of layout; one of HORIZONTAL or VERTICAL
+        ///
+        /// #### Returns
+        ///
+        /// the minimum size
         abstract int calculateMaximumSize(int axis);
 
-        /**
-         * Returns the parent of this spring.
-         */
+        /// Returns the parent of this spring.
         Spring getParent() {
             return parent;
         }
 
-        /**
-         * Sets the parent of this Spring.
-         */
+        /// Sets the parent of this Spring.
         void setParent(Spring parent) {
             this.parent = parent;
         }
@@ -1302,9 +1363,7 @@ public class GroupLayout extends Layout {
             this.alignment = alignment;
         }
 
-        /**
-         * Returns the minimum size.
-         */
+        /// Returns the minimum size.
         final int getMinimumSize(int axis) {
             if (min == UNSET) {
                 min = constrain(calculateMinimumSize(axis));
@@ -1312,9 +1371,7 @@ public class GroupLayout extends Layout {
             return min;
         }
 
-        /**
-         * Returns the preferred size.
-         */
+        /// Returns the preferred size.
         final int getPreferredSize(int axis) {
             if (pref == UNSET) {
                 pref = constrain(calculatePreferredSize(axis));
@@ -1322,9 +1379,7 @@ public class GroupLayout extends Layout {
             return pref;
         }
 
-        /**
-         * Returns the maximum size.
-         */
+        /// Returns the maximum size.
         final int getMaximumSize(int axis) {
             if (max == UNSET) {
                 max = constrain(calculateMaximumSize(axis));
@@ -1332,22 +1387,22 @@ public class GroupLayout extends Layout {
             return max;
         }
 
-        /**
-         * Resets the cached min/max/pref.
-         */
+        /// Resets the cached min/max/pref.
         void unset() {
             size = min = pref = max = UNSET;
         }
 
-        /**
-         * Sets the value and location of the spring.  Subclasses
-         * will want to invoke super, then do any additional sizing.
-         *
-         * @param axis   HORIZONTAL or VERTICAL
-         * @param origin of this Spring
-         * @param size   of the Spring.  If size is UNSET, this invokes
-         *               clear.
-         */
+        /// Sets the value and location of the spring.  Subclasses
+        /// will want to invoke super, then do any additional sizing.
+        ///
+        /// #### Parameters
+        ///
+        /// - `axis`: HORIZONTAL or VERTICAL
+        ///
+        /// - `origin`: of this Spring
+        ///
+        /// - `size`: @param size   of the Spring.  If size is UNSET, this invokes
+        ///               clear.
         void setSize(int axis, int origin, int size) {
             this.size = size;
             if (size == UNSET) {
@@ -1355,9 +1410,7 @@ public class GroupLayout extends Layout {
             }
         }
 
-        /**
-         * Returns the current size.
-         */
+        /// Returns the current size.
         int getSize() {
             return size;
         }
@@ -1380,22 +1433,18 @@ public class GroupLayout extends Layout {
             return (min != pref || pref != getMaximumSize(axis));
         }
 
-        /**
-         * Returns true if this Spring will ALWAYS have a zero size. This should
-         * NOT check the current size, rather it's meant to
-         * quickly test if this Spring will always have a zero size.
-         */
+        /// Returns true if this Spring will ALWAYS have a zero size. This should
+        /// NOT check the current size, rather it's meant to
+        /// quickly test if this Spring will always have a zero size.
         abstract boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized);
     }
 
-    /**
-     * Group provides for commonality between the two types of operations
-     * supported by <code>GroupLayout</code>: laying out components one
-     * after another (<code>SequentialGroup</code>) or layout on top
-     * of each other (<code>ParallelGroup</code>). Use one of
-     * <code>createSequentialGroup</code> or
-     * <code>createParallelGroup</code> to create one.
-     */
+    /// Group provides for commonality between the two types of operations
+    /// supported by `GroupLayout`: laying out components one
+    /// after another (`SequentialGroup`) or layout on top
+    /// of each other (`ParallelGroup`). Use one of
+    /// `createSequentialGroup` or
+    /// `createParallelGroup` to create one.
     public abstract class Group extends Spring {
         // private int origin;
         // private int size;
@@ -1409,10 +1458,8 @@ public class GroupLayout extends Layout {
             return springs.indexOf(spring);
         }
 
-        /**
-         * Adds the Spring to the list of <code>Spring</code>s and returns
-         * the receiver.
-         */
+        /// Adds the Spring to the list of `Spring`s and returns
+        /// the receiver.
         Group addSpring(Spring spring) {
             springs.add(spring);
             spring.setParent(this);
@@ -1439,10 +1486,8 @@ public class GroupLayout extends Layout {
             }
         }
 
-        /**
-         * This is invoked from <code>setSize</code> if passed a value
-         * other than UNSET.
-         */
+        /// This is invoked from `setSize` if passed a value
+        /// other than UNSET.
         abstract void setValidSize(int axis, int origin, int size);
 
         @Override
@@ -1460,20 +1505,16 @@ public class GroupLayout extends Layout {
             return calculateSize(axis, MAX_SIZE);
         }
 
-        /**
-         * Used to compute how the two values representing two springs
-         * will be combined.  For example, a group that layed things out
-         * one after the next would return <code>a + b</code>.
-         */
+        /// Used to compute how the two values representing two springs
+        /// will be combined.  For example, a group that layed things out
+        /// one after the next would return `a + b`.
         abstract int operator(int a, int b);
 
-        /**
-         * Calculates the specified size.  This is called from
-         * one of the <code>getMinimumSize0</code>,
-         * <code>getPreferredSize0</code> or
-         * <code>getMaximumSize0</code> methods.  This will invoke
-         * to <code>operator</code> to combine the values.
-         */
+        /// Calculates the specified size.  This is called from
+        /// one of the `getMinimumSize0`,
+        /// `getPreferredSize0` or
+        /// `getMaximumSize0` methods.  This will invoke
+        /// to `operator` to combine the values.
         int calculateSize(int axis, int type) {
             int count = springs.size();
             if (count == 0) {
@@ -1512,30 +1553,33 @@ public class GroupLayout extends Layout {
 
         // Padding
 
-        /**
-         * Adjusts the autopadding springs in this group and its children.
-         * If <code>insert</code> is true this will insert auto padding
-         * springs, otherwise this will only adjust the springs that
-         * comprise auto preferred padding springs.
-         *
-         * @param axis            the axis of the springs; HORIZONTAL or VERTICAL
-         * @param leadingPadding  List of AutopaddingSprings that occur before
-         *                        this Group
-         * @param trailingPadding any trailing autopadding springs are added
-         *                        to this on exit
-         * @param leading         List of ComponentSprings that occur before this Group
-         * @param trailing        any trailing ComponentSpring are added to this
-         *                        List
-         * @param insert          Whether or not to insert AutopaddingSprings or just
-         *                        adjust any existing AutopaddingSprings.
-         */
+        /// Adjusts the autopadding springs in this group and its children.
+        /// If `insert` is true this will insert auto padding
+        /// springs, otherwise this will only adjust the springs that
+        /// comprise auto preferred padding springs.
+        ///
+        /// #### Parameters
+        ///
+        /// - `axis`: the axis of the springs; HORIZONTAL or VERTICAL
+        ///
+        /// - `leadingPadding`: @param leadingPadding  List of AutopaddingSprings that occur before
+        ///                        this Group
+        ///
+        /// - `trailingPadding`: @param trailingPadding any trailing autopadding springs are added
+        ///                        to this on exit
+        ///
+        /// - `leading`: List of ComponentSprings that occur before this Group
+        ///
+        /// - `trailing`: @param trailing        any trailing ComponentSpring are added to this
+        ///                        List
+        ///
+        /// - `insert`: @param insert          Whether or not to insert AutopaddingSprings or just
+        ///                        adjust any existing AutopaddingSprings.
         abstract void insertAutopadding(int axis, ArrayList leadingPadding,
                                         ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
                                         boolean insert);
 
-        /**
-         * Removes any AutopaddingSprings.
-         */
+        /// Removes any AutopaddingSprings.
         void removeAutopadding() {
             unset();
             for (int counter = springs.size() - 1; counter >= 0; counter--) {
@@ -1592,38 +1636,45 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * A <code>Group</code> that lays out its elements sequentially, one
-     * after another.  This class has no public constructor, use the
-     * <code>createSequentialGroup</code> method to create one.
-     *
-     * @see #createSequentialGroup()
-     */
+    /// A `Group` that lays out its elements sequentially, one
+    /// after another.  This class has no public constructor, use the
+    /// `createSequentialGroup` method to create one.
+    ///
+    /// #### See also
+    ///
+    /// - #createSequentialGroup()
     public class SequentialGroup extends Group {
         private Spring baselineSpring;
 
         SequentialGroup() {
         }
 
-        /**
-         * Adds the specified <code>Group</code> to this
-         * <code>SequentialGroup</code>
-         *
-         * @param group the Group to add
-         * @return this Group
-         */
+        /// Adds the specified `Group` to this
+        /// `SequentialGroup`
+        ///
+        /// #### Parameters
+        ///
+        /// - `group`: the Group to add
+        ///
+        /// #### Returns
+        ///
+        /// this Group
         public SequentialGroup add(Group group) {
             return (SequentialGroup) addSpring(group);
         }
 
-        /**
-         * Adds a <code>Group</code> to this <code>Group</code>.
-         *
-         * @param group         the <code>Group</code> to add
-         * @param useAsBaseline whether the specified <code>Group</code> should
-         *                      be used to calculate the baseline for this <code>Group</code>
-         * @return this <code>Group</code>
-         */
+        /// Adds a `Group` to this `Group`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `group`: the `Group` to add
+        ///
+        /// - `useAsBaseline`: @param useAsBaseline whether the specified `Group` should
+        ///                      be used to calculate the baseline for this `Group`
+        ///
+        /// #### Returns
+        ///
+        /// this `Group`
         public SequentialGroup add(boolean useAsBaseline, Group group) {
             add(group);
             if (useAsBaseline) {
@@ -1632,25 +1683,32 @@ public class GroupLayout extends Layout {
             return this;
         }
 
-        /**
-         * Adds the specified Component.  If the Component's min/max
-         * are different from its pref than the component will be resizable.
-         *
-         * @param component the Component to add
-         * @return this <code>SequentialGroup</code>
-         */
+        /// Adds the specified Component.  If the Component's min/max
+        /// are different from its pref than the component will be resizable.
+        ///
+        /// #### Parameters
+        ///
+        /// - `component`: the Component to add
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`
         public SequentialGroup add(Component component) {
             return add(component, DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);
         }
 
-        /**
-         * Adds a <code>Component</code> to this <code>Group</code>.
-         *
-         * @param useAsBaseline whether the specified <code>Component</code> should
-         *                      be used to calculate the baseline for this <code>Group</code>
-         * @param component     the <code>Component</code> to add
-         * @return this <code>Group</code>
-         */
+        /// Adds a `Component` to this `Group`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `useAsBaseline`: @param useAsBaseline whether the specified `Component` should
+        ///                      be used to calculate the baseline for this `Group`
+        ///
+        /// - `component`: the `Component` to add
+        ///
+        /// #### Returns
+        ///
+        /// this `Group`
         public SequentialGroup add(boolean useAsBaseline, Component component) {
             add(component);
             if (useAsBaseline) {
@@ -1659,46 +1717,64 @@ public class GroupLayout extends Layout {
             return this;
         }
 
-        /**
-         * Adds the specified <code>Component</code>.  Min, pref and max
-         * can be absolute values, or they can be one of
-         * <code>DEFAULT_SIZE</code> or <code>PREFERRED_SIZE</code>.  For
-         * example, the following:
-         * <pre>
-         *   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
-         * </pre>
-         * Forces a max of 1000, with the min and preferred equalling that
-         * of the preferred size of <code>component</code>.
-         *
-         * @param component the Component to add
-         * @param min       the minimum size
-         * @param pref      the preferred size
-         * @param max       the maximum size
-         * @return this <code>SequentialGroup</code>
-         * @throws IllegalArgumentException if min, pref or max are
-         *                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE
-         */
+        /// Adds the specified `Component`.  Min, pref and max
+        /// can be absolute values, or they can be one of
+        /// `DEFAULT_SIZE` or `PREFERRED_SIZE`.  For
+        /// example, the following:
+        ///
+        /// ```java
+        ///   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
+        /// ```
+        ///
+        /// Forces a max of 1000, with the min and preferred equalling that
+        /// of the preferred size of `component`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `component`: the Component to add
+        ///
+        /// - `min`: the minimum size
+        ///
+        /// - `pref`: the preferred size
+        ///
+        /// - `max`: the maximum size
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if min, pref or max are
+        ///                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE
         public SequentialGroup add(Component component, int min, int pref,
                                    int max) {
             return (SequentialGroup) addSpring(new ComponentSpring(
                     component, min, pref, max));
         }
 
-        /**
-         * Adds a <code>Component</code> to this <code>Group</code>
-         * with the specified size.
-         *
-         * @param useAsBaseline whether the specified <code>Component</code> should
-         *                      be used to calculate the baseline for this <code>Group</code>
-         * @param component     the <code>Component</code> to add
-         * @param min           the minimum size or one of <code>DEFAULT_SIZE</code> or
-         *                      <code>PREFERRED_SIZE</code>
-         * @param pref          the preferred size or one of <code>DEFAULT_SIZE</code> or
-         *                      <code>PREFERRED_SIZE</code>
-         * @param max           the maximum size or one of <code>DEFAULT_SIZE</code> or
-         *                      <code>PREFERRED_SIZE</code>
-         * @return this <code>Group</code>
-         */
+        /// Adds a `Component` to this `Group`
+        /// with the specified size.
+        ///
+        /// #### Parameters
+        ///
+        /// - `useAsBaseline`: @param useAsBaseline whether the specified `Component` should
+        ///                      be used to calculate the baseline for this `Group`
+        ///
+        /// - `component`: the `Component` to add
+        ///
+        /// - `min`: @param min           the minimum size or one of `DEFAULT_SIZE` or
+        ///                      `PREFERRED_SIZE`
+        ///
+        /// - `pref`: @param pref          the preferred size or one of `DEFAULT_SIZE` or
+        ///                      `PREFERRED_SIZE`
+        ///
+        /// - `max`: @param max           the maximum size or one of `DEFAULT_SIZE` or
+        ///                      `PREFERRED_SIZE`
+        ///
+        /// #### Returns
+        ///
+        /// this `Group`
         public SequentialGroup add(boolean useAsBaseline,
                                    Component component, int min, int pref, int max) {
             add(component, min, pref, max);
@@ -1708,66 +1784,103 @@ public class GroupLayout extends Layout {
             return this;
         }
 
-        /**
-         * Adds a rigid gap.
-         *
-         * @param pref the size of the gap
-         * @return this <code>SequentialGroup</code>
-         * @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
-         *                                  or the following is not meant min <= pref <= max
-         */
+        /// Adds a rigid gap.
+        ///
+        /// #### Parameters
+        ///
+        /// - `pref`: the size of the gap
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
+        ///                                  or the following is not meant min <= pref <= max
         public SequentialGroup add(int pref) {
             return add(pref, pref, pref);
         }
 
-        /**
-         * Adds a gap with the specified size.
-         *
-         * @param min  the minimum size of the gap, or PREFERRED_SIZE
-         * @param pref the preferred size of the gap
-         * @param max  the maximum size of the gap, or PREFERRED_SIZE
-         * @return this <code>SequentialGroup</code>
-         * @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
-         *                                  or the following is not meant min <= pref <= max
-         */
+        /// Adds a gap with the specified size.
+        ///
+        /// #### Parameters
+        ///
+        /// - `min`: the minimum size of the gap, or PREFERRED_SIZE
+        ///
+        /// - `pref`: the preferred size of the gap
+        ///
+        /// - `max`: the maximum size of the gap, or PREFERRED_SIZE
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
+        ///                                  or the following is not meant min <= pref <= max
         public SequentialGroup add(int min, int pref, int max) {
             return (SequentialGroup) addSpring(new GapSpring(min, pref, max));
         }
 
-        /**
-         * Adds an element representing the preferred gap between the two
-         * components.
-         *
-         * @param comp1 the first component
-         * @param comp2 the second component
-         * @param type  the type of gap; one of the constants defined by
-         *              LayoutStyle
-         * @return this <code>SequentialGroup</code>
-         * @throws IllegalArgumentException if <code>type</code> is not a
-         *                                  valid LayoutStyle constant
-         * @see LayoutStyle
-         */
+        /// Adds an element representing the preferred gap between the two
+        /// components.
+        ///
+        /// #### Parameters
+        ///
+        /// - `comp1`: the first component
+        ///
+        /// - `comp2`: the second component
+        ///
+        /// - `type`: @param type  the type of gap; one of the constants defined by
+        ///              LayoutStyle
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if `type` is not a
+        ///                                  valid LayoutStyle constant
+        ///
+        /// #### See also
+        ///
+        /// - LayoutStyle
         public SequentialGroup addPreferredGap(Component comp1,
                                                Component comp2,
                                                int type) {
             return addPreferredGap(comp1, comp2, type, false);
         }
 
-        /**
-         * Adds an element representing the preferred gap between the two
-         * components.
-         *
-         * @param comp1   the first component
-         * @param comp2   the second component
-         * @param type    the type of gap; one of the constants defined by
-         *                LayoutStyle
-         * @param canGrow true if the gap can grow if more
-         *                space is available
-         * @return this <code>SequentialGroup</code>
-         * @throws IllegalArgumentException if <code>type</code> is not a
-         *                                  valid LayoutStyle constant
-         * @see LayoutStyle
-         */
+        /// Adds an element representing the preferred gap between the two
+        /// components.
+        ///
+        /// #### Parameters
+        ///
+        /// - `comp1`: the first component
+        ///
+        /// - `comp2`: the second component
+        ///
+        /// - `type`: @param type    the type of gap; one of the constants defined by
+        ///                LayoutStyle
+        ///
+        /// - `canGrow`: @param canGrow true if the gap can grow if more
+        ///                space is available
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if `type` is not a
+        ///                                  valid LayoutStyle constant
+        ///
+        /// #### See also
+        ///
+        /// - LayoutStyle
         public SequentialGroup addPreferredGap(Component comp1,
                                                Component comp2,
                                                int type, boolean canGrow) {
@@ -1784,50 +1897,70 @@ public class GroupLayout extends Layout {
                     comp1, comp2, type, canGrow));
         }
 
-        /**
-         * Adds an element representing the preferred gap between the
-         * nearest components.  That is, during layout the neighboring
-         * components are found, and the min, pref and max of this
-         * element is set based on the preferred gap between the
-         * components.  If no neighboring components are found the
-         * min, pref and max are set to 0.
-         *
-         * @param type the type of gap; one of the LayoutStyle constants
-         * @return this SequentialGroup
-         * @throws IllegalArgumentException if type is not one of
-         *                                  <code>LayoutStyle.RELATED</code> or
-         *                                  <code>LayoutStyle.UNRELATED</code>
-         * @see LayoutStyle
-         */
+        /// Adds an element representing the preferred gap between the
+        /// nearest components.  That is, during layout the neighboring
+        /// components are found, and the min, pref and max of this
+        /// element is set based on the preferred gap between the
+        /// components.  If no neighboring components are found the
+        /// min, pref and max are set to 0.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: the type of gap; one of the LayoutStyle constants
+        ///
+        /// #### Returns
+        ///
+        /// this SequentialGroup
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if type is not one of
+        ///                                  `LayoutStyle.RELATED` or
+        ///                                  `LayoutStyle.UNRELATED`
+        ///
+        /// #### See also
+        ///
+        /// - LayoutStyle
         public SequentialGroup addPreferredGap(int type) {
             return addPreferredGap(type, DEFAULT_SIZE, DEFAULT_SIZE);
         }
 
-        /**
-         * Adds an element for the preferred gap between the
-         * nearest components.  That is, during layout the neighboring
-         * components are found, and the min of this
-         * element is set based on the preferred gap between the
-         * components.  If no neighboring components are found the
-         * min is set to 0.  This method allows you to specify the
-         * preferred and maximum size by way of the <code>pref</code>
-         * and <code>max</code> arguments.  These can either be a
-         * value &gt;= 0, in which case the preferred or max is the max
-         * of the argument and the preferred gap, of DEFAULT_VALUE in
-         * which case the value is the same as the preferred gap.
-         *
-         * @param type the type of gap; one of LayoutStyle.RELATED or
-         *             LayoutStyle.UNRELATED
-         * @param pref the preferred size; one of DEFAULT_SIZE or a value > 0
-         * @param max  the maximum size; one of DEFAULT_SIZE, PREFERRED_SIZE
-         *             or a value > 0
-         * @return this SequentialGroup
-         * @throws IllegalArgumentException if type is not one of
-         *                                  <code>LayoutStyle.RELATED</code> or
-         *                                  <code>LayoutStyle.UNRELATED</code> or pref/max is
-         *                                  != DEFAULT_SIZE and < 0, or pref > max
-         * @see LayoutStyle
-         */
+        /// Adds an element for the preferred gap between the
+        /// nearest components.  That is, during layout the neighboring
+        /// components are found, and the min of this
+        /// element is set based on the preferred gap between the
+        /// components.  If no neighboring components are found the
+        /// min is set to 0.  This method allows you to specify the
+        /// preferred and maximum size by way of the `pref`
+        /// and `max` arguments.  These can either be a
+        /// value >= 0, in which case the preferred or max is the max
+        /// of the argument and the preferred gap, of DEFAULT_VALUE in
+        /// which case the value is the same as the preferred gap.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: @param type the type of gap; one of LayoutStyle.RELATED or
+        ///             LayoutStyle.UNRELATED
+        ///
+        /// - `pref`: the preferred size; one of DEFAULT_SIZE or a value > 0
+        ///
+        /// - `max`: @param max  the maximum size; one of DEFAULT_SIZE, PREFERRED_SIZE
+        ///             or a value > 0
+        ///
+        /// #### Returns
+        ///
+        /// this SequentialGroup
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if type is not one of
+        ///                                  `LayoutStyle.RELATED` or
+        ///                                  `LayoutStyle.UNRELATED` or pref/max is
+        ///                                  != DEFAULT_SIZE and  max
+        ///
+        /// #### See also
+        ///
+        /// - LayoutStyle
         public SequentialGroup addPreferredGap(int type, int pref,
                                                int max) {
             if (type != LayoutStyle.RELATED && type != LayoutStyle.UNRELATED) {
@@ -1846,31 +1979,38 @@ public class GroupLayout extends Layout {
                     type, pref, max));
         }
 
-        /**
-         * Adds an element representing the preferred gap between one edge
-         * of the container and the next/previous Component.  This will have
-         * no effect if the next/previous element is not a Component and does
-         * not touch one edge of the parent container.
-         *
-         * @return this <code>SequentialGroup</code>.
-         */
+        /// Adds an element representing the preferred gap between one edge
+        /// of the container and the next/previous Component.  This will have
+        /// no effect if the next/previous element is not a Component and does
+        /// not touch one edge of the parent container.
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`.
         public SequentialGroup addContainerGap() {
             return addContainerGap(DEFAULT_SIZE, DEFAULT_SIZE);
         }
 
-        /**
-         * Adds an element representing the preferred gap between one edge
-         * of the container and the next/previous Component.  This will have
-         * no effect if the next/previous element is not a Component and does
-         * not touch one edge of the parent container.
-         *
-         * @param pref the preferred size; one of DEFAULT_SIZE or a value > 0
-         * @param max  the maximum size; one of DEFAULT_SIZE, PREFERRED_SIZE
-         *             or a value > 0.
-         * @return this <code>SequentialGroup</code>
-         * @throws IllegalArgumentException if pref/max is
-         *                                  != DEFAULT_SIZE and < 0, or pref > max
-         */
+        /// Adds an element representing the preferred gap between one edge
+        /// of the container and the next/previous Component.  This will have
+        /// no effect if the next/previous element is not a Component and does
+        /// not touch one edge of the parent container.
+        ///
+        /// #### Parameters
+        ///
+        /// - `pref`: the preferred size; one of DEFAULT_SIZE or a value > 0
+        ///
+        /// - `max`: @param max  the maximum size; one of DEFAULT_SIZE, PREFERRED_SIZE
+        ///             or a value > 0.
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if pref/max is
+        ///                                  != DEFAULT_SIZE and  max
         public SequentialGroup addContainerGap(int pref, int max) {
             if ((pref < 0 && pref != DEFAULT_SIZE) ||
                     (max < 0 && max != DEFAULT_SIZE && max != PREFERRED_SIZE) ||
@@ -1984,10 +2124,8 @@ public class GroupLayout extends Layout {
             }
         }
 
-        /**
-         * Returns the sorted list of SpringDelta's for the current set of
-         * Springs.
-         */
+        /// Returns the sorted list of SpringDelta's for the current set of
+        /// Springs.
         private ArrayList buildResizableList(int axis, boolean useMin) {
             // First pass, figure out what is resizable
             int size = springs.size();
@@ -2217,14 +2355,14 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * A <code>Group</code> that lays out its elements on top of each
-     * other.  If a child element is smaller than the provided space it
-     * is aligned based on the alignment of the child (if specified) or
-     * on the alignment of the ParallelGroup.
-     *
-     * @see #createParallelGroup()
-     */
+    /// A `Group` that lays out its elements on top of each
+    /// other.  If a child element is smaller than the provided space it
+    /// is aligned based on the alignment of the child (if specified) or
+    /// on the alignment of the ParallelGroup.
+    ///
+    /// #### See also
+    ///
+    /// - #createParallelGroup()
     public class ParallelGroup extends Group {
         // How children are layed out.
         private final int childAlignment;
@@ -2236,130 +2374,187 @@ public class GroupLayout extends Layout {
             this.resizable = resizable;
         }
 
-        /**
-         * Adds the specified <code>Group</code>.
-         *
-         * @param group the Group to add
-         * @return this Group
-         */
+        /// Adds the specified `Group`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `group`: the Group to add
+        ///
+        /// #### Returns
+        ///
+        /// this Group
         public ParallelGroup add(Group group) {
             return (ParallelGroup) addSpring(group);
         }
 
-        /**
-         * Adds the specified Component.  If the Component's min/max
-         * are different from its pref than the component will be resizable.
-         *
-         * @param component the Component to add
-         * @return this <code>ParallelGroup</code>
-         */
+        /// Adds the specified Component.  If the Component's min/max
+        /// are different from its pref than the component will be resizable.
+        ///
+        /// #### Parameters
+        ///
+        /// - `component`: the Component to add
+        ///
+        /// #### Returns
+        ///
+        /// this `ParallelGroup`
         public ParallelGroup add(Component component) {
             return add(component, DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);
         }
 
-        /**
-         * Adds the specified <code>Component</code>.  Min, pref and max
-         * can be absolute values, or they can be one of
-         * <code>DEFAULT_SIZE</code> or <code>PREFERRED_SIZE</code>.  For
-         * example, the following:
-         * <pre>
-         *   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
-         * </pre>
-         * Forces a max of 1000, with the min and preferred equalling that
-         * of the preferred size of <code>component</code>.
-         *
-         * @param component the Component to add
-         * @param min       the minimum size
-         * @param pref      the preferred size
-         * @param max       the maximum size
-         * @return this <code>SequentialGroup</code>
-         * @throws IllegalArgumentException if min, pref or max are
-         *                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
-         */
+        /// Adds the specified `Component`.  Min, pref and max
+        /// can be absolute values, or they can be one of
+        /// `DEFAULT_SIZE` or `PREFERRED_SIZE`.  For
+        /// example, the following:
+        ///
+        /// ```java
+        ///   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
+        /// ```
+        ///
+        /// Forces a max of 1000, with the min and preferred equalling that
+        /// of the preferred size of `component`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `component`: the Component to add
+        ///
+        /// - `min`: the minimum size
+        ///
+        /// - `pref`: the preferred size
+        ///
+        /// - `max`: the maximum size
+        ///
+        /// #### Returns
+        ///
+        /// this `SequentialGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if min, pref or max are
+        ///                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
         public ParallelGroup add(Component component, int min, int pref,
                                  int max) {
             return (ParallelGroup) addSpring(new ComponentSpring(
                     component, min, pref, max));
         }
 
-        /**
-         * Adds a rigid gap.
-         *
-         * @param pref the size of the gap
-         * @return this <code>ParallelGroup</code>
-         * @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
-         *                                  or the following is not meant min <= pref <= max.
-         */
+        /// Adds a rigid gap.
+        ///
+        /// #### Parameters
+        ///
+        /// - `pref`: the size of the gap
+        ///
+        /// #### Returns
+        ///
+        /// this `ParallelGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
+        ///                                  or the following is not meant min <= pref <= max.
         public ParallelGroup add(int pref) {
             return add(pref, pref, pref);
         }
 
-        /**
-         * Adds a gap with the specified size.
-         *
-         * @param min  the minimum size of the gap
-         * @param pref the preferred size of the gap
-         * @param max  the maximum size of the gap
-         * @return this <code>ParallelGroup</code>
-         * @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
-         *                                  or the following is not meant min <= pref <= max.
-         */
+        /// Adds a gap with the specified size.
+        ///
+        /// #### Parameters
+        ///
+        /// - `min`: the minimum size of the gap
+        ///
+        /// - `pref`: the preferred size of the gap
+        ///
+        /// - `max`: the maximum size of the gap
+        ///
+        /// #### Returns
+        ///
+        /// this `ParallelGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
+        ///                                  or the following is not meant min <= pref <= max.
         public ParallelGroup add(int min, int pref, int max) {
             return (ParallelGroup) addSpring(new GapSpring(min, pref, max));
         }
 
-        /**
-         * Adds the specified <code>Group</code> as a child of this group.
-         *
-         * @param alignment the alignment of the Group.
-         * @param group     the Group to add
-         * @return this <code>ParallelGroup</code>
-         * @throws IllegalArgumentException if alignment is not one of
-         *                                  <code>LEADING</code>, <code>TRAILING</code> or
-         *                                  <code>CENTER</code>
-         */
+        /// Adds the specified `Group` as a child of this group.
+        ///
+        /// #### Parameters
+        ///
+        /// - `alignment`: the alignment of the Group.
+        ///
+        /// - `group`: the Group to add
+        ///
+        /// #### Returns
+        ///
+        /// this `ParallelGroup`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if alignment is not one of
+        ///                                  `LEADING`, `TRAILING` or
+        ///                                  `CENTER`
         public ParallelGroup add(int alignment, Group group) {
             checkChildAlignment(alignment);
             group.setAlignment(alignment);
             return (ParallelGroup) addSpring(group);
         }
 
-        /**
-         * Adds the specified Component.  If the Component's min/max
-         * are different from its pref than the component will be resizable.
-         *
-         * @param alignment the alignment for the component
-         * @param component the Component to add
-         * @return this <code>Group</code>
-         * @throws IllegalArgumentException if alignment is not one of
-         *                                  <code>LEADING</code>, <code>TRAILING</code> or
-         *                                  <code>CENTER</code>
-         */
+        /// Adds the specified Component.  If the Component's min/max
+        /// are different from its pref than the component will be resizable.
+        ///
+        /// #### Parameters
+        ///
+        /// - `alignment`: the alignment for the component
+        ///
+        /// - `component`: the Component to add
+        ///
+        /// #### Returns
+        ///
+        /// this `Group`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if alignment is not one of
+        ///                                  `LEADING`, `TRAILING` or
+        ///                                  `CENTER`
         public ParallelGroup add(int alignment, Component component) {
             return add(alignment, component, DEFAULT_SIZE, DEFAULT_SIZE,
                     DEFAULT_SIZE);
         }
 
-        /**
-         * Adds the specified <code>Component</code>.  Min, pref and max
-         * can be absolute values, or they can be one of
-         * <code>DEFAULT_SIZE</code> or <code>PREFERRED_SIZE</code>.  For
-         * example, the following:
-         * <pre>
-         *   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
-         * </pre>
-         * Forces a max of 1000, with the min and preferred equalling that
-         * of the preferred size of <code>component</code>.
-         *
-         * @param alignment the alignment for the component.
-         * @param component the Component to add
-         * @param min       the minimum size
-         * @param pref      the preferred size
-         * @param max       the maximum size
-         * @return this <code>Group</code>
-         * @throws IllegalArgumentException if min, pref or max are
-         *                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
-         */
+        /// Adds the specified `Component`.  Min, pref and max
+        /// can be absolute values, or they can be one of
+        /// `DEFAULT_SIZE` or `PREFERRED_SIZE`.  For
+        /// example, the following:
+        ///
+        /// ```java
+        ///   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
+        /// ```
+        ///
+        /// Forces a max of 1000, with the min and preferred equalling that
+        /// of the preferred size of `component`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `alignment`: the alignment for the component.
+        ///
+        /// - `component`: the Component to add
+        ///
+        /// - `min`: the minimum size
+        ///
+        /// - `pref`: the preferred size
+        ///
+        /// - `max`: the maximum size
+        ///
+        /// #### Returns
+        ///
+        /// this `Group`
+        ///
+        /// #### Throws
+        ///
+        /// - `IllegalArgumentException`: @throws IllegalArgumentException if min, pref or max are
+        ///                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
         public ParallelGroup add(int alignment, Component component, int min,
                                  int pref, int max) {
             checkChildAlignment(alignment);
@@ -2462,10 +2657,8 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * An extension of <code>ParallelGroup</code> that aligns its
-     * constituent <code>Spring</code>s along the baseline.
-     */
+    /// An extension of `ParallelGroup` that aligns its
+    /// constituent `Spring`s along the baseline.
     private class BaselineGroup extends ParallelGroup {
         // Whether or not all child springs have a baseline
         private boolean allSpringsHaveBaseline;
@@ -2663,10 +2856,8 @@ public class GroupLayout extends Layout {
             return Math.max(nonBaselineMin, minAscent + minDescent);
         }
 
-        /**
-         * Lays out springs that have a baseline along the baseline.  All
-         * others are centered.
-         */
+        /// Lays out springs that have a baseline along the baseline.  All
+        /// others are centered.
         private void baselineLayout(int origin, int size) {
             int ascent;
             int descent;
@@ -2746,17 +2937,17 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * A Spring representing one axis of a Component.
-     * There are three ways to configure this:
-     * <ul>
-     * <li>Use the pref/min/max from the component
-     * <li>Use the pref from the component and fix the min to 0 or max
-     *     to a big number.
-     * <li>Force the min/max/pref to be a certain value.
-     * If the Component's size is to be linked to another components than
-     * the min/max/pref all come from the ComponentInfo.
-     */
+    /// A Spring representing one axis of a Component.
+    /// There are three ways to configure this:
+    ///
+    /// - Use the pref/min/max from the component
+    ///
+    /// - Use the pref from the component and fix the min to 0 or max
+    ///     to a big number.
+    ///
+    /// - Force the min/max/pref to be a certain value.
+    /// If the Component's size is to be linked to another components than
+    /// the min/max/pref all come from the ComponentInfo.
     private final class ComponentSpring extends Spring {
         // min/pref/max are either a value >= 0 or one of
         // DEFAULT_SIZE or PREFERRED_SIZE
@@ -2936,9 +3127,7 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Spring representing the preferred distance between two components.
-     */
+    /// Spring representing the preferred distance between two components.
     private final class PaddingSpring extends Spring {
         private final Component source;
         private final Component target;
@@ -2988,9 +3177,7 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Spring represented a certain amount of space.
-     */
+    /// Spring represented a certain amount of space.
     private final class GapSpring extends Spring {
         private final int min;
         private final int pref;
@@ -3030,12 +3217,10 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Spring reprensenting the distance between any number of sources and
-     * targets.  The targets and sources are computed during layout.  An
-     * instance of this can either be dynamically created when
-     * autocreatePadding is true, or explicitly created by the developer.
-     */
+    /// Spring reprensenting the distance between any number of sources and
+    /// targets.  The targets and sources are computed during layout.  An
+    /// instance of this can either be dynamically created when
+    /// autocreatePadding is true, or explicitly created by the developer.
     private class AutopaddingSpring extends Spring {
         private final int pref;
         private final int max;
@@ -3208,9 +3393,7 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * An extension of AutopaddingSpring used for container level padding.
-     */
+    /// An extension of AutopaddingSpring used for container level padding.
     private class ContainerAutopaddingSpring extends AutopaddingSpring {
         private ArrayList targets;
 
@@ -3308,11 +3491,9 @@ public class GroupLayout extends Layout {
         }
     }
 
-    /**
-     * Tracks the horizontal/vertical Springs for a Component.
-     * This class is also used to handle Springs that have their sizes
-     * linked.
-     */
+    /// Tracks the horizontal/vertical Springs for a Component.
+    /// This class is also used to handle Springs that have their sizes
+    /// linked.
     private final class ComponentInfo {
         ComponentSpring horizontalSpring;
         ComponentSpring verticalSpring;
@@ -3361,11 +3542,11 @@ public class GroupLayout extends Layout {
             return visible;
         }
 
-        /**
-         * Updates the cached visibility.
-         *
-         * @return true if the visibility changed
-         */
+        /// Updates the cached visibility.
+        ///
+        /// #### Returns
+        ///
+        /// true if the visibility changed
         boolean updateVisibility() {
             boolean honorsVisibility;
             if (this.honorsVisibility == null) {
@@ -3410,10 +3591,8 @@ public class GroupLayout extends Layout {
             }
         }
 
-        /**
-         * Returns true if this component has its size linked to
-         * other components.
-         */
+        /// Returns true if this component has its size linked to
+        /// other components.
         public boolean isLinked(int axis) {
             if (axis == HORIZONTAL) {
                 return horizontalMaster != null;

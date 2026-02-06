@@ -24,12 +24,13 @@ package com.codename1.ui.geom;
 
 import com.codename1.ui.Transform;
 
-/**
- * A utility class for expressing 2-D affine transforms in Codename One.
- *
- * @author shannah
- * @since 7.0
- */
+/// A utility class for expressing 2-D affine transforms in Codename One.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public class AffineTransform {
     private double m00;
     private double m10;
@@ -38,18 +39,16 @@ public class AffineTransform {
     private double m02;
     private double m12;
 
-    /**
-     * Creates identity transform.
-     */
+    /// Creates identity transform.
     public AffineTransform() {
         m00 = m11 = 1.0;
     }
 
-    /**
-     * Creates new affine transform as a copy of the given transform.
-     *
-     * @param atx Transform to copy.
-     */
+    /// Creates new affine transform as a copy of the given transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `atx`: Transform to copy.
     public AffineTransform(AffineTransform atx) {
         m00 = atx.m00;
         m10 = atx.m10;
@@ -61,16 +60,21 @@ public class AffineTransform {
 
     }
 
-    /**
-     * Creates a new AffineTransform.
-     *
-     * @param m00 the X coordinate scaling element of the 3x3 matrix
-     * @param m10 the Y coordinate shearing element of the 3x3 matrix
-     * @param m01 the X coordinate shearing element of the 3x3 matrix
-     * @param m11 the Y coordinate scaling element of the 3x3 matrix
-     * @param m02 the X coordinate translation element of the 3x3 matrix
-     * @param m12 the Y coordinate translation element of the 3x3 matrix
-     */
+    /// Creates a new AffineTransform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m00`: the X coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m10`: the Y coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m01`: the X coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m11`: the Y coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m02`: the X coordinate translation element of the 3x3 matrix
+    ///
+    /// - `m12`: the Y coordinate translation element of the 3x3 matrix
     public AffineTransform(float m00,
                            float m10,
                            float m01,
@@ -86,15 +90,15 @@ public class AffineTransform {
         check();
     }
 
-    /**
-     * Creates a new AffineTransform.
-     *
-     * @param m the float array containing the values to be set
-     *          in the new <code>AffineTransform</code> object. The length of the
-     *          array is assumed to be at least 4. If the length of the array is
-     *          less than 6, only the first 4 values are taken. If the length of
-     *          the array is greater than 6, the first 6 values are taken.
-     */
+    /// Creates a new AffineTransform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: @param m the float array containing the values to be set
+    ///          in the new `AffineTransform` object. The length of the
+    ///          array is assumed to be at least 4. If the length of the array is
+    ///          less than 6, only the first 4 values are taken. If the length of
+    ///          the array is greater than 6, the first 6 values are taken.
     public AffineTransform(float[] m) {
         int len = m.length;
         m00 = m[0];
@@ -108,16 +112,21 @@ public class AffineTransform {
         check();
     }
 
-    /**
-     * Creates a new AffineTransform.
-     *
-     * @param m00 the X coordinate scaling element of the 3x3 matrix
-     * @param m10 the Y coordinate shearing element of the 3x3 matrix
-     * @param m01 the X coordinate shearing element of the 3x3 matrix
-     * @param m11 the Y coordinate scaling element of the 3x3 matrix
-     * @param m02 the X coordinate translation element of the 3x3 matrix
-     * @param m12 the Y coordinate translation element of the 3x3 matrix
-     */
+    /// Creates a new AffineTransform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m00`: the X coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m10`: the Y coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m01`: the X coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m11`: the Y coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m02`: the X coordinate translation element of the 3x3 matrix
+    ///
+    /// - `m12`: the Y coordinate translation element of the 3x3 matrix
     public AffineTransform(
             double m00,
             double m10,
@@ -134,15 +143,15 @@ public class AffineTransform {
         check();
     }
 
-    /**
-     * Creates a new AffineTransform.
-     *
-     * @param m the double array containing the values to be set
-     *          in the new <code>AffineTransform</code> object. The length of the
-     *          array is assumed to be at least 4. If the length of the array is
-     *          less than 6, only the first 4 values are taken. If the length of
-     *          the array is greater than 6, the first 6 values are taken.
-     */
+    /// Creates a new AffineTransform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: @param m the double array containing the values to be set
+    ///          in the new `AffineTransform` object. The length of the
+    ///          array is assumed to be at least 4. If the length of the array is
+    ///          less than 6, only the first 4 values are taken. If the length of
+    ///          the array is greater than 6, the first 6 values are taken.
     public AffineTransform(double[] m) {
         int len = m.length;
         m00 = m[0];
@@ -156,26 +165,26 @@ public class AffineTransform {
         check();
     }
 
-    /**
-     * Gets a rotation transform
-     *
-     * @param theta Radian rotation angle.
-     * @return
-     */
+    /// Gets a rotation transform
+    ///
+    /// #### Parameters
+    ///
+    /// - `theta`: Radian rotation angle.
     public static AffineTransform getRotateInstance(double theta) {
         AffineTransform atx = new AffineTransform();
         atx.setToRotation(theta);
         return atx;
     }
 
-    /**
-     * Gets a rotation transform.
-     *
-     * @param theta   Radian rotation angle.
-     * @param anchorx Anchor point x-coord.
-     * @param anchory Anchor point y-coord.
-     * @return
-     */
+    /// Gets a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theta`: Radian rotation angle.
+    ///
+    /// - `anchorx`: Anchor point x-coord.
+    ///
+    /// - `anchory`: Anchor point y-coord.
     public static AffineTransform getRotateInstance(double theta,
                                                     double anchorx,
                                                     double anchory) {
@@ -191,12 +200,13 @@ public class AffineTransform {
 
     }
 
-    /**
-     * Sets transform to a scale transform.
-     *
-     * @param sx X-scale factor
-     * @param sy Y-scale factor
-     */
+    /// Sets transform to a scale transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sx`: X-scale factor
+    ///
+    /// - `sy`: Y-scale factor
     public void setToScale(double sx, double sy) {
 
         m00 = sx;
@@ -207,12 +217,13 @@ public class AffineTransform {
         m12 = 0.0;
     }
 
-    /**
-     * Sets transform to a shear transform.
-     *
-     * @param shx The shear-x
-     * @param shy The shear-y
-     */
+    /// Sets transform to a shear transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shx`: The shear-x
+    ///
+    /// - `shy`: The shear-y
     public void setToShear(double shx, double shy) {
         m00 = 1.0;
         m01 = shx;
@@ -223,12 +234,13 @@ public class AffineTransform {
 
     }
 
-    /**
-     * Sets transform to a rotation transform.
-     *
-     * @param vecx x-coordinate of rotation vector.
-     * @param vecy y-coordinate of rotation vector.
-     */
+    /// Sets transform to a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `vecx`: x-coordinate of rotation vector.
+    ///
+    /// - `vecy`: y-coordinate of rotation vector.
     public void setToRotation(double vecx, double vecy) {
         double sin;
         double cos;
@@ -259,14 +271,17 @@ public class AffineTransform {
         m12 = 0.0;
     }
 
-    /**
-     * Sets the transform to a rotation transform.
-     *
-     * @param vecx    x-coordinate of rotation vector.
-     * @param vecy    y-coordinate of rotation vector
-     * @param anchorx Anchor point x-coordinate
-     * @param anchory Anchor point y-coordinate
-     */
+    /// Sets the transform to a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `vecx`: x-coordinate of rotation vector.
+    ///
+    /// - `vecy`: y-coordinate of rotation vector
+    ///
+    /// - `anchorx`: Anchor point x-coordinate
+    ///
+    /// - `anchory`: Anchor point y-coordinate
     public void setToRotation(double vecx, double vecy,
                               double anchorx, double anchory) {
         setToRotation(vecx, vecy);
@@ -276,20 +291,19 @@ public class AffineTransform {
         m12 = anchory * oneMinusCos - anchorx * sin;
     }
 
-    /**
-     * Set to the identity matrix.
-     */
+    /// Set to the identity matrix.
     public void setToIdentity() {
         m00 = m11 = 1.0;
         m10 = m01 = m02 = m12 = 0.0;
     }
 
-    /**
-     * Sets transform to a translation transform.
-     *
-     * @param tx x-translation
-     * @param ty y-translation
-     */
+    /// Sets transform to a translation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tx`: x-translation
+    ///
+    /// - `ty`: y-translation
     public void setToTranslation(double tx, double ty) {
         m00 = 1.0;
         m10 = 0.0;
@@ -299,13 +313,15 @@ public class AffineTransform {
         m12 = ty;
     }
 
-    /**
-     * Sets to a rotation transform.
-     *
-     * @param theta   Radian rotation angle.
-     * @param anchorx Anchor point x-coord.
-     * @param anchory Anchor point y-coord.
-     */
+    /// Sets to a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theta`: Radian rotation angle.
+    ///
+    /// - `anchorx`: Anchor point x-coord.
+    ///
+    /// - `anchory`: Anchor point y-coord.
     public void setToRotation(double theta, double anchorx, double anchory) {
         setToRotation(theta);
         double sin = m10;
@@ -314,11 +330,11 @@ public class AffineTransform {
         m12 = anchory * oneMinusCos - anchorx * sin;
     }
 
-    /**
-     * Sets to a rotation transform.
-     *
-     * @param theta Rotation angle in radians.
-     */
+    /// Sets to a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theta`: Rotation angle in radians.
     public void setToRotation(double theta) {
         double sin = Math.sin(theta);
         double cos;
@@ -342,16 +358,21 @@ public class AffineTransform {
         m12 = 0.0;
     }
 
-    /**
-     * Sets the transform to the given double coords.
-     *
-     * @param m00 the X coordinate scaling element of the 3x3 matrix
-     * @param m10 the Y coordinate shearing element of the 3x3 matrix
-     * @param m01 the X coordinate shearing element of the 3x3 matrix
-     * @param m11 the Y coordinate scaling element of the 3x3 matrix
-     * @param m02 the X coordinate translation element of the 3x3 matrix
-     * @param m12 the Y coordinate translation element of the 3x3 matrix
-     */
+    /// Sets the transform to the given double coords.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m00`: the X coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m10`: the Y coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m01`: the X coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m11`: the Y coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m02`: the X coordinate translation element of the 3x3 matrix
+    ///
+    /// - `m12`: the Y coordinate translation element of the 3x3 matrix
     public void setTransform(double m00, double m10,
                              double m01, double m11,
                              double m02, double m12) {
@@ -364,11 +385,7 @@ public class AffineTransform {
 
     }
 
-    /**
-     * Converts the transform to a {@link Transform}
-     *
-     * @return
-     */
+    /// Converts the transform to a `Transform`
     public Transform toTransform() {
         return Transform.makeAffine(m00, m10, m01, m11, m02, m12);
     }

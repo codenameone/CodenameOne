@@ -26,12 +26,10 @@ import com.codename1.components.InteractionDialog;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
 
-/**
- * Central management for tooltips, this class can be derived/customized
- * to override the default tooltip behavior.
- *
- * @author Shai Almog
- */
+/// Central management for tooltips, this class can be derived/customized
+/// to override the default tooltip behavior.
+///
+/// @author Shai Almog
 public class TooltipManager {
     private static TooltipManager instance;
 
@@ -43,9 +41,7 @@ public class TooltipManager {
     private String dialogUIID = "TooltipDialog";
     private String textUIID = "Tooltip";
 
-    /**
-     * Default tooltip manager
-     */
+    /// Default tooltip manager
     protected TooltipManager() {
     }
 
@@ -53,25 +49,21 @@ public class TooltipManager {
         return instance;
     }
 
-    /**
-     * Enables the tooltip manager and default tooltip behavior
-     */
+    /// Enables the tooltip manager and default tooltip behavior
     public static void enableTooltips() {
         instance = new TooltipManager();
     }
 
-    /**
-     * Enables the tooltip manager with a custom subclass
-     *
-     * @param custom customized subclass of this class
-     */
+    /// Enables the tooltip manager with a custom subclass
+    ///
+    /// #### Parameters
+    ///
+    /// - `custom`: customized subclass of this class
     public static void enableTooltips(TooltipManager custom) {
         instance = custom;
     }
 
-    /**
-     * Invoked to dispose the current tooltip when the pointer moves
-     */
+    /// Invoked to dispose the current tooltip when the pointer moves
     protected void clearTooltip() {
         if (currentTooltip != null) {
             currentTooltip.dispose();
@@ -84,14 +76,15 @@ public class TooltipManager {
         currentComponent = null;
     }
 
-    /**
-     * Gets ready to show the tooltip, this method implements the delay
-     * before the actual showing of the tooltip. It's invoked internally
-     * by the framework
-     *
-     * @param tip the tooltip text
-     * @param cmp the component
-     */
+    /// Gets ready to show the tooltip, this method implements the delay
+    /// before the actual showing of the tooltip. It's invoked internally
+    /// by the framework
+    ///
+    /// #### Parameters
+    ///
+    /// - `tip`: the tooltip text
+    ///
+    /// - `cmp`: the component
     protected void prepareTooltip(final String tip, final Component cmp) {
         if (currentComponent == cmp) { //NOPMD CompareObjectsWithEquals
             return;
@@ -111,13 +104,14 @@ public class TooltipManager {
         }
     }
 
-    /**
-     * Shows the actual tooltip, this is invoked when the time for the tooltip
-     * elapses. It shows the tooltip UI immediately
-     *
-     * @param tip the tooltip text
-     * @param cmp the component
-     */
+    /// Shows the actual tooltip, this is invoked when the time for the tooltip
+    /// elapses. It shows the tooltip UI immediately
+    ///
+    /// #### Parameters
+    ///
+    /// - `tip`: the tooltip text
+    ///
+    /// - `cmp`: the component
     protected void showTooltip(final String tip, final Component cmp) {
         currentTooltip = new InteractionDialog(new BorderLayout());
 
@@ -134,58 +128,58 @@ public class TooltipManager {
         currentTooltip.showPopupDialog(cmp, true);
     }
 
-    /**
-     * The time in milliseconds between the pointer stopping and the showing
-     * of the tooltip
-     *
-     * @return the tooltipShowDelay
-     */
+    /// The time in milliseconds between the pointer stopping and the showing
+    /// of the tooltip
+    ///
+    /// #### Returns
+    ///
+    /// the tooltipShowDelay
     public int getTooltipShowDelay() {
         return tooltipShowDelay;
     }
 
-    /**
-     * The time in milliseconds between the pointer stopping and the showing
-     * of the tooltip
-     *
-     * @param tooltipShowDelay the tooltipShowDelay to set
-     */
+    /// The time in milliseconds between the pointer stopping and the showing
+    /// of the tooltip
+    ///
+    /// #### Parameters
+    ///
+    /// - `tooltipShowDelay`: the tooltipShowDelay to set
     public void setTooltipShowDelay(int tooltipShowDelay) {
         this.tooltipShowDelay = tooltipShowDelay;
     }
 
-    /**
-     * UIID of the tooltip dialog
-     *
-     * @return the dialogUIID
-     */
+    /// UIID of the tooltip dialog
+    ///
+    /// #### Returns
+    ///
+    /// the dialogUIID
     public String getDialogUIID() {
         return dialogUIID;
     }
 
-    /**
-     * UIID of the tooltip dialog
-     *
-     * @param dialogUIID the dialogUIID to set
-     */
+    /// UIID of the tooltip dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `dialogUIID`: the dialogUIID to set
     public void setDialogUIID(String dialogUIID) {
         this.dialogUIID = dialogUIID;
     }
 
-    /**
-     * UIID of the tooltip text body
-     *
-     * @return the textUIID
-     */
+    /// UIID of the tooltip text body
+    ///
+    /// #### Returns
+    ///
+    /// the textUIID
     public String getTextUIID() {
         return textUIID;
     }
 
-    /**
-     * UIID of the tooltip text body
-     *
-     * @param textUIID the textUIID to set
-     */
+    /// UIID of the tooltip text body
+    ///
+    /// #### Parameters
+    ///
+    /// - `textUIID`: the textUIID to set
     public void setTextUIID(String textUIID) {
         this.textUIID = textUIID;
     }

@@ -39,14 +39,12 @@ import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.util.ArrayList;
 
-/**
- * The Login abstract base class is used to simplify Oauth2 authentications
- * services.
- * Services can override the default Oauth2 web login and offers the native login
- * experience.
- *
- * @author Chen
- */
+/// The Login abstract base class is used to simplify Oauth2 authentications
+/// services.
+/// Services can override the default Oauth2 web login and offers the native login
+/// experience.
+///
+/// @author Chen
 public abstract class Login {
 
 
@@ -67,14 +65,23 @@ public abstract class Login {
     // So this needs to be explicitly enabled by the app.
     private boolean preferRedirectPrompt = false;
 
-    /**
-     * Adds the given scopes to the OAuth2 login request.
-     *
-     * @param scopes Scopes to add.
-     * @return Self for chaining.
-     * @see #setScope(java.lang.String)
-     * @since 7.0
-     */
+    /// Adds the given scopes to the OAuth2 login request.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scopes`: Scopes to add.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setScope(java.lang.String)
     public Login addScopes(String... scopes) {
         ArrayList<String> existing = new ArrayList<String>();
         if (scope != null) {
@@ -110,13 +117,16 @@ public abstract class Login {
         return this;
     }
 
-    /**
-     * Connects to the login service asynchronously, automatically logging in
-     * if not yet logged in.
-     *
-     * @return AsyncResource that can be monitored for completion.
-     * @since 7.0
-     */
+    /// Connects to the login service asynchronously, automatically logging in
+    /// if not yet logged in.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource that can be monitored for completion.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public AsyncResource<Login> connect() {
         final AsyncResource<Login> out = new AsyncResource<Login>();
         if (isUserLoggedIn()) {
@@ -137,12 +147,15 @@ public abstract class Login {
         return out;
     }
 
-    /**
-     * Initiates login using the given single-use callback.
-     *
-     * @param callback Callback to be called if login succeeds or fails.
-     * @since 7.0
-     */
+    /// Initiates login using the given single-use callback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: Callback to be called if login succeeds or fails.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void doLogin(LoginCallback callback) {
         if (callback != null) {
             loginCallbacksSingleUse.add(callback);
@@ -150,11 +163,9 @@ public abstract class Login {
         doLogin();
     }
 
-    /**
-     * Logs in the user.
-     * If the service has a native login it will try to use that, otherwise an
-     * Oauth2 web login will be used.
-     */
+    /// Logs in the user.
+    /// If the service has a native login it will try to use that, otherwise an
+    /// Oauth2 web login will be used.
     public void doLogin() {
         if (isNativeLoginSupported()) {
             nativelogin();
@@ -221,9 +232,7 @@ public abstract class Login {
 
     }
 
-    /**
-     * Logs out the current user
-     */
+    /// Logs out the current user
     public void doLogout() {
         if (isNativeLoginSupported()) {
             nativeLogout();
@@ -233,11 +242,11 @@ public abstract class Login {
         Preferences.delete(getClass().getName() + "Token");
     }
 
-    /**
-     * Indicates if the user is currently logged in
-     *
-     * @return true if logged in
-     */
+    /// Indicates if the user is currently logged in
+    ///
+    /// #### Returns
+    ///
+    /// true if logged in
     public boolean isUserLoggedIn() {
         if (isNativeLoginSupported()) {
             return nativeIsLoggedIn();
@@ -250,50 +259,46 @@ public abstract class Login {
         }
     }
 
-    /**
-     * Indicates if the user is currently logged in.
-     * Subclasses that uses a native sdk to login/logout should override this
-     * method.
-     *
-     * @return true if logged in
-     */
+    /// Indicates if the user is currently logged in.
+    /// Subclasses that uses a native sdk to login/logout should override this
+    /// method.
+    ///
+    /// #### Returns
+    ///
+    /// true if logged in
     public boolean nativeIsLoggedIn() {
         throw new RuntimeException("Native isLoggedIn not implemented");
     }
 
-    /**
-     * Logs in the current user natively.
-     * Subclasses that uses a native sdk to login/logout should override this
-     * method.
-     */
+    /// Logs in the current user natively.
+    /// Subclasses that uses a native sdk to login/logout should override this
+    /// method.
     public void nativelogin() {
         throw new RuntimeException("Native login not implemented");
     }
 
-    /**
-     * Logs out the current user natively.
-     * Subclasses that uses a native sdk to login/logout should override this
-     * method.
-     */
+    /// Logs out the current user natively.
+    /// Subclasses that uses a native sdk to login/logout should override this
+    /// method.
     public void nativeLogout() {
         throw new RuntimeException("Native logout not implemented");
     }
 
 
-    /**
-     * Returns true if this service supports native login.
-     * If implementation returns true here, the nativelogin, nativelogout,
-     * nativeIsLoggedIn should be implemented
-     *
-     * @return true if the service supports native login
-     */
+    /// Returns true if this service supports native login.
+    /// If implementation returns true here, the nativelogin, nativelogout,
+    /// nativeIsLoggedIn should be implemented
+    ///
+    /// #### Returns
+    ///
+    /// true if the service supports native login
     public abstract boolean isNativeLoginSupported();
 
-    /**
-     * The AccessToken of this service
-     *
-     * @return the token
-     */
+    /// The AccessToken of this service
+    ///
+    /// #### Returns
+    ///
+    /// the token
     public AccessToken getAccessToken() {
         if (token == null) {
             Util.register(new AccessToken());
@@ -302,9 +307,7 @@ public abstract class Login {
         return token;
     }
 
-    /**
-     * Sets the Login access token
-     */
+    /// Sets the Login access token
     public void setAccessToken(AccessToken token) {
         if (!Objects.equals(token, this.token)) {
             this.token = token;
@@ -312,12 +315,10 @@ public abstract class Login {
         }
     }
 
-    /**
-     * This method tries to validate the last access token if exists, if the
-     * last token is not valid anymore it will try to login the user in order to
-     * get a fresh token
-     * The method blocks until a valid token has been granted
-     */
+    /// This method tries to validate the last access token if exists, if the
+    /// last token is not valid anymore it will try to login the user in order to
+    /// get a fresh token
+    /// The method blocks until a valid token has been granted
     public void validateToken() throws IOException {
 
         String token = Preferences.get(getClass().getName() + "Token", null);
@@ -355,101 +356,106 @@ public abstract class Login {
         }
     }
 
-    /**
-     * Returns true if the previous granted access token is still valid otherwise
-     * false.
-     *
-     * @param token the access token to check
-     * @return true of the token is valid
-     */
+    /// Returns true if the previous granted access token is still valid otherwise
+    /// false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the access token to check
+    ///
+    /// #### Returns
+    ///
+    /// true of the token is valid
     protected abstract boolean validateToken(String token);
 
-    /**
-     * Sets the login callback that will receive event callback notification
-     * from the API
-     *
-     * @param lc the login callback or null to remove the existing login
-     *           callback
-     */
+    /// Sets the login callback that will receive event callback notification
+    /// from the API
+    ///
+    /// #### Parameters
+    ///
+    /// - `lc`: @param lc the login callback or null to remove the existing login
+    ///           callback
     public void setCallback(LoginCallback lc) {
         loginCallback = lc;
     }
 
 
-    /**
-     * The client id (appid) which asks to connect
-     *
-     * @param clientId
-     */
+    /// The client id (appid) which asks to connect
+    ///
+    /// #### Parameters
+    ///
+    /// - `clientId`
     public void setClientId(String id) {
         clientId = id;
     }
 
-    /**
-     * The client secret
-     *
-     * @param clientSecret
-     */
+    /// The client secret
+    ///
+    /// #### Parameters
+    ///
+    /// - `clientSecret`
     public void setClientSecret(String secret) {
         clientSecret = secret;
     }
 
-    /**
-     * The redirect URI
-     *
-     * @param redirectURI
-     */
+    /// The redirect URI
+    ///
+    /// #### Parameters
+    ///
+    /// - `redirectURI`
     public void setRedirectURI(String redirectURI) {
         this.redirectURI = redirectURI;
     }
 
-    /**
-     * The authentication scope
-     */
+    /// The authentication scope
     public void setScope(String scope) {
         this.scope = scope;
     }
 
-    /**
-     * The oauth2 URL
-     */
+    /// The oauth2 URL
     public void setOauth2URL(String oauth2URL) {
         this.oauth2URL = oauth2URL;
     }
 
-    /**
-     * Creates the oauth2 to be used to login in case no native login is available
-     * for this service.
-     *
-     * @return the Oauth2 to be used to login if no native login available and
-     * on the simulator
-     */
+    /// Creates the oauth2 to be used to login in case no native login is available
+    /// for this service.
+    ///
+    /// #### Returns
+    ///
+    /// @return the Oauth2 to be used to login if no native login available and
+    /// on the simulator
     protected Oauth2 createOauth2() {
         return new Oauth2(oauth2URL, clientId, redirectURI, scope);
     }
 
-    /**
-     * A flag used by the javascript port to indicate that the login will use a redirect
-     * for the prompt instead of a popup.   On the web, a redirect is usually better UX
-     * but it can be problematic since it involves leaving the app, and reloading it
-     * after the login.
-     *
-     * @return the preferRedirectPrompt
-     * @since 7.0
-     */
+    /// A flag used by the javascript port to indicate that the login will use a redirect
+    /// for the prompt instead of a popup.   On the web, a redirect is usually better UX
+    /// but it can be problematic since it involves leaving the app, and reloading it
+    /// after the login.
+    ///
+    /// #### Returns
+    ///
+    /// the preferRedirectPrompt
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public boolean isPreferRedirectPrompt() {
         return preferRedirectPrompt;
     }
 
-    /**
-     * A flag used by the javascript port to indicate that the login will use a redirect
-     * for the prompt instead of a popup.   On the web, a redirect is usually better UX
-     * but it can be problematic since it involves leaving the app, and reloading it
-     * after the login.
-     *
-     * @param preferRedirectPrompt the preferRedirectPrompt to set
-     * @since 7.0
-     */
+    /// A flag used by the javascript port to indicate that the login will use a redirect
+    /// for the prompt instead of a popup.   On the web, a redirect is usually better UX
+    /// but it can be problematic since it involves leaving the app, and reloading it
+    /// after the login.
+    ///
+    /// #### Parameters
+    ///
+    /// - `preferRedirectPrompt`: the preferRedirectPrompt to set
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setPreferRedirectPrompt(boolean preferRedirectPrompt) {
         this.preferRedirectPrompt = preferRedirectPrompt;
     }

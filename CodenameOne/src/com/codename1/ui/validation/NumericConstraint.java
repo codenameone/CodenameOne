@@ -22,25 +22,26 @@
  */
 package com.codename1.ui.validation;
 
-/**
- * Forces the value to be a number potentially within specific bounds
- *
- * @author Shai Almog
- */
+/// Forces the value to be a number potentially within specific bounds
+///
+/// @author Shai Almog
 public class NumericConstraint implements Constraint {
     private final boolean dec;
     private final double minimum;
     private final double maximum;
     private final String errorMessage;
 
-    /**
-     * Creates a new numeric constraint
-     *
-     * @param dec          whether the number is decimal or integer, true for decimal
-     * @param minimum      the minimal value to a number or Double.NaN for no minimum value
-     * @param maximum      the maximum value to a number or Double.NaN for no minimum value
-     * @param errorMessage the default error message if the constraint fails
-     */
+    /// Creates a new numeric constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `dec`: whether the number is decimal or integer, true for decimal
+    ///
+    /// - `minimum`: the minimal value to a number or Double.NaN for no minimum value
+    ///
+    /// - `maximum`: the maximum value to a number or Double.NaN for no minimum value
+    ///
+    /// - `errorMessage`: the default error message if the constraint fails
     public NumericConstraint(boolean dec, double minimum, double maximum, String errorMessage) {
         this.dec = dec;
         this.minimum = minimum;
@@ -49,18 +50,16 @@ public class NumericConstraint implements Constraint {
     }
 
 
-    /**
-     * Creates a new numeric constraint
-     *
-     * @param dec whether the number is decimal or integer, true for decimal
-     */
+    /// Creates a new numeric constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `dec`: whether the number is decimal or integer, true for decimal
     public NumericConstraint(boolean dec) {
         this(dec, Integer.MIN_VALUE, Integer.MAX_VALUE, null);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isValid(Object value) {
         if (value != null) {
@@ -95,9 +94,7 @@ public class NumericConstraint implements Constraint {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getDefaultFailMessage() {
         if (errorMessage == null) {

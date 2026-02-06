@@ -17,23 +17,17 @@
 
 package com.codename1.util;
 
-/**
- * Static library that provides {@link TBigInteger} base conversion from/to any
- * integer represented in an {@link java.lang.String} Object.
- */
+/// Static library that provides `TBigInteger` base conversion from/to any
+/// integer represented in an `java.lang.String` Object.
 final class TConversion {
 
-    /**
-     * Holds the maximal exponent for each radix, so that radix<sup>digitFitInInt[radix]</sup>
-     * fit in an {@code int} (32 bits).
-     */
+    /// Holds the maximal exponent for each radix, so that radixdigitFitInInt[radix]
+    /// fit in an `int` (32 bits).
     static final int[] digitFitInInt = {-1, -1, 31, 19, 15, 13, 11, 11, 10, 9, 9, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7,
             7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5};
-    /**
-     * bigRadices values are precomputed maximal powers of radices (integer
-     * numbers from 2 to 36) that fit into unsigned int (32 bits). bigRadices[0] =
-     * 2 ^ 31, bigRadices[8] = 10 ^ 9, etc.
-     */
+    /// bigRadices values are precomputed maximal powers of radices (integer
+    /// numbers from 2 to 36) that fit into unsigned int (32 bits). bigRadices[0] =
+    /// 2 ^ 31, bigRadices[8] = 10 ^ 9, etc.
 
     static final int[] bigRadices = {-2147483648, 1162261467, 1073741824, 1220703125, 362797056, 1977326743,
             1073741824, 387420489, 1000000000, 214358881, 429981696, 815730721, 1475789056, 170859375, 268435456,
@@ -41,15 +35,13 @@ final class TConversion {
             308915776, 387420489, 481890304, 594823321, 729000000, 887503681, 1073741824, 1291467969, 1544804416,
             1838265625, 60466176};
 
-    /**
-     * Just to denote that this class can't be instantiated
-     */
+    /// Just to denote that this class can't be instantiated
     private TConversion() {
     }
 
-    /**
-     * @see TBigInteger#toString(int)
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#toString(int)
     static String bigInteger2String(TBigInteger val, int radix) {
         int sign = val.sign;
         int numberLength = val.numberLength;
@@ -121,13 +113,14 @@ final class TConversion {
         return new String(result, currentChar, resLengthInChars - currentChar);
     }
 
-    /**
-     * Builds the correspondent {@code String} representation of {@code val}
-     * being scaled by {@code scale}.
-     *
-     * @see TBigInteger#toString()
-     * @see TBigDecimal#toString()
-     */
+    /// Builds the correspondent `String` representation of `val`
+    /// being scaled by `scale`.
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#toString()
+    ///
+    /// - TBigDecimal#toString()
     static String toDecimalScaledString(TBigInteger val, int scale) {
         int sign = val.sign;
         int numberLength = val.numberLength;
@@ -409,9 +402,9 @@ final class TConversion {
         return (rem << 32) | (quot & 0xFFFFFFFFL);
     }
 
-    /**
-     * @see TBigInteger#doubleValue()
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#doubleValue()
     static double bigInteger2Double(TBigInteger val) {
         // val.bitLength() < 64
         if ((val.numberLength < 2) || ((val.numberLength == 2) && (val.digits[1] > 0))) {

@@ -25,13 +25,14 @@ package com.codename1.plugin;
 import com.codename1.plugin.event.PluginEvent;
 import com.codename1.ui.events.ActionListener;
 
-/**
- * Interface that must be implemented by Codename One plugins.  Plugins can be registered with the CodenameOne
- * runtime via {@link PluginSupport#registerPlugin(Plugin)}.  Thereafter it will be given an opportunity to
- * override core functionality by processing plugin events that it is interested in.
- *
- * @author Steve Hannah
- * @since 8.0
- */
+/// Interface that must be implemented by Codename One plugins.  Plugins can be registered with the CodenameOne
+/// runtime via `PluginSupport#registerPlugin(Plugin)`.  Thereafter it will be given an opportunity to
+/// override core functionality by processing plugin events that it is interested in.
+///
+/// @author Steve Hannah
+///
+/// #### Since
+///
+/// 8.0
 public interface Plugin extends ActionListener<PluginEvent> {
 }

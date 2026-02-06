@@ -22,33 +22,37 @@
  */
 package com.codename1.ui.events;
 
-/**
- * <b>Important: Calls to this interface are always performed on a separate
- * thread from the EDT! They are performed on the native webkit rendering
- * thread or native event dispatch thread, this interface MUST NEVER block
- * or synchronize against the EDT which WILL lead to deadlocks. </b><br>
- * This interface can be used to bind functionality to URL navigation
- * which is a very portable way to invoke Java functionality from the
- * JavaScript side of things.<br>
- * This interface should be applied to the BrowserComponent or WebBrowser
- * class.
- *
- * @author shannah
- */
+/// **Important: Calls to this interface are always performed on a separate
+/// thread from the EDT! They are performed on the native webkit rendering
+/// thread or native event dispatch thread, this interface MUST NEVER block
+/// or synchronize against the EDT which WILL lead to deadlocks. **
+///
+/// This interface can be used to bind functionality to URL navigation
+/// which is a very portable way to invoke Java functionality from the
+/// JavaScript side of things.
+///
+/// This interface should be applied to the BrowserComponent or WebBrowser
+/// class.
+///
+/// @author shannah
 public interface BrowserNavigationCallback {
-    /**
-     * <b>Important: Calls to this interface are always performed on a separate
-     * thread from the EDT! They are performed on the native webkit rendering
-     * thread or native event dispatch thread, this interface MUST NEVER block
-     * or synchronize against the EDT which WILL lead to deadlocks. </b><br>
-     * This method can be used to bind functionality to URL navigation
-     * which is a very portable way to invoke Java functionality from the
-     * JavaScript side of things. The method should return true if navigation
-     * should occur otherwise it can return false and do any processing it
-     * desires with the requested URL.
-     *
-     * @param url the URL requested
-     * @return true to navigate to the given URL, false to ignore it.
-     */
+    /// **Important: Calls to this interface are always performed on a separate
+    /// thread from the EDT! They are performed on the native webkit rendering
+    /// thread or native event dispatch thread, this interface MUST NEVER block
+    /// or synchronize against the EDT which WILL lead to deadlocks. **
+    ///
+    /// This method can be used to bind functionality to URL navigation
+    /// which is a very portable way to invoke Java functionality from the
+    /// JavaScript side of things. The method should return true if navigation
+    /// should occur otherwise it can return false and do any processing it
+    /// desires with the requested URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL requested
+    ///
+    /// #### Returns
+    ///
+    /// true to navigate to the given URL, false to ignore it.
     boolean shouldNavigate(String url);
 }

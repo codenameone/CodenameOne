@@ -35,31 +35,41 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
-/**
- * <p>The {@code Accordion} ui pattern is a vertically stacked list of items.
- * Each item can be opened/closed to reveal more content similarly to a {@link com.codename1.ui.tree.Tree}
- * however unlike the {@link com.codename1.ui.tree.Tree} the {@code Accordion} is designed to include
- * containers or arbitrary components rather than model based data.</p>
- * <p>
- * This makes the {@code Accordion} more convenient as a tool for folding/collapsing UI elements known in advance
- * whereas a {@link com.codename1.ui.tree.Tree} makes more sense as a tool to map data e.g. filesystem
- * structure, XML hierarchy etc.
- * </p>
- * <p>
- * Note that the {@code Accordion} like many composite components in Codename One is scrollable by default
- * which means you should use it within a non-scrollable hierarchy. If you wish to add it into a scrollable
- * {@link com.codename1.ui.Container} you should disable it's default scrollability using {@code setScrollable(false)}.
- * </p>
- *
- * <h3>Example Usage</h3>
- *
- * <script src="https://gist.github.com/codenameone/2b48d1650d8c5032d094066c79922cf1.js"></script>
- *
- * <h3>Screenshots</h3>
- * <p><img src="https://www.codenameone.com/img/developer-guide/components-accordion.png" alt="Accordion Component"/></p>
- *
- * @author Chen
- */
+/// The `Accordion` ui pattern is a vertically stacked list of items.
+/// Each item can be opened/closed to reveal more content similarly to a `com.codename1.ui.tree.Tree`
+/// however unlike the `com.codename1.ui.tree.Tree` the `Accordion` is designed to include
+/// containers or arbitrary components rather than model based data.
+///
+/// This makes the `Accordion` more convenient as a tool for folding/collapsing UI elements known in advance
+/// whereas a `com.codename1.ui.tree.Tree` makes more sense as a tool to map data e.g. filesystem
+/// structure, XML hierarchy etc.
+///
+/// Note that the `Accordion` like many composite components in Codename One is scrollable by default
+/// which means you should use it within a non-scrollable hierarchy. If you wish to add it into a scrollable
+/// `com.codename1.ui.Container` you should disable it's default scrollability using `setScrollable(false)`.
+///
+/// Example Usage
+///
+/// ```java
+/// Form f = new Form("Accordion", new BorderLayout());
+/// Accordion accr = new Accordion();
+/// accr.addContent("Item1", new SpanLabel("The quick brown fox jumps over the lazy dog\n"
+///         + "The quick brown fox jumps over the lazy dog"));
+/// accr.addContent("Item2", new SpanLabel("The quick brown fox jumps over the lazy dog\n"
+///         + "The quick brown fox jumps over the lazy dog\n "
+///         + "The quick brown fox jumps over the lazy dog\n "
+///         + "The quick brown fox jumps over the lazy dog\n "
+///         + ""));
+///
+/// accr.addContent("Item3", BoxLayout.encloseY(new Label("Label"), new TextField(), new Button("Button"), new CheckBox("CheckBox")));
+///
+/// f.add(BorderLayout.CENTER, accr);
+/// f.show();
+/// ```
+///
+/// Screenshots
+///
+/// @author Chen
 public class Accordion extends Container {
 
     private final EventDispatcher listeners = new EventDispatcher();
@@ -70,9 +80,7 @@ public class Accordion extends Container {
     private String uiidHeader = "AccordionArrow";
     private String uiidOpenCloseIcon = "AccordionArrow";
 
-    /**
-     * Empty Constructor
-     */
+    /// Empty Constructor
     public Accordion() {
         super.setLayout(BoxLayout.y());
 
@@ -84,12 +92,13 @@ public class Accordion extends Container {
         super.setScrollableY(true);
     }
 
-    /**
-     * Create an accordion with open and close icons set
-     *
-     * @param openIcon  the open icon of the accordion
-     * @param closeIcon the close icon of the accordion
-     */
+    /// Create an accordion with open and close icons set
+    ///
+    /// #### Parameters
+    ///
+    /// - `openIcon`: the open icon of the accordion
+    ///
+    /// - `closeIcon`: the close icon of the accordion
     public Accordion(Image openIcon, Image closeIcon) {
         super.setLayout(BoxLayout.y());
         this.closeIcon = openIcon;
@@ -97,12 +106,13 @@ public class Accordion extends Container {
         setScrollableY(true);
     }
 
-    /**
-     * Create an accordion with open and close icons set
-     *
-     * @param openIcon  the open icon of the accordion
-     * @param closeIcon the close icon of the accordion
-     */
+    /// Create an accordion with open and close icons set
+    ///
+    /// #### Parameters
+    ///
+    /// - `openIcon`: the open icon of the accordion
+    ///
+    /// - `closeIcon`: the close icon of the accordion
     public Accordion(char openIcon, char closeIcon) {
         super.setLayout(BoxLayout.y());
         this.closeIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
@@ -110,13 +120,15 @@ public class Accordion extends Container {
         setScrollableY(true);
     }
 
-    /**
-     * Create an accordion with open and close icons set
-     *
-     * @param openIcon      the open icon of the accordion
-     * @param closeIcon     the close icon of the accordion
-     * @param openCloseUIID the uiid of the open and close icons
-     */
+    /// Create an accordion with open and close icons set
+    ///
+    /// #### Parameters
+    ///
+    /// - `openIcon`: the open icon of the accordion
+    ///
+    /// - `closeIcon`: the close icon of the accordion
+    ///
+    /// - `openCloseUIID`: the uiid of the open and close icons
     public Accordion(char openIcon, char closeIcon, String openCloseUIID) {
         super.setLayout(BoxLayout.y());
         this.uiidOpenCloseIcon = openCloseUIID;
@@ -125,66 +137,71 @@ public class Accordion extends Container {
         setScrollableY(true);
     }
 
-    /**
-     * Add an item to the Accordion Container
-     *
-     * @param header the item title
-     * @param body   the item Component to hide/show
-     */
+    /// Add an item to the Accordion Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `header`: the item title
+    ///
+    /// - `body`: the item Component to hide/show
     public void addContent(String header, Component body) {
         addContent(new Label(header, uiidHeader), body);
     }
 
-    /**
-     * Replaces the title for content that was already added. Notice that this will fail if the content isn't
-     * in yet.
-     *
-     * @param header the new title for the content
-     * @param body   the content that was already added with a different header using addContent
-     */
+    /// Replaces the title for content that was already added. Notice that this will fail if the content isn't
+    /// in yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `header`: the new title for the content
+    ///
+    /// - `body`: the content that was already added with a different header using addContent
     public void setHeader(String header, Component body) {
         AccordionContent ac = (AccordionContent) body.getParent();
         ((Label) ac.header).setText(header);
     }
 
-    /**
-     * Replaces the title for content that was already added. Notice that this will fail if the content isn't
-     * in yet.
-     *
-     * @param header the new title for the content
-     * @param body   the content that was already added with a different header using addContent
-     */
+    /// Replaces the title for content that was already added. Notice that this will fail if the content isn't
+    /// in yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `header`: the new title for the content
+    ///
+    /// - `body`: the content that was already added with a different header using addContent
     public void setHeader(Component header, Component body) {
         AccordionContent ac = (AccordionContent) body.getParent();
         ac.header.getParent().replace(ac.header, header, null);
     }
 
-    /**
-     * Removes the content from the accordion
-     *
-     * @param body the body previously added with {@link #addContent(com.codename1.ui.Component, com.codename1.ui.Component)} or
-     */
+    /// Removes the content from the accordion
+    ///
+    /// #### Parameters
+    ///
+    /// - `body`: the body previously added with `com.codename1.ui.Component)` or
     public void removeContent(Component body) {
         body.getParent().remove();
         body.remove();
     }
 
-    /**
-     * Add an item to the Accordion Container
-     *
-     * @param header the item title Component
-     * @param body   the item Component to hide/show
-     */
+    /// Add an item to the Accordion Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `header`: the item title Component
+    ///
+    /// - `body`: the item Component to hide/show
     public void addContent(Component header, Component body) {
         add(new AccordionContent(header, body));
     }
 
-    /**
-     * Sets the header UIID for the given accordion uiid
-     *
-     * @param body the component within the accordion
-     * @param uiid the uiid for the header
-     */
+    /// Sets the header UIID for the given accordion uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `body`: the component within the accordion
+    ///
+    /// - `uiid`: the uiid for the header
     public void setHeaderUIID(Component body, String uiid) {
         AccordionContent ac = (AccordionContent) body.getParent();
         if (ac == null) {
@@ -198,11 +215,11 @@ public class Accordion extends Container {
         }
     }
 
-    /**
-     * Returns the body component of the currently expanded accordion element or null if none is expanded
-     *
-     * @return a component
-     */
+    /// Returns the body component of the currently expanded accordion element or null if none is expanded
+    ///
+    /// #### Returns
+    ///
+    /// a component
     public Component getCurrentlyExpanded() {
         for (Component cc : this) {
             AccordionContent c = (AccordionContent) cc;
@@ -213,11 +230,11 @@ public class Accordion extends Container {
         return null;
     }
 
-    /**
-     * Expands the accordion with the given "body"
-     *
-     * @param body the body component of the accordion to expand
-     */
+    /// Expands the accordion with the given "body"
+    ///
+    /// #### Parameters
+    ///
+    /// - `body`: the body component of the accordion to expand
     public void expand(Component body) {
         if (autoClose) {
             for (Component cc : this) {
@@ -234,11 +251,11 @@ public class Accordion extends Container {
         }
     }
 
-    /**
-     * Closes the accordion with the given "body"
-     *
-     * @param body the body component of the accordion to close
-     */
+    /// Closes the accordion with the given "body"
+    ///
+    /// #### Parameters
+    ///
+    /// - `body`: the body component of the accordion to close
     public void collapse(Component body) {
         for (Component cc : this) {
             AccordionContent c = (AccordionContent) cc;
@@ -248,106 +265,110 @@ public class Accordion extends Container {
         }
     }
 
-    /**
-     * Sets the closed icon
-     *
-     * @param closeIcon the close icon
-     */
+    /// Sets the closed icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `closeIcon`: the close icon
     public void setCloseIcon(Image closeIcon) {
         this.closeIcon = closeIcon;
     }
 
-    /**
-     * Sets the open icon
-     *
-     * @param openIcon the open icon
-     */
+    /// Sets the open icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `openIcon`: the open icon
     public void setOpenIcon(Image openIcon) {
         this.openIcon = openIcon;
     }
 
-    /**
-     * Sets the closed icon using material image
-     *
-     * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
-     */
+    /// Sets the closed icon using material image
+    ///
+    /// #### Parameters
+    ///
+    /// - `closeIcon`: the close icon (e.g. `FontImage.MATERIAL_KEYBOARD_ARROW_DOWN`)
     public void setCloseIcon(char closeIcon) {
         this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
     }
 
-    /**
-     * Sets the open icon using material image
-     *
-     * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
-     */
+    /// Sets the open icon using material image
+    ///
+    /// #### Parameters
+    ///
+    /// - `openIcon`: the open icon (e.g. `FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT`)
     public void setOpenIcon(char openIcon) {
         this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
     }
 
-    /**
-     * Sets the closed icon using material image
-     *
-     * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
-     * @param size      the size in millimeters for the arrow
-     */
+    /// Sets the closed icon using material image
+    ///
+    /// #### Parameters
+    ///
+    /// - `closeIcon`: the close icon (e.g. `FontImage.MATERIAL_KEYBOARD_ARROW_DOWN`)
+    ///
+    /// - `size`: the size in millimeters for the arrow
     public void setCloseIcon(char closeIcon, float size) {
         this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon), size);
     }
 
-    /**
-     * Sets the open icon using material image
-     *
-     * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
-     * @param size     the size in millimeters for the arrow
-     */
+    /// Sets the open icon using material image
+    ///
+    /// #### Parameters
+    ///
+    /// - `openIcon`: the open icon (e.g. `FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT`)
+    ///
+    /// - `size`: the size in millimeters for the arrow
     public void setOpenIcon(char openIcon, float size) {
         this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon), size);
     }
 
-    /**
-     * Sets the closed icon using material image with a custom uiid
-     *
-     * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
-     * @param uiid      to custom icon from res file
-     */
+    /// Sets the closed icon using material image with a custom uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `closeIcon`: the close icon (e.g. `FontImage.MATERIAL_KEYBOARD_ARROW_DOWN`)
+    ///
+    /// - `uiid`: to custom icon from res file
     public void setCloseIcon(char closeIcon, String uiid) {
         this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiid));
     }
 
-    /**
-     * Sets the open icon using material image with a custom uiid
-     *
-     * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
-     * @param uiid     to custom icon from res file
-     */
+    /// Sets the open icon using material image with a custom uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `openIcon`: the open icon (e.g. `FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT`)
+    ///
+    /// - `uiid`: to custom icon from res file
     public void setOpenIcon(char openIcon, String uiid) {
         this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiid));
     }
 
-    /**
-     * Sets the auto close flag, if this flag is true clicking on an item to open
-     * an item will automatically close the previous opened item.
-     *
-     * @param autoClose determines if more then 1 item can be opened on screen
-     */
+    /// Sets the auto close flag, if this flag is true clicking on an item to open
+    /// an item will automatically close the previous opened item.
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoClose`: determines if more then 1 item can be opened on screen
     public void setAutoClose(boolean autoClose) {
         this.autoClose = autoClose;
     }
 
-    /**
-     * To listen item click in accordion component
-     *
-     * @param a ActionListener to implement the method
-     */
+    /// To listen item click in accordion component
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: ActionListener to implement the method
     public void addOnClickItemListener(ActionListener a) {
         listeners.addListener(a);
     }
 
-    /**
-     * To remove item click in accordion component
-     *
-     * @param a ActionListener to implement the method
-     */
+    /// To remove item click in accordion component
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: ActionListener to implement the method
     public void removeOnClickItemListener(ActionListener a) {
         listeners.removeListener(a);
     }
@@ -356,56 +377,54 @@ public class Accordion extends Container {
         listeners.fireActionEvent(ev);
     }
 
-    /**
-     * Default UIID for the content item within the accordion
-     *
-     * @return the uiid
-     */
+    /// Default UIID for the content item within the accordion
+    ///
+    /// #### Returns
+    ///
+    /// the uiid
     public String getBackgroundItemUIID() {
         return uiidBackGroundItem;
     }
 
-    /**
-     * Default UIID for the content item within the accordion
-     *
-     * @param uiidBackGroundItem to custom the background in the accordion component
-     */
+    /// Default UIID for the content item within the accordion
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiidBackGroundItem`: to custom the background in the accordion component
     public void setBackgroundItemUIID(String uiidBackGroundItem) {
         this.uiidBackGroundItem = uiidBackGroundItem;
     }
 
-    /**
-     * UIID for the header component
-     *
-     * @retrun the uiid
-     */
+    /// UIID for the header component
+    ///
+    /// @retrun the uiid
     public String getHeaderUIID() {
         return uiidHeader;
     }
 
-    /**
-     * UIID for the header component
-     *
-     * @param uiidHeader to custom the header in the accordion component
-     */
+    /// UIID for the header component
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiidHeader`: to custom the header in the accordion component
     public void setHeaderUIID(String uiidHeader) {
         this.uiidHeader = uiidHeader;
     }
 
-    /**
-     * UIID for the arrow icon for expanding/collapsing
-     *
-     * @return the UIID
-     */
+    /// UIID for the arrow icon for expanding/collapsing
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
     public String getOpenCloseIconUIID() {
         return uiidOpenCloseIcon;
     }
 
-    /**
-     * UIID for the arrow icon for expanding/collapsing
-     *
-     * @param uiidOpenCloseIcon to custom the background of the Open/Close icon
-     */
+    /// UIID for the arrow icon for expanding/collapsing
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiidOpenCloseIcon`: to custom the background of the Open/Close icon
     public void setOpenCloseIconUIID(String uiidOpenCloseIcon) {
         this.uiidOpenCloseIcon = uiidOpenCloseIcon;
     }

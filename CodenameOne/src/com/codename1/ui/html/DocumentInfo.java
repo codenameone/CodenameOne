@@ -23,38 +23,26 @@
  */
 package com.codename1.ui.html;
 
-/**
- * DocumentInfo holds important information about a document that is loading.
- * This class is constructed internally by HTMLComponent and HTMLForm and is sent to the RequestHandler.
- * It is intended for the RequestHandler to use and update (For example update encoding according to the HTTP response, update URL in case of a redirect etc.)
- *
- * @author Ofir Leitner
- */
+/// DocumentInfo holds important information about a document that is loading.
+/// This class is constructed internally by HTMLComponent and HTMLForm and is sent to the RequestHandler.
+/// It is intended for the RequestHandler to use and update (For example update encoding according to the HTTP response, update URL in case of a redirect etc.)
+///
+/// @author Ofir Leitner
 public class DocumentInfo {
 
-    /**
-     * ISO-8859-1 encoding, the default one
-     */
+    /// ISO-8859-1 encoding, the default one
     public final static String ENCODING_ISO = "ISO-8859-1";
 
-    /**
-     * UTF8 encoding, very common
-     */
+    /// UTF8 encoding, very common
     public final static String ENCODING_UTF8 = "UTF-8";
 
-    /**
-     * Indicates that the request is for a page
-     */
+    /// Indicates that the request is for a page
     public static final int TYPE_HTML = 0;
 
-    /**
-     * Indicates that the request is for an image
-     */
+    /// Indicates that the request is for an image
     public static final int TYPE_IMAGE = 1;
 
-    /**
-     * Indicates that the request is for a CSS file
-     */
+    /// Indicates that the request is for a CSS file
     public static final int TYPE_CSS = 2;
 
     private static String DEFAULT_ENCODING = ENCODING_ISO;
@@ -69,71 +57,76 @@ public class DocumentInfo {
     private String encoding = DEFAULT_ENCODING;
     private int expectedContentType = TYPE_HTML;
 
-    /**
-     * Constructs the DocumentInfo with the given URL
-     *
-     * @param url The URL of the document
-     */
+    /// Constructs the DocumentInfo with the given URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL of the document
     DocumentInfo(String url) {
         setUrl(url);
     }
 
-    /**
-     * Constructs the DocumentInfo with the given URL
-     *
-     * @param url The URL of the document
-     */
+    /// Constructs the DocumentInfo with the given URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL of the document
     DocumentInfo(String url, int type) {
         setUrl(url);
         expectedContentType = type;
     }
 
-    /**
-     * Constructs the DocumentInfo with the given URL
-     *
-     * @param url         The URL of the document
-     * @param params      The parameters
-     * @param postRequest true if this is a POST request, false otherwise (i.e. GET)
-     */
+    /// Constructs the DocumentInfo with the given URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL of the document
+    ///
+    /// - `params`: The parameters
+    ///
+    /// - `postRequest`: true if this is a POST request, false otherwise (i.e. GET)
     DocumentInfo(String url, String params, boolean postRequest) {
         this.params = params;
         this.postRequest = postRequest;
         setUrl(url);
     }
 
-    /**
-     * Sets the default encoding for the document e.g. ENCODING_UTF8
-     *
-     * @param encoding the encoding string matching ISO standards
-     */
+    /// Sets the default encoding for the document e.g. ENCODING_UTF8
+    ///
+    /// #### Parameters
+    ///
+    /// - `encoding`: the encoding string matching ISO standards
     public static void setDefaultEncoding(String encoding) {
         DEFAULT_ENCODING = encoding;
     }
 
-    /**
-     * Check if the specified URL is an absolute URL
-     *
-     * @param url the URL to check
-     * @return true if the specified URL is an absolute URL, false otherwise
-     */
+    /// Check if the specified URL is an absolute URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL to check
+    ///
+    /// #### Returns
+    ///
+    /// true if the specified URL is an absolute URL, false otherwise
     static boolean isAbsoluteURL(String url) {
         return (url.substring(0, Math.min(10, url.length())).indexOf("://") != -1); //Absolute URL - check only the start of the string for a case where a    parameter is ....&url=http://..
     }
 
-    /**
-     * Returns the absolute URL associated with this DocumentInfo object
-     *
-     * @return the absolute URL associated with this DocumentInfo object
-     */
+    /// Returns the absolute URL associated with this DocumentInfo object
+    ///
+    /// #### Returns
+    ///
+    /// the absolute URL associated with this DocumentInfo object
     public String getUrl() {
         return pageURL;
     }
 
-    /**
-     * Sets the URL to the specified URL
-     *
-     * @param url the URL to set as the URL of the document
-     */
+    /// Sets the URL to the specified URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL to set as the URL of the document
     public void setUrl(String url) {
         pageURL = convertURL(url);
 
@@ -166,11 +159,11 @@ public class DocumentInfo {
         }
     }
 
-    /**
-     * Returns the full url string including parameters in GET request
-     *
-     * @return the full url string including parameters in GET request
-     */
+    /// Returns the full url string including parameters in GET request
+    ///
+    /// #### Returns
+    ///
+    /// the full url string including parameters in GET request
     public String getFullUrl() {
         if ((postRequest) || (params == null) || ("".equals(params))) {
             return pageURL;
@@ -179,86 +172,89 @@ public class DocumentInfo {
         }
     }
 
-    /**
-     * Returns the expected content type, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
-     *
-     * @return the expected content type, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
-     */
+    /// Returns the expected content type, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
+    ///
+    /// #### Returns
+    ///
+    /// the expected content type, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
     public int getExpectedContentType() {
         return expectedContentType;
     }
 
-    /**
-     * Sets this expected content type to be either TYPE_HTML, TYPE_IMAGE or TYPE_CSS
-     * When the document itself is requested the type will be TYPE_HTML and when images in the document are requested the type will be TYPE_IMAGE
-     * The differentiation is important to handle cases in which the HTMLComponent expects one type but the URL is has a resource of another type
-     *
-     * @param requestType the requestType to set, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
-     */
+    /// Sets this expected content type to be either TYPE_HTML, TYPE_IMAGE or TYPE_CSS
+    /// When the document itself is requested the type will be TYPE_HTML and when images in the document are requested the type will be TYPE_IMAGE
+    /// The differentiation is important to handle cases in which the HTMLComponent expects one type but the URL is has a resource of another type
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestType`: the requestType to set, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
     public void setExpectedContentType(int requestType) {
         this.expectedContentType = requestType;
     }
 
-    /**
-     * Returns whether this document request is a POST request or not
-     *
-     * @return true if the document was requested via POST, false otherwise
-     */
+    /// Returns whether this document request is a POST request or not
+    ///
+    /// #### Returns
+    ///
+    /// true if the document was requested via POST, false otherwise
     public boolean isPostRequest() {
         return postRequest;
     }
 
-    /**
-     * Sets this DocumentInfo as using a POST request or not
-     *
-     * @param postRequest true if this is a POST request, false otherwise
-     */
+    /// Sets this DocumentInfo as using a POST request or not
+    ///
+    /// #### Parameters
+    ///
+    /// - `postRequest`: true if this is a POST request, false otherwise
     public void setPostRequest(boolean postRequest) {
         this.postRequest = postRequest;
     }
 
-    /**
-     * Returns the request paramter as a percentage-encoded string
-     *
-     * @return the request paramter as an encoded string
-     */
+    /// Returns the request paramter as a percentage-encoded string
+    ///
+    /// #### Returns
+    ///
+    /// the request paramter as an encoded string
     public String getParams() {
         return params;
     }
 
-    /**
-     * Sets the request paramters of this request
-     *
-     * @param params The request paramters to set, should be as a percentage encoded string
-     */
+    /// Sets the request paramters of this request
+    ///
+    /// #### Parameters
+    ///
+    /// - `params`: The request paramters to set, should be as a percentage encoded string
     public void setParams(String params) {
         this.params = params;
     }
 
-    /**
-     * Returns a string describing the document's encoding
-     *
-     * @return the document's encoding
-     */
+    /// Returns a string describing the document's encoding
+    ///
+    /// #### Returns
+    ///
+    /// the document's encoding
     public String getEncoding() {
         return encoding;
     }
 
-    /**
-     * Sets the document encoding (This can be determined via the charset attribute in the response)
-     *
-     * @param encoding the encoding to set. It is recommended to use the ENCODING_* constants when possible to avoid typos
-     */
+    /// Sets the document encoding (This can be determined via the charset attribute in the response)
+    ///
+    /// #### Parameters
+    ///
+    /// - `encoding`: the encoding to set. It is recommended to use the ENCODING_* constants when possible to avoid typos
     public void setEncoding(String encoding) {
         this.encoding = encoding;
     }
 
-    /**
-     * Converts the given URL to an absolute URL based on the current page's URL
-     *
-     * @param url The url to convert (Can be relative)
-     * @return The absolute URL representing the given URL in relation to the current one.
-     */
+    /// Converts the given URL to an absolute URL based on the current page's URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The url to convert (Can be relative)
+    ///
+    /// #### Returns
+    ///
+    /// The absolute URL representing the given URL in relation to the current one.
     String convertURL(String url) {
         if (url == null) {
             return pageURL; //Refresh
@@ -303,20 +299,20 @@ public class DocumentInfo {
         }
     }
 
-    /**
-     * Returns the base URL for this document
-     *
-     * @return the baseURL
-     */
+    /// Returns the base URL for this document
+    ///
+    /// #### Returns
+    ///
+    /// the baseURL
     public String getBaseURL() {
         return baseURL;
     }
 
-    /**
-     * Sets the base URL for this document. Usually this is deduced automatically from the page URL, but in some cases this is different, for example when an HREF attribute is provided in the BASE tag
-     *
-     * @param baseURL the baseURL to set
-     */
+    /// Sets the base URL for this document. Usually this is deduced automatically from the page URL, but in some cases this is different, for example when an HREF attribute is provided in the BASE tag
+    ///
+    /// #### Parameters
+    ///
+    /// - `baseURL`: the baseURL to set
     public void setBaseURL(String baseURL) {
         this.baseURL = baseURL;
     }

@@ -44,40 +44,38 @@ import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * <p>Floating action buttons are a material design element used to promote a special action in a Form.
- * They are represented as a floating circle with a flat icon floating above the UI typically in the bottom right
- * area.</p>
- *
- * <p>
- * Simple use cases include just the button as a standalone:
- * </p>
- * <script src="https://gist.github.com/codenameone/f6820a6b0c781e5bb5ffa8004c5b5f2e.js"></script>
- *
- * <p>
- * The button can also nest sub actions
- * </p>
- * <script src="https://gist.github.com/codenameone/aa4180054368f61176c55979010d757b.js"></script>
- * <img src="http://www.codenameone.com/img/blog/floating-action.png" alt="Floating Button" />
- *
- * @author Chen
- */
+/// Floating action buttons are a material design element used to promote a special action in a Form.
+/// They are represented as a floating circle with a flat icon floating above the UI typically in the bottom right
+/// area.
+///
+/// Simple use cases include just the button as a standalone:
+///
+/// ```java
+/// FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
+/// fab.addActionListener(e -> ToastBar.showErrorMessage("Not implemented yet..."));
+/// fab.bindFabToContainer(hi.getContentPane());
+/// ```
+///
+/// The button can also nest sub actions
+///
+/// ```java
+/// FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
+/// fab.createSubFAB(FontImage.MATERIAL_PEOPLE, "");
+/// fab.createSubFAB(FontImage.MATERIAL_IMPORT_CONTACTS, "");
+/// fab.bindFabToContainer(hi.getContentPane());
+/// ```
+///
+/// @author Chen
 public class FloatingActionButton extends Button {
 
-    /**
-     * The FloatingActionButton tries to size/pad itself automatically but
-     * this means that manual padding is ignored. Setting this to false
-     * disables that behavior
-     */
+    /// The FloatingActionButton tries to size/pad itself automatically but
+    /// this means that manual padding is ignored. Setting this to false
+    /// disables that behavior
     private static boolean autoSizing = true;
-    /**
-     * The default icon size for the fab
-     */
+    /// The default icon size for the fab
     private static float fabDefaultSize = 3.8f;
     private List<FloatingActionButton> subMenu;
-    /**
-     * The UIID of the sub action texts can be overriden. It defaults to {@code FloatingActionText}
-     */
+    /// The UIID of the sub action texts can be overriden. It defaults to `FloatingActionText`
     private String floatingActionTextUIID = "FloatingActionText";
     private String text;
     private int shadowOpacity = 100;
@@ -86,25 +84,30 @@ public class FloatingActionButton extends Button {
     private boolean isBadge;
     private float sizeMm = fabDefaultSize;
 
-    /**
-     * Constructor
-     *
-     * @param icon one of the FontImage.MATERIAL_* constants
-     * @param text the text of the sub FloatingActionButton
-     * @param size the size in millimeters
-     */
+    /// Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// - `text`: the text of the sub FloatingActionButton
+    ///
+    /// - `size`: the size in millimeters
     protected FloatingActionButton(char icon, String text, float size) {
         this(icon, text, "FloatingActionButton", size);
     }
 
-    /**
-     * Constructor
-     *
-     * @param icon one of the FontImage.MATERIAL_* constants
-     * @param text the text of the sub FloatingActionButton
-     * @param uiid the uiid of the FAB
-     * @param size the size in millimeters
-     */
+    /// Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// - `text`: the text of the sub FloatingActionButton
+    ///
+    /// - `uiid`: the uiid of the FAB
+    ///
+    /// - `size`: the size in millimeters
     protected FloatingActionButton(char icon, String text, String uiid, float size) {
         FontImage image = FontImage.createMaterial(icon, uiid, size);
         setGap(0);
@@ -119,9 +122,7 @@ public class FloatingActionButton extends Button {
         updateBorder();
     }
 
-    /**
-     * This constructor is used by text badges
-     */
+    /// This constructor is used by text badges
     private FloatingActionButton(String text) {
         super.setText(text);
         rectangle = true;
@@ -131,81 +132,89 @@ public class FloatingActionButton extends Button {
         isBadge = true;
     }
 
-    /**
-     * The default icon size for the fab icon in millimeters
-     *
-     * @return the fabDefaultSize
-     */
+    /// The default icon size for the fab icon in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// the fabDefaultSize
     public static float getIconDefaultSize() {
         return fabDefaultSize;
     }
 
-    /**
-     * The default icon size for the fab icon in millimeters
-     *
-     * @param aFabDefaultSize the fabDefaultSize to set
-     */
+    /// The default icon size for the fab icon in millimeters
+    ///
+    /// #### Parameters
+    ///
+    /// - `aFabDefaultSize`: the fabDefaultSize to set
     public static void setIconDefaultSize(float aFabDefaultSize) {
         fabDefaultSize = aFabDefaultSize;
     }
 
-    /**
-     * The FloatingActionButton tries to size/pad itself automatically but
-     * this means that manual padding is ignored. Setting this to false
-     * disables that behavior
-     *
-     * @return the autoSizing
-     */
+    /// The FloatingActionButton tries to size/pad itself automatically but
+    /// this means that manual padding is ignored. Setting this to false
+    /// disables that behavior
+    ///
+    /// #### Returns
+    ///
+    /// the autoSizing
     public static boolean isAutoSizing() {
         return autoSizing;
     }
 
-    /**
-     * The FloatingActionButton tries to size/pad itself automatically but
-     * this means that manual padding is ignored. Setting this to false
-     * disables that behavior
-     *
-     * @param aAutoSizing the autoSizing to set
-     */
+    /// The FloatingActionButton tries to size/pad itself automatically but
+    /// this means that manual padding is ignored. Setting this to false
+    /// disables that behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `aAutoSizing`: the autoSizing to set
     public static void setAutoSizing(boolean aAutoSizing) {
         autoSizing = aAutoSizing;
     }
 
-    /**
-     * Creates a text badge
-     *
-     * @param text the text of the badge
-     * @return a badge component
-     */
+    /// Creates a text badge
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the badge
+    ///
+    /// #### Returns
+    ///
+    /// a badge component
     public static FloatingActionButton createBadge(String text) {
         return new FloatingActionButton(text);
     }
 
-    /**
-     * a factory method to create a FloatingActionButton.
-     *
-     * @param icon one of the FontImage.MATERIAL_* constants
-     * @return a FloatingActionButton instance
-     */
+    /// a factory method to create a FloatingActionButton.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// #### Returns
+    ///
+    /// a FloatingActionButton instance
     public static FloatingActionButton createFAB(char icon) {
         return new FloatingActionButton(icon, null, fabDefaultSize);
     }
 
-    /**
-     * a factory method to create a FloatingActionButton.
-     *
-     * @param icon one of the FontImage.MATERIAL_* constants
-     * @param uiid the uiid for the fab
-     * @return a FloatingActionButton instance
-     */
+    /// a factory method to create a FloatingActionButton.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// - `uiid`: the uiid for the fab
+    ///
+    /// #### Returns
+    ///
+    /// a FloatingActionButton instance
     public static FloatingActionButton createFAB(char icon, String uiid) {
         return new FloatingActionButton(icon, null, uiid, fabDefaultSize);
     }
 
-    /**
-     * Overriden to update the icon
-     * {@inheritDoc}
-     */
+    /// Overriden to update the icon
+    /// {@inheritDoc}
     @Override
     public void setUIID(String id) {
         super.setUIID(id);
@@ -232,11 +241,9 @@ public class FloatingActionButton extends Button {
                 shadowOpacity(shadowOpacity).rectangle(rectangle));
     }
 
-    /**
-     * We override this method to track style changes to the background color and map them to the border
-     * <p>
-     * {@inheritDoc}
-     */
+    /// We override this method to track style changes to the background color and map them to the border
+    ///
+    /// {@inheritDoc}
     @Override
     public void styleChanged(String propertyName, Style source) {
         if (Style.BG_COLOR.equals(propertyName)) {
@@ -250,14 +257,18 @@ public class FloatingActionButton extends Button {
         }
     }
 
-    /**
-     * Adds a sub FAB to the FloatingActionButton instance. Once pressed all its
-     * sub FAB's are displayed.
-     *
-     * @param icon one of the FontImage.MATERIAL_* constants
-     * @param text the text of the sub FloatingActionButton
-     * @return a FloatingActionButton instance for the sub FAB added
-     */
+    /// Adds a sub FAB to the FloatingActionButton instance. Once pressed all its
+    /// sub FAB's are displayed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// - `text`: the text of the sub FloatingActionButton
+    ///
+    /// #### Returns
+    ///
+    /// a FloatingActionButton instance for the sub FAB added
     public FloatingActionButton createSubFAB(char icon, String text) {
         FloatingActionButton sub = new FloatingActionButton(icon, text, 2.8f);
         if (subMenu == null) {
@@ -275,26 +286,34 @@ public class FloatingActionButton extends Button {
         return super.calcPreferredSize();
     }
 
-    /**
-     * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
-     * use the layered pane if the container is a content pane.
-     *
-     * @param cnt the Container to add the FAB to
-     * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
-     */
+    /// This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
+    /// use the layered pane if the container is a content pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the Container to add the FAB to
+    ///
+    /// #### Returns
+    ///
+    /// a new Container that contains the cnt and the FAB on top or null in the case of a content pane
     public Container bindFabToContainer(Component cnt) {
         return bindFabToContainer(cnt, Component.RIGHT, Component.BOTTOM);
     }
 
-    /**
-     * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
-     * use the layered pane if the container is a content pane.
-     *
-     * @param cnt         the Container to add the FAB to
-     * @param orientation one of Component.RIGHT/LEFT/CENTER
-     * @param valign      one of Component.TOP/BOTTOM/CENTER
-     * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
-     */
+    /// This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
+    /// use the layered pane if the container is a content pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the Container to add the FAB to
+    ///
+    /// - `orientation`: one of Component.RIGHT/LEFT/CENTER
+    ///
+    /// - `valign`: one of Component.TOP/BOTTOM/CENTER
+    ///
+    /// #### Returns
+    ///
+    /// a new Container that contains the cnt and the FAB on top or null in the case of a content pane
     public Container bindFabToContainer(Component cnt, int orientation, int valign) {
         FlowLayout flow = new FlowLayout(orientation);
         flow.setValign(valign);
@@ -314,9 +333,7 @@ public class FloatingActionButton extends Button {
         return LayeredLayout.encloseIn(cnt, conUpper);
     }
 
-    /**
-     * Removes the floating action button from its parent
-     */
+    /// Removes the floating action button from its parent
     public void unbind() {
         Container cnt = getParent();
         remove();
@@ -381,12 +398,15 @@ public class FloatingActionButton extends Button {
         }
     }
 
-    /**
-     * Creates the popup content container to display on the dialog.
-     *
-     * @param fabs List of sub FloatingActionButton
-     * @return a Container that contains all fabs
-     */
+    /// Creates the popup content container to display on the dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fabs`: List of sub FloatingActionButton
+    ///
+    /// #### Returns
+    ///
+    /// a Container that contains all fabs
     protected Container createPopupContent(List<FloatingActionButton> fabs) {
         Container con = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         for (final FloatingActionButton next : subMenu) {
@@ -402,26 +422,26 @@ public class FloatingActionButton extends Button {
         return con;
     }
 
-    /**
-     * Shows the popup Dialog with the sub FABs.
-     *
-     * @param dialog the Dialog with all sub FAB's Components
-     */
+    /// Shows the popup Dialog with the sub FABs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dialog`: the Dialog with all sub FAB's Components
     protected void showPopupDialog(Dialog dialog) {
         dialog.setPopupDirectionBiasPortrait(Boolean.TRUE);
         dialog.showPopupDialog(this);
     }
 
-    /**
-     * @return the floatingActionTextUIID
-     */
+    /// #### Returns
+    ///
+    /// the floatingActionTextUIID
     public String getFloatingActionTextUIID() {
         return floatingActionTextUIID;
     }
 
-    /**
-     * @param floatingActionTextUIID the floatingActionTextUIID to set
-     */
+    /// #### Parameters
+    ///
+    /// - `floatingActionTextUIID`: the floatingActionTextUIID to set
     public void setFloatingActionTextUIID(String floatingActionTextUIID) {
         this.floatingActionTextUIID = floatingActionTextUIID;
     }

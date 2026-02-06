@@ -34,11 +34,9 @@ import com.codename1.ui.util.EventDispatcher;
 
 import java.util.Vector;
 
-/**
- * This is a Points Layer
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This is a Points Layer
+///
+/// @author Roman Kamyk
 public class PointsLayer extends AbstractLayer implements ActionSource {
 
     private final Vector points = new Vector();
@@ -46,39 +44,31 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
     private final Font f = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
     private Image icon;
 
-    /**
-     * Constructor with default projection Mercator.
-     */
+    /// Constructor with default projection Mercator.
     public PointsLayer() {
         super(new Mercator(), "");
     }
 
-    /**
-     * Constructor with default projection Mercator.
-     */
+    /// Constructor with default projection Mercator.
     public PointsLayer(String name) {
         super(new Mercator(), name);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public PointsLayer(Projection p, String name) {
         super(p, name);
     }
 
-    /**
-     * Sets the Points icon
-     *
-     * @param icon
-     */
+    /// Sets the Points icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`
     public void setPointIcon(Image icon) {
         this.icon = icon;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g, Tile tile) {
         int length = points.size();
@@ -92,11 +82,11 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
         }
     }
 
-    /**
-     * Adds a point to the PointsLayer
-     *
-     * @param point a point to add
-     */
+    /// Adds a point to the PointsLayer
+    ///
+    /// #### Parameters
+    ///
+    /// - `point`: a point to add
     public void addPoint(PointLayer point) {
 
         Image pointIcon = point.getIcon();
@@ -112,11 +102,11 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
         points.addElement(point);
     }
 
-    /**
-     * Removes a point from the PointsLayer
-     *
-     * @param point to remove from the PointsLayer
-     */
+    /// Removes a point from the PointsLayer
+    ///
+    /// #### Parameters
+    ///
+    /// - `point`: to remove from the PointsLayer
     public void removePoint(PointLayer point) {
         if (!point.isProjected()) {
             Coord c = getProjection().fromWGS84(point);
@@ -128,40 +118,38 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public BoundingBox boundingBox() {
         return BoundingBox.create(points);
     }
 
-    /**
-     * Adds a listener to the Points Layer which will cause an event to dispatch
-     * on click the ActionEvent will contain the pressed PointLayer unprojected
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Adds a listener to the Points Layer which will cause an event to dispatch
+    /// on click the ActionEvent will contain the pressed PointLayer unprojected
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     @Override
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
 
-    /**
-     * Removes the given action listener Points Layer
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Removes the given action listener Points Layer
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     @Override
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
 
-    /**
-     * Trigger an event for the points that in contained in the BoundingBox
-     *
-     * @param box the BoundingBox to trigger event.
-     */
+    /// Trigger an event for the points that in contained in the BoundingBox
+    ///
+    /// #### Parameters
+    ///
+    /// - `box`: the BoundingBox to trigger event.
     public void fireActionEvent(BoundingBox box) {
         for (int i = 0; i < points.size(); i++) {
             PointLayer point = (PointLayer) points.elementAt(i);

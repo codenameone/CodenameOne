@@ -37,30 +37,77 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Vector;
 
-/**
- * <p>A multipart post request allows a developer to submit large binary data
- * files to the server in a multipart mime post request. This is a standard method
- * for large binary file uploads to webservers and data services. <br>
- * The sample code below includes both the client code using the upload capabilities as
- * well as a simple sample servlet that can accept multipart data:
- * </p>
- * <script src="https://gist.github.com/codenameone/9cad1248365512416101.js"></script>
- *
- * <p>
- * The sample code below demonstrates uploading to the
- * <a href="https://www.filestack.com/features-upload" target="_blank">filestack.com</a> API.</p>
- *
- * <script src="https://gist.github.com/codenameone/7f6e07dadbdd169648ed.js"></script>
- *
- * @author Shai Almog
- */
+/// A multipart post request allows a developer to submit large binary data
+/// files to the server in a multipart mime post request. This is a standard method
+/// for large binary file uploads to webservers and data services.
+///
+/// The sample code below includes both the client code using the upload capabilities as
+/// well as a simple sample servlet that can accept multipart data:
+///
+/// ```java
+/// // File: MultipartClientSample.java
+/// MultipartRequest request = new MultipartRequest();
+/// request.setUrl(url);
+/// request.addData("myFileName", fullPathToFile, "text/plain")
+/// NetworkManager.getInstance().addToQueue(request);
+/// ```
+///
+/// ```java
+/// // File: UploadServlet.java
+/// @WebServlet(name = "UploadServlet", urlPatterns = {"/upload"})
+/// @MultipartConfig(fileSizeThreshold = 1024 * 1024 * 100, // 10 MB
+///         maxFileSize = 1024 * 1024 * 150, // 50 MB
+///         maxRequestSize = 1024 * 1024 * 200)      // 100 MB
+/// public class UploadServlet extends HttpServlet {
+/// @Override
+///     public void doPost(HttpServletRequest req, HttpServletResponse res)
+///             throws ServletException, IOException {
+///         Collection parts = req.getParts();
+///         Part data = parts.iterator().next();
+///         try(InputStream is = data.getInputStream()) {}
+///             // store or do something with the input stream
+///         }
+///     }
+/// }
+/// ```
+///
+/// The sample code below demonstrates uploading to the
+/// [filestack.com](https://www.filestack.com/features-upload) API.
+///
+/// ```java
+/// public void pictureUpload(final Callback resultURL) {
+///     String picture = Capture.capturePhoto(1024, -1);
+///     if(picture!=null){
+///         String filestack = "https://www.filestackapi.com/api/store/S3?key=MY_KEY&filename=myPicture.jpg";
+///         MultipartRequest request = new MultipartRequest() {
+///            protected void readResponse(InputStream input) throws IOException  {
+///               JSONParser jp = new JSONParser();
+///               Map result = jp.parseJSON(new InputStreamReader(input, "UTF-8"));
+///               String url = (String)result.get("url");
+///               if(url == null) {
+///                  resultURL.onError(null, null, 1, result.toString());
+///                  return;
+///               }
+///               resultURL.onSucess(url);
+///            }
+///         };
+///         request.setUrl(filestack);
+///         try {
+///             request.addData("fileUpload", picture, "image/jpeg");
+///             request.setFilename("fileUpload", "myPicture.jpg");
+///             NetworkManager.getInstance().addToQueue(request);
+///         } catch(IOException err) {
+///             err.printStackTrace();
+///         }
+///     }
+/// }
+/// ```
+/// @author Shai Almog
 public class MultipartRequest extends ConnectionRequest {
 
     private static final String CRLF = "\r\n";
     private static boolean canFlushStream = true;
-    /**
-     * Special flag to keep input stream files open after they are read
-     */
+    /// Special flag to keep input stream files open after they are read
     private static boolean leaveInputStreamsOpen;
     private String boundary;
     private LinkedHashMap args = new LinkedHashMap();
@@ -70,14 +117,10 @@ public class MultipartRequest extends ConnectionRequest {
     private long contentLength = -1L;
     private boolean manualRedirect = true;
     private Vector ignoreEncoding = new Vector();
-    /**
-     * Set to true to encode binary data as base 64
-     */
+    /// Set to true to encode binary data as base 64
     private boolean base64Binaries = true;
 
-    /**
-     * Initialize variables
-     */
+    /// Initialize variables
     public MultipartRequest() {
         setPost(true);
         setWriteRequest(true);
@@ -89,50 +132,48 @@ public class MultipartRequest extends ConnectionRequest {
         setContentType("multipart/form-data; boundary=" + boundary);
     }
 
-    /**
-     * Special flag to keep input stream files open after they are read
-     *
-     * @return the leaveInputStreamsOpen
-     */
+    /// Special flag to keep input stream files open after they are read
+    ///
+    /// #### Returns
+    ///
+    /// the leaveInputStreamsOpen
     public static boolean isLeaveInputStreamsOpen() {
         return leaveInputStreamsOpen;
     }
 
-    /**
-     * Special flag to keep input stream files open after they are read
-     *
-     * @param aLeaveInputStreamsOpen the leaveInputStreamsOpen to set
-     */
+    /// Special flag to keep input stream files open after they are read
+    ///
+    /// #### Parameters
+    ///
+    /// - `aLeaveInputStreamsOpen`: the leaveInputStreamsOpen to set
     public static void setLeaveInputStreamsOpen(boolean aLeaveInputStreamsOpen) {
         leaveInputStreamsOpen = aLeaveInputStreamsOpen;
     }
 
-    /**
-     * Sending large files requires flushing the writer once in a while to prevent
-     * Out Of Memory Errors, Some J2ME implementation are not able to flush the
-     * streams causing the upload to fail.
-     * This method can indicate to the upload to not use the flushing mechanism.
-     */
+    /// Sending large files requires flushing the writer once in a while to prevent
+    /// Out Of Memory Errors, Some J2ME implementation are not able to flush the
+    /// streams causing the upload to fail.
+    /// This method can indicate to the upload to not use the flushing mechanism.
     public static void setCanFlushStream(boolean flush) {
         canFlushStream = flush;
     }
 
-    /**
-     * Returns the boundary string which is normally generated based on system time
-     *
-     * @return the multipart boundary string
-     */
+    /// Returns the boundary string which is normally generated based on system time
+    ///
+    /// #### Returns
+    ///
+    /// the multipart boundary string
     public String getBoundary() {
         return boundary;
     }
 
-    /**
-     * Sets the boundary string, normally you don't need this method. Its useful to
-     * workaround server issues only. Notice that this method must be invoked before adding
-     * any elements.
-     *
-     * @param boundary the boundary string
-     */
+    /// Sets the boundary string, normally you don't need this method. Its useful to
+    /// workaround server issues only. Notice that this method must be invoked before adding
+    /// any elements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `boundary`: the boundary string
     public void setBoundary(String boundary) {
         this.boundary = boundary;
         setContentType("multipart/form-data; boundary=" + boundary);
@@ -145,13 +186,15 @@ public class MultipartRequest extends ConnectionRequest {
         super.initConnection(connection);
     }
 
-    /**
-     * Adds a binary argument to the arguments
-     *
-     * @param name     the name of the data
-     * @param data     the data as bytes
-     * @param mimeType the mime type for the content
-     */
+    /// Adds a binary argument to the arguments
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the data
+    ///
+    /// - `data`: the data as bytes
+    ///
+    /// - `mimeType`: the mime type for the content
     public void addData(String name, byte[] data, String mimeType) {
         args.put(name, data);
         mimeTypes.put(name, mimeType);
@@ -161,30 +204,38 @@ public class MultipartRequest extends ConnectionRequest {
         filesizes.put(name, String.valueOf(data.length));
     }
 
-    /**
-     * Adds a binary argument to the arguments
-     *
-     * @param name     the name of the file data
-     * @param filePath the path of the file to upload
-     * @param mimeType the mime type for the content
-     * @throws IOException if the file cannot be opened
-     */
+    /// Adds a binary argument to the arguments
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the file data
+    ///
+    /// - `filePath`: the path of the file to upload
+    ///
+    /// - `mimeType`: the mime type for the content
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the file cannot be opened
     public void addData(String name, String filePath, String mimeType) throws IOException {
         addData(name, FileSystemStorage.getInstance().openInputStream(filePath),
                 FileSystemStorage.getInstance().getLength(filePath), mimeType);
     }
 
-    /**
-     * Adds a binary argument to the arguments, notice the input stream will be
-     * read only during submission
-     *
-     * @param name     the name of the data
-     * @param data     the data stream
-     * @param dataSize the byte size of the data stream, if the data stream is a file
-     *                 the file size can be obtained using the
-     *                 FileSystemStorage.getInstance().getLength(file) method
-     * @param mimeType the mime type for the content
-     */
+    /// Adds a binary argument to the arguments, notice the input stream will be
+    /// read only during submission
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the data
+    ///
+    /// - `data`: the data stream
+    ///
+    /// - `dataSize`: @param dataSize the byte size of the data stream, if the data stream is a file
+    ///                 the file size can be obtained using the
+    ///                 FileSystemStorage.getInstance().getLength(file) method
+    ///
+    /// - `mimeType`: the mime type for the content
     public void addData(String name, InputStream data, long dataSize, String mimeType) {
         args.put(name, data);
         if (!filenames.containsKey(name)) {
@@ -194,19 +245,18 @@ public class MultipartRequest extends ConnectionRequest {
         mimeTypes.put(name, mimeType);
     }
 
-    /**
-     * Sets the filename for the given argument
-     *
-     * @param arg      the argument name
-     * @param filename the file name
-     */
+    /// Sets the filename for the given argument
+    ///
+    /// #### Parameters
+    ///
+    /// - `arg`: the argument name
+    ///
+    /// - `filename`: the file name
     public void setFilename(String arg, String filename) {
         filenames.put(arg, filename);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addArgumentNoEncoding(String key, String value) {
         args.put(key, value);
@@ -216,34 +266,26 @@ public class MultipartRequest extends ConnectionRequest {
         ignoreEncoding.addElement(key);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addArgumentNoEncoding(String key, String[] value) {
         addArgument(key, value);
         ignoreEncoding.add(key);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addArgumentNoEncodingArray(String key, String... value) {
         addArgumentNoEncoding(key, (String[]) value);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addArgument(String name, String[] value) {
         args.put(name, value);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addArgument(String name, String value) {
         args.put(name, value);
@@ -321,9 +363,7 @@ public class MultipartRequest extends ConnectionRequest {
         return length;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void buildRequestBody(OutputStream os) throws IOException {
         Writer writer = null; //NOPMD CloseResource
@@ -476,39 +516,39 @@ public class MultipartRequest extends ConnectionRequest {
         return manualRedirect;
     }
 
-    /**
-     * By default redirect responses (302 etc.) are handled manually in multipart requests
-     *
-     * @return the autoRedirect
-     */
+    /// By default redirect responses (302 etc.) are handled manually in multipart requests
+    ///
+    /// #### Returns
+    ///
+    /// the autoRedirect
     public boolean isManualRedirect() {
         return manualRedirect;
     }
 
-    /**
-     * By default redirect responses (302 etc.) are handled manually in multipart requests, set this
-     * to false to handle the redirect. Notice that a redirect converts a post to a get.
-     *
-     * @param autoRedirect the autoRedirect to set
-     */
+    /// By default redirect responses (302 etc.) are handled manually in multipart requests, set this
+    /// to false to handle the redirect. Notice that a redirect converts a post to a get.
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoRedirect`: the autoRedirect to set
     public void setManualRedirect(boolean autoRedirect) {
         this.manualRedirect = autoRedirect;
     }
 
-    /**
-     * Set to true to encode binary data as base 64
-     *
-     * @return the base64Binaries
-     */
+    /// Set to true to encode binary data as base 64
+    ///
+    /// #### Returns
+    ///
+    /// the base64Binaries
     public boolean isBase64Binaries() {
         return base64Binaries;
     }
 
-    /**
-     * Set to true to encode binary data as base 64
-     *
-     * @param base64Binaries the base64Binaries to set
-     */
+    /// Set to true to encode binary data as base 64
+    ///
+    /// #### Parameters
+    ///
+    /// - `base64Binaries`: the base64Binaries to set
     public void setBase64Binaries(boolean base64Binaries) {
         this.base64Binaries = base64Binaries;
     }
@@ -531,9 +571,7 @@ public class MultipartRequest extends ConnectionRequest {
                 (ignoreEncoding == null ? that.ignoreEncoding == null : ignoreEncoding.equals(that.ignoreEncoding));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         int result = super.hashCode();

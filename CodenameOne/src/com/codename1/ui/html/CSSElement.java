@@ -31,21 +31,17 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * The CSSElement class defines a single CSS element with its attributes and children.
- * It extends Element and adds to it certain CSS-specific methods.
- * Each CSSElement object is in fact a CSS selector.
- *
- * @author Ofir Leitner
- */
+/// The CSSElement class defines a single CSS element with its attributes and children.
+/// It extends Element and adds to it certain CSS-specific methods.
+/// Each CSSElement object is in fact a CSS selector.
+///
+/// @author Ofir Leitner
 class CSSElement extends HTMLElement {
 
-    /**
-     * A constant representing both the attribute value of 'font-variant' and the font name that should be given to small-caps fonts
-     * Since J2ME doesn't support small-caps fonts, when a small-caps font varinat is requested
-     * the font-family is changed to "smallcaps" which should be loaded to HTMLComponent and the theme as a bitmap font
-     * If no smallcaps font is found at all, then the family stays the same, but if even only one is found - the best match will be used.
-     */
+    /// A constant representing both the attribute value of 'font-variant' and the font name that should be given to small-caps fonts
+    /// Since J2ME doesn't support small-caps fonts, when a small-caps font varinat is requested
+    /// the font-family is changed to "smallcaps" which should be loaded to HTMLComponent and the theme as a bitmap font
+    /// If no smallcaps font is found at all, then the family stays the same, but if even only one is found - the best match will be used.
     final static String SMALL_CAPS_STRING = "small-caps";
     // Background repeat strings and their corresponding values
     static final String[] BG_REPEAT_STRINGS = {"repeat", "repeat-x", "repeat-y", "no-repeat"};
@@ -58,9 +54,7 @@ class CSSElement extends HTMLElement {
     static final int FONT_SIZE_SMALL = 12;
     static final int FONT_SIZE_MEDIUM = 15;
     static final int FONT_SIZE_LARGE = 19;
-    /**
-     * Since the other tags are 0 based the CSS tags should start at this point
-     */
+    /// Since the other tags are 0 based the CSS tags should start at this point
     static final int CSS_STYLE_ID_OFFSET = 500;
     // CSS Attributes
     static final int CSS_BACKGROUND_COLOR = CSS_STYLE_ID_OFFSET;
@@ -133,9 +127,7 @@ class CSSElement extends HTMLElement {
     static final int CSS_COUNTER_INCREMENT = CSS_STYLE_ID_OFFSET + 67;
     static final int CSS_DIRECTION = CSS_STYLE_ID_OFFSET + 68;
     private static final int LAST_CSS_PROPERTY_INDEX = (HTMLComponent.PROCESS_HTML_MP1_ONLY ? CSS_PAGEURL : CSS_DIRECTION) - CSS_STYLE_ID_OFFSET;
-    /**
-     * The types of the attribute
-     */
+    /// The types of the attribute
     static final int[] CSS_ATTRIBUTE_TYPES = {
             TYPE_COLOR, // CSS_BACKGROUND_COLOR
             TYPE_CSS_URL, //CSS_BACKGROUND_IMAGE
@@ -207,18 +199,12 @@ class CSSElement extends HTMLElement {
             TYPE_NMTOKENS, //CSS_COUNTER_INCREMENT
             TYPE_NMTOKENS, //CSS_DIRECTION
     };
-    /**
-     * This very high integer value is added to a numeric value stored in attrVals to denote that it is a percentage value
-     */
+    /// This very high integer value is added to a numeric value stored in attrVals to denote that it is a percentage value
     static final int VAL_PERCENTAGE = 1 << 20;
-    /**
-     * This very high integer value is added to a numeric value stored in attrVals to denote that it is a value in the CSS 'ex' unit (EX means half of the font size)
-     */
+    /// This very high integer value is added to a numeric value stored in attrVals to denote that it is a value in the CSS 'ex' unit (EX means half of the font size)
     static final int VAL_EX = 1 << 21;
-    /**
-     * A string array with the attributes supported by the WCSS spec
-     * Note that shorthand attributes appear in a different array
-     */
+    /// A string array with the attributes supported by the WCSS spec
+    /// Note that shorthand attributes appear in a different array
     static final String[] CSS_ATTRIBUTE_ROOTS = {
             "background-color", "background-image", "background-repeat", "background-attachment",
             "background-position-x", "background-position-y",
@@ -241,10 +227,8 @@ class CSSElement extends HTMLElement {
             "direction" //css2
 
     };
-    /**
-     * A string array containing all supported shorthand attributes
-     * Shorthand attrributes are mapped to multiple CSS base attributes are used to define several CSS attributes at once
-     */
+    /// A string array containing all supported shorthand attributes
+    /// Shorthand attrributes are mapped to multiple CSS base attributes are used to define several CSS attributes at once
     static final String[] CSS_SHORTHAND_ATTRIBUTE_LIST = {
             "background",
             "background-position",
@@ -262,10 +246,8 @@ class CSSElement extends HTMLElement {
             "list-style",
             "outline"
     };
-    /**
-     * A boolean array defining which of the CSS shorthand attributes when defined with less than the expected number of values copy the values defined to the remaining undefined attributes
-     * For example, margin expects 4 values (top/right/bottom/left), but can also be defined with 1 value that will be used for all 4, or with 2 values which will be used one for the vertical margins and the other for the horizontal etc.
-     */
+    /// A boolean array defining which of the CSS shorthand attributes when defined with less than the expected number of values copy the values defined to the remaining undefined attributes
+    /// For example, margin expects 4 values (top/right/bottom/left), but can also be defined with 1 value that will be used for all 4, or with 2 values which will be used one for the vertical margins and the other for the horizontal etc.
     static final boolean[] CSS_IS_SHORTHAND_ATTRIBUTE_COLLATABLE = new boolean[]{
             false, // "background",
             false, // "background-position",
@@ -283,109 +265,67 @@ class CSSElement extends HTMLElement {
             false,  // "list-style"
             false   // "outline"
     };
-    /**
-     * A constant representing the focus pseudo-class
-     */
+    /// A constant representing the focus pseudo-class
     static final int PC_FOCUS = 1;
-    /**
-     * A constant representing the active pseudo-class
-     */
+    /// A constant representing the active pseudo-class
     static final int PC_ACTIVE = 2;
-    /**
-     * A constant representing the link pseudo-class
-     */
+    /// A constant representing the link pseudo-class
     static final int PC_LINK = 4;
-    /**
-     * A constant representing the visited pseudo-class
-     */
+    /// A constant representing the visited pseudo-class
     static final int PC_VISITED = 8;
-    /**
-     * A constant representing the 'before' pseudo-class
-     */
+    /// A constant representing the 'before' pseudo-class
     static final int PC_BEFORE = 16;
-    /**
-     * A constant representing the 'after' pseudo-class
-     */
+    /// A constant representing the 'after' pseudo-class
     static final int PC_AFTER = 32;
-    /**
-     * A constant representing the 'first-child' pseudo-class
-     */
+    /// A constant representing the 'first-child' pseudo-class
     static final int PC_FIRST_CHILD = 64;
-    /**
-     * The list of strings representing the various CSS pseudo-classes
-     */
+    /// The list of strings representing the various CSS pseudo-classes
     final static String[] PSEUDO_CLASSES_STRINGS = {"hover", "focus", "active", "link", "visited", "before", "after", "first-child"};
-    /**
-     * The values per each string in PSEUDO_CLASSES_STRINGS
-     * Note that 'hover' is mapped to PC_FOCUS since we don't support hover on mobile.
-     */
+    /// The values per each string in PSEUDO_CLASSES_STRINGS
+    /// Note that 'hover' is mapped to PC_FOCUS since we don't support hover on mobile.
     final static int[] PSEUDO_CLASSES_VALS = {PC_FOCUS, PC_FOCUS, PC_ACTIVE, PC_LINK, PC_VISITED, PC_BEFORE, PC_AFTER, PC_FIRST_CHILD}; // Since we don't have hover in most/all devices we convert hover to focus as well
-    /**
-     * Defines the Dots-per-Inch - used when CSS length values are denoted in units like inches (in), cm, mm, points (pt) etc.
-     * This can be customized per device in build time. However since these units are not mandatory in WCSS so even if this is not accurate no harm done.
-     * In any case, always prefer using the supported length units: px, em, ex
-     */
+    /// Defines the Dots-per-Inch - used when CSS length values are denoted in units like inches (in), cm, mm, points (pt) etc.
+    /// This can be customized per device in build time. However since these units are not mandatory in WCSS so even if this is not accurate no harm done.
+    /// In any case, always prefer using the supported length units: px, em, ex
     private static final int DPI = 72;
-    /**
-     * Possible suffix strings for values of the CSS length type
-     */
+    /// Possible suffix strings for values of the CSS length type
     private final static String[] CSS_LENGTH_SUFFIX = {"px", "em", "ex", "in", "pt", "pc", "mm", "cm"};
-    /**
-     * The multiplier values for the suffix strings
-     */
+    /// The multiplier values for the suffix strings
     private final static int[] CSS_LENGTH_FACTORS = {1, 2, 1, DPI, DPI / 72, DPI / 6, (int) (DPI / 2.54 / 10), (int) (DPI / 2.54)}; // unit factors for {"px","em","ex","in","pt","pc","mm","cm"};
     private final static int LENGTH_SUFFIX_PX = 0;
     private final static int LENGTH_SUFFIX_EM = 1;
     private final static int LENGTH_SUFFIX_EX = 2;
 
-    /**
-     * Since this value is used in multiple CSS properties it is defined as a constant
-     */
+    /// Since this value is used in multiple CSS properties it is defined as a constant
     private final static String CENTER_STR = "center";
 
-    /**
-     * Since this value is used in multiple CSS properties it is defined as a constant
-     */
+    /// Since this value is used in multiple CSS properties it is defined as a constant
     private static final String CSS_NONE = "none";
     private static final int[] BG_REPEAT_VALS = {Style.BACKGROUND_IMAGE_TILE_BOTH, Style.BACKGROUND_IMAGE_TILE_HORIZONTAL, Style.BACKGROUND_IMAGE_TILE_VERTICAL, 0};
 
-    /**
-     * Horizontal alignment strings and their corresponding values
-     */
+    /// Horizontal alignment strings and their corresponding values
     private static final String[] TEXT_ALIGN_STRINGS = {"left", "right", CENTER_STR};
     private static final int[] TEXT_ALIGN_VALS = {Component.LEFT, Component.RIGHT, Component.CENTER};
 
-    /**
-     * Vertical alignment strings and their corresponding values
-     */
+    /// Vertical alignment strings and their corresponding values
     private static final String[] VERTICAL_ALIGN_STRINGS = {"top", "middle", "bottom", "baseline", "sub", "super"};
     private static final int[] VERTICAL_ALIGN_VALS = {Component.TOP, Component.CENTER, Component.BOTTOM, -1, -1, -1};
 
-    /**
-     * Border style strings
-     */
+    /// Border style strings
     private static final String[] BORDER_STYLE_STRINGS = {CSS_NONE, "solid", "dotted", "dashed", "double", "groove", "ridge", "inset", "outset"};
 
-    /**
-     * Border width strings and their corresponding values
-     */
+    /// Border width strings and their corresponding values
     private static final String[] BORDER_WIDTH_STRINGS = {"thin", "medium", "thick"};
     private static final int[] BORDER_WIDTH_VALS = {1, 3, 5};
 
-    /**
-     * The default border width (when not specified)
-     */
+    /// The default border width (when not specified)
     static final int BORDER_DEFAULT_WIDTH = BORDER_WIDTH_VALS[1]; // medium
 
-    /**
-     * Font size strings and their corresponding values
-     */
+    /// Font size strings and their corresponding values
     private static final String[] FONT_SIZE_STRINGS = {"xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large", "smaller", "larger"};
     private static final int[] FONT_SIZE_VALS = {FONT_SIZE_SMALL - 4, FONT_SIZE_SMALL - 2, FONT_SIZE_SMALL, FONT_SIZE_MEDIUM, FONT_SIZE_LARGE, FONT_SIZE_LARGE + 2, FONT_SIZE_LARGE + 4, FONT_SIZE_SMALLER, FONT_SIZE_LARGER};
 
-    /**
-     * Font style strings and their corresponding values, note that oblique is translated to italic
-     */
+    /// Font style strings and their corresponding values, note that oblique is translated to italic
     private static final String[] FONT_STYLE_STRINGS = {"normal", "italic", "oblique"};
     private static final int[] FONT_STYLE_VALS = {Font.STYLE_PLAIN, Font.STYLE_ITALIC, Font.STYLE_ITALIC};
 
@@ -394,19 +334,15 @@ class CSSElement extends HTMLElement {
     private static final String[] FONT_WEIGHT_STRINGS = {"normal", "bold", "bolder", "lighter", "100", "200", "300", "400", "500", "600", "700", "800", "900"};
     private static final int[] FONT_WEIGHT_VALS = {Font.STYLE_PLAIN, Font.STYLE_BOLD, Font.STYLE_BOLD, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_PLAIN, Font.STYLE_BOLD, Font.STYLE_BOLD, Font.STYLE_BOLD, Font.STYLE_BOLD};
 
-    /**
-     * Values associated with BG_POS_STRINGS
-     */
+    /// Values associated with BG_POS_STRINGS
     private final static int[] BG_POS_PERCENTAGE = {VAL_PERCENTAGE, 50 + VAL_PERCENTAGE, 100 + VAL_PERCENTAGE};
 
-    /**
-     * The values of each of the allowed strings.
-     * When adding an attribute which its value is an allowed string, the attribute value is set according to this array.
-     * For attributes that have no allowed strings (i.e. accpeting numeric values solely) this is not reelvant.
-     * For attributes that do have allowed strings and 'null' as the values, it means that the first string in the allowed list will be translated to 0, the second to 1 etc.
-     * The purpose of converting strings in strings that have non-null values, is to convert them to a value representing the essence of the string (FOr example thin in border is 1)
-     * And for those with null values, is to avoid having to parse strings all the time (so they are conerted to 0,1...,n)
-     */
+    /// The values of each of the allowed strings.
+    /// When adding an attribute which its value is an allowed string, the attribute value is set according to this array.
+    /// For attributes that have no allowed strings (i.e. accpeting numeric values solely) this is not reelvant.
+    /// For attributes that do have allowed strings and 'null' as the values, it means that the first string in the allowed list will be translated to 0, the second to 1 etc.
+    /// The purpose of converting strings in strings that have non-null values, is to convert them to a value representing the essence of the string (FOr example thin in border is 1)
+    /// And for those with null values, is to avoid having to parse strings all the time (so they are conerted to 0,1...,n)
     private static final int[][] CSS_ALLOWED_STRINGS_VALS = {
             null, //TYPE_COLOR, // CSS_BACKGROUND_COLOR
             null, //TYPE_CSS_URL, //CSS_BACKGROUND_IMAGE
@@ -479,17 +415,13 @@ class CSSElement extends HTMLElement {
             null,   //CSS_DIRECTION
     };
 
-    /**
-     * A constant defining the offset in which the base CSS attribute relating to the TOP appears in the shorthand attribute index
-     */
+    /// A constant defining the offset in which the base CSS attribute relating to the TOP appears in the shorthand attribute index
     private static final int CSS_TOP = 0;
 
-    /**
-     * An array containing the allowed strings for CSS attributes.
-     * Note that these strings are allowed in addition for the allowed values according to the attribute types.
-     * Also, unlike the allowed string in Element that are matched per type, here in CSSElement each line matches an attribute (and not its type).
-     * This is because of the great variance of allowed strings in CSS that are really per attribute and not per type.
-     */
+    /// An array containing the allowed strings for CSS attributes.
+    /// Note that these strings are allowed in addition for the allowed values according to the attribute types.
+    /// Also, unlike the allowed string in Element that are matched per type, here in CSSElement each line matches an attribute (and not its type).
+    /// This is because of the great variance of allowed strings in CSS that are really per attribute and not per type.
     private static final String[][] CSS_ALLOWED_STRINGS = {
             null, //TYPE_COLOR, // CSS_BACKGROUND_COLOR
             null, //TYPE_CSS_URL, //CSS_BACKGROUND_IMAGE
@@ -562,23 +494,15 @@ class CSSElement extends HTMLElement {
             {"rtl", "ltr"},   //CSS_DIRECTION
     };
 
-    /**
-     * A constant defining the offset in which the base CSS attribute relating to the RIGHT appears in the shorthand attribute index
-     */
+    /// A constant defining the offset in which the base CSS attribute relating to the RIGHT appears in the shorthand attribute index
     private static final int CSS_RIGHT = 1;
 
-    /**
-     * A constant defining the offset in which the base CSS attribute relating to the BOTTOM appears in the shorthand attribute index
-     */
+    /// A constant defining the offset in which the base CSS attribute relating to the BOTTOM appears in the shorthand attribute index
     private static final int CSS_BOTTOM = 2;
-    /**
-     * A constant defining the offset in which the base CSS attribute relating to the LEFT appears in the shorthand attribute index
-     */
+    /// A constant defining the offset in which the base CSS attribute relating to the LEFT appears in the shorthand attribute index
     private static final int CSS_LEFT = 3;
-    /**
-     * A map defining the rules by which values of collatable shorthand attributes are assigned to the base attributes
-     * This map is according to the CSS specs
-     */
+    /// A map defining the rules by which values of collatable shorthand attributes are assigned to the base attributes
+    /// This map is according to the CSS specs
     static final int[][][] CSS_COLLATABLE_ORDER = {
             { // When one value is specified it is set to all sides
                     {CSS_TOP, CSS_RIGHT, CSS_BOTTOM, CSS_LEFT}
@@ -600,18 +524,14 @@ class CSSElement extends HTMLElement {
             }
     };
 
-    /**
-     * The following constants are used in CSS_SHORTHAND_ATTRIBUTE_INDEX when a shorthand attribute translates to a second level of shorthand attributes
-     * For example 'border' which translated to width/style/color. The values of the constants denote their location in the CSS_SHORTHAND_ATTRIBUTE_INDEX map
-     */
+    /// The following constants are used in CSS_SHORTHAND_ATTRIBUTE_INDEX when a shorthand attribute translates to a second level of shorthand attributes
+    /// For example 'border' which translated to width/style/color. The values of the constants denote their location in the CSS_SHORTHAND_ATTRIBUTE_INDEX map
     private static final int CSS_SHORTHAND_BACKGROUND_POSITION = 1;
     private static final int CSS_SHORTHAND_BORDER_WIDTH = 2;
     private static final int CSS_SHORTHAND_BORDER_STYLE = 3;
     private static final int CSS_SHORTHAND_BORDER_COLOR = 4;
 
-    /**
-     * A map of CSS shorthand attributes to their corresponding base attributes (or to other shorthand attributes)
-     */
+    /// A map of CSS shorthand attributes to their corresponding base attributes (or to other shorthand attributes)
     static final int[][] CSS_SHORTHAND_ATTRIBUTE_INDEX = {
             {CSS_BACKGROUND_COLOR, CSS_BACKGROUND_IMAGE, CSS_BACKGROUND_REPEAT, CSS_BACKGROUND_ATTACHMENT, CSS_SHORTHAND_BACKGROUND_POSITION},
             {CSS_BACKGROUND_POSITION_X, CSS_BACKGROUND_POSITION_Y},
@@ -629,26 +549,18 @@ class CSSElement extends HTMLElement {
             {CSS_LIST_STYLE_TYPE, CSS_LIST_STYLE_POSITION, CSS_LIST_STYLE_IMAGE},
             {CSS_OUTLINE_WIDTH, CSS_OUTLINE_STYLE, CSS_OUTLINE_COLOR}
     };
-    /**
-     * The attrVals array holds the numeric values of most of the attributes of this element.
-     * This is used for quick access, instead of parsing strings in the attributes Hashtable
-     * Values are set during addAttribute.
-     */
+    /// The attrVals array holds the numeric values of most of the attributes of this element.
+    /// This is used for quick access, instead of parsing strings in the attributes Hashtable
+    /// Values are set during addAttribute.
     int[] attrVals = new int[LAST_CSS_PROPERTY_INDEX + 1];
-    /**
-     * This is true if this selector is a descendant selector - and false if it is a child selector.
-     * For example is this selector is h2, and was derived from a 'h1 h2' combo it will be true - but if derived from 'h1 > h2' will be false.
-     * Note - for the first selector in the combo (h1 in the above example) this value is not significant and never read.
-     */
+    /// This is true if this selector is a descendant selector - and false if it is a child selector.
+    /// For example is this selector is h2, and was derived from a 'h1 h2' combo it will be true - but if derived from 'h1 > h2' will be false.
+    /// Note - for the first selector in the combo (h1 in the above example) this value is not significant and never read.
     boolean descendantSelector;
-    /**
-     * This is true if this selector is a sibling (adjacent) selector - and false otherwise
-     */
+    /// This is true if this selector is a sibling (adjacent) selector - and false otherwise
     boolean siblingSelector;
-    /**
-     * A vector holding any attribute selections (For example p[att=value])
-     * This will be null in non-attribute selectors.
-     */
+    /// A vector holding any attribute selections (For example p[att=value])
+    /// This will be null in non-attribute selectors.
     Vector attributeSelections;
     private int selectorSpecificity = -1; // A value used to determine how specific this selector is - the more the selector is specific (i.e. id > class > tag) the more it overrides other less specific selectors
     private String selectorId = null; // The selector's ID (if it's an ID selector, i.e. '#someid')
@@ -656,11 +568,11 @@ class CSSElement extends HTMLElement {
     private String selectorTag = null; // The selector's tag (if it's a tag selector - i.e. 'div')
     private int selectorPseudoClass = 0;
 
-    /**
-     * Constructs a CSSElement, This basically sets the name and ID and resets the attrVals array.
-     *
-     * @param name
-     */
+    /// Constructs a CSSElement, This basically sets the name and ID and resets the attrVals array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`
     CSSElement(String name) {
         setTagId(TAG_CSS_SELECTOR);
         int index = name.indexOf('[');
@@ -691,11 +603,11 @@ class CSSElement extends HTMLElement {
         }
     }
 
-    /**
-     * Creates this CSSElement as a copy of the given selector
-     *
-     * @param selector The selector to copy
-     */
+    /// Creates this CSSElement as a copy of the given selector
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: The selector to copy
     CSSElement(CSSElement selector) {
         setTagId(selector.getTagId());
         setTagName(selector.getTagName());
@@ -707,23 +619,30 @@ class CSSElement extends HTMLElement {
         }
     }
 
-    /**
-     * Convenience method with defaultSuffix == LENGTH_SUFFIX_PX
-     *
-     * @param units The string with CSS units (can be either percentage or px/em/ex and other sufixes from CSS_LENGTH_SUFFIX)
-     * @return The value in pixels/font-multipliers/percentage
-     */
+    /// Convenience method with defaultSuffix == LENGTH_SUFFIX_PX
+    ///
+    /// #### Parameters
+    ///
+    /// - `units`: The string with CSS units (can be either percentage or px/em/ex and other sufixes from CSS_LENGTH_SUFFIX)
+    ///
+    /// #### Returns
+    ///
+    /// The value in pixels/font-multipliers/percentage
     static int convertUnitsOrPercentage(String units) {
         return convertUnitsOrPercentage(units, LENGTH_SUFFIX_PX);
     }
 
-    /**
-     * Converts the given CSS length/percentage string to pixels
-     *
-     * @param units         The string with CSS units (can be either percentage or px/em/ex and other sufixes from CSS_LENGTH_SUFFIX)
-     * @param defaultSuffix The suffix to use as default if none is specified
-     * @return The value in pixels/font-multipliers/percentage
-     */
+    /// Converts the given CSS length/percentage string to pixels
+    ///
+    /// #### Parameters
+    ///
+    /// - `units`: The string with CSS units (can be either percentage or px/em/ex and other sufixes from CSS_LENGTH_SUFFIX)
+    ///
+    /// - `defaultSuffix`: The suffix to use as default if none is specified
+    ///
+    /// #### Returns
+    ///
+    /// The value in pixels/font-multipliers/percentage
     static int convertUnitsOrPercentage(String units, int defaultSuffix) {
         if (units == null) {
             return -1;
@@ -743,13 +662,17 @@ class CSSElement extends HTMLElement {
         return val;
     }
 
-    /**
-     * Converts the given CSS length string to pixels
-     *
-     * @param units         The string with CSS units (can be px/em/ex and other  sufixes from CSS_LENGTH_SUFFIX)
-     * @param defaultSuffix The suffix to use as default if none is specified
-     * @return the CSS length in pixels
-     */
+    /// Converts the given CSS length string to pixels
+    ///
+    /// #### Parameters
+    ///
+    /// - `units`: The string with CSS units (can be px/em/ex and other  sufixes from CSS_LENGTH_SUFFIX)
+    ///
+    /// - `defaultSuffix`: The suffix to use as default if none is specified
+    ///
+    /// #### Returns
+    ///
+    /// the CSS length in pixels
     static int convertUnits(String units, int defaultSuffix) {
         if (units == null) {
             return -1;
@@ -799,11 +722,11 @@ class CSSElement extends HTMLElement {
         return val;
     }
 
-    /**
-     * Adds the given attribute selection
-     *
-     * @param exp The expression inside the square brackets (for example p[title=test][class] will be parsed in the construvtor and be sent here twice as 'title=test' and then 'class')
-     */
+    /// Adds the given attribute selection
+    ///
+    /// #### Parameters
+    ///
+    /// - `exp`: The expression inside the square brackets (for example p[title=test][class] will be parsed in the construvtor and be sent here twice as 'title=test' and then 'class')
     void addAttributeSelection(String exp) {
         int index = exp.indexOf('=');
         String value = null;
@@ -836,24 +759,28 @@ class CSSElement extends HTMLElement {
         attributeSelections.addElement(new AttString(exp, constraint, value));
     }
 
-    /**
-     * Overrides Element.getName to return the name string of this CSSElement.
-     * Unlike Element which discards the name string and uses the id to identify the name, the CSSElement retains the name and simply returns it here.
-     * This is because a CSSElement name is in fact the selector string which is any combination of tags, classes and IDs and as such cannot be converted to a simple int.
-     *
-     * @return the selector's name
-     *
-    public String getName() {
-    return name;
-    }*/
+    /// Overrides Element.getName to return the name string of this CSSElement.
+    /// Unlike Element which discards the name string and uses the id to identify the name, the CSSElement retains the name and simply returns it here.
+    /// This is because a CSSElement name is in fact the selector string which is any combination of tags, classes and IDs and as such cannot be converted to a simple int.
+    ///
+    /// #### Returns
+    ///
+    /// @return the selector's name
+    ///
+    ///     public String getName() {
+    ///     return name;
+    ///     }
 
-    /**
-     * Returns the language code of the specified element (or one of its ancestors)
-     * This implementation is optimized for minimal storage but not for performance - each element checks its ancestors for any lang definition
-     *
-     * @param element The element to check
-     * @return The language code of the element, or null if none specified
-     */
+    /// Returns the language code of the specified element (or one of its ancestors)
+    /// This implementation is optimized for minimal storage but not for performance - each element checks its ancestors for any lang definition
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element to check
+    ///
+    /// #### Returns
+    ///
+    /// The language code of the element, or null if none specified
     private String getLang(HTMLElement element) {
         String lang = element.getAttributeById(HTMLElement.ATTR_LANG);
         if (lang != null) {
@@ -869,12 +796,15 @@ class CSSElement extends HTMLElement {
         }
     }
 
-    /**
-     * Matches the attribute selections of this selector (if any) to the provided element
-     *
-     * @param element The element to match to
-     * @return true for a match, false otherwise
-     */
+    /// Matches the attribute selections of this selector (if any) to the provided element
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element to match to
+    ///
+    /// #### Returns
+    ///
+    /// true for a match, false otherwise
     boolean matchAttributeSelections(HTMLElement element) {
         if (getTagId() == TAG_CSS_ILLEGAL_SELECTOR) {
             return false;
@@ -923,25 +853,34 @@ class CSSElement extends HTMLElement {
         return true;
     }
 
-    /**
-     * Checks if the specified attribute is assigned (i.e. was set with a legal value)
-     *
-     * @param attrId The attribute ID (Should be one of the CSS attributes, i.e. >= CSS_STYLE_ID_OFFSET)
-     * @return true if this attribute is assigned, false otherwise
-     */
+    /// Checks if the specified attribute is assigned (i.e. was set with a legal value)
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrId`: The attribute ID (Should be one of the CSS attributes, i.e. >= CSS_STYLE_ID_OFFSET)
+    ///
+    /// #### Returns
+    ///
+    /// true if this attribute is assigned, false otherwise
     boolean isAttributeAssigned(int attrId) {
         return ((attrVals[attrId - CSS_STYLE_ID_OFFSET] != -1) || ((getAttributes() != null) && (getAttributes().get(Integer.valueOf(attrId)) != null)));
     }
 
-    /**
-     * Returns the CSSElement's child positioned at the specified index.
-     * This is a convenience method that is very similar to Element.getChildAt, but returns an object of the CSSElement class.
-     * Since all of the children of a CSSElement are CSSElements as well, this prevents redundant casting.
-     *
-     * @param index The requested child position
-     * @return The child at the requested position
-     * @throws ArrayIndexOutOfBoundsException if the index is bigger than the children's count or smaller than 0
-     */
+    /// Returns the CSSElement's child positioned at the specified index.
+    /// This is a convenience method that is very similar to Element.getChildAt, but returns an object of the CSSElement class.
+    /// Since all of the children of a CSSElement are CSSElements as well, this prevents redundant casting.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: The requested child position
+    ///
+    /// #### Returns
+    ///
+    /// The child at the requested position
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if the index is bigger than the children's count or smaller than 0
     CSSElement getCSSChildAt(int index) {
         Vector children = getChildren();
         if ((index < 0) || (children == null) || (index >= children.size())) {
@@ -950,16 +889,20 @@ class CSSElement extends HTMLElement {
         return (CSSElement) children.elementAt(index);
     }
 
-    /**
-     * Adds the specified attribute and value to this CSSElement if it is supported and has a valid value.
-     * This method overrides Element.addAttribute to provide with specific CSSElement functionality.
-     * Unlike Element which retains all the value strings in the attributes hashtable, In CSSElement the value is immediately converted to a numeric value if possible and placed in the attrVals array.
-     * The string is retained only for values that can't be converted to int (such as URLs).
-     *
-     * @param attribute The attribute's name
-     * @param value     The attribute's value
-     * @return a positive error code or -1 if attribute is supported and valid
-     */
+    /// Adds the specified attribute and value to this CSSElement if it is supported and has a valid value.
+    /// This method overrides Element.addAttribute to provide with specific CSSElement functionality.
+    /// Unlike Element which retains all the value strings in the attributes hashtable, In CSSElement the value is immediately converted to a numeric value if possible and placed in the attrVals array.
+    /// The string is retained only for values that can't be converted to int (such as URLs).
+    ///
+    /// #### Parameters
+    ///
+    /// - `attribute`: The attribute's name
+    ///
+    /// - `value`: The attribute's value
+    ///
+    /// #### Returns
+    ///
+    /// a positive error code or -1 if attribute is supported and valid
     @Override
     public int setAttribute(String attribute, String value) {
         int attrId = -1;
@@ -982,14 +925,18 @@ class CSSElement extends HTMLElement {
         }
     }
 
-    /**
-     * Adds the specified attribute and value to this CSSElement if it is supported and has a valid value.
-     * This method is used by addAttribute(String,String) and also when we already know the attribute's id (Such as in shorthand attributes)
-     *
-     * @param attrId The attribute's id
-     * @param value  The attribute's value
-     * @return a positive error code or -1 if attribute is supported and valid
-     */
+    /// Adds the specified attribute and value to this CSSElement if it is supported and has a valid value.
+    /// This method is used by addAttribute(String,String) and also when we already know the attribute's id (Such as in shorthand attributes)
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrId`: The attribute's id
+    ///
+    /// - `value`: The attribute's value
+    ///
+    /// #### Returns
+    ///
+    /// a positive error code or -1 if attribute is supported and valid
     int addAttribute(int attrId, String value) {
 
         if (value == null) {
@@ -1040,12 +987,12 @@ class CSSElement extends HTMLElement {
         return -1; // No error code - attribute addition succeeded
     }
 
-    /**
-     * Checks if the attribute is one of CSS_BACKGROUND_POSITION_X or CSS_BACKGROUND_POSITION_Y and if so fixes the default of the other attribute accordingly.
-     * Background position is a very special case, since when it is not specified the default is TOP, LEFT, but when one of the background positions is specified, the other's default turns to CENTER
-     *
-     * @param attrId The attributeID
-     */
+    /// Checks if the attribute is one of CSS_BACKGROUND_POSITION_X or CSS_BACKGROUND_POSITION_Y and if so fixes the default of the other attribute accordingly.
+    /// Background position is a very special case, since when it is not specified the default is TOP, LEFT, but when one of the background positions is specified, the other's default turns to CENTER
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrId`: The attributeID
     private void fixBackgroundPositionDefaults(int attrId) {
         if ((attrId == CSS_BACKGROUND_POSITION_X) && (!isAttributeAssigned(CSS_BACKGROUND_POSITION_Y))) {
             addAttribute(CSS_BACKGROUND_POSITION_Y, CENTER_STR);
@@ -1054,21 +1001,19 @@ class CSSElement extends HTMLElement {
         }
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public String getAttributeName(Integer attrKey) {
         return CSS_ATTRIBUTE_ROOTS[attrKey.intValue() - CSS_STYLE_ID_OFFSET];
     }
 
-    /**
-     * Returns this selector's specificity. A specificity of a selector determines the order in which it should be applied.
-     * The bigger the specificty, the later the selector will be applied (Which means it will overdride previously applied selectors)
-     * This lazily invokes calcSelectorSpecificity if it wasn't invoked before.
-     *
-     * @return this selector's specificity.
-     */
+    /// Returns this selector's specificity. A specificity of a selector determines the order in which it should be applied.
+    /// The bigger the specificty, the later the selector will be applied (Which means it will overdride previously applied selectors)
+    /// This lazily invokes calcSelectorSpecificity if it wasn't invoked before.
+    ///
+    /// #### Returns
+    ///
+    /// this selector's specificity.
     int getSelectorSpecificity() {
         if (selectorSpecificity == -1) {
             selectorSpecificity = calcSelectorSpecificity();
@@ -1077,35 +1022,43 @@ class CSSElement extends HTMLElement {
 
     }
 
-    /**
-     * Returns the value of the requested attribute
-     *
-     * @param attrId The attribute's id
-     * @return the value of the requested attribute
-     */
+    /// Returns the value of the requested attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrId`: The attribute's id
+    ///
+    /// #### Returns
+    ///
+    /// the value of the requested attribute
     int getAttrVal(int attrId) {
         return attrVals[attrId - CSS_STYLE_ID_OFFSET];
     }
 
-    /**
-     * Returns the length value of the requested attribute.
-     * A CSS length value can be denoted in various units, or percentages. This method calculates the final value in pixels.
-     *
-     * @param attrId        The attribute's id
-     * @param cmp           The component relevant to the length calculation (Used in case of length values based on font size)
-     * @param origDimension The original dimension to take into account if the value is specified as a percentage value
-     * @return the calculated value
-     */
+    /// Returns the length value of the requested attribute.
+    /// A CSS length value can be denoted in various units, or percentages. This method calculates the final value in pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrId`: The attribute's id
+    ///
+    /// - `cmp`: The component relevant to the length calculation (Used in case of length values based on font size)
+    ///
+    /// - `origDimension`: The original dimension to take into account if the value is specified as a percentage value
+    ///
+    /// #### Returns
+    ///
+    /// the calculated value
     int getAttrLengthVal(int attrId, Component cmp, int origDimension) {
         int val = getAttrVal(attrId);
         return convertLengthVal(val, cmp, origDimension);
     }
 
-    /**
-     * Calculates this selector's specificity
-     *
-     * @return this selector's specificity
-     */
+    /// Calculates this selector's specificity
+    ///
+    /// #### Returns
+    ///
+    /// this selector's specificity
     int calcSelectorSpecificity() {
         int spec = 0;
         if (attributeSelections != null) {
@@ -1177,51 +1130,51 @@ class CSSElement extends HTMLElement {
         return spec;
     }
 
-    /**
-     * Returns this selector's id, or null if none
-     * This method assumes that calcSelectorSpecificity was invoked before.
-     *
-     * @return this selector's id, or null if none
-     */
+    /// Returns this selector's id, or null if none
+    /// This method assumes that calcSelectorSpecificity was invoked before.
+    ///
+    /// #### Returns
+    ///
+    /// this selector's id, or null if none
     String getSelectorId() {
         return selectorId;
     }
 
-    /**
-     * Returns this selector's class, or null if none
-     * This method assumes that calcSelectorSpecificity was invoked before.
-     *
-     * @return this selector's class, or null if none
-     */
+    /// Returns this selector's class, or null if none
+    /// This method assumes that calcSelectorSpecificity was invoked before.
+    ///
+    /// #### Returns
+    ///
+    /// this selector's class, or null if none
     String getSelectorClass() {
         return selectorClass;
     }
 
-    /**
-     * Returns this selector's tag, or null if none
-     * This method assumes that calcSelectorSpecificity was invoked before.
-     *
-     * @return this selector's tag, or null if none
-     */
+    /// Returns this selector's tag, or null if none
+    /// This method assumes that calcSelectorSpecificity was invoked before.
+    ///
+    /// #### Returns
+    ///
+    /// this selector's tag, or null if none
     String getSelectorTag() {
         return selectorTag;
     }
 
-    /**
-     * This method assumes that calcSelectorSpecificity was invoked before.
-     *
-     * @return the selectorPseudoClass
-     */
+    /// This method assumes that calcSelectorSpecificity was invoked before.
+    ///
+    /// #### Returns
+    ///
+    /// the selectorPseudoClass
     int getSelectorPseudoClass() {
         return selectorPseudoClass;
     }
 
-    /**
-     * Copies all properties, both string and numeric values to the destination element
-     * This is used for grouped selectors
-     *
-     * @param dest The destination selector
-     */
+    /// Copies all properties, both string and numeric values to the destination element
+    /// This is used for grouped selectors
+    ///
+    /// #### Parameters
+    ///
+    /// - `dest`: The destination selector
     void copyAttributesTo(CSSElement dest) {
         System.arraycopy(attrVals, 0, dest.attrVals, 0, attrVals.length);
         Hashtable attributes = getAttributes();
@@ -1234,11 +1187,9 @@ class CSSElement extends HTMLElement {
         }
     }
 
-    /**
-     * Simple data class to hold a data to be used for attribute selections
-     *
-     * @author Ofir Leitner
-     */
+    /// Simple data class to hold a data to be used for attribute selections
+    ///
+    /// @author Ofir Leitner
     static class AttString {
 
         static final int EQUALS = 0;

@@ -26,10 +26,7 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 
 
-/**
- * @author shannah
- * @deprecated
- */
+/// @author shannah
 public class PathMeasure {
 
     private final GeneralPath path;

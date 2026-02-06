@@ -27,11 +27,9 @@ import com.codename1.maps.Tile;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Point;
 
-/**
- * This is a tiled map provider
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This is a tiled map provider
+///
+/// @author Roman Kamyk
 public abstract class TiledProvider extends MapProvider {
 
     protected final String _url;
@@ -39,26 +37,33 @@ public abstract class TiledProvider extends MapProvider {
     // Very ugly cacheing
     private Point _tileNo;
 
-    /**
-     * Creates a new Tiled provider
-     *
-     * @param url        the url of the provider
-     * @param projection the Projection system of the Provider
-     * @param tileSize   the tiles size(usually 256x256)
-     */
+    /// Creates a new Tiled provider
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url of the provider
+    ///
+    /// - `projection`: the Projection system of the Provider
+    ///
+    /// - `tileSize`: the tiles size(usually 256x256)
     public TiledProvider(String url, Projection projection, Dimension tileSize) {
         super(projection, tileSize);
         _url = url;
     }
 
-    /**
-     * build a url request for a tile
-     *
-     * @param zoomLevel the zoom level
-     * @param xTile     x position of the tile
-     * @param yTile     y position of the tile
-     * @return the image url of the tile
-     */
+    /// build a url request for a tile
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoomLevel`: the zoom level
+    ///
+    /// - `xTile`: x position of the tile
+    ///
+    /// - `yTile`: y position of the tile
+    ///
+    /// #### Returns
+    ///
+    /// the image url of the tile
     protected String url(int zoomLevel, int xTile, int yTile) {
         return _url + "/" +
                 zoomLevel +
@@ -77,12 +82,15 @@ public abstract class TiledProvider extends MapProvider {
         return tileNo * scale + pos0;
     }
 
-    /**
-     * Scale to the zoom level
-     *
-     * @param zoomLevel to scale to
-     * @return a scaled coordinate.
-     */
+    /// Scale to the zoom level
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoomLevel`: to scale to
+    ///
+    /// #### Returns
+    ///
+    /// a scaled coordinate.
     @Override
     public Coord scale(int zoomLevel) {
         int divider = (1 << zoomLevel);
@@ -100,9 +108,7 @@ public abstract class TiledProvider extends MapProvider {
                 tileCoord(tileNo.getX(), boundary.getLongitude(), scale.getLongitude()), true);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public BoundingBox bboxFor(Coord position, int zoomLevel) {
         _zoomLevel = zoomLevel;
@@ -119,9 +125,7 @@ public abstract class TiledProvider extends MapProvider {
         return new BoundingBox(start, end);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Tile tileFor(BoundingBox bbox) {
         String url = url(_zoomLevel, _tileNo.getX(), (1 << _zoomLevel) - _tileNo.getY() - 1);

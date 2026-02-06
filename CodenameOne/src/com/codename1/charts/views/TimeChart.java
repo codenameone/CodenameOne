@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -31,88 +29,84 @@ import java.util.List;
 import java.util.TimeZone;
 
 
-/**
- * Specialised {@link LineChart} that formats the X axis as dates or times.
- * <p>
- * Populate the chart with an {@link XYMultipleSeriesDataset} where X values are
- * expressed as milliseconds since the epoch. Configure the desired date format
- * using {@link #setDateFormat(String)} or let the chart choose an appropriate
- * format automatically.
- */
+/// Specialised `LineChart` that formats the X axis as dates or times.
+///
+/// Populate the chart with an `XYMultipleSeriesDataset` where X values are
+/// expressed as milliseconds since the epoch. Configure the desired date format
+/// using `#setDateFormat(String)` or let the chart choose an appropriate
+/// format automatically.
 public class TimeChart extends LineChart {
-    /**
-     * /** The constant to identify this chart type.
-     */
+    /// /** The constant to identify this chart type.
     public static final String TYPE = "Time";
-    /**
-     * The number of milliseconds in a day.
-     */
+    /// The number of milliseconds in a day.
     public static final long DAY = 24 * 60 * 60 * 1000;
-    /**
-     * The number of milliseconds in a minute.
-     */
+    /// The number of milliseconds in a minute.
     private static final int MILLIS_TO_MINUTES = 60000;
-    /**
-     * This is missing from the Codename One Calendar object, but required by
-     * TimeZone.getOffset()
-     */
+    /// This is missing from the Codename One Calendar object, but required by
+    /// TimeZone.getOffset()
     private static final int ERA = 0;
-    /**
-     * The date format pattern to be used in formatting the X axis labels.
-     */
+    /// The date format pattern to be used in formatting the X axis labels.
     private String mDateFormat;
-    /**
-     * The starting point for labels.
-     */
+    /// The starting point for labels.
     private Double mStartPoint;
 
     TimeChart() {
     }
 
-    /**
-     * Builds a new time chart instance.
-     *
-     * @param dataset  the multiple series dataset
-     * @param renderer the multiple series renderer
-     */
+    /// Builds a new time chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the multiple series dataset
+    ///
+    /// - `renderer`: the multiple series renderer
     public TimeChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
         super(dataset, renderer);
     }
 
-    /**
-     * Returns the date format pattern to be used for formatting the X axis
-     * labels.
-     *
-     * @return the date format pattern for the X axis labels
-     */
+    /// Returns the date format pattern to be used for formatting the X axis
+    /// labels.
+    ///
+    /// #### Returns
+    ///
+    /// the date format pattern for the X axis labels
     public String getDateFormat() {
         return mDateFormat;
     }
 
-    /**
-     * Sets the date format pattern to be used for formatting the X axis labels.
-     *
-     * @param format the date format pattern for the X axis labels. If null, an
-     *               appropriate default format will be used.
-     */
+    /// Sets the date format pattern to be used for formatting the X axis labels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `format`: @param format the date format pattern for the X axis labels. If null, an
+    ///               appropriate default format will be used.
     public void setDateFormat(String format) {
         mDateFormat = format;
     }
 
-    /**
-     * The graphical representation of the labels on the X axis.
-     *
-     * @param xLabels             the X labels values
-     * @param xTextLabelLocations the X text label locations
-     * @param canvas              the canvas to paint to
-     * @param paint               the paint to be used for drawing
-     * @param left                the left value of the labels area
-     * @param top                 the top value of the labels area
-     * @param bottom              the bottom value of the labels area
-     * @param xPixelsPerUnit      the amount of pixels per one unit in the chart labels
-     * @param minX                the minimum value on the X axis in the chart
-     * @param maxX                the maximum value on the X axis in the chart
-     */
+    /// The graphical representation of the labels on the X axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xLabels`: the X labels values
+    ///
+    /// - `xTextLabelLocations`: the X text label locations
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `left`: the left value of the labels area
+    ///
+    /// - `top`: the top value of the labels area
+    ///
+    /// - `bottom`: the bottom value of the labels area
+    ///
+    /// - `xPixelsPerUnit`: the amount of pixels per one unit in the chart labels
+    ///
+    /// - `minX`: the minimum value on the X axis in the chart
+    ///
+    /// - `maxX`: the maximum value on the X axis in the chart
     @Override
     protected void drawXLabels(List<Double> xLabels, Double[] xTextLabelLocations, Canvas canvas,
                                Paint paint, int left, int top, int bottom, double xPixelsPerUnit, double minX, double maxX) {
@@ -145,13 +139,17 @@ public class TimeChart extends LineChart {
                 minX, maxX);
     }
 
-    /**
-     * Returns the date format pattern to be used, based on the date range.
-     *
-     * @param start the start date in milliseconds
-     * @param end   the end date in milliseconds
-     * @return the date format
-     */
+    /// Returns the date format pattern to be used, based on the date range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the start date in milliseconds
+    ///
+    /// - `end`: the end date in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// the date format
     private DateFormat getDateFormat(double start, double end) {
         if (mDateFormat != null) {
             SimpleDateFormat format = null;
@@ -172,11 +170,11 @@ public class TimeChart extends LineChart {
         return format;
     }
 
-    /**
-     * Returns the chart type identifier.
-     *
-     * @return the chart type
-     */
+    /// Returns the chart type identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the chart type
     @Override
     public String getChartType() {
         return TYPE;
@@ -259,27 +257,26 @@ public class TimeChart extends LineChart {
         return result;
     }
 
-    /**
-     * Determine the number of minutes to adjust the date for local DST. This
-     * should provide a historically correct value, also accounting for changes
-     * in GMT offset. See TimeZone javadoc for more details.
-     *
-     * @param source
-     * @return
-     */
+    /// Determine the number of minutes to adjust the date for local DST. This
+    /// should provide a historically correct value, also accounting for changes
+    /// in GMT offset. See TimeZone javadoc for more details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`
     int getDSTOffset(Calendar source) {
         TimeZone localTimezone = Calendar.getInstance().getTimeZone();
         int rawOffset = localTimezone.getRawOffset() / MILLIS_TO_MINUTES;
         return getOffsetInMinutes(source, localTimezone) - rawOffset;
     }
 
-    /**
-     * Get the offset from GMT for a given timezone.
-     *
-     * @param source
-     * @param timezone
-     * @return
-     */
+    /// Get the offset from GMT for a given timezone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`
+    ///
+    /// - `timezone`
     int getOffsetInMinutes(Calendar source, TimeZone timezone) {
         return timezone.getOffset(source.get(ERA), source.get(Calendar.YEAR), source.get(Calendar.MONTH),
                 source.get(Calendar.DAY_OF_MONTH), source.get(Calendar.DAY_OF_WEEK), source.get(Calendar.MILLISECOND))

@@ -26,18 +26,17 @@ package com.codename1.ui.animations;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.MathUtil;
 
-/**
- * Abstracts the notion of physical motion over time from a numeric location to
- * another. This class can be subclassed to implement any motion equation for
- * appropriate physics effects.
- * <p>This class relies on the System.currentTimeMillis() method to provide
- * transitions between coordinates. The motion can be subclassed to provide every
- * type of motion feel from parabolic motion to spline and linear motion. The default
- * implementation provides a simple algorithm giving the feel of acceleration and
- * deceleration.
- *
- * @author Shai Almog
- */
+/// Abstracts the notion of physical motion over time from a numeric location to
+/// another. This class can be subclassed to implement any motion equation for
+/// appropriate physics effects.
+///
+/// This class relies on the System.currentTimeMillis() method to provide
+/// transitions between coordinates. The motion can be subclassed to provide every
+/// type of motion feel from parabolic motion to spline and linear motion. The default
+/// implementation provides a simple algorithm giving the feel of acceleration and
+/// deceleration.
+///
+/// @author Shai Almog
 public class Motion {
     // package protected for the resource editor
     static final int LINEAR = 0;
@@ -66,13 +65,15 @@ public class Motion {
     private float p2;
     private float p3;
 
-    /**
-     * Construct a point/destination motion
-     *
-     * @param sourceValue      starting value
-     * @param destinationValue destination value
-     * @param duration         motion duration
-     */
+    /// Construct a point/destination motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
     protected Motion(int sourceValue, int destinationValue, int duration) {
         this.sourceValue = sourceValue;
         this.destinationValue = destinationValue;
@@ -85,13 +86,15 @@ public class Motion {
         previousLastReturnedValueTime[0] = -1;
     }
 
-    /**
-     * Construct a velocity motion
-     *
-     * @param sourceValue  starting value
-     * @param initVelocity initial velocity
-     * @param friction     degree of friction
-     */
+    /// Construct a velocity motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `initVelocity`: initial velocity
+    ///
+    /// - `friction`: degree of friction
     protected Motion(int sourceValue, float initVelocity, float friction) {
         this.sourceValue = sourceValue;
         this.initVelocity = initVelocity;
@@ -110,36 +113,45 @@ public class Motion {
         previousLastReturnedValueTime[0] = -1;
     }
 
-    /**
-     * Allows debugging motion behavior by slowing motions down 50 fold, doesn't apply to friction motion
-     *
-     * @return the slowMotion
-     */
+    /// Allows debugging motion behavior by slowing motions down 50 fold, doesn't apply to friction motion
+    ///
+    /// #### Returns
+    ///
+    /// the slowMotion
     public static boolean isSlowMotion() {
         return slowMotion;
     }
 
-    /**
-     * Allows debugging motion behavior by slowing motions down 50 fold, doesn't apply to friction motion
-     *
-     * @param aSlowMotion the slowMotion to set
-     */
+    /// Allows debugging motion behavior by slowing motions down 50 fold, doesn't apply to friction motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `aSlowMotion`: the slowMotion to set
     public static void setSlowMotion(boolean aSlowMotion) {
         slowMotion = aSlowMotion;
     }
 
-    /**
-     * Creates a standard Cubic Bezier motion to implement functions such as ease-in/out etc.
-     *
-     * @param sourceValue      starting value
-     * @param destinationValue destination value
-     * @param duration         motion duration
-     * @param p0               argument to the bezier function
-     * @param p1               argument to the bezier function
-     * @param p2               argument to the bezier function
-     * @param p3               argument to the bezier function
-     * @return Motion instance
-     */
+    /// Creates a standard Cubic Bezier motion to implement functions such as ease-in/out etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// - `p0`: argument to the bezier function
+    ///
+    /// - `p1`: argument to the bezier function
+    ///
+    /// - `p2`: argument to the bezier function
+    ///
+    /// - `p3`: argument to the bezier function
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
     public static Motion createCubicBezierMotion(int sourceValue, int destinationValue, int duration,
                                                  float p0, float p1, float p2, float p3) {
         Motion m = new Motion(sourceValue, destinationValue, duration);
@@ -151,124 +163,169 @@ public class Motion {
         return m;
     }
 
-    /**
-     * Equivalent to createCubicBezierMotion with 0, 0.42, 0.58, 1.0 as arguments.
-     *
-     * @param sourceValue      starting value
-     * @param destinationValue destination value
-     * @param duration         motion duration
-     * @return Motion instance
-     */
+    /// Equivalent to createCubicBezierMotion with 0, 0.42, 0.58, 1.0 as arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
     public static Motion createEaseInOutMotion(int sourceValue, int destinationValue, int duration) {
         return createCubicBezierMotion(sourceValue, destinationValue, duration, 0, 0.42f, 0.58f, 1);
     }
 
-    /**
-     * Equivalent to createCubicBezierMotion with 0f, 0.25f, 0.25f, 1 as arguments.
-     *
-     * @param sourceValue      starting value
-     * @param destinationValue destination value
-     * @param duration         motion duration
-     * @return Motion instance
-     */
+    /// Equivalent to createCubicBezierMotion with 0f, 0.25f, 0.25f, 1 as arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
     public static Motion createEaseMotion(int sourceValue, int destinationValue, int duration) {
         return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0.25f, 0.25f, 1.0f);
     }
 
-    /**
-     * Equivalent to createCubicBezierMotion with 0f, 0.42f, 1f, 1f as arguments.
-     *
-     * @param sourceValue      starting value
-     * @param destinationValue destination value
-     * @param duration         motion duration
-     * @return Motion instance
-     */
+    /// Equivalent to createCubicBezierMotion with 0f, 0.42f, 1f, 1f as arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
     public static Motion createEaseInMotion(int sourceValue, int destinationValue, int duration) {
         return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0.42f, 1f, 1f);
     }
 
-    /**
-     * Equivalent to createCubicBezierMotion with 0f, 0f, 0.58f, 1.0f as arguments.
-     *
-     * @param sourceValue      starting value
-     * @param destinationValue destination value
-     * @param duration         motion duration
-     * @return Motion instance
-     */
+    /// Equivalent to createCubicBezierMotion with 0f, 0f, 0.58f, 1.0f as arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
     public static Motion createEaseOutMotion(int sourceValue, int destinationValue, int duration) {
         return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0f, 0.58f, 1.0f);
     }
 
-    /**
-     * Creates a linear motion starting from source value all the way to destination value
-     *
-     * @param sourceValue      the number from which we are starting (usually indicating animation start position)
-     * @param destinationValue the number to which we are heading (usually indicating animation destination)
-     * @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
-     *                         destinationValue)
-     * @return new motion object
-     */
+    /// Creates a linear motion starting from source value all the way to destination value
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
+    ///
+    /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
+    ///                         destinationValue)
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
     public static Motion createLinearMotion(int sourceValue, int destinationValue, int duration) {
         Motion l = new Motion(sourceValue, destinationValue, duration);
         l.motionType = LINEAR;
         return l;
     }
 
-    /**
-     * Creates a linear motion starting from source value all the way to destination value for a color value.
-     * Unlike a regular linear motion a color linear motion is shifted based on channels where red, green &amp; blue
-     * get shifted separately.
-     *
-     * @param sourceValue      the color from which we are starting
-     * @param destinationValue the destination color
-     * @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
-     *                         destinationValue)
-     * @return new motion object
-     */
+    /// Creates a linear motion starting from source value all the way to destination value for a color value.
+    /// Unlike a regular linear motion a color linear motion is shifted based on channels where red, green & blue
+    /// get shifted separately.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the color from which we are starting
+    ///
+    /// - `destinationValue`: the destination color
+    ///
+    /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
+    ///                         destinationValue)
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
     public static Motion createLinearColorMotion(int sourceValue, int destinationValue, int duration) {
         Motion l = new Motion(sourceValue, destinationValue, duration);
         l.motionType = COLOR_LINEAR;
         return l;
     }
 
-    /**
-     * Creates a spline motion starting from source value all the way to destination value
-     *
-     * @param sourceValue      the number from which we are starting (usually indicating animation start position)
-     * @param destinationValue the number to which we are heading (usually indicating animation destination)
-     * @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
-     *                         destinationValue)
-     * @return new motion object
-     */
+    /// Creates a spline motion starting from source value all the way to destination value
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
+    ///
+    /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
+    ///                         destinationValue)
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
     public static Motion createSplineMotion(int sourceValue, int destinationValue, int duration) {
         Motion spline = new Motion(sourceValue, destinationValue, duration);
         spline.motionType = SPLINE;
         return spline;
     }
 
-    /**
-     * Creates a deceleration motion starting from source value all the way to destination value
-     *
-     * @param sourceValue      the number from which we are starting (usually indicating animation start position)
-     * @param destinationValue the number to which we are heading (usually indicating animation destination)
-     * @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
-     *                         destinationValue)
-     * @return new motion object
-     */
+    /// Creates a deceleration motion starting from source value all the way to destination value
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
+    ///
+    /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
+    ///                         destinationValue)
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
     public static Motion createDecelerationMotion(int sourceValue, int destinationValue, int duration) {
         Motion deceleration = new Motion(sourceValue, destinationValue, duration);
         deceleration.motionType = DECELERATION;
         return deceleration;
     }
 
-    /**
-     * Creates a deceleration motion starting from the current position of another motion.
-     *
-     * @param motion              the number from which we are starting (usually indicating animation start position)
-     * @param maxDestinationValue The farthest position to allow motion to go.
-     * @param maxDuration         The longest that the duration is allowed to proceed for.
-     * @return new motion object
-     */
+    /// Creates a deceleration motion starting from the current position of another motion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `motion`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `maxDestinationValue`: The farthest position to allow motion to go.
+    ///
+    /// - `maxDuration`: The longest that the duration is allowed to proceed for.
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
     public static Motion createDecelerationMotionFrom(Motion motion, int maxDestinationValue, int maxDuration) {
         return createDecelerationMotion(
                 motion.lastReturnedValue,
@@ -279,15 +336,21 @@ public class Motion {
         );
     }
 
-    /**
-     * Creates a friction motion starting from source with initial speed and the friction
-     *
-     * @param sourceValue  the number from which we are starting (usually indicating animation start position)
-     * @param maxValue     the maximum value for the friction
-     * @param initVelocity the starting velocity
-     * @param friction     the motion friction
-     * @return new motion object
-     */
+    /// Creates a friction motion starting from source with initial speed and the friction
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `maxValue`: the maximum value for the friction
+    ///
+    /// - `initVelocity`: the starting velocity
+    ///
+    /// - `friction`: the motion friction
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
     public static Motion createFrictionMotion(int sourceValue, int maxValue, float initVelocity, float friction) {
         Motion frictionMotion = new Motion(sourceValue, initVelocity, friction);
         frictionMotion.destinationValue = maxValue;
@@ -305,9 +368,7 @@ public class Motion {
 
     }
 
-    /**
-     * Sends the motion to the end time instantly which is useful for flushing an animation
-     */
+    /// Sends the motion to the end time instantly which is useful for flushing an animation
     public void finish() {
         if (!isFinished()) {
             startTime = System.currentTimeMillis() - duration;
@@ -316,18 +377,16 @@ public class Motion {
         }
     }
 
-    /**
-     * Sets the start time to the current time
-     */
+    /// Sets the start time to the current time
     public void start() {
         startTime = System.currentTimeMillis();
     }
 
-    /**
-     * Returns the current time within the motion relative to start time
-     *
-     * @return long value representing System.currentTimeMillis() - startTime
-     */
+    /// Returns the current time within the motion relative to start time
+    ///
+    /// #### Returns
+    ///
+    /// long value representing System.currentTimeMillis() - startTime
     public long getCurrentMotionTime() {
         if (currentMotionTime < 0) {
             return System.currentTimeMillis() - startTime;
@@ -335,12 +394,12 @@ public class Motion {
         return currentMotionTime;
     }
 
-    /**
-     * Allows overriding the getCurrentMotionTime method value with a manual value
-     * to provide full developer control over animation speed/position.
-     *
-     * @param currentMotionTime the time in milliseconds for the motion.
-     */
+    /// Allows overriding the getCurrentMotionTime method value with a manual value
+    /// to provide full developer control over animation speed/position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentMotionTime`: the time in milliseconds for the motion.
     public void setCurrentMotionTime(long currentMotionTime) {
         this.previousCurrentMotionTime = this.currentMotionTime;
         this.currentMotionTime = currentMotionTime;
@@ -355,12 +414,12 @@ public class Motion {
         return motionType == EXPONENTIAL_DECAY;
     }
 
-    /**
-     * Returns true if the motion has run its course and has finished meaning the current
-     * time is greater than startTime + duration.
-     *
-     * @return true if System.currentTimeMillis() > duration + startTime or the last returned value is the destination value
-     */
+    /// Returns true if the motion has run its course and has finished meaning the current
+    /// time is greater than startTime + duration.
+    ///
+    /// #### Returns
+    ///
+    /// true if System.currentTimeMillis() > duration + startTime or the last returned value is the destination value
     public boolean isFinished() {
         return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue || (EXPONENTIAL_DECAY == motionType && previousLastReturnedValue[0] == lastReturnedValue);
     }
@@ -432,12 +491,12 @@ public class Motion {
         return current;
     }
 
-    /**
-     * Returns the value for the motion for the current clock time.
-     * The value is dependent on the Motion type.
-     *
-     * @return a value that is relative to the source value
-     */
+    /// Returns the value for the motion for the current clock time.
+    /// The value is dependent on the Motion type.
+    ///
+    /// #### Returns
+    ///
+    /// a value that is relative to the source value
     public int getValue() {
         if (currentMotionTime > -1 && startTime > getCurrentMotionTime()) {
             return sourceValue;
@@ -478,15 +537,17 @@ public class Motion {
         return lastReturnedValue;
     }
 
-    /**
-     * Gets an approximation of the current velocity in pixels per millisecond.
-     *
-     * <p>NOTE: If {@link #countAvailableVelocitySamplingPoints()} <= 1, then this method will always output {@literal 0}.
-     * Therefore the output of this method only has meaning if {@link #countAvailableVelocitySamplingPoints()} > {@literal 0}</p>
-     *
-     * @return Current velocity in pixels per millisecond.
-     * @since 8.0
-     */
+    /// Gets an approximation of the current velocity in pixels per millisecond.
+    ///
+    /// NOTE: If `#countAvailableVelocitySamplingPoints()`  0
+    ///
+    /// #### Returns
+    ///
+    /// Current velocity in pixels per millisecond.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public double getVelocity() {
         final long localCurrentMotionTime = getCurrentMotionTime();
         final int lastReturnedValueLocal = lastReturnedValue;
@@ -506,13 +567,16 @@ public class Motion {
         return velocity;
     }
 
-    /**
-     * Gets the number of sampling points that can be used by {@link #getVelocity()}.  A minimum of 2 sampling
-     * points are required for the result of {@link #getVelocity()} to have any meaning.
-     *
-     * @return The number of sampling points that can be used by {@link #getVelocity()}.
-     * @since 8.0
-     */
+    /// Gets the number of sampling points that can be used by `#getVelocity()`.  A minimum of 2 sampling
+    /// points are required for the result of `#getVelocity()` to have any meaning.
+    ///
+    /// #### Returns
+    ///
+    /// The number of sampling points that can be used by `#getVelocity()`.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public int countAvailableVelocitySamplingPoints() {
         int count = 1;
         final long localCurrentMotionTime = getCurrentMotionTime();
@@ -650,56 +714,56 @@ public class Motion {
         return x;
     }
 
-    /**
-     * The number from which we are starting (usually indicating animation start position)
-     *
-     * @return the source value
-     */
+    /// The number from which we are starting (usually indicating animation start position)
+    ///
+    /// #### Returns
+    ///
+    /// the source value
     public int getSourceValue() {
         return sourceValue;
     }
 
-    /**
-     * The number from which we are starting (usually indicating animation start position)
-     *
-     * @param sourceValue the source value
-     */
+    /// The number from which we are starting (usually indicating animation start position)
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the source value
     public void setSourceValue(int sourceValue) {
         this.sourceValue = sourceValue;
     }
 
-    /**
-     * The number to which we will reach when the motion is finished
-     *
-     * @return the source value
-     */
+    /// The number to which we will reach when the motion is finished
+    ///
+    /// #### Returns
+    ///
+    /// the source value
     public int getDestinationValue() {
         return destinationValue;
     }
 
-    /**
-     * The value of System.currentTimemillis() when motion was started
-     *
-     * @return the start time
-     */
+    /// The value of System.currentTimemillis() when motion was started
+    ///
+    /// #### Returns
+    ///
+    /// the start time
     protected long getStartTime() {
         return startTime;
     }
 
-    /**
-     * Sets the start time of the motion
-     *
-     * @param startTime the starting time
-     */
+    /// Sets the start time of the motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `startTime`: the starting time
     public void setStartTime(long startTime) {
         this.startTime = startTime;
     }
 
-    /**
-     * Returns the animation duration
-     *
-     * @return animation duration in milliseconds
-     */
+    /// Returns the animation duration
+    ///
+    /// #### Returns
+    ///
+    /// animation duration in milliseconds
     public int getDuration() {
         return duration;
     }

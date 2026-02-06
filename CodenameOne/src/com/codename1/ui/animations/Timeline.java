@@ -30,11 +30,9 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * A timeline represents the motions of animation objects
- *
- * @author Shai Almog
- */
+/// A timeline represents the motions of animation objects
+///
+/// @author Shai Almog
 public final class Timeline extends Image implements Animation, Painter {
     AnimationObject[] animations;
     private int time;
@@ -43,11 +41,9 @@ public final class Timeline extends Image implements Animation, Painter {
     private Dimension scaledTo;
     private long currentTime = -1;
 
-    /**
-     * Inidicates the minimal delay between animation frames allowing the CPU to rest.
-     * Increase this number to increase general device performance, decrease it to speed
-     * the animation.
-     */
+    /// Inidicates the minimal delay between animation frames allowing the CPU to rest.
+    /// Increase this number to increase general device performance, decrease it to speed
+    /// the animation.
     private int animationDelay = 100;
 
     private boolean pause;
@@ -58,15 +54,20 @@ public final class Timeline extends Image implements Animation, Painter {
         super(null);
     }
 
-    /**
-     * Create a new timeline animation
-     *
-     * @param duration   the duration of the animation in milliseconds
-     * @param animations the animation objects that are part of this timeline
-     * @param size       size of the animation in virtual pixels, if the size differs the animation would be
-     *                   scaled on the fly
-     * @return the new timeline instance
-     */
+    /// Create a new timeline animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the animation in milliseconds
+    ///
+    /// - `animations`: the animation objects that are part of this timeline
+    ///
+    /// - `size`: @param size       size of the animation in virtual pixels, if the size differs the animation would be
+    ///                   scaled on the fly
+    ///
+    /// #### Returns
+    ///
+    /// the new timeline instance
     public static Timeline createTimeline(int duration, AnimationObject[] animations, Dimension size) {
         if (duration <= 0) {
             throw new IllegalArgumentException("Illegal duration " + duration);
@@ -78,9 +79,7 @@ public final class Timeline extends Image implements Animation, Painter {
         return t;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void lock() {
         if (animations != null) {
@@ -91,9 +90,7 @@ public final class Timeline extends Image implements Animation, Painter {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void unlock() {
         if (animations != null) {
@@ -104,9 +101,7 @@ public final class Timeline extends Image implements Animation, Painter {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int[] getRGB() {
         Image i = Image.createImage(getWidth(), getHeight());
@@ -114,19 +109,17 @@ public final class Timeline extends Image implements Animation, Painter {
         return i.getRGB();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int[] getRGBCached() {
         return getRGB();
     }
 
-    /**
-     * Adds an animation object to show using this timeline
-     *
-     * @param o animation object featured in this timeline
-     */
+    /// Adds an animation object to show using this timeline
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: animation object featured in this timeline
     public void addAnimation(AnimationObject o) {
         AnimationObject[] n = new AnimationObject[animations.length + 1];
         System.arraycopy(animations, 0, n, 0, animations.length);
@@ -134,20 +127,20 @@ public final class Timeline extends Image implements Animation, Painter {
         animations = n;
     }
 
-    /**
-     * Returns the time of the timeline
-     *
-     * @return the time of the timeline in ms starting from 0
-     */
+    /// Returns the time of the timeline
+    ///
+    /// #### Returns
+    ///
+    /// the time of the timeline in ms starting from 0
     public int getTime() {
         return time;
     }
 
-    /**
-     * Set the time of the timeline
-     *
-     * @param time the time of the timeline in ms starting from 0
-     */
+    /// Set the time of the timeline
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`: the time of the timeline in ms starting from 0
     public void setTime(int time) {
         if (!pause) {
             if (time >= 0 && time <= duration) {
@@ -157,17 +150,13 @@ public final class Timeline extends Image implements Animation, Painter {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isAnimation() {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         if (!pause) {
@@ -194,17 +183,13 @@ public final class Timeline extends Image implements Animation, Painter {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         paint(g, null);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g, Rectangle rect) {
         float scaleX = 1;
@@ -232,31 +217,29 @@ public final class Timeline extends Image implements Animation, Painter {
         }
     }
 
-    /**
-     * Inidicates the minimal delay between animation frames allowing the CPU to rest.
-     * Increase this number to increase general device performance, decrease it to speed
-     * the animation.
-     *
-     * @return the animationDelay
-     */
+    /// Inidicates the minimal delay between animation frames allowing the CPU to rest.
+    /// Increase this number to increase general device performance, decrease it to speed
+    /// the animation.
+    ///
+    /// #### Returns
+    ///
+    /// the animationDelay
     public int getAnimationDelay() {
         return animationDelay;
     }
 
-    /**
-     * Inidicates the minimal delay between animation frames allowing the CPU to rest.
-     * Increase this number to increase general device performance, decrease it to speed
-     * the animation.
-     *
-     * @param animationDelay the animationDelay to set
-     */
+    /// Inidicates the minimal delay between animation frames allowing the CPU to rest.
+    /// Increase this number to increase general device performance, decrease it to speed
+    /// the animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `animationDelay`: the animationDelay to set
     public void setAnimationDelay(int animationDelay) {
         this.animationDelay = animationDelay;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         g.translate(x, y);
@@ -270,9 +253,7 @@ public final class Timeline extends Image implements Animation, Painter {
         g.translate(-x, -y);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         g.translate(x, y);
@@ -282,9 +263,7 @@ public final class Timeline extends Image implements Animation, Painter {
         g.translate(-x, -y);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getWidth() {
         if (scaledTo != null) {
@@ -293,9 +272,7 @@ public final class Timeline extends Image implements Animation, Painter {
         return size.getWidth();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getHeight() {
         if (scaledTo != null) {
@@ -304,9 +281,7 @@ public final class Timeline extends Image implements Animation, Painter {
         return size.getHeight();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Image scaled(int width, int height) {
         Timeline t = new Timeline();
@@ -320,71 +295,78 @@ public final class Timeline extends Image implements Animation, Painter {
         return t;
     }
 
-    /**
-     * Returns true when the timeline is paused
-     *
-     * @return the pause state
-     */
+    /// Returns true when the timeline is paused
+    ///
+    /// #### Returns
+    ///
+    /// the pause state
     public boolean isPause() {
         return pause;
     }
 
-    /**
-     * Indicate that the application is paused
-     *
-     * @param pause true to pause the application
-     */
+    /// Indicate that the application is paused
+    ///
+    /// #### Parameters
+    ///
+    /// - `pause`: true to pause the application
     public void setPause(boolean pause) {
         this.pause = pause;
     }
 
-    /**
-     * Returns the duration of the entire timeline in milliseconds
-     *
-     * @return the duration
-     */
+    /// Returns the duration of the entire timeline in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// the duration
     public int getDuration() {
         return duration;
     }
 
-    /**
-     * Returns the pixel based unscaled dimentions of this timeline
-     *
-     * @return the size
-     */
+    /// Returns the pixel based unscaled dimentions of this timeline
+    ///
+    /// #### Returns
+    ///
+    /// the size
     public Dimension getSize() {
         return size;
     }
 
-    /**
-     * Returns the number of animation objects in this timeline
-     *
-     * @return the number of animations
-     */
+    /// Returns the number of animation objects in this timeline
+    ///
+    /// #### Returns
+    ///
+    /// the number of animations
     public int getAnimationCount() {
         return animations.length;
     }
 
-    /**
-     * Returns the animation object in the given offset
-     *
-     * @param i the offset of the animation
-     * @return the animation object
-     */
+    /// Returns the animation object in the given offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the offset of the animation
+    ///
+    /// #### Returns
+    ///
+    /// the animation object
     public AnimationObject getAnimation(int i) {
         return animations[i];
     }
 
-    /**
-     * Returns the animation object at the given X/Y coordinate in the timeline
-     * for the current frame. This allows functionality such as responding to pointer
-     * events on the resource editor. Notice that this method is not efficient since it tests
-     * the pixel opacity which is a pretty expensive operation...
-     *
-     * @param x the x location in the timeline
-     * @param y the y location in the timeline
-     * @return an animation object or null if no animation object is at that position.
-     */
+    /// Returns the animation object at the given X/Y coordinate in the timeline
+    /// for the current frame. This allows functionality such as responding to pointer
+    /// events on the resource editor. Notice that this method is not efficient since it tests
+    /// the pixel opacity which is a pretty expensive operation...
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x location in the timeline
+    ///
+    /// - `y`: the y location in the timeline
+    ///
+    /// #### Returns
+    ///
+    /// an animation object or null if no animation object is at that position.
     public AnimationObject getAnimationAt(int x, int y) {
         int alen = animations.length;
         for (int iter = 0; iter < alen; iter++) {
@@ -412,27 +394,25 @@ public final class Timeline extends Image implements Animation, Painter {
         return null;
     }
 
-    /**
-     * Indicates if the image should loop
-     *
-     * @return the loop
-     */
+    /// Indicates if the image should loop
+    ///
+    /// #### Returns
+    ///
+    /// the loop
     public boolean isLoop() {
         return loop;
     }
 
-    /**
-     * Indicates if the image should loop
-     *
-     * @param loop the loop to set
-     */
+    /// Indicates if the image should loop
+    ///
+    /// #### Parameters
+    ///
+    /// - `loop`: the loop to set
     public void setLoop(boolean loop) {
         this.loop = loop;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean requiresDrawImage() {
         return true;

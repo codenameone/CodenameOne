@@ -22,36 +22,31 @@
  */
 package com.codename1.processing;
 
-/**
- * Internal class, do not use.
- * <p>
- * This evaluator handles expressions that involve child text. Examples:
- *
- * <code>
- * Get last names of all players named 'Andre'
- * <p>
- * /tournament/player[name='Andre']/lastname
- * <p>
- * Get all lineitem numbers with a price over 35
- * <p>
- * //order/lineitem[price>35]/@linenum
- * <p>
- * Get all PO numbers of orders that contain a lineitem with a price over 35
- * <p>
- * //order/lineitem[price>35]/../order/@ponum
- *
- * </code>
- *
- * @author Eric Coolman
- */
+/// Internal class, do not use.
+///
+/// This evaluator handles expressions that involve child text. Examples:
+///
+/// `Get last names of all players named 'Andre'
+///
+///  /tournament/player[name='Andre']/lastname
+///
+///  Get all lineitem numbers with a price over 35
+///
+///  //order/lineitem[price>35]/@linenum
+///
+///  Get all PO numbers of orders that contain a lineitem with a price over 35
+///
+///  //order/lineitem[price>35]/../order/@ponum`
+///
+/// @author Eric Coolman
 class TextEvaluator extends AbstractEvaluator {
     static final String FUNC_TEXT = "text()";
 
-    /**
-     * Construct with a full predicate expression.
-     *
-     * @param expr a full predicate expression.
-     */
+    /// Construct with a full predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `expr`: a full predicate expression.
     public TextEvaluator(String expr) {
         super(expr);
     }

@@ -35,51 +35,56 @@ import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.Vector;
 
-/**
- * A Glass Tutorial appears on top of the UI especially on a touch device
- * but could be on any device and points to/circles components within the UI
- * coupled with explanation of what they do and a tint of the screen.
- * It is implemented as a GlassPane on top of a Form which is automatically
- * removed when a user touches the screen or presses a button.<br>
- * To position elements within the glass tutorial the elements must be
- * associated with a component instance of the underlying UI and positioned
- * relatively to said component.<br>
- * The GlassTutorial uses the "GlassTutorial" UIID to paint itself it then paints
- * the hint components in their proper places.
- *
- * @author Shai Almog
- * @deprecated interaction dialog is a superior way for displaying these types of tutorials
- */
+/// A Glass Tutorial appears on top of the UI especially on a touch device
+/// but could be on any device and points to/circles components within the UI
+/// coupled with explanation of what they do and a tint of the screen.
+/// It is implemented as a GlassPane on top of a Form which is automatically
+/// removed when a user touches the screen or presses a button.
+///
+/// To position elements within the glass tutorial the elements must be
+/// associated with a component instance of the underlying UI and positioned
+/// relatively to said component.
+///
+/// The GlassTutorial uses the "GlassTutorial" UIID to paint itself it then paints
+/// the hint components in their proper places.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// interaction dialog is a superior way for displaying these types of tutorials
 public class GlassTutorial implements Painter {
     private static final String DEST = "$$GLSDESTHINT$$";
     private static final String POS = "$$GLSDESTPOS$$";
     private final Vector vec = new Vector();
     private Component internal;
 
-    /**
-     * Places a hint within the glass in a position relative to the destinationComponent, the position
-     * is indicated with border layout attributes. Notice you can place multiple components on a single
-     * element and they will be rendered in order e.g. a component with a border can be used to "circle"
-     * the destination by placing it in the CENTER position and another arrow with text can be places in
-     * the south position below.
-     *
-     * @param hintComponent        The component that would be renderered in the given position
-     * @param destinationComponent the "hinted" component over which the hint will show
-     * @param position             the position relative to the destinationComponent in BorderLayout values e.g. to place the hint
-     *                             above the component just place it in BorderLayout.NORTH. The center will stretch the component but the
-     *                             other sides will give the component its exact preferred size.
-     */
+    /// Places a hint within the glass in a position relative to the destinationComponent, the position
+    /// is indicated with border layout attributes. Notice you can place multiple components on a single
+    /// element and they will be rendered in order e.g. a component with a border can be used to "circle"
+    /// the destination by placing it in the CENTER position and another arrow with text can be places in
+    /// the south position below.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hintComponent`: The component that would be renderered in the given position
+    ///
+    /// - `destinationComponent`: the "hinted" component over which the hint will show
+    ///
+    /// - `position`: @param position             the position relative to the destinationComponent in BorderLayout values e.g. to place the hint
+    ///                             above the component just place it in BorderLayout.NORTH. The center will stretch the component but the
+    ///                             other sides will give the component its exact preferred size.
     public void addHint(Component hintComponent, Component destinationComponent, String position) {
         hintComponent.putClientProperty(POS, position);
         hintComponent.putClientProperty(DEST, destinationComponent);
         vec.addElement(hintComponent);
     }
 
-    /**
-     * Install the glass tutorial on a form and seamlessly dismiss it when no longer necessary
-     *
-     * @param f the form
-     */
+    /// Install the glass tutorial on a form and seamlessly dismiss it when no longer necessary
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form
     public void showOn(Form f) {
         Painter oldPane = f.getGlassPane();
         f.setGlassPane(this);
@@ -95,9 +100,7 @@ public class GlassTutorial implements Painter {
         f.setGlassPane(oldPane);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g, Rectangle rect) {
         if (internal == null) {

@@ -23,29 +23,25 @@
 package com.codename1.processing;
 
 
-/**
- * Internal class, do not use.
- * <p>
- * Predicate Evaluator Factory, attempts to create a predicate evaluator given the expression.
- * <p>
- * ie:
- *
- * <code>
- * [0] = IndexEvaluator
- * [last()] = IndexEvaluator
- * [@ponum=3] = AttributeEvaluator
- * [lastname='Coolman'] = TextEvaluator
- * </code>
- *
- * @author Eric Coolman
- */
+/// Internal class, do not use.
+///
+/// Predicate Evaluator Factory, attempts to create a predicate evaluator given the expression.
+///
+/// ie:
+///
+/// `[0] = IndexEvaluator [last()] = IndexEvaluator [@ponum=3] = AttributeEvaluator [lastname='Coolman'] = TextEvaluator`
+///
+/// @author Eric Coolman
 abstract class EvaluatorFactory {
-    /**
-     * Construct an evaluator for a given predicate expression.
-     *
-     * @param text a full predicate expression.
-     * @return an Evaluator instance that can process the expression.
-     */
+    /// Construct an evaluator for a given predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: a full predicate expression.
+    ///
+    /// #### Returns
+    ///
+    /// an Evaluator instance that can process the expression.
     public static Evaluator createEvaluator(String text) {
         if (isNumeric(text)) {
             return new IndexEvaluator(text);
@@ -67,12 +63,11 @@ abstract class EvaluatorFactory {
         throw new IllegalStateException("Could not create a comparator for value: " + text);
     }
 
-    /**
-     * Test if string contains only digits.
-     *
-     * @param text
-     * @return
-     */
+    /// Test if string contains only digits.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`
     private static boolean isNumeric(String text) {
         text = text.trim();
         int tlen = text.length();

@@ -32,82 +32,122 @@ import com.codename1.ui.plaf.Style;
 
 import java.util.Vector;
 
-/**
- * <p>TableLayout is a very elaborate <b>constraint based</b> layout manager that can arrange elements
- * in rows/columns while defining constraints to control complex behavior such as spanning, alignment/weight
- * etc.<br>
- * Notice that the table layout is in the <code>com.codename1.ui.table</code> package and not in the
- * layouts package. <br>
- * This is due to the fact that <code>TableLayout</code> was originally designed for the
- * {@link Table} class.</p>
- *
- * <p>Despite being constraint based the table layout isn't strict about constraints and will implicitly add a
- * constraint when one is missing. However, unlike grid layout table layout won't implicitly add a row if the
- * row/column count is incorrect<br>
- * E.g this creates a 2x2 table but adds 5 elements. The 5th element won't show:</p>
- * <script src="https://gist.github.com/codenameone/a25944769128d5330cd4.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/table-layout-2x2.png" alt="TableLayout 2x2 missing component" />
- *
- * <p>Table layout supports the ability to grow the last column which can be enabled using the
- * <code>setGrowHorizontally</code> method. You can also use a shortened terse syntax to construct a table
- * layout however since the table layout is a constraint based layout you won't be able to utilize its full power
- * with this syntax.</>
- *
- * <p>The default usage of the encloseIn below uses the <code>setGrowHorizontally</code> flag.</p>
- * <script src="https://gist.github.com/codenameone/2b4d9a13f409e297fb2e.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
- *
- * <h4>The Full Potential</h4>
- * <p>To truly appreciate the {@code TableLayout} we need to use the constraint syntax which allows
- * us to span, align and set width/height for the rows &amp; columns.<br>
- * Table layout works with a {@link Constraint} instance that can communicate our intentions into the
- * layout manager. Such constraints can include more than one attribute e.g. span and height.</p>
- *
- * <p>Notice that table layout constraints can't be reused for more than one component.<br>
- * The constraint class supports the following attributes:</p>
- *
- * <table summary="" border="1">
- *   <tr>
- *        <td> column       </td><td> The column for the table cell. This defaults to -1 which will just place the component in the next available cell</td>
- *   </tr>
- *   <tr>
- *        <td> row             </td><td> Similar to column, defaults to -1 as well</td>
- *   </tr>
- *   <tr>
- *       <td> width           </td><td> The column width in percentages, -1 will use the preferred size. -2 for width will take up the rest of the available space</td>
- *   </tr>
- *   <tr>
- *       <td> height          </td><td> The row height in percentages, -1 will use the preferred size. -2 for height will take up the rest of the available space</td>
- *   </tr>
- *   <tr>
- *       <td> spanHorizontal  </td><td> The cells that should be occupied horizontally defaults to 1 and can't exceed the column count - current offset.</td>
- *   </tr>
- *   <tr>
- *       <td> spanVertical    </td><td> Similar to spanHorizontal with the same limitations</td>
- *   </tr>
- *   <tr>
- *       <td> horizontalAlign </td><td> The horizontal alignment of the content within the cell, defaults to the special case -1 value to take up all the cell space can be either `-1`, `Component.LEFT`, `Component.RIGHT` or `Component.CENTER`</td>
- *   </tr>
- *   <tr>
- *       <td> verticalAlign   </td><td> Similar to horizontalAlign can be one of `-1`, `Component.TOP`, `Component.BOTTOM` or `Component.CENTER`</td>
- *   </tr>
- * </table>
- *
- * <p> Notice that you only need to set `width`/`height` to one cell in a column/row.<br>
- * The table layout constraint sample tries to demonstrate some of the unique things you can do with constraints.<br>
- * <p>
- * We go into further details on this in the <a href="https://www.codenameone.com/manual/basics.html#_table_layout">developer guide</a>
- * so check that out.</p>
- * <script src="https://gist.github.com/codenameone/573f73164df4af00b7b1.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/table-layout-constraints.png" alt="TableLayout with complex constraints" />
- *
- * @author Shai Almog
- */
+/// TableLayout is a very elaborate **constraint based** layout manager that can arrange elements
+/// in rows/columns while defining constraints to control complex behavior such as spanning, alignment/weight
+/// etc.
+///
+/// Notice that the table layout is in the `com.codename1.ui.table` package and not in the
+/// layouts package.
+///
+/// This is due to the fact that `TableLayout` was originally designed for the
+/// `Table` class.
+///
+/// Despite being constraint based the table layout isn't strict about constraints and will implicitly add a
+/// constraint when one is missing. However, unlike grid layout table layout won't implicitly add a row if the
+/// row/column count is incorrect
+///
+/// E.g this creates a 2x2 table but adds 5 elements. The 5th element won't show:
+///
+/// ```java
+/// Form hi = new Form("Table Layout 2x2", new TableLayout(2, 2));
+/// hi.add(new Label("First")).
+///     add(new Label("Second")).
+///     add(new Label("Third")).
+///     add(new Label("Fourth")).
+///     add(new Label("Fifth"));
+/// hi.show();
+/// ```
+///
+/// Table layout supports the ability to grow the last column which can be enabled using the
+/// `setGrowHorizontally` method. You can also use a shortened terse syntax to construct a table
+/// layout however since the table layout is a constraint based layout you won't be able to utilize its full power
+/// with this syntax.
+///
+/// The default usage of the encloseIn below uses the `setGrowHorizontally` flag.
+///
+/// ```java
+/// Container tl = TableLayout.encloseIn(2, new Label("First"),
+///                 new Label("Second"),
+///                 new Label("Third"),
+///                 new Label("Fourth"),
+///                 new Label("Fifth")));
+/// ```
+///
+/// The Full Potential
+///
+/// To truly appreciate the `TableLayout` we need to use the constraint syntax which allows
+/// us to span, align and set width/height for the rows & columns.
+///
+/// Table layout works with a `Constraint` instance that can communicate our intentions into the
+/// layout manager. Such constraints can include more than one attribute e.g. span and height.
+///
+/// Notice that table layout constraints can't be reused for more than one component.
+///
+/// The constraint class supports the following attributes:
+///
+///
+///         column        The column for the table cell. This defaults to -1 which will just place the component in the next available cell
+///
+///
+///         row              Similar to column, defaults to -1 as well
+///
+///
+///        width            The column width in percentages, -1 will use the preferred size. -2 for width will take up the rest of the available space
+///
+///
+///        height           The row height in percentages, -1 will use the preferred size. -2 for height will take up the rest of the available space
+///
+///
+///        spanHorizontal   The cells that should be occupied horizontally defaults to 1 and can't exceed the column count - current offset.
+///
+///
+///        spanVertical     Similar to spanHorizontal with the same limitations
+///
+///
+///        horizontalAlign  The horizontal alignment of the content within the cell, defaults to the special case -1 value to take up all the cell space can be either `-1`, `Component.LEFT`, `Component.RIGHT` or `Component.CENTER`
+///
+///
+///        verticalAlign    Similar to horizontalAlign can be one of `-1`, `Component.TOP`, `Component.BOTTOM` or `Component.CENTER`
+///
+///
+///  Notice that you only need to set `width`/`height` to one cell in a column/row.
+///
+/// The table layout constraint sample tries to demonstrate some of the unique things you can do with constraints.
+///
+/// We go into further details on this in the [developer guide](https://www.codenameone.com/manual/basics.html#_table_layout)
+/// so check that out.
+///
+/// ```java
+/// TableLayout tl = new TableLayout(2, 3);
+/// Form hi = new Form("Table Layout Cons", tl);
+/// hi.setScrollable(false);
+/// hi.add(tl.createConstraint().
+///             widthPercentage(20),
+///                 new Label("AAA")).
+///
+///         add(tl.createConstraint().
+///             horizontalSpan(2).
+///             heightPercentage(80).
+///             verticalAlign(Component.CENTER).
+///             horizontalAlign(Component.CENTER),
+///                 new Label("Span H")).
+///
+///         add(new Label("BBB")).
+///
+///         add(tl.createConstraint().
+///             widthPercentage(60).
+///             heightPercentage(20),
+///                 new Label("CCC")).
+///
+///         add(tl.createConstraint().
+///             widthPercentage(20),
+///                 new Label("DDD"));
+/// ```
+///
+/// @author Shai Almog
 public class TableLayout extends Layout {
 
-    /**
-     * Special case marker SPAN constraint reserving place for other elements
-     */
+    /// Special case marker SPAN constraint reserving place for other elements
     private static final Constraint H_SPAN_CONSTRAINT = new Constraint();
     private static final Constraint V_SPAN_CONSTRAINT = new Constraint();
     private static final Constraint VH_SPAN_CONSTRAINT = new Constraint();
@@ -127,105 +167,127 @@ public class TableLayout extends Layout {
     private boolean truncateHorizontally; //whether we should truncate or shrink the table if the prefered width of all elements exceed the available width. default = false = shrink
     private boolean truncateVertically;
 
-    /**
-     * A table must declare the amount of rows and columns in advance
-     *
-     * @param rows    rows of the table
-     * @param columns columns of the table
-     */
+    /// A table must declare the amount of rows and columns in advance
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: rows of the table
+    ///
+    /// - `columns`: columns of the table
     public TableLayout(int rows, int columns) {
         this.rows = rows;
         this.columns = columns;
         tablePositions = new Constraint[rows * columns];
     }
 
-    /**
-     * Indicates the minimum size for a column in the table, this is applicable for tables that are
-     * not scrollable on the X axis. This will force the earlier columns to leave room for
-     * the latter columns.
-     *
-     * @return the minimum width of the column
-     */
+    /// Indicates the minimum size for a column in the table, this is applicable for tables that are
+    /// not scrollable on the X axis. This will force the earlier columns to leave room for
+    /// the latter columns.
+    ///
+    /// #### Returns
+    ///
+    /// the minimum width of the column
     public static int getMinimumSizePerColumn() {
         return minimumSizePerColumn;
     }
 
-    /**
-     * Sets the minimum size for a column in the table, this is applicable for tables that are
-     * not scrollable on the X axis. This will force the earlier columns to leave room for
-     * the latter columns.
-     *
-     * @param minimumSize the minimum width of the column
-     */
+    /// Sets the minimum size for a column in the table, this is applicable for tables that are
+    /// not scrollable on the X axis. This will force the earlier columns to leave room for
+    /// the latter columns.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimumSize`: the minimum width of the column
     public static void setMinimumSizePerColumn(int minimumSize) {
         minimumSizePerColumn = minimumSize;
     }
 
-    /**
-     * Indicates the default (in percentage) for the column width, -1 indicates
-     * automatic sizing
-     *
-     * @return width in percentage
-     */
+    /// Indicates the default (in percentage) for the column width, -1 indicates
+    /// automatic sizing
+    ///
+    /// #### Returns
+    ///
+    /// width in percentage
     public static int getDefaultColumnWidth() {
         return defaultColumnWidth;
     }
 
-    /**
-     * Indicates the default (in percentage) for the column width, -1 indicates
-     * automatic sizing
-     *
-     * @param w width in percentage
-     */
+    /// Indicates the default (in percentage) for the column width, -1 indicates
+    /// automatic sizing
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: width in percentage
     public static void setDefaultColumnWidth(int w) {
         defaultColumnWidth = w;
     }
 
-    /**
-     * Indicates the default (in percentage) for the row height, -1 indicates
-     * automatic sizing
-     *
-     * @return height in percentage
-     */
+    /// Indicates the default (in percentage) for the row height, -1 indicates
+    /// automatic sizing
+    ///
+    /// #### Returns
+    ///
+    /// height in percentage
     public static int getDefaultRowHeight() {
         return defaultRowHeight;
     }
 
-    /**
-     * Indicates the default (in percentage) for the row height, -1 indicates
-     * automatic sizing
-     *
-     * @param h height in percentage
-     */
+    /// Indicates the default (in percentage) for the row height, -1 indicates
+    /// automatic sizing
+    ///
+    /// #### Parameters
+    ///
+    /// - `h`: height in percentage
     public static void setDefaultRowHeight(int h) {
         defaultRowHeight = h;
     }
 
-    /**
-     * <p>Creates a table layout container that grows the last column horizontally, the number of rows is automatically
-     * calculated based on the number of columns. See usage:</p>
-     * <script src="https://gist.github.com/codenameone/2b4d9a13f409e297fb2e.js"></script>
-     * <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
-     *
-     * @param columns the number of columns
-     * @param cmps    components to add
-     * @return a newly created table layout container with the components in it
-     */
+    /// Creates a table layout container that grows the last column horizontally, the number of rows is automatically
+    /// calculated based on the number of columns. See usage:
+    ///
+    /// ```java
+    /// Container tl = TableLayout.encloseIn(2, new Label("First"),
+    ///                 new Label("Second"),
+    ///                 new Label("Third"),
+    ///                 new Label("Fourth"),
+    ///                 new Label("Fifth")));
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: the number of columns
+    ///
+    /// - `cmps`: components to add
+    ///
+    /// #### Returns
+    ///
+    /// a newly created table layout container with the components in it
     public static Container encloseIn(int columns, Component... cmps) {
         return encloseIn(columns, true, cmps);
     }
 
-    /**
-     * <p>Creates a table layout container, the number of rows is automatically calculated based on the number
-     * of columns. See usage:</p>
-     * <script src="https://gist.github.com/codenameone/2b4d9a13f409e297fb2e.js"></script>
-     * <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
-     *
-     * @param columns          the number of columns
-     * @param growHorizontally true to grow the last column to fit available width
-     * @param cmps             components to add
-     * @return a newly created table layout container with the components in it
-     */
+    /// Creates a table layout container, the number of rows is automatically calculated based on the number
+    /// of columns. See usage:
+    ///
+    /// ```java
+    /// Container tl = TableLayout.encloseIn(2, new Label("First"),
+    ///                 new Label("Second"),
+    ///                 new Label("Third"),
+    ///                 new Label("Fourth"),
+    ///                 new Label("Fifth")));
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: the number of columns
+    ///
+    /// - `growHorizontally`: true to grow the last column to fit available width
+    ///
+    /// - `cmps`: components to add
+    ///
+    /// #### Returns
+    ///
+    /// a newly created table layout container with the components in it
     public static Container encloseIn(int columns, boolean growHorizontally, Component... cmps) {
         int rows = cmps.length;
         if (rows % columns > 0) {
@@ -238,31 +300,35 @@ public class TableLayout extends Layout {
         return Container.encloseIn(tl, cmps);
     }
 
-    /**
-     * Get the number of rows
-     *
-     * @return number of rows
-     */
+    /// Get the number of rows
+    ///
+    /// #### Returns
+    ///
+    /// number of rows
     public int getRows() {
         return rows;
     }
 
-    /**
-     * Get the number of columns
-     *
-     * @return number of columns
-     */
+    /// Get the number of columns
+    ///
+    /// #### Returns
+    ///
+    /// number of columns
     public int getColumns() {
         return columns;
     }
 
-    /**
-     * Returns the component at the given row/column
-     *
-     * @param row    the row of the component
-     * @param column the column of the component
-     * @return the component instance
-     */
+    /// Returns the component at the given row/column
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the component
+    ///
+    /// - `column`: the column of the component
+    ///
+    /// #### Returns
+    ///
+    /// the component instance
     public Component getComponentAt(int row, int column) {
         int pos = row * columns + column;
         if (pos > -1 && pos < tablePositions.length) {
@@ -272,9 +338,7 @@ public class TableLayout extends Layout {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void layoutContainer(Container parent) {
         try {
@@ -496,13 +560,16 @@ public class TableLayout extends Layout {
         }
     }
 
-    /**
-     * Returns the position of the given table row. A valid value is only returned after the
-     * layout occurred.
-     *
-     * @param row the row in the table
-     * @return the Y position in pixels or -1 if layout hasn't occured/row is too large etc.
-     */
+    /// Returns the position of the given table row. A valid value is only returned after the
+    /// layout occurred.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row in the table
+    ///
+    /// #### Returns
+    ///
+    /// the Y position in pixels or -1 if layout hasn't occured/row is too large etc.
     public int getRowPosition(int row) {
         if (rowPositions != null && rowPositions.length > row) {
             return rowPositions[row];
@@ -510,13 +577,16 @@ public class TableLayout extends Layout {
         return -1;
     }
 
-    /**
-     * Returns the position of the given table column. A valid value is only returned after the
-     * layout occurred.
-     *
-     * @param col the column in the table
-     * @return the X position in pixels or -1 if layout hasn't occured/column is too large etc.
-     */
+    /// Returns the position of the given table column. A valid value is only returned after the
+    /// layout occurred.
+    ///
+    /// #### Parameters
+    ///
+    /// - `col`: the column in the table
+    ///
+    /// #### Returns
+    ///
+    /// the X position in pixels or -1 if layout hasn't occured/column is too large etc.
     public int getColumnPosition(int col) {
         if (columnPositions != null && columnPositions.length > col) {
             return columnPositions[col];
@@ -524,9 +594,7 @@ public class TableLayout extends Layout {
         return -1;
     }
 
-    /**
-     * Places the component/constraint in the proper alignment within the cell whose bounds are given
-     */
+    /// Places the component/constraint in the proper alignment within the cell whose bounds are given
     private void placeComponent(boolean rtl, Constraint con, int x, int y, int width, int height) {
         con.parent.setX(x);
         con.parent.setY(y);
@@ -588,11 +656,15 @@ public class TableLayout extends Layout {
         }
     }
 
-    /**
-     * @param column:       the column index
-     * @param percentageOf: the table width to take into account to compute percentages constraints. if <0 these constraints are ignored and the max prefered width of the components of this column is returned
-     * @return a size 2 int array with: the prefered width of the column , in pixels, as first element of the array and a constraint code for this column as second element. 0=column width is fixed, -1=column width is modifiable, -2=column width can automatically grow to take all the available space
-     */
+    /// #### Parameters
+    ///
+    /// - `column:`: the column index
+    ///
+    /// - `percentageOf:`: the table width to take into account to compute percentages constraints. if <0 these constraints are ignored and the max prefered width of the components of this column is returned
+    ///
+    /// #### Returns
+    ///
+    /// a size 2 int array with: the prefered width of the column , in pixels, as first element of the array and a constraint code for this column as second element. 0=column width is fixed, -1=column width is modifiable, -2=column width can automatically grow to take all the available space
     private int[] getColumnWidthPixels(int column, int percentageOf) {
         int current = 0;
         boolean foundExplicitWidth = false;
@@ -650,9 +722,7 @@ public class TableLayout extends Layout {
         return new int[]{current, (foundExplicitHeight ? 0 : (growable ? -2 : -1))};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getPreferredSize(Container parent) {
         Style s = parent.getStyle();
@@ -670,20 +740,20 @@ public class TableLayout extends Layout {
         return new Dimension(w, h);
     }
 
-    /**
-     * Returns the row where the next operation of add will appear
-     *
-     * @return the row where the next operation of add will appear
-     */
+    /// Returns the row where the next operation of add will appear
+    ///
+    /// #### Returns
+    ///
+    /// the row where the next operation of add will appear
     public int getNextRow() {
         return currentRow;
     }
 
-    /**
-     * Returns the column where the next operation of add will appear
-     *
-     * @return the column where the next operation of add will appear
-     */
+    /// Returns the column where the next operation of add will appear
+    ///
+    /// #### Returns
+    ///
+    /// the column where the next operation of add will appear
     public int getNextColumn() {
         return currentColumn;
     }
@@ -724,9 +794,7 @@ public class TableLayout extends Layout {
         tablePositions = newArr;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
         Constraint con = null;
@@ -811,71 +879,85 @@ public class TableLayout extends Layout {
         }
     }
 
-    /**
-     * Returns the spanning for the table cell at the given coordinate
-     *
-     * @param row    row in the table
-     * @param column column within the table
-     * @return the amount of spanning 1 for no spanning
-     */
+    /// Returns the spanning for the table cell at the given coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: row in the table
+    ///
+    /// - `column`: column within the table
+    ///
+    /// #### Returns
+    ///
+    /// the amount of spanning 1 for no spanning
     public int getCellHorizontalSpan(int row, int column) {
         return tablePositions[row * columns + column].spanHorizontal;
     }
 
-    /**
-     * Returns the spanning for the table cell at the given coordinate
-     *
-     * @param row    row in the table
-     * @param column column within the table
-     * @return the amount of spanning 1 for no spanning
-     */
+    /// Returns the spanning for the table cell at the given coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: row in the table
+    ///
+    /// - `column`: column within the table
+    ///
+    /// #### Returns
+    ///
+    /// the amount of spanning 1 for no spanning
     public int getCellVerticalSpan(int row, int column) {
         return tablePositions[row * columns + column].spanVertical;
     }
 
-    /**
-     * Returns true if the cell at the given position is spanned through vertically
-     *
-     * @param row    cell row
-     * @param column cell column
-     * @return true if the cell is a part of a span for another cell
-     */
+    /// Returns true if the cell at the given position is spanned through vertically
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: cell row
+    ///
+    /// - `column`: cell column
+    ///
+    /// #### Returns
+    ///
+    /// true if the cell is a part of a span for another cell
     public boolean isCellSpannedThroughVertically(int row, int column) {
         return tablePositions[row * columns + column] == V_SPAN_CONSTRAINT || tablePositions[row * columns + column] == VH_SPAN_CONSTRAINT;
     }
 
-    /**
-     * Returns true if the cell at the given position is spanned through horizontally
-     *
-     * @param row    cell row
-     * @param column cell column
-     * @return true if the cell is a part of a span for another cell
-     */
+    /// Returns true if the cell at the given position is spanned through horizontally
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: cell row
+    ///
+    /// - `column`: cell column
+    ///
+    /// #### Returns
+    ///
+    /// true if the cell is a part of a span for another cell
     public boolean isCellSpannedThroughHorizontally(int row, int column) {
         return tablePositions[row * columns + column] == H_SPAN_CONSTRAINT || tablePositions[row * columns + column] == VH_SPAN_CONSTRAINT;
     }
 
-    /**
-     * Indicates whether there is spanning within this layout
-     *
-     * @return true if the layout makes use of spanning
-     */
+    /// Indicates whether there is spanning within this layout
+    ///
+    /// #### Returns
+    ///
+    /// true if the layout makes use of spanning
     public boolean hasVerticalSpanning() {
         return verticalSpanningExists;
     }
 
-    /**
-     * Indicates whether there is spanning within this layout
-     *
-     * @return true if the layout makes use of spanning
-     */
+    /// Indicates whether there is spanning within this layout
+    ///
+    /// #### Returns
+    ///
+    /// true if the layout makes use of spanning
     public boolean hasHorizontalSpanning() {
         return horizontalSpanningExists;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeLayoutComponent(Component comp) {
         // reflow the table
@@ -906,9 +988,7 @@ public class TableLayout extends Layout {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getComponentConstraint(Component comp) {
         for (int r = 0; r < rows; r++) {
@@ -921,44 +1001,52 @@ public class TableLayout extends Layout {
         return null;
     }
 
-    /**
-     * Creates a new Constraint instance to add to the layout
-     *
-     * @return the default constraint
-     */
+    /// Creates a new Constraint instance to add to the layout
+    ///
+    /// #### Returns
+    ///
+    /// the default constraint
     public Constraint createConstraint() {
         return new Constraint();
     }
 
-    /**
-     * Creates a new Constraint instance to add to the layout, same as
-     * {@code createConstraint} only shorter syntax
-     *
-     * @return the default constraint
-     */
+    /// Creates a new Constraint instance to add to the layout, same as
+    /// `createConstraint` only shorter syntax
+    ///
+    /// #### Returns
+    ///
+    /// the default constraint
     public Constraint cc() {
         return new Constraint();
     }
 
-    /**
-     * Creates a new Constraint instance to add to the layout, same as
-     * {@code createConstraint} only shorter syntax
-     *
-     * @param row    the row for the table starting with 0
-     * @param column the column for the table starting with 0
-     * @return the new constraint
-     */
+    /// Creates a new Constraint instance to add to the layout, same as
+    /// `createConstraint` only shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row for the table starting with 0
+    ///
+    /// - `column`: the column for the table starting with 0
+    ///
+    /// #### Returns
+    ///
+    /// the new constraint
     public Constraint cc(int row, int column) {
         return createConstraint(row, column);
     }
 
-    /**
-     * Creates a new Constraint instance to add to the layout
-     *
-     * @param row    the row for the table starting with 0
-     * @param column the column for the table starting with 0
-     * @return the new constraint
-     */
+    /// Creates a new Constraint instance to add to the layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row for the table starting with 0
+    ///
+    /// - `column`: the column for the table starting with 0
+    ///
+    /// #### Returns
+    ///
+    /// the new constraint
     public Constraint createConstraint(int row, int column) {
         Constraint c = createConstraint();
         c.row = row;
@@ -966,17 +1054,13 @@ public class TableLayout extends Layout {
         return c;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "TableLayout";
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         return super.equals(o) && ((TableLayout) o).getRows() == getRows() && ((TableLayout) o).getColumns() == getColumns();
@@ -987,64 +1071,62 @@ public class TableLayout extends Layout {
         return super.hashCode() ^ getRows() ^ getColumns();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isConstraintTracking() {
         return true;
     }
 
-    /**
-     * Indicates whether the table layout should grow horizontally to take up available space by stretching the last column
-     *
-     * @return the growHorizontally
-     */
+    /// Indicates whether the table layout should grow horizontally to take up available space by stretching the last column
+    ///
+    /// #### Returns
+    ///
+    /// the growHorizontally
     public boolean isGrowHorizontally() {
         return growHorizontally;
     }
 
-    /**
-     * Indicates whether the table layout should grow horizontally to take up available space by stretching the last column
-     *
-     * @param growHorizontally the growHorizontally to set
-     */
+    /// Indicates whether the table layout should grow horizontally to take up available space by stretching the last column
+    ///
+    /// #### Parameters
+    ///
+    /// - `growHorizontally`: the growHorizontally to set
     public void setGrowHorizontally(boolean growHorizontally) {
         this.growHorizontally = growHorizontally;
     }
 
-    /**
-     * Indicates whether the table should be truncated if it do not have enough available horizontal space to display all its content. If not, will shrink
-     *
-     * @return the truncateHorizontally
-     */
+    /// Indicates whether the table should be truncated if it do not have enough available horizontal space to display all its content. If not, will shrink
+    ///
+    /// #### Returns
+    ///
+    /// the truncateHorizontally
     public boolean isTruncateHorizontally() {
         return truncateHorizontally;
     }
 
-    /**
-     * Indicates whether the table should be truncated if it do not have enough available horizontal space to display all its content. If not, will shrink
-     *
-     * @param truncateHorizontally the truncateHorizontally to set
-     */
+    /// Indicates whether the table should be truncated if it do not have enough available horizontal space to display all its content. If not, will shrink
+    ///
+    /// #### Parameters
+    ///
+    /// - `truncateHorizontally`: the truncateHorizontally to set
     public void setTruncateHorizontally(boolean truncateHorizontally) {
         this.truncateHorizontally = truncateHorizontally;
     }
 
-    /**
-     * Indicates whether the table should be truncated if it do not have enough available vertical space to display all its content. If not, will shrink
-     *
-     * @return the truncateVertically
-     */
+    /// Indicates whether the table should be truncated if it do not have enough available vertical space to display all its content. If not, will shrink
+    ///
+    /// #### Returns
+    ///
+    /// the truncateVertically
     public boolean isTruncateVertically() {
         return truncateVertically;
     }
 
-    /**
-     * Indicates whether the table should be truncated if it do not have enough available vertical space to display all its content. If not, will shrink
-     *
-     * @param truncateVertically the truncateVertically to set
-     */
+    /// Indicates whether the table should be truncated if it do not have enough available vertical space to display all its content. If not, will shrink
+    ///
+    /// #### Parameters
+    ///
+    /// - `truncateVertically`: the truncateVertically to set
     public void setTruncateVertically(boolean truncateVertically) {
         this.truncateVertically = truncateVertically;
     }
@@ -1067,10 +1149,8 @@ public class TableLayout extends Layout {
         return out;
     }
 
-    /**
-     * Represents the layout constraint for an entry within the table indicating
-     * the desired position/behavior of the component.
-     */
+    /// Represents the layout constraint for an entry within the table indicating
+    /// the desired position/behavior of the component.
     public static class Constraint {
         int actualRow = -1;
         int actualColumn = -1;
@@ -1084,189 +1164,193 @@ public class TableLayout extends Layout {
         private int align = -1;
         private int valign = -1;
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public String toString() {
             return "row: " + row + " column: " + column + " width: " + width + " height: " + height + " hspan: " +
                     spanHorizontal + " vspan: " + spanVertical + " align " + align + " valign " + valign;
         }
 
-        /**
-         * Sets the cells to span vertically, this number must never be smaller than 1
-         *
-         * @param span a number larger than 1
-         * @return this
-         */
+        /// Sets the cells to span vertically, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
+        ///
+        /// #### Returns
+        ///
+        /// this
         public Constraint verticalSpan(int span) {
             setVerticalSpan(span);
             return this;
         }
 
-        /**
-         * Sets the cells to span vertically, this number must never be smaller than 1
-         *
-         * @param span a number larger than 1
-         * @return this
-         */
+        /// Sets the cells to span vertically, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
+        ///
+        /// #### Returns
+        ///
+        /// this
         public Constraint vs(int span) {
             return verticalSpan(span);
         }
 
-        /**
-         * Sets the cells to span horizontally, this number must never be smaller than 1
-         *
-         * @param span a number larger than 1
-         */
+        /// Sets the cells to span horizontally, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
         public Constraint horizontalSpan(int span) {
             setHorizontalSpan(span);
             return this;
         }
 
-        /**
-         * Sets the cells to span horizontally, this number must never be smaller than 1
-         *
-         * @param span a number larger than 1
-         */
+        /// Sets the cells to span horizontally, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
         public Constraint hs(int span) {
             return horizontalSpan(span);
         }
 
-        /**
-         * Sets the column width based on percentage of the parent
-         *
-         * @param width negative number indicates ignoring this member
-         */
+        /// Sets the column width based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `width`: negative number indicates ignoring this member
         public Constraint widthPercentage(int width) {
             this.width = width;
             return this;
         }
 
-        /**
-         * Sets the column width based on percentage of the parent
-         *
-         * @param width negative number indicates ignoring this member
-         */
+        /// Sets the column width based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `width`: negative number indicates ignoring this member
         public Constraint wp(int width) {
             return widthPercentage(width);
         }
 
-        /**
-         * Sets the row height based on percentage of the parent
-         *
-         * @param height negative number indicates ignoring this member
-         */
+        /// Sets the row height based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `height`: negative number indicates ignoring this member
         public Constraint heightPercentage(int height) {
             this.height = height;
             return this;
         }
 
-        /**
-         * Sets the row height based on percentage of the parent
-         *
-         * @param height negative number indicates ignoring this member
-         */
+        /// Sets the row height based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `height`: negative number indicates ignoring this member
         public Constraint hp(int height) {
             return heightPercentage(height);
         }
 
-        /**
-         * Sets the horizontal alignment of the table cell
-         *
-         * @param align Component.LEFT/RIGHT/CENTER
-         */
+        /// Sets the horizontal alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `align`: Component.LEFT/RIGHT/CENTER
         public Constraint horizontalAlign(int align) {
             this.align = align;
             return this;
         }
 
-        /**
-         * Sets the horizontal alignment of the table cell
-         *
-         * @param align Component.LEFT/RIGHT/CENTER
-         */
+        /// Sets the horizontal alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `align`: Component.LEFT/RIGHT/CENTER
         public Constraint ha(int align) {
             return horizontalAlign(align);
         }
 
-        /**
-         * Sets the vertical alignment of the table cell
-         *
-         * @param valign Component.TOP/BOTTOM/CENTER
-         */
+        /// Sets the vertical alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `valign`: Component.TOP/BOTTOM/CENTER
         public Constraint verticalAlign(int valign) {
             this.valign = valign;
             return this;
         }
 
-        /**
-         * Sets the vertical alignment of the table cell
-         *
-         * @param valign Component.TOP/BOTTOM/CENTER
-         */
+        /// Sets the vertical alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `valign`: Component.TOP/BOTTOM/CENTER
         public Constraint va(int valign) {
             return verticalAlign(valign);
         }
 
-        /**
-         * @return the row
-         */
+        /// #### Returns
+        ///
+        /// the row
         public int getRow() {
             return row;
         }
 
-        /**
-         * @return the column
-         */
+        /// #### Returns
+        ///
+        /// the column
         public int getColumn() {
             return column;
         }
 
-        /**
-         * @return the width
-         */
+        /// #### Returns
+        ///
+        /// the width
         public int getWidthPercentage() {
             return width;
         }
 
-        /**
-         * Sets the column width based on percentage of the parent
-         *
-         * @param width negative number indicates ignoring this member
-         */
+        /// Sets the column width based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `width`: negative number indicates ignoring this member
         public void setWidthPercentage(int width) {
             this.width = width;
         }
 
-        /**
-         * @return the height
-         */
+        /// #### Returns
+        ///
+        /// the height
         public int getHeightPercentage() {
             return height;
         }
 
-        /**
-         * Sets the row height based on percentage of the parent
-         *
-         * @param height negative number indicates ignoring this member
-         */
+        /// Sets the row height based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `height`: negative number indicates ignoring this member
         public void setHeightPercentage(int height) {
             this.height = height;
         }
 
-        /**
-         * @return the spanHorizontal
-         */
+        /// #### Returns
+        ///
+        /// the spanHorizontal
         public int getHorizontalSpan() {
             return spanHorizontal;
         }
 
-        /**
-         * Sets the cells to span horizontally, this number must never be smaller than 1
-         *
-         * @param span a number larger than 1
-         */
+        /// Sets the cells to span horizontally, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
         public void setHorizontalSpan(int span) {
             if (span < 1) {
                 throw new IllegalArgumentException("Illegal span");
@@ -1274,18 +1358,18 @@ public class TableLayout extends Layout {
             spanHorizontal = span;
         }
 
-        /**
-         * @return the spanVertical
-         */
+        /// #### Returns
+        ///
+        /// the spanVertical
         public int getVerticalSpan() {
             return spanVertical;
         }
 
-        /**
-         * Sets the cells to span vertically, this number must never be smaller than 1
-         *
-         * @param span a number larger than 1
-         */
+        /// Sets the cells to span vertically, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
         public void setVerticalSpan(int span) {
             if (span < 1) {
                 throw new IllegalArgumentException("Illegal span");
@@ -1293,34 +1377,34 @@ public class TableLayout extends Layout {
             spanVertical = span;
         }
 
-        /**
-         * @return the align
-         */
+        /// #### Returns
+        ///
+        /// the align
         public int getHorizontalAlign() {
             return align;
         }
 
-        /**
-         * Sets the horizontal alignment of the table cell
-         *
-         * @param align Component.LEFT/RIGHT/CENTER
-         */
+        /// Sets the horizontal alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `align`: Component.LEFT/RIGHT/CENTER
         public void setHorizontalAlign(int align) {
             this.align = align;
         }
 
-        /**
-         * @return the valign
-         */
+        /// #### Returns
+        ///
+        /// the valign
         public int getVerticalAlign() {
             return valign;
         }
 
-        /**
-         * Sets the vertical alignment of the table cell
-         *
-         * @param valign Component.TOP/BOTTOM/CENTER
-         */
+        /// Sets the vertical alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `valign`: Component.TOP/BOTTOM/CENTER
         public void setVerticalAlign(int valign) {
             this.valign = valign;
         }

@@ -29,18 +29,17 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
-/**
- * <p>The analytics service allows an application to report its usage, it is seamlessly
- * invoked by GUI builder applications if analytics is enabled for your application but can
- * work just as well for handcoded apps!</p>
- * <p>To enable analytics just use the {@link #init(java.lang.String, java.lang.String)}
- * method of the analytics service. For most typical usage you should also invoke the
- * {@link #setAppsMode(boolean)} method with {@code true}. If you are
- * not using the GUI builder invoke the visit method whenever you would like to log a
- * page view event.</p>
- *
- * @author Shai Almog
- */
+/// The analytics service allows an application to report its usage, it is seamlessly
+/// invoked by GUI builder applications if analytics is enabled for your application but can
+/// work just as well for handcoded apps!
+///
+/// To enable analytics just use the `java.lang.String)`
+/// method of the analytics service. For most typical usage you should also invoke the
+/// `#setAppsMode(boolean)` method with `true`. If you are
+/// not using the GUI builder invoke the visit method whenever you would like to log a
+/// page view event.
+///
+/// @author Shai Almog
 public class AnalyticsService {
     private static final Object INSTANCE_LOCK = new Object();
     private static AnalyticsService instance;
@@ -52,79 +51,86 @@ public class AnalyticsService {
     private String domain;
     private ConnectionRequest lastRequest;
 
-    /**
-     * Indicates whether analytics server failures should brodcast an error event
-     *
-     * @return the failSilently
-     */
+    /// Indicates whether analytics server failures should brodcast an error event
+    ///
+    /// #### Returns
+    ///
+    /// the failSilently
     public static boolean isFailSilently() {
         return failSilently;
     }
 
-    /**
-     * Indicates whether analytics server failures should brodcast an error event
-     *
-     * @param aFailSilently the failSilently to set
-     */
+    /// Indicates whether analytics server failures should brodcast an error event
+    ///
+    /// #### Parameters
+    ///
+    /// - `aFailSilently`: the failSilently to set
     public static void setFailSilently(boolean aFailSilently) {
         failSilently = aFailSilently;
     }
 
-    /**
-     * Apps mode allows improved analytics using the newer google analytics API designed for apps
-     *
-     * @return the appsMode
-     */
+    /// Apps mode allows improved analytics using the newer google analytics API designed for apps
+    ///
+    /// #### Returns
+    ///
+    /// the appsMode
     public static boolean isAppsMode() {
         return appsMode;
     }
 
-    /**
-     * Apps mode allows improved analytics using the newer google analytics API designed for apps.
-     * Most developers should invoke this method with {@code true}.
-     *
-     * @param aAppsMode the appsMode to set
-     */
+    /// Apps mode allows improved analytics using the newer google analytics API designed for apps.
+    /// Most developers should invoke this method with `true`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aAppsMode`: the appsMode to set
     public static void setAppsMode(boolean aAppsMode) {
         appsMode = aAppsMode;
     }
 
-    /**
-     * Sets timeout for HTTP requests to Google Analytics service.
-     *
-     * @param ms Milliseconds timeout.
-     * @since 7.0
-     */
+    /// Sets timeout for HTTP requests to Google Analytics service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ms`: Milliseconds timeout.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static void setTimeout(int ms) {
         timeout = ms;
     }
 
-    /**
-     * Sets read timeout for  HTTP requests to Google Analytics services.
-     *
-     * @param ms Milliseconds read timeout.
-     * @since 7.0
-     */
+    /// Sets read timeout for  HTTP requests to Google Analytics services.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ms`: Milliseconds read timeout.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static void setReadTimeout(int ms) {
         readTimeout = ms;
     }
 
-    /**
-     * Indicates whether analytics is enabled for this application
-     *
-     * @return true if analytics is enabled
-     */
+    /// Indicates whether analytics is enabled for this application
+    ///
+    /// #### Returns
+    ///
+    /// true if analytics is enabled
     public static boolean isEnabled() {
         return instance != null && instance.isAnalyticsEnabled();
     }
 
-    /**
-     * Initializes google analytics for this application
-     *
-     * @param agent  the google analytics tracking agent
-     * @param domain a domain to represent your application, commonly you should use your package name as a URL (e.g.
-     *               com.mycompany.myapp should become: myapp.mycompany.com)
-     */
+    /// Initializes google analytics for this application
+    ///
+    /// #### Parameters
+    ///
+    /// - `agent`: the google analytics tracking agent
+    ///
+    /// - `domain`: @param domain a domain to represent your application, commonly you should use your package name as a URL (e.g.
+    ///               com.mycompany.myapp should become: myapp.mycompany.com)
     public static void init(String agent, String domain) {
         synchronized (INSTANCE_LOCK) {
             if (instance == null) {
@@ -135,35 +141,38 @@ public class AnalyticsService {
         }
     }
 
-    /**
-     * Allows installing an analytics service other than the default
-     *
-     * @param i the analytics service implementation.
-     */
+    /// Allows installing an analytics service other than the default
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the analytics service implementation.
     public static void init(AnalyticsService i) {
         synchronized (INSTANCE_LOCK) {
             instance = i;
         }
     }
 
-    /**
-     * Sends an asynchronous notice to the server regarding a page in the application being viewed, notice that
-     * you don't need to append the URL prefix to the page string.
-     *
-     * @param page    the page viewed
-     * @param referer the source page
-     */
+    /// Sends an asynchronous notice to the server regarding a page in the application being viewed, notice that
+    /// you don't need to append the URL prefix to the page string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: the page viewed
+    ///
+    /// - `referer`: the source page
     public static void visit(String page, String referer) {
         instance.visitPage(page, referer);
     }
 
-    /**
-     * In apps mode we can send information about an exception to the analytics server
-     *
-     * @param t       the exception
-     * @param message up to 150 character message,
-     * @param fatal   is the exception fatal
-     */
+    /// In apps mode we can send information about an exception to the analytics server
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the exception
+    ///
+    /// - `message`: up to 150 character message,
+    ///
+    /// - `fatal`: is the exception fatal
     public static void sendCrashReport(Throwable t, String message, boolean fatal) {
         // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#exception
         ConnectionRequest req = getGaRequest();
@@ -197,38 +206,44 @@ public class AnalyticsService {
         return req;
     }
 
-    /**
-     * Indicates if the analytics is enabled, subclasses must override this method to process their information
-     *
-     * @return true if analytics is enabled
-     */
+    /// Indicates if the analytics is enabled, subclasses must override this method to process their information
+    ///
+    /// #### Returns
+    ///
+    /// true if analytics is enabled
     protected boolean isAnalyticsEnabled() {
         return agent != null;
     }
 
-    /**
-     * Decorates the ConnectionRequest to be sent to the server before the request is sent.
-     * This can be overridden to add additional request parameters to the service, and hence provide
-     * additional analytics data.
-     *
-     * <p>If using Google Analytics, the current you can see the available POST parameters that
-     * the server accepts <a href="https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters">here</a>.</p>
-     *
-     * @param page    The page visited
-     * @param referer The page from which the user came.
-     * @param request The ConnectionRequest
-     * @since 7.0
-     */
+    /// Decorates the ConnectionRequest to be sent to the server before the request is sent.
+    /// This can be overridden to add additional request parameters to the service, and hence provide
+    /// additional analytics data.
+    ///
+    /// If using Google Analytics, the current you can see the available POST parameters that
+    /// the server accepts [here](https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters).
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: The page visited
+    ///
+    /// - `referer`: The page from which the user came.
+    ///
+    /// - `request`: The ConnectionRequest
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected void decorateVisitPageRequest(String page, String referer, ConnectionRequest request) {
 
     }
 
-    /**
-     * Subclasses should override this method to track page visits
-     *
-     * @param page    the page visited
-     * @param referer the page from which the user came
-     */
+    /// Subclasses should override this method to track page visits
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: the page visited
+    ///
+    /// - `referer`: the page from which the user came
     protected void visitPage(String page, String referer) {
         if (lastRequest != null) {
             final String fPage = page;

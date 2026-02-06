@@ -31,14 +31,12 @@ import com.codename1.ui.InterFormContainer;
 
 import java.util.Map;
 
-/**
- * Represents a transition animation between two forms this class is used internally
- * by Display to play an animation when moving from one form to the next. A transition
- * can be installed on a  {@link com.codename1.ui.Form}  object using the in/out transitions, for ease of use
- * {@link com.codename1.ui.plaf.LookAndFeel} has support for default transitions.
- *
- * @author Shai Almog
- */
+/// Represents a transition animation between two forms this class is used internally
+/// by Display to play an animation when moving from one form to the next. A transition
+/// can be installed on a  `com.codename1.ui.Form`  object using the in/out transitions, for ease of use
+/// `com.codename1.ui.plaf.LookAndFeel` has support for default transitions.
+///
+/// @author Shai Almog
 public abstract class Transition implements Animation {
 
     private Component source;
@@ -47,13 +45,14 @@ public abstract class Transition implements Animation {
 
     private Map<InterFormContainer, InterFormContainer> interFormContainers;
 
-    /**
-     * Invoked by {@link com.codename1.ui.Display} to set the source and destination forms.
-     * This method should not be invoked by developers.
-     *
-     * @param source      the source form from which the transition originates
-     * @param destination the destination form to which the transition will lead
-     */
+    /// Invoked by `com.codename1.ui.Display` to set the source and destination forms.
+    /// This method should not be invoked by developers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the source form from which the transition originates
+    ///
+    /// - `destination`: the destination form to which the transition will lead
     public final void init(Component source, Component destination) {
         this.source = source;
         this.destination = destination;
@@ -66,14 +65,14 @@ public abstract class Transition implements Animation {
         interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());
     }
 
-    /**
-     * Sets visibility on all shared InterFormContainers between the source and destination
-     * to be hidden.  This is useful since these containers are not transitioned like
-     * the rest of components, so the transition may need to be able to paint the source
-     * or destination without these containers, and paint them separately.
-     *
-     * @since 7.0
-     */
+    /// Sets visibility on all shared InterFormContainers between the source and destination
+    /// to be hidden.  This is useful since these containers are not transitioned like
+    /// the rest of components, so the transition may need to be able to paint the source
+    /// or destination without these containers, and paint them separately.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected void hideInterformContainers() {
         if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
             return;
@@ -87,14 +86,14 @@ public abstract class Transition implements Animation {
         }
     }
 
-    /**
-     * Sets visibility on all shared InterFormContainers between the source and destination
-     * to be visible.  This is useful since these containers are not transitioned like
-     * the rest of components, so the transition may need to be able to paint the source
-     * or destination without these containers, and paint them separately.
-     *
-     * @since 7.0
-     */
+    /// Sets visibility on all shared InterFormContainers between the source and destination
+    /// to be visible.  This is useful since these containers are not transitioned like
+    /// the rest of components, so the transition may need to be able to paint the source
+    /// or destination without these containers, and paint them separately.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected void showInterformContainers() {
         if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
             return;
@@ -108,12 +107,15 @@ public abstract class Transition implements Animation {
         }
     }
 
-    /**
-     * Paints all shared InterFormContainers between the source and destination.
-     *
-     * @param g Graphics context to paint to.
-     * @since 7.0
-     */
+    /// Paints all shared InterFormContainers between the source and destination.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: Graphics context to paint to.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected void paintInterformContainers(Graphics g) {
         if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
             return;
@@ -128,69 +130,62 @@ public abstract class Transition implements Animation {
         }
     }
 
-    /**
-     * Callback thats invoked before a transition begins, the source form may be null
-     * for the first form in the application.
-     */
+    /// Callback thats invoked before a transition begins, the source form may be null
+    /// for the first form in the application.
     public void initTransition() {
     }
 
-    /**
-     * Returns the destination form that should be set once animation is completed
-     *
-     * @return the destination component
-     */
+    /// Returns the destination form that should be set once animation is completed
+    ///
+    /// #### Returns
+    ///
+    /// the destination component
     public final Component getDestination() {
         return destination;
     }
 
-    /**
-     * Returns the source form which is the form from which the animation is starting.
-     * This may be null for the first form in the application
-     *
-     * @return the source component
-     */
+    /// Returns the source form which is the form from which the animation is starting.
+    /// This may be null for the first form in the application
+    ///
+    /// #### Returns
+    ///
+    /// the source component
     public final Component getSource() {
         return source;
     }
 
-    /**
-     * Optional operation to cleanup the garbage left over by a running transition
-     */
+    /// Optional operation to cleanup the garbage left over by a running transition
     public void cleanup() {
         source = null;
         destination = null;
     }
 
-    /**
-     * Create a copy of the transition, usually the transition used is a copy.
-     *
-     * @param reverse creates a new transition instance with "reverse" behavior useful
-     *                for signifying "back" operations
-     * @return new transition instance
-     */
+    /// Create a copy of the transition, usually the transition used is a copy.
+    ///
+    /// #### Parameters
+    ///
+    /// - `reverse`: @param reverse creates a new transition instance with "reverse" behavior useful
+    ///                for signifying "back" operations
+    ///
+    /// #### Returns
+    ///
+    /// new transition instance
     public Transition copy(boolean reverse) {
         // for compatibility with older transitions
         return this;
     }
 
-    /**
-     * Allows setting the source form to null to save memory if the transition doesn't need
-     * it in memory.
-     */
+    /// Allows setting the source form to null to save memory if the transition doesn't need
+    /// it in memory.
     protected final void cleanSource() {
         source = null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public abstract boolean animate();
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public abstract void paint(Graphics g);
 }

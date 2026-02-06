@@ -26,12 +26,10 @@ package com.codename1.facebook;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * This class represents a Facebook Post Object
- * http://developers.facebook.com/docs/reference/api/post/
- *
- * @author Chen Fishbein
- */
+/// This class represents a Facebook Post Object
+/// http://developers.facebook.com/docs/reference/api/post/
+///
+/// @author Chen Fishbein
 public class Post extends FBObject {
 
     private String type;
@@ -46,25 +44,21 @@ public class Post extends FBObject {
     private String created_time;
     private String picture;
 
-    /**
-     * Empty Contructor
-     */
+    /// Empty Contructor
     public Post() {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public Post(Hashtable props) {
         super(props);
         init(props);
     }
 
-    /**
-     * Gets the from User
-     *
-     * @return from User
-     */
+    /// Gets the from User
+    ///
+    /// #### Returns
+    ///
+    /// from User
     public User getFrom() {
         if (from == null) {
             from = new User();
@@ -72,84 +66,87 @@ public class Post extends FBObject {
         return from;
     }
 
-    /**
-     * Gets the to users
-     *
-     * @return Vector of Users
-     */
+    /// Gets the to users
+    ///
+    /// #### Returns
+    ///
+    /// Vector of Users
     public Vector getTo() {
         return to;
     }
 
-    /**
-     * Get the type
-     *
-     * @return the type
-     */
+    /// Get the type
+    ///
+    /// #### Returns
+    ///
+    /// the type
     public String getType() {
         return type;
     }
 
-    /**
-     * Gets the Attribution
-     *
-     * @return the attribution
-     */
+    /// Gets the Attribution
+    ///
+    /// #### Returns
+    ///
+    /// the attribution
     public String getAttribution() {
         return attribution;
     }
 
-    /**
-     * Gets the message
-     *
-     * @return the message
-     */
+    /// Gets the message
+    ///
+    /// #### Returns
+    ///
+    /// the message
     public String getMessage() {
         return message;
     }
 
-    /**
-     * Gets the link Url
-     *
-     * @return the linkUrl
-     */
+    /// Gets the link Url
+    ///
+    /// #### Returns
+    ///
+    /// the linkUrl
     public String getLinkUrl() {
         return linkUrl;
     }
 
-    /**
-     * Gets the comments count number
-     *
-     * @return the comments count
-     */
+    /// Gets the comments count number
+    ///
+    /// #### Returns
+    ///
+    /// the comments count
     public String getCommentsCount() {
         return commentsCount;
     }
 
-    /**
-     * Gets the Link Name
-     *
-     * @return the linkName
-     * @deprecated use getName() instead
-     */
+    /// Gets the Link Name
+    ///
+    /// #### Returns
+    ///
+    /// the linkName
+    ///
+    /// #### Deprecated
+    ///
+    /// use getName() instead
     public String getLinkName() {
         return getName();
     }
 
-    /**
-     * Gets the linkDescription
-     *
-     * @return the linkDescription
-     */
+    /// Gets the linkDescription
+    ///
+    /// #### Returns
+    ///
+    /// the linkDescription
     public String getLinkDescription() {
         return linkDescription;
     }
 
-    /**
-     * Gets the picture id
-     *
-     * @return the picture id
-     */
+    /// Gets the picture id
+    ///
+    /// #### Returns
+    ///
+    /// the picture id
     public String getPicture() {
         return picture;
     }
@@ -159,28 +156,26 @@ public class Post extends FBObject {
         return created_time;
     }
 
-    /**
-     * Gets the Link Count
-     *
-     * @return the likes count
-     */
+    /// Gets the Link Count
+    ///
+    /// #### Returns
+    ///
+    /// the likes count
     public String getLikes() {
         return likes;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "type = " + type + " post = " + message;
     }
 
-    /**
-     * copies the relevant values from the given hashtable
-     *
-     * @param props an hashtable to copy from
-     */
+    /// copies the relevant values from the given hashtable
+    ///
+    /// #### Parameters
+    ///
+    /// - `props`: an hashtable to copy from
     @Override
     public void copy(Hashtable props) {
         super.copy(props);
@@ -228,9 +223,7 @@ public class Post extends FBObject {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         if (this == o) {

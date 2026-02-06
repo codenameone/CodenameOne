@@ -42,46 +42,30 @@ import java.io.Reader;
 import java.io.Writer;
 
 
-/**
- * Pluggable logging framework that allows a developer to log into storage
- * using the file connector API. It is highly recommended to use this
- * class coupled with Netbeans preprocessing tags to reduce its overhead
- * completely in runtime.
- *
- * @author Shai Almog
- */
+/// Pluggable logging framework that allows a developer to log into storage
+/// using the file connector API. It is highly recommended to use this
+/// class coupled with Netbeans preprocessing tags to reduce its overhead
+/// completely in runtime.
+///
+/// @author Shai Almog
 public class Log {
-    /**
-     * Constant indicating the logging level Debug is the default and the lowest level
-     * followed by info, warning and error
-     */
+    /// Constant indicating the logging level Debug is the default and the lowest level
+    /// followed by info, warning and error
     public static final int DEBUG = 1;
-    /**
-     * Constant indicating the logging level Debug is the default and the lowest level
-     * followed by info, warning and error
-     */
+    /// Constant indicating the logging level Debug is the default and the lowest level
+    /// followed by info, warning and error
     public static final int INFO = 2;
-    /**
-     * Constant indicating the logging level Debug is the default and the lowest level
-     * followed by info, warning and error
-     */
+    /// Constant indicating the logging level Debug is the default and the lowest level
+    /// followed by info, warning and error
     public static final int WARNING = 3;
-    /**
-     * Constant indicating the logging level Debug is the default and the lowest level
-     * followed by info, warning and error
-     */
+    /// Constant indicating the logging level Debug is the default and the lowest level
+    /// followed by info, warning and error
     public static final int ERROR = 4;
-    /**
-     * Indicates that log reporting to the cloud should be disabled
-     */
+    /// Indicates that log reporting to the cloud should be disabled
     public static final int REPORTING_NONE = 0;
-    /**
-     * Indicates that log reporting to the cloud should occur regardless of whether an error occurred
-     */
+    /// Indicates that log reporting to the cloud should occur regardless of whether an error occurred
     public static final int REPORTING_DEBUG = 1;
-    /**
-     * Indicates that log reporting to the cloud should occur only if an error occurred
-     */
+    /// Indicates that log reporting to the cloud should occur only if an error occurred
     public static final int REPORTING_PRODUCTION = 3;
     private static boolean crashBound;
     private static Log instance = new Log();
@@ -94,53 +78,54 @@ public class Log {
     private boolean logDirty;
     private int reporting = REPORTING_NONE;
 
-    /**
-     * Prevent new Log() syntax. Use getInstance()
-     */
+    /// Prevent new Log() syntax. Use getInstance()
     protected Log() {
     }
 
-    /**
-     * Indicates the level of log reporting, this allows developers to send device logs to the cloud
-     * thus tracking crashes or functionality in the device.
-     *
-     * @return one of REPORTING_NONE, REPORTING_DEBUG, REPORTING_PRODUCTION
-     */
+    /// Indicates the level of log reporting, this allows developers to send device logs to the cloud
+    /// thus tracking crashes or functionality in the device.
+    ///
+    /// #### Returns
+    ///
+    /// one of REPORTING_NONE, REPORTING_DEBUG, REPORTING_PRODUCTION
     public static int getReportingLevel() {
         return instance.reporting;
     }
 
-    /**
-     * Indicates the level of log reporting, this allows developers to send device logs to the cloud
-     * thus tracking crashes or functionality in the device.
-     *
-     * @param level one of REPORTING_NONE, REPORTING_DEBUG, REPORTING_PRODUCTION
-     */
+    /// Indicates the level of log reporting, this allows developers to send device logs to the cloud
+    /// thus tracking crashes or functionality in the device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `level`: one of REPORTING_NONE, REPORTING_DEBUG, REPORTING_PRODUCTION
     public static void setReportingLevel(int level) {
         instance.reporting = level;
     }
 
-    /**
-     * Returns a server generated unique device id that is cached locally and is only valid per application.
-     * Notice that this device id is specific to your application and to a specific install, it is guaranteed
-     * to be completely unique or -1 if unavailable (which can be due to a network error). Warning: this
-     * method might block while accessing the server!s
-     *
-     * @return a unique device id
-     * @deprecated this will no longer work. Use {@link #getUniqueDeviceKey()}
-     */
+    /// Returns a server generated unique device id that is cached locally and is only valid per application.
+    /// Notice that this device id is specific to your application and to a specific install, it is guaranteed
+    /// to be completely unique or -1 if unavailable (which can be due to a network error). Warning: this
+    /// method might block while accessing the server!s
+    ///
+    /// #### Returns
+    ///
+    /// a unique device id
+    ///
+    /// #### Deprecated
+    ///
+    /// this will no longer work. Use `#getUniqueDeviceKey()`
     public static long getUniqueDeviceId() {
         return -1;
     }
 
-    /**
-     * Returns a server generated unique device id that is cached locally and is only valid per application.
-     * Notice that this device id is specific to your application and to a specific install, it is guaranteed
-     * to be completely unique or null if unavailable (which can be due to a network error). Warning: this
-     * method might block while accessing the server!s
-     *
-     * @return a unique device id
-     */
+    /// Returns a server generated unique device id that is cached locally and is only valid per application.
+    /// Notice that this device id is specific to your application and to a specific install, it is guaranteed
+    /// to be completely unique or null if unavailable (which can be due to a network error). Warning: this
+    /// method might block while accessing the server!s
+    ///
+    /// #### Returns
+    ///
+    /// a unique device id
     public static String getUniqueDeviceKey() {
         String devId = Preferences.get("DeviceKey__$", null);
         if (devId != null) {
@@ -187,24 +172,18 @@ public class Log {
         return Preferences.get("UDeviceKey__$", null);
     }
 
-    /**
-     * Sends the current log to the cloud. Notice that this method is synchronous and
-     * returns only when the sending completes
-     */
+    /// Sends the current log to the cloud. Notice that this method is synchronous and
+    /// returns only when the sending completes
     public static void sendLog() {
         sendLogImpl(true);
     }
 
-    /**
-     * Sends the current log to the cloud and returns immediately
-     */
+    /// Sends the current log to the cloud and returns immediately
     public static void sendLogAsync() {
         sendLogImpl(true);
     }
 
-    /**
-     * Sends the current log to the cloud regardless of the reporting level
-     */
+    /// Sends the current log to the cloud regardless of the reporting level
     private static void sendLogImpl(boolean sync) {
         try {
             // this can cause a crash
@@ -245,46 +224,45 @@ public class Log {
         }
     }
 
-    /**
-     * Installs a log subclass that can replace the logging destination/behavior
-     *
-     * @param newInstance the new instance for the Log object
-     */
+    /// Installs a log subclass that can replace the logging destination/behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `newInstance`: the new instance for the Log object
     public static void install(Log newInstance) {
         instance = newInstance;
     }
 
-    /**
-     * Default println method invokes the print instance method, uses DEBUG level
-     *
-     * @param text the text to print
-     */
+    /// Default println method invokes the print instance method, uses DEBUG level
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to print
     public static void p(String text) {
         p(text, DEBUG);
     }
 
-    /**
-     * Default println method invokes the print instance method, uses given level
-     *
-     * @param text  the text to print
-     * @param level one of DEBUG, INFO, WARNING, ERROR
-     */
+    /// Default println method invokes the print instance method, uses given level
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to print
+    ///
+    /// - `level`: one of DEBUG, INFO, WARNING, ERROR
     public static void p(String text, int level) {
         instance.print(text, level);
     }
 
-    /**
-     * This method is a shorthand form for logThrowable
-     *
-     * @param t the exception
-     */
+    /// This method is a shorthand form for logThrowable
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the exception
     public static void e(Throwable t) {
         instance.logThrowable(t);
     }
 
-    /**
-     * Deletes the current log file
-     */
+    /// Deletes the current log file
     public static void deleteLog() {
         if (instance.output != null) {
             Util.cleanup(instance.output);
@@ -299,33 +277,36 @@ public class Log {
         }
     }
 
-    /**
-     * Returns the logging level for printing log details, the lower the value
-     * the more verbose would the printouts be
-     *
-     * @return one of DEBUG, INFO, WARNING, ERROR
-     */
+    /// Returns the logging level for printing log details, the lower the value
+    /// the more verbose would the printouts be
+    ///
+    /// #### Returns
+    ///
+    /// one of DEBUG, INFO, WARNING, ERROR
     public static int getLevel() {
         return instance.level;
     }
 
-    /**
-     * Sets the logging level for printing log details, the lower the value
-     * the more verbose would the printouts be
-     *
-     * @param level one of DEBUG, INFO, WARNING, ERROR
-     */
+    /// Sets the logging level for printing log details, the lower the value
+    /// the more verbose would the printouts be
+    ///
+    /// #### Parameters
+    ///
+    /// - `level`: one of DEBUG, INFO, WARNING, ERROR
     public static void setLevel(int level) {
         instance.level = level;
     }
 
-    /**
-     * Returns the contents of the log as a single long string to be displayed by
-     * the application any way it sees fit
-     *
-     * @return string containing the whole log
-     * @deprecated this was practical in old J2ME devices but hasn't been maintained in ages, use sendLog() instead
-     */
+    /// Returns the contents of the log as a single long string to be displayed by
+    /// the application any way it sees fit
+    ///
+    /// #### Returns
+    ///
+    /// string containing the whole log
+    ///
+    /// #### Deprecated
+    ///
+    /// this was practical in old J2ME devices but hasn't been maintained in ages, use sendLog() instead
     public static String getLogContent() {
         try {
             String text = "";
@@ -355,13 +336,13 @@ public class Log {
         }
     }
 
-    /**
-     * Places a form with the log as a TextArea on the screen, this method can
-     * be attached to appear at a given time or using a fixed global key. Using
-     * this method might cause a problem with further log output
-     *
-     * @deprecated this method is an outdated method that's no longer supported
-     */
+    /// Places a form with the log as a TextArea on the screen, this method can
+    /// be attached to appear at a given time or using a fixed global key. Using
+    /// this method might cause a problem with further log output
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is an outdated method that's no longer supported
     public static void showLog() {
         try {
             String text = getLogContent();
@@ -385,21 +366,21 @@ public class Log {
         }
     }
 
-    /**
-     * Returns the singleton instance of the log
-     *
-     * @return the singleton instance of the log
-     */
+    /// Returns the singleton instance of the log
+    ///
+    /// #### Returns
+    ///
+    /// the singleton instance of the log
     public static Log getInstance() {
         return instance;
     }
 
-    /**
-     * Binds pro based crash protection logic that will send out an email in case of an exception thrown on the EDT
-     *
-     * @param consumeError true will hide the error from the user, false will leave the builtin logic that defaults to
-     *                     showing an error dialog to the user
-     */
+    /// Binds pro based crash protection logic that will send out an email in case of an exception thrown on the EDT
+    ///
+    /// #### Parameters
+    ///
+    /// - `consumeError`: @param consumeError true will hide the error from the user, false will leave the builtin logic that defaults to
+    ///                     showing an error dialog to the user
     public static void bindCrashProtection(final boolean consumeError) {
         if (Display.getInstance().isSimulator()) {
             return;
@@ -427,22 +408,22 @@ public class Log {
         crashBound = true;
     }
 
-    /**
-     * Returns true if the user bound crash protection
-     *
-     * @return true if crash protection is bound
-     */
+    /// Returns true if the user bound crash protection
+    ///
+    /// #### Returns
+    ///
+    /// true if crash protection is bound
     public static boolean isCrashBound() {
         return crashBound;
     }
 
-    /**
-     * Logs an exception to the log, by default print is called with the exception
-     * details, on supported devices the stack trace is also physically written to
-     * the log
-     *
-     * @param t
-     */
+    /// Logs an exception to the log, by default print is called with the exception
+    /// details, on supported devices the stack trace is also physically written to
+    /// the log
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`
     protected void logThrowable(Throwable t) {
         if (t == null) {
             p("Exception logging invoked with null exception...");
@@ -465,13 +446,14 @@ public class Log {
         }
     }
 
-    /**
-     * Default log implementation prints to the console and the file connector
-     * if applicable. Also prepends the thread information and time before
-     *
-     * @param text  the text to print
-     * @param level one of DEBUG, INFO, WARNING, ERROR
-     */
+    /// Default log implementation prints to the console and the file connector
+    /// if applicable. Also prepends the thread information and time before
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to print
+    ///
+    /// - `level`: one of DEBUG, INFO, WARNING, ERROR
     protected void print(String text, int level) {
         if (!initialized) {
             initialized = true;
@@ -512,13 +494,16 @@ public class Log {
         }
     }
 
-    /**
-     * Default method for creating the output writer into which we write, this method
-     * creates a simple log file using the file connector
-     *
-     * @return writer object
-     * @throws IOException when thrown by the connector
-     */
+    /// Default method for creating the output writer into which we write, this method
+    /// creates a simple log file using the file connector
+    ///
+    /// #### Returns
+    ///
+    /// writer object
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when thrown by the connector
     protected Writer createWriter() throws IOException {
         try {
             if (getFileURL() == null) {
@@ -550,11 +535,11 @@ public class Log {
         return output;
     }
 
-    /**
-     * Returns a simple string containing a timestamp and thread name.
-     *
-     * @return timestamp string for use in the log
-     */
+    /// Returns a simple string containing a timestamp and thread name.
+    ///
+    /// #### Returns
+    ///
+    /// timestamp string for use in the log
     protected String getThreadAndTimeStamp() {
         long time = System.currentTimeMillis() - zeroTime;
         long milli = time % 1000;
@@ -568,38 +553,38 @@ public class Log {
         return "[" + Thread.currentThread().getName() + "] " + hour + ":" + min + ":" + sec + "," + milli;
     }
 
-    /**
-     * Indicates whether GCF's file writing should be used to generate the log file
-     *
-     * @return the fileWriteEnabled
-     */
+    /// Indicates whether GCF's file writing should be used to generate the log file
+    ///
+    /// #### Returns
+    ///
+    /// the fileWriteEnabled
     public boolean isFileWriteEnabled() {
         return fileWriteEnabled;
     }
 
-    /**
-     * Indicates whether GCF's file writing should be used to generate the log file
-     *
-     * @param fileWriteEnabled the fileWriteEnabled to set
-     */
+    /// Indicates whether GCF's file writing should be used to generate the log file
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileWriteEnabled`: the fileWriteEnabled to set
     public void setFileWriteEnabled(boolean fileWriteEnabled) {
         this.fileWriteEnabled = fileWriteEnabled;
     }
 
-    /**
-     * Indicates the URL where the log file is saved
-     *
-     * @return the fileURL
-     */
+    /// Indicates the URL where the log file is saved
+    ///
+    /// #### Returns
+    ///
+    /// the fileURL
     public String getFileURL() {
         return fileURL;
     }
 
-    /**
-     * Indicates the URL where the log file is saved
-     *
-     * @param fileURL the fileURL to set
-     */
+    /// Indicates the URL where the log file is saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileURL`: the fileURL to set
     public void setFileURL(String fileURL) {
         if (!Objects.equals(this.fileURL, fileURL)) {
             try {
@@ -611,9 +596,7 @@ public class Log {
         }
     }
 
-    /**
-     * Activates the filesystem tracking of file open/close operations
-     */
+    /// Activates the filesystem tracking of file open/close operations
     public void trackFileSystem() {
         Util.getImplementation().setLogListener(new ActionListener() {
             @Override

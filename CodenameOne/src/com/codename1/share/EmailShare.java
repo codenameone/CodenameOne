@@ -42,16 +42,12 @@ import com.codename1.ui.util.Resources;
 
 import java.util.Hashtable;
 
-/**
- * Email sharing service.
- *
- * @author Chen
- */
+/// Email sharing service.
+///
+/// @author Chen
 public class EmailShare extends ShareService {
 
-    /**
-     * Default Constructor
-     */
+    /// Default Constructor
     public EmailShare() {
         super("Email", null);
     }
@@ -66,9 +62,7 @@ public class EmailShare extends ShareService {
         return i;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void share(final String toShare, final String image, final String mimeType) {
         final Form currentForm = Display.getInstance().getCurrent();
@@ -159,9 +153,7 @@ public class EmailShare extends ShareService {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void share(final String toShare) {
         share(toShare, null, null);
@@ -183,9 +175,7 @@ public class EmailShare extends ShareService {
         return new GenericListCellRenderer(sel, unsel);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean canShareImage() {
         return true;

@@ -27,35 +27,51 @@ import com.codename1.ui.Display;
 
 import java.util.Date;
 
-/**
- * <p>The localization manager allows adapting values for display in different locales thru parsing and formatting
- * capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
- * related API's similar to Locale/currency API's from JavaSE.<br>
- * The sample code below just lists the various capabilities of the API:</p>
- *
- * <script src="https://gist.github.com/codenameone/6d93edd5e6b69e7c088a.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/l10n-manager.png" alt="Localization formatting/parsing and information" />
- *
- * @author Shai Almog
- */
+/// The localization manager allows adapting values for display in different locales thru parsing and formatting
+/// capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
+/// related API's similar to Locale/currency API's from JavaSE.
+///
+/// The sample code below just lists the various capabilities of the API:
+///
+/// ```java
+/// Form hi = new Form("L10N", new TableLayout(16, 2));
+/// L10NManager l10n = L10NManager.getInstance();
+/// hi.add("format(double)").add(l10n.format(11.11)).
+///     add("format(int)").add(l10n.format(33)).
+///     add("formatCurrency").add(l10n.formatCurrency(53.267)).
+///     add("formatDateLongStyle").add(l10n.formatDateLongStyle(new Date())).
+///     add("formatDateShortStyle").add(l10n.formatDateShortStyle(new Date())).
+///     add("formatDateTime").add(l10n.formatDateTime(new Date())).
+///     add("formatDateTimeMedium").add(l10n.formatDateTimeMedium(new Date())).
+///     add("formatDateTimeShort").add(l10n.formatDateTimeShort(new Date())).
+///     add("getCurrencySymbol").add(l10n.getCurrencySymbol()).
+///     add("getLanguage").add(l10n.getLanguage()).
+///     add("getLocale").add(l10n.getLocale()).
+///     add("isRTLLocale").add("" + l10n.isRTLLocale()).
+///     add("parseCurrency").add(l10n.formatCurrency(l10n.parseCurrency("33.77$"))).
+///     add("parseDouble").add(l10n.format(l10n.parseDouble("34.35"))).
+///     add("parseInt").add(l10n.format(l10n.parseInt("56"))).
+///     add("parseLong").add("" + l10n.parseLong("4444444"));
+/// hi.show();
+/// ```
+///
+/// @author Shai Almog
 public class L10NManager {
     private String language;
     private String locale;
     private DateFormatSymbols symbols;
 
-    /**
-     * Instances of this class should be received via the Display class
-     */
+    /// Instances of this class should be received via the Display class
     protected L10NManager(String language, String locale) {
         this.language = language;
         this.locale = locale;
     }
 
-    /**
-     * Convenience method that invokes Display.getLocalizationManager()
-     *
-     * @return the L10NManager instance
-     */
+    /// Convenience method that invokes Display.getLocalizationManager()
+    ///
+    /// #### Returns
+    ///
+    /// the L10NManager instance
     public static L10NManager getInstance() {
         return Display.getInstance().getLocalizationManager();
     }
@@ -67,64 +83,83 @@ public class L10NManager {
         return symbols;
     }
 
-    /**
-     * Returns the current locale language as an ISO 639 two letter code
-     *
-     * @return iso language string
-     */
+    /// Returns the current locale language as an ISO 639 two letter code
+    ///
+    /// #### Returns
+    ///
+    /// iso language string
     public String getLanguage() {
         return language;
     }
 
-    /**
-     * Forces the locale/language
-     *
-     * @param locale   the new locale
-     * @param language the language to use
-     */
+    /// Forces the locale/language
+    ///
+    /// #### Parameters
+    ///
+    /// - `locale`: the new locale
+    ///
+    /// - `language`: the language to use
     public void setLocale(String locale, String language) {
         this.language = language;
         this.locale = locale;
     }
 
-    /**
-     * Format an integer number for this locale
-     *
-     * @param number the number to format
-     * @return a string representation of a number
-     */
+    /// Format an integer number for this locale
+    ///
+    /// #### Parameters
+    ///
+    /// - `number`: the number to format
+    ///
+    /// #### Returns
+    ///
+    /// a string representation of a number
     public String format(int number) {
         return "" + number;
     }
 
-    /**
-     * Format a double number for this locale
-     *
-     * @param number the number to format
-     * @return a string representation of a number
-     */
+    /// Format a double number for this locale
+    ///
+    /// #### Parameters
+    ///
+    /// - `number`: the number to format
+    ///
+    /// #### Returns
+    ///
+    /// a string representation of a number
     public String format(double number) {
         return "" + number;
     }
 
-    /**
-     * Gets the short month name in the current locale for the given date.
-     *
-     * @param date The date.
-     * @return Short month name.  E.g. Jan, Feb, etc..
-     * @since 7.0
-     */
+    /// Gets the short month name in the current locale for the given date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `date`: The date.
+    ///
+    /// #### Returns
+    ///
+    /// Short month name.  E.g. Jan, Feb, etc..
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public String getShortMonthName(Date date) {
         return limitLength(getLongMonthName(date), 3);
     }
 
-    /**
-     * Gets the long month name in the current locale for the given date.
-     *
-     * @param date The date.
-     * @return Long month name.  E.g. January, February, etc..
-     * @since 7.0
-     */
+    /// Gets the long month name in the current locale for the given date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `date`: The date.
+    ///
+    /// #### Returns
+    ///
+    /// Long month name.  E.g. January, February, etc..
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public String getLongMonthName(Date date) {
         String fmt = formatDateLongStyle(date);
         try {
@@ -161,71 +196,89 @@ public class L10NManager {
 
     }
 
-    /**
-     * Format a currency value
-     *
-     * @param currency the monetary value
-     * @return a string representation of a number
-     */
+    /// Format a currency value
+    ///
+    /// #### Parameters
+    ///
+    /// - `currency`: the monetary value
+    ///
+    /// #### Returns
+    ///
+    /// a string representation of a number
     public String formatCurrency(double currency) {
         return "" + currency;
     }
 
-    /**
-     * Returns the currency symbol for this locale
-     *
-     * @return currency symbol
-     */
+    /// Returns the currency symbol for this locale
+    ///
+    /// #### Returns
+    ///
+    /// currency symbol
     public String getCurrencySymbol() {
         return "$";
     }
 
-    /**
-     * Formats a date in a long form e.g. Sunday January 1st 2001
-     *
-     * @param d the date
-     * @return the long form string
-     */
+    /// Formats a date in a long form e.g. Sunday January 1st 2001
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the date
+    ///
+    /// #### Returns
+    ///
+    /// the long form string
     public String formatDateLongStyle(Date d) {
         return d.toString();
     }
 
-    /**
-     * Formats a date in a short form e.g. 1/1/2011
-     *
-     * @param d the date
-     * @return the short form string
-     */
+    /// Formats a date in a short form e.g. 1/1/2011
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the date
+    ///
+    /// #### Returns
+    ///
+    /// the short form string
     public String formatDateShortStyle(Date d) {
         return d.toString();
     }
 
-    /**
-     * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
-     *
-     * @param d the date
-     * @return the date and time
-     */
+    /// Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the date
+    ///
+    /// #### Returns
+    ///
+    /// the date and time
     public String formatDateTime(Date d) {
         return d.toString();
     }
 
-    /**
-     * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
-     *
-     * @param d the date
-     * @return the date and time
-     */
+    /// Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the date
+    ///
+    /// #### Returns
+    ///
+    /// the date and time
     public String formatDateTimeMedium(Date d) {
         return d.toString();
     }
 
-    /**
-     * Formats the time in a default form e.g. 10:00AM
-     *
-     * @param d the date time object
-     * @return the time as a String
-     */
+    /// Formats the time in a default form e.g. 10:00AM
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the date time object
+    ///
+    /// #### Returns
+    ///
+    /// the time as a String
     public String formatTime(Date d) {
         String s = formatDateTimeMedium(d);
         int pos = s.lastIndexOf(" ");
@@ -238,41 +291,48 @@ public class L10NManager {
         return s;
     }
 
-    /**
-     * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
-     *
-     * @param d the date
-     * @return the date and time
-     */
+    /// Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the date
+    ///
+    /// #### Returns
+    ///
+    /// the date and time
     public String formatDateTimeShort(Date d) {
         return d.toString();
     }
 
-    /**
-     * Indicates whether the language is a right to left language
-     *
-     * @return true for bidi/rtl languages
-     */
+    /// Indicates whether the language is a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// true for bidi/rtl languages
     public boolean isRTLLocale() {
         return "iw".equals(language) || "ar".equals(language);
     }
 
-    /**
-     * Determines the locale (location) as an ISO 3166 country code
-     *
-     * @return the locale
-     */
+    /// Determines the locale (location) as an ISO 3166 country code
+    ///
+    /// #### Returns
+    ///
+    /// the locale
     public String getLocale() {
         return locale;
     }
 
-    /**
-     * Formats a number as a String with a fixed number of decimal places
-     *
-     * @param number        the number
-     * @param decimalPlaces decimals
-     * @return formatted string
-     */
+    /// Formats a number as a String with a fixed number of decimal places
+    ///
+    /// #### Parameters
+    ///
+    /// - `number`: the number
+    ///
+    /// - `decimalPlaces`: decimals
+    ///
+    /// #### Returns
+    ///
+    /// formatted string
     public String format(double number, int decimalPlaces) {
         if (decimalPlaces == 0) {
             return format((double) ((long) number));
@@ -287,42 +347,54 @@ public class L10NManager {
         return format(number);
     }
 
-    /**
-     * Parses a double based on locale conventions
-     *
-     * @param localeFormattedDecimal the locale formatted number
-     * @return the parsed double
-     */
+    /// Parses a double based on locale conventions
+    ///
+    /// #### Parameters
+    ///
+    /// - `localeFormattedDecimal`: the locale formatted number
+    ///
+    /// #### Returns
+    ///
+    /// the parsed double
     public double parseDouble(String localeFormattedDecimal) {
         return Double.parseDouble(localeFormattedDecimal);
     }
 
-    /**
-     * Parses a long based on locale conventions
-     *
-     * @param localeFormattedLong the number
-     * @return a long
-     */
+    /// Parses a long based on locale conventions
+    ///
+    /// #### Parameters
+    ///
+    /// - `localeFormattedLong`: the number
+    ///
+    /// #### Returns
+    ///
+    /// a long
     public long parseLong(String localeFormattedLong) {
         return Long.parseLong(localeFormattedLong);
     }
 
-    /**
-     * Parses an integer based on locale conventions
-     *
-     * @param localeFormattedInteger the number
-     * @return a parsed number
-     */
+    /// Parses an integer based on locale conventions
+    ///
+    /// #### Parameters
+    ///
+    /// - `localeFormattedInteger`: the number
+    ///
+    /// #### Returns
+    ///
+    /// a parsed number
     public int parseInt(String localeFormattedInteger) {
         return Integer.parseInt(localeFormattedInteger);
     }
 
-    /**
-     * Parses the currency value
-     *
-     * @param amount the amount
-     * @return a numeric value for the currency
-     */
+    /// Parses the currency value
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: the amount
+    ///
+    /// #### Returns
+    ///
+    /// a numeric value for the currency
     public double parseCurrency(String amount) {
         StringBuilder b = new StringBuilder();
         int l = amount.length();

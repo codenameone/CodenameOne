@@ -29,76 +29,65 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Vector;
 
-/**
- * The Element class defines a single XML element with its attributes and children.
- * Due to its hierarchial nature, this class can be used for a single "leaf" Element, for more complex elements (with child elements), and up to describing the entire document.
- *
- * @author Ofir Leitner
- */
+/// The Element class defines a single XML element with its attributes and children.
+/// Due to its hierarchial nature, this class can be used for a single "leaf" Element, for more complex elements (with child elements), and up to describing the entire document.
+///
+/// @author Ofir Leitner
 public class Element implements Iterable<Element> {
 
-    /**
-     * A constant that can be used for the get descendants methods to denote infinite recursion
-     */
+    /// A constant that can be used for the get descendants methods to denote infinite recursion
     public static final int DEPTH_INFINITE = Integer.MAX_VALUE;
     boolean isComment;
     boolean caseSensitive;
-    /**
-     * True if this is a text element, false otherwise
-     */
+    /// True if this is a text element, false otherwise
     private boolean textElement;
-    /**
-     * The element's name (or text for text elements)
-     */
+    /// The element's name (or text for text elements)
     private String name;
-    /**
-     * A vector containing this element's children
-     */
+    /// A vector containing this element's children
     private ArrayList<Element> children;
-    /**
-     * This element's parent
-     */
+    /// This element's parent
     private Element parent;
-    /**
-     * A hashtable containing this element's attributes
-     */
+    /// A hashtable containing this element's attributes
     private Hashtable attributes;
 
-    /**
-     * Constructs and Element without specifying a name
-     * This can be used by subclasses that do not require name assigments.
-     */
+    /// Constructs and Element without specifying a name
+    /// This can be used by subclasses that do not require name assigments.
     protected Element() {
     }
 
 
-    /**
-     * Constructs an Element with the specified name
-     *
-     * @param tagName The tag name
-     */
+    /// Constructs an Element with the specified name
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagName`: The tag name
     public Element(String tagName) {
         this.name = tagName;
     }
 
-    /**
-     * Constructs an Element (or a text element) with the specified name or text.
-     *
-     * @param tagName       The tag name, or in the case of a text element the element's text
-     * @param isTextElement true for a text element, false otherwise
-     */
+    /// Constructs an Element (or a text element) with the specified name or text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagName`: The tag name, or in the case of a text element the element's text
+    ///
+    /// - `isTextElement`: true for a text element, false otherwise
     public Element(String tagName, boolean isTextElement) {
         this(tagName);
         textElement = isTextElement;
     }
 
-    /**
-     * Compares a name to a tag. Returns true if the tag has that name, or if tagName = '*'.
-     *
-     * @param tagName The tag name to compare, or '*' to match any tag.
-     * @param tag     The element whose tag we are comparing.
-     * @return True if tagName='*' or if the tagName matches the tag name of tag.
-     */
+    /// Compares a name to a tag. Returns true if the tag has that name, or if tagName = '*'.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagName`: The tag name to compare, or '*' to match any tag.
+    ///
+    /// - `tag`: The element whose tag we are comparing.
+    ///
+    /// #### Returns
+    ///
+    /// True if tagName='*' or if the tagName matches the tag name of tag.
     private static boolean cmpTagName(String tagName, Element tag) {
         if ("*".equals(tagName)) {
             return true;
@@ -106,30 +95,33 @@ public class Element implements Iterable<Element> {
         return tagName.equalsIgnoreCase(tag.getTagName());
     }
 
-    /**
-     * Returns true if this is a text element, false otherwise
-     *
-     * @return true if this is a text element, false otherwise
-     */
+    /// Returns true if this is a text element, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a text element, false otherwise
     public boolean isTextElement() {
         return textElement;
     }
 
-    /**
-     * Sets this element as a text element
-     *
-     * @param textElement true to set this as a text element, false otherwise
-     */
+    /// Sets this element as a text element
+    ///
+    /// #### Parameters
+    ///
+    /// - `textElement`: true to set this as a text element, false otherwise
     protected void setTextElement(boolean textElement) {
         this.textElement = textElement;
     }
 
-    /**
-     * Returns this Element's tag name
-     *
-     * @return the Element's tag name
-     * @throws IllegalStateException if this is a text element
-     */
+    /// Returns this Element's tag name
+    ///
+    /// #### Returns
+    ///
+    /// the Element's tag name
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if this is a text element
     public String getTagName() {
         if (textElement) {
             throw new IllegalStateException("Text elements do not have a tag name");
@@ -137,31 +129,32 @@ public class Element implements Iterable<Element> {
         return name;
     }
 
-    /**
-     * Sets the name or text (for text elements) of this tag
-     *
-     * @param name The name or text of this tag
-     */
+    /// Sets the name or text (for text elements) of this tag
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The name or text of this tag
     protected void setTagName(String name) {
         this.name = name;
     }
 
-    /**
-     * Returns the attributes Hashtable
-     *
-     * @return the attributes Hashtable
-     */
+    /// Returns the attributes Hashtable
+    ///
+    /// #### Returns
+    ///
+    /// the attributes Hashtable
     public Hashtable getAttributes() {
         return attributes;
     }
 
-    /**
-     * Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
-     * This method allows creating a key that is non-string to be used by subclasses that optimize attributes retrieval
-     *
-     * @param id    The attribute ID
-     * @param value The attribute value
-     */
+    /// Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
+    /// This method allows creating a key that is non-string to be used by subclasses that optimize attributes retrieval
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The attribute ID
+    ///
+    /// - `value`: The attribute value
     protected void setAttribute(Object id, String value) {
         if (attributes == null) {
             attributes = new Hashtable();
@@ -169,41 +162,41 @@ public class Element implements Iterable<Element> {
         attributes.put(id, value);
     }
 
-    /**
-     * Adds the specified Element as a child to this element.
-     * If the specified element was found to be unsupported (i.e. it's ID is TAG_UNSUPPORTED, it is not added.
-     *
-     * @param childElement The child element
-     */
+    /// Adds the specified Element as a child to this element.
+    /// If the specified element was found to be unsupported (i.e. it's ID is TAG_UNSUPPORTED, it is not added.
+    ///
+    /// #### Parameters
+    ///
+    /// - `childElement`: The child element
     public void addChild(Element childElement) {
         setChildParent(childElement);
         children.add(childElement);
         //childElement.setParent(this);
     }
 
-    /**
-     * Returns this Element's parent
-     *
-     * @return this Element's parent
-     */
+    /// Returns this Element's parent
+    ///
+    /// #### Returns
+    ///
+    /// this Element's parent
     public Element getParent() {
         return parent;
     }
 
-    /**
-     * Sets this element parent, done interanlly in addChild
-     *
-     * @param parent The element's parent
-     */
+    /// Sets this element parent, done interanlly in addChild
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The element's parent
     protected void setParent(Element parent) {
         this.parent = parent;
     }
 
-    /**
-     * Returns the number of this Element's children
-     *
-     * @return the number of this Element's children
-     */
+    /// Returns the number of this Element's children
+    ///
+    /// #### Returns
+    ///
+    /// the number of this Element's children
     public int getNumChildren() {
         if (children == null) {
             return 0;
@@ -211,12 +204,15 @@ public class Element implements Iterable<Element> {
         return children.size();
     }
 
-    /**
-     * Returns the internal children vector
-     *
-     * @return the children vector
-     * @deprecated this uses the old vector API instead of the more modern Collection/List
-     */
+    /// Returns the internal children vector
+    ///
+    /// #### Returns
+    ///
+    /// the children vector
+    ///
+    /// #### Deprecated
+    ///
+    /// this uses the old vector API instead of the more modern Collection/List
     protected Vector getChildren() {
         if (children == null) {
             return null;
@@ -224,12 +220,15 @@ public class Element implements Iterable<Element> {
         return new Vector(children);
     }
 
-    /**
-     * Sets the children vector of this Element
-     *
-     * @param children The vector to set as this Element's children
-     * @deprecated this uses the old vector API instead of the more modern Collection/List
-     */
+    /// Sets the children vector of this Element
+    ///
+    /// #### Parameters
+    ///
+    /// - `children`: The vector to set as this Element's children
+    ///
+    /// #### Deprecated
+    ///
+    /// this uses the old vector API instead of the more modern Collection/List
     protected void setChildren(Vector children) {
         if (children == null) {
             this.children = null;
@@ -238,13 +237,19 @@ public class Element implements Iterable<Element> {
         }
     }
 
-    /**
-     * Returns the Element's child positioned at the specified index
-     *
-     * @param index The requested index
-     * @return child number index of this ELement
-     * @throws ArrayIndexOutOfBoundsException if the index is bigger than the children's count or smaller than 0
-     */
+    /// Returns the Element's child positioned at the specified index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: The requested index
+    ///
+    /// #### Returns
+    ///
+    /// child number index of this ELement
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if the index is bigger than the children's count or smaller than 0
     public Element getChildAt(int index) {
         if ((index < 0) || (children == null) || (index >= children.size())) {
             throw new ArrayIndexOutOfBoundsException();
@@ -253,12 +258,15 @@ public class Element implements Iterable<Element> {
 
     }
 
-    /**
-     * Returns an Element's child by a tag name
-     *
-     * @param name The child's tag name
-     * @return the first child with the specified name, or null if not found
-     */
+    /// Returns an Element's child by a tag name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The child's tag name
+    ///
+    /// #### Returns
+    ///
+    /// the first child with the specified name, or null if not found
     public Element getFirstChildByTagName(String name) {
         if (children == null) {
             return null;
@@ -276,12 +284,15 @@ public class Element implements Iterable<Element> {
         return found;
     }
 
-    /**
-     * Returns the element with the specified ID
-     *
-     * @param id The id to find
-     * @return An element with the id, or null if none found
-     */
+    /// Returns the element with the specified ID
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The id to find
+    ///
+    /// #### Returns
+    ///
+    /// An element with the id, or null if none found
     public Element getElementById(String id) {
         String thisId = getAttribute("id");
         if ((thisId != null) && (thisId.equals(id))) {
@@ -343,14 +354,19 @@ public class Element implements Iterable<Element> {
 
     }
 
-    /**
-     * Returns all descendants with the specified tag name and the none empty attribute
-     *
-     * @param name          The tag name to look for
-     * @param attributeName the attribute that must exist on the tag
-     * @param depth         The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
-     * @return A vector containing descendants with the specified tag name
-     */
+    /// Returns all descendants with the specified tag name and the none empty attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The tag name to look for
+    ///
+    /// - `attributeName`: the attribute that must exist on the tag
+    ///
+    /// - `depth`: The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing descendants with the specified tag name
     public Vector getDescendantsByTagNameAndAttribute(String name, String attributeName, int depth) {
         if (depth < 1) {
             throw new IllegalArgumentException("Depth must be 1 or higher");
@@ -363,13 +379,17 @@ public class Element implements Iterable<Element> {
         return v;
     }
 
-    /**
-     * Returns all descendants with the specified tag name
-     *
-     * @param name  The tag name to look for
-     * @param depth The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
-     * @return A vector containing descendants with the specified tag name
-     */
+    /// Returns all descendants with the specified tag name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The tag name to look for
+    ///
+    /// - `depth`: The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing descendants with the specified tag name
     public Vector getDescendantsByTagName(String name, int depth) {
         if (depth < 1) {
             throw new IllegalArgumentException("Depth must be 1 or higher");
@@ -382,23 +402,29 @@ public class Element implements Iterable<Element> {
         return v;
     }
 
-    /**
-     * Returns all descendants with the specified tag name
-     *
-     * @param name The tag name to look for
-     * @return A vector containing descendants with the specified tag name
-     */
+    /// Returns all descendants with the specified tag name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The tag name to look for
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing descendants with the specified tag name
     public Vector getDescendantsByTagName(String name) {
         return getDescendantsByTagName(name, DEPTH_INFINITE);
     }
 
 
-    /**
-     * Returns all children with the specified tag name
-     *
-     * @param name The tag name to look for
-     * @return A vector containing children with the specified tag name
-     */
+    /// Returns all children with the specified tag name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The tag name to look for
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing children with the specified tag name
     public Vector getChildrenByTagName(String name) {
         return getDescendantsByTagName(name, 1);
     }
@@ -432,14 +458,19 @@ public class Element implements Iterable<Element> {
     }
 
 
-    /**
-     * Returns all text descendants containing the specified text
-     *
-     * @param text          The text to look for (null to return all text children)
-     * @param caseSensitive true to perform a case sensitive match, false to ignore case
-     * @param depth         The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
-     * @return A vector containing descendants containing the specified text
-     */
+    /// Returns all text descendants containing the specified text
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The text to look for (null to return all text children)
+    ///
+    /// - `caseSensitive`: true to perform a case sensitive match, false to ignore case
+    ///
+    /// - `depth`: The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing descendants containing the specified text
     public Vector getTextDescendants(String text, boolean caseSensitive, int depth) {
         if (depth < 1) {
             throw new IllegalArgumentException("Depth must be 1 or higher");
@@ -455,34 +486,45 @@ public class Element implements Iterable<Element> {
         return v;
     }
 
-    /**
-     * Returns all text descendants containing the specified text
-     *
-     * @param text          The text to look for (null to return all text children)
-     * @param caseSensitive true to perform a case sensitive match, false to ignore case
-     * @return A vector containing decensants containing the specified text
-     */
+    /// Returns all text descendants containing the specified text
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The text to look for (null to return all text children)
+    ///
+    /// - `caseSensitive`: true to perform a case sensitive match, false to ignore case
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing decensants containing the specified text
     public Vector getTextDescendants(String text, boolean caseSensitive) {
         return getTextDescendants(text, caseSensitive, DEPTH_INFINITE);
     }
 
-    /**
-     * Returns all children with the specified text
-     *
-     * @param text          The text to look for (null to return all text children)
-     * @param caseSensitive true to perform a case sensitive match, false to ignore case
-     * @return A vector containing children containing the specified text
-     */
+    /// Returns all children with the specified text
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The text to look for (null to return all text children)
+    ///
+    /// - `caseSensitive`: true to perform a case sensitive match, false to ignore case
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing children containing the specified text
     public Vector getTextChildren(String text, boolean caseSensitive) {
         return getTextDescendants(text, caseSensitive, 1);
     }
 
-    /**
-     * Returns true if the specified element is contained in this element's hierarchy (meaning it is one of its descendants)
-     *
-     * @param element The element to look for
-     * @return true if this element contains the specified element, false otherwise
-     */
+    /// Returns true if the specified element is contained in this element's hierarchy (meaning it is one of its descendants)
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element to look for
+    ///
+    /// #### Returns
+    ///
+    /// true if this element contains the specified element, false otherwise
     public boolean contains(Element element) {
         if (this == element) { //NOPMD CompareObjectsWithEquals
             return true;
@@ -502,13 +544,17 @@ public class Element implements Iterable<Element> {
     }
 
 
-    /**
-     * Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
-     *
-     * @param attribute The attribute's name
-     * @param value     The attribute's value
-     * @return a positive error code or -1 if attribute is supported and valid
-     */
+    /// Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `attribute`: The attribute's name
+    ///
+    /// - `value`: The attribute's value
+    ///
+    /// #### Returns
+    ///
+    /// a positive error code or -1 if attribute is supported and valid
     public int setAttribute(String attribute, String value) {
         if (textElement) {
             throw new IllegalStateException("Text elements cannot have attributes");
@@ -522,22 +568,22 @@ public class Element implements Iterable<Element> {
         return -1;
     }
 
-    /**
-     * Removes the specified attribute
-     *
-     * @param attribute The attribute to remove
-     */
+    /// Removes the specified attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `attribute`: The attribute to remove
     public void removeAttribute(String attribute) {
         removeAttribute((Object) attribute);
     }
 
 
-    /**
-     * Removes the specified attribute if it exist in this Element
-     * This method allows creating a key that is non-string to be used by subclasses that optimize attributes retrieval
-     *
-     * @param id The attribute ID
-     */
+    /// Removes the specified attribute if it exist in this Element
+    /// This method allows creating a key that is non-string to be used by subclasses that optimize attributes retrieval
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The attribute ID
     protected void removeAttribute(Object id) {
         if (attributes != null) {
             attributes.remove(id);
@@ -547,13 +593,17 @@ public class Element implements Iterable<Element> {
         }
     }
 
-    /**
-     * Helper method to return the attribute as an integer
-     *
-     * @param name the name of the attribute
-     * @param def  default value
-     * @return return value
-     */
+    /// Helper method to return the attribute as an integer
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the attribute
+    ///
+    /// - `def`: default value
+    ///
+    /// #### Returns
+    ///
+    /// return value
     public int getAttributeAsInt(String name, int def) {
         String s = getAttribute(name);
         if (s == null) {
@@ -567,12 +617,15 @@ public class Element implements Iterable<Element> {
     }
 
 
-    /**
-     * Returns the attribute value by its name (or null if it wasn't defined for this element)
-     *
-     * @param name The attribute id
-     * @return the attribute value by its name (or null if it wasn't defined for this element)
-     */
+    /// Returns the attribute value by its name (or null if it wasn't defined for this element)
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The attribute id
+    ///
+    /// #### Returns
+    ///
+    /// the attribute value by its name (or null if it wasn't defined for this element)
     public String getAttribute(String name) {
         if (attributes == null) {
             return null;
@@ -600,11 +653,11 @@ public class Element implements Iterable<Element> {
         child.setParent(this);
     }
 
-    /**
-     * Removes the child at the given index
-     *
-     * @param index The child's index
-     */
+    /// Removes the child at the given index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: The child's index
     public void removeChildAt(int index) {
         if ((index < 0) || (children == null) || (index >= children.size())) {
             throw new ArrayIndexOutOfBoundsException();
@@ -614,12 +667,15 @@ public class Element implements Iterable<Element> {
         children.remove(index);
     }
 
-    /**
-     * Returns the child index
-     *
-     * @param child The child element to look for
-     * @return The child position, or -1 if the child does not belong to this element.
-     */
+    /// Returns the child index
+    ///
+    /// #### Parameters
+    ///
+    /// - `child`: The child element to look for
+    ///
+    /// #### Returns
+    ///
+    /// The child position, or -1 if the child does not belong to this element.
     public int getChildIndex(Element child) {
         int result = -1;
         if (children != null) {
@@ -633,23 +689,25 @@ public class Element implements Iterable<Element> {
         return result;
     }
 
-    /**
-     * Inserts the given child at the specified index
-     *
-     * @param child The child to insert
-     * @param index The index to insert it at
-     */
+    /// Inserts the given child at the specified index
+    ///
+    /// #### Parameters
+    ///
+    /// - `child`: The child to insert
+    ///
+    /// - `index`: The index to insert it at
     public void insertChildAt(Element child, int index) {
         setChildParent(child);
         children.add(index, child);
     }
 
-    /**
-     * Replaces one child with another
-     *
-     * @param oldChild The child to replace (Must belong to this element, otherwise a call to this method will have no effect)
-     * @param newChild The child to replace it with
-     */
+    /// Replaces one child with another
+    ///
+    /// #### Parameters
+    ///
+    /// - `oldChild`: The child to replace (Must belong to this element, otherwise a call to this method will have no effect)
+    ///
+    /// - `newChild`: The child to replace it with
     public void replaceChild(Element oldChild, Element newChild) {
         if (children != null) {
             setChildParent(newChild);
@@ -665,12 +723,15 @@ public class Element implements Iterable<Element> {
         throw new IllegalArgumentException("The oldChild element specified must be this element's child");
     }
 
-    /**
-     * Returns the text of this element (for text elements only)
-     *
-     * @return the text of this element (for text elements only)
-     * @throws IllegalStateException if this is not a text element
-     */
+    /// Returns the text of this element (for text elements only)
+    ///
+    /// #### Returns
+    ///
+    /// the text of this element (for text elements only)
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if this is not a text element
     public String getText() {
         if (!textElement) {
             throw new IllegalStateException("Only text elements can get text");
@@ -678,12 +739,15 @@ public class Element implements Iterable<Element> {
         return name;
     }
 
-    /**
-     * Sets the text of this element to the specified string (For text elements only)
-     *
-     * @param str The text to set
-     * @throws IllegalStateException if this is not a text element
-     */
+    /// Sets the text of this element to the specified string (For text elements only)
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The text to set
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if this is not a text element
     public void setText(String str) {
         if (!textElement) {
             throw new IllegalStateException("Only text elements can set text");
@@ -692,23 +756,26 @@ public class Element implements Iterable<Element> {
 
     }
 
-    /**
-     * Returns a printable string representing this element
-     *
-     * @return a printable string representing this element
-     */
+    /// Returns a printable string representing this element
+    ///
+    /// #### Returns
+    ///
+    /// a printable string representing this element
     @Override
     public String toString() {
         return toString("");
     }
 
-    /**
-     * A recursive method for creating a printout of a full tag with its entire hierarchy.
-     * This is used by the public method toString().
-     *
-     * @param spacing Increased by one in each recursion phase to provide with indentation
-     * @return the printout of this tag
-     */
+    /// A recursive method for creating a printout of a full tag with its entire hierarchy.
+    /// This is used by the public method toString().
+    ///
+    /// #### Parameters
+    ///
+    /// - `spacing`: Increased by one in each recursion phase to provide with indentation
+    ///
+    /// #### Returns
+    ///
+    /// the printout of this tag
     public String toString(String spacing) {
 
         StringBuilder str = new StringBuilder(spacing);
@@ -734,11 +801,11 @@ public class Element implements Iterable<Element> {
         return str.toString();
     }
 
-    /**
-     * Determines whether or not this Element has any text children.
-     *
-     * @return true if any of this Elements children are text Elements.
-     */
+    /// Determines whether or not this Element has any text children.
+    ///
+    /// #### Returns
+    ///
+    /// true if any of this Elements children are text Elements.
     public boolean hasTextChild() {
         if (children != null) {
             for (Object child : children) {
@@ -750,20 +817,20 @@ public class Element implements Iterable<Element> {
         return false;
     }
 
-    /**
-     * Determines whether or not this Element has no children.
-     *
-     * @return true if this Element has no children.
-     */
+    /// Determines whether or not this Element has no children.
+    ///
+    /// #### Returns
+    ///
+    /// true if this Element has no children.
     public boolean isEmpty() {
         return children == null || children.isEmpty();
     }
 
-    /**
-     * Iterable for children of this entry making tree walking easier, this makes for(Element child : base) {} possible
-     *
-     * @return the children iterator
-     */
+    /// Iterable for children of this entry making tree walking easier, this makes for(Element child : base) {} possible
+    ///
+    /// #### Returns
+    ///
+    /// the children iterator
     @Override
     public Iterator<Element> iterator() {
         return children.iterator();

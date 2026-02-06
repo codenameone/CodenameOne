@@ -36,45 +36,46 @@ import java.io.InputStreamReader;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * Calls to the Twitter REST API can be performed via this class although currently
- * support for authentication isn't implemented due to the transition to oAuth instead
- * of basic authentication.
- *
- * @author Shai Almog
- */
+/// Calls to the Twitter REST API can be performed via this class although currently
+/// support for authentication isn't implemented due to the transition to oAuth instead
+/// of basic authentication.
+///
+/// @author Shai Almog
 public class TwitterRESTService extends ConnectionRequest {
     public static final String METHOD_USER_TIMELINE = "statuses/user_timeline";
     public static final String METHOD_TWEETS = "search/tweets";
     private static String authToken;
     private Hashtable parseTree;
 
-    /**
-     * The constructor accepts the method to invoke
-     *
-     * @param method the api method to invoke e.g. "statuses/public_timeline"
-     */
+    /// The constructor accepts the method to invoke
+    ///
+    /// #### Parameters
+    ///
+    /// - `method`: the api method to invoke e.g. "statuses/public_timeline"
     public TwitterRESTService(String method) {
         this(method, "1.1", false);
     }
 
-    /**
-     * The constructor accepts the method to invoke
-     *
-     * @param method the api method to invoke e.g. "statuses/public_timeline"
-     * @param post   true for post requests and false for get request
-     */
+    /// The constructor accepts the method to invoke
+    ///
+    /// #### Parameters
+    ///
+    /// - `method`: the api method to invoke e.g. "statuses/public_timeline"
+    ///
+    /// - `post`: true for post requests and false for get request
     public TwitterRESTService(String method, boolean post) {
         this(method, "1.1", post);
     }
 
-    /**
-     * The constructor accepts the method to invoke
-     *
-     * @param method  the api method to invoke e.g. "statuses/public_timeline"
-     * @param version the API version to send e.g. "1"
-     * @param post    true for post requests and false for get request
-     */
+    /// The constructor accepts the method to invoke
+    ///
+    /// #### Parameters
+    ///
+    /// - `method`: the api method to invoke e.g. "statuses/public_timeline"
+    ///
+    /// - `version`: the API version to send e.g. "1"
+    ///
+    /// - `post`: true for post requests and false for get request
     public TwitterRESTService(String method, String version, boolean post) {
         setPost(post);
         setUrl("https://api.twitter.com/" + version + "/" + method + ".json");
@@ -83,13 +84,17 @@ public class TwitterRESTService extends ConnectionRequest {
         addRequestHeader("Accept", "application/json");
     }
 
-    /**
-     * Logs in to twitter as an application
-     *
-     * @param consumerKey    the key to login with
-     * @param consumerSecret the secret to to login with
-     * @return the authorization token
-     */
+    /// Logs in to twitter as an application
+    ///
+    /// #### Parameters
+    ///
+    /// - `consumerKey`: the key to login with
+    ///
+    /// - `consumerSecret`: the secret to to login with
+    ///
+    /// #### Returns
+    ///
+    /// the authorization token
     public static String initToken(String consumerKey, String consumerSecret) {
         ConnectionRequest auth = new ConnectionRequest() {
             @Override
@@ -111,11 +116,11 @@ public class TwitterRESTService extends ConnectionRequest {
         return authToken;
     }
 
-    /**
-     * For every request twitter now needs an authorization token
-     *
-     * @param token the token
-     */
+    /// For every request twitter now needs an authorization token
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the token
     public static void setToken(String token) {
         authToken = token;
     }
@@ -137,9 +142,7 @@ public class TwitterRESTService extends ConnectionRequest {
         return result;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void readResponse(InputStream input) throws IOException {
         InputStreamReader i = new InputStreamReader(input, "UTF-8");
@@ -147,20 +150,20 @@ public class TwitterRESTService extends ConnectionRequest {
         fireResponseListener(new NetworkEvent(this, parseTree));
     }
 
-    /**
-     * Returns the full Hashtable parse tree read from the server
-     *
-     * @return the parse tree
-     */
+    /// Returns the full Hashtable parse tree read from the server
+    ///
+    /// #### Returns
+    ///
+    /// the parse tree
     public Hashtable<String, Object> getParseTree() {
         return parseTree;
     }
 
-    /**
-     * Returns the number of statuses within the response
-     *
-     * @return the number of statuses
-     */
+    /// Returns the number of statuses within the response
+    ///
+    /// #### Returns
+    ///
+    /// the number of statuses
     public int getStatusesCount() {
         Vector v = (Vector) parseTree.get("statuses");
         if (v == null) {
@@ -169,23 +172,26 @@ public class TwitterRESTService extends ConnectionRequest {
         return v.size();
     }
 
-    /**
-     * Returns the status at the given offset
-     *
-     * @param offset the offset for the status
-     * @return the status hashtable
-     */
+    /// Returns the status at the given offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the offset for the status
+    ///
+    /// #### Returns
+    ///
+    /// the status hashtable
     public Hashtable<String, Object> getStatus(int offset) {
         Vector v = (Vector) parseTree.get("statuses");
         return (Hashtable<String, Object>) v.get(offset);
     }
 
-    /**
-     * Gets the id string of the first entry which is important if we want to set the id
-     * to start with in the next request
-     *
-     * @return the id of the first entry
-     */
+    /// Gets the id string of the first entry which is important if we want to set the id
+    /// to start with in the next request
+    ///
+    /// #### Returns
+    ///
+    /// the id of the first entry
     public String getIdStr() {
         if (getStatusesCount() > 0) {
             return (String) getStatus(0).get("id_str");

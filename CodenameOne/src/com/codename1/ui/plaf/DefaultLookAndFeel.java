@@ -57,13 +57,14 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 
-/**
- * Used to render the default look of Codename One
- *
- * @author Chen Fishbein
- * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate
- * our desire to reduce usage/reliance on this class.
- */
+/// Used to render the default look of Codename One
+///
+/// @author Chen Fishbein
+///
+/// #### Deprecated
+///
+/// @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate
+/// our desire to reduce usage/reliance on this class.
 public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private static final Image[] threeImageCache = new Image[3];
     private static final Image[] oneImageCache = new Image[1];
@@ -80,9 +81,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private Component pullDown;
     private Component releaseToRefresh;
 
-    /**
-     * Creates a new instance of DefaultLookAndFeel
-     */
+    /// Creates a new instance of DefaultLookAndFeel
     public DefaultLookAndFeel(UIManager manager) {
         super(manager);
     }
@@ -109,23 +108,26 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return rounded;
     }
 
-    /**
-     * Takes a floating point coordinate on a virtual axis and rusterizes it to
-     * a coordinate in the pixel surface. This is a very simple algorithm since
-     * anti-aliasing isn't supported.
-     *
-     * @param coordinate a position in a theoretical plain
-     * @param plain      the amount of space in the theoretical plain
-     * @param pixelSize  the amount of pixels available on the screen
-     * @return the pixel which we should color
-     */
+    /// Takes a floating point coordinate on a virtual axis and rusterizes it to
+    /// a coordinate in the pixel surface. This is a very simple algorithm since
+    /// anti-aliasing isn't supported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `coordinate`: a position in a theoretical plain
+    ///
+    /// - `plain`: the amount of space in the theoretical plain
+    ///
+    /// - `pixelSize`: the amount of pixels available on the screen
+    ///
+    /// #### Returns
+    ///
+    /// the pixel which we should color
     private static int scaleCoordinate(float coordinate, float plain, int pixelSize) {
         return round(coordinate / plain * pixelSize);
     }
 
-    /**
-     * Reverses alignment in the case of bidi
-     */
+    /// Reverses alignment in the case of bidi
     public static int reverseAlignForBidi(Component c, int align) {
         if (c.isRTL()) {
             switch (align) {
@@ -141,9 +143,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return align;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void bind(Component cmp) {
         if (tickWhenFocused && cmp instanceof Label) {
@@ -151,44 +151,48 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * This method allows to set all Labels, Buttons, CheckBoxes, RadioButtons
-     * to start ticking when the text is too long.
-     *
-     * @return tickWhenFocused
-     */
+    /// This method allows to set all Labels, Buttons, CheckBoxes, RadioButtons
+    /// to start ticking when the text is too long.
+    ///
+    /// #### Returns
+    ///
+    /// tickWhenFocused
     public boolean isTickWhenFocused() {
         return tickWhenFocused;
     }
 
-    /**
-     * This method allows to set all Labels, Buttons, CheckBoxes, RadioButtons
-     * to start ticking when the text is too long.
-     *
-     * @param tickWhenFocused
-     */
+    /// This method allows to set all Labels, Buttons, CheckBoxes, RadioButtons
+    /// to start ticking when the text is too long.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tickWhenFocused`
     public void setTickWhenFocused(boolean tickWhenFocused) {
         this.tickWhenFocused = tickWhenFocused;
     }
 
-    /**
-     * Sets images for checkbox checked/unchecked modes
-     *
-     * @param checkedX   the image to draw in order to represent a checked checkbox
-     * @param uncheckedX the image to draw in order to represent an uncheck checkbox
-     */
+    /// Sets images for checkbox checked/unchecked modes
+    ///
+    /// #### Parameters
+    ///
+    /// - `checkedX`: the image to draw in order to represent a checked checkbox
+    ///
+    /// - `uncheckedX`: the image to draw in order to represent an uncheck checkbox
     public void setCheckBoxImages(Image checkedX, Image uncheckedX) {
         setCheckBoxImages(checkedX, uncheckedX, checkedX, uncheckedX);
     }
 
-    /**
-     * Sets images for checkbox checked/unchecked modes
-     *
-     * @param checkedX          the image to draw in order to represent a checked checkbox
-     * @param uncheckedX        the image to draw in order to represent an uncheck checkbox
-     * @param disabledChecked   same as checked for the disabled state
-     * @param disabledUnchecked same as unchecked for the disabled state
-     */
+    /// Sets images for checkbox checked/unchecked modes
+    ///
+    /// #### Parameters
+    ///
+    /// - `checkedX`: the image to draw in order to represent a checked checkbox
+    ///
+    /// - `uncheckedX`: the image to draw in order to represent an uncheck checkbox
+    ///
+    /// - `disabledChecked`: same as checked for the disabled state
+    ///
+    /// - `disabledUnchecked`: same as unchecked for the disabled state
     public void setCheckBoxImages(Image checkedX, Image uncheckedX, Image disabledChecked, Image disabledUnchecked) {
         if (checkedX == null || uncheckedX == null) {
             chkBoxImages = null;
@@ -203,14 +207,17 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * Sets images for checkbox when in focused mode
-     *
-     * @param checkedX          the image to draw in order to represent a checked checkbox
-     * @param uncheckedX        the image to draw in order to represent an uncheck checkbox
-     * @param disabledChecked   same as checked for the disabled state
-     * @param disabledUnchecked same as unchecked for the disabled state
-     */
+    /// Sets images for checkbox when in focused mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `checkedX`: the image to draw in order to represent a checked checkbox
+    ///
+    /// - `uncheckedX`: the image to draw in order to represent an uncheck checkbox
+    ///
+    /// - `disabledChecked`: same as checked for the disabled state
+    ///
+    /// - `disabledUnchecked`: same as unchecked for the disabled state
     public void setCheckBoxFocusImages(Image checkedX, Image uncheckedX, Image disabledChecked, Image disabledUnchecked) {
         if (checkedX == null || uncheckedX == null) {
             chkBoxImagesFocus = null;
@@ -225,21 +232,22 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * Sets image for the combo box dropdown drawing
-     *
-     * @param picker picker image
-     */
+    /// Sets image for the combo box dropdown drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `picker`: picker image
     public void setComboBoxImage(Image picker) {
         comboImage = picker;
     }
 
-    /**
-     * Sets images for radio button selected/unselected modes
-     *
-     * @param selected   the image to draw in order to represent a selected radio button
-     * @param unselected the image to draw in order to represent an unselected radio button
-     */
+    /// Sets images for radio button selected/unselected modes
+    ///
+    /// #### Parameters
+    ///
+    /// - `selected`: the image to draw in order to represent a selected radio button
+    ///
+    /// - `unselected`: the image to draw in order to represent an unselected radio button
     public void setRadioButtonImages(Image selected, Image unselected) {
         if (selected == null || unselected == null) {
             rButtonImages = null;
@@ -248,14 +256,17 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * Sets images for radio button selected/unselected modes
-     *
-     * @param selected           the image to draw in order to represent a selected radio button
-     * @param unselected         the image to draw in order to represent an unselected radio button
-     * @param disabledSelected   same as selected for the disabled state
-     * @param disabledUnselected same as unselected for the disabled state
-     */
+    /// Sets images for radio button selected/unselected modes
+    ///
+    /// #### Parameters
+    ///
+    /// - `selected`: the image to draw in order to represent a selected radio button
+    ///
+    /// - `unselected`: the image to draw in order to represent an unselected radio button
+    ///
+    /// - `disabledSelected`: same as selected for the disabled state
+    ///
+    /// - `disabledUnselected`: same as unselected for the disabled state
     public void setRadioButtonImages(Image selected, Image unselected, Image disabledSelected, Image disabledUnselected) {
         if (selected == null || unselected == null) {
             rButtonImages = null;
@@ -270,14 +281,17 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * Sets images for radio button selected/unselected and disabled modes, when the radio button has focus, these are entirely optional
-     *
-     * @param selected           the image to draw in order to represent a selected radio button
-     * @param unselected         the image to draw in order to represent an unselected radio button
-     * @param disabledSelected   same as selected for the disabled state
-     * @param disabledUnselected same as unselected for the disabled state
-     */
+    /// Sets images for radio button selected/unselected and disabled modes, when the radio button has focus, these are entirely optional
+    ///
+    /// #### Parameters
+    ///
+    /// - `selected`: the image to draw in order to represent a selected radio button
+    ///
+    /// - `unselected`: the image to draw in order to represent an unselected radio button
+    ///
+    /// - `disabledSelected`: same as selected for the disabled state
+    ///
+    /// - `disabledUnselected`: same as unselected for the disabled state
     public void setRadioButtonFocusImages(Image selected, Image unselected, Image disabledSelected, Image disabledUnselected) {
         if (selected == null || unselected == null) {
             rButtonImagesFocus = null;
@@ -292,64 +306,62 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * Sets the password character to display in the TextArea and the TextField
-     *
-     * @param the char to display
-     */
+    /// Sets the password character to display in the TextArea and the TextField
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: char to display
     public void setPasswordChar(char c) {
         passwordChar = c;
     }
 
-    /**
-     * Returns the images used to represent the radio button (selected followed by unselected).
-     *
-     * @return images representing the radio button or null for using the default drawing
-     */
+    /// Returns the images used to represent the radio button (selected followed by unselected).
+    ///
+    /// #### Returns
+    ///
+    /// images representing the radio button or null for using the default drawing
     public Image[] getRadioButtonImages() {
         return rButtonImages;
     }
 
-    /**
-     * Returns the images used to represent the radio button when in focused mode
-     *
-     * @return images representing the radio button or null for using the default drawing
-     */
+    /// Returns the images used to represent the radio button when in focused mode
+    ///
+    /// #### Returns
+    ///
+    /// images representing the radio button or null for using the default drawing
     public Image[] getRadioButtonFocusImages() {
         return rButtonImagesFocus;
     }
 
-    /**
-     * Returns the images used to represent the checkbox (selected followed by unselected).
-     *
-     * @return images representing the check box or null for using the default drawing
-     */
+    /// Returns the images used to represent the checkbox (selected followed by unselected).
+    ///
+    /// #### Returns
+    ///
+    /// images representing the check box or null for using the default drawing
     public Image[] getCheckBoxImages() {
         return chkBoxImages;
     }
 
-    /**
-     * Returns the images used to represent the checkbox when focused
-     *
-     * @return images representing the check box or null for using the default drawing
-     */
+    /// Returns the images used to represent the checkbox when focused
+    ///
+    /// #### Returns
+    ///
+    /// images representing the check box or null for using the default drawing
     public Image[] getCheckBoxFocusImages() {
         return chkBoxImagesFocus;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is no longer used by the implementation, we shifted code away to improve performance
     @Override
     public void drawButton(Graphics g, Button b) {
         drawComponent(g, b, b.getIconFromState(), null, 0);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drawCheckBox(Graphics g, Button cb) {
         if (chkBoxImages != null) {
@@ -418,11 +430,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is no longer used by the implementation, we shifted code away to improve performance
     @Override
     public void drawLabel(Graphics g, Label l) {
         drawComponent(g, l, l.getMaskedIcon(), null, 0);
@@ -617,9 +629,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return sel.newSpan(l);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drawRadioButton(Graphics g, Button rb) {
         if (rButtonImages != null) {
@@ -669,9 +679,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drawComboBox(Graphics g, List cb) {
         int border = 2;
@@ -755,9 +763,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
     }
 
-    /**
-     * Finds a suitable destination color for gradient values
-     */
+    /// Finds a suitable destination color for gradient values
     private int findDestColor(int color) {
         // brighten or darken the color slightly
         int sourceR = color >> 16 & 0xff;
@@ -782,9 +788,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return ((sourceR << 16) & 0xff0000) | ((sourceG << 8) & 0xff00) | (sourceB & 0xff);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drawList(Graphics g, List l) {
     }
@@ -886,9 +890,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return out;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drawTextArea(Graphics g, TextArea ta) {
         setFG(g, ta);
@@ -970,9 +972,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         g.setAlpha(alpha);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getButtonPreferredSize(Button b) {
         threeImageCache[0] = b.getMaskedIcon();
@@ -981,9 +981,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return getPreferredSize(b, threeImageCache, null);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getCheckBoxPreferredSize(Button cb) {
         if (cb.isToggle()) {
@@ -1008,18 +1006,14 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return d;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getLabelPreferredSize(Label l) {
         oneImageCache[0] = l.getMaskedIcon();
         return getPreferredSize(l, oneImageCache, null);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     private Dimension getPreferredSize(Label l, Image[] icons, Image stateImage) {
         int prefW = 0;
         int prefH = 0;
@@ -1103,9 +1097,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return new Dimension(prefW, prefH);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getListPreferredSize(List l) {
         Dimension d = getListPreferredSizeImpl(l);
@@ -1206,9 +1198,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getRadioButtonPreferredSize(Button rb) {
         if (rb.isToggle()) {
@@ -1237,9 +1227,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return d;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getTextAreaSize(TextArea ta, boolean pref) {
         int prefW = 0;
@@ -1286,9 +1274,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return new Dimension(prefW, prefH);
     }
 
-    /**
-     * Reverses alignment in the case of bidi
-     */
+    /// Reverses alignment in the case of bidi
     private int reverseAlignForBidi(Component c) {
         return reverseAlignForBidi(c, c.getStyle().getAlignment());
     }
@@ -1647,10 +1633,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         g.drawImage(icon, x, drawY);
     }
 
-    /**
-     * Implements the drawString for the text component and adjust the valign
-     * assuming the icon is in one of the sides
-     */
+    /// Implements the drawString for the text component and adjust the valign
+    /// assuming the icon is in one of the sides
     private int drawLabelStringValign(Graphics g, Label l, String str, int x, int y,
                                       int iconStringHGap, int iconHeight, int textSpaceX, int textSpaceW, int fontHeight) {
         if (str.length() == 0) {
@@ -1701,10 +1685,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * Implements the drawString for the text component and adjust the valign
-     * assuming the icon is in one of the sides
-     */
+    /// Implements the drawString for the text component and adjust the valign
+    /// assuming the icon is in one of the sides
     private int drawLabelString(Graphics g, Label l, String text, int x, int y, int textSpaceX, int textSpaceW) {
         if (text.length() == 0) {
             return 0;
@@ -1754,17 +1736,25 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
     }
 
-    /**
-     * Draws the text of a label
-     *
-     * @param g          graphics context
-     * @param l          label component
-     * @param text       the text for the label
-     * @param x          position for the label
-     * @param y          position for the label
-     * @param textSpaceW the width available for the component
-     * @return the space used by the drawing
-     */
+    /// Draws the text of a label
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `l`: label component
+    ///
+    /// - `text`: the text for the label
+    ///
+    /// - `x`: position for the label
+    ///
+    /// - `y`: position for the label
+    ///
+    /// - `textSpaceW`: the width available for the component
+    ///
+    /// #### Returns
+    ///
+    /// the space used by the drawing
     protected int drawLabelText(Graphics g, Label l, String text, int x, int y, int textSpaceW) {
         Style style = l.getStyle();
         Font f = style.getFont();
@@ -1818,9 +1808,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return f.substringWidth(s, 0, length) < width;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getComboBoxPreferredSize(List cb) {
         Dimension d = getListPreferredSize(cb);
@@ -1833,9 +1821,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     }
 
 
-    /**
-     * Similar to getText() but works properly with password fields
-     */
+    /// Similar to getText() but works properly with password fields
     protected String getTextFieldString(TextArea ta) {
         String txt = ta.getText();
         String text;
@@ -1988,9 +1974,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drawTextField(Graphics g, TextArea ta) {
         setFG(g, ta);
@@ -2105,20 +2089,21 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     }
 
 
-    /**
-     * Returns true if the given character is an RTL character or a space
-     * character
-     *
-     * @param c character to test
-     * @return true if bidi is active and this is a
-     */
+    /// Returns true if the given character is an RTL character or a space
+    /// character
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: character to test
+    ///
+    /// #### Returns
+    ///
+    /// true if bidi is active and this is a
     private boolean isRTLOrWhitespace(char c) {
         return (Display.getInstance().isRTL(c)) || c == ' ';
     }
 
-    /**
-     * Calculates the position of the text field cursor within the string
-     */
+    /// Calculates the position of the text field cursor within the string
     private int getTextFieldCursorX(TextArea ta) {
         Style style = ta.getStyle();
         Font f = style.getFont();
@@ -2174,17 +2159,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return cursorX + x;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getTextFieldPreferredSize(TextArea ta) {
         return getTextAreaSize(ta, true);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drawTextFieldCursor(Graphics g, TextArea ta) {
         Style style = ta.getStyle();
@@ -2239,9 +2220,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         return FontImage.createMaterial(FontImage.MATERIAL_ARROW_UPWARD, s);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drawPullToRefresh(Graphics g, final Component cmp, boolean taskExecuted) {
         final Form parentForm = cmp.getComponentForm();
@@ -2327,9 +2306,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         pull.paintComponent(g);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getPullToRefreshHeight() {
         if (pull == null) {
@@ -2381,9 +2358,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void focusGained(Component cmp) {
         if (cmp instanceof Label) {
@@ -2394,9 +2369,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void focusLost(Component cmp) {
         if (cmp instanceof Label) {
@@ -2407,9 +2380,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean b) {
         chkBoxImages = null;

@@ -28,52 +28,55 @@ import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * <p>Simple map like class to store application and Codename One preference
- * settings in the {@link com.codename1.io.Storage}. <br>
- * Simple usage of the class for storing a {@code String} token:</p>
- *
- * <script src="https://gist.github.com/codenameone/fc7693ef69108e90057c.js"></script>
- *
- * <p>
- * Notice that this class might get somewhat confusing with primitive numbers e.g. if you use
- * {@code Preferences.set("primitiveLongValue", myLongNumber)} then invoke
- * {@code Preferences.get("primitiveLongValue", 0)} you might get an exception!<br>
- * This would happen because the value is physically a {@code Long} object but you are trying to get an
- * {@code Integer}. <br>
- * The workaround is to remain consistent and use code like this {@code Preferences.get("primitiveLongValue", (long)0)}.
- * </p>
- *
- * @author Shai Almog
- * @author Miguel Mu\u00f1oz
- */
+/// Simple map like class to store application and Codename One preference
+/// settings in the `com.codename1.io.Storage`.
+///
+/// Simple usage of the class for storing a `String` token:
+///
+/// ```java
+/// // save a token to storage
+/// Preferences.set("token", myToken);
+///
+/// // get the token from storage or null if it isn't there
+/// String token = Preferences.get("token", null);
+/// ```
+///
+/// Notice that this class might get somewhat confusing with primitive numbers e.g. if you use
+/// `Preferences.set("primitiveLongValue", myLongNumber)` then invoke
+/// `Preferences.get("primitiveLongValue", 0)` you might get an exception!
+///
+/// This would happen because the value is physically a `Long` object but you are trying to get an
+/// `Integer`.
+///
+/// The workaround is to remain consistent and use code like this `Preferences.get("primitiveLongValue", (long)0)`.
+///
+/// @author Shai Almog
+/// @author Miguel Mu\u00f1oz
 public final class Preferences {
     private static final HashMap<String, ArrayList<PreferenceListener>> listenerMap = new HashMap<String, ArrayList<PreferenceListener>>();
     private static Hashtable<String, Object> p;
     private static String preferencesLocation = "CN1Preferences";
 
-    /**
-     * Block instantiation of preferences
-     */
+    /// Block instantiation of preferences
     private Preferences() {
     }
 
-    /**
-     * Returns the location within the storage of the preferences file to an arbitrary name. This is useful in a case
-     * of encryption where we would want preferences to use a different file name.
-     *
-     * @return the storage file name
-     */
+    /// Returns the location within the storage of the preferences file to an arbitrary name. This is useful in a case
+    /// of encryption where we would want preferences to use a different file name.
+    ///
+    /// #### Returns
+    ///
+    /// the storage file name
     public static String getPreferencesLocation() {
         return preferencesLocation;
     }
 
-    /**
-     * Sets the location within the storage of the preferences file to an arbitrary name. This is useful in a case
-     * of encryption where we would want preferences to use a different file name.
-     *
-     * @param storageFileName the name of the preferences file
-     */
+    /// Sets the location within the storage of the preferences file to an arbitrary name. This is useful in a case
+    /// of encryption where we would want preferences to use a different file name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageFileName`: the name of the preferences file
     public static void setPreferencesLocation(String storageFileName) {
         preferencesLocation = storageFileName;
         p = null;
@@ -95,12 +98,13 @@ public final class Preferences {
         Storage.getInstance().writeObject(preferencesLocation, p, false);
     }
 
-    /**
-     * Sets a preference value, supported values are Strings, numbers and boolean
-     *
-     * @param pref the key any unique none null value that doesn't start with cn1
-     * @param o    a String a number or boolean
-     */
+    /// Sets a preference value, supported values are Strings, numbers and boolean
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `o`: a String a number or boolean
     private static void set(String pref, Object o) {
         Object prior = get(pref, null);
         if (o == null) {
@@ -112,11 +116,11 @@ public final class Preferences {
         fireChange(pref, prior, o);
     }
 
-    /**
-     * Sets a set of preference values as a batch, and performs a single save.
-     *
-     * @param values The key/value pairs to set in preferences.
-     */
+    /// Sets a set of preference values as a batch, and performs a single save.
+    ///
+    /// #### Parameters
+    ///
+    /// - `values`: The key/value pairs to set in preferences.
     public static void set(Map<String, Object> values) {
         ArrayList<Object[]> changeParams = new ArrayList<Object[]>();
         for (Map.Entry<String, Object> entry : values.entrySet()) {
@@ -136,61 +140,66 @@ public final class Preferences {
         }
     }
 
-    /**
-     * Sets a preference value
-     *
-     * @param pref the key any unique none null value that doesn't start with cn1
-     * @param s    a String
-     */
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `s`: a String
     public static void set(String pref, String s) {
         set(pref, (Object) s);
     }
 
-    /**
-     * Sets a preference value
-     *
-     * @param pref the key any unique none null value that doesn't start with cn1
-     * @param i    a number
-     */
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `i`: a number
     public static void set(String pref, int i) {
         set(pref, Integer.valueOf(i));
     }
 
-    /**
-     * Sets a preference value
-     *
-     * @param pref the key any unique none null value that doesn't start with cn1
-     * @param l    a number
-     */
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `l`: a number
     public static void set(String pref, long l) {
         set(pref, Long.valueOf(l));
     }
 
-    /**
-     * Sets a preference value
-     *
-     * @param pref the key any unique none null value that doesn't start with cn1
-     * @param d    a number
-     */
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `d`: a number
     public static void set(String pref, double d) {
         set(pref, Double.valueOf(d));
     }
 
-    /**
-     * Sets a preference value
-     *
-     * @param pref the key any unique none null value that doesn't start with cn1
-     * @param f    a number
-     */
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `f`: a number
     public static void set(String pref, float f) {
         set(pref, Float.valueOf(f));
     }
 
-    /**
-     * Deletes a value for the given setting
-     *
-     * @param pref the preference value
-     */
+    /// Deletes a value for the given setting
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference value
     public static void delete(String pref) {
         Object prior = get(pref, null);
         get().remove(pref);
@@ -198,9 +207,7 @@ public final class Preferences {
         fireChange(pref, prior, null);
     }
 
-    /**
-     * Remove all preferences
-     */
+    /// Remove all preferences
     public static void clearAll() {
         // We only need to save prior values for Preferences that actually have listeners.
         Hashtable<String, Object> priorValues = null;
@@ -230,12 +237,13 @@ public final class Preferences {
         return p.keySet();
     }
 
-    /**
-     * Sets a preference value
-     *
-     * @param pref the key any unique none null value that doesn't start with cn1
-     * @param b    the value
-     */
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `b`: the value
     public static void set(String pref, boolean b) {
         if (b) {
             set(pref, Boolean.TRUE);
@@ -244,13 +252,17 @@ public final class Preferences {
         }
     }
 
-    /**
-     * Gets the value as a String
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a String
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static String get(String pref, String def) {
         Object t = get().get(pref);
         if (t == null) {
@@ -259,13 +271,17 @@ public final class Preferences {
         return t.toString();
     }
 
-    /**
-     * Gets the value as a String if the value is null def is returned and saved
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a String if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static String getAndSet(String pref, String def) {
         Object t = get().get(pref);
         if (t == null) {
@@ -275,13 +291,17 @@ public final class Preferences {
         return t.toString();
     }
 
-    /**
-     * Gets the value as a number if the value is null def is returned and saved
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static int getAndSet(String pref, int def) {
         Integer t = (Integer) get().get(pref);
         if (t == null) {
@@ -291,13 +311,17 @@ public final class Preferences {
         return t.intValue();
     }
 
-    /**
-     * Gets the value as a number
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static int get(String pref, int def) {
         Integer t = (Integer) get().get(pref);
         if (t == null) {
@@ -306,13 +330,17 @@ public final class Preferences {
         return t.intValue();
     }
 
-    /**
-     * Gets the value as a number if the value is null def is returned and saved
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static long getAndSet(String pref, long def) {
         Long t = (Long) get().get(pref);
         if (t == null) {
@@ -322,13 +350,17 @@ public final class Preferences {
         return t.longValue();
     }
 
-    /**
-     * Gets the value as a number
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static long get(String pref, long def) {
         Long t = (Long) get().get(pref);
         if (t == null) {
@@ -337,13 +369,17 @@ public final class Preferences {
         return t.longValue();
     }
 
-    /**
-     * Gets the value as a number if the value is null def is returned and saved
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static double getAndSet(String pref, double def) {
         Double t = (Double) get().get(pref);
         if (t == null) {
@@ -353,13 +389,17 @@ public final class Preferences {
         return t.doubleValue();
     }
 
-    /**
-     * Gets the value as a number
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static double get(String pref, double def) {
         Double t = (Double) get().get(pref);
         if (t == null) {
@@ -368,13 +408,17 @@ public final class Preferences {
         return t.doubleValue();
     }
 
-    /**
-     * Gets the value as a number if the value is null def is returned and saved
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static float getAndSet(String pref, float def) {
         Float t = (Float) get().get(pref);
         if (t == null) {
@@ -384,13 +428,17 @@ public final class Preferences {
         return t.floatValue();
     }
 
-    /**
-     * Gets the value as a number
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static float get(String pref, float def) {
         Float t = (Float) get().get(pref);
         if (t == null) {
@@ -399,13 +447,17 @@ public final class Preferences {
         return t.floatValue();
     }
 
-    /**
-     * Gets the value as a number if the value is null def is returned and saved
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static boolean getAndSet(String pref, boolean def) {
         Boolean t = (Boolean) get().get(pref);
         if (t == null) {
@@ -416,13 +468,17 @@ public final class Preferences {
     }
 
 
-    /**
-     * Gets the value as a number
-     *
-     * @param pref the preference key
-     * @param def  the default value
-     * @return the default value or the value
-     */
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
     public static boolean get(String pref, boolean def) {
         Boolean t = (Boolean) get().get(pref);
         if (t == null) {
@@ -431,13 +487,15 @@ public final class Preferences {
         return t.booleanValue();
     }
 
-    /**
-     * Fires the PreferenceListeners if priorValue and value are not equal.
-     *
-     * @param pref       The preference name
-     * @param priorValue The prior value, which may be null
-     * @param value      The new value, which may be null
-     */
+    /// Fires the PreferenceListeners if priorValue and value are not equal.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: The preference name
+    ///
+    /// - `priorValue`: The prior value, which may be null
+    ///
+    /// - `value`: The new value, which may be null
     private static void fireChange(final String pref, final Object priorValue, final Object value) {
         //noinspection EqualsReplaceableByObjectsCall,ObjectEquality
         boolean valueChanged = (priorValue != value) && ((priorValue == null) || !priorValue.equals(value)); //NOPMD CompareObjectsWithEquals
@@ -454,14 +512,15 @@ public final class Preferences {
         }
     }
 
-    /**
-     * Adds a preference listener for the specified property to the list of listeners. When calling this method, it is
-     * advisable to also read the current value and set it, since the value may have changed since the last time the
-     * listener was removed. (Should this return the current value of the preference?)
-     *
-     * @param pref     The preference to listen to
-     * @param listener The listener to add, which cannot be null.
-     */
+    /// Adds a preference listener for the specified property to the list of listeners. When calling this method, it is
+    /// advisable to also read the current value and set it, since the value may have changed since the last time the
+    /// listener was removed. (Should this return the current value of the preference?)
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: The preference to listen to
+    ///
+    /// - `listener`: The listener to add, which cannot be null.
     public static void addPreferenceListener(String pref, PreferenceListener listener) {
         if (listener == null) {
             // fail fast. Without this, it will fail when the listener is fired, when it's harder to trace back.
@@ -475,13 +534,17 @@ public final class Preferences {
         listenerList.add(listener);
     }
 
-    /**
-     * Remove the listener for the specified preference.
-     *
-     * @param pref     The preference that the listener listens to
-     * @param listener The listener to remove
-     * @return true if the listener was removed, false if it was not found.
-     */
+    /// Remove the listener for the specified preference.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: The preference that the listener listens to
+    ///
+    /// - `listener`: The listener to remove
+    ///
+    /// #### Returns
+    ///
+    /// true if the listener was removed, false if it was not found.
     public static boolean removePreferenceListener(String pref, PreferenceListener listener) {
         ArrayList<PreferenceListener> listenerList = listenerMap.get(pref);
         if (listenerList != null) {

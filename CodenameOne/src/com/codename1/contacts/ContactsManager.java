@@ -24,73 +24,120 @@ package com.codename1.contacts;
 
 import com.codename1.ui.Display;
 
-/**
- * <p>{@code ContactsManager} provides access to the contacts on the device for listing, adding and deleting contacts.<br>
- * The sample below demonstrates listing all the contacts within the device with their photos</p>
- *
- * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
- *
- * @author Chen
- */
+/// `ContactsManager` provides access to the contacts on the device for listing, adding and deleting contacts.
+///
+/// The sample below demonstrates listing all the contacts within the device with their photos
+///
+/// ```java
+/// Form hi = new Form("Contacts", new BoxLayout(BoxLayout.Y_AXIS));
+/// hi.add(new InfiniteProgress());
+/// int size = Display.getInstance().convertToPixels(5, true);
+/// FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_PERSON, FontImage.getMaterialDesignFont(), 0xff, size, size);
+///
+/// Display.getInstance().scheduleBackgroundTask(() -> {
+///     Contact[] contacts = Display.getInstance().getAllContacts(true, true, false, true, false, false);
+///     Display.getInstance().callSerially(() -> {
+///         hi.removeAll();
+///         for(Contact c : contacts) {
+///             MultiButton mb = new MultiButton(c.getDisplayName());
+///             mb.setIcon(fi);
+///             mb.setTextLine2(c.getPrimaryPhoneNumber());
+///             hi.add(mb);
+///             mb.putClientProperty("id", c.getId());
+///             Display.getInstance().scheduleBackgroundTask(() -> {
+///                 Contact cc = ContactsManager.getContactById(c.getId(), false, true, false, false, false);
+///                 Display.getInstance().callSerially(() -> {
+///                     Image photo = cc.getPhoto();
+///                     if(photo != null) {
+///                         mb.setIcon(photo.fill(size, size));
+///                         mb.revalidate();
+///                     }
+///                 });
+///             });
+///         }
+///         hi.getContentPane().animateLayout(150);
+///     });
+/// });
+/// ```
+///
+/// @author Chen
 public class ContactsManager {
 
-    /**
-     * This method returns all contacts IDs
-     *
-     * @return array of contacts IDs
-     */
+    /// This method returns all contacts IDs
+    ///
+    /// #### Returns
+    ///
+    /// array of contacts IDs
     public static String[] getAllContacts() {
         return Display.getInstance().getAllContacts(false);
     }
 
-    /**
-     * This method returns all contacts that has a phone number
-     *
-     * @return array of contacts IDs
-     */
+    /// This method returns all contacts that has a phone number
+    ///
+    /// #### Returns
+    ///
+    /// array of contacts IDs
     public static String[] getAllContactsWithNumbers() {
         return Display.getInstance().getAllContacts(true);
     }
 
-    /**
-     * This method returns a Contact by the contact id
-     *
-     * @param id of the Contact
-     * @return a Contact Object
-     */
+    /// This method returns a Contact by the contact id
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: of the Contact
+    ///
+    /// #### Returns
+    ///
+    /// a Contact Object
     public static Contact getContactById(String id) {
         return Display.getInstance().getContactById(id);
     }
 
-    /**
-     * This method returns a Contact by the contact id and fills it's data
-     * according to the given flags
-     *
-     * @param id               of the Contact
-     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
-     * @param includesPicture  if true try to fetch the Contact Picture if exists
-     * @param includesNumbers  if true try to fetch all Contact numbers
-     * @param includesEmail    if ture try to fetch all Contact Emails
-     * @param includeAddress   if ture try to fetch all Contact Addresses
-     * @return a Contact Object
-     */
+    /// This method returns a Contact by the contact id and fills it's data
+    /// according to the given flags
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: of the Contact
+    ///
+    /// - `includesFullName`: if true try to fetch the full name of the Contact(not just display name)
+    ///
+    /// - `includesPicture`: if true try to fetch the Contact Picture if exists
+    ///
+    /// - `includesNumbers`: if true try to fetch all Contact numbers
+    ///
+    /// - `includesEmail`: if ture try to fetch all Contact Emails
+    ///
+    /// - `includeAddress`: if ture try to fetch all Contact Addresses
+    ///
+    /// #### Returns
+    ///
+    /// a Contact Object
     public static Contact getContactById(String id, boolean includesFullName, boolean includesPicture,
                                          boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         return Display.getInstance().getContactById(id, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
     }
 
-    /**
-     * Create a contact to the device contacts book
-     *
-     * @param firstName   the Contact firstName
-     * @param familyName  the Contact familyName
-     * @param workPhone   the Contact work phone or null
-     * @param homePhone   the Contact home phone or null
-     * @param mobilePhone the Contact mobile phone or null
-     * @param email       the Contact email or null
-     * @return the contact id if creation succeeded or null  if failed
-     */
+    /// Create a contact to the device contacts book
+    ///
+    /// #### Parameters
+    ///
+    /// - `firstName`: the Contact firstName
+    ///
+    /// - `familyName`: the Contact familyName
+    ///
+    /// - `workPhone`: the Contact work phone or null
+    ///
+    /// - `homePhone`: the Contact home phone or null
+    ///
+    /// - `mobilePhone`: the Contact mobile phone or null
+    ///
+    /// - `email`: the Contact email or null
+    ///
+    /// #### Returns
+    ///
+    /// the contact id if creation succeeded or null  if failed
     public static String createContact(String firstName, String familyName,
                                        String workPhone, String homePhone, String mobilePhone,
                                        String email) {
@@ -98,90 +145,117 @@ public class ContactsManager {
                 workPhone, homePhone, mobilePhone, email);
     }
 
-    /**
-     * removed a contact from the device contacts book
-     *
-     * @param id the contact id to remove
-     * @return true if deletion succeeded false otherwise
-     */
+    /// removed a contact from the device contacts book
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the contact id to remove
+    ///
+    /// #### Returns
+    ///
+    /// true if deletion succeeded false otherwise
     public static boolean deleteContact(String id) {
         return Display.getInstance().deleteContact(id);
     }
 
-    /**
-     * Notice: this method might be very slow and should be invoked on a separate thread!
-     * It might have platform specific optimizations over getAllContacts followed by looping
-     * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
-     * information.
-     *
-     * @param withNumbers      if true returns only contacts that has a number
-     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
-     * @param includesPicture  if true try to fetch the Contact Picture if exists
-     * @param includesNumbers  if true try to fetch all Contact numbers
-     * @param includesEmail    if true try to fetch all Contact Emails
-     * @param includeAddress   if true try to fetch all Contact Addresses
-     * @return array of the contacts
-     */
+    /// Notice: this method might be very slow and should be invoked on a separate thread!
+    /// It might have platform specific optimizations over getAllContacts followed by looping
+    /// over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
+    /// information.
+    ///
+    /// #### Parameters
+    ///
+    /// - `withNumbers`: if true returns only contacts that has a number
+    ///
+    /// - `includesFullName`: if true try to fetch the full name of the Contact(not just display name)
+    ///
+    /// - `includesPicture`: if true try to fetch the Contact Picture if exists
+    ///
+    /// - `includesNumbers`: if true try to fetch all Contact numbers
+    ///
+    /// - `includesEmail`: if true try to fetch all Contact Emails
+    ///
+    /// - `includeAddress`: if true try to fetch all Contact Addresses
+    ///
+    /// #### Returns
+    ///
+    /// array of the contacts
     public static Contact[] getContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         return Display.getInstance().getAllContacts(withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
     }
 
-    /**
-     * Indicates if the getAllContacts is platform optimized, notice that the method
-     * might still take seconds or more to run so you should still use a separate thread!
-     *
-     * @return true if getAllContacts will perform faster that just getting each contact
-     */
+    /// Indicates if the getAllContacts is platform optimized, notice that the method
+    /// might still take seconds or more to run so you should still use a separate thread!
+    ///
+    /// #### Returns
+    ///
+    /// true if getAllContacts will perform faster that just getting each contact
     public static boolean isAllContactsFast() {
         return Display.getInstance().isGetAllContactsFast();
     }
 
-    /**
-     * Clears the contacts cache to that they will be loaded from the system the next time {@link #getContacts(boolean, boolean, boolean, boolean, boolean, boolean) }
-     * is called.
-     *
-     * <p>This is only necessary on platforms that use a transactional address book, if you want to reload contact changes
-     * that have occurred outside the app.  At time of writing, the only platform that does this is iOS.  This method will have no effect on other platforms.</p>
-     */
+    /// Clears the contacts cache to that they will be loaded from the system the next time `boolean, boolean, boolean, boolean, boolean)`
+    /// is called.
+    ///
+    /// This is only necessary on platforms that use a transactional address book, if you want to reload contact changes
+    /// that have occurred outside the app.  At time of writing, the only platform that does this is iOS.  This method will have no effect on other platforms.
     public static void refresh() {
         Display.getInstance().refreshContacts();
     }
 
-    /**
-     * Notice: this method might be very slow and should be invoked on a separate thread!
-     * It might have platform specific optimizations over getAllContacts followed by looping
-     * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
-     * information.
-     *
-     * @param withNumbers      if true returns only contacts that has a number
-     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
-     * @param includesPicture  if true try to fetch the Contact Picture if exists
-     * @param includesNumbers  if true try to fetch all Contact numbers
-     * @param includesEmail    if true try to fetch all Contact Emails
-     * @param includeAddress   if true try to fetch all Contact Addresses
-     * @return array of the contacts
-     * @deprecated this method was incorrectly introduced use getContacts instead
-     */
+    /// Notice: this method might be very slow and should be invoked on a separate thread!
+    /// It might have platform specific optimizations over getAllContacts followed by looping
+    /// over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
+    /// information.
+    ///
+    /// #### Parameters
+    ///
+    /// - `withNumbers`: if true returns only contacts that has a number
+    ///
+    /// - `includesFullName`: if true try to fetch the full name of the Contact(not just display name)
+    ///
+    /// - `includesPicture`: if true try to fetch the Contact Picture if exists
+    ///
+    /// - `includesNumbers`: if true try to fetch all Contact numbers
+    ///
+    /// - `includesEmail`: if true try to fetch all Contact Emails
+    ///
+    /// - `includeAddress`: if true try to fetch all Contact Addresses
+    ///
+    /// #### Returns
+    ///
+    /// array of the contacts
+    ///
+    /// #### Deprecated
+    ///
+    /// this method was incorrectly introduced use getContacts instead
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         return Display.getInstance().getAllContacts(withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
     }
 
-    /**
-     * Indicates if the getAllContacts is platform optimized, notice that the method
-     * might still take seconds or more to run so you should still use a separate thread!
-     *
-     * @return true if getAllContacts will perform faster that just getting each contact
-     * @deprecated this method was incorrectly introduced and isn't static use isAllContactsFast instead
-     */
+    /// Indicates if the getAllContacts is platform optimized, notice that the method
+    /// might still take seconds or more to run so you should still use a separate thread!
+    ///
+    /// #### Returns
+    ///
+    /// true if getAllContacts will perform faster that just getting each contact
+    ///
+    /// #### Deprecated
+    ///
+    /// this method was incorrectly introduced and isn't static use isAllContactsFast instead
     public boolean isGetAllContactsFast() {
         return Display.getInstance().isGetAllContactsFast();
     }
 
-    /**
-     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
-     * @param c The contact whose "linked" contacts are to be retrieved.
-     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
-     */
+    /// Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The contact whose "linked" contacts are to be retrieved.
+    ///
+    /// #### Returns
+    ///
+    /// Array of Contacts.  Should never be null, but may be a zero-sized array.
     //public static Contact[] getLinkedContacts(Contact c) {
     //    return Display.getInstance().getLinkedContacts(c);
     //}

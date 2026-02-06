@@ -31,61 +31,72 @@ import com.codename1.util.MathUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-/**
- * <p>A general geometric path, consisting of any number of subpaths constructed
- * out of straight lines and cubic or quadratic Bezier curves. The inside of the
- * curve is defined for drawing purposes by a winding rule. Either the
- * {@link #WIND_EVEN_ODD} or {@link #WIND_NON_ZERO} winding rule can be chosen.</p>
- *
- * <h4>A drawing of a GeneralPath</h4>
- * <p>
- * <img
- * src="http://developer.classpath.org/doc/java/awt/geom/doc-files/GeneralPath-1.png"/>
- *
- * <p>
- * The {@link #WIND_EVEN_ODD} winding rule defines a point as inside a path if:
- * A ray from the point towards infinity in an arbitrary direction intersects
- * the path an odd number of times. Points {@literal A} and {@literal C} in the
- * image are considered to be outside the path. (both intersect twice) Point
- * {@literal B} intersects once, and is inside.</p>
- *
- * <p>
- * The {@link #WIND_NON_ZERO} winding rule defines a point as inside a path if:
- * The path intersects the ray in an equal number of opposite directions. Point
- * {@link A} in the image is outside (one intersection in the 'up' direction,
- * one in the 'down' direction) Point {@literal B} in the image is inside (one
- * intersection 'down') Point C in the image is inside (two intersections in the
- * 'down' direction)</p>
- *
- * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
- *
- * <p>Note: This description and image were copied from <a
- * href="http://developer.classpath.org/doc/java/awt/geom/GeneralPath.html">the
- * GNU classpath</a>
- * docs). License here http://www.gnu.org/licenses/licenses.html#FDL</p>
- *
- * @author shannah
- * @see com.codename1.ui.Graphics#drawShape
- * @see com.codename1.ui.Graphics#fillShape
- */
+/// A general geometric path, consisting of any number of subpaths constructed
+/// out of straight lines and cubic or quadratic Bezier curves. The inside of the
+/// curve is defined for drawing purposes by a winding rule. Either the
+/// `#WIND_EVEN_ODD` or `#WIND_NON_ZERO` winding rule can be chosen.
+///
+/// A drawing of a GeneralPath
+///
+/// The `#WIND_EVEN_ODD` winding rule defines a point as inside a path if:
+/// A ray from the point towards infinity in an arbitrary direction intersects
+/// the path an odd number of times. Points A and C in the
+/// image are considered to be outside the path. (both intersect twice) Point
+/// B intersects once, and is inside.
+///
+/// The `#WIND_NON_ZERO` winding rule defines a point as inside a path if:
+/// The path intersects the ray in an equal number of opposite directions. Point
+/// `A` in the image is outside (one intersection in the 'up' direction,
+/// one in the 'down' direction) Point B in the image is inside (one
+/// intersection 'down') Point C in the image is inside (two intersections in the
+/// 'down' direction)
+///
+/// ```java
+/// Form hi = new Form("Shape");
+///
+/// // We create a 50 x 100 shape, this is arbitrary since we can scale it easily
+/// GeneralPath path = new GeneralPath();
+/// path.moveTo(20,0);
+/// path.lineTo(30, 0);
+/// path.lineTo(30, 100);
+/// path.lineTo(20, 100);
+/// path.lineTo(20, 15);
+/// path.lineTo(5, 40);
+/// path.lineTo(5, 25);
+/// path.lineTo(20,0);
+///
+/// hi.getContentPane().getUnselectedStyle().setBgPainter((Graphics g, Rectangle rect) -> {
+///     g.setColor(0xff);
+///     float widthRatio = ((float)rect.getWidth()) / 50f;
+///     float heightRatio = ((float)rect.getHeight()) / 100f;
+///     g.scale(widthRatio, heightRatio);
+///     g.translate((int)(((float)rect.getX()) / widthRatio), (int)(((float)rect.getY()) / heightRatio));
+///     g.fillShape(path);
+///     g.resetAffine();
+/// });
+///
+/// hi.show();
+/// ```
+///
+/// Note: This description and image were copied from [the GNU classpath](http://developer.classpath.org/doc/java/awt/geom/GeneralPath.html)
+/// docs). License here http://www.gnu.org/licenses/licenses.html#FDL
+///
+/// @author shannah
+///
+/// #### See also
+///
+/// - com.codename1.ui.Graphics#drawShape
+///
+/// - com.codename1.ui.Graphics#fillShape
 public final class GeneralPath implements Shape {
 
-    /**
-     * Same constant as {@link PathIterator#WIND_EVEN_ODD}
-     */
+    /// Same constant as `PathIterator#WIND_EVEN_ODD`
     public static final int WIND_EVEN_ODD = PathIterator.WIND_EVEN_ODD;
-    /**
-     * Same constant as {@link PathIterator#WIND_NON_ZERO}
-     */
+    /// Same constant as `PathIterator#WIND_NON_ZERO`
     public static final int WIND_NON_ZERO = PathIterator.WIND_NON_ZERO;
-    /**
-     * The buffers size
-     */
+    /// The buffers size
     private static final int BUFFER_SIZE = 10;
-    /**
-     * The buffers capacity
-     */
+    /// The buffers capacity
     private static final int BUFFER_CAPACITY = 10;
     private static final int MAX_POOL_SIZE = 20;
     private static final ArrayList<GeneralPath> pathPool = new ArrayList<GeneralPath>();
@@ -93,9 +104,7 @@ public final class GeneralPath implements Shape {
     private static final ArrayList<float[]> floatPool = new ArrayList<float[]>();
     private static final ArrayList<boolean[]> boolPool = new ArrayList<boolean[]>();
     private static final ArrayList<Iterator> iteratorPool = new ArrayList<Iterator>();
-    /**
-     * The space amount in points buffer for different segmenet's types
-     */
+    /// The space amount in points buffer for different segmenet's types
     private static final int[] pointShift = {
             2, // MOVETO
             2, // LINETO
@@ -104,70 +113,63 @@ public final class GeneralPath implements Shape {
             0}; // CLOSE
     private static final Pt tmpV1 = new Pt();
     private static final Pt tmpV2 = new Pt();
-    /**
-     * The point's types buffer
-     */
+    /// The point's types buffer
     byte[] types;
-    /**
-     * The points buffer
-     */
+    /// The points buffer
     float[] points;
-    /**
-     * The point's type buffer size
-     */
+    /// The point's type buffer size
     int typeSize;
-    /**
-     * The points buffer size
-     */
+    /// The points buffer size
     int pointSize;
-    /**
-     * The path rule
-     */
+    /// The path rule
     int rule;
 
-    /**
-     * Constructs a GeneralPath with the default ({@link #WIND_NON_ZERO})
-     * winding rule and initial capacity (10).
-     */
+    /// Constructs a GeneralPath with the default (`#WIND_NON_ZERO`)
+    /// winding rule and initial capacity (10).
     public GeneralPath() {
         this(WIND_NON_ZERO, BUFFER_SIZE);
     }
 
 
-    /**
-     * Constructs a GeneralPath with a specific winding rule and the default
-     * initial capacity (10).
-     *
-     * @param rule The winding rule. One of {@link #WIND_NON_ZERO} and
-     *             {@link #WIND_EVEN_ODD}
-     * @see #WIND_NON_ZERO
-     * @see #WIND_EVEN_ODD
-     */
+    /// Constructs a GeneralPath with a specific winding rule and the default
+    /// initial capacity (10).
+    ///
+    /// #### Parameters
+    ///
+    /// - `rule`: @param rule The winding rule. One of `#WIND_NON_ZERO` and
+    ///             `#WIND_EVEN_ODD`
+    ///
+    /// #### See also
+    ///
+    /// - #WIND_NON_ZERO
+    ///
+    /// - #WIND_EVEN_ODD
     public GeneralPath(int rule) {
         this(rule, BUFFER_SIZE);
     }
 
-    /**
-     * Constructs a GeneralPath with a specific winding rule and the initial
-     * capacity. The initial capacity should be the approximate number of path
-     * segments to be used.
-     *
-     * @param rule            The winding rule. ({@link #WIND_NON_ZERO} or
-     *                        {@link #WIND_EVEN_ODD}).
-     * @param initialCapacity the inital capacity, in path segments
-     */
+    /// Constructs a GeneralPath with a specific winding rule and the initial
+    /// capacity. The initial capacity should be the approximate number of path
+    /// segments to be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rule`: @param rule            The winding rule. (`#WIND_NON_ZERO` or
+    ///                        `#WIND_EVEN_ODD`).
+    ///
+    /// - `initialCapacity`: the inital capacity, in path segments
     public GeneralPath(int rule, int initialCapacity) {
         setWindingRule(rule);
         types = new byte[initialCapacity];
         points = new float[initialCapacity * 2];
     }
 
-    /**
-     * Constructs a GeneralPath from an arbitrary shape object. The Shapes
-     * PathIterator path and winding rule will be used.
-     *
-     * @param shape
-     */
+    /// Constructs a GeneralPath from an arbitrary shape object. The Shapes
+    /// PathIterator path and winding rule will be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shape`
     public GeneralPath(Shape shape) {
         this(WIND_NON_ZERO, BUFFER_SIZE);
         if (shape.getClass() == GeneralPath.class) {
@@ -254,12 +256,15 @@ public final class GeneralPath implements Shape {
 
     }
 
-    /**
-     * Returns a GeneralPath to the reusable object pool for GeneralPaths.
-     *
-     * @param p The path to recycle.
-     * @see #createFromPool()
-     */
+    /// Returns a GeneralPath to the reusable object pool for GeneralPaths.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: The path to recycle.
+    ///
+    /// #### See also
+    ///
+    /// - #createFromPool()
     public static synchronized void recycle(GeneralPath p) {
         if (pathPool().size() >= MAX_POOL_SIZE || p == null) {
             return;
@@ -295,28 +300,28 @@ public final class GeneralPath implements Shape {
         iteratorPool.add(it);
     }
 
-    /**
-     * Creates a new GeneralPath from an object Pool.  This is useful
-     * if you need to create a temporary General path that you wish
-     * to dispose of after using.
-     *
-     * <p>You should return this object back to the pool when you are done
-     * using the {@link #recycle(com.codename1.ui.geom.GeneralPath) } method.
-     *
-     * @return
-     */
+    /// Creates a new GeneralPath from an object Pool.  This is useful
+    /// if you need to create a temporary General path that you wish
+    /// to dispose of after using.
+    ///
+    /// You should return this object back to the pool when you are done
+    /// using the `#recycle(com.codename1.ui.geom.GeneralPath)` method.
     public static GeneralPath createFromPool() {
         return createPathFromPool();
     }
 
-    /**
-     * Checks to see if the set of points form a convex polygon.
-     * if
-     *
-     * @param xPoints The x coordinates of the polygon.
-     * @param yPoints The y coordinates of the polygon.
-     * @return True if the points comprise a convex polygon.
-     */
+    /// Checks to see if the set of points form a convex polygon.
+    /// if
+    ///
+    /// #### Parameters
+    ///
+    /// - `xPoints`: The x coordinates of the polygon.
+    ///
+    /// - `yPoints`: The y coordinates of the polygon.
+    ///
+    /// #### Returns
+    ///
+    /// True if the points comprise a convex polygon.
     public static boolean isConvexPolygon(float[] xPoints, float[] yPoints) {
         int len = xPoints.length;
         Pt[] p = new Pt[len];
@@ -395,11 +400,11 @@ public final class GeneralPath implements Shape {
         return (p);
     }
 
-    /**
-     * Checks to see if this path forms a polygon.
-     *
-     * @return True if the path is a polygon.
-     */
+    /// Checks to see if this path forms a polygon.
+    ///
+    /// #### Returns
+    ///
+    /// True if the path is a polygon.
     public boolean isPolygon() {
 
         if (isRectangle()) {
@@ -441,38 +446,38 @@ public final class GeneralPath implements Shape {
 
     }
 
-    /**
-     * Returns the number of path commands in this path.
-     *
-     * @return The number of path commands in this path.
-     */
+    /// Returns the number of path commands in this path.
+    ///
+    /// #### Returns
+    ///
+    /// The number of path commands in this path.
     public int getTypesSize() {
         return typeSize;
     }
 
-    /**
-     * Returns the number of points in this path.
-     *
-     * @return The number of points in this path.
-     */
+    /// Returns the number of points in this path.
+    ///
+    /// #### Returns
+    ///
+    /// The number of points in this path.
     public int getPointsSize() {
         return pointSize;
     }
 
-    /**
-     * Returns a copy of the types (aka path commands) in this path.
-     *
-     * @param out An array to copy the path commands into.
-     */
+    /// Returns a copy of the types (aka path commands) in this path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: An array to copy the path commands into.
     public void getTypes(byte[] out) {
         System.arraycopy(types, 0, out, 0, Math.min(types.length, out.length));
     }
 
-    /**
-     * Returns a copy of the points in this path.
-     *
-     * @param out An array to copy the points into.
-     */
+    /// Returns a copy of the points in this path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: An array to copy the points into.
     public void getPoints(float[] out) {
         System.arraycopy(points, 0, out, 0, Math.min(points.length, out.length));
     }
@@ -550,23 +555,23 @@ public final class GeneralPath implements Shape {
         }
     }
 
-    /**
-     * Returns the path's current winding rule.
-     *
-     * @return {@link #WIND_NON_ZERO} or {@link #WIND_EVEN_ODD}
-     */
+    /// Returns the path's current winding rule.
+    ///
+    /// #### Returns
+    ///
+    /// `#WIND_NON_ZERO` or `#WIND_EVEN_ODD`
     public int getWindingRule() {
         return rule;
     }
 
-    /**
-     * Sets the path's winding rule, which controls which areas are considered
-     * 'inside' or 'outside' the path on drawing. Valid rules are
-     * {@link #WIND_EVEN_ODD} for an even-odd winding rule, or
-     * {@link #WIND_NON_ZERO} for a non-zero winding rule.
-     *
-     * @param rule the rule. ({@link #WIND_NON_ZERO} or {@link #WIND_EVEN_ODD}).
-     */
+    /// Sets the path's winding rule, which controls which areas are considered
+    /// 'inside' or 'outside' the path on drawing. Valid rules are
+    /// `#WIND_EVEN_ODD` for an even-odd winding rule, or
+    /// `#WIND_NON_ZERO` for a non-zero winding rule.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rule`: the rule. (`#WIND_NON_ZERO` or `#WIND_EVEN_ODD`).
     public void setWindingRule(int rule) {
         if (rule != WIND_EVEN_ODD && rule != WIND_NON_ZERO) {
             // awt.209=Invalid winding rule value
@@ -575,12 +580,12 @@ public final class GeneralPath implements Shape {
         this.rule = rule;
     }
 
-    /**
-     * Checks points and types buffer size to add pointCount points. If
-     * necessary realloc buffers to enlarge size.
-     *
-     * @param pointCount - the point count to be added in buffer
-     */
+    /// Checks points and types buffer size to add pointCount points. If
+    /// necessary realloc buffers to enlarge size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointCount`: - the point count to be added in buffer
     private void checkBuf(int pointCount, boolean checkMove) {
         if (checkMove && typeSize == 0) {
             // awt.20A=First segment should be SEG_MOVETO type
@@ -602,12 +607,13 @@ public final class GeneralPath implements Shape {
         moveTo((float) x, (float) y);
     }
 
-    /**
-     * Adds a new point to a path.
-     *
-     * @param x the x-coordinate.
-     * @param y the y-coordinate.
-     */
+    /// Adds a new point to a path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x-coordinate.
+    ///
+    /// - `y`: the y-coordinate.
     public void moveTo(float x, float y) {
         if (typeSize > 0 && types[typeSize - 1] == PathIterator.SEG_MOVETO) {
             points[pointSize - 2] = x;
@@ -624,12 +630,13 @@ public final class GeneralPath implements Shape {
         lineTo((float) x, (float) y);
     }
 
-    /**
-     * Appends a straight line to the current path.
-     *
-     * @param x x coordinate of the line endpoint.
-     * @param y y coordinate of the line endpoint.
-     */
+    /// Appends a straight line to the current path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x coordinate of the line endpoint.
+    ///
+    /// - `y`: y coordinate of the line endpoint.
     public void lineTo(float x, float y) {
         checkBuf(2, true);
         types[typeSize++] = PathIterator.SEG_LINETO;
@@ -641,14 +648,17 @@ public final class GeneralPath implements Shape {
         quadTo((float) x1, (float) y1, (float) x2, (float) y2);
     }
 
-    /**
-     * Appends a quadratic Bezier curve to the current path.
-     *
-     * @param x1 x coordinate of the control point
-     * @param y1 y coordinate of the control point
-     * @param x2 x coordinate of the curve endpoint.
-     * @param y2 y coordinate of the curve endpoint.
-     */
+    /// Appends a quadratic Bezier curve to the current path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x1`: x coordinate of the control point
+    ///
+    /// - `y1`: y coordinate of the control point
+    ///
+    /// - `x2`: x coordinate of the curve endpoint.
+    ///
+    /// - `y2`: y coordinate of the curve endpoint.
     public void quadTo(float x1, float y1, float x2, float y2) {
         checkBuf(4, true);
         types[typeSize++] = PathIterator.SEG_QUADTO;
@@ -668,16 +678,21 @@ public final class GeneralPath implements Shape {
 //        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY, false);
 //    }
 
-    /**
-     * Appends a cubic Bezier curve to the current path.
-     *
-     * @param x1 x coordinate of the first control point
-     * @param y1 y coordinate of the first control point
-     * @param x2 x coordinate of the second control point
-     * @param y2 y coordinate of the second control point
-     * @param x3 x coordinate of the curve endpoint.
-     * @param y3 y coordinate of the curve endpoint.
-     */
+    /// Appends a cubic Bezier curve to the current path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x1`: x coordinate of the first control point
+    ///
+    /// - `y1`: y coordinate of the first control point
+    ///
+    /// - `x2`: x coordinate of the second control point
+    ///
+    /// - `y2`: y coordinate of the second control point
+    ///
+    /// - `x3`: x coordinate of the curve endpoint.
+    ///
+    /// - `y3`: y coordinate of the curve endpoint.
     public void curveTo(float x1, float y1, float x2, float y2, float x3, float y3) {
         checkBuf(6, true);
         types[typeSize++] = PathIterator.SEG_CUBICTO;
@@ -689,74 +704,87 @@ public final class GeneralPath implements Shape {
         points[pointSize++] = y3;
     }
 
-    /**
-     * Draws an elliptical arc on the path given the provided bounds.
-     *
-     * @param x          Left x coord of bounding rect.
-     * @param y          Top y coordof bounding rect.
-     * @param w          Width of bounding rect.
-     * @param h          Height of bounding rect.
-     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
-     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
-     */
+    /// Draws an elliptical arc on the path given the provided bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Left x coord of bounding rect.
+    ///
+    /// - `y`: Top y coordof bounding rect.
+    ///
+    /// - `w`: Width of bounding rect.
+    ///
+    /// - `h`: Height of bounding rect.
+    ///
+    /// - `startAngle`: Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+    ///
+    /// - `sweepAngle`: Sweep angle in radians. Counter-clockwise.
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle) {
 
         arc(x, y, w, h, startAngle, sweepAngle, false);
     }
 
-    /**
-     * Adds a circular arc to the given path by approximating it through a cubic Bezier curve, splitting it if
-     * necessary. The precision of the approximation can be adjusted through {@code pointsOnCircle} and
-     * {@code overlapPoints} parameters.
-     * <p>
-     * <strong>Example:</strong> imagine an arc starting from 0? and sweeping 100? with a value of
-     * {@code pointsOnCircle} equal to 12 (threshold -> 360? / 12 = 30?):
-     * <ul>
-     * <li>if {@code overlapPoints} is {@code true}, it will be split as following:
-     * <ul>
-     * <li>from 0? to 30? (sweep 30?)</li>
-     * <li>from 30? to 60? (sweep 30?)</li>
-     * <li>from 60? to 90? (sweep 30?)</li>
-     * <li>from 90? to 100? (sweep 10?)</li>
-     * </ul>
-     * </li>
-     * <li>if {@code overlapPoints} is {@code false}, it will be split into 4 equal arcs:
-     * <ul>
-     * <li>from 0? to 25? (sweep 25?)</li>
-     * <li>from 25? to 50? (sweep 25?)</li>
-     * <li>from 50? to 75? (sweep 25?)</li>
-     * <li>from 75? to 100? (sweep 25?)</li>
-     * </ul>
-     * </li>
-     * </ul>
-     * </p>
-     * <p/>
-     * For a technical explanation:
-     * <a href="http://hansmuller-flex.blogspot.de/2011/10/more-about-approximating-circular-arcs.html">
-     * http://hansmuller-flex.blogspot.de/2011/10/more-about-approximating-circular-arcs.html
-     * </a>
-     *
-     * @param center            The center of the circle.
-     * @param radius            The radius of the circle.
-     * @param startAngleRadians The starting angle on the circle (in radians).
-     * @param sweepAngleRadians How long to make the total arc (in radians).
-     * @param pointsOnCircle    Defines a <i>threshold</i> (360? /{@code pointsOnCircle}) to split the Bezier arc to
-     *                          better approximate a circular arc, depending also on the value of {@code overlapPoints}.
-     *                          The suggested number to have a reasonable approximation of a circle is at least 4 (90?).
-     *                          Less than 1 will be ignored (the arc will not be split).
-     * @param overlapPoints     Given the <i>threshold</i> defined through {@code pointsOnCircle}:
-     *                          <ul>
-     *                          <li>if {@code true}, split the arc on every angle which is a multiple of the
-     *                          <i>threshold</i> (yields better results if drawing precision is required,
-     *                          especially when stacking multiple arcs, but can potentially use more points)</li>
-     *                          <li>if {@code false}, split the arc equally so that each part is shorter than
-     *                          the <i>threshold</i></li>
-     *                          </ul>
-     * @param addToPath         An existing path where to add the arc to, or {@code null} to create a new path.
-     *
-     *
-     * @see #createBezierArcDegrees(android.graphics.PointF, float, float, float, int, boolean, android.graphics.Path)
-     */
+    /// Adds a circular arc to the given path by approximating it through a cubic Bezier curve, splitting it if
+    /// necessary. The precision of the approximation can be adjusted through `pointsOnCircle` and
+    /// `overlapPoints` parameters.
+    ///
+    /// **Example:** imagine an arc starting from 0? and sweeping 100? with a value of
+    /// `pointsOnCircle` equal to 12 (threshold -> 360? / 12 = 30?):
+    ///
+    /// - if `overlapPoints` is `true`, it will be split as following:
+    ///
+    /// - from 0? to 30? (sweep 30?)
+    ///
+    /// - from 30? to 60? (sweep 30?)
+    ///
+    /// - from 60? to 90? (sweep 30?)
+    ///
+    /// - from 90? to 100? (sweep 10?)
+    ///
+    /// - if `overlapPoints` is `false`, it will be split into 4 equal arcs:
+    ///
+    /// - from 0? to 25? (sweep 25?)
+    ///
+    /// - from 25? to 50? (sweep 25?)
+    ///
+    /// - from 50? to 75? (sweep 25?)
+    ///
+    /// - from 75? to 100? (sweep 25?)
+    ///
+    /// For a technical explanation:
+    /// [http://hansmuller-flex.blogspot.de/2011/10/more-about-approximating-circular-arcs.html](http://hansmuller-flex.blogspot.de/2011/10/more-about-approximating-circular-arcs.html)
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: The center of the circle.
+    ///
+    /// - `radius`: The radius of the circle.
+    ///
+    /// - `startAngleRadians`: The starting angle on the circle (in radians).
+    ///
+    /// - `sweepAngleRadians`: How long to make the total arc (in radians).
+    ///
+    /// - `pointsOnCircle`: @param pointsOnCircle    Defines a *threshold* (360? /`pointsOnCircle`) to split the Bezier arc to
+    ///                          better approximate a circular arc, depending also on the value of `overlapPoints`.
+    ///                          The suggested number to have a reasonable approximation of a circle is at least 4 (90?).
+    ///                          Less than 1 will be ignored (the arc will not be split).
+    ///
+    /// - `overlapPoints`: @param overlapPoints     Given the *threshold* defined through `pointsOnCircle`:
+    ///
+    ///
+    ///
+    /// - if `true`, split the arc on every angle which is a multiple of the
+    ///                          *threshold* (yields better results if drawing precision is required,
+    ///                          especially when stacking multiple arcs, but can potentially use more points)
+    ///
+    /// - if `false`, split the arc equally so that each part is shorter than
+    ///                          the *threshold*
+    ///
+    /// - `addToPath`: An existing path where to add the arc to, or `null` to create a new path.
+    ///
+    /// #### See also
+    ///
+    /// - #createBezierArcDegrees(android.graphics.PointF, float, float, float, int, boolean, android.graphics.Path)
 //    private static void createBezierArcRadians(float cx, float cy, float radiusX, float radiusY, double startAngleRadians,
 //                                              double sweepAngleRadians, int pointsOnCircle, boolean overlapPoints,
 //                                              GeneralPath addToPath, boolean joinPath)
@@ -836,13 +864,15 @@ public final class GeneralPath implements Shape {
 //        
 //    }
 
-    /**
-     * Normalize the input radians in the range 360? > x >= 0?.
-     *
-     * @param radians The angle to normalize (in radians).
-     *
-     * @return The angle normalized in the range 360? > x >= 0?.
-     */
+    /// Normalize the input radians in the range 360? > x >= 0?.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radians`: The angle to normalize (in radians).
+    ///
+    /// #### Returns
+    ///
+    /// The angle normalized in the range 360? > x >= 0?.
 //    private static double normalizeRadians(double radians)
 //    {
 //        double PI2 = Math.PI*2d;
@@ -852,17 +882,23 @@ public final class GeneralPath implements Shape {
 //        return radians;
 //    }
 
-    /**
-     * Draws an elliptical arc on the path given the provided bounds.
-     *
-     * @param x          Left x coord of bounding rect.
-     * @param y          Top y coordof bounding rect.
-     * @param w          Width of bounding rect.
-     * @param h          Height of bounding rect.
-     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
-     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
-     * @param joinPath   If true, then this will join the arc to the existing path with a line.
-     */
+    /// Draws an elliptical arc on the path given the provided bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Left x coord of bounding rect.
+    ///
+    /// - `y`: Top y coordof bounding rect.
+    ///
+    /// - `w`: Width of bounding rect.
+    ///
+    /// - `h`: Height of bounding rect.
+    ///
+    /// - `startAngle`: Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+    ///
+    /// - `sweepAngle`: Sweep angle in radians. Counter-clockwise.
+    ///
+    /// - `joinPath`: If true, then this will join the arc to the existing path with a line.
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle, boolean joinPath) {
 
         Ellipse e = new Ellipse();
@@ -870,61 +906,79 @@ public final class GeneralPath implements Shape {
         e.addToPath(this, -startAngle, -sweepAngle, joinPath);
     }
 
-    /**
-     * Draws an elliptical arc on the path given the provided bounds.
-     *
-     * @param x          Left x coord of bounding rect.
-     * @param y          Top y coordof bounding rect.
-     * @param w          Width of bounding rect.
-     * @param h          Height of bounding rect.
-     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
-     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
-     */
+    /// Draws an elliptical arc on the path given the provided bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Left x coord of bounding rect.
+    ///
+    /// - `y`: Top y coordof bounding rect.
+    ///
+    /// - `w`: Width of bounding rect.
+    ///
+    /// - `h`: Height of bounding rect.
+    ///
+    /// - `startAngle`: Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+    ///
+    /// - `sweepAngle`: Sweep angle in radians. Counter-clockwise.
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle) {
         arc(x, y, w, h, startAngle, sweepAngle, false);
     }
 
-    /**
-     * Draws an elliptical arc on the path given the provided bounds.
-     *
-     * @param x          Left x coord of bounding rect.
-     * @param y          Top y coordof bounding rect.
-     * @param w          Width of bounding rect.
-     * @param h          Height of bounding rect.
-     * @param startAngle Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
-     * @param sweepAngle Sweep angle in radians. Counter-clockwise.
-     * @param joinPath   If true then this will join the arc to the existing path with a line.
-     */
+    /// Draws an elliptical arc on the path given the provided bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Left x coord of bounding rect.
+    ///
+    /// - `y`: Top y coordof bounding rect.
+    ///
+    /// - `w`: Width of bounding rect.
+    ///
+    /// - `h`: Height of bounding rect.
+    ///
+    /// - `startAngle`: Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+    ///
+    /// - `sweepAngle`: Sweep angle in radians. Counter-clockwise.
+    ///
+    /// - `joinPath`: If true then this will join the arc to the existing path with a line.
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle, boolean joinPath) {
         arc((float) x, (float) y, (float) w, (float) h, (float) startAngle, (float) sweepAngle, joinPath);
     }
 
-    /**
-     * Adds an arc to the path.  This method uses an approximation of an arc using
-     * a cubic path.  It is not a precise arc.
-     *
-     * <p>Note:  The arc is drawn counter-clockwise around the center point.  See {@link #arcTo(double, double, double, double, boolean) }
-     * to draw clockwise.</p>
-     *
-     * @param cX   The x-coordinate of the oval center.
-     * @param cY   The y-coordinate of the oval center.
-     * @param endX The end X coordinate.
-     * @param endY The end Y coordinate.
-     */
+    /// Adds an arc to the path.  This method uses an approximation of an arc using
+    /// a cubic path.  It is not a precise arc.
+    ///
+    /// Note:  The arc is drawn counter-clockwise around the center point.  See `double, double, double, boolean)`
+    /// to draw clockwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cX`: The x-coordinate of the oval center.
+    ///
+    /// - `cY`: The y-coordinate of the oval center.
+    ///
+    /// - `endX`: The end X coordinate.
+    ///
+    /// - `endY`: The end Y coordinate.
     public void arcTo(float cX, float cY, float endX, float endY) {
         arcTo(cX, cY, endX, endY, false);
     }
 
-    /**
-     * Adds an arc to the path.  This method uses an approximation of an arc using
-     * a cubic path.  It is not a precise arc.
-     *
-     * @param cX        The x-coordinate of the oval center.
-     * @param cY        The y-coordinate of the oval center.
-     * @param endX      The end X coordinate.
-     * @param endY      The end Y coordinate.
-     * @param clockwise If true, the arc is drawn clockwise around the center point.
-     */
+    /// Adds an arc to the path.  This method uses an approximation of an arc using
+    /// a cubic path.  It is not a precise arc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cX`: The x-coordinate of the oval center.
+    ///
+    /// - `cY`: The y-coordinate of the oval center.
+    ///
+    /// - `endX`: The end X coordinate.
+    ///
+    /// - `endY`: The end Y coordinate.
+    ///
+    /// - `clockwise`: If true, the arc is drawn clockwise around the center point.
     public void arcTo(float cX, float cY, float endX, float endY, boolean clockwise) {
         if (pointSize < 2) {
             throw new RuntimeException("Cannot add arc to path if it doesn't already have a starting point.");
@@ -958,39 +1012,45 @@ public final class GeneralPath implements Shape {
         lineTo(endX, endY);
     }
 
-    /**
-     * Adds an arc to the path.  This method uses an approximation of an arc using
-     * a cubic path.  It is not a precise arc.
-     * <p>Note:  The arc is drawn counter-clockwise around the center point.  See {@link #arcTo(double, double, double, double, boolean) }
-     * to draw clockwise.</p>
-     *
-     * @param cX   The x-coordinate of the oval center.
-     * @param cY   The y-coordinate of the oval center.
-     * @param endX The end X coordinate.
-     * @param endY The end Y coordinate.
-     */
+    /// Adds an arc to the path.  This method uses an approximation of an arc using
+    /// a cubic path.  It is not a precise arc.
+    ///
+    /// Note:  The arc is drawn counter-clockwise around the center point.  See `double, double, double, boolean)`
+    /// to draw clockwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cX`: The x-coordinate of the oval center.
+    ///
+    /// - `cY`: The y-coordinate of the oval center.
+    ///
+    /// - `endX`: The end X coordinate.
+    ///
+    /// - `endY`: The end Y coordinate.
     public void arcTo(double cX, double cY, double endX, double endY) {
         arcTo(cX, cY, endX, endY, false);
     }
 
-    /**
-     * Adds an arc to the path.  This method uses an approximation of an arc using
-     * a cubic path.  It is not a precise arc.
-     *
-     * @param cX        The x-coordinate of the oval center.
-     * @param cY        The y-coordinate of the oval center.
-     * @param endX      The end X coordinate.
-     * @param endY      The end Y coordinate.
-     * @param clockwise If true, the arc is drawn clockwise around the center point.
-     */
+    /// Adds an arc to the path.  This method uses an approximation of an arc using
+    /// a cubic path.  It is not a precise arc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cX`: The x-coordinate of the oval center.
+    ///
+    /// - `cY`: The y-coordinate of the oval center.
+    ///
+    /// - `endX`: The end X coordinate.
+    ///
+    /// - `endY`: The end Y coordinate.
+    ///
+    /// - `clockwise`: If true, the arc is drawn clockwise around the center point.
     public void arcTo(double cX, double cY, double endX, double endY, boolean clockwise) {
         arcTo((float) cX, (float) cY, (float) endX, (float) endY, clockwise);
     }
 
-    /**
-     * Closes the current subpath by drawing a line back to the point of the
-     * last moveTo, unless the path is already closed.
-     */
+    /// Closes the current subpath by drawing a line back to the point of the
+    /// last moveTo, unless the path is already closed.
     public void closePath() {
         if (typeSize == 0 || types[typeSize - 1] != PathIterator.SEG_CLOSE) {
             checkBuf(0, true);
@@ -998,14 +1058,15 @@ public final class GeneralPath implements Shape {
         }
     }
 
-    /**
-     * Appends the segments of a Shape to the path. If connect is
-     * {@literal true}, the new path segments are connected to the existing one
-     * with a line. The winding rule of the Shape is ignored.
-     *
-     * @param shape   the shape (null not permitted).
-     * @param connect whether to connect the new shape to the existing path.
-     */
+    /// Appends the segments of a Shape to the path. If connect is
+    /// true, the new path segments are connected to the existing one
+    /// with a line. The winding rule of the Shape is ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shape`: the shape (null not permitted).
+    ///
+    /// - `connect`: whether to connect the new shape to the existing path.
     public void append(Shape shape, boolean connect) {
         if (shape.getClass() == GeneralPath.class) {
             Iterator it = createIteratorFromPool((GeneralPath) shape, null);
@@ -1021,20 +1082,21 @@ public final class GeneralPath implements Shape {
 
     }
 
-    /**
-     * Appends the segments of a PathIterator to this GeneralPath. Optionally,
-     * the initial {@link PathIterator#SEG_MOVETO} segment of the appended path
-     * is changed into a {@link PathIterator#SEG_LINETO} segment.
-     *
-     * @param path    the PathIterator specifying which segments shall be appended
-     *                (null not permitted).
-     * @param connect {@literal true} for substituting the initial
-     *                {@link PathIterator#SEG_MOVETO} segment by a
-     *                {@link PathIterator#SEG_LINETO}, or false for not performing any
-     *                substitution. If this {@code GeneralPath} is currently empty, connect is
-     *                assumed to be {@literal false}, thus leaving the initial
-     *                {@link PathIterator#SEG_MOVETO} unchanged.
-     */
+    /// Appends the segments of a PathIterator to this GeneralPath. Optionally,
+    /// the initial `PathIterator#SEG_MOVETO` segment of the appended path
+    /// is changed into a `PathIterator#SEG_LINETO` segment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: @param path    the PathIterator specifying which segments shall be appended
+    ///                (null not permitted).
+    ///
+    /// - `connect`: @param connect true for substituting the initial
+    ///                `PathIterator#SEG_MOVETO` segment by a
+    ///                `PathIterator#SEG_LINETO`, or false for not performing any
+    ///                substitution. If this `GeneralPath` is currently empty, connect is
+    ///                assumed to be false, thus leaving the initial
+    ///                `PathIterator#SEG_MOVETO` unchanged.
     public void append(PathIterator path, boolean connect) {
         float[] coords = createFloatArrayFromPool(6); //new float[6];
         append(path, connect, coords);
@@ -1077,12 +1139,12 @@ public final class GeneralPath implements Shape {
         }
     }
 
-    /**
-     * Returns the current appending point of the path.
-     *
-     * @return 2-element array of the form {@code [x,y]} representing {@code x}
-     * and {@code y} coordinate of the current appending point of the path..
-     */
+    /// Returns the current appending point of the path.
+    ///
+    /// #### Returns
+    ///
+    /// @return 2-element array of the form `[x,y]` representing `x`
+    /// and `y` coordinate of the current appending point of the path..
     public float[] getCurrentPoint() {
         if (typeSize == 0) {
             return null;
@@ -1092,11 +1154,11 @@ public final class GeneralPath implements Shape {
         return out;
     }
 
-    /**
-     * Sets the coordinates of the given point to the current point in the path.
-     *
-     * @param point Out parameter.  Will be filled with the coords of the current point.
-     */
+    /// Sets the coordinates of the given point to the current point in the path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `point`: Out parameter.  Will be filled with the coords of the current point.
     public void getCurrentPoint(float[] point) {
         if (typeSize == 0) {
             throw new RuntimeException("Cannot get point because the size of this command is 0");
@@ -1117,19 +1179,17 @@ public final class GeneralPath implements Shape {
         //return new float[]{points[j], points[j + 1]};
     }
 
-    /**
-     * Resets the path. All points and segments are destroyed.
-     */
+    /// Resets the path. All points and segments are destroyed.
     public void reset() {
         typeSize = 0;
         pointSize = 0;
     }
 
-    /**
-     * Returns the path's bounding box, in float precision.
-     *
-     * @return 4-element array of the form {@code [x, y, width, height]}.
-     */
+    /// Returns the path's bounding box, in float precision.
+    ///
+    /// #### Returns
+    ///
+    /// 4-element array of the form `[x, y, width, height]`.
     @Override
     public float[] getBounds2D() {
         float[] out = new float[4];
@@ -1137,11 +1197,11 @@ public final class GeneralPath implements Shape {
         return out;
     }
 
-    /**
-     * Sets the 4-element array to the bounding box coordinates of the path.  x, y, width, height.
-     *
-     * @param out 4-element float[] array.
-     */
+    /// Sets the 4-element array to the bounding box coordinates of the path.  x, y, width, height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: 4-element float[] array.
     public void getBounds2D(float[] out) {
         float rx1;
         float ry1;
@@ -1174,11 +1234,11 @@ public final class GeneralPath implements Shape {
         out[3] = ry2 - ry1;
     }
 
-    /**
-     * Returns the path's bounding box.
-     *
-     * @return The bounding box of the path.
-     */
+    /// Returns the path's bounding box.
+    ///
+    /// #### Returns
+    ///
+    /// The bounding box of the path.
     @Override
     public Rectangle getBounds() {
         // NOTE (SJH20180614): If the path contains bezier curves,  may be larger than drawn bounds.
@@ -1191,11 +1251,11 @@ public final class GeneralPath implements Shape {
         return new Rectangle(x1, y1, x2 - x1, y2 - y1);
     }
 
-    /**
-     * Sets the coordinates of the provided rectangle to the bounding box of this path.
-     *
-     * @param out
-     */
+    /// Sets the coordinates of the provided rectangle to the bounding box of this path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`
     public void getBounds(Rectangle out) {
         // NOTE (SJH20180614): If the path contains bezier curves, this bounds
         // may be much larger than the actual drawn bounds because it includes
@@ -1243,11 +1303,11 @@ public final class GeneralPath implements Shape {
 
     }
 
-    /**
-     * Checks to see if this path is a rectangle.
-     *
-     * @return True if this path forms a rectangle.  False otherwise.
-     */
+    /// Checks to see if this path is a rectangle.
+    ///
+    /// #### Returns
+    ///
+    /// True if this path forms a rectangle.  False otherwise.
     @Override
     public boolean isRectangle() {
         // NOTE (SJH20180614): This is used extensively in clipping.   We can probably
@@ -1328,17 +1388,13 @@ public final class GeneralPath implements Shape {
         }
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public PathIterator getPathIterator() {
         return new Iterator(this);
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public PathIterator getPathIterator(Transform m) {
         Iterator out = (Iterator) getPathIterator();
@@ -1346,14 +1402,18 @@ public final class GeneralPath implements Shape {
         return out;
     }
 
-    /**
-     * Returns a shape formed by transforming the current shape with the provided
-     * transform.
-     * <p>Note: If {@link com.codename1.ui.Transform#isSupported} is false, this may throw a RuntimeException.</p>
-     *
-     * @param m The transform to be used to transform the shape.
-     * @return The transformed shape.
-     */
+    /// Returns a shape formed by transforming the current shape with the provided
+    /// transform.
+    ///
+    /// Note: If `com.codename1.ui.Transform#isSupported` is false, this may throw a RuntimeException.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: The transform to be used to transform the shape.
+    ///
+    /// #### Returns
+    ///
+    /// The transformed shape.
     public Shape createTransformedShape(Transform m) {
 
         GeneralPath out = new GeneralPath();
@@ -1361,13 +1421,14 @@ public final class GeneralPath implements Shape {
         return out;
     }
 
-    /**
-     * Sets this path to be identical to the provided path {@code p} with the given
-     * Transform {@code t} applied to it.
-     *
-     * @param p The path to copy.
-     * @param t The transform to apply to all points in the path.
-     */
+    /// Sets this path to be identical to the provided path `p` with the given
+    /// Transform `t` applied to it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: The path to copy.
+    ///
+    /// - `t`: The transform to apply to all points in the path.
     public void setPath(GeneralPath p, Transform t) {
         typeSize = p.typeSize;
         pointSize = p.pointSize;
@@ -1389,13 +1450,14 @@ public final class GeneralPath implements Shape {
 
     }
 
-    /**
-     * Sets this path to be a rectangle with the provided bounds, but with
-     * the given transform applied to it.
-     *
-     * @param r Rectangle to copy.
-     * @param t The transform to apply to the points in in {@code r}.
-     */
+    /// Sets this path to be a rectangle with the provided bounds, but with
+    /// the given transform applied to it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: Rectangle to copy.
+    ///
+    /// - `t`: The transform to apply to the points in in `r`.
     public void setRect(Rectangle r, Transform t) {
         reset();
         int x = r.getX();
@@ -1440,13 +1502,14 @@ public final class GeneralPath implements Shape {
         }
     }
 
-    /**
-     * Sets this path to be a copy of the provided shape, but with the provided
-     * transform applied to it.
-     *
-     * @param s The shape to copy.
-     * @param t The transform to apply to all points in the shape.
-     */
+    /// Sets this path to be a copy of the provided shape, but with the provided
+    /// transform applied to it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The shape to copy.
+    ///
+    /// - `t`: The transform to apply to all points in the shape.
     public void setShape(Shape s, Transform t) {
         if (s.getClass() == GeneralPath.class) {
             setPath((GeneralPath) s, t);
@@ -1458,13 +1521,16 @@ public final class GeneralPath implements Shape {
         }
     }
 
-    /**
-     * Sets the current path to the intersection of itself and the provided rectangle.
-     *
-     * @param rect The rectangle to intersect with this path.
-     * @return True if {@code rect} intersects the current path.  False otherwise.  If there is no intersection, the
-     * path will be reset to be empty.
-     */
+    /// Sets the current path to the intersection of itself and the provided rectangle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: The rectangle to intersect with this path.
+    ///
+    /// #### Returns
+    ///
+    /// @return True if `rect` intersects the current path.  False otherwise.  If there is no intersection, the
+    /// path will be reset to be empty.
     public boolean intersect(Rectangle rect) {
         GeneralPath intersectionScratchPath = createPathFromPool();
         try {
@@ -1491,25 +1557,26 @@ public final class GeneralPath implements Shape {
         }
     }
 
-    /**
-     * Transforms the current path in place using the given transform.
-     *
-     * @param m The transform to apply to the path.
-     */
+    /// Transforms the current path in place using the given transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: The transform to apply to the path.
     public void transform(Transform m) {
         if (m != null && !m.isIdentity()) {
             m.transformPoints(2, points, 0, points, 0, pointSize / 2);
         }
     }
 
-    /**
-     * Resets this path to be the intersection of itself with the given shape.  Note that only
-     * {@link com.codename1.ui.geom.Rectangle}s are current supported.  If you pass any other
-     * shape, it will throw a RuntimeException.
-     * <p>Note: If {@link com.codename1.ui.TransformisSupported} is false, this will throw a Runtime Exception</p>
-     *
-     * @param shape The shape to intersect with the current shape.
-     */
+    /// Resets this path to be the intersection of itself with the given shape.  Note that only
+    /// `com.codename1.ui.geom.Rectangle`s are current supported.  If you pass any other
+    /// shape, it will throw a RuntimeException.
+    ///
+    /// Note: If `com.codename1.ui.TransformisSupported` is false, this will throw a Runtime Exception
+    ///
+    /// #### Parameters
+    ///
+    /// - `shape`: The shape to intersect with the current shape.
     public void intersect(Shape shape) {
         //Log.p("Start intersect");
         if (!(shape instanceof Rectangle)) {
@@ -1518,9 +1585,7 @@ public final class GeneralPath implements Shape {
         intersect((Rectangle) shape);
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public Shape intersection(Rectangle rect) {
         Shape out = ShapeUtil.intersection(rect, this);
@@ -1530,12 +1595,15 @@ public final class GeneralPath implements Shape {
         return out;
     }
 
-    /**
-     * Checks cross count according to path rule to define is it point inside shape or not.
-     *
-     * @param cross - the point cross count
-     * @return true if point is inside path, or false otherwise
-     */
+    /// Checks cross count according to path rule to define is it point inside shape or not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cross`: - the point cross count
+    ///
+    /// #### Returns
+    ///
+    /// true if point is inside path, or false otherwise
     boolean isInside(int cross) {
         if (rule == WIND_NON_ZERO) {
             return ShapeUtil.isInsideNonZero(cross);
@@ -1543,35 +1611,44 @@ public final class GeneralPath implements Shape {
         return ShapeUtil.isInsideEvenOdd(cross);
     }
 
-    /**
-     * Checks if the given point is contained in the current shape.
-     *
-     * @param x The x coordinate to check
-     * @param y The y coordinate to check
-     * @return True if the point is inside the shape.
-     */
+    /// Checks if the given point is contained in the current shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x coordinate to check
+    ///
+    /// - `y`: The y coordinate to check
+    ///
+    /// #### Returns
+    ///
+    /// True if the point is inside the shape.
     public boolean contains(float x, float y) {
         return isInside(ShapeUtil.crossShape(this, x, y));
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public boolean contains(int x, int y) {
         return contains((float) x, (float) y);
     }
 
-    /**
-     * @param path
-     * @param cx
-     * @param cy
-     * @param startX
-     * @param startY
-     * @param endX
-     * @param endY
-     * @param clockwise
-     */
+    /// #### Parameters
+    ///
+    /// - `path`
+    ///
+    /// - `cx`
+    ///
+    /// - `cy`
+    ///
+    /// - `startX`
+    ///
+    /// - `startY`
+    ///
+    /// - `endX`
+    ///
+    /// - `endY`
+    ///
+    /// - `clockwise`
 //    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
 //                                          double startX, double startY, double endX, double endY, boolean clockwise) {
 //        if ( startX != endX || startY != endY ){
@@ -1802,38 +1879,32 @@ public final class GeneralPath implements Shape {
         double y;
     }
 
-    /**
-     * @author shannah
-     */
+    /// @author shannah
     final static class ShapeUtil {
         private ShapeUtil() {
         }
 
-        /**
-         * Rectangle cross segment
-         */
+        /// Rectangle cross segment
         public static final int CROSSING = 255;
-        /**
-         * Allowable tolerance for bounds comparison
-         */
+        /// Allowable tolerance for bounds comparison
         static final double DELTA = 1E-5;
-        /**
-         * If roots have distance less then <code>ROOT_DELTA</code> they are double
-         */
+        /// If roots have distance less then `ROOT_DELTA` they are double
         static final double ROOT_DELTA = 1E-10;
-        /**
-         * Unknown crossing result
-         */
+        /// Unknown crossing result
         static final int UNKNOWN = 254;
 
-        /**
-         * Generates the intersection of a given shape and a given rectangle.  Only supported convex polygons.
-         *
-         * @param r A rectangle.
-         * @param s A shape
-         * @return The shape that is the intersected area of the shape and
-         * rectangle.
-         */
+        /// Generates the intersection of a given shape and a given rectangle.  Only supported convex polygons.
+        ///
+        /// #### Parameters
+        ///
+        /// - `r`: A rectangle.
+        ///
+        /// - `s`: A shape
+        ///
+        /// #### Returns
+        ///
+        /// @return The shape that is the intersected area of the shape and
+        /// rectangle.
         static Shape intersection(Rectangle r, Shape s) {
             return intersection(r, s, new GeneralPath());
         }
@@ -2033,19 +2104,23 @@ public final class GeneralPath implements Shape {
 
         }
 
-        /**
-         * Segments a given shape so that all points of the shape that intersect the
-         * provided rectangle edges are nodes of the shape path. This operation
-         * makes it easier to form the intersection.
-         * <p>
-         * Only supports convex polygons.
-         *
-         * @param r A rectangle.
-         * @param s A shape
-         * @return A shape that is identical to the input shape except that it may
-         * include additional path segments so that all points of intersection are
-         * start/end points of a segment.
-         */
+        /// Segments a given shape so that all points of the shape that intersect the
+        /// provided rectangle edges are nodes of the shape path. This operation
+        /// makes it easier to form the intersection.
+        ///
+        /// Only supports convex polygons.
+        ///
+        /// #### Parameters
+        ///
+        /// - `r`: A rectangle.
+        ///
+        /// - `s`: A shape
+        ///
+        /// #### Returns
+        ///
+        /// @return A shape that is identical to the input shape except that it may
+        /// include additional path segments so that all points of intersection are
+        /// start/end points of a segment.
         static Shape segmentShape(Rectangle r, Shape s) {
             return segmentShape(r, s, new GeneralPath());
         }
@@ -2330,13 +2405,17 @@ public final class GeneralPath implements Shape {
 
         }
 
-        /**
-         * Solves quadratic equation
-         *
-         * @param eqn - the coefficients of the equation
-         * @param res - the roots of the equation
-         * @return a number of roots
-         */
+        /// Solves quadratic equation
+        ///
+        /// #### Parameters
+        ///
+        /// - `eqn`: - the coefficients of the equation
+        ///
+        /// - `res`: - the roots of the equation
+        ///
+        /// #### Returns
+        ///
+        /// a number of roots
         public static int solveQuad(double[] eqn, double[] res) {
             double a = eqn[2];
             double b = eqn[1];
@@ -2363,13 +2442,17 @@ public final class GeneralPath implements Shape {
             return fixRoots(res, rc);
         }
 
-        /**
-         * Solves cubic equation
-         *
-         * @param eqn - the coefficients of the equation
-         * @param res - the roots of the equation
-         * @return a number of roots
-         */
+        /// Solves cubic equation
+        ///
+        /// #### Parameters
+        ///
+        /// - `eqn`: - the coefficients of the equation
+        ///
+        /// - `res`: - the roots of the equation
+        ///
+        /// #### Returns
+        ///
+        /// a number of roots
         public static int solveCubic(double[] eqn, double[] res) {
             double d = eqn[3];
             if (isZero(d)) {
@@ -2419,13 +2502,17 @@ public final class GeneralPath implements Shape {
             return fixRoots(res, rc);
         }
 
-        /**
-         * Excludes double roots. Roots are double if they lies enough close with each other.
-         *
-         * @param res - the roots
-         * @param rc  - the roots count
-         * @return new roots count
-         */
+        /// Excludes double roots. Roots are double if they lies enough close with each other.
+        ///
+        /// #### Parameters
+        ///
+        /// - `res`: - the roots
+        ///
+        /// - `rc`: - the roots count
+        ///
+        /// #### Returns
+        ///
+        /// new roots count
         static int fixRoots(double[] res, int rc) {
             int tc = 0;
             for (int i = 0; i < rc; i++) {
@@ -2442,9 +2529,7 @@ public final class GeneralPath implements Shape {
             return tc;
         }
 
-        /**
-         * Returns how many times ray from point (x,y) cross line.
-         */
+        /// Returns how many times ray from point (x,y) cross line.
         public static int crossLine(double x1, double y1, double x2, double y2, double x, double y) {
 
             // LEFT/RIGHT/UP/EMPTY
@@ -2478,9 +2563,7 @@ public final class GeneralPath implements Shape {
             return x1 < x2 ? 1 : -1;
         }
 
-        /**
-         * Returns how many times ray from point (x,y) cross quard curve
-         */
+        /// Returns how many times ray from point (x,y) cross quard curve
         public static int crossQuad(double x1, double y1, double cx, double cy, double x2, double y2, double x, double y) {
 
             // LEFT/RIGHT/UP/EMPTY
@@ -2509,9 +2592,7 @@ public final class GeneralPath implements Shape {
             return c.cross(res, rc, py, py);
         }
 
-        /**
-         * Returns how many times ray from point (x,y) cross cubic curve
-         */
+        /// Returns how many times ray from point (x,y) cross cubic curve
         public static int crossCubic(double x1, double y1, double cx1, double cy1, double cx2, double cy2, double x2, double y2, double x, double y) {
 
             // LEFT/RIGHT/UP/EMPTY
@@ -2539,9 +2620,7 @@ public final class GeneralPath implements Shape {
             return c.cross(res, rc, py, py);
         }
 
-        /**
-         * Returns how many times ray from point (x,y) cross path
-         */
+        /// Returns how many times ray from point (x,y) cross path
         public static int crossPath(PathIterator p, double x, double y) {
             int cross = 0;
             double mx;
@@ -2592,9 +2671,7 @@ public final class GeneralPath implements Shape {
             return cross;
         }
 
-        /**
-         * Returns how many times ray from point (x,y) cross shape
-         */
+        /// Returns how many times ray from point (x,y) cross shape
         public static int crossShape(Shape s, double x, double y) {
             if (!s.getBounds().contains((int) x, (int) y)) {
                 return 0;
@@ -2603,16 +2680,12 @@ public final class GeneralPath implements Shape {
             return crossPath(s.getPathIterator(null), x, y);
         }
 
-        /**
-         * Returns true if value enough small
-         */
+        /// Returns true if value enough small
         public static boolean isZero(double val) {
             return -DELTA < val && val < DELTA;
         }
 
-        /**
-         * Sort bound array
-         */
+        /// Sort bound array
         static void sortBound(double[] bound, int bc) {
             for (int i = 0; i < bc - 4; i += 4) {
                 int k = i;
@@ -2638,9 +2711,7 @@ public final class GeneralPath implements Shape {
             }
         }
 
-        /**
-         * Returns are bounds intersect or not intersect rectangle
-         */
+        /// Returns are bounds intersect or not intersect rectangle
         static int crossBound(double[] bound, int bc, double py1, double py2) {
 
             // LEFT/RIGHT
@@ -2696,9 +2767,7 @@ public final class GeneralPath implements Shape {
             return UNKNOWN;
         }
 
-        /**
-         * Returns how many times rectangle stripe cross line or the are intersect
-         */
+        /// Returns how many times rectangle stripe cross line or the are intersect
         public static int intersectLine(double x1, double y1, double x2, double y2, double rx1, double ry1, double rx2, double ry2) {
 
             // LEFT/RIGHT/UP
@@ -2763,9 +2832,7 @@ public final class GeneralPath implements Shape {
 
         }
 
-        /**
-         * Returns how many times rectangle stripe cross quad curve or the are intersect
-         */
+        /// Returns how many times rectangle stripe cross quad curve or the are intersect
         public static int intersectQuad(double x1, double y1, double cx, double cy, double x2, double y2, double rx1, double ry1, double rx2, double ry2) {
 
             // LEFT/RIGHT/UP ------------------------------------------------------
@@ -2833,9 +2900,7 @@ public final class GeneralPath implements Shape {
             return c.cross(res1, rc1, py1, py2);
         }
 
-        /**
-         * Returns how many times rectangle stripe cross cubic curve or the are intersect
-         */
+        /// Returns how many times rectangle stripe cross cubic curve or the are intersect
         public static int intersectCubic(double x1, double y1, double cx1, double cy1, double cx2, double cy2, double x2, double y2, double rx1, double ry1, double rx2, double ry2) {
 
             // LEFT/RIGHT/UP
@@ -2906,9 +2971,7 @@ public final class GeneralPath implements Shape {
             return c.cross(res1, rc1, py1, py2);
         }
 
-        /**
-         * Returns how many times rectangle stripe cross path or the are intersect
-         */
+        /// Returns how many times rectangle stripe cross path or the are intersect
         public static int intersectPath(PathIterator p, double x, double y, double w, double h) {
 
             int cross = 0;
@@ -2970,9 +3033,7 @@ public final class GeneralPath implements Shape {
             return cross;
         }
 
-        /**
-         * Returns how many times rectangle stripe cross shape or the are intersect
-         */
+        /// Returns how many times rectangle stripe cross shape or the are intersect
         public static int intersectShape(Shape s, double x, double y, double w, double h) {
             if (!s.getBounds().intersects((int) x, (int) y, (int) w, (int) h)) {
                 return 0;
@@ -2980,23 +3041,17 @@ public final class GeneralPath implements Shape {
             return intersectPath(s.getPathIterator(null), x, y, w, h);
         }
 
-        /**
-         * Returns true if cross count correspond inside location for non zero path rule
-         */
+        /// Returns true if cross count correspond inside location for non zero path rule
         public static boolean isInsideNonZero(int cross) {
             return cross != 0;
         }
 
-        /**
-         * Returns true if cross count correspond inside location for even-odd path rule
-         */
+        /// Returns true if cross count correspond inside location for even-odd path rule
         public static boolean isInsideEvenOdd(int cross) {
             return (cross & 1) != 0;
         }
 
-        /**
-         * QuadCurve class provides basic functionality to find curve crossing and calculating bounds
-         */
+        /// QuadCurve class provides basic functionality to find curve crossing and calculating bounds
         public static class QuadCurve {
 
             double ax;
@@ -3098,9 +3153,7 @@ public final class GeneralPath implements Shape {
 
         }
 
-        /**
-         * CubicCurve class provides basic functionality to find curve crossing and calculating bounds
-         */
+        /// CubicCurve class provides basic functionality to find curve crossing and calculating bounds
         public static class CubicCurve {
 
             double ax;
@@ -3238,28 +3291,22 @@ public final class GeneralPath implements Shape {
      */
     private static class Iterator implements PathIterator {
 
-        /**
-         * The current cursor position in types buffer
-         */
+        /// The current cursor position in types buffer
         int typeIndex;
 
-        /**
-         * The current cursor position in points buffer
-         */
+        /// The current cursor position in points buffer
         int pointIndex;
 
-        /**
-         * The source GeneralPath object
-         */
+        /// The source GeneralPath object
         GeneralPath p;
 
         Transform transform;
 
-        /**
-         * Constructs a new GeneralPath.Iterator for given general path
-         *
-         * @param path - the source GeneralPath object
-         */
+        /// Constructs a new GeneralPath.Iterator for given general path
+        ///
+        /// #### Parameters
+        ///
+        /// - `path`: - the source GeneralPath object
         Iterator(GeneralPath path) {
             this.p = path;
 

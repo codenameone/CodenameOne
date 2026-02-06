@@ -40,36 +40,27 @@ import com.codename1.ui.plaf.UIManager;
 
 import java.util.Vector;
 
-/**
- * This class represents the Form MenuBar.
- * This class is responsible to show the Form Commands and to handle device soft
- * keys, back key, clear key, etc...
- * This class can be overridden and replaced in the LookAndFeel
- *
- * @author Chen Fishbein
- * @see LookAndFeel#setMenuBarClass(java.lang.Class)
- */
+/// This class represents the Form MenuBar.
+/// This class is responsible to show the Form Commands and to handle device soft
+/// keys, back key, clear key, etc...
+/// This class can be overridden and replaced in the LookAndFeel
+///
+/// @author Chen Fishbein
+///
+/// #### See also
+///
+/// - LookAndFeel#setMenuBarClass(java.lang.Class)
 public class MenuBar extends Container implements ActionListener {
-    /**
-     * This member holds the left soft key value
-     */
+    /// This member holds the left soft key value
     static int leftSK;
-    /**
-     * This member holds the right soft key value
-     */
+    /// This member holds the right soft key value
     static int rightSK;
-    /**
-     * This member holds the 2nd right soft key value
-     * this is used for different BB devices
-     */
+    /// This member holds the 2nd right soft key value
+    /// this is used for different BB devices
     static int rightSK2;
-    /**
-     * This member holds the back command key value
-     */
+    /// This member holds the back command key value
     static int backSK;
-    /**
-     * This member holds the clear command key value
-     */
+    /// This member holds the clear command key value
     static int clearSK;
     static int backspaceSK;
 
@@ -90,17 +81,13 @@ public class MenuBar extends Container implements ActionListener {
     private boolean minimizeOnBack = true;
     private Command selectCommand;
     private Command defaultCommand;
-    /**
-     * Indicates the command that is defined as the back command out of this form.
-     * A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
-     * and by elements such as transitions etc. to change the behavior based on
-     * direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
-     */
+    /// Indicates the command that is defined as the back command out of this form.
+    /// A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
+    /// and by elements such as transitions etc. to change the behavior based on
+    /// direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
     private Command backCommand;
-    /**
-     * Indicates the command that is defined as the clear command out of this form similar
-     * in spirit to the back command
-     */
+    /// Indicates the command that is defined as the clear command out of this form similar
+    /// in spirit to the back command
     private Command clearCommand;
     private Command menuCommand;
     private Button[] soft;
@@ -138,11 +125,11 @@ public class MenuBar extends Container implements ActionListener {
         return 0;
     }
 
-    /**
-     * Initialize the MenuBar
-     *
-     * @param parent the associated Form
-     */
+    /// Initialize the MenuBar
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the associated Form
     protected void initMenuBar(Form parent) {
         this.parent = parent;
         selectMenuItem = createMenuSelectCommand();
@@ -240,9 +227,7 @@ public class MenuBar extends Container implements ActionListener {
         softCommand = new Command[soft.length];
     }
 
-    /**
-     * This method removes empty J2ME softbuttons that don't have a command
-     */
+    /// This method removes empty J2ME softbuttons that don't have a command
     public void removeEmptySoftbuttons() {
         if (left != null && left.getParent() != null && "".equals(left.getText())) {
             left.getParent().removeComponent(left);
@@ -272,13 +257,13 @@ public class MenuBar extends Container implements ActionListener {
         return i;
     }
 
-    /**
-     * Default command is invoked when a user presses fire, this functionality works
-     * well in some situations but might collide with elements such as navigation
-     * and combo boxes. Use with caution.
-     *
-     * @return the command to treat as default
-     */
+    /// Default command is invoked when a user presses fire, this functionality works
+    /// well in some situations but might collide with elements such as navigation
+    /// and combo boxes. Use with caution.
+    ///
+    /// #### Returns
+    ///
+    /// the command to treat as default
     public Command getDefaultCommand() {
         if (selectCommand != null) {
             return selectCommand;
@@ -286,45 +271,48 @@ public class MenuBar extends Container implements ActionListener {
         return defaultCommand;
     }
 
-    /**
-     * Default command is invoked when a user presses fire, this functionality works
-     * well in some situations but might collide with elements such as navigation
-     * and combo boxes. Use with caution.
-     *
-     * @param defaultCommand the command to treat as default
-     */
+    /// Default command is invoked when a user presses fire, this functionality works
+    /// well in some situations but might collide with elements such as navigation
+    /// and combo boxes. Use with caution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultCommand`: the command to treat as default
     public void setDefaultCommand(Command defaultCommand) {
         this.defaultCommand = defaultCommand;
     }
 
-    /**
-     * Indicates the command that is defined as the clear command in this form.
-     * A clear command can be used both to map to a "clear" hardware button
-     * if such a button exists.
-     *
-     * @return the command to treat as the clear Command
-     */
+    /// Indicates the command that is defined as the clear command in this form.
+    /// A clear command can be used both to map to a "clear" hardware button
+    /// if such a button exists.
+    ///
+    /// #### Returns
+    ///
+    /// the command to treat as the clear Command
     public Command getClearCommand() {
         return clearCommand;
     }
 
-    /**
-     * Indicates the command that is defined as the clear command in this form.
-     * A clear command can be used both to map to a "clear" hardware button
-     * if such a button exists.
-     *
-     * @param clearCommand the command to treat as the clear Command
-     */
+    /// Indicates the command that is defined as the clear command in this form.
+    /// A clear command can be used both to map to a "clear" hardware button
+    /// if such a button exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clearCommand`: the command to treat as the clear Command
     public void setClearCommand(Command clearCommand) {
         this.clearCommand = clearCommand;
     }
 
-    /**
-     * Find the command component instance if such an instance exists
-     *
-     * @param c the command instance
-     * @return the button instance
-     */
+    /// Find the command component instance if such an instance exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the command instance
+    ///
+    /// #### Returns
+    ///
+    /// the button instance
     public Button findCommandComponent(Command c) {
         Button b = findCommandComponent(c, this);
         if (b == null) {
@@ -438,26 +426,26 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * Indicates the command that is defined as the back command out of this form.
-     * A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
-     * and by elements such as transitions etc. to change the behavior based on
-     * direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
-     *
-     * @return the command to treat as the back Command
-     */
+    /// Indicates the command that is defined as the back command out of this form.
+    /// A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
+    /// and by elements such as transitions etc. to change the behavior based on
+    /// direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
+    ///
+    /// #### Returns
+    ///
+    /// the command to treat as the back Command
     public Command getBackCommand() {
         return backCommand;
     }
 
-    /**
-     * Indicates the command that is defined as the back command out of this form.
-     * A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
-     * and by elements such as transitions etc. to change the behavior based on
-     * direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
-     *
-     * @param backCommand the command to treat as the back Command
-     */
+    /// Indicates the command that is defined as the back command out of this form.
+    /// A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
+    /// and by elements such as transitions etc. to change the behavior based on
+    /// direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
+    ///
+    /// #### Parameters
+    ///
+    /// - `backCommand`: the command to treat as the back Command
     public void setBackCommand(Command backCommand) {
         this.backCommand = backCommand;
         if (parent.getToolbar() != null) {
@@ -478,28 +466,26 @@ public class MenuBar extends Container implements ActionListener {
         updateTitleCommandPlacement();
     }
 
-    /**
-     * The selectCommand is the command to invoke when a Component has foucs in
-     * Third Soft Button state.
-     *
-     * @return the select command
-     */
+    /// The selectCommand is the command to invoke when a Component has foucs in
+    /// Third Soft Button state.
+    ///
+    /// #### Returns
+    ///
+    /// the select command
     public Command getSelectCommand() {
         return selectCommand;
     }
 
-    /**
-     * Sets the select command
-     *
-     * @param selectCommand
-     */
+    /// Sets the select command
+    ///
+    /// #### Parameters
+    ///
+    /// - `selectCommand`
     public void setSelectCommand(Command selectCommand) {
         this.selectCommand = selectCommand;
     }
 
-    /**
-     * Updates the command mapping to the softbuttons
-     */
+    /// Updates the command mapping to the softbuttons
     private void updateCommands() {
         int commandBehavior = getCommandBehavior();
         if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
@@ -559,9 +545,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * Invoked when a softbutton is pressed
-     */
+    /// Invoked when a softbutton is pressed
     @Override
     public void actionPerformed(ActionEvent evt) {
         if (evt.isConsumed()) {
@@ -618,11 +602,11 @@ public class MenuBar extends Container implements ActionListener {
 
     }
 
-    /**
-     * Creates a soft button Component
-     *
-     * @return the softbutton component
-     */
+    /// Creates a soft button Component
+    ///
+    /// #### Returns
+    ///
+    /// the softbutton component
     protected Button createSoftButton(String uiid) {
         Button b = new Button();
         b.setUIID(uiid);
@@ -641,9 +625,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setUnselectedStyle(Style style) {
         style.setMargin(Component.TOP, 0, true);
@@ -656,9 +638,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * Prevents scaling down of the menu when there is no text on the menu bar
-     */
+    /// Prevents scaling down of the menu when there is no text on the menu bar
     @Override
     protected Dimension calcPreferredSize() {
         if (soft.length > 1) {
@@ -675,28 +655,24 @@ public class MenuBar extends Container implements ActionListener {
         return super.calcPreferredSize();
     }
 
-    /**
-     * Sets the menu transitions for showing/hiding the menu, can be null...
-     */
+    /// Sets the menu transitions for showing/hiding the menu, can be null...
     public void setTransitions(Transition transitionIn, Transition transitionOut) {
         this.transitionIn = transitionIn;
         this.transitionOut = transitionOut;
     }
 
-    /**
-     * This method will return true if the menu dialog is currently displaying
-     *
-     * @return true of the menu dialog is displaying
-     */
+    /// This method will return true if the menu dialog is currently displaying
+    ///
+    /// #### Returns
+    ///
+    /// true of the menu dialog is displaying
     public boolean isMenuShowing() {
         return menuDisplaying;
     }
 
-    /**
-     * This method shows the menu on the Form.
-     * The method creates a Dialog with the commands and calls showMenuDialog.
-     * The method blocks until the user dispose the dialog.
-     */
+    /// This method shows the menu on the Form.
+    /// The method creates a Dialog with the commands and calls showMenuDialog.
+    /// The method blocks until the user dispose the dialog.
     public void showMenu() {
         final Dialog d = new Dialog("Menu", "");
         d.setDisposeWhenPointerOutOfBounds(true);
@@ -1014,11 +990,11 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * Adds a Command to the MenuBar
-     *
-     * @param cmd Command to add
-     */
+    /// Adds a Command to the MenuBar
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: Command to add
     public void addCommand(Command cmd) {
         // prevent duplicate commands which might happen in some edge cases
         // with the select command
@@ -1064,12 +1040,15 @@ public class MenuBar extends Container implements ActionListener {
         updateCommands();
     }
 
-    /**
-     * Returns the command occupying the given index
-     *
-     * @param index offset of the command
-     * @return the command at the given index
-     */
+    /// Returns the command occupying the given index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: offset of the command
+    ///
+    /// #### Returns
+    ///
+    /// the command at the given index
     public Command getCommand(int index) {
         if (index < 0 || index >= commands.size()) {
             return null;
@@ -1077,21 +1056,22 @@ public class MenuBar extends Container implements ActionListener {
         return (Command) commands.elementAt(index);
     }
 
-    /**
-     * Returns number of commands
-     *
-     * @return number of commands
-     */
+    /// Returns number of commands
+    ///
+    /// #### Returns
+    ///
+    /// number of commands
     public int getCommandCount() {
         return commands.size();
     }
 
-    /**
-     * Add a Command to the MenuBar
-     *
-     * @param cmd   Command to Add
-     * @param index determines the order of the added commands
-     */
+    /// Add a Command to the MenuBar
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: Command to Add
+    ///
+    /// - `index`: determines the order of the added commands
     protected void addCommand(Command cmd, int index) {
         if (getCommandCount() == 0 && parent != null) {
             installMenuBar();
@@ -1135,9 +1115,7 @@ public class MenuBar extends Container implements ActionListener {
         updateCommands();
     }
 
-    /**
-     * Adds the MenuBar on the parent Form
-     */
+    /// Adds the MenuBar on the parent Form
     protected void installMenuBar() {
         if (getParent() == null) {
             int type = getCommandBehavior();
@@ -1157,9 +1135,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * Removes the MenuBar from the parent Form
-     */
+    /// Removes the MenuBar from the parent Form
     protected void unInstallMenuBar() {
         parent.removeComponentFromForm(this);
         Container t = getTitleAreaContainer();
@@ -1174,9 +1150,7 @@ public class MenuBar extends Container implements ActionListener {
         initTitleBarStatus();
     }
 
-    /**
-     * Remove all commands from the menuBar
-     */
+    /// Remove all commands from the menuBar
     protected void removeAllCommands() {
         commands.removeAllElements();
         int behavior = getCommandBehavior();
@@ -1197,11 +1171,11 @@ public class MenuBar extends Container implements ActionListener {
         updateCommands();
     }
 
-    /**
-     * Removes a Command from the MenuBar
-     *
-     * @param cmd Command to remove
-     */
+    /// Removes a Command from the MenuBar
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: Command to remove
     protected void removeCommand(Command cmd) {
         int behavior = getCommandBehavior();
         if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR
@@ -1241,69 +1215,72 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * Factory method that returns the Form select Command.
-     * This Command is used when Display.getInstance().isThirdSoftButton()
-     * returns true.
-     * This method can be overridden to customize the Command on the Form.
-     *
-     * @return Command
-     */
+    /// Factory method that returns the Form select Command.
+    /// This Command is used when Display.getInstance().isThirdSoftButton()
+    /// returns true.
+    /// This method can be overridden to customize the Command on the Form.
+    ///
+    /// #### Returns
+    ///
+    /// Command
     protected Command createSelectCommand() {
         return new Command(parent.getUIManager().localize("select", "Select"));
     }
 
-    /**
-     * Factory method that returns the Form Menu select Command.
-     * This method can be overridden to customize the Command on the Form.
-     *
-     * @return Command
-     */
+    /// Factory method that returns the Form Menu select Command.
+    /// This method can be overridden to customize the Command on the Form.
+    ///
+    /// #### Returns
+    ///
+    /// Command
     protected Command createMenuSelectCommand() {
         UIManager manager = parent.getUIManager();
         LookAndFeel lf = manager.getLookAndFeel();
         return new Command(manager.localize("select", "Select"), lf.getMenuIcons()[0]);
     }
 
-    /**
-     * Factory method that returns the Form Menu cancel Command.
-     * This method can be overridden to customize the Command on the Form.
-     *
-     * @return Command
-     */
+    /// Factory method that returns the Form Menu cancel Command.
+    /// This method can be overridden to customize the Command on the Form.
+    ///
+    /// #### Returns
+    ///
+    /// Command
     protected Command createMenuCancelCommand() {
         UIManager manager = parent.getUIManager();
         LookAndFeel lf = manager.getLookAndFeel();
         return new Command(manager.localize("cancel", "Cancel"), lf.getMenuIcons()[1]);
     }
 
-    /**
-     * The MenuBar default implementation shows the menu commands in a List
-     * contained in a Dialog.
-     * This method replaces the menu ListCellRenderer of the Menu List.
-     *
-     * @param menuCellRenderer
-     */
+    /// The MenuBar default implementation shows the menu commands in a List
+    /// contained in a Dialog.
+    /// This method replaces the menu ListCellRenderer of the Menu List.
+    ///
+    /// #### Parameters
+    ///
+    /// - `menuCellRenderer`
     public void setMenuCellRenderer(ListCellRenderer menuCellRenderer) {
         this.menuCellRenderer = menuCellRenderer;
     }
 
-    /**
-     * Returns the Menu Dialog Style
-     *
-     * @return Menu Dialog Style
-     */
+    /// Returns the Menu Dialog Style
+    ///
+    /// #### Returns
+    ///
+    /// Menu Dialog Style
     public Style getMenuStyle() {
         return menuStyle;
     }
 
-    /**
-     * This method returns true if the MenuBar should handle the given keycode.
-     *
-     * @param keyCode to determine if the MenuBar is responsible for.
-     * @return true if the keycode is a MenuBar related keycode such as softkey,
-     * back button, clear button, ...
-     */
+    /// This method returns true if the MenuBar should handle the given keycode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: to determine if the MenuBar is responsible for.
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the keycode is a MenuBar related keycode such as softkey,
+    /// back button, clear button, ...
     public boolean handlesKeycode(int keyCode) {
         if (keyCode == 0) {
             return false;
@@ -1315,9 +1292,7 @@ public class MenuBar extends Container implements ActionListener {
                 || (thirdSoftButton && game == Display.GAME_FIRE);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int keyCode) {
         int commandBehavior = getCommandBehavior();
@@ -1344,9 +1319,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
         int commandBehavior = getCommandBehavior();
@@ -1414,9 +1387,7 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -1453,14 +1424,17 @@ public class MenuBar extends Container implements ActionListener {
     }
     }*/
 
-    /**
-     * A menu is implemented as a dialog, this method allows you to override dialog
-     * display in order to customize the dialog menu in various ways
-     *
-     * @param menu a dialog containing menu options that can be customized
-     * @return the command selected by the user in the dialog (not menu) Select
-     * or Cancel
-     */
+    /// A menu is implemented as a dialog, this method allows you to override dialog
+    /// display in order to customize the dialog menu in various ways
+    ///
+    /// #### Parameters
+    ///
+    /// - `menu`: a dialog containing menu options that can be customized
+    ///
+    /// #### Returns
+    ///
+    /// @return the command selected by the user in the dialog (not menu) Select
+    /// or Cancel
     protected Command showMenuDialog(Dialog menu) {
         UIManager manager = parent.getUIManager();
         boolean pref = manager.isThemeConstant("menuPrefSizeBool", false);
@@ -1497,12 +1471,12 @@ public class MenuBar extends Container implements ActionListener {
         }
     }
 
-    /**
-     * Allows an individual form to reverse the layout direction of the softbuttons, this method is RTL
-     * sensitive and might reverse the result based on RTL state
-     *
-     * @return The value of UIManager.getInstance().getLookAndFeel().isReverseSoftButtons()
-     */
+    /// Allows an individual form to reverse the layout direction of the softbuttons, this method is RTL
+    /// sensitive and might reverse the result based on RTL state
+    ///
+    /// #### Returns
+    ///
+    /// The value of UIManager.getInstance().getLookAndFeel().isReverseSoftButtons()
     protected boolean isReverseSoftButtons() {
         LookAndFeel lf = parent.getUIManager().getLookAndFeel();
         if (isRTL()) {
@@ -1511,14 +1485,17 @@ public class MenuBar extends Container implements ActionListener {
         return lf.isReverseSoftButtons();
     }
 
-    /**
-     * Calculates the amount of columns to give to the touch commands within the
-     * grid
-     *
-     * @param grid container that will be arranged in the grid containing the
-     *             components
-     * @return an integer representing the touch command grid size
-     */
+    /// Calculates the amount of columns to give to the touch commands within the
+    /// grid
+    ///
+    /// #### Parameters
+    ///
+    /// - `grid`: @param grid container that will be arranged in the grid containing the
+    ///             components
+    ///
+    /// #### Returns
+    ///
+    /// an integer representing the touch command grid size
     protected int calculateTouchCommandGridColumns(Container grid) {
         int count = grid.getComponentCount();
         int maxWidth = 10;
@@ -1533,13 +1510,14 @@ public class MenuBar extends Container implements ActionListener {
         return Math.max(2, Display.getInstance().getDisplayWidth() / maxWidth);
     }
 
-    /**
-     * Sets the command UIID to the given UIID, notice that this won't work for all menu types since some menu
-     * types might be implemented natively or as a list in which case the UIID won't apply!
-     *
-     * @param cmd  the command
-     * @param uiid the uiid for the given command
-     */
+    /// Sets the command UIID to the given UIID, notice that this won't work for all menu types since some menu
+    /// types might be implemented natively or as a list in which case the UIID won't apply!
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command
+    ///
+    /// - `uiid`: the uiid for the given command
     public void setCommandUIID(Command cmd, String uiid) {
         Button b = findCommandComponent(cmd);
         if (b != null) {
@@ -1549,12 +1527,15 @@ public class MenuBar extends Container implements ActionListener {
         cmd.putClientProperty("cn1$CommandUIID", uiid);
     }
 
-    /**
-     * Creates a touch command for use as a touch menu item
-     *
-     * @param c command to map into the returned button
-     * @return a button that would fire the touch command appropriately
-     */
+    /// Creates a touch command for use as a touch menu item
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: command to map into the returned button
+    ///
+    /// #### Returns
+    ///
+    /// a button that would fire the touch command appropriately
     protected Button createTouchCommandButton(Command c) {
         Button b = new Button(c);
         if (b.getIcon() == null) {
@@ -1581,14 +1562,17 @@ public class MenuBar extends Container implements ActionListener {
         return b;
     }
 
-    /**
-     * Creates the component containing the commands within the given vector
-     * used for showing the menu dialog, this method calls the createCommandList
-     * method by default however it allows more elaborate menu creation.
-     *
-     * @param commands list of command objects
-     * @return Component that will result in the parent menu dialog recieving a command event
-     */
+    /// Creates the component containing the commands within the given vector
+    /// used for showing the menu dialog, this method calls the createCommandList
+    /// method by default however it allows more elaborate menu creation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: list of command objects
+    ///
+    /// #### Returns
+    ///
+    /// Component that will result in the parent menu dialog recieving a command event
     protected Component createCommandComponent(Vector commands) {
         UIManager manager = parent.getUIManager();
         // Create a touch based menu interface
@@ -1635,22 +1619,25 @@ public class MenuBar extends Container implements ActionListener {
         return createCommandList(commands);
     }
 
-    /**
-     * This method returns a Vector of Command objects
-     *
-     * @return Vector of Command objects
-     */
+    /// This method returns a Vector of Command objects
+    ///
+    /// #### Returns
+    ///
+    /// Vector of Command objects
     protected Vector getCommands() {
         return commands;
     }
 
-    /**
-     * Creates the list component containing the commands within the given vector
-     * used for showing the menu dialog
-     *
-     * @param commands list of command objects
-     * @return List object
-     */
+    /// Creates the list component containing the commands within the given vector
+    /// used for showing the menu dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: list of command objects
+    ///
+    /// #### Returns
+    ///
+    /// List object
     protected List createCommandList(Vector commands) {
         List l = new List(commands);
         l.setUIID("CommandList");
@@ -1681,64 +1668,62 @@ public class MenuBar extends Container implements ActionListener {
         return null;
     }
 
-    /**
-     * This method returns the select menu item, when a menu is opened
-     *
-     * @return select Command
-     */
+    /// This method returns the select menu item, when a menu is opened
+    ///
+    /// #### Returns
+    ///
+    /// select Command
     protected Command getSelectMenuItem() {
         return selectMenuItem;
     }
 
-    /**
-     * This method returns the cancel menu item, when a menu is opened
-     *
-     * @return cancel Command
-     */
+    /// This method returns the cancel menu item, when a menu is opened
+    ///
+    /// #### Returns
+    ///
+    /// cancel Command
     protected Command getCancelMenuItem() {
         return cancelMenuItem;
     }
 
-    /**
-     * When set to true the physical back button will minimize the application
-     *
-     * @return the minimizeOnBack
-     */
+    /// When set to true the physical back button will minimize the application
+    ///
+    /// #### Returns
+    ///
+    /// the minimizeOnBack
     public boolean isMinimizeOnBack() {
         return minimizeOnBack;
     }
 
-    /**
-     * When set to true the physical back button will minimize the application
-     *
-     * @param minimizeOnBack the minimizeOnBack to set
-     */
+    /// When set to true the physical back button will minimize the application
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimizeOnBack`: the minimizeOnBack to set
     public void setMinimizeOnBack(boolean minimizeOnBack) {
         this.minimizeOnBack = minimizeOnBack;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected int getDragRegionStatus(int x, int y) {
         return DRAG_REGION_NOT_DRAGGABLE;
     }
 
-    /**
-     * Returns the parent Form title area
-     *
-     * @return the title area Container
-     */
+    /// Returns the parent Form title area
+    ///
+    /// #### Returns
+    ///
+    /// the title area Container
     protected Container getTitleAreaContainer() {
         return parent.getTitleArea();
     }
 
-    /**
-     * Gets the Form titleComponent
-     *
-     * @return titleComponent
-     */
+    /// Gets the Form titleComponent
+    ///
+    /// #### Returns
+    ///
+    /// titleComponent
     protected Component getTitleComponent() {
         return parent.getTitleComponent();
     }

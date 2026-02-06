@@ -68,21 +68,17 @@ import java.util.Random;
 import java.util.Set;
 import java.util.Vector;
 
-/**
- * Various utility methods used for HTTP/IO operations
- *
- * @author Shai Almog
- */
+/// Various utility methods used for HTTP/IO operations
+///
+/// @author Shai Almog
 public final class Util {
     private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis());
     private static CodenameOneImplementation implInstance;
     private static Hashtable externalizables = new Hashtable();
     private static boolean charArrayBugTested;
     private static boolean charArrayBug;
-    /**
-     * Fix for RFE 427: http://java.net/jira/browse/LWUIT-427
-     * Allows determining chars that should not be encoded
-     */
+    /// Fix for RFE 427: http://java.net/jira/browse/LWUIT-427
+    /// Allows determining chars that should not be encoded
     private static String ignoreCharsWhenEncoding = "";
     private static SimpleDateFormat dateFormatter;
 
@@ -90,34 +86,37 @@ public final class Util {
         register("EncodedImage", EncodedImage.class);
     }
 
-    /**
-     * These chars will not be encoded by the encoding method in this class
-     * as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
-     *
-     * @return chars skipped
-     */
+    /// These chars will not be encoded by the encoding method in this class
+    /// as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
+    ///
+    /// #### Returns
+    ///
+    /// chars skipped
     public static String getIgnorCharsWhileEncoding() {
         return ignoreCharsWhenEncoding;
     }
 
-    /**
-     * These chars will not be encoded by the encoding method in this class
-     * as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
-     *
-     * @param s set of characters to skip when encoding
-     */
+    /// These chars will not be encoded by the encoding method in this class
+    /// as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: set of characters to skip when encoding
     public static void setIgnorCharsWhileEncoding(String s) {
         ignoreCharsWhenEncoding = s;
     }
 
     private Util() {}
 
-    /**
-     * Helper to get a reader from an input stream with UTF-8 encoding
-     *
-     * @param in the input stream
-     * @return the reader
-     */
+    /// Helper to get a reader from an input stream with UTF-8 encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the input stream
+    ///
+    /// #### Returns
+    ///
+    /// the reader
     public static InputStreamReader getReader(InputStream in) {
         try {
             return new InputStreamReader(in, "UTF-8");
@@ -127,12 +126,15 @@ public final class Util {
         }
     }
 
-    /**
-     * Helper to get a writer from an output stream with UTF-8 encoding
-     *
-     * @param out the output stream
-     * @return the writer
-     */
+    /// Helper to get a writer from an output stream with UTF-8 encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the output stream
+    ///
+    /// #### Returns
+    ///
+    /// the writer
     public static OutputStreamWriter getWriter(OutputStream out) {
         try {
             return new OutputStreamWriter(out, "UTF-8");
@@ -142,36 +144,42 @@ public final class Util {
         }
     }
 
-    /**
-     * Copy the input stream into the output stream, closes both streams when finishing or in
-     * a case of an exception
-     *
-     * @param i source
-     * @param o destination
-     */
+    /// Copy the input stream into the output stream, closes both streams when finishing or in
+    /// a case of an exception
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: source
+    ///
+    /// - `o`: destination
     public static void copy(InputStream i, OutputStream o) throws IOException {
         copy(i, o, 8192);
     }
 
-    /**
-     * Copy the input stream into the output stream, without closing the streams when done
-     *
-     * @param i          source
-     * @param o          destination
-     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
-     */
+    /// Copy the input stream into the output stream, without closing the streams when done
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: source
+    ///
+    /// - `o`: destination
+    ///
+    /// - `bufferSize`: the size of the buffer, which should be a power of 2 large enough
     public static void copyNoClose(InputStream i, OutputStream o, int bufferSize) throws IOException {
         copyNoClose(i, o, bufferSize, null);
     }
 
-    /**
-     * Copy the input stream into the output stream, without closing the streams when done
-     *
-     * @param i          source
-     * @param o          destination
-     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
-     * @param callback   called after each copy step
-     */
+    /// Copy the input stream into the output stream, without closing the streams when done
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: source
+    ///
+    /// - `o`: destination
+    ///
+    /// - `bufferSize`: the size of the buffer, which should be a power of 2 large enough
+    ///
+    /// - `callback`: called after each copy step
     public static void copyNoClose(InputStream i, OutputStream o, int bufferSize, IOProgressListener callback) throws IOException {
 
         byte[] buffer = new byte[bufferSize];
@@ -186,14 +194,16 @@ public final class Util {
         }
     }
 
-    /**
-     * Copy the input stream into the output stream, closes both streams when finishing or in
-     * a case of an exception
-     *
-     * @param i          source
-     * @param o          destination
-     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
-     */
+    /// Copy the input stream into the output stream, closes both streams when finishing or in
+    /// a case of an exception
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: source
+    ///
+    /// - `o`: destination
+    ///
+    /// - `bufferSize`: the size of the buffer, which should be a power of 2 large enough
     public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
         try {
             copyNoClose(i, o, bufferSize);
@@ -203,36 +213,52 @@ public final class Util {
         }
     }
 
-    /**
-     * Closes the object (connection, stream etc.) without throwing any exception, even if the
-     * object is null
-     *
-     * @param o Connection, Stream or other closeable object
-     */
+    /// Closes the object (connection, stream etc.) without throwing any exception, even if the
+    /// object is null
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: Connection, Stream or other closeable object
     public static void cleanup(Object o) {
         Util.getImplementation().cleanup(o);
     }
 
-    /**
-     * Reads an input stream to a string
-     *
-     * @param i the input stream
-     * @return a UTF-8 string
-     * @throws IOException thrown by the stream
-     */
+    /// Reads an input stream to a string
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the input stream
+    ///
+    /// #### Returns
+    ///
+    /// a UTF-8 string
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by the stream
     public static String readToString(InputStream i) throws IOException {
         return readToString(i, "UTF-8");
     }
 
-    /**
-     * Reads the contents of a file to a string.
-     *
-     * @param file    The file to read.
-     * @param charset The Charset to use to write the file.
-     * @return The string read from the file.
-     * @throws IOException If the file does not exist, or cannot be read for some reason.
-     * @since 8.0
-     */
+    /// Reads the contents of a file to a string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The file to read.
+    ///
+    /// - `charset`: The Charset to use to write the file.
+    ///
+    /// #### Returns
+    ///
+    /// The string read from the file.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: If the file does not exist, or cannot be read for some reason.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static String readToString(File file, String charset) throws IOException {
         if (charset == null) {
             charset = "UTF-8";
@@ -243,39 +269,63 @@ public final class Util {
         return Util.readToString(FileSystemStorage.getInstance().openInputStream(file.getAbsolutePath()), charset);
     }
 
-    /**
-     * Reads the contents of a file to a string.  Uses UTF-8 encoding.
-     *
-     * @param file The file to read.
-     * @return The string read from the file.
-     * @throws IOException If the file does not exist, or cannot be read for some reason.
-     * @since 8.0
-     */
+    /// Reads the contents of a file to a string.  Uses UTF-8 encoding.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The file to read.
+    ///
+    /// #### Returns
+    ///
+    /// The string read from the file.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: If the file does not exist, or cannot be read for some reason.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static String readToString(File file) throws IOException {
         return readToString(file, "UTF-8");
     }
 
-    /**
-     * Writes a string to a file using UTF-8 encoding.
-     *
-     * @param file     The file to write to.
-     * @param contents The contents to write to the file.
-     * @throws IOException If it cannot write to the file for some reason.
-     * @since 8.0
-     */
+    /// Writes a string to a file using UTF-8 encoding.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The file to write to.
+    ///
+    /// - `contents`: The contents to write to the file.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: If it cannot write to the file for some reason.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static void writeStringToFile(File file, String contents) throws IOException {
         writeStringToFile(file, contents, "UTF-8");
     }
 
-    /**
-     * Writes a string to a file.
-     *
-     * @param file     The file to write to.
-     * @param contents The contents to write to the file.
-     * @param charset  The charset to use.  If null, it defaults to UTF-8
-     * @throws IOException If it cannot write to the file for some reason.
-     * @since 8.0
-     */
+    /// Writes a string to a file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The file to write to.
+    ///
+    /// - `contents`: The contents to write to the file.
+    ///
+    /// - `charset`: The charset to use.  If null, it defaults to UTF-8
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: If it cannot write to the file for some reason.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static void writeStringToFile(File file, String contents, String charset) throws IOException {
         if (charset == null) {
             charset = "UTF-8";
@@ -289,28 +339,45 @@ public final class Util {
         }
     }
 
-    /**
-     * Reads an input stream to a string
-     *
-     * @param i        the input stream
-     * @param encoding the encoding of the stream
-     * @return a string
-     * @throws IOException thrown by the stream
-     */
+    /// Reads an input stream to a string
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the input stream
+    ///
+    /// - `encoding`: the encoding of the stream
+    ///
+    /// #### Returns
+    ///
+    /// a string
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by the stream
     public static String readToString(InputStream i, String encoding) throws IOException {
         byte[] b = readInputStream(i);
         return new String(b, 0, b.length, encoding);
     }
 
-    /**
-     * Reads a reader to a string
-     *
-     * @param i        the input stream
-     * @param encoding the encoding of the stream
-     * @return a string
-     * @throws IOException thrown by the stream
-     * @since 7.0
-     */
+    /// Reads a reader to a string
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the input stream
+    ///
+    /// - `encoding`: the encoding of the stream
+    ///
+    /// #### Returns
+    ///
+    /// a string
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by the stream
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static String readToString(Reader reader) throws IOException {
         StringBuilder sb = new StringBuilder();
         char[] buf = new char[1024];
@@ -321,59 +388,290 @@ public final class Util {
         return sb.toString();
     }
 
-    /**
-     * Converts a small input stream to a byte array
-     *
-     * @param i the stream to convert
-     * @return byte array of the content of the stream
-     */
+    /// Converts a small input stream to a byte array
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the stream to convert
+    ///
+    /// #### Returns
+    ///
+    /// byte array of the content of the stream
     public static byte[] readInputStream(InputStream i) throws IOException {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         copy(i, b);
         return b.toByteArray();
     }
 
-    /**
-     * <p>Registers this externalizable so readObject will be able to load such objects.</p>
-     * <p>
-     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
-     * </p>
-     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
-     *
-     * @param e the externalizable instance
-     */
+    /// Registers this externalizable so readObject will be able to load such objects.
+    ///
+    /// The sample below demonstrates the usage and registration of the `com.codename1.io.Externalizable` interface:
+    ///
+    /// ```java
+    /// // File: Main.java
+    /// public Main {
+    ///   public void init(Object o) {
+    ///     theme = UIManager.initFirstTheme("/theme");
+    ///
+    ///     // IMPORTANT: Notice we don't use MyClass.class.getName()! This won't work due to obfuscation!
+    ///     Util.register("MyClass", MyClass.class);
+    ///   }
+    ///
+    ///   public void start() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void stop() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void destroy() {
+    ///     //...
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: MyClass.java
+    /// public MyClass implements Externalizable {
+    ///   // allows us to manipulate the version, in this case we are demonstrating a data change between the initial release
+    ///   // and the current state of object data
+    ///   private static final int VERSION = 2;
+    ///
+    ///   private String name;
+    ///   private Map data;
+    ///
+    ///   // this field was added after version 1
+    ///   private Date startedAt;
+    ///
+    ///   public int getVersion() {
+    ///     return VERSION;
+    ///   }
+    ///
+    ///   public void externalize(DataOutputStream out) throws IOException {
+    ///     Util.writeUTF(name, out);
+    ///     Util.writeObject(data, out);
+    ///     if(startedAt != null) {
+    ///         out.writeBoolean(true);
+    ///         out.writeLong(startedAt.getTime());
+    ///     } else {
+    ///         out.writeBoolean(false);
+    ///     }
+    ///   }
+    ///   public void internalize(int version, DataInputStream in) throws IOException {
+    ///     name = Util.readUTF(in);
+    ///     data = (Map)Util.readObject(in);
+    ///     if(version > 1) {
+    ///         boolean hasDate = in.readBoolean();
+    ///         if(hasDate) {
+    ///             startedAt = new Date(in.readLong());
+    ///         }
+    ///     }
+    ///   }
+    ///   public String getObjectId() {
+    ///     // IMPORTANT: Notice we don't use getClass().getName()! This won't work due to obfuscation!
+    ///     return "MyClass";
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: ReadAndWrite.java
+    /// // will read the file or return null if failed
+    /// MyClass object = (MyClass)Storage.getInstance().readObject("NameOfFile");
+    ///
+    /// // write the object back to storage
+    /// Storage.getInstance().writeObject("NameOfFile", object);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the externalizable instance
     public static void register(Externalizable e) {
         externalizables.put(e.getObjectId(), e.getClass());
     }
 
-    /**
-     * <p>Registers this externalizable so readObject will be able to load such objects.</p>
-     *
-     * <p>
-     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
-     * </p>
-     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
-     *
-     * @param id id of the externalizable
-     * @param c  the class for the externalizable
-     */
+    /// Registers this externalizable so readObject will be able to load such objects.
+    ///
+    /// The sample below demonstrates the usage and registration of the `com.codename1.io.Externalizable` interface:
+    ///
+    /// ```java
+    /// // File: Main.java
+    /// public Main {
+    ///   public void init(Object o) {
+    ///     theme = UIManager.initFirstTheme("/theme");
+    ///
+    ///     // IMPORTANT: Notice we don't use MyClass.class.getName()! This won't work due to obfuscation!
+    ///     Util.register("MyClass", MyClass.class);
+    ///   }
+    ///
+    ///   public void start() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void stop() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void destroy() {
+    ///     //...
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: MyClass.java
+    /// public MyClass implements Externalizable {
+    ///   // allows us to manipulate the version, in this case we are demonstrating a data change between the initial release
+    ///   // and the current state of object data
+    ///   private static final int VERSION = 2;
+    ///
+    ///   private String name;
+    ///   private Map data;
+    ///
+    ///   // this field was added after version 1
+    ///   private Date startedAt;
+    ///
+    ///   public int getVersion() {
+    ///     return VERSION;
+    ///   }
+    ///
+    ///   public void externalize(DataOutputStream out) throws IOException {
+    ///     Util.writeUTF(name, out);
+    ///     Util.writeObject(data, out);
+    ///     if(startedAt != null) {
+    ///         out.writeBoolean(true);
+    ///         out.writeLong(startedAt.getTime());
+    ///     } else {
+    ///         out.writeBoolean(false);
+    ///     }
+    ///   }
+    ///   public void internalize(int version, DataInputStream in) throws IOException {
+    ///     name = Util.readUTF(in);
+    ///     data = (Map)Util.readObject(in);
+    ///     if(version > 1) {
+    ///         boolean hasDate = in.readBoolean();
+    ///         if(hasDate) {
+    ///             startedAt = new Date(in.readLong());
+    ///         }
+    ///     }
+    ///   }
+    ///   public String getObjectId() {
+    ///     // IMPORTANT: Notice we don't use getClass().getName()! This won't work due to obfuscation!
+    ///     return "MyClass";
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: ReadAndWrite.java
+    /// // will read the file or return null if failed
+    /// MyClass object = (MyClass)Storage.getInstance().readObject("NameOfFile");
+    ///
+    /// // write the object back to storage
+    /// Storage.getInstance().writeObject("NameOfFile", object);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: id of the externalizable
+    ///
+    /// - `c`: the class for the externalizable
     public static void register(String id, Class c) {
         externalizables.put(id, c);
     }
 
-    /**
-     * <p>Writes an object to the given output stream, notice that it should be externalizable or one of
-     * the supported types.</p>
-     *
-     * <p>
-     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
-     * </p>
-     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
-     *
-     * @param o   the object to write which can be null
-     * @param out the destination output stream
-     * @throws IOException thrown by the stream
-     */
+    /// Writes an object to the given output stream, notice that it should be externalizable or one of
+    /// the supported types.
+    ///
+    /// The sample below demonstrates the usage and registration of the `com.codename1.io.Externalizable` interface:
+    ///
+    /// ```java
+    /// // File: Main.java
+    /// public Main {
+    ///   public void init(Object o) {
+    ///     theme = UIManager.initFirstTheme("/theme");
+    ///
+    ///     // IMPORTANT: Notice we don't use MyClass.class.getName()! This won't work due to obfuscation!
+    ///     Util.register("MyClass", MyClass.class);
+    ///   }
+    ///
+    ///   public void start() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void stop() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void destroy() {
+    ///     //...
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: MyClass.java
+    /// public MyClass implements Externalizable {
+    ///   // allows us to manipulate the version, in this case we are demonstrating a data change between the initial release
+    ///   // and the current state of object data
+    ///   private static final int VERSION = 2;
+    ///
+    ///   private String name;
+    ///   private Map data;
+    ///
+    ///   // this field was added after version 1
+    ///   private Date startedAt;
+    ///
+    ///   public int getVersion() {
+    ///     return VERSION;
+    ///   }
+    ///
+    ///   public void externalize(DataOutputStream out) throws IOException {
+    ///     Util.writeUTF(name, out);
+    ///     Util.writeObject(data, out);
+    ///     if(startedAt != null) {
+    ///         out.writeBoolean(true);
+    ///         out.writeLong(startedAt.getTime());
+    ///     } else {
+    ///         out.writeBoolean(false);
+    ///     }
+    ///   }
+    ///   public void internalize(int version, DataInputStream in) throws IOException {
+    ///     name = Util.readUTF(in);
+    ///     data = (Map)Util.readObject(in);
+    ///     if(version > 1) {
+    ///         boolean hasDate = in.readBoolean();
+    ///         if(hasDate) {
+    ///             startedAt = new Date(in.readLong());
+    ///         }
+    ///     }
+    ///   }
+    ///   public String getObjectId() {
+    ///     // IMPORTANT: Notice we don't use getClass().getName()! This won't work due to obfuscation!
+    ///     return "MyClass";
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: ReadAndWrite.java
+    /// // will read the file or return null if failed
+    /// MyClass object = (MyClass)Storage.getInstance().readObject("NameOfFile");
+    ///
+    /// // write the object back to storage
+    /// Storage.getInstance().writeObject("NameOfFile", object);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object to write which can be null
+    ///
+    /// - `out`: the destination output stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by the stream
     public static void writeObject(Object o, DataOutputStream out) throws IOException {
         if (o == null) {
             out.writeBoolean(false);
@@ -599,102 +897,221 @@ public final class Util {
                 + " value: " + o);
     }
 
-    /**
-     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     *
-     * @param o object to test
-     * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
-     * once the bug is fixed
-     */
+    /// This method allows working around [issue 58](http://code.google.com/p/codenameone/issues/detail?id=58)
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to test
+    ///
+    /// #### Returns
+    ///
+    /// true if it matches the state
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+    /// once the bug is fixed
     public static boolean instanceofObjArray(Object o) {
         return getImplementation().instanceofObjArray(o);
     }
 
-    /**
-     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     *
-     * @param o object to test
-     * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
-     * once the bug is fixed
-     */
+    /// This method allows working around [issue 58](http://code.google.com/p/codenameone/issues/detail?id=58)
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to test
+    ///
+    /// #### Returns
+    ///
+    /// true if it matches the state
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+    /// once the bug is fixed
     public static boolean instanceofByteArray(Object o) {
         return getImplementation().instanceofByteArray(o);
     }
 
-    /**
-     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     *
-     * @param o object to test
-     * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
-     * once the bug is fixed
-     */
+    /// This method allows working around [issue 58](http://code.google.com/p/codenameone/issues/detail?id=58)
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to test
+    ///
+    /// #### Returns
+    ///
+    /// true if it matches the state
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+    /// once the bug is fixed
     public static boolean instanceofShortArray(Object o) {
         return getImplementation().instanceofShortArray(o);
     }
 
-    /**
-     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     *
-     * @param o object to test
-     * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
-     * once the bug is fixed
-     */
+    /// This method allows working around [issue 58](http://code.google.com/p/codenameone/issues/detail?id=58)
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to test
+    ///
+    /// #### Returns
+    ///
+    /// true if it matches the state
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+    /// once the bug is fixed
     public static boolean instanceofLongArray(Object o) {
         return getImplementation().instanceofLongArray(o);
     }
 
-    /**
-     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     *
-     * @param o object to test
-     * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
-     * once the bug is fixed
-     */
+    /// This method allows working around [issue 58](http://code.google.com/p/codenameone/issues/detail?id=58)
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to test
+    ///
+    /// #### Returns
+    ///
+    /// true if it matches the state
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+    /// once the bug is fixed
     public static boolean instanceofIntArray(Object o) {
         return getImplementation().instanceofIntArray(o);
     }
 
-    /**
-     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     *
-     * @param o object to test
-     * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
-     * once the bug is fixed
-     */
+    /// This method allows working around [issue 58](http://code.google.com/p/codenameone/issues/detail?id=58)
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to test
+    ///
+    /// #### Returns
+    ///
+    /// true if it matches the state
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+    /// once the bug is fixed
     public static boolean instanceofFloatArray(Object o) {
         return getImplementation().instanceofFloatArray(o);
     }
 
-    /**
-     * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     *
-     * @param o object to test
-     * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
-     * once the bug is fixed
-     */
+    /// This method allows working around [issue 58](http://code.google.com/p/codenameone/issues/detail?id=58)
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to test
+    ///
+    /// #### Returns
+    ///
+    /// true if it matches the state
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+    /// once the bug is fixed
     public static boolean instanceofDoubleArray(Object o) {
         return getImplementation().instanceofDoubleArray(o);
     }
 
-    /**
-     * <p>Reads an object from the stream, notice that this is the inverse of the
-     * {@link #writeObject(java.lang.Object, java.io.DataOutputStream)}.</p>
-     *
-     * <p>
-     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
-     * </p>
-     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
-     *
-     * @param input the source input stream
-     * @throws IOException thrown by the stream
-     */
+    /// Reads an object from the stream, notice that this is the inverse of the
+    /// `java.io.DataOutputStream)`.
+    ///
+    /// The sample below demonstrates the usage and registration of the `com.codename1.io.Externalizable` interface:
+    ///
+    /// ```java
+    /// // File: Main.java
+    /// public Main {
+    ///   public void init(Object o) {
+    ///     theme = UIManager.initFirstTheme("/theme");
+    ///
+    ///     // IMPORTANT: Notice we don't use MyClass.class.getName()! This won't work due to obfuscation!
+    ///     Util.register("MyClass", MyClass.class);
+    ///   }
+    ///
+    ///   public void start() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void stop() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void destroy() {
+    ///     //...
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: MyClass.java
+    /// public MyClass implements Externalizable {
+    ///   // allows us to manipulate the version, in this case we are demonstrating a data change between the initial release
+    ///   // and the current state of object data
+    ///   private static final int VERSION = 2;
+    ///
+    ///   private String name;
+    ///   private Map data;
+    ///
+    ///   // this field was added after version 1
+    ///   private Date startedAt;
+    ///
+    ///   public int getVersion() {
+    ///     return VERSION;
+    ///   }
+    ///
+    ///   public void externalize(DataOutputStream out) throws IOException {
+    ///     Util.writeUTF(name, out);
+    ///     Util.writeObject(data, out);
+    ///     if(startedAt != null) {
+    ///         out.writeBoolean(true);
+    ///         out.writeLong(startedAt.getTime());
+    ///     } else {
+    ///         out.writeBoolean(false);
+    ///     }
+    ///   }
+    ///   public void internalize(int version, DataInputStream in) throws IOException {
+    ///     name = Util.readUTF(in);
+    ///     data = (Map)Util.readObject(in);
+    ///     if(version > 1) {
+    ///         boolean hasDate = in.readBoolean();
+    ///         if(hasDate) {
+    ///             startedAt = new Date(in.readLong());
+    ///         }
+    ///     }
+    ///   }
+    ///   public String getObjectId() {
+    ///     // IMPORTANT: Notice we don't use getClass().getName()! This won't work due to obfuscation!
+    ///     return "MyClass";
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: ReadAndWrite.java
+    /// // will read the file or return null if failed
+    /// MyClass object = (MyClass)Storage.getInstance().readObject("NameOfFile");
+    ///
+    /// // write the object back to storage
+    /// Storage.getInstance().writeObject("NameOfFile", object);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `input`: the source input stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by the stream
     public static Object readObject(DataInputStream input) throws IOException {
         try {
             if (!input.readBoolean()) {
@@ -853,35 +1270,41 @@ public final class Util {
         }
     }
 
-    /**
-     * Encode a string for HTML requests
-     *
-     * @param str none encoded string
-     * @return encoded string
-     */
+    /// Encode a string for HTML requests
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: none encoded string
+    ///
+    /// #### Returns
+    ///
+    /// encoded string
     public static String encodeUrl(final String str) {
         return encode(str, "%20");
     }
 
-    /**
-     * Encodes the provided string as a URL (with %20 for spaces).
-     *
-     * @param str              The URL to encode
-     * @param doNotEncodeChars A string whose characters will not be encoded.
-     * @return
-     */
+    /// Encodes the provided string as a URL (with %20 for spaces).
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The URL to encode
+    ///
+    /// - `doNotEncodeChars`: A string whose characters will not be encoded.
     public static String encodeUrl(final String str, String doNotEncodeChars) {
         return encode(str.toCharArray(), "%20", doNotEncodeChars);
     }
 
-    /**
-     * toCharArray should return a new array always, however some devices might
-     * suffer a bug that allows mutating a String (serious security hole in the JVM)
-     * hence this method simulates the proper behavior
-     *
-     * @param s a string
-     * @return the contents of the string as a char array guaranteed to be a copy of the current array
-     */
+    /// toCharArray should return a new array always, however some devices might
+    /// suffer a bug that allows mutating a String (serious security hole in the JVM)
+    /// hence this method simulates the proper behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: a string
+    ///
+    /// #### Returns
+    ///
+    /// the contents of the string as a char array guaranteed to be a copy of the current array
     public static char[] toCharArray(String s) {
         // toCharArray should return a new array always, however some devices might
         // suffer a bug that allows mutating a String (serious security hole in the JVM)
@@ -907,14 +1330,19 @@ public final class Util {
         return encode(toCharArray(str), spaceChar);
     }
 
-    /**
-     * Decodes a String URL encoded URL
-     *
-     * @param s           the string
-     * @param enc         the encoding (defaults to UTF-8 if null)
-     * @param plusToSpace true if plus signs be converted to spaces
-     * @return a decoded string
-     */
+    /// Decodes a String URL encoded URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the string
+    ///
+    /// - `enc`: the encoding (defaults to UTF-8 if null)
+    ///
+    /// - `plusToSpace`: true if plus signs be converted to spaces
+    ///
+    /// #### Returns
+    ///
+    /// a decoded string
     public static String decode(String s, String enc, boolean plusToSpace) {
         boolean modified = false;
         if (enc == null || enc.length() == 0) {
@@ -1006,23 +1434,32 @@ public final class Util {
         return sbuf.toString();
     }
 
-    /**
-     * Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
-     *
-     * @param str none encoded string
-     * @return encoded string
-     */
+    /// Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: none encoded string
+    ///
+    /// #### Returns
+    ///
+    /// encoded string
     public static String encodeBody(final String str) {
         return encode(str, "+");
     }
 
-    /**
-     * Encode a string for HTML requests
-     *
-     * @param buf none encoded string
-     * @return encoded string
-     * @deprecated use encodeUrl(char[]) instead
-     */
+    /// Encode a string for HTML requests
+    ///
+    /// #### Parameters
+    ///
+    /// - `buf`: none encoded string
+    ///
+    /// #### Returns
+    ///
+    /// encoded string
+    ///
+    /// #### Deprecated
+    ///
+    /// use encodeUrl(char[]) instead
     public static String encodeUrl(final byte[] buf) {
         char[] b = new char[buf.length];
         for (int iter = 0; iter < buf.length; iter++) {
@@ -1031,33 +1468,45 @@ public final class Util {
         return encode(b, "%20");
     }
 
-    /**
-     * Encode a string for HTML requests
-     *
-     * @param buf none encoded string
-     * @return encoded string
-     */
+    /// Encode a string for HTML requests
+    ///
+    /// #### Parameters
+    ///
+    /// - `buf`: none encoded string
+    ///
+    /// #### Returns
+    ///
+    /// encoded string
     public static String encodeUrl(final char[] buf) {
         return encode(buf, "%20");
     }
 
-    /**
-     * Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
-     *
-     * @param buf none encoded string
-     * @return encoded string
-     */
+    /// Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
+    ///
+    /// #### Parameters
+    ///
+    /// - `buf`: none encoded string
+    ///
+    /// #### Returns
+    ///
+    /// encoded string
     public static String encodeBody(final char[] buf) {
         return encode(buf, "+");
     }
 
-    /**
-     * Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
-     *
-     * @param buf none encoded string
-     * @return encoded string
-     * @deprecated use encodeUrl(char[]) instead
-     */
+    /// Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
+    ///
+    /// #### Parameters
+    ///
+    /// - `buf`: none encoded string
+    ///
+    /// #### Returns
+    ///
+    /// encoded string
+    ///
+    /// #### Deprecated
+    ///
+    /// use encodeUrl(char[]) instead
     public static String encodeBody(final byte[] buf) {
         char[] b = new char[buf.length];
         int blen = buf.length;
@@ -1101,13 +1550,17 @@ public final class Util {
         }
     }
 
-    /**
-     * Converts a relative url e.g.: /myfile.html to an absolute url
-     *
-     * @param baseURL     a source URL whose properties should be used to construct the actual URL
-     * @param relativeURL relative address
-     * @return an absolute URL
-     */
+    /// Converts a relative url e.g.: /myfile.html to an absolute url
+    ///
+    /// #### Parameters
+    ///
+    /// - `baseURL`: a source URL whose properties should be used to construct the actual URL
+    ///
+    /// - `relativeURL`: relative address
+    ///
+    /// #### Returns
+    ///
+    /// an absolute URL
     public static String relativeToAbsolute(String baseURL, String relativeURL) {
         if (relativeURL.startsWith("/")) {
             return getURLProtocol(baseURL) + "://" + getURLHost(baseURL) + relativeURL;
@@ -1116,12 +1569,15 @@ public final class Util {
         }
     }
 
-    /**
-     * Returns the protocol of an absolute URL e.g. http, https etc.
-     *
-     * @param url absolute URL
-     * @return protocol
-     */
+    /// Returns the protocol of an absolute URL e.g. http, https etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: absolute URL
+    ///
+    /// #### Returns
+    ///
+    /// protocol
     public static String getURLProtocol(String url) {
         int index = url.indexOf("://");
         if (index != -1) {
@@ -1130,12 +1586,15 @@ public final class Util {
         return null;
     }
 
-    /**
-     * Returns the URL's host portion
-     *
-     * @param url absolute URL
-     * @return the domain of the URL
-     */
+    /// Returns the URL's host portion
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: absolute URL
+    ///
+    /// #### Returns
+    ///
+    /// the domain of the URL
     public static String getURLHost(String url) {
         int start = url.indexOf("://");
         int end = url.indexOf('/', start + 3);
@@ -1146,12 +1605,15 @@ public final class Util {
         }
     }
 
-    /**
-     * Returns the URL's path
-     *
-     * @param url absolute URL
-     * @return the path within the host
-     */
+    /// Returns the URL's path
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: absolute URL
+    ///
+    /// #### Returns
+    ///
+    /// the path within the host
     public static String getURLPath(String url) {
         int start = url.indexOf('/', url.indexOf("://") + 3);
         if (start != -1) {
@@ -1160,13 +1622,16 @@ public final class Util {
         return "/";
     }
 
-    /**
-     * Returns the URL's base path, which is the same as the path only without an ending file e.g.:
-     * http://domain.com/f/f.html would return as: /f/
-     *
-     * @param url absolute URL
-     * @return the path within the host
-     */
+    /// Returns the URL's base path, which is the same as the path only without an ending file e.g.:
+    /// http://domain.com/f/f.html would return as: /f/
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: absolute URL
+    ///
+    /// #### Returns
+    ///
+    /// the path within the host
     public static String getURLBasePath(String url) {
         int start = url.indexOf('/', url.indexOf("://") + 3);
         int end = url.lastIndexOf('/');
@@ -1176,13 +1641,17 @@ public final class Util {
         return "/";
     }
 
-    /**
-     * Writes a string with a null flag, this allows a String which may be null
-     *
-     * @param s the string to write
-     * @param d the destination output stream
-     * @throws java.io.IOException
-     */
+    /// Writes a string with a null flag, this allows a String which may be null
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the string to write
+    ///
+    /// - `d`: the destination output stream
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`
     public static void writeUTF(String s, DataOutputStream d) throws IOException {
         if (s == null) {
             d.writeBoolean(false);
@@ -1192,13 +1661,19 @@ public final class Util {
         d.writeUTF(s);
     }
 
-    /**
-     * Reads a UTF string that may be null previously written by writeUTF
-     *
-     * @param d the stream
-     * @return a string or null
-     * @throws java.io.IOException
-     */
+    /// Reads a UTF string that may be null previously written by writeUTF
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the stream
+    ///
+    /// #### Returns
+    ///
+    /// a string or null
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`
     public static String readUTF(DataInputStream d) throws IOException {
         if (d.readBoolean()) {
             return d.readUTF();
@@ -1206,30 +1681,38 @@ public final class Util {
         return null;
     }
 
-    /**
-     * The read fully method from data input stream is very useful for all types of
-     * streams...
-     *
-     * @param b the buffer into which the data is read.
-     * @throws IOException the stream has been closed and the contained
-     *                     input stream does not support reading after close, or
-     *                     another I/O error occurs.
-     */
+    /// The read fully method from data input stream is very useful for all types of
+    /// streams...
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the buffer into which the data is read.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException the stream has been closed and the contained
+    ///                     input stream does not support reading after close, or
+    ///                     another I/O error occurs.
     public static void readFully(InputStream i, byte b[]) throws IOException {
         readFully(i, b, 0, b.length);
     }
 
-    /**
-     * The read fully method from data input stream is very useful for all types of
-     * streams...
-     *
-     * @param b   the buffer into which the data is read.
-     * @param off the start offset of the data.
-     * @param len the number of bytes to read.
-     * @throws IOException the stream has been closed and the contained
-     *                     input stream does not support reading after close, or
-     *                     another I/O error occurs.
-     */
+    /// The read fully method from data input stream is very useful for all types of
+    /// streams...
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the buffer into which the data is read.
+    ///
+    /// - `off`: the start offset of the data.
+    ///
+    /// - `len`: the number of bytes to read.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException the stream has been closed and the contained
+    ///                     input stream does not support reading after close, or
+    ///                     another I/O error occurs.
     public static void readFully(InputStream i, byte b[], int off, int len) throws IOException {
         if (len < 0) {
             throw new IndexOutOfBoundsException();
@@ -1244,15 +1727,21 @@ public final class Util {
         }
     }
 
-    /**
-     * Reads until the array is full or until the stream ends
-     *
-     * @param b the buffer into which the data is read.
-     * @return the amount read
-     * @throws IOException the stream has been closed and the contained
-     *                     input stream does not support reading after close, or
-     *                     another I/O error occurs.
-     */
+    /// Reads until the array is full or until the stream ends
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the buffer into which the data is read.
+    ///
+    /// #### Returns
+    ///
+    /// the amount read
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException the stream has been closed and the contained
+    ///                     input stream does not support reading after close, or
+    ///                     another I/O error occurs.
     public static int readAll(InputStream i, byte b[]) throws IOException {
         int len = b.length;
         int n = 0;
@@ -1266,14 +1755,18 @@ public final class Util {
         return n;
     }
 
-    /**
-     * Provides a utility method breaks a given String to array of String according
-     * to the given separator
-     *
-     * @param original  the String to break
-     * @param separator the pattern to look in the original String
-     * @return array of Strings from the original String
-     */
+    /// Provides a utility method breaks a given String to array of String according
+    /// to the given separator
+    ///
+    /// #### Parameters
+    ///
+    /// - `original`: the String to break
+    ///
+    /// - `separator`: the pattern to look in the original String
+    ///
+    /// #### Returns
+    ///
+    /// array of Strings from the original String
     public static String[] split(String original, String separator) {
 
         Vector nodes = new Vector();
@@ -1297,55 +1790,60 @@ public final class Util {
         return implInstance;
     }
 
-    /**
-     * Invoked internally from Display, this method is for internal use only
-     *
-     * @param impl implementation instance
-     */
+    /// Invoked internally from Display, this method is for internal use only
+    ///
+    /// #### Parameters
+    ///
+    /// - `impl`: implementation instance
     public static void setImplementation(CodenameOneImplementation impl) {
         implInstance = impl;
     }
 
-    /**
-     * Merges arrays into one larger array
-     */
+    /// Merges arrays into one larger array
     public static void mergeArrays(Object[] arr1, Object[] arr2, Object[] destinationArray) {
         System.arraycopy(arr1, 0, destinationArray, 0, arr1.length);
         System.arraycopy(arr2, 0, destinationArray, arr1.length, arr2.length);
     }
 
-    /**
-     * Removes the object at the source array offset and copies all other objects to the destination array
-     *
-     * @param sourceArray      the source array
-     * @param destinationArray the resulting array which should be of the length sourceArray.length - 1
-     * @param o                the object to remove from the array
-     */
+    /// Removes the object at the source array offset and copies all other objects to the destination array
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceArray`: the source array
+    ///
+    /// - `destinationArray`: the resulting array which should be of the length sourceArray.length - 1
+    ///
+    /// - `o`: the object to remove from the array
     public static void removeObjectAtOffset(Object[] sourceArray, Object[] destinationArray, Object o) {
         int off = indexOf(sourceArray, o);
         removeObjectAtOffset(sourceArray, destinationArray, off);
     }
 
-    /**
-     * Removes the object at the source array offset and copies all other objects to the destination array
-     *
-     * @param sourceArray      the source array
-     * @param destinationArray the resulting array which should be of the length sourceArray.length - 1
-     * @param offset           the offset of the array
-     */
+    /// Removes the object at the source array offset and copies all other objects to the destination array
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceArray`: the source array
+    ///
+    /// - `destinationArray`: the resulting array which should be of the length sourceArray.length - 1
+    ///
+    /// - `offset`: the offset of the array
     public static void removeObjectAtOffset(Object[] sourceArray, Object[] destinationArray, int offset) {
         System.arraycopy(sourceArray, 0, destinationArray, 0, offset);
         System.arraycopy(sourceArray, offset + 1, destinationArray, offset, sourceArray.length - offset - 1);
     }
 
-    /**
-     * Inserts the object at the destination array offset
-     *
-     * @param sourceArray      the source array
-     * @param destinationArray the resulting array which should be of the length sourceArray.length + 1
-     * @param offset           the offset of the array
-     * @param o                the object
-     */
+    /// Inserts the object at the destination array offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceArray`: the source array
+    ///
+    /// - `destinationArray`: the resulting array which should be of the length sourceArray.length + 1
+    ///
+    /// - `offset`: the offset of the array
+    ///
+    /// - `o`: the object
     public static void insertObjectAtOffset(Object[] sourceArray, Object[] destinationArray, int offset, Object o) {
         if (offset == 0) {
             destinationArray[0] = o;
@@ -1362,14 +1860,18 @@ public final class Util {
         }
     }
 
-    /**
-     * Finds the object at the given offset while using the == operator and not the equals method call, it doesn't
-     * rely on the ordering of the elements like the Arrays method.
-     *
-     * @param arr   the array
-     * @param value the value to search
-     * @return the offset or -1
-     */
+    /// Finds the object at the given offset while using the == operator and not the equals method call, it doesn't
+    /// rely on the ordering of the elements like the Arrays method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arr`: the array
+    ///
+    /// - `value`: the value to search
+    ///
+    /// #### Returns
+    ///
+    /// the offset or -1
     public static int indexOf(Object[] arr, Object value) {
         int l = arr.length;
         for (int iter = 0; iter < l; iter++) {
@@ -1380,105 +1882,211 @@ public final class Util {
         return -1;
     }
 
-    /**
-     * Blocking method that will download the given URL to storage and return when the
-     * operation completes
-     *
-     * @param url          the URL
-     * @param fileName     the storage file name
-     * @param showProgress whether to block the UI until download completes/fails
-     * @return true on success false on error
-     */
+    /// Blocking method that will download the given URL to storage and return when the
+    /// operation completes
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    ///
+    /// - `fileName`: the storage file name
+    ///
+    /// - `showProgress`: whether to block the UI until download completes/fails
+    ///
+    /// #### Returns
+    ///
+    /// true on success false on error
     public static boolean downloadUrlToStorage(String url, String fileName, boolean showProgress) {
         return downloadUrlTo(url, fileName, showProgress, false, true, null);
     }
 
-    /**
-     * Blocking method that will download the given URL to the file system storage and return when the
-     * operation completes
-     *
-     * @param url          the URL
-     * @param fileName     the file name
-     * @param showProgress whether to block the UI until download completes/fails
-     * @return true on success false on error
-     */
+    /// Blocking method that will download the given URL to the file system storage and return when the
+    /// operation completes
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    ///
+    /// - `fileName`: the file name
+    ///
+    /// - `showProgress`: whether to block the UI until download completes/fails
+    ///
+    /// #### Returns
+    ///
+    /// true on success false on error
     public static boolean downloadUrlToFile(String url, String fileName, boolean showProgress) {
         return downloadUrlTo(url, fileName, showProgress, false, false, null);
     }
 
-    /**
-     * <p>Non-blocking method that will download the given URL to storage in the background and return
-     * immediately. This method can be used to fetch data dynamically and asynchronously e.g. in this code it is used
-     * to fetch book covers for the {@link com.codename1.components.ImageViewer}:</p>
-     *
-     * <script src="https://gist.github.com/codenameone/305c3f5426b0e2e80833.js"></script>
-     * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png" alt="Image viewer with dynamic URL fetching model" />
-     *
-     * @param url      the URL
-     * @param fileName the storage file name
-     */
+    /// Non-blocking method that will download the given URL to storage in the background and return
+    /// immediately. This method can be used to fetch data dynamically and asynchronously e.g. in this code it is used
+    /// to fetch book covers for the `com.codename1.components.ImageViewer`:
+    ///
+    /// ```java
+    /// Form hi = new Form("ImageViewer", new BorderLayout());
+    /// final EncodedImage placeholder = EncodedImage.createFromImage(
+    ///         FontImage.createMaterial(FontImage.MATERIAL_SYNC, s).
+    ///                 scaled(300, 300), false);
+    ///
+    /// class ImageList implements ListModel {
+    ///     private int selection;
+    ///     private String[] imageURLs = {
+    ///         "http://awoiaf.westeros.org/images/thumb/9/93/AGameOfThrones.jpg/300px-AGameOfThrones.jpg",
+    ///         "http://awoiaf.westeros.org/images/thumb/3/39/AClashOfKings.jpg/300px-AClashOfKings.jpg",
+    ///         "http://awoiaf.westeros.org/images/thumb/2/24/AStormOfSwords.jpg/300px-AStormOfSwords.jpg",
+    ///         "http://awoiaf.westeros.org/images/thumb/a/a3/AFeastForCrows.jpg/300px-AFeastForCrows.jpg",
+    ///         "http://awoiaf.westeros.org/images/7/79/ADanceWithDragons.jpg"
+    ///     };
+    ///     private Image[] images;
+    ///     private EventDispatcher listeners = new EventDispatcher();
+    ///
+    ///     public ImageList() {
+    ///         this.images = new EncodedImage[imageURLs.length];
+    ///     }
+    ///
+    ///     public Image getItemAt(final int index) {
+    ///         if(images[index] == null) {
+    ///             images[index] = placeholder;
+    ///             Util.downloadUrlToStorageInBackground(imageURLs[index], "list" + index, (e) -> {
+    ///                     try {
+    ///                         images[index] = EncodedImage.create(Storage.getInstance().createInputStream("list" + index));
+    ///                         listeners.fireDataChangeEvent(index, DataChangedListener.CHANGED);
+    ///                     } catch(IOException err) {
+    ///                         err.printStackTrace();
+    ///                     }
+    ///             });
+    ///         }
+    ///         return images[index];
+    ///     }
+    ///
+    ///     public int getSize() {
+    ///         return imageURLs.length;
+    ///     }
+    ///
+    ///     public int getSelectedIndex() {
+    ///         return selection;
+    ///     }
+    ///
+    ///     public void setSelectedIndex(int index) {
+    ///         selection = index;
+    ///     }
+    ///
+    ///     public void addDataChangedListener(DataChangedListener l) {
+    ///         listeners.addListener(l);
+    ///     }
+    ///
+    ///     public void removeDataChangedListener(DataChangedListener l) {
+    ///         listeners.removeListener(l);
+    ///     }
+    ///
+    ///     public void addSelectionListener(SelectionListener l) {
+    ///     }
+    ///
+    ///     public void removeSelectionListener(SelectionListener l) {
+    ///     }
+    ///
+    ///     public void addItem(Image item) {
+    ///     }
+    ///
+    ///     public void removeItem(int index) {
+    ///     }
+    /// };
+    ///
+    /// ImageList imodel = new ImageList();
+    ///
+    /// ImageViewer iv = new ImageViewer(imodel.getItemAt(0));
+    /// iv.setImageList(imodel);
+    /// hi.add(BorderLayout.CENTER, iv);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    ///
+    /// - `fileName`: the storage file name
     public static void downloadUrlToStorageInBackground(String url, String fileName) {
         downloadUrlTo(url, fileName, false, true, true, null);
     }
 
-    /**
-     * Non-blocking method that will download the given URL to file system storage in the background and return immediately
-     *
-     * @param url      the URL
-     * @param fileName the file name
-     */
+    /// Non-blocking method that will download the given URL to file system storage in the background and return immediately
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    ///
+    /// - `fileName`: the file name
     public static void downloadUrlToFileSystemInBackground(String url, String fileName) {
         downloadUrlTo(url, fileName, false, true, false, null);
     }
 
-    /**
-     * Non-blocking method that will download the given URL to storage in the background and return immediately
-     *
-     * @param url          the URL
-     * @param fileName     the storage file name
-     * @param onCompletion invoked when download completes
-     */
+    /// Non-blocking method that will download the given URL to storage in the background and return immediately
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    ///
+    /// - `fileName`: the storage file name
+    ///
+    /// - `onCompletion`: invoked when download completes
     public static void downloadUrlToStorageInBackground(String url, String fileName, ActionListener onCompletion) {
         downloadUrlTo(url, fileName, false, true, true, onCompletion);
     }
 
-    /**
-     * Non-blocking method that will download the given URL to file system storage in the background and return immediately
-     *
-     * @param url          the URL
-     * @param fileName     the file name
-     * @param onCompletion invoked when download completes
-     */
+    /// Non-blocking method that will download the given URL to file system storage in the background and return immediately
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    ///
+    /// - `fileName`: the file name
+    ///
+    /// - `onCompletion`: invoked when download completes
     public static void downloadUrlToFileSystemInBackground(String url, String fileName, ActionListener onCompletion) {
         downloadUrlTo(url, fileName, false, true, false, onCompletion);
     }
 
-    /**
-     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
-     * the file system.
-     *
-     * @param url       The URL to download the image from.
-     * @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
-     *                  network request altogether.
-     * @param onSuccess Callback called on success.
-     * @param onFail    Callback called if we fail to load the image.
-     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
-     * @since 3.4
-     */
+    /// Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
+    /// the file system.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to download the image from.
+    ///
+    /// - `fileName`: @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+    ///                  network request altogether.
+    ///
+    /// - `onSuccess`: Callback called on success.
+    ///
+    /// - `onFail`: Callback called if we fail to load the image.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    ///
+    /// #### See also
+    ///
+    /// - ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
     public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         implInstance.downloadImageToFileSystem(url, fileName, onSuccess, onFail);
     }
 
-    /**
-     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
-     * the file system.
-     *
-     * @param url      The URL to download the image from.
-     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
-     *                 network request altogether.
-     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
-     * @since 7.0
-     */
+    /// Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
+    /// the file system.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to download the image from.
+    ///
+    /// - `fileName`: @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+    ///                 network request altogether.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
     public static AsyncResource<Image> downloadImageToFileSystem(String url, String fileName) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToFileSystem(url, fileName, new SuccessCallback<Image>() {
@@ -1498,47 +2106,71 @@ public final class Util {
         return out;
     }
 
-    /**
-     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
-     * the file system.
-     *
-     * @param url       The URL to download the image from.
-     * @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
-     *                  network request altogether.
-     * @param onSuccess Callback called on success.
-     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback)
-     * @since 3.4
-     */
+    /// Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
+    /// the file system.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to download the image from.
+    ///
+    /// - `fileName`: @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+    ///                  network request altogether.
+    ///
+    /// - `onSuccess`: Callback called on success.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    ///
+    /// #### See also
+    ///
+    /// - ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback)
     public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess) {
         downloadImageToFileSystem(url, fileName, onSuccess, new CallbackAdapter<Image>());
     }
 
-    /**
-     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
-     * storage.
-     *
-     * @param url       The URL to download the image from.
-     * @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
-     *                  network request altogether.
-     * @param onSuccess Callback called on success.
-     * @param onFail    Callback called if we fail to load the image.
-     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
-     * @since 3.4
-     */
+    /// Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
+    /// storage.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to download the image from.
+    ///
+    /// - `fileName`: @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+    ///                  network request altogether.
+    ///
+    /// - `onSuccess`: Callback called on success.
+    ///
+    /// - `onFail`: Callback called if we fail to load the image.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    ///
+    /// #### See also
+    ///
+    /// - ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
     public static void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         implInstance.downloadImageToStorage(url, fileName, onSuccess, onFail);
     }
 
-    /**
-     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
-     * storage.
-     *
-     * @param url      The URL to download the image from.
-     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
-     *                 network request altogether.
-     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
-     * @since 7.0
-     */
+    /// Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
+    /// storage.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to download the image from.
+    ///
+    /// - `fileName`: @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+    ///                 network request altogether.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
     public static AsyncResource<Image> downloadImageToStorage(String url, String fileName) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToStorage(url, fileName, new SuccessCallback<Image>() {
@@ -1558,25 +2190,33 @@ public final class Util {
         return out;
     }
 
-    /**
-     * Downloads an image to the cache asynchronously.
-     *
-     * @param url       The URL to download.
-     * @param onSuccess Callback to run on successful completion.
-     * @param onFail    Callback to run if download fails.
-     */
+    /// Downloads an image to the cache asynchronously.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to download.
+    ///
+    /// - `onSuccess`: Callback to run on successful completion.
+    ///
+    /// - `onFail`: Callback to run if download fails.
     public static void downloadImageToCache(String url, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         implInstance.downloadImageToCache(url, onSuccess, onFail);
 
     }
 
-    /**
-     * Downloads an image to the cache asynchronously.
-     *
-     * @param url The URL of the image to download.
-     * @return AsyncResource to wrap the Image.
-     * @since 7.0
-     */
+    /// Downloads an image to the cache asynchronously.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL of the image to download.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource to wrap the Image.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static AsyncResource<Image> downloadImageToCache(String url) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToCache(url, new SuccessCallback<Image>() {
@@ -1596,17 +2236,25 @@ public final class Util {
         return out;
     }
 
-    /**
-     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
-     * storage.
-     *
-     * @param url       The URL to download the image from.
-     * @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
-     *                  network request altogether.
-     * @param onSuccess Callback called on success.
-     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback)
-     * @since 3.4
-     */
+    /// Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
+    /// storage.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to download the image from.
+    ///
+    /// - `fileName`: @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+    ///                  network request altogether.
+    ///
+    /// - `onSuccess`: Callback called on success.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    ///
+    /// #### See also
+    ///
+    /// - ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback)
     public static void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess) {
         downloadImageToStorage(url, fileName, onSuccess, new CallbackAdapter<Image>());
     }
@@ -1654,11 +2302,11 @@ public final class Util {
         return rc == 200 || rc == 201;
     }
 
-    /**
-     * Shorthand method for Thread sleep that doesn't throw the stupid interrupted checked exception
-     *
-     * @param t the time
-     */
+    /// Shorthand method for Thread sleep that doesn't throw the stupid interrupted checked exception
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the time
     public static void sleep(int t) {
         try {
             Thread.sleep(t);
@@ -1666,13 +2314,14 @@ public final class Util {
         }
     }
 
-    /**
-     * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
-     * includes the synchronized block to further reduce code clutter
-     *
-     * @param o the object to wait on
-     * @param t the time
-     */
+    /// Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
+    /// includes the synchronized block to further reduce code clutter
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object to wait on
+    ///
+    /// - `t`: the time
     public static void wait(Object o, int t) {
         synchronized (o) {
             long end = System.currentTimeMillis() + t;
@@ -1691,12 +2340,12 @@ public final class Util {
         }
     }
 
-    /**
-     * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
-     * includes the synchronized block to further reduce code clutter
-     *
-     * @param o the object to wait on
-     */
+    /// Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
+    /// includes the synchronized block to further reduce code clutter
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object to wait on
     public static void wait(Object o) {
         synchronized (o) {
             boolean waiting = true;
@@ -1711,12 +2360,15 @@ public final class Util {
         }
     }
 
-    /**
-     * Returns true or false based on a "soft" object
-     *
-     * @param val a boolean value as a Boolean object, String or number
-     * @return true or false
-     */
+    /// Returns true or false based on a "soft" object
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: a boolean value as a Boolean object, String or number
+    ///
+    /// #### Returns
+    ///
+    /// true or false
     public static boolean toBooleanValue(Object val) {
         if (val == null) {
             return false;
@@ -1731,12 +2383,15 @@ public final class Util {
         return toIntValue(val) != 0;
     }
 
-    /**
-     * Returns the number object as an int
-     *
-     * @param number this can be a String or any number type
-     * @return an int value or an exception
-     */
+    /// Returns the number object as an int
+    ///
+    /// #### Parameters
+    ///
+    /// - `number`: this can be a String or any number type
+    ///
+    /// #### Returns
+    ///
+    /// an int value or an exception
     public static int toIntValue(Object number) {
         if (number == null) {
             return 0;
@@ -1777,12 +2432,15 @@ public final class Util {
         throw new IllegalArgumentException("Not a number: " + number);
     }
 
-    /**
-     * Returns the number object as a long
-     *
-     * @param number this can be a String or any number type
-     * @return a long value or an exception
-     */
+    /// Returns the number object as a long
+    ///
+    /// #### Parameters
+    ///
+    /// - `number`: this can be a String or any number type
+    ///
+    /// #### Returns
+    ///
+    /// a long value or an exception
     public static long toLongValue(Object number) {
         // we should convert this to use Number
         if (number instanceof Long) {
@@ -1819,12 +2477,15 @@ public final class Util {
         throw new IllegalArgumentException("Not a number: " + number);
     }
 
-    /**
-     * Returns the number object as a float
-     *
-     * @param number this can be a String or any number type
-     * @return a float value or an exception
-     */
+    /// Returns the number object as a float
+    ///
+    /// #### Parameters
+    ///
+    /// - `number`: this can be a String or any number type
+    ///
+    /// #### Returns
+    ///
+    /// a float value or an exception
     public static float toFloatValue(Object number) {
         // we should convert this to use Number
         if (number instanceof Float) {
@@ -1858,12 +2519,15 @@ public final class Util {
         throw new IllegalArgumentException("Not a number: " + number);
     }
 
-    /**
-     * Returns the number object as a double
-     *
-     * @param number this can be a String or any number type
-     * @return a double value or an exception
-     */
+    /// Returns the number object as a double
+    ///
+    /// #### Parameters
+    ///
+    /// - `number`: this can be a String or any number type
+    ///
+    /// #### Returns
+    ///
+    /// a double value or an exception
     public static double toDoubleValue(Object number) {
         // we should convert this to use Number
         if (number instanceof Double) {
@@ -1897,21 +2561,24 @@ public final class Util {
         throw new IllegalArgumentException("Not a number: " + number);
     }
 
-    /**
-     * Sets a custom formatter to use when toDateValue is invoked
-     *
-     * @param formatter the formatter to use
-     */
+    /// Sets a custom formatter to use when toDateValue is invoked
+    ///
+    /// #### Parameters
+    ///
+    /// - `formatter`: the formatter to use
     public static void setDateFormatter(SimpleDateFormat formatter) {
         dateFormatter = formatter;
     }
 
-    /**
-     * Tries to convert an arbitrary object to a date
-     *
-     * @param o an object that can be a string, number or date
-     * @return a Date object
-     */
+    /// Tries to convert an arbitrary object to a date
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: an object that can be a string, number or date
+    ///
+    /// #### Returns
+    ///
+    /// a Date object
     public static Date toDateValue(Object o) {
         if (o == null) {
             return null;
@@ -1937,13 +2604,16 @@ public final class Util {
         return new Date(toLongValue(o));
     }
 
-    /**
-     * Encodes a string in a way that makes it harder to read it "as is" this makes it possible for Strings to be
-     * "encoded" within the app and thus harder to discover by a casual search.
-     *
-     * @param s the string to decode
-     * @return the decoded string
-     */
+    /// Encodes a string in a way that makes it harder to read it "as is" this makes it possible for Strings to be
+    /// "encoded" within the app and thus harder to discover by a casual search.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the string to decode
+    ///
+    /// #### Returns
+    ///
+    /// the decoded string
     public static String xorDecode(String s) {
         try {
             byte[] dat = Base64.decode(s.getBytes("UTF-8"));
@@ -1958,12 +2628,15 @@ public final class Util {
         }
     }
 
-    /**
-     * The inverse method of xorDecode, this is normally unnecessary and is here mostly for completeness
-     *
-     * @param s a regular string
-     * @return a String that can be used in the xorDecode method
-     */
+    /// The inverse method of xorDecode, this is normally unnecessary and is here mostly for completeness
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: a regular string
+    ///
+    /// #### Returns
+    ///
+    /// a String that can be used in the xorDecode method
     public static String xorEncode(String s) {
         try {
             byte[] dat = s.getBytes("UTF-8");
@@ -1978,18 +2651,24 @@ public final class Util {
         }
     }
 
-    /**
-     * Tries to determine the mime type of a file based on its first
-     * bytes.Direct inspection of the bytes to determine the content type is
-     * often more accurate than believing the content type claimed by the
-     * <code>http</code> server or by the file extension.
-     *
-     * @param sourceFile, it automatically choose Storage API or
-     *                    FileSystemStorage API
-     * @return the detected mime type, or "application/octet-stream" if the type
-     * is not detected
-     * @throws IOException
-     */
+    /// Tries to determine the mime type of a file based on its first
+    /// bytes.Direct inspection of the bytes to determine the content type is
+    /// often more accurate than believing the content type claimed by the
+    /// `http` server or by the file extension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceFile,`: @param sourceFile, it automatically choose Storage API or
+    ///                    FileSystemStorage API
+    ///
+    /// #### Returns
+    ///
+    /// @return the detected mime type, or "application/octet-stream" if the type
+    /// is not detected
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public static String guessMimeType(String sourceFile) throws IOException {
         InputStream inputStream = null; //NOPMD CloseResource
         try {
@@ -2005,17 +2684,23 @@ public final class Util {
         }
     }
 
-    /**
-     * Tries to determine the mime type of an InputStream based on its first
-     * bytes.Direct inspection of the bytes to determine the content type is
-     * often more accurate than believing the content type claimed by the
-     * <code>http</code> server or by the file extension.
-     *
-     * @param in
-     * @return the detected mime type, or "application/octet-stream" if the type
-     * is not detected
-     * @throws IOException
-     */
+    /// Tries to determine the mime type of an InputStream based on its first
+    /// bytes.Direct inspection of the bytes to determine the content type is
+    /// often more accurate than believing the content type claimed by the
+    /// `http` server or by the file extension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`
+    ///
+    /// #### Returns
+    ///
+    /// @return the detected mime type, or "application/octet-stream" if the type
+    /// is not detected
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public static String guessMimeType(InputStream in) throws IOException {
         byte[] header = new byte[11];
         int bytesRead = in.read(header, 0, header.length);
@@ -2028,16 +2713,19 @@ public final class Util {
         return guessMimeType(Arrays.copyOf(header, bytesRead));
     }
 
-    /**
-     * Tries to determine the mime type of a byte array based on its first
-     * bytes.Direct inspection of the bytes to determine the content type is
-     * often more accurate than believing the content type claimed by the
-     * <code>http</code> server or by the file extension.
-     *
-     * @param data
-     * @return the detected mime type, or "application/octet-stream" if the type
-     * is not detected
-     */
+    /// Tries to determine the mime type of a byte array based on its first
+    /// bytes.Direct inspection of the bytes to determine the content type is
+    /// often more accurate than believing the content type claimed by the
+    /// `http` server or by the file extension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`
+    ///
+    /// #### Returns
+    ///
+    /// @return the detected mime type, or "application/octet-stream" if the type
+    /// is not detected
     public static String guessMimeType(byte[] data) {
         // I took the most of header codes from: https://github.com/Servoy/servoy-client/blob/e7f5bce3c3dc0f0eb1cd240fce48c75143a25432/servoy_shared/src/com/servoy/j2db/util/MimeTypes.java
         // For further reference, the header codes used by OpenJDK8 are here: https://github.com/frohoff/jdk8u-dev-jdk/blob/master/src/share/classes/java/net/URLConnection.java
@@ -2151,12 +2839,10 @@ public final class Util {
                 return "image/jpeg";
             }
 
-            /**
-             * File format used by digital cameras to store images. Exif Format
-             * can be read by any application supporting JPEG. Exif Spec can be
-             * found at:
-             * http://www.pima.net/standards/it10/PIMA15740/Exif_2-1.PDF
-             */
+            /// File format used by digital cameras to store images. Exif Format
+            /// can be read by any application supporting JPEG. Exif Spec can be
+            /// found at:
+            /// http://www.pima.net/standards/it10/PIMA15740/Exif_2-1.PDF
             if ((c4 == 0xE1) && (c7 == 'E' && c8 == 'x' && c9 == 'i' && c10 == 'f' && c11 == 0)) {
                 return "image/jpeg";
             }
@@ -2166,12 +2852,10 @@ public final class Util {
             }
         }
 
-        /**
-         * According to
-         * http://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
-         * first 6 bytes are of type "AC1018" (for example) and the next 5 bytes
-         * are 0x00.
-         */
+        /// According to
+        /// http://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+        /// first 6 bytes are of type "AC1018" (for example) and the next 5 bytes
+        /// are 0x00.
         if ((c1 == 0x41 && c2 == 0x43) && (c7 == 0x00 && c8 == 0x00 && c9 == 0x00 && c10 == 0x00 && c11 == 0x00)) {
             return "application/acad";
         }
@@ -2204,27 +2888,34 @@ public final class Util {
         return "application/octet-stream"; // unknown file type
     }
 
-    /**
-     * Returns -1 if the content length is unknown, a value greater than 0 if
-     * the Content-Length is known.
-     *
-     * @param url
-     * @return Content-Length if known
-     */
+    /// Returns -1 if the content length is unknown, a value greater than 0 if
+    /// the Content-Length is known.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`
+    ///
+    /// #### Returns
+    ///
+    /// Content-Length if known
     public static long getFileSizeWithoutDownload(final String url) {
         return getFileSizeWithoutDownload(url, false);
     }
 
-    /**
-     * Returns -2 if the server doesn't accept partial downloads (and if
-     * checkPartialDownloadSupport is true), -1 if the content length is unknow,
-     * a value greater than 0 if the Content-Length is known.
-     *
-     * @param url
-     * @param checkPartialDownloadSupport if true returns -2 if the server
-     *                                    doesn't accept partial downloads.
-     * @return Content-Length if known
-     */
+    /// Returns -2 if the server doesn't accept partial downloads (and if
+    /// checkPartialDownloadSupport is true), -1 if the content length is unknow,
+    /// a value greater than 0 if the Content-Length is known.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`
+    ///
+    /// - `checkPartialDownloadSupport`: @param checkPartialDownloadSupport if true returns -2 if the server
+    ///                                    doesn't accept partial downloads.
+    ///
+    /// #### Returns
+    ///
+    /// Content-Length if known
     public static long getFileSizeWithoutDownload(final String url, final boolean checkPartialDownloadSupport) {
         // documentation about the headers: https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
         // code discussed here: https://stackoverflow.com/a/62130371
@@ -2254,43 +2945,189 @@ public final class Util {
         return result.get();
     }
 
-    /**
-     * <p>
-     * Safely download the given URL to the Storage or to the FileSystemStorage:
-     * this method is resistant to network errors and capable of resume the
-     * download as soon as network conditions allow and in a completely
-     * transparent way for the user; note that in the global network error
-     * handling, there must be an automatic
-     * <pre>.retry()</pre>, as in the code example below.</p>
-     * <p>
-     * This method is useful if the server correctly returns Content-Length and
-     * if it supports partial downloads: if not, it works like a normal
-     * download.</p>
-     * <p>
-     * Pros: always allows you to complete downloads, even if very heavy (e.g.
-     * 100MB), even if the connection is unstable (network errors) and even if
-     * the app goes temporarily in the background (on some platforms the
-     * download will continue in the background, on others it will be
-     * temporarily suspended).</p>
-     * <p>
-     * Cons: since this method is based on splitting the download into small
-     * parts (512kbytes is the default), this approach causes many GET requests
-     * that slightly slow down the download and cause more traffic than normally
-     * needed.</p>
-     * <p>
-     * Usage example:</p>
-     * <script src="https://gist.github.com/jsfan3/554590a12c3102a3d77e17533e7eca98.js"></script>
-     *
-     * @param url
-     * @param fileName           must be a valid Storage file name or FileSystemStorage
-     *                           file path
-     * @param percentageCallback invoked (in EDT) during the download to notify
-     *                           the progress (from 0 to 100); it can be null if you are not interested in
-     *                           monitoring the progress
-     * @param filesavedCallback  invoked (in EDT) only when the download is
-     *                           finished; if null, no action is taken
-     * @throws IOException
-     */
+    /// Safely download the given URL to the Storage or to the FileSystemStorage:
+    /// this method is resistant to network errors and capable of resume the
+    /// download as soon as network conditions allow and in a completely
+    /// transparent way for the user; note that in the global network error
+    /// handling, there must be an automatic
+    ///
+    /// ```java
+    /// .retry()
+    /// ```
+    /// , as in the code example below.
+    ///
+    /// This method is useful if the server correctly returns Content-Length and
+    /// if it supports partial downloads: if not, it works like a normal
+    /// download.
+    ///
+    /// Pros: always allows you to complete downloads, even if very heavy (e.g.
+    /// 100MB), even if the connection is unstable (network errors) and even if
+    /// the app goes temporarily in the background (on some platforms the
+    /// download will continue in the background, on others it will be
+    /// temporarily suspended).
+    ///
+    /// Cons: since this method is based on splitting the download into small
+    /// parts (512kbytes is the default), this approach causes many GET requests
+    /// that slightly slow down the download and cause more traffic than normally
+    /// needed.
+    ///
+    /// Usage example:
+    ///
+    /// ```java
+    /// import com.codename1.components.SpanLabel;
+    /// import com.codename1.components.ToastBar;
+    /// import static com.codename1.ui.CN.*;
+    /// import com.codename1.ui.Display;
+    /// import com.codename1.ui.Form;
+    /// import com.codename1.ui.Dialog;
+    /// import com.codename1.ui.Label;
+    /// import com.codename1.ui.plaf.UIManager;
+    /// import com.codename1.ui.util.Resources;
+    /// import com.codename1.io.Log;
+    /// import com.codename1.ui.Toolbar;
+    /// import java.io.IOException;
+    /// import com.codename1.ui.layouts.BoxLayout;
+    /// import com.codename1.io.NetworkEvent;
+    /// import com.codename1.io.Storage;
+    /// import com.codename1.io.Util;
+    /// import java.util.Timer;
+    /// import java.util.TimerTask;
+    ///
+    /// /**
+    ///  * This file was generated by [Codename One](https://www.codenameone.com/) for the purpose
+    ///  * of building native mobile applications using Java.
+    ///  */
+    /// public class MyApplication {
+    ///
+    ///     private Form current;
+    ///     private Resources theme;
+    ///
+    ///     public void init(Object context) {
+    ///         // use two network threads instead of one
+    ///         updateNetworkThreadCount(2);
+    ///
+    ///         theme = UIManager.initFirstTheme("/theme");
+    ///
+    ///         // Enable Toolbar on all Forms by default
+    ///         Toolbar.setGlobalToolbar(true);
+    ///
+    ///         // Pro only feature
+    ///         Log.bindCrashProtection(true);
+    ///
+    ///         // Manage both network errors (connectivity issues) and server errors (codes different from 2xx)
+    ///         addNetworkAndServerErrorListener();
+    ///     }
+    ///
+    ///     public void start() {
+    ///         if(current != null){
+    ///             current.show();
+    ///             return;
+    ///         }
+    ///
+    ///         String url = "https://www.informatica-libera.net/video/AVO_Cariati_Pasqua_2020.mp4"; // 38 MB
+    ///
+    ///         Form form = new Form("Test Download 38MB", BoxLayout.y());
+    ///         Label infoLabel = new Label("Starting download...");
+    ///         form.add(infoLabel);
+    ///
+    ///         try {
+    ///             Util.downloadUrlSafely(url, "myHeavyVideo.mp4", (percentage) -> {
+    ///                 // percentage callback
+    ///                 infoLabel.setText("Downloaded: " + percentage + "%");
+    ///                 infoLabel.repaint();
+    ///             }, (filename) -> {
+    ///                 // file saved callback
+    ///                 infoLabel.setText("Downloaded completed");
+    ///                 int fileSizeMB = Storage.getInstance().entrySize(filename) / 1048576;
+    ///                 form.add("Checking files size: " + fileSizeMB + " MB");
+    ///                 form.revalidate();
+    ///             });
+    ///         } catch (IOException ex) {
+    ///             Log.p("Error in downloading: " + url);
+    ///             Log.e(ex);
+    ///             form.add(new SpanLabel("Error in downloading:\n" + url));
+    ///             form.revalidate();
+    ///         }
+    ///
+    ///         form.show();
+    ///
+    ///
+    ///     }
+    ///
+    ///     public void stop() {
+    ///         current = getCurrentForm();
+    ///         if(current instanceof Dialog) {
+    ///             ((Dialog)current).dispose();
+    ///             current = getCurrentForm();
+    ///         }
+    ///     }
+    ///
+    ///     public void destroy() {
+    ///     }
+    ///
+    ///     private void addNetworkAndServerErrorListener() {
+    ///         // The following way to manage network errors is discussed here:
+    ///         // https://stackoverflow.com/questions/61993127/distinguish-between-server-side-errors-and-connection-problems
+    ///         addNetworkErrorListener(err -> {
+    ///             // prevents the event from propagating
+    ///             err.consume();
+    ///
+    ///             if (err.getError() != null) {
+    ///                 // this is the case of a network error,
+    ///                 // like: java.io.IOException: Unreachable
+    ///                 Log.p("Error connectiong to: " + err.getConnectionRequest().getUrl(), Log.ERROR);
+    ///                 // maybe there are connectivity issues, let's try again
+    ///                 ToastBar.showInfoMessage("Reconnect...");
+    ///                 Timer timer = new Timer();
+    ///                 timer.schedule(new TimerTask() {
+    /// @Override
+    ///                     public void run() {
+    ///                         err.getConnectionRequest().retry();
+    ///                     }
+    ///                 }, 2000);
+    ///             } else {
+    ///                 // this is the case of a server error
+    ///                 // logs the error
+    ///                 String errorLog = "REST ERROR\nURL:" + err.getConnectionRequest().getUrl()
+    ///                         + "\nMethod: " + err.getConnectionRequest().getHttpMethod()
+    ///                         + "\nResponse code: " + err.getConnectionRequest().getResponseCode();
+    ///                 if (err.getConnectionRequest().getRequestBody() != null) {
+    ///                     errorLog += "\nRequest body: " + err.getConnectionRequest().getRequestBody();
+    ///                 }
+    ///                 if (err.getConnectionRequest().getResponseData() != null) {
+    ///                     errorLog += "\nResponse message: " + new String(err.getConnectionRequest().getResponseData());
+    ///                 }
+    ///                 if (err.getConnectionRequest().getResponseErrorMessage() != null) {
+    ///                     errorLog += "\nResponse error message: " + err.getConnectionRequest().getResponseErrorMessage();
+    ///                 }
+    ///                 Log.p(errorLog, Log.ERROR);
+    ///
+    ///                 Log.sendLogAsync();
+    ///                 ToastBar.showErrorMessage("Server Error", 10000);
+    ///             }
+    ///         });
+    ///     }
+    ///
+    /// }
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`
+    ///
+    /// - `fileName`: @param fileName           must be a valid Storage file name or FileSystemStorage
+    ///                           file path
+    ///
+    /// - `percentageCallback`: @param percentageCallback invoked (in EDT) during the download to notify
+    ///                           the progress (from 0 to 100); it can be null if you are not interested in
+    ///                           monitoring the progress
+    ///
+    /// - `filesavedCallback`: @param filesavedCallback  invoked (in EDT) only when the download is
+    ///                           finished; if null, no action is taken
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public static void downloadUrlSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
         // Code discussion here: https://stackoverflow.com/a/62137379/1277576
         String partialDownloadsDir = FileSystemStorage.getInstance().getAppHomePath() + FileSystemStorage.getInstance().getFileSystemSeparator() + "partialDownloads";
@@ -2395,73 +3232,87 @@ public final class Util {
         });
     }
 
-    /**
-     * <p>
-     * Creates a new UUID, that is a 128-bit number used to identify information
-     * in computer systems. UUIDs aim to be unique for practical purposes.</p>
-     *
-     * <p>
-     * This implementation uses the system clock and some device info as seeds
-     * for random data, that are enough for practical usage. More specifically,
-     * two instances of Random, instantiated with different seeds, are used. The
-     * first seed corresponds to the timestamp in which the first object of the
-     * static class UUID is created, the second seed is a number (long type)
-     * that identifies the current installation of the app and is assumed to be
-     * as different as possible from other installations of the app. A unique
-     * identifier (long type) associated with the current app installation can
-     * be specified by the developer via the Preference "CustomDeviceId__$" (as
-     * in the following example) BEFORE the generation of the first UIID, or -
-     * if it is not specified - it is obtained from an internal Codename One
-     * implementation; in the worst case, if an identifier has not been
-     * specified by the developer and Codename One is unable to distinguish the
-     * current installation of the app from other installations, an internal
-     * algorithm will be used that will generate a number based on some hardware
-     * and software characteristics of the device: the number thus generated
-     * will be the same on identical models of the same device and with the same
-     * version of the operating system, but will vary between different models.
-     * Even in the worst case scenario, the probability that two app
-     * installations with identical device identifiers will generate the first
-     * UIID in the same timestamp is very low.</p>
-     *
-     * <p>
-     * As a tip, consider that any alphanumeric text string (corresponding for
-     * example to a username) can be converted into a long type number,
-     * considering this string as a number based on 36, provided it does not
-     * exceed 12 characters. This suggestion is applied in the following
-     * example.</p>
-     *
-     * <p>
-     * Code example:</p>
-     * <script src="https://gist.github.com/jsfan3/2fdc5fae2b723cba40e65faab923e552.js"></script>
-     *
-     * @return a pseudo-random Universally Unique Identifier in its canonical
-     * textual representation
-     */
+    /// Creates a new UUID, that is a 128-bit number used to identify information
+    /// in computer systems. UUIDs aim to be unique for practical purposes.
+    ///
+    /// This implementation uses the system clock and some device info as seeds
+    /// for random data, that are enough for practical usage. More specifically,
+    /// two instances of Random, instantiated with different seeds, are used. The
+    /// first seed corresponds to the timestamp in which the first object of the
+    /// static class UUID is created, the second seed is a number (long type)
+    /// that identifies the current installation of the app and is assumed to be
+    /// as different as possible from other installations of the app. A unique
+    /// identifier (long type) associated with the current app installation can
+    /// be specified by the developer via the Preference "CustomDeviceId__$" (as
+    /// in the following example) BEFORE the generation of the first UIID, or -
+    /// if it is not specified - it is obtained from an internal Codename One
+    /// implementation; in the worst case, if an identifier has not been
+    /// specified by the developer and Codename One is unable to distinguish the
+    /// current installation of the app from other installations, an internal
+    /// algorithm will be used that will generate a number based on some hardware
+    /// and software characteristics of the device: the number thus generated
+    /// will be the same on identical models of the same device and with the same
+    /// version of the operating system, but will vary between different models.
+    /// Even in the worst case scenario, the probability that two app
+    /// installations with identical device identifiers will generate the first
+    /// UIID in the same timestamp is very low.
+    ///
+    /// As a tip, consider that any alphanumeric text string (corresponding for
+    /// example to a username) can be converted into a long type number,
+    /// considering this string as a number based on 36, provided it does not
+    /// exceed 12 characters. This suggestion is applied in the following
+    /// example.
+    ///
+    /// Code example:
+    ///
+    /// ```java
+    /// Form hi = new Form("Test UIID", BoxLayout.y());
+    /// Button button = new Button("Generate 10 UIID");
+    /// hi.add(button);
+    /// hi.show();
+    /// button.addActionListener(l -> {
+    ///     String myId = "myUsername"; // do not exceed 12 characters
+    ///     Preferences.set("CustomDeviceId__$", Long.parseLong(myId, 36));
+    ///     hi.add(new SpanLabel("10 Random UUID"));
+    ///     for (int i = 0; i < 10; i++) {
+    ///         hi.add(new SpanLabel(Util.getUIID()));
+    ///     }
+    ///     hi.revalidate();
+    /// });
+    /// ```
+    ///
+    /// #### Returns
+    ///
+    /// @return a pseudo-random Universally Unique Identifier in its canonical
+    /// textual representation
     public static String getUUID() {
         return new Util.UUID().toString();
     }
 
-    /**
-     * Creates a custom UUID, from the given two <code>long</code> values.
-     *
-     * @param time            the upper 64 bits
-     * @param clockSeqAndNode the lower 64 bits
-     * @return a Universally Unique Identifier in its canonical textual
-     * representation
-     */
+    /// Creates a custom UUID, from the given two `long` values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`: the upper 64 bits
+    ///
+    /// - `clockSeqAndNode`: the lower 64 bits
+    ///
+    /// #### Returns
+    ///
+    /// @return a Universally Unique Identifier in its canonical textual
+    /// representation
     public static String getUUID(long time, long clockSeqAndNode) {
         return new Util.UUID(time, clockSeqAndNode).toString();
     }
 
-    /**
-     * This class represents an UUID according to the DCE Universal Token
-     * Identifier specification.
-     * <p>
-     * All you need to know:
-     * <pre>
-     * UUID u = new UUID().toString();
-     * </pre>
-     */
+    /// This class represents an UUID according to the DCE Universal Token
+    /// Identifier specification.
+    ///
+    /// All you need to know:
+    ///
+    /// ```java
+    /// UUID u = new UUID().toString();
+    /// ```
     static class UUID {
 
         /*
@@ -2477,21 +3328,20 @@ public final class Util {
         private long time = 0l;
         private long clockSeqAndNode = 0l;
 
-        /**
-         * Constructor for UUID, it uses the system clock and some device info
-         * as seeds for random data, that are enough for practical usage.
-         */
+        /// Constructor for UUID, it uses the system clock and some device info
+        /// as seeds for random data, that are enough for practical usage.
         public UUID() {
             this.time = randomTime.nextLong();
             this.clockSeqAndNode = randomClockSeqAndNode.nextLong();
         }
 
-        /**
-         * Constructs a UUID from two <code>long</code> values.
-         *
-         * @param time            the upper 64 bits
-         * @param clockSeqAndNode the lower 64 bits
-         */
+        /// Constructs a UUID from two `long` values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `time`: the upper 64 bits
+        ///
+        /// - `clockSeqAndNode`: the lower 64 bits
         public UUID(long time, long clockSeqAndNode) {
             this.time = time;
             this.clockSeqAndNode = clockSeqAndNode;
@@ -2526,14 +3376,10 @@ public final class Util {
             return id;
         }
 
-        /**
-         * Generates a long number using some device info: the same type of
-         * device (a specific model of a specific brand, with the same OS
-         * version) will always produce the same number, while different devices
-         * will most likely produce different numbers.
-         *
-         * @return
-         */
+        /// Generates a long number using some device info: the same type of
+        /// device (a specific model of a specific brand, with the same OS
+        /// version) will always produce the same number, while different devices
+        /// will most likely produce different numbers.
         private static long generateLongFromDeviceInfo() {
             return CN.getDeviceDensity()
                     * CN.getDisplayHeight()
@@ -2544,13 +3390,12 @@ public final class Util {
                     * Long.parseLong(sanitizeString(CN.getProperty("OSVer", "1")), 36);
         }
 
-        /**
-         * Removes all non-alphanumeric characters from a string and returns the
-         * first 10 characters.
-         *
-         * @param input
-         * @return
-         */
+        /// Removes all non-alphanumeric characters from a string and returns the
+        /// first 10 characters.
+        ///
+        /// #### Parameters
+        ///
+        /// - `input`
         private static String sanitizeString(String input) {
             StringBuilder result = new StringBuilder();
             for (char myChar : input.toCharArray()) {
@@ -2561,11 +3406,11 @@ public final class Util {
             return result.toString().substring(0, Math.min(10, result.length())).toUpperCase();
         }
 
-        /**
-         * Returns this UUID as a String.
-         *
-         * @return a String, never <code>null</code>
-         */
+        /// Returns this UUID as a String.
+        ///
+        /// #### Returns
+        ///
+        /// a String, never `null`
         @Override
         public final String toString() {
             return toCanonicalForm();

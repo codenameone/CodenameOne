@@ -38,11 +38,9 @@ import java.io.InputStreamReader;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * Invokes the Facebook REST API documented here http://developers.facebook.com/docs/guides/mobile/
- *
- * @author Shai Almog
- */
+/// Invokes the Facebook REST API documented here http://developers.facebook.com/docs/guides/mobile/
+///
+/// @author Shai Almog
 class FacebookRESTService extends ConnectionRequest implements JSONParseCallback {
 
     // PMD Fix (UnusedPrivateField): Removed redundant token storage; the access token is forwarded directly via request arguments.
@@ -286,9 +284,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         return -1;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void longToken(long tok) {
     }
@@ -312,9 +308,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
                 (root == null ? that.root == null : root.equals(that.root));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         int result = super.hashCode();

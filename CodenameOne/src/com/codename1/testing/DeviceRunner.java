@@ -31,20 +31,16 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * Runs the test cases from the test build of the app, notice that this class
- * is abstract since device/app specific code can exist in the implementation
- *
- * @author Shai Almog
- */
+/// Runs the test cases from the test build of the app, notice that this class
+/// is abstract since device/app specific code can exist in the implementation
+///
+/// @author Shai Almog
 public abstract class DeviceRunner {
     private static final int VERSION = 1;
     private int failedTests;
     private int passedTests;
 
-    /**
-     * Run all the test cases
-     */
+    /// Run all the test cases
     public void runTests() {
         failedTests = 0;
         passedTests = 0;
@@ -95,22 +91,18 @@ public abstract class DeviceRunner {
         Log.p("-----FINISHED TESTS-----");
     }
 
-    /**
-     * This method starts a new application instance
-     */
+    /// This method starts a new application instance
     protected abstract void startApplicationInstance();
 
-    /**
-     * This method should cleanup the application so the next test case can run on a clean
-     * application instance
-     */
+    /// This method should cleanup the application so the next test case can run on a clean
+    /// application instance
     protected abstract void stopApplicationInstance();
 
-    /**
-     * Runs the given test case
-     *
-     * @param testClassName the class name of the test case
-     */
+    /// Runs the given test case
+    ///
+    /// #### Parameters
+    ///
+    /// - `testClassName`: the class name of the test case
     public void runTest(String testClassName) {
         try {
             final UnitTest t = (UnitTest) Class.forName(testClassName).newInstance();

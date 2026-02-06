@@ -28,18 +28,21 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Vector;
 
-/**
- * <p>The {@code CSVParser} allows importing data into applications quickly from a CSV source.  CSV
- * is a <a href="https://en.wikipedia.org/wiki/Comma-separated_values" target="_blank">file format</a>
- * that is supported by all spreadsheets and most databases for data exchange. <br>
- * The sample below lists a simple hardcoded CSV within the table:
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/e60d45dcd79c91be9d31.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/csv-parsing.png" alt="CSV parsing results, notice the properly escaped parentheses and comma" />
- *
- * @author Shai Almog
- */
+/// The `CSVParser` allows importing data into applications quickly from a CSV source.  CSV
+/// is a [file format](https://en.wikipedia.org/wiki/Comma-separated_values)
+/// that is supported by all spreadsheets and most databases for data exchange.
+///
+/// The sample below lists a simple hardcoded CSV within the table:
+///
+/// ```java
+/// Form hi = new Form("CSV Parsing", new BorderLayout());
+/// CSVParser parser = new CSVParser();
+/// try(Reader r = new com.codename1.io.CharArrayReader("1997,Ford,E350,\"Super, \"\"luxurious\"\" truck\"".toCharArray())) {
+///     String[][] data = parser.parse(r);
+///     String[] columnNames = new String[data[0].length];
+///     for(int iter=  0 ; iter
+///
+/// @author Shai Almog
 public class CSVParser {
     private final char separatorChar;
     private final char[] buffer = new char[8192];
@@ -47,39 +50,44 @@ public class CSVParser {
     private int bufferSize = -1;
     private int bufferOffset;
 
-    /**
-     * Initializes a parser with the default comma (',') separator char
-     */
+    /// Initializes a parser with the default comma (',') separator char
     public CSVParser() {
         this(',');
     }
 
-    /**
-     * Allows creating a parser with a custom separator char
-     *
-     * @param separatorChar custom separator character such as semi-colon (';') etc.
-     */
+    /// Allows creating a parser with a custom separator char
+    ///
+    /// #### Parameters
+    ///
+    /// - `separatorChar`: custom separator character such as semi-colon (';') etc.
     public CSVParser(char separatorChar) {
         this.separatorChar = separatorChar;
     }
 
-    /**
-     * Parses input from the given stream and returns the tokens broken into rows and columns
-     *
-     * @param r the input stream
-     * @return array of rows and columns
-     */
+    /// Parses input from the given stream and returns the tokens broken into rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the input stream
+    ///
+    /// #### Returns
+    ///
+    /// array of rows and columns
     public String[][] parse(InputStream r) throws IOException {
         return parse(Util.getReader(r));
     }
 
-    /**
-     * Parses input from the given stream and returns the tokens broken into rows and columns
-     *
-     * @param r        the input stream
-     * @param encoding the encoding of the stream
-     * @return array of rows and columns
-     */
+    /// Parses input from the given stream and returns the tokens broken into rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the input stream
+    ///
+    /// - `encoding`: the encoding of the stream
+    ///
+    /// #### Returns
+    ///
+    /// array of rows and columns
     public String[][] parse(InputStream r, String encoding) throws IOException {
         return parse(new InputStreamReader(r, encoding));
     }
@@ -101,12 +109,15 @@ public class CSVParser {
         return buffer[bufferOffset];
     }
 
-    /**
-     * Parses input from the given reader and returns the tokens broken into rows and columns
-     *
-     * @param r the reader stream
-     * @return array of rows and columns
-     */
+    /// Parses input from the given reader and returns the tokens broken into rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the reader stream
+    ///
+    /// #### Returns
+    ///
+    /// array of rows and columns
     public String[][] parse(Reader r) throws IOException {
         currentReader = r;
         StringBuilder stringBuf = new StringBuilder();

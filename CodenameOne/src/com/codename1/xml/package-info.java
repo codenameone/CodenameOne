@@ -4,11 +4,5 @@
     Author     : Ofir Leitner
 */
 
-/**
- * <p>
- *     The XML package allows parsing XML documents into DOM objects.
- * </p>
- * <p>
- * </p>
- */
+/// The XML package allows parsing XML documents into DOM objects.
 package com.codename1.xml;

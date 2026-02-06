@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 
@@ -31,45 +29,35 @@ import com.codename1.charts.util.ColorUtil;
 import java.util.List;
 
 
-/**
- * Renders a bar chart based on an {@link XYMultipleSeriesDataset}.
- * <p>
- * Create an instance together with a matching {@link XYMultipleSeriesRenderer}
- * and wrap it in a {@link com.codename1.charts.ChartComponent} to display it in
- * the UI. A minimal setup looks like this:
- *
- * <pre>
- * XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
- * dataset.addSeries(mySeries);
- *
- * XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
- * renderer.addSeriesRenderer(new XYSeriesRenderer());
- *
- * BarChart chart = new BarChart(dataset, renderer, BarChart.Type.DEFAULT);
- * Form form = new Form(new BorderLayout());
- * form.add(BorderLayout.CENTER, new ChartComponent(chart));
- * form.show();
- * </pre>
- * <p>
- * The {@link Type} supplied to the constructor controls whether the bars are
- * rendered in their default style, stacked or heaped.
- */
+/// Renders a bar chart based on an `XYMultipleSeriesDataset`.
+///
+/// Create an instance together with a matching `XYMultipleSeriesRenderer`
+/// and wrap it in a `com.codename1.charts.ChartComponent` to display it in
+/// the UI. A minimal setup looks like this:
+///
+/// ```java
+/// XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+/// dataset.addSeries(mySeries);
+///
+/// XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
+/// renderer.addSeriesRenderer(new XYSeriesRenderer());
+///
+/// BarChart chart = new BarChart(dataset, renderer, BarChart.Type.DEFAULT);
+/// Form form = new Form(new BorderLayout());
+/// form.add(BorderLayout.CENTER, new ChartComponent(chart));
+/// form.show();
+/// ```
+///
+/// The `Type` supplied to the constructor controls whether the bars are
+/// rendered in their default style, stacked or heaped.
 public class BarChart extends XYChart {
-    /**
-     * The constant to identify this chart type.
-     */
+    /// The constant to identify this chart type.
     public static final String TYPE = "Bar";
-    /**
-     * The legend shape width.
-     */
+    /// The legend shape width.
     private static final int SHAPE_WIDTH = 12;
-    /**
-     * The chart type.
-     */
+    /// The chart type.
     protected Type mType = Type.DEFAULT;
-    /**
-     * The previous series Y axis point limits to be used for HEAP type bar charts.
-     */
+    /// The previous series Y axis point limits to be used for HEAP type bar charts.
     private List<Float> mPreviousSeriesPoints;
 
     BarChart() {
@@ -79,13 +67,15 @@ public class BarChart extends XYChart {
         mType = type;
     }
 
-    /**
-     * Builds a new bar chart instance.
-     *
-     * @param dataset  the multiple series dataset
-     * @param renderer the multiple series renderer
-     * @param type     the bar chart type
-     */
+    /// Builds a new bar chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the multiple series dataset
+    ///
+    /// - `renderer`: the multiple series renderer
+    ///
+    /// - `type`: the bar chart type
     public BarChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer, Type type) {
         super(dataset, renderer);
         mType = type;
@@ -113,17 +103,23 @@ public class BarChart extends XYChart {
         return ret;
     }
 
-    /**
-     * The graphical representation of a series.
-     *
-     * @param canvas         the canvas to paint to
-     * @param paint          the paint to be used for drawing
-     * @param points         the array of points to be used for drawing the series
-     * @param seriesRenderer the series renderer
-     * @param yAxisValue     the minimum value of the y axis
-     * @param seriesIndex    the index of the series currently being drawn
-     * @param startIndex     the start index of the rendering points
-     */
+    /// The graphical representation of a series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesRenderer`: the series renderer
+    ///
+    /// - `yAxisValue`: the minimum value of the y axis
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points,
                            XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
@@ -149,19 +145,27 @@ public class BarChart extends XYChart {
         mPreviousSeriesPoints = points;
     }
 
-    /**
-     * Draws a bar.
-     *
-     * @param canvas      the canvas
-     * @param xMin        the X axis minimum
-     * @param yMin        the Y axis minimum
-     * @param xMax        the X axis maximum
-     * @param yMax        the Y axis maximum
-     * @param halfDiffX   half the size of a bar
-     * @param seriesNr    the total number of series
-     * @param seriesIndex the current series index
-     * @param paint       the paint
-     */
+    /// Draws a bar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `xMin`: the X axis minimum
+    ///
+    /// - `yMin`: the Y axis minimum
+    ///
+    /// - `xMax`: the X axis maximum
+    ///
+    /// - `yMax`: the Y axis maximum
+    ///
+    /// - `halfDiffX`: half the size of a bar
+    ///
+    /// - `seriesNr`: the total number of series
+    ///
+    /// - `seriesIndex`: the current series index
+    ///
+    /// - `paint`: the paint
     protected void drawBar(Canvas canvas, float xMin, float yMin, float xMax, float yMax,
                            float halfDiffX, int seriesNr, int seriesIndex, Paint paint) {
         int scale = mDataset.getSeriesAt(seriesIndex).getScaleNumber();
@@ -173,18 +177,25 @@ public class BarChart extends XYChart {
         }
     }
 
-    /**
-     * Draws a bar.
-     *
-     * @param canvas      the canvas
-     * @param xMin        the X axis minimum
-     * @param yMin        the Y axis minimum
-     * @param xMax        the X axis maximum
-     * @param yMax        the Y axis maximum
-     * @param scale       the scale index
-     * @param seriesIndex the current series index
-     * @param paint       the paint
-     */
+    /// Draws a bar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `xMin`: the X axis minimum
+    ///
+    /// - `yMin`: the Y axis minimum
+    ///
+    /// - `xMax`: the X axis maximum
+    ///
+    /// - `yMax`: the Y axis maximum
+    ///
+    /// - `scale`: the scale index
+    ///
+    /// - `seriesIndex`: the current series index
+    ///
+    /// - `paint`: the paint
     protected void drawBar(Canvas canvas, float xMin, float yMin, float xMax, float yMax, int scale,
                            int seriesIndex, Paint paint) {
         // Fix negative bars issue in Android 4.2
@@ -255,17 +266,23 @@ public class BarChart extends XYChart {
         return ColorUtil.argb(alpha, r, g, b);
     }
 
-    /**
-     * The graphical representation of the series values as text.
-     *
-     * @param canvas      the canvas to paint to
-     * @param series      the series to be painted
-     * @param renderer    the series renderer
-     * @param paint       the paint to be used for drawing
-     * @param points      the array of points to be used for drawing the series
-     * @param seriesIndex the index of the series currently being drawn
-     * @param startIndex  the start index of the rendering points
-     */
+    /// The graphical representation of the series values as text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `series`: the series to be painted
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
     @Override
     protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
                                        Paint paint, List<Float> points, int seriesIndex, int startIndex) {
@@ -291,27 +308,35 @@ public class BarChart extends XYChart {
         }
     }
 
-    /**
-     * Returns the legend shape width.
-     *
-     * @param seriesIndex the series index
-     * @return the legend shape width
-     */
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
     @Override
     public int getLegendShapeWidth(int seriesIndex) {
         return SHAPE_WIDTH;
     }
 
-    /**
-     * The graphical representation of the legend shape.
-     *
-     * @param canvas      the canvas to paint to
-     * @param renderer    the series renderer
-     * @param x           the x value of the point the shape should be drawn at
-     * @param y           the y value of the point the shape should be drawn at
-     * @param seriesIndex the series index
-     * @param paint       the paint to be used for drawing
-     */
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
@@ -319,15 +344,20 @@ public class BarChart extends XYChart {
         canvas.drawRect(x, y - halfShapeWidth, x + SHAPE_WIDTH, y + halfShapeWidth, paint);
     }
 
-    /**
-     * Calculates and returns the half-distance in the graphical representation of
-     * 2 consecutive points.
-     *
-     * @param points   the points
-     * @param length   the points length
-     * @param seriesNr the series number
-     * @return the calculated half-distance value
-     */
+    /// Calculates and returns the half-distance in the graphical representation of
+    /// 2 consecutive points.
+    ///
+    /// #### Parameters
+    ///
+    /// - `points`: the points
+    ///
+    /// - `length`: the points length
+    ///
+    /// - `seriesNr`: the series number
+    ///
+    /// #### Returns
+    ///
+    /// the calculated half-distance value
     protected float getHalfDiffX(List<Float> points, int length, int seriesNr) {
         float barWidth = mRenderer.getBarWidth();
         if (barWidth > 0) {
@@ -348,48 +378,46 @@ public class BarChart extends XYChart {
         return (float) (halfDiffX / (getCoeficient() * (1 + mRenderer.getBarSpacing())));
     }
 
-    /**
-     * Returns the value of a constant used to calculate the half-distance.
-     *
-     * @return the constant value
-     */
+    /// Returns the value of a constant used to calculate the half-distance.
+    ///
+    /// #### Returns
+    ///
+    /// the constant value
     protected float getCoeficient() {
         return 1f;
     }
 
-    /**
-     * Returns if the chart should display the null values.
-     *
-     * @return if null values should be rendered
-     */
+    /// Returns if the chart should display the null values.
+    ///
+    /// #### Returns
+    ///
+    /// if null values should be rendered
     @Override
     protected boolean isRenderNullValues() {
         return true;
     }
 
-    /**
-     * Returns the default axis minimum.
-     *
-     * @return the default axis minimum
-     */
+    /// Returns the default axis minimum.
+    ///
+    /// #### Returns
+    ///
+    /// the default axis minimum
     @Override
     public double getDefaultMinimum() {
         return 0;
     }
 
-    /**
-     * Returns the chart type identifier.
-     *
-     * @return the chart type
-     */
+    /// Returns the chart type identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the chart type
     @Override
     public String getChartType() {
         return TYPE;
     }
 
-    /**
-     * The bar chart type enum.
-     */
+    /// The bar chart type enum.
     public enum Type {
         DEFAULT, STACKED, HEAPED
     }

@@ -24,11 +24,9 @@ package com.codename1.push;
 
 import com.codename1.xml.Element;
 
-/**
- * A convenience class for building a push notification Payload.
- *
- * @author shannah
- */
+/// A convenience class for building a push notification Payload.
+///
+/// @author shannah
 public class PushBuilder {
     private String title;
     private String body;
@@ -38,114 +36,140 @@ public class PushBuilder {
     private int type;
     private int badge;
 
-    /**
-     * Sets the title of the push notification.
-     *
-     * @param title The title of the push notification.
-     * @return Self for chaining.
-     */
+    /// Sets the title of the push notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title of the push notification.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public PushBuilder title(String title) {
         this.title = title;
         return this;
     }
 
-    /**
-     * Sets the badge to set with the push notification.
-     *
-     * @param badge The badge to set.
-     * @return Self for chaining.
-     */
+    /// Sets the badge to set with the push notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `badge`: The badge to set.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public PushBuilder badge(int badge) {
         this.badge = badge;
         return this;
     }
 
-    /**
-     * Sets the body of the push notification.
-     *
-     * @param body The body of the push notification.
-     * @return Self for chaining.
-     */
+    /// Sets the body of the push notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `body`: The body of the push notification.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public PushBuilder body(String body) {
         this.body = body;
         return this;
     }
 
-    /**
-     * Sets the metadata (i.e. content the user shouldn't see) for the push notification.
-     *
-     * @param metaData The metadata.
-     * @return Self for chaining.
-     */
+    /// Sets the metadata (i.e. content the user shouldn't see) for the push notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `metaData`: The metadata.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public PushBuilder metaData(String metaData) {
         this.metaData = metaData;
         return this;
     }
 
-    /**
-     * Sets the URL for an image to send in the push notification.  Make sure you use https:// or the image won't be shown on iOS.
-     *
-     * @param imageUrl The image URL.
-     * @return Self for chaining.
-     */
+    /// Sets the URL for an image to send in the push notification.  Make sure you use https:// or the image won't be shown on iOS.
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageUrl`: The image URL.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public PushBuilder imageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
         return this;
     }
 
-    /**
-     * Sets the category of the push notification.
-     *
-     * @param category The category.
-     * @return Self for chaining.
-     */
+    /// Sets the category of the push notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `category`: The category.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public PushBuilder category(String category) {
         this.category = category;
         return this;
     }
 
-    /**
-     * Sets the type of the push notification.
-     * <p><strong>Types</strong></p>
-     * <table><tr><th>Type</th><th>Description</th></tr>
-     * <tr><td>1</td><td>Sends only body as the notification message</td></tr>
-     * <tr><td>2</td><td>Sends only metadata.  Invisible to user but will be received in push callback</td></tr>
-     * <tr><td>3</td><td>Sends both metadata and body.  Body is visible to the user.  Push callback will receive &lt;metadata&gt;;&lt;body&gt;.</td></tr>
-     * <tr><td>4</td><td>Sends both title and body. Push callback will receive &lt;title&gt;;&lt;body&gt;</td></tr>
-     * <tr><td>100</td><td>Sends only the badge</td></tr>
-     * <tr><td>101</td><td>Sends the badge and body.  Push callback will receive the body only.</td></tr>
-     * <tr><td>102</td><td>Sends the badge, title, and body. Push callback will receive &lt;title&gt;;&lt;body&gt;</td><tr>
-     * </table>
-     *
-     * <p>Both {@link #imageUrl} and {@link #category} can be added to any notification type.  If either of these values are non-null,
-     * then the push notification is considered to be a rich push notification, and {@link #getType() } will return {@literal 99},
-     * which signifies that it is a rich push notification.</p>
-     *
-     * @param type The type of the push notification.
-     * @return Self for chaining.
-     */
+    /// Sets the type of the push notification.
+    ///
+    /// **Types**
+    ///
+    /// TypeDescription
+    /// 1Sends only body as the notification message
+    /// 2Sends only metadata.  Invisible to user but will be received in push callback
+    /// 3Sends both metadata and body.  Body is visible to the user.  Push callback will receive <metadata>;<body>.
+    /// 4Sends both title and body. Push callback will receive <title>;<body>
+    /// 100Sends only the badge
+    /// 101Sends the badge and body.  Push callback will receive the body only.
+    /// 102Sends the badge, title, and body. Push callback will receive <title>;<body>
+    ///
+    /// Both `#imageUrl` and `#category` can be added to any notification type.  If either of these values are non-null,
+    /// then the push notification is considered to be a rich push notification, and `#getType()` will return 99,
+    /// which signifies that it is a rich push notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: The type of the push notification.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public PushBuilder type(int type) {
         this.type = type;
         return this;
     }
 
-    /**
-     * A notification is considered to be a rich push notification if either {@link #imageUrl} or {@link #category} is set.
-     *
-     * @return True if the notification is a rich notification.
-     */
+    /// A notification is considered to be a rich push notification if either `#imageUrl` or `#category` is set.
+    ///
+    /// #### Returns
+    ///
+    /// True if the notification is a rich notification.
     public boolean isRichPush() {
         return imageUrl != null || category != null;
     }
 
-    /**
-     * Gets the type of the notification.  This will return {@literal 99} if {@link #isRichPush() } is true.  Otherwise
-     * it will return the underlying type as set with {@link #type(int) }.
-     *
-     * @return The type of the notification.
-     * @see #type(int)
-     * @see #isRichPush()
-     */
+    /// Gets the type of the notification.  This will return 99 if `#isRichPush()` is true.  Otherwise
+    /// it will return the underlying type as set with `#type(int)`.
+    ///
+    /// #### Returns
+    ///
+    /// The type of the notification.
+    ///
+    /// #### See also
+    ///
+    /// - #type(int)
+    ///
+    /// - #isRichPush()
     public int getType() {
         if (isRichPush()) {
             return 99;
@@ -154,11 +178,11 @@ public class PushBuilder {
     }
 
 
-    /**
-     * Builds the payload for this rich push notification.
-     *
-     * @return The payload that can be passed as the message body to {@link Push}
-     */
+    /// Builds the payload for this rich push notification.
+    ///
+    /// #### Returns
+    ///
+    /// The payload that can be passed as the message body to `Push`
     public String build() {
         StringBuilder sb = new StringBuilder();
 

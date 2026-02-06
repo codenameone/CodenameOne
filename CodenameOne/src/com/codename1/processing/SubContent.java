@@ -27,34 +27,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
-/**
- * Internal class, do not use.
- * <p>
- * An accessor implementation for working with subset of data.
- *
- * @author Eric Coolman
- */
+/// Internal class, do not use.
+///
+/// An accessor implementation for working with subset of data.
+///
+/// @author Eric Coolman
 class SubContent implements StructuredContent {
 
     private final List<StructuredContent> root;
     private StructuredContent parent;
 
-    /**
-     * Construct from subset of content.
-     *
-     * @param content subset content
-     */
+    /// Construct from subset of content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: subset content
     public SubContent(List<StructuredContent> content) {
         this.root = content;
     }
 
-    /**
-     * INTERNAL - link a node to it's parent so we can traverse backwards when
-     * required.
-     *
-     * @param content a subset of data.
-     * @param parent  the parent element of content.
-     */
+    /// INTERNAL - link a node to it's parent so we can traverse backwards when
+    /// required.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a subset of data.
+    ///
+    /// - `parent`: the parent element of content.
     SubContent(List<StructuredContent> content, StructuredContent parent) {
         this.root = content;
         this.parent = parent;

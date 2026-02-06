@@ -32,93 +32,118 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * <p>A border that can either be a circle or a circular rectangle which is a rectangle whose sides are circles.
- * This border can optionally have a drop shadow associated with it.</p>
- * <p>
- * <strong>IMPORTANT:</strong> {@code RoundRectBorder} instances can't be reused
- * you would need to create a separate instance for each style object!
- * See <a href="https://github.com/codenameone/CodenameOne/issues/2578#issuecomment-429554441">this issue</a> for further details.
- * </p>
- * <script src="https://gist.github.com/codenameone/3e91e5eab4e677e6b03962e78ae99e07.js"></script>
- * <img src="https://www.codenameone.com/img/blog/round-border.png" alt="Round Border" />
- *
- * @author Shai Almog
- */
+/// A border that can either be a circle or a circular rectangle which is a rectangle whose sides are circles.
+/// This border can optionally have a drop shadow associated with it.
+///
+/// **IMPORTANT:** `RoundRectBorder` instances can't be reused
+/// you would need to create a separate instance for each style object!
+/// See [this issue](https://github.com/codenameone/CodenameOne/issues/2578#issuecomment-429554441) for further details.
+///
+/// ```java
+/// Form hi = new Form("Round", new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+///
+/// Button ok = new Button("OK");
+/// Button cancel = new Button("Cancel");
+///
+/// Label loginLabel = new Label("Login", "Container");
+/// loginLabel.getAllStyles().setAlignment(Component.CENTER);
+///
+/// Label passwordLabel = new Label("Password", "Container");
+/// passwordLabel.getAllStyles().setAlignment(Component.CENTER);
+///
+/// TextField login = new TextField("", "Login", 20, TextArea.ANY);
+/// TextField password = new TextField("", "Password", 20, TextArea.PASSWORD);
+/// Style loginStyle = login.getAllStyles();
+/// Stroke borderStroke = new Stroke(2, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1);
+/// loginStyle.setBorder(RoundBorder.create().
+///         rectangle(true).
+///         color(0xffffff).
+///         strokeColor(0).
+///         strokeOpacity(120).
+///         stroke(borderStroke));
+/// loginStyle.setMarginUnit(Style.UNIT_TYPE_DIPS);
+/// loginStyle.setMargin(Component.BOTTOM, 3);
+/// Style passwordStyle = password.getAllStyles();
+/// passwordStyle.setBorder(RoundBorder.create().
+///         rectangle(true).
+///         color(0xffffff).
+///         strokeColor(0).
+///         strokeOpacity(120).
+///         stroke(borderStroke));
+///
+/// Container box = BoxLayout.encloseY(
+///         loginLabel,
+///         login,
+///         passwordLabel,
+///         password,
+///             GridLayout.encloseIn(2, cancel, ok));
+///
+/// Button closeButton = new Button();
+/// Style closeStyle = closeButton.getAllStyles();
+/// closeStyle.setFgColor(0xffffff);
+/// closeStyle.setBgTransparency(0);
+/// closeStyle.setPaddingUnit(Style.UNIT_TYPE_DIPS);
+/// closeStyle.setPadding(3, 3, 3, 3);
+/// closeStyle.setBorder(RoundBorder.create().shadowOpacity(100));
+/// FontImage.setMaterialIcon(closeButton, FontImage.MATERIAL_CLOSE);
+///
+/// Container layers = LayeredLayout.encloseIn(box, FlowLayout.encloseRight(closeButton));
+/// Style boxStyle = box.getUnselectedStyle();
+/// boxStyle.setBgTransparency(255);
+/// boxStyle.setBgColor(0xeeeeee);
+/// boxStyle.setMarginUnit(Style.UNIT_TYPE_DIPS);
+/// boxStyle.setPaddingUnit(Style.UNIT_TYPE_DIPS);
+/// boxStyle.setMargin(4, 3, 3, 3);
+/// boxStyle.setPadding(2, 2, 2, 2);
+///
+/// hi.add(BorderLayout.CENTER, layers);
+///
+/// hi.show();
+/// ```
+///
+/// @author Shai Almog
 public final class RoundBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rbcache";
     // these allow us to have more than one border per component in cache which is important for selected/unselected/pressed values
     private static int instanceCounter;
     private final int instanceVal;
     private long modificationTime;
-    /**
-     * The color of the border background
-     */
+    /// The color of the border background
     private int color = 0xd32f2f;
-    /**
-     * The opacity (transparency) of the border background
-     */
+    /// The opacity (transparency) of the border background
     private int opacity = 255;
-    /**
-     * The color of the edge of the border if applicable
-     */
+    /// The color of the edge of the border if applicable
     private int strokeColor;
-    /**
-     * The opacity of the edge of the border if applicable
-     */
+    /// The opacity of the edge of the border if applicable
     private int strokeOpacity = 255;
     private Stroke stroke;
-    /**
-     * The thickness of the edge of the border if applicable, 0 if no stroke is needed
-     */
+    /// The thickness of the edge of the border if applicable, 0 if no stroke is needed
     private float strokeThickness;
-    /**
-     * True if the thickness of the stroke is in millimeters
-     */
+    /// True if the thickness of the stroke is in millimeters
     private boolean strokeMM;
-    /**
-     * The spread of the shadow in pixels of millimeters
-     */
+    /// The spread of the shadow in pixels of millimeters
     private int shadowSpread;
-    /**
-     * The opacity of the shadow between 0 and 255
-     */
+    /// The opacity of the shadow between 0 and 255
     private int shadowOpacity = 0;
-    /**
-     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
-     */
+    /// X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
     private float shadowX = 0.5f;
-    /**
-     * Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
-     */
+    /// Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
     private float shadowY = 0.5f;
-    /**
-     * The Gaussian blur size
-     */
+    /// The Gaussian blur size
     private float shadowBlur = 10;
-    /**
-     * True if the shadow spread is in millimeters
-     */
+    /// True if the shadow spread is in millimeters
     private boolean shadowMM;
-    /**
-     * True if this border grows into a rectangle horizontally or keeps growing as a circle
-     */
+    /// True if this border grows into a rectangle horizontally or keeps growing as a circle
     private boolean rectangle;
-    /**
-     * Forces a special case of the rectangle mode that renders the right side as
-     * square. This is ignored when the rectangle mode is false
-     */
+    /// Forces a special case of the rectangle mode that renders the right side as
+    /// square. This is ignored when the rectangle mode is false
     private boolean onlyLeftRounded;
-    /**
-     * Forces a special case of the rectangle mode that renders the left side as
-     * square. This is ignored when the rectangle mode is false
-     */
+    /// Forces a special case of the rectangle mode that renders the left side as
+    /// square. This is ignored when the rectangle mode is false
     private boolean onlyRightRounded;
     private boolean uiid;
 
-    /**
-     * This is useful for showing an Uber like stroke effect progress bar
-     */
+    /// This is useful for showing an Uber like stroke effect progress bar
     private int strokeAngle = 360;
 
     private RoundBorder() {
@@ -127,108 +152,131 @@ public final class RoundBorder extends Border {
         instanceVal = instanceCounter;
     }
 
-    /**
-     * Creates a flat round border with no stroke and no shadow and the default color, this call can
-     * be chained with the other calls to mutate the color/opacity etc.
-     *
-     * @return a border instance
-     */
+    /// Creates a flat round border with no stroke and no shadow and the default color, this call can
+    /// be chained with the other calls to mutate the color/opacity etc.
+    ///
+    /// #### Returns
+    ///
+    /// a border instance
     public static RoundBorder create() {
         return new RoundBorder();
     }
 
-    /**
-     * <p>Uses the style of the components UIID to draw the background of the border, this effectively overrides all
-     * other style settings but allows the full power of UIID drawing including gradients, background images
-     * etc.</p>
-     * <p><strong>Notice: </strong>this flag will only work when shaped clipping is supported. That feature
-     * isn't available in all platforms...</p>
-     *
-     * @param uiid true to use the background of the component setting
-     * @return border instance so these calls can be chained
-     */
+    /// Uses the style of the components UIID to draw the background of the border, this effectively overrides all
+    /// other style settings but allows the full power of UIID drawing including gradients, background images
+    /// etc.
+    ///
+    /// **Notice: **this flag will only work when shaped clipping is supported. That feature
+    /// isn't available in all platforms...
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: true to use the background of the component setting
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder uiid(boolean uiid) {
         this.uiid = uiid;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * True is we use the background of the component setting to draw
-     *
-     * @return true if we draw based on the component UIID
-     */
+    /// True is we use the background of the component setting to draw
+    ///
+    /// #### Returns
+    ///
+    /// true if we draw based on the component UIID
     public boolean getUIID() {
         return uiid;
     }
 
-    /**
-     * Sets the background color of the circle/rectangle
-     *
-     * @param color the color
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the background color of the circle/rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: the color
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder color(int color) {
         this.color = color;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * Sets the background opacity of the circle/rectangle
-     *
-     * @param opacity the background opacity from 0-255 where 255 is completely opaque
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the background opacity of the circle/rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `opacity`: the background opacity from 0-255 where 255 is completely opaque
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder opacity(int opacity) {
         this.opacity = opacity;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * Sets the opacity of the stroke line around the circle/rectangle
-     *
-     * @param strokeOpacity the opacity from 0-255 where 255 is completely opaque
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the opacity of the stroke line around the circle/rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeOpacity`: the opacity from 0-255 where 255 is completely opaque
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder strokeOpacity(int strokeOpacity) {
         this.strokeOpacity = strokeOpacity;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * Sets the stroke color of the circle/rectangle
-     *
-     * @param strokeColor the color
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the stroke color of the circle/rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeColor`: the color
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder strokeColor(int strokeColor) {
         this.strokeColor = strokeColor;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * Sets the stroke of the circle/rectangle
-     *
-     * @param stroke the stroke object
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the stroke of the circle/rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `stroke`: the stroke object
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder stroke(Stroke stroke) {
         this.stroke = stroke;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * Sets the stroke of the circle/rectangle
-     *
-     * @param stroke the thickness of the stroke object
-     * @param mm     set to true to indicate the value is in millimeters, false indicates pixels
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the stroke of the circle/rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `stroke`: the thickness of the stroke object
+    ///
+    /// - `mm`: set to true to indicate the value is in millimeters, false indicates pixels
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder stroke(float stroke, boolean mm) {
         strokeThickness = stroke;
         if (strokeThickness == 0) {
@@ -242,25 +290,32 @@ public final class RoundBorder extends Border {
         return stroke(new Stroke(stroke, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1));
     }
 
-    /**
-     * Sets the stroke angle of the circle, this only applies to circular versions
-     *
-     * @param strokeAngle the stroke angle in degrees
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the stroke angle of the circle, this only applies to circular versions
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeAngle`: the stroke angle in degrees
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder strokeAngle(int strokeAngle) {
         this.strokeAngle = strokeAngle;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * Sets the spread in pixels of the shadow i.e how much bigger is it than the actual circle/rectangle
-     *
-     * @param shadowSpread the amount in pixels representing the size of the shadow
-     * @param mm           set to true to indicate the value is in millimeters, false indicates pixels
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the spread in pixels of the shadow i.e how much bigger is it than the actual circle/rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowSpread`: the amount in pixels representing the size of the shadow
+    ///
+    /// - `mm`: set to true to indicate the value is in millimeters, false indicates pixels
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder shadowSpread(int shadowSpread, boolean mm) {
         this.shadowMM = mm;
         this.shadowSpread = shadowSpread;
@@ -268,119 +323,149 @@ public final class RoundBorder extends Border {
         return this;
     }
 
-    /**
-     * Sets the spread in pixels of the shadow i.e how much bigger is it than the actual circle/rectangle
-     *
-     * @param shadowSpread the amount in pixels representing the size of the shadow
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the spread in pixels of the shadow i.e how much bigger is it than the actual circle/rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowSpread`: the amount in pixels representing the size of the shadow
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder shadowSpread(int shadowSpread) {
         this.shadowSpread = shadowSpread;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * Sets the opacity of the shadow from 0 - 255 where 0 means no shadow and 255 means opaque black shadow
-     *
-     * @param shadowOpacity the opacity of the shadow
-     * @return border instance so these calls can be chained
-     */
+    /// Sets the opacity of the shadow from 0 - 255 where 0 means no shadow and 255 means opaque black shadow
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowOpacity`: the opacity of the shadow
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder shadowOpacity(int shadowOpacity) {
         this.shadowOpacity = shadowOpacity;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * The position of the shadow on the X axis where 0.5f means the center and higher values draw it to the right side
-     *
-     * @param shadowX the position of the shadow between 0 - 1 where 0 equals left and 1 equals right
-     * @return border instance so these calls can be chained
-     */
+    /// The position of the shadow on the X axis where 0.5f means the center and higher values draw it to the right side
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowX`: the position of the shadow between 0 - 1 where 0 equals left and 1 equals right
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder shadowX(float shadowX) {
         this.shadowX = shadowX;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * The position of the shadow on the Y axis where 0.5f means the center and higher values draw it to the bottom
-     *
-     * @param shadowY the position of the shadow between 0 - 1 where 0 equals top and 1 equals bottom
-     * @return border instance so these calls can be chained
-     */
+    /// The position of the shadow on the Y axis where 0.5f means the center and higher values draw it to the bottom
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowY`: the position of the shadow between 0 - 1 where 0 equals top and 1 equals bottom
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder shadowY(float shadowY) {
         this.shadowY = shadowY;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * The blur on the shadow this is the standard Gaussian blur radius
-     *
-     * @param shadowBlur The blur on the shadow this is the standard Gaussian blur radius
-     * @return border instance so these calls can be chained
-     */
+    /// The blur on the shadow this is the standard Gaussian blur radius
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadowBlur`: The blur on the shadow this is the standard Gaussian blur radius
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder shadowBlur(float shadowBlur) {
         this.shadowBlur = shadowBlur;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * When set to true this border grows into a rectangle when the space isn't perfectly circular
-     *
-     * @param rectangle When set to true this border grows into a rectangle when the space isn't perfectly circular
-     * @return border instance so these calls can be chained
-     */
+    /// When set to true this border grows into a rectangle when the space isn't perfectly circular
+    ///
+    /// #### Parameters
+    ///
+    /// - `rectangle`: When set to true this border grows into a rectangle when the space isn't perfectly circular
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder rectangle(boolean rectangle) {
         this.rectangle = rectangle;
         modificationTime = System.currentTimeMillis();
         return this;
     }
 
-    /**
-     * Forces a special case of the rectangle mode that renders the right side as
-     * square. This is ignored when the rectangle mode is false
-     *
-     * @param onlyLeftRounded the new state of this mode
-     * @return border instance so these calls can be chained
-     */
+    /// Forces a special case of the rectangle mode that renders the right side as
+    /// square. This is ignored when the rectangle mode is false
+    ///
+    /// #### Parameters
+    ///
+    /// - `onlyLeftRounded`: the new state of this mode
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder onlyLeftRounded(boolean onlyLeftRounded) {
         this.onlyLeftRounded = onlyLeftRounded;
         return this;
     }
 
 
-    /**
-     * Checks if only left side is rounded.
-     *
-     * @return True if only left side is rounded.
-     * @since 7.0
-     */
+    /// Checks if only left side is rounded.
+    ///
+    /// #### Returns
+    ///
+    /// True if only left side is rounded.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public boolean isOnlyLeftRounded() {
         return onlyLeftRounded;
     }
 
-    /**
-     * Forces a special case of the rectangle mode that renders the left side as
-     * square. This is ignored when the rectangle mode is false
-     *
-     * @param onlyRightRounded the new state of this mode
-     * @return border instance so these calls can be chained
-     */
+    /// Forces a special case of the rectangle mode that renders the left side as
+    /// square. This is ignored when the rectangle mode is false
+    ///
+    /// #### Parameters
+    ///
+    /// - `onlyRightRounded`: the new state of this mode
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
     public RoundBorder onlyRightRounded(boolean onlyRightRounded) {
         this.onlyRightRounded = onlyRightRounded;
         return this;
     }
 
-    /**
-     * Checks if only right side is rounded.
-     *
-     * @return True if only right side is rounded.
-     * @since 7.0
-     */
+    /// Checks if only right side is rounded.
+    ///
+    /// #### Returns
+    ///
+    /// True if only right side is rounded.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public boolean isOnlyRightRounded() {
         return onlyRightRounded;
     }
@@ -595,119 +680,119 @@ public final class RoundBorder extends Border {
         return true;
     }
 
-    /**
-     * The color of the border background
-     *
-     * @return the color
-     */
+    /// The color of the border background
+    ///
+    /// #### Returns
+    ///
+    /// the color
     public int getColor() {
         return color;
     }
 
-    /**
-     * The opacity (transparency) of the border background
-     *
-     * @return the opacity
-     */
+    /// The opacity (transparency) of the border background
+    ///
+    /// #### Returns
+    ///
+    /// the opacity
     public int getOpacity() {
         return opacity;
     }
 
-    /**
-     * The color of the edge of the border if applicable
-     *
-     * @return the strokeColor
-     */
+    /// The color of the edge of the border if applicable
+    ///
+    /// #### Returns
+    ///
+    /// the strokeColor
     public int getStrokeColor() {
         return strokeColor;
     }
 
-    /**
-     * The opacity of the edge of the border if applicable
-     *
-     * @return the strokeOpacity
-     */
+    /// The opacity of the edge of the border if applicable
+    ///
+    /// #### Returns
+    ///
+    /// the strokeOpacity
     public int getStrokeOpacity() {
         return strokeOpacity;
     }
 
-    /**
-     * The thickness of the edge of the border if applicable, 0 if no stroke is needed
-     *
-     * @return the strokeThickness
-     */
+    /// The thickness of the edge of the border if applicable, 0 if no stroke is needed
+    ///
+    /// #### Returns
+    ///
+    /// the strokeThickness
     public float getStrokeThickness() {
         return strokeThickness;
     }
 
-    /**
-     * True if the thickness of the stroke is in millimeters
-     *
-     * @return the strokeMM
-     */
+    /// True if the thickness of the stroke is in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// the strokeMM
     public boolean isStrokeMM() {
         return strokeMM;
     }
 
-    /**
-     * The spread of the shadow in pixels of millimeters
-     *
-     * @return the shadowSpread
-     */
+    /// The spread of the shadow in pixels of millimeters
+    ///
+    /// #### Returns
+    ///
+    /// the shadowSpread
     public int getShadowSpread() {
         return shadowSpread;
     }
 
-    /**
-     * The opacity of the shadow between 0 and 255
-     *
-     * @return the shadowOpacity
-     */
+    /// The opacity of the shadow between 0 and 255
+    ///
+    /// #### Returns
+    ///
+    /// the shadowOpacity
     public int getShadowOpacity() {
         return shadowOpacity;
     }
 
-    /**
-     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
-     *
-     * @return the shadowX
-     */
+    /// X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
+    ///
+    /// #### Returns
+    ///
+    /// the shadowX
     public float getShadowX() {
         return shadowX;
     }
 
-    /**
-     * Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
-     *
-     * @return the shadowY
-     */
+    /// Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
+    ///
+    /// #### Returns
+    ///
+    /// the shadowY
     public float getShadowY() {
         return shadowY;
     }
 
-    /**
-     * The Gaussian blur size
-     *
-     * @return the shadowBlur
-     */
+    /// The Gaussian blur size
+    ///
+    /// #### Returns
+    ///
+    /// the shadowBlur
     public float getShadowBlur() {
         return shadowBlur;
     }
 
-    /**
-     * True if the shadow spread is in millimeters
-     *
-     * @return the shadowMM
-     */
+    /// True if the shadow spread is in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// the shadowMM
     public boolean isShadowMM() {
         return shadowMM;
     }
 
-    /**
-     * True if this border grows into a rectangle horizontally or keeps growing as a circle
-     *
-     * @return the rectangle
-     */
+    /// True if this border grows into a rectangle horizontally or keeps growing as a circle
+    ///
+    /// #### Returns
+    ///
+    /// the rectangle
     public boolean isRectangle() {
         return rectangle;
     }

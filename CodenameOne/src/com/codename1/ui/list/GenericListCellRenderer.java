@@ -47,43 +47,131 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * <p>The generic list cell renderer can display containers or arbitrary Codename One components
- * as items in a list, <b>notice</b> that
- * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
- * discourage usage of lists</a>.. It relies on the source data being a {@code Map} object. It extracts values from
- * the {@code Map} using the component name as an indication to the Map key lookup.<br>
- * This renderer supports label tickering, check boxes/radio buttons etc. seamlessly.</p>
- * <p>
- * Please notice that you must use at least two distinct instances of the component
- * when passing them to the constructor, reusing the same instance <b>WILL NOT WORK!</b><br>
- * Furthermore, the renderer instance cannot be reused for multiple lists, each list will need
- * a new instance of this renderer!</p>
- * <p>
- * Sample usage for this renderer follows:
- * </p>
- * <script src="https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-generic-list-cell-renderer.png" alt="Sample of using the generic list cell renderer" />
- *
- * <script src="https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js"></script>
- *
- * @author Shai Almog
- */
+/// The generic list cell renderer can display containers or arbitrary Codename One components
+/// as items in a list, **notice** that
+/// [we strongly discourage usage of lists](https://www.codenameone.com/blog/avoiding-lists.html).. It relies on the source data being a `Map` object. It extracts values from
+/// the `Map` using the component name as an indication to the Map key lookup.
+///
+/// This renderer supports label tickering, check boxes/radio buttons etc. seamlessly.
+///
+/// Please notice that you must use at least two distinct instances of the component
+/// when passing them to the constructor, reusing the same instance **WILL NOT WORK!**
+///
+/// Furthermore, the renderer instance cannot be reused for multiple lists, each list will need
+/// a new instance of this renderer!
+///
+/// Sample usage for this renderer follows:
+///
+/// ```java
+/// public void showForm() {
+///     com.codename1.ui.List list = new com.codename1.ui.List(createGenericListCellRendererModelData());
+///     list.setRenderer(new GenericListCellRenderer(createGenericRendererContainer(), createGenericRendererContainer()));
+///     Form hi = new Form("GenericListCellRenderer", new BorderLayout());
+///     hi.add(BorderLayout.CENTER, list);
+///     hi.show();
+/// }
+///
+/// private Container createGenericRendererContainer() {
+///     Label name = new Label();
+///     name.setFocusable(true);
+///     name.setName("Name");
+///     Label surname = new Label();
+///     surname.setFocusable(true);
+///     surname.setName("Surname");
+///     CheckBox selected = new CheckBox();
+///     selected.setName("Selected");
+///     selected.setFocusable(true);
+///     Container c = BorderLayout.center(name).
+///             add(BorderLayout.SOUTH, surname).
+///             add(BorderLayout.WEST, selected);
+///     c.setUIID("ListRenderer");
+///     return c;
+/// }
+///
+/// private Object[] createGenericListCellRendererModelData() {
+///     Map[] data = new HashMap[5];
+///     data[0] = new HashMap<>();
+///     data[0].put("Name", "Shai");
+///     data[0].put("Surname", "Almog");
+///     data[0].put("Selected", Boolean.TRUE);
+///     data[1] = new HashMap<>();
+///     data[1].put("Name", "Chen");
+///     data[1].put("Surname", "Fishbein");
+///     data[1].put("Selected", Boolean.TRUE);
+///     data[2] = new HashMap<>();
+///     data[2].put("Name", "Ofir");
+///     data[2].put("Surname", "Leitner");
+///     data[3] = new HashMap<>();
+///     data[3].put("Name", "Yaniv");
+///     data[3].put("Surname", "Vakarat");
+///     data[4] = new HashMap<>();
+///     data[4].put("Name", "Meirav");
+///     data[4].put("Surname", "Nachmanovitch");
+///     return data;
+/// }
+/// ```
+///
+/// ```java
+/// public void showForm() {
+///     com.codename1.ui.List list = new com.codename1.ui.List(createGenericListCellRendererModelData());
+///     list.setRenderer(new GenericListCellRenderer(createGenericRendererContainer(), createGenericRendererContainer()));
+///     Form hi = new Form("GenericListCellRenderer", new BorderLayout());
+///     hi.add(BorderLayout.CENTER, list);
+///     hi.show();
+/// }
+///
+/// private Container createGenericRendererContainer() {
+///     Label name = new Label();
+///     name.setFocusable(true);
+///     name.setName("Name");
+///     Label surname = new Label();
+///     surname.setFocusable(true);
+///     surname.setName("Surname");
+///     CheckBox selected = new CheckBox();
+///     selected.setName("Selected");
+///     selected.setFocusable(true);
+///     Container c = BorderLayout.center(name).
+///             add(BorderLayout.SOUTH, surname).
+///             add(BorderLayout.WEST, selected);
+///     c.setUIID("ListRenderer");
+///     return c;
+/// }
+///
+/// private Object[] createGenericListCellRendererModelData() {
+///     Map[] data = new HashMap[5];
+///     data[0] = new HashMap<>();
+///     data[0].put("Name", "Shai");
+///     data[0].put("Surname", "Almog");
+///     data[0].put("Selected", Boolean.TRUE);
+///     data[1] = new HashMap<>();
+///     data[1].put("Name", "Chen");
+///     data[1].put("Surname", "Fishbein");
+///     data[1].put("Selected", Boolean.TRUE);
+///     data[2] = new HashMap<>();
+///     data[2].put("Name", "Ofir");
+///     data[2].put("Surname", "Leitner");
+///     data[3] = new HashMap<>();
+///     data[3].put("Name", "Yaniv");
+///     data[3].put("Surname", "Vakarat");
+///     data[4] = new HashMap<>();
+///     data[4].put("Name", "Meirav");
+///     data[4].put("Surname", "Nachmanovitch");
+///     return data;
+/// }
+/// ```
+///
+/// @author Shai Almog
 public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRenderer<T> {
 
-    /**
-     * If this flag exists in a Map of data the renderer will enable/disable
-     * the entries, the flag assumes either Boolean.TRUE or Boolean.FALSE.
-     * Notice that just setting it to false when necessary will not work, when its
-     * used it must be applied to all entries otherwise the reuse of the renderer
-     * component will break this feature.
-     */
+    /// If this flag exists in a Map of data the renderer will enable/disable
+    /// the entries, the flag assumes either Boolean.TRUE or Boolean.FALSE.
+    /// Notice that just setting it to false when necessary will not work, when its
+    /// used it must be applied to all entries otherwise the reuse of the renderer
+    /// component will break this feature.
     public static final String ENABLED = "$$ENABLED$$";
-    /**
-     * Put this flag as a Map key to indicate that a checkbox entry rendered by
-     * this renderer should act as a "select all" entry and toggle all other entries.
-     * The value for this entry is ignored
-     */
+    /// Put this flag as a Map key to indicate that a checkbox entry rendered by
+    /// this renderer should act as a "select all" entry and toggle all other entries.
+    /// The value for this entry is ignored
     public static final String SELECT_ALL_FLAG = "$$SELECTALL$$";
     private static URLImage.ImageAdapter defaultAdapter = URLImage.RESIZE_SCALE;
     private final Label focusComponent = new Label();
@@ -106,12 +194,13 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     private boolean waitingForRegisterAnimation;
     private URLImage.ImageAdapter adapter = defaultAdapter;
 
-    /**
-     * Constructs a generic renderer with the given selected/unselected components
-     *
-     * @param selected   indicates the selected value for the renderer
-     * @param unselected indicates the unselected value for the renderer
-     */
+    /// Constructs a generic renderer with the given selected/unselected components
+    ///
+    /// #### Parameters
+    ///
+    /// - `selected`: indicates the selected value for the renderer
+    ///
+    /// - `unselected`: indicates the unselected value for the renderer
     public GenericListCellRenderer(Component selected, Component unselected) {
         if (selected == unselected) { //NOPMD CompareObjectsWithEquals
             throw new IllegalArgumentException("Must use distinct instances for renderer!");
@@ -128,15 +217,18 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         addSelectedEntriesListener(unselectedEntries);
     }
 
-    /**
-     * Constructs a generic renderer with the given selected/unselected components for
-     * odd/even values allowing a "pinstripe" effect
-     *
-     * @param odd            indicates the selected value for the renderer
-     * @param oddUnselected  indicates the unselected value for the renderer
-     * @param even           indicates the selected value for the renderer
-     * @param evenUnselected indicates the unselected value for the renderer
-     */
+    /// Constructs a generic renderer with the given selected/unselected components for
+    /// odd/even values allowing a "pinstripe" effect
+    ///
+    /// #### Parameters
+    ///
+    /// - `odd`: indicates the selected value for the renderer
+    ///
+    /// - `oddUnselected`: indicates the unselected value for the renderer
+    ///
+    /// - `even`: indicates the selected value for the renderer
+    ///
+    /// - `evenUnselected`: indicates the unselected value for the renderer
     public GenericListCellRenderer(Component odd, Component oddUnselected, Component even, Component evenUnselected) {
         this(odd, oddUnselected);
         selectedEven = even;
@@ -147,20 +239,20 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         addSelectedEntriesListener(unselectedEntriesEven);
     }
 
-    /**
-     * The default adapter to use for image URLs
-     *
-     * @return the defaultAdapter
-     */
+    /// The default adapter to use for image URLs
+    ///
+    /// #### Returns
+    ///
+    /// the defaultAdapter
     public static URLImage.ImageAdapter getDefaultAdapter() {
         return defaultAdapter;
     }
 
-    /**
-     * The default adapter to use for image URLs
-     *
-     * @param aDefaultAdapter the defaultAdapter to set
-     */
+    /// The default adapter to use for image URLs
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultAdapter`: the defaultAdapter to set
     public static void setDefaultAdapter(URLImage.ImageAdapter aDefaultAdapter) {
         defaultAdapter = aDefaultAdapter;
     }
@@ -171,10 +263,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         l.removeActionListener(mon);
     }
 
-    /**
-     * Updates the placeholder instances, this is useful for changing the URLImage placeholder in runtime as
-     * might happen in the designer
-     */
+    /// Updates the placeholder instances, this is useful for changing the URLImage placeholder in runtime as
+    /// might happen in the designer
     public void updateIconPlaceholders() {
         updateIconPlaceholders(selectedEntries);
         updateIconPlaceholders(unselectedEntries);
@@ -227,15 +317,15 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         }
     }
 
-    /**
-     * Allows partitioning the renderer into "areas" that can be clicked. When
-     * receiving an action event in the list this method allows a developer to
-     * query the renderer to "see" whether a button within the component was "touched"
-     * by the user on a touch screen device.
-     * This method will reset the value to null after returning a none-null value!
-     *
-     * @return a button or null
-     */
+    /// Allows partitioning the renderer into "areas" that can be clicked. When
+    /// receiving an action event in the list this method allows a developer to
+    /// query the renderer to "see" whether a button within the component was "touched"
+    /// by the user on a touch screen device.
+    /// This method will reset the value to null after returning a none-null value!
+    ///
+    /// #### Returns
+    ///
+    /// a button or null
     public Button extractLastClickedComponent() {
         Button c = lastClickedComponent;
         lastClickedComponent = null;
@@ -276,9 +366,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
         Component cmp;
@@ -395,9 +483,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
         return getCellRendererComponent(list, list.getModel(), value, index, isSelected);
@@ -438,12 +524,13 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         }
     }
 
-    /**
-     * Initializes the given component with the given value
-     *
-     * @param cmp   one of the components that is or is a part of the renderer
-     * @param value the value to install into the component
-     */
+    /// Initializes the given component with the given value
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: one of the components that is or is a part of the renderer
+    ///
+    /// - `value`: the value to install into the component
     private void setComponentValue(Component cmp, Object value, Component parent, Component rootRenderer) {
         // fixed components shouldn't be modified by the renderer, this allows for
         // hardcoded properties in the renderer. We still want them to go through the
@@ -535,32 +622,28 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getListFocusComponent(List list) {
         return focusComponent;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getFocusComponent(Component list) {
         return focusComponent;
     }
 
-    /**
-     * @return the selectionListener
-     */
+    /// #### Returns
+    ///
+    /// the selectionListener
     public boolean isSelectionListener() {
         return selectionListener;
     }
 
-    /**
-     * @param selectionListener the selectionListener to set
-     */
+    /// #### Parameters
+    ///
+    /// - `selectionListener`: the selectionListener to set
     public void setSelectionListener(boolean selectionListener) {
         if (parentList != null) {
             if (parentList instanceof List) {
@@ -570,66 +653,66 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         this.selectionListener = selectionListener;
     }
 
-    /**
-     * @return the selected
-     */
+    /// #### Returns
+    ///
+    /// the selected
     public Component getSelected() {
         return selected;
     }
 
-    /**
-     * @return the unselected
-     */
+    /// #### Returns
+    ///
+    /// the unselected
     public Component getUnselected() {
         return unselected;
     }
 
-    /**
-     * @return the selectedEven
-     */
+    /// #### Returns
+    ///
+    /// the selectedEven
     public Component getSelectedEven() {
         return selectedEven;
     }
 
-    /**
-     * @return the unselectedEven
-     */
+    /// #### Returns
+    ///
+    /// the unselectedEven
     public Component getUnselectedEven() {
         return unselectedEven;
     }
 
-    /**
-     * In fisheye rendering mode the renderer maintains selected component drawing
-     *
-     * @return the fisheye
-     */
+    /// In fisheye rendering mode the renderer maintains selected component drawing
+    ///
+    /// #### Returns
+    ///
+    /// the fisheye
     public boolean isFisheye() {
         return fisheye;
     }
 
-    /**
-     * In fisheye rendering mode the renderer maintains selected component drawing
-     *
-     * @param fisheye the fisheye to set
-     */
+    /// In fisheye rendering mode the renderer maintains selected component drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `fisheye`: the fisheye to set
     public void setFisheye(boolean fisheye) {
         this.fisheye = fisheye;
     }
 
-    /**
-     * The adapter used when dealing with image URL's
-     *
-     * @return the adapter
-     */
+    /// The adapter used when dealing with image URL's
+    ///
+    /// #### Returns
+    ///
+    /// the adapter
     public URLImage.ImageAdapter getAdapter() {
         return adapter;
     }
 
-    /**
-     * The adapter used when dealing with image URL's
-     *
-     * @param adapter the adapter to set
-     */
+    /// The adapter used when dealing with image URL's
+    ///
+    /// #### Parameters
+    ///
+    /// - `adapter`: the adapter to set
     public void setAdapter(URLImage.ImageAdapter adapter) {
         this.adapter = adapter;
     }
@@ -639,9 +722,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         private boolean selectAllChecked;
         private int selectAllOffset;
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public boolean animate() {
             boolean hasAnimations = false;
@@ -704,16 +785,12 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
             return false;
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public void paint(Graphics g) {
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public void actionPerformed(ActionEvent evt) {
             if (evt.getComponent() instanceof Button) {

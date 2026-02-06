@@ -23,76 +23,61 @@
  */
 package com.codename1.xml;
 
-/**
- * A callback used to dispatch errors encountered while parsing XML resources
- *
- * @author Ofir Leitner
- */
+/// A callback used to dispatch errors encountered while parsing XML resources
+///
+/// @author Ofir Leitner
 public interface ParserCallback {
 
-    /**
-     * Error code denoting that an unsupported tag was found in the XML
-     */
+    /// Error code denoting that an unsupported tag was found in the XML
     int ERROR_TAG_NOT_SUPPORTED = 0;
 
-    /**
-     * Error code denoting that an unsupported attribute was found in the XML
-     */
+    /// Error code denoting that an unsupported attribute was found in the XML
     int ERROR_ATTRIBUTE_NOT_SUPPORTED = 1;
 
-    /**
-     * Error code denoting that an  invalid attribute value was found in the XML
-     */
+    /// Error code denoting that an  invalid attribute value was found in the XML
     int ERROR_ATTIBUTE_VALUE_INVALID = 2;
 
-    /**
-     * Error code denoting that a tag was not closed properly in the XML
-     */
+    /// Error code denoting that a tag was not closed properly in the XML
     int ERROR_NO_CLOSE_TAG = 3;
 
-    /**
-     * Error code denoting that an  invalid character entity was found
-     * A character entity is XML codes that start with an ampersand and end with semicolon and denote special/reserved chars
-     */
+    /// Error code denoting that an  invalid character entity was found
+    /// A character entity is XML codes that start with an ampersand and end with semicolon and denote special/reserved chars
     int ERROR_UNRECOGNIZED_CHAR_ENTITY = 4;
 
-    /**
-     * Error code denoting that a tag was not closed  prematurely
-     */
+    /// Error code denoting that a tag was not closed  prematurely
     int ERROR_UNEXPECTED_TAG_CLOSING = 5;
 
-    /**
-     * Error code denoting that the parser bumped into an unexpected character
-     */
+    /// Error code denoting that the parser bumped into an unexpected character
     int ERROR_UNEXPECTED_CHARACTER = 6;
 
-    /**
-     * Error code denoting that the document had more than one root element
-     */
+    /// Error code denoting that the document had more than one root element
     int ERROR_MULTIPLE_ROOTS = 7;
 
-    /**
-     * Error code denoting that the document had no root element at all (empty document or seriously malformed XML)
-     */
+    /// Error code denoting that the document had no root element at all (empty document or seriously malformed XML)
     int ERROR_NO_ROOTS = 8;
 
-    /**
-     * Error code denoting that the encoding the page needed according to its charset (usually specified in the content-type response header) is unsupported in the device
-     */
+    /// Error code denoting that the encoding the page needed according to its charset (usually specified in the content-type response header) is unsupported in the device
     int ERROR_ENCODING = 9;
 
-    /**
-     * Called when encountering an error while parsing the XML document.
-     * When implementing this, the developer should return true if the error should be ignored and the document needs to be further parsed, or false to stop parsing and issue an error to the user
-     * Note that this method is always called NOT on the EDT thread.
-     *
-     * @param errorId     The error ID, one of the ERROR_* constants
-     * @param tag         The tag in which the error occured (Can be null for non-tag related errors)
-     * @param attribute   The attribute in which the error occured (Can be null for non-attribute related errors)
-     * @param value       The value in which the error occured (Can be null for non-value related errors)
-     * @param description A verbal description of the error
-     * @return true to continue parsing, false to stop
-     */
+    /// Called when encountering an error while parsing the XML document.
+    /// When implementing this, the developer should return true if the error should be ignored and the document needs to be further parsed, or false to stop parsing and issue an error to the user
+    /// Note that this method is always called NOT on the EDT thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorId`: The error ID, one of the ERROR_* constants
+    ///
+    /// - `tag`: The tag in which the error occured (Can be null for non-tag related errors)
+    ///
+    /// - `attribute`: The attribute in which the error occured (Can be null for non-attribute related errors)
+    ///
+    /// - `value`: The value in which the error occured (Can be null for non-value related errors)
+    ///
+    /// - `description`: A verbal description of the error
+    ///
+    /// #### Returns
+    ///
+    /// true to continue parsing, false to stop
     boolean parsingError(int errorId, String tag, String attribute, String value, String description);
 
 

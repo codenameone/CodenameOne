@@ -41,18 +41,25 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
-/**
- * <p>Unlike a regular dialog the interaction dialog only looks like a dialog,
- * it resides in the layered pane and can be used to implement features where
- * interaction with the background form is still required.<br>
- * Since this code is designed for interaction all "dialogs" created thru here are
- * modless and never block.</p>
- *
- * <script src="https://gist.github.com/codenameone/d1db2033981c835fb925.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-interaction-dialog.png" alt="InteractionDialog Sample" />
- *
- * @author Shai Almog
- */
+/// Unlike a regular dialog the interaction dialog only looks like a dialog,
+/// it resides in the layered pane and can be used to implement features where
+/// interaction with the background form is still required.
+///
+/// Since this code is designed for interaction all "dialogs" created thru here are
+/// modless and never block.
+///
+/// ```java
+/// InteractionDialog dlg = new InteractionDialog("Hello");
+/// dlg.setLayout(new BorderLayout());
+/// dlg.add(BorderLayout.CENTER, new Label("Hello Dialog"));
+/// Button close = new Button("Close");
+/// close.addActionListener((ee) -> dlg.dispose());
+/// dlg.addComponent(BorderLayout.SOUTH, close);
+/// Dimension pre = dlg.getContentPane().getPreferredSize();
+/// dlg.show(0, 0, Display.getInstance().getDisplayWidth() - (pre.getWidth() + pre.getWidth() / 6), 0);
+/// ```
+///
+/// @author Shai Almog
 public class InteractionDialog extends Container {
     private final Label title = new Label();
     private final Container titleArea = new Container(new BorderLayout());
@@ -62,39 +69,35 @@ public class InteractionDialog extends Container {
     private boolean disposed;
     private boolean disposeWhenPointerOutOfBounds;
 
-    /**
-     * Whether the interaction dialog uses the form layered pane of the regular layered pane
-     */
+    /// Whether the interaction dialog uses the form layered pane of the regular layered pane
     private boolean formMode;
     private boolean pressedOutOfBounds;
     private ActionListener pressedListener;
     private ActionListener releasedListener;
 
-    /**
-     * Default constructor with no title
-     */
+    /// Default constructor with no title
     public InteractionDialog() {
         super(new BorderLayout());
         contentPane = new Container();
         init();
     }
 
-    /**
-     * Default constructor with layout
-     *
-     * @param l layout
-     */
+    /// Default constructor with layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: layout
     public InteractionDialog(Layout l) {
         super(new BorderLayout());
         contentPane = new Container(l);
         init();
     }
 
-    /**
-     * Constructor with dialog title
-     *
-     * @param title the title of the dialog
-     */
+    /// Constructor with dialog title
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title of the dialog
     public InteractionDialog(String title) {
         super(new BorderLayout());
         contentPane = new Container();
@@ -103,12 +106,13 @@ public class InteractionDialog extends Container {
     }
 
 
-    /**
-     * Constructor with dialog title
-     *
-     * @param title the title of the dialog
-     * @param l     the layout for the content pane
-     */
+    /// Constructor with dialog title
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title of the dialog
+    ///
+    /// - `l`: the layout for the content pane
     public InteractionDialog(String title, Layout l) {
         super(new BorderLayout());
         contentPane = new Container(l);
@@ -132,124 +136,100 @@ public class InteractionDialog extends Container {
         installPointerOutOfBoundsListeners();
     }
 
-    /**
-     * This flag indicates if the dialog should be disposed if a pointer
-     * released event occurred out of the dialog content.
-     *
-     * @return true if the dialog should dispose
-     */
+    /// This flag indicates if the dialog should be disposed if a pointer
+    /// released event occurred out of the dialog content.
+    ///
+    /// #### Returns
+    ///
+    /// true if the dialog should dispose
     public boolean isDisposeWhenPointerOutOfBounds() {
         return disposeWhenPointerOutOfBounds;
     }
 
-    /**
-     * This flag indicates if the dialog should be disposed if a pointer
-     * released event occurred out of the dialog content.
-     *
-     * @param disposeWhenPointerOutOfBounds
-     */
+    /// This flag indicates if the dialog should be disposed if a pointer
+    /// released event occurred out of the dialog content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `disposeWhenPointerOutOfBounds`
     public void setDisposeWhenPointerOutOfBounds(boolean disposeWhenPointerOutOfBounds) {
         this.disposeWhenPointerOutOfBounds = disposeWhenPointerOutOfBounds;
     }
 
-    /**
-     * Returns the body of the interaction dialog
-     *
-     * @return the container where the elements of the interaction dialog are added.
-     */
+    /// Returns the body of the interaction dialog
+    ///
+    /// #### Returns
+    ///
+    /// the container where the elements of the interaction dialog are added.
     public Container getContentPane() {
         return contentPane;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Layout getLayout() {
         return contentPane.getLayout();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setLayout(Layout layout) {
         contentPane.setLayout(layout);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public String getTitle() {
         return title.getText();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public void setTitle(String title) {
         this.title.setText(title);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addComponent(Component cmp) {
         contentPane.addComponent(cmp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addComponent(Object constraints, Component cmp) {
         contentPane.addComponent(constraints, cmp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addComponent(int index, Object constraints, Component cmp) {
         contentPane.addComponent(index, constraints, cmp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addComponent(int index, Component cmp) {
         contentPane.addComponent(index, cmp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeAll() {
         contentPane.removeAll();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeComponent(Component cmp) {
         contentPane.removeComponent(cmp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public Label getTitleComponent() {
         return title;
     }
@@ -277,9 +257,7 @@ public class InteractionDialog extends Container {
         return c;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         super.deinitialize();
@@ -328,20 +306,24 @@ public class InteractionDialog extends Container {
         }
     }
 
-    /**
-     * This method shows the form as a modal alert allowing us to produce a behavior
-     * of an alert/dialog box. This method will block the calling thread even if the
-     * calling thread is the EDT. Notice that this method will not release the block
-     * until dispose is called even if show() from another form is called!
-     * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
-     * dialogs where you would want the underlying form to "peek" from behind the
-     * form.
-     *
-     * @param top    space in pixels between the top of the screen and the form
-     * @param bottom space in pixels between the bottom of the screen and the form
-     * @param left   space in pixels between the left of the screen and the form
-     * @param right  space in pixels between the right of the screen and the form
-     */
+    /// This method shows the form as a modal alert allowing us to produce a behavior
+    /// of an alert/dialog box. This method will block the calling thread even if the
+    /// calling thread is the EDT. Notice that this method will not release the block
+    /// until dispose is called even if show() from another form is called!
+    ///
+    /// Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
+    /// dialogs where you would want the underlying form to "peek" from behind the
+    /// form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: space in pixels between the top of the screen and the form
+    ///
+    /// - `bottom`: space in pixels between the bottom of the screen and the form
+    ///
+    /// - `left`: space in pixels between the left of the screen and the form
+    ///
+    /// - `right`: space in pixels between the right of the screen and the form
     public void show(int top, int bottom, int left, int right) {
         getUnselectedStyle().setOpacity(255);
         disposed = false;
@@ -407,9 +389,7 @@ public class InteractionDialog extends Container {
         */
     }
 
-    /**
-     * Removes the interaction dialog from view
-     */
+    /// Removes the interaction dialog from view
     public void dispose() {
         disposed = true;
         Container p = getParent();
@@ -441,39 +421,31 @@ public class InteractionDialog extends Container {
         }
     }
 
-    /**
-     * Removes the interaction dialog from view with an animation to the left
-     */
+    /// Removes the interaction dialog from view with an animation to the left
     public void disposeToTheLeft() {
         disposeTo(Component.LEFT);
     }
 
-    /**
-     * Removes the interaction dialog from view with an animation to the bottom
-     */
+    /// Removes the interaction dialog from view with an animation to the bottom
     public void disposeToTheBottom() {
         disposeTo(Component.BOTTOM);
     }
 
-    /**
-     * Removes the interaction dialog from view with an animation to the bottom
-     *
-     * @param onFinish Callback called when dispose animation is complete.
-     */
+    /// Removes the interaction dialog from view with an animation to the bottom
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: Callback called when dispose animation is complete.
     public void disposeToTheBottom(Runnable onFinish) {
         disposeTo(Component.BOTTOM, onFinish);
     }
 
-    /**
-     * Removes the interaction dialog from view with an animation to the top
-     */
+    /// Removes the interaction dialog from view with an animation to the top
     public void disposeToTheTop() {
         disposeTo(Component.TOP);
     }
 
-    /**
-     * Removes the interaction dialog from view with an animation to the right
-     */
+    /// Removes the interaction dialog from view with an animation to the right
     public void disposeToTheRight() {
         disposeTo(Component.RIGHT);
     }
@@ -542,29 +514,29 @@ public class InteractionDialog extends Container {
         }
     }
 
-    /**
-     * Will return true if the dialog is currently showing
-     *
-     * @return true if showing
-     */
+    /// Will return true if the dialog is currently showing
+    ///
+    /// #### Returns
+    ///
+    /// true if showing
     public boolean isShowing() {
         return getParent() != null;
     }
 
-    /**
-     * Indicates whether show/dispose should be animated or not
-     *
-     * @return the animateShow
-     */
+    /// Indicates whether show/dispose should be animated or not
+    ///
+    /// #### Returns
+    ///
+    /// the animateShow
     public boolean isAnimateShow() {
         return animateShow;
     }
 
-    /**
-     * Indicates whether show/dispose should be animated or not
-     *
-     * @param animateShow the animateShow to set
-     */
+    /// Indicates whether show/dispose should be animated or not
+    ///
+    /// #### Parameters
+    ///
+    /// - `animateShow`: the animateShow to set
     public void setAnimateShow(boolean animateShow) {
         this.animateShow = animateShow;
     }
@@ -620,26 +592,27 @@ public class InteractionDialog extends Container {
         }
     }
 
-    /**
-     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
-     * when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
-     * dialog has the {@literal PopupDialog} style by default.
-     *
-     * @param c the context component which is used to position the dialog and can also be pointed at
-     */
+    /// A popup dialog is shown with the context of a component and  its selection. You should use `#setDisposeWhenPointerOutOfBounds(boolean)` to make it dispose
+    /// when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
+    /// dialog has the PopupDialog style by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the context component which is used to position the dialog and can also be pointed at
     public void showPopupDialog(Component c) {
         showPopupDialog(c, Display.getInstance().isPortrait());
     }
 
-    /**
-     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
-     * when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
-     * dialog has the {@literal PopupDialog} style by default.
-     *
-     * @param c    the context component which is used to position the dialog and can also be pointed at
-     * @param bias biases the dialog to appear above/below or to the sides.
-     *             This is ignored if there isn't enough space
-     */
+    /// A popup dialog is shown with the context of a component and  its selection. You should use `#setDisposeWhenPointerOutOfBounds(boolean)` to make it dispose
+    /// when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
+    /// dialog has the PopupDialog style by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the context component which is used to position the dialog and can also be pointed at
+    ///
+    /// - `bias`: @param bias biases the dialog to appear above/below or to the sides.
+    ///             This is ignored if there isn't enough space
     public void showPopupDialog(Component c, boolean bias) {
         if (c == null) {
             throw new IllegalArgumentException("Component cannot be null");
@@ -657,26 +630,27 @@ public class InteractionDialog extends Container {
         showPopupDialog(componentPos, bias);
     }
 
-    /**
-     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
-     * when the user clicks outside the bounds of the popup.  It can optionally provide an arrow in the theme to point at the context component. The popup
-     * dialog has the {@literal PopupDialog} style by default.
-     *
-     * @param rect the screen rectangle to which the popup should point
-     */
+    /// A popup dialog is shown with the context of a component and  its selection. You should use `#setDisposeWhenPointerOutOfBounds(boolean)` to make it dispose
+    /// when the user clicks outside the bounds of the popup.  It can optionally provide an arrow in the theme to point at the context component. The popup
+    /// dialog has the PopupDialog style by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the screen rectangle to which the popup should point
     public void showPopupDialog(Rectangle rect) {
         showPopupDialog(rect, Display.getInstance().isPortrait());
     }
 
-    /**
-     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
-     * when the user clicks outside the bounds of the popup.  It can optionally provide an arrow in the theme to point at the context component. The popup
-     * dialog has the {@literal PopupDialog} style by default.
-     *
-     * @param rect the screen rectangle to which the popup should point
-     * @param bias biases the dialog to appear above/below or to the sides.
-     *             This is ignored if there isn't enough space
-     */
+    /// A popup dialog is shown with the context of a component and  its selection. You should use `#setDisposeWhenPointerOutOfBounds(boolean)` to make it dispose
+    /// when the user clicks outside the bounds of the popup.  It can optionally provide an arrow in the theme to point at the context component. The popup
+    /// dialog has the PopupDialog style by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the screen rectangle to which the popup should point
+    ///
+    /// - `bias`: @param bias biases the dialog to appear above/below or to the sides.
+    ///             This is ignored if there isn't enough space
     public void showPopupDialog(Rectangle rect, boolean bias) {
         if (rect == null) {
             throw new IllegalArgumentException("rect cannot be null");
@@ -870,65 +844,65 @@ public class InteractionDialog extends Container {
                 orientation) + padding);
     }
 
-    /**
-     * Returns the uiid of the dialog
-     *
-     * @return the uiid of the dialog
-     */
+    /// Returns the uiid of the dialog
+    ///
+    /// #### Returns
+    ///
+    /// the uiid of the dialog
     public String getDialogUIID() {
         return getContentPane().getUIID();
     }
 
-    /**
-     * Simple setter to set the Dialog uiid
-     *
-     * @param uiid the id for the dialog
-     */
+    /// Simple setter to set the Dialog uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the id for the dialog
     public void setDialogUIID(String uiid) {
         getContentPane().setUIID(uiid);
     }
 
-    /**
-     * Simple getter to get the Dialog Style
-     *
-     * @return the style of the dialog
-     */
+    /// Simple getter to get the Dialog Style
+    ///
+    /// #### Returns
+    ///
+    /// the style of the dialog
     public Style getDialogStyle() {
         return getContentPane().getStyle();
     }
 
-    /**
-     * Repositions the component so the animation will "grow/shrink" when showing/disposing
-     *
-     * @return the repositionAnimation
-     */
+    /// Repositions the component so the animation will "grow/shrink" when showing/disposing
+    ///
+    /// #### Returns
+    ///
+    /// the repositionAnimation
     public boolean isRepositionAnimation() {
         return repositionAnimation;
     }
 
-    /**
-     * Repositions the component so the animation will "grow/shrink" when showing/disposing
-     *
-     * @param repositionAnimation the repositionAnimation to set
-     */
+    /// Repositions the component so the animation will "grow/shrink" when showing/disposing
+    ///
+    /// #### Parameters
+    ///
+    /// - `repositionAnimation`: the repositionAnimation to set
     public void setRepositionAnimation(boolean repositionAnimation) {
         this.repositionAnimation = repositionAnimation;
     }
 
-    /**
-     * Whether the interaction dialog uses the form layered pane of the regular layered pane
-     *
-     * @return the formMode
-     */
+    /// Whether the interaction dialog uses the form layered pane of the regular layered pane
+    ///
+    /// #### Returns
+    ///
+    /// the formMode
     public boolean isFormMode() {
         return formMode;
     }
 
-    /**
-     * Whether the interaction dialog uses the form layered pane of the regular layered pane
-     *
-     * @param formMode the formMode to set
-     */
+    /// Whether the interaction dialog uses the form layered pane of the regular layered pane
+    ///
+    /// #### Parameters
+    ///
+    /// - `formMode`: the formMode to set
     public void setFormMode(boolean formMode) {
         this.formMode = formMode;
     }

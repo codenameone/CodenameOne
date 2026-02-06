@@ -22,66 +22,55 @@
  */
 package com.codename1.ui.geom;
 
-/**
- * Utility class that holds x,y
- *
- * @author Chen Fishbein
- */
+/// Utility class that holds x,y
+///
+/// @author Chen Fishbein
 public class Point2D {
 
     private double x;
     private double y;
 
-    /**
-     * Constructor with x and y
-     *
-     * @param x
-     * @param y
-     */
+    /// Constructor with x and y
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
+    ///
+    /// - `y`
     public Point2D(double x, double y) {
         this.x = x;
         this.y = y;
     }
 
-    /**
-     * Gets the x value of this Point
-     *
-     * @return
-     */
+    /// Gets the x value of this Point
     public double getX() {
         return x;
     }
 
-    /**
-     * Sets the x value of this Point
-     *
-     * @param x
-     */
+    /// Sets the x value of this Point
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
     public void setX(double x) {
         this.x = x;
     }
 
-    /**
-     * Gets the y value of this Point
-     *
-     * @return
-     */
+    /// Gets the y value of this Point
     public double getY() {
         return y;
     }
 
-    /**
-     * Sets the y value of this Point
-     *
-     * @param y
-     */
+    /// Sets the y value of this Point
+    ///
+    /// #### Parameters
+    ///
+    /// - `y`
     public void setY(double y) {
         this.y = y;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return x + ", " + y;

@@ -17,30 +17,29 @@
 
 package com.codename1.util;
 
-/**
- * The library implements some logical operations over {@code BigInteger}. The
- * operations provided are listed below.
- * <ul type="circle">
- * <li>not</li>
- * <li>and</li>
- * <li>andNot</li>
- * <li>or</li>
- * <li>xor</li>
- * </ul>
- */
+/// The library implements some logical operations over `BigInteger`. The
+/// operations provided are listed below.
+///
+/// - not
+///
+/// - and
+///
+/// - andNot
+///
+/// - or
+///
+/// - xor
 final class TLogical {
 
-    /**
-     * Just to denote that this class can't be instantiated.
-     */
+    /// Just to denote that this class can't be instantiated.
 
     private TLogical() {
     }
 
 
-    /**
-     * @see TBigInteger#not()
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#not()
     static TBigInteger not(TBigInteger val) {
         if (val.sign == 0) {
             return TBigInteger.MINUS_ONE;
@@ -82,9 +81,9 @@ final class TLogical {
         return new TBigInteger(-val.sign, i, resDigits);
     }
 
-    /**
-     * @see TBigInteger#and(TBigInteger)
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#and(TBigInteger)
     static TBigInteger and(TBigInteger val, TBigInteger that) {
         if (that.sign == 0 || val.sign == 0) {
             return TBigInteger.ZERO;
@@ -113,9 +112,9 @@ final class TLogical {
         }
     }
 
-    /**
-     * @return sign = 1, magnitude = val.magnitude & that.magnitude
-     */
+    /// #### Returns
+    ///
+    /// sign = 1, magnitude = val.magnitude & that.magnitude
     static TBigInteger andPositive(TBigInteger val, TBigInteger that) {
         // PRE: both arguments are positive
         int resLength = Math.min(val.numberLength, that.numberLength);
@@ -135,9 +134,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @return sign = positive.magnitude & magnitude = -negative.magnitude
-     */
+    /// #### Returns
+    ///
+    /// sign = positive.magnitude & magnitude = -negative.magnitude
     static TBigInteger andDiffSigns(TBigInteger positive, TBigInteger negative) {
         // PRE: positive is positive and negative is negative
         int iPos = positive.getFirstNonzeroDigit();
@@ -174,9 +173,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @return sign = -1, magnitude = -(-longer.magnitude & -shorter.magnitude)
-     */
+    /// #### Returns
+    ///
+    /// sign = -1, magnitude = -(-longer.magnitude & -shorter.magnitude)
     static TBigInteger andNegative(TBigInteger longer, TBigInteger shorter) {
         // PRE: longer and shorter are negative
         // PRE: longer has at least as many digits as shorter
@@ -230,9 +229,9 @@ final class TLogical {
         return new TBigInteger(-1, resLength, resDigits);
     }
 
-    /**
-     * @see TBigInteger#andNot(TBigInteger)
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#andNot(TBigInteger)
     static TBigInteger andNot(TBigInteger val, TBigInteger that) {
         if (that.sign == 0) {
             return val;
@@ -264,9 +263,9 @@ final class TLogical {
         }
     }
 
-    /**
-     * @return sign = 1, magnitude = val.magnitude & ~that.magnitude
-     */
+    /// #### Returns
+    ///
+    /// sign = 1, magnitude = val.magnitude & ~that.magnitude
     static TBigInteger andNotPositive(TBigInteger val, TBigInteger that) {
         // PRE: both arguments are positive
         int[] resDigits = new int[val.numberLength];
@@ -285,9 +284,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @return sign = 1, magnitude = positive.magnitude & ~(-negative.magnitude)
-     */
+    /// #### Returns
+    ///
+    /// sign = 1, magnitude = positive.magnitude & ~(-negative.magnitude)
     static TBigInteger andNotPositiveNegative(TBigInteger positive, TBigInteger negative) {
         // PRE: positive > 0 && negative < 0
         int iNeg = negative.getFirstNonzeroDigit();
@@ -320,9 +319,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @return sign = -1, magnitude = -(-negative.magnitude & ~positive.magnitude)
-     */
+    /// #### Returns
+    ///
+    /// sign = -1, magnitude = -(-negative.magnitude & ~positive.magnitude)
     static TBigInteger andNotNegativePositive(TBigInteger negative, TBigInteger positive) {
         // PRE: negative < 0 && positive > 0
         int resLength;
@@ -395,9 +394,9 @@ final class TLogical {
         return new TBigInteger(-1, resLength, resDigits);
     }
 
-    /**
-     * @return sign = 1, magnitude = -val.magnitude & ~(-that.magnitude)
-     */
+    /// #### Returns
+    ///
+    /// sign = 1, magnitude = -val.magnitude & ~(-that.magnitude)
     static TBigInteger andNotNegative(TBigInteger val, TBigInteger that) {
         // PRE: val < 0 && that < 0
         int iVal = val.getFirstNonzeroDigit();
@@ -453,9 +452,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @see TBigInteger#or(TBigInteger)
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#or(TBigInteger)
     static TBigInteger or(TBigInteger val, TBigInteger that) {
         if (that.equals(TBigInteger.MINUS_ONE) || val.equals(TBigInteger.MINUS_ONE)) {
             return TBigInteger.MINUS_ONE;
@@ -488,9 +487,9 @@ final class TLogical {
         }
     }
 
-    /**
-     * @return sign = 1, magnitude = longer.magnitude | shorter.magnitude
-     */
+    /// #### Returns
+    ///
+    /// sign = 1, magnitude = longer.magnitude | shorter.magnitude
     static TBigInteger orPositive(TBigInteger longer, TBigInteger shorter) {
         // PRE: longer and shorter are positive;
         // PRE: longer has at least as many digits as shorter
@@ -508,9 +507,9 @@ final class TLogical {
         return new TBigInteger(1, resLength, resDigits);
     }
 
-    /**
-     * @return sign = -1, magnitude = -(-val.magnitude | -that.magnitude)
-     */
+    /// #### Returns
+    ///
+    /// sign = -1, magnitude = -(-val.magnitude | -that.magnitude)
     static TBigInteger orNegative(TBigInteger val, TBigInteger that) {
         // PRE: val and that are negative;
         // PRE: val has at least as many trailing zeros digits as that
@@ -547,9 +546,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @return sign = -1, magnitude = -(positive.magnitude | -negative.magnitude)
-     */
+    /// #### Returns
+    ///
+    /// sign = -1, magnitude = -(positive.magnitude | -negative.magnitude)
     static TBigInteger orDiffSigns(TBigInteger positive, TBigInteger negative) {
         // Jumping over the least significant zero bits
         int iNeg = negative.getFirstNonzeroDigit();
@@ -610,9 +609,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @see TBigInteger#xor(TBigInteger)
-     */
+    /// #### See also
+    ///
+    /// - TBigInteger#xor(TBigInteger)
     static TBigInteger xor(TBigInteger val, TBigInteger that) {
         if (that.sign == 0) {
             return val;
@@ -648,9 +647,9 @@ final class TLogical {
         }
     }
 
-    /**
-     * @return sign = 0, magnitude = longer.magnitude | shorter.magnitude
-     */
+    /// #### Returns
+    ///
+    /// sign = 0, magnitude = longer.magnitude | shorter.magnitude
     static TBigInteger xorPositive(TBigInteger longer, TBigInteger shorter) {
         // PRE: longer and shorter are positive;
         // PRE: longer has at least as many digits as shorter
@@ -669,9 +668,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @return sign = 0, magnitude = -val.magnitude ^ -that.magnitude
-     */
+    /// #### Returns
+    ///
+    /// sign = 0, magnitude = -val.magnitude ^ -that.magnitude
     static TBigInteger xorNegative(TBigInteger val, TBigInteger that) {
         // PRE: val and that are negative
         // PRE: val has at least as many trailing zero digits as that
@@ -726,9 +725,9 @@ final class TLogical {
         return result;
     }
 
-    /**
-     * @return sign = 1, magnitude = -(positive.magnitude ^ -negative.magnitude)
-     */
+    /// #### Returns
+    ///
+    /// sign = 1, magnitude = -(positive.magnitude ^ -negative.magnitude)
     static TBigInteger xorDiffSigns(TBigInteger positive, TBigInteger negative) {
         int resLength = Math.max(negative.numberLength, positive.numberLength);
         int[] resDigits;

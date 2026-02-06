@@ -26,64 +26,63 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
-/**
- * Internal class, do not use.
- * <p>
- * This evaluator handles expressions that involve the index. Example:
- *
- * <code>
- * <p>
- * Get the name of the second player
- * <p>
- * /tournament/player[2]/name
- * <p>
- * Get the name of the last player
- * <p>
- * /tournament/player[last()]/name
- * <p>
- * Get the name of the second last player
- * <p>
- * //player[last()-1]/name
- * <p>
- * Get players 4 and greater
- * <p>
- * //player[position() > 3]/name
- * <p>
- * Get players 0 to 4
- * <p>
- * //player[position() < 5]/name
- * </code>
- *
- * @author Eric Coolman
- */
+/// Internal class, do not use.
+///
+/// This evaluator handles expressions that involve the index. Example:
+///
+/// `
+///
+///  Get the name of the second player
+///
+///  /tournament/player[2]/name
+///
+///  Get the name of the last player
+///
+///  /tournament/player[last()]/name
+///
+///  Get the name of the second last player
+///
+///  //player[last()-1]/name
+///
+///  Get players 4 and greater
+///
+///  //player[position() > 3]/name
+///
+///  Get players 0 to 4
+///
+///  //player[position() < 5]/name`
+///
+/// @author Eric Coolman
 class IndexEvaluator extends AbstractEvaluator {
 
     static String FUNC_LAST = "last()";
     static String FUNC_POSITION = "position()";
 
-    /**
-     * Construct with a full predicate expression.
-     *
-     * @param expr a full predicate expression
-     */
+    /// Construct with a full predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `expr`: a full predicate expression
     public IndexEvaluator(String expr) {
         super(expr);
     }
 
-    /**
-     * Select all elements from the array with an index less than the given
-     * value.
-     * <p>
-     * Example:
-     *
-     * <code>
-     * [position() < 5]
-     * </code>
-     *
-     * @param elements array of StructuredContent elements
-     * @param rvalue   index value
-     * @return an array of matching elements.
-     */
+    /// Select all elements from the array with an index less than the given
+    /// value.
+    ///
+    /// Example:
+    ///
+    /// `[position() < 5]`
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: array of StructuredContent elements
+    ///
+    /// - `rvalue`: index value
+    ///
+    /// #### Returns
+    ///
+    /// an array of matching elements.
     private List getByPositionLess(List elements, int rvalue) {
         if (rvalue > elements.size()) {
             return elements;
@@ -103,20 +102,22 @@ class IndexEvaluator extends AbstractEvaluator {
         return array;
     }
 
-    /**
-     * Select all elements from the array with an index greater than the given
-     * value.
-     * <p>
-     * Example:
-     *
-     * <code>
-     * [position() > 5]
-     * </code>
-     *
-     * @param elements array of StructuredContent elements
-     * @param rvalue   index value
-     * @return an array of matching elements.
-     */
+    /// Select all elements from the array with an index greater than the given
+    /// value.
+    ///
+    /// Example:
+    ///
+    /// `[position() > 5]`
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: array of StructuredContent elements
+    ///
+    /// - `rvalue`: index value
+    ///
+    /// #### Returns
+    ///
+    /// an array of matching elements.
     private List getByPositionGreater(List elements, int rvalue) {
         if (rvalue >= elements.size()) {
             return null;
@@ -136,24 +137,25 @@ class IndexEvaluator extends AbstractEvaluator {
         return array;
     }
 
-    /**
-     * Select a single element from an array, relative to the last element. Ie.
-     *
-     * <code>
-     * Fifth last element:
-     * <p>
-     * [last() - 5]
-     * <p>
-     * Last element:
-     * <p>
-     * [last()]
-     *
-     * </code>
-     *
-     * @param elements array of StructuredContent elements
-     * @param rvalue   index value
-     * @return an array of matching elements.
-     */
+    /// Select a single element from an array, relative to the last element. Ie.
+    ///
+    /// `Fifth last element:
+    ///
+    ///  [last() - 5]
+    ///
+    ///  Last element:
+    ///
+    ///  [last()]`
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: array of StructuredContent elements
+    ///
+    /// - `rvalue`: index value
+    ///
+    /// #### Returns
+    ///
+    /// an array of matching elements.
     private StructuredContent getByLast(List elements, String expr) throws IllegalArgumentException {
         int index = expr.indexOf("-");
         if (index == -1) {

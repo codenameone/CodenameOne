@@ -4,9 +4,5 @@
     Author     : Shai Almog
 */
 
-/**
- * <p>
- *     Table component for editing and viewing tabular data and arranging Codename One components in a tabular form
- * </p>
- */
+/// Table component for editing and viewing tabular data and arranging Codename One components in a tabular form
 package com.codename1.ui.table;

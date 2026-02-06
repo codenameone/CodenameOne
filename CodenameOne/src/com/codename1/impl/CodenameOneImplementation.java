@@ -106,43 +106,34 @@ import java.util.Hashtable;
 import java.util.Map;
 import java.util.Vector;
 
-/**
- * Represents a vendor extension mechanizm for Codename One, <b>WARNING: this class is for internal
- * use only and is subject to change in future API revisions</b>. To replace the way in which
- * Codename One performs its task this class can be extended and its functionality replaced or
- * enhanced.
- * <p>It is the responsibility of the implementation class to grab and fire all events to the
- * Display specifically for key, pointer events and screen resolution.
- *
- * @author Shai Almog
- */
+/// Represents a vendor extension mechanizm for Codename One, **WARNING: this class is for internal
+/// use only and is subject to change in future API revisions**. To replace the way in which
+/// Codename One performs its task this class can be extended and its functionality replaced or
+/// enhanced.
+///
+/// It is the responsibility of the implementation class to grab and fire all events to the
+/// Display specifically for key, pointer events and screen resolution.
+///
+/// @author Shai Almog
 public abstract class CodenameOneImplementation {
-    /**
-     * Indicates the range of "hard" RTL bidi characters in unicode
-     */
+    /// Indicates the range of "hard" RTL bidi characters in unicode
     private static final int RTL_RANGE_BEGIN = 0x590;
     private static final int RTL_RANGE_END = 0x7BF;
     private static PushCallback callback;
     private static PurchaseCallback purchaseCallback;
     private static Runnable onCurrentFormChange;
     private static Runnable onExit;
-    /**
-     * Useful since the content of a single element touch event is often recycled
-     * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
-     * touch event should be very efficient
-     */
+    /// Useful since the content of a single element touch event is often recycled
+    /// and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
+    /// touch event should be very efficient
     private final int[] xPointerEvent = new int[1];
-    /**
-     * Useful since the content of a single element touch event is often recycled
-     * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
-     * touch event should be very efficient
-     */
+    /// Useful since the content of a single element touch event is often recycled
+    /// and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
+    /// touch event should be very efficient
     private final int[] yPointerEvent = new int[1];
     private final Hashtable builtinSounds = new Hashtable();
-    /**
-     * For use inside paintDirty() so that we don't have to instantiate
-     * a rectangle each time it is called.
-     */
+    /// For use inside paintDirty() so that we don't have to instantiate
+    /// a rectangle each time it is called.
     private final Rectangle paintDirtyTmpRect = new Rectangle();
     private Object displayLock;
     private boolean bidi;
@@ -178,34 +169,30 @@ public abstract class CodenameOneImplementation {
         onCurrentFormChange = on;
     }
 
-    /**
-     * Set a task to be executed once the implementation is being destroyed
-     */
+    /// Set a task to be executed once the implementation is being destroyed
     public static void setOnExit(Runnable on) {
         onExit = on;
     }
 
-    /**
-     * Allows the system to register to receive push callbacks
-     *
-     * @param push the callback object
-     */
+    /// Allows the system to register to receive push callbacks
+    ///
+    /// #### Parameters
+    ///
+    /// - `push`: the callback object
     public static void setPushCallback(PushCallback push) {
         callback = push;
     }
 
-    /**
-     * Returns the purchase callback instance
-     */
+    /// Returns the purchase callback instance
     public static PurchaseCallback getPurchaseCallback() {
         return purchaseCallback;
     }
 
-    /**
-     * Allows the system to register the purchase callback instance
-     *
-     * @param pc the pc callback
-     */
+    /// Allows the system to register the purchase callback instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `pc`: the pc callback
     public static void setPurchaseCallback(PurchaseCallback pc) {
         purchaseCallback = pc;
     }
@@ -219,63 +206,59 @@ public abstract class CodenameOneImplementation {
         return (int) f;
     }
 
-    /**
-     * This is a temporary workaround for an XMLVM Bug!
-     */
+    /// This is a temporary workaround for an XMLVM Bug!
     public static Class getStringArrayClass() {
         return String[].class;
     }
 
-    /**
-     * This is a temporary workaround for an XMLVM Bug!
-     */
+    /// This is a temporary workaround for an XMLVM Bug!
     public static Class getStringArray2DClass() {
         return String[][].class;
     }
 
-    /**
-     * This is a temporary workaround for an XMLVM Bug!
-     */
+    /// This is a temporary workaround for an XMLVM Bug!
     public static Class getImageArrayClass() {
         return Image[].class;
     }
 
-    /**
-     * This is a temporary workaround for an XMLVM Bug!
-     */
+    /// This is a temporary workaround for an XMLVM Bug!
     public static Class getObjectArrayClass() {
         return Object[].class;
     }
 
-    /**
-     * Stops the polling push loop
-     */
+    /// Stops the polling push loop
     protected static void stopPolling() {
     }
 
-    /**
-     * Returns the key for the application comprised of the builders email coupled with the
-     * package name. It should uniquely identify the application across different builds
-     * which allows interaction with the cloud.
-     *
-     * @return a unique string with the format builders_email/packagename
-     */
+    /// Returns the key for the application comprised of the builders email coupled with the
+    /// package name. It should uniquely identify the application across different builds
+    /// which allows interaction with the cloud.
+    ///
+    /// #### Returns
+    ///
+    /// a unique string with the format builders_email/packagename
     protected static String getApplicationKey() {
         Display d = Display.getInstance();
         return d.getProperty("built_by_user", "Unknown Build Key") + '/' +
                 d.getProperty("package_name", "Unknown Build Key");
     }
 
-    /**
-     * Sends a server request to register push support. This is a method for use
-     * by implementations.
-     *
-     * @param id             the platform specific push ID
-     * @param applicationKey the unique id of the application
-     * @param pushType       for server side type
-     * @param packageName    the application package name used by the push service
-     * @return true for success, false otherwise
-     */
+    /// Sends a server request to register push support. This is a method for use
+    /// by implementations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the platform specific push ID
+    ///
+    /// - `applicationKey`: the unique id of the application
+    ///
+    /// - `pushType`: for server side type
+    ///
+    /// - `packageName`: the application package name used by the push service
+    ///
+    /// #### Returns
+    ///
+    /// true for success, false otherwise
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
                                              String packageName) {
         //Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
@@ -310,23 +293,24 @@ public abstract class CodenameOneImplementation {
         return true;
     }
 
-    /**
-     * Sends a server request to register push support. This is a method for use
-     * by implementations.
-     *
-     * @param id             the platform specific push ID
-     * @param applicationKey the unique id of the application
-     * @param pushType       for server side type
-     * @param packageName    the application package name used by the push service
-     */
+    /// Sends a server request to register push support. This is a method for use
+    /// by implementations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the platform specific push ID
+    ///
+    /// - `applicationKey`: the unique id of the application
+    ///
+    /// - `pushType`: for server side type
+    ///
+    /// - `packageName`: the application package name used by the push service
     public static void registerPushOnServer(String id, String applicationKey, byte pushType, String udid,
                                             String packageName) {
         registerServerPush(id, applicationKey, pushType, udid, packageName);
     }
 
-    /**
-     * For use by implementations, stop receiving push notifications from the server
-     */
+    /// For use by implementations, stop receiving push notifications from the server
     public static void deregisterPushFromServer() {
         /*long i = Preferences.get("push_id", (long)-1);
         if(i > -1) {
@@ -341,19 +325,19 @@ public abstract class CodenameOneImplementation {
         }*/
     }
 
-    /**
-     * Registers a polling thread to simulate push notification
-     *
-     * @deprecated this functionality is no longer supported
-     */
+    /// Registers a polling thread to simulate push notification
+    ///
+    /// #### Deprecated
+    ///
+    /// this functionality is no longer supported
     protected static void registerPollingFallback() {
     }
 
-    /**
-     * Invoked by the display init method allowing the implementation to "bind"
-     *
-     * @param m the object passed to the Display init method
-     */
+    /// Invoked by the display init method allowing the implementation to "bind"
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the object passed to the Display init method
     public final void initImpl(Object m) {
         init(m);
         if (m != null) {
@@ -363,162 +347,165 @@ public abstract class CodenameOneImplementation {
         initiailized = true;
     }
 
-    /**
-     * Returns true if the implementation is initialized.
-     */
+    /// Returns true if the implementation is initialized.
     public boolean isInitialized() {
         return initiailized;
     }
 
-    /**
-     * Allows implementations to send an error to the push callback
-     *
-     * @param message   the error message
-     * @param errorCode the error code
-     */
+    /// Allows implementations to send an error to the push callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: the error message
+    ///
+    /// - `errorCode`: the error code
     protected void sendPushRegistrationError(String message, int errorCode) {
         if (callback != null) {
             callback.pushRegistrationError(message, errorCode);
         }
     }
 
-    /**
-     * Invoked by the display init method allowing the implementation to "bind"
-     *
-     * @param m the object passed to the Display init method
-     */
+    /// Invoked by the display init method allowing the implementation to "bind"
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the object passed to the Display init method
     public abstract void init(Object m);
 
-    /**
-     * Some implementations might need to perform initializations of the EDT thread
-     */
+    /// Some implementations might need to perform initializations of the EDT thread
     public void initEDT() {
     }
 
-    /**
-     * Allows subclasses to cleanup if necessary
-     */
+    /// Allows subclasses to cleanup if necessary
     public void deinitialize() {
         initiailized = false;
     }
 
-    /**
-     * Invoked when a dialog is shown, this method allows a dialog to play a sound
-     *
-     * @param type the type of the dialog matching the dialog classes defined types
-     */
+    /// Invoked when a dialog is shown, this method allows a dialog to play a sound
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the type of the dialog matching the dialog classes defined types
     public void playDialogSound(final int type) {
     }
 
-    /**
-     * Vibrates the device for the given length of time
-     *
-     * @param duration length of time to vibrate
-     */
+    /// Vibrates the device for the given length of time
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: length of time to vibrate
     public void vibrate(int duration) {
     }
 
-    /**
-     * Flash the backlight of the device for the given length of time
-     *
-     * @param duration length of time to flash the backlight
-     */
+    /// Flash the backlight of the device for the given length of time
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: length of time to flash the backlight
     public void flashBacklight(int duration) {
     }
 
-    /**
-     * Returns the width dimension of the display controlled by this implementation
-     *
-     * @return the width
-     */
+    /// Returns the width dimension of the display controlled by this implementation
+    ///
+    /// #### Returns
+    ///
+    /// the width
     public abstract int getDisplayWidth();
 
-    /**
-     * Returns the height dimension of the display controlled by this implementation
-     *
-     * @return the height
-     */
+    /// Returns the height dimension of the display controlled by this implementation
+    ///
+    /// #### Returns
+    ///
+    /// the height
     public abstract int getDisplayHeight();
 
-    /**
-     * Returns the display height ignoring manipulations performed by the VKB
-     *
-     * @return the height
-     */
+    /// Returns the display height ignoring manipulations performed by the VKB
+    ///
+    /// #### Returns
+    ///
+    /// the height
     public int getActualDisplayHeight() {
         return getDisplayHeight();
     }
 
-    /**
-     * Returns the size of the desktop area hosting the application window when running on a desktop
-     * platform. Implementations that do not support windows may return {@code null}.
-     *
-     * @return the desktop size or {@code null}
-     */
+    /// Returns the size of the desktop area hosting the application window when running on a desktop
+    /// platform. Implementations that do not support windows may return `null`.
+    ///
+    /// #### Returns
+    ///
+    /// the desktop size or `null`
     public Dimension getDesktopSize() {
         return null;
     }
 
-    /**
-     * Returns the bounds of the application window when running on a desktop platform.
-     *
-     * @return the window bounds, defaults to the current display size
-     */
+    /// Returns the bounds of the application window when running on a desktop platform.
+    ///
+    /// #### Returns
+    ///
+    /// the window bounds, defaults to the current display size
     public Rectangle getWindowBounds() {
         return new Rectangle(0, 0, getDisplayWidth(), getDisplayHeight());
     }
 
-    /**
-     * Requests a resize of the application window when supported by the platform.
-     *
-     * @param width  the desired window width in pixels
-     * @param height the desired window height in pixels
-     */
+    /// Requests a resize of the application window when supported by the platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the desired window width in pixels
+    ///
+    /// - `height`: the desired window height in pixels
     public void setWindowSize(int width, int height) {
     }
 
-    /**
-     * Returns the optional desktop window size hint provided by the first form.
-     *
-     * @return the stored hint or {@code null}
-     */
+    /// Returns the optional desktop window size hint provided by the first form.
+    ///
+    /// #### Returns
+    ///
+    /// the stored hint or `null`
     public Dimension getInitialWindowSizeHintPercent() {
         return initialWindowSizeHintPercent;
     }
 
-    /**
-     * Stores an optional window size hint (in percent values) for desktop environments. Implementations
-     * that do not support windows may ignore this value.
-     *
-     * @param hint a {@link Dimension} whose width/height represent percentages of the desktop to use for
-     *             the initial window size, or {@code null} to clear a previously stored hint
-     */
+    /// Stores an optional window size hint (in percent values) for desktop environments. Implementations
+    /// that do not support windows may ignore this value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: @param hint a `Dimension` whose width/height represent percentages of the desktop to use for
+    ///             the initial window size, or `null` to clear a previously stored hint
     public void setInitialWindowSizeHintPercent(Dimension hint) {
         initialWindowSizeHintPercent = hint;
     }
 
-    /**
-     * Invoked when an exception occurs on the EDT, allows the implementation to
-     * take control of the device to produce testing information.
-     *
-     * @param err the exception that was caught in the EDT loop
-     * @return false by default, true if the exception shouldn't be handled further
-     * by the EDT
-     */
+    /// Invoked when an exception occurs on the EDT, allows the implementation to
+    /// take control of the device to produce testing information.
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the exception that was caught in the EDT loop
+    ///
+    /// #### Returns
+    ///
+    /// @return false by default, true if the exception shouldn't be handled further
+    /// by the EDT
     public boolean handleEDTException(Throwable err) {
         return false;
     }
 
-    /**
-     * Encapsulates the editing code which is specific to the platform, some platforms
-     * would allow "in place editing" MIDP does not.
-     *
-     * @param cmp               the {@link TextArea} component
-     * @param maxSize           the maximum size from the text area
-     * @param constraint        the constraints of the text area
-     * @param text              the string to edit
-     * @param initiatingKeycode the keycode used to initiate the edit.
-     */
+    /// Encapsulates the editing code which is specific to the platform, some platforms
+    /// would allow "in place editing" MIDP does not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the `TextArea` component
+    ///
+    /// - `maxSize`: the maximum size from the text area
+    ///
+    /// - `constraint`: the constraints of the text area
+    ///
+    /// - `text`: the string to edit
+    ///
+    /// - `initiatingKeycode`: the keycode used to initiate the edit.
     public final void editStringImpl(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
         if (cmp instanceof TextArea) {
             ((TextArea) cmp).registerAsInputDevice();
@@ -530,11 +517,9 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Sets current editingText value and sets it focused.
-     * NB! it not call editString, that is it should be called only internally and
-     * actually the methdo should not be added :)
-     */
+    /// Sets current editingText value and sets it focused.
+    /// NB! it not call editString, that is it should be called only internally and
+    /// actually the methdo should not be added :)
     public void setFocusedEditingText(Component cmp) {
         editingText = cmp;
         if (cmp != null) {
@@ -545,15 +530,11 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Invoked for special cases to stop text editing and clear native editing state
-     */
+    /// Invoked for special cases to stop text editing and clear native editing state
     public void stopTextEditing() {
     }
 
-    /**
-     * Invoked for special cases to stop text editing and clear native editing state
-     */
+    /// Invoked for special cases to stop text editing and clear native editing state
     public void stopTextEditing(Runnable onFinish) {
         stopTextEditing();
         if (onFinish != null) {
@@ -561,79 +542,79 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Using invokeAndBlock inside EditString creates peculiar behaviour that needs
-     * to be worked around.  Ideally no port should use invokeAndBlock for this
-     * but currently JavaSE and UWP both do.  Need to be able to detect this
-     * for workarounds.
-     *
-     * @return
-     */
+    /// Using invokeAndBlock inside EditString creates peculiar behaviour that needs
+    /// to be worked around.  Ideally no port should use invokeAndBlock for this
+    /// but currently JavaSE and UWP both do.  Need to be able to detect this
+    /// for workarounds.
     public boolean usesInvokeAndBlockForEditString() {
         return false;
     }
 
-    /**
-     * Encapsulates the editing code which is specific to the platform, some platforms
-     * would allow "in place editing" MIDP does not.
-     *
-     * @param cmp               the {@link TextArea} component
-     * @param maxSize           the maximum size from the text area
-     * @param constraint        the constraints of the text area
-     * @param text              the string to edit
-     * @param initiatingKeycode the keycode used to initiate the edit.
-     */
+    /// Encapsulates the editing code which is specific to the platform, some platforms
+    /// would allow "in place editing" MIDP does not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the `TextArea` component
+    ///
+    /// - `maxSize`: the maximum size from the text area
+    ///
+    /// - `constraint`: the constraints of the text area
+    ///
+    /// - `text`: the string to edit
+    ///
+    /// - `initiatingKeycode`: the keycode used to initiate the edit.
     public abstract void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode);
 
     public boolean nativeEditorPaintsHint() {
         return true;
     }
 
-    /**
-     * Returns true if we are currently editing a component
-     *
-     * @return whether a component is being edited
-     */
+    /// Returns true if we are currently editing a component
+    ///
+    /// #### Returns
+    ///
+    /// whether a component is being edited
     public boolean isEditingText() {
         return editingText != null;
     }
 
-    /**
-     * Checks to see if this is a platform that uses the {@link TextField#setInputMode(java.lang.String) }.
-     */
+    /// Checks to see if this is a platform that uses the `TextField#setInputMode(java.lang.String)`.
     public boolean platformUsesInputMode() {
         Display d = Display.getInstance();
         String platform = d.getPlatformName();
         return "me".equals(platform) || "rim".equals(platform);
     }
 
-    /**
-     * Checks whether the native text editor is currently visible over top of the
-     * given component (usually a {@code TextArea}
-     *
-     * @param c The textarea/component we are checking
-     * @return True if the native editor is visible.
-     */
+    /// Checks whether the native text editor is currently visible over top of the
+    /// given component (usually a `TextArea`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The textarea/component we are checking
+    ///
+    /// #### Returns
+    ///
+    /// True if the native editor is visible.
     public boolean isNativeEditorVisible(Component c) {
         return this.isNativeInputSupported() && this.isEditingText(c);
     }
 
-    /**
-     * Called when TextArea text is changed.  Can be used by the native
-     * implementation to trigger an update to the native editor if in async edit
-     * mode.
-     *
-     * @param c    The TextArea that is being edited.
-     * @param text
-     */
+    /// Called when TextArea text is changed.  Can be used by the native
+    /// implementation to trigger an update to the native editor if in async edit
+    /// mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The TextArea that is being edited.
+    ///
+    /// - `text`
     public void updateNativeEditorText(Component c, String text) {
 
     }
 
-    /**
-     * In case of scrolling we can hide the text editor unless the user starts typing again,
-     * this is only relevant for the async mode...
-     */
+    /// In case of scrolling we can hide the text editor unless the user starts typing again,
+    /// this is only relevant for the async mode...
     public void hideTextEditor() {
         Component c = editingText;
         editingText = null;
@@ -652,9 +633,7 @@ public abstract class CodenameOneImplementation {
         appArg = arg;
     }
 
-    /**
-     * Allows the implementation to refresh the text field
-     */
+    /// Allows the implementation to refresh the text field
     protected final void repaintTextEditor(final boolean focus) {
         Display.getInstance().callSerially(new Runnable() {
             @Override
@@ -669,110 +648,115 @@ public abstract class CodenameOneImplementation {
         });
     }
 
-    /**
-     * Returns true if we are currently editing this component
-     *
-     * @return whether a component is being edited
-     */
+    /// Returns true if we are currently editing this component
+    ///
+    /// #### Returns
+    ///
+    /// whether a component is being edited
     public boolean isEditingText(Component c) {
         return editingText == c; //NOPMD CompareObjectsWithEquals
     }
 
-    /**
-     * Gets the component that is currently editing text
-     *
-     * @return
-     */
+    /// Gets the component that is currently editing text
     public Component getEditingText() {
         return editingText;
     }
 
-    /**
-     * Returns true if edit string will return immediately and broadcast editing events directly to the text field
-     *
-     * @return false by default
-     */
+    /// Returns true if edit string will return immediately and broadcast editing events directly to the text field
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isAsyncEditMode() {
         return false;
     }
 
-    /**
-     * Returns the height of the VKB when it is open for an implementation that requires
-     * us to allow scrolling further
-     *
-     * @return height in pixels
-     */
+    /// Returns the height of the VKB when it is open for an implementation that requires
+    /// us to allow scrolling further
+    ///
+    /// #### Returns
+    ///
+    /// height in pixels
     public int getInvisibleAreaUnderVKB() {
         return 0;
     }
 
-    /**
-     * Invoked if Codename One needs to dispose the native text editing but would like the editor
-     * to store its state.
-     */
+    /// Invoked if Codename One needs to dispose the native text editing but would like the editor
+    /// to store its state.
     public void saveTextEditingState() {
     }
 
-    /**
-     * Returns true if the implementation still has elements to paint.
-     *
-     * @return false by default
-     */
+    /// Returns true if the implementation still has elements to paint.
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean hasPendingPaints() {
         return paintQueueFill != 0;
     }
 
-    /**
-     * Return the number of alpha levels supported by the implementation.
-     *
-     * @return the number of alpha levels supported by the implementation
-     * @deprecated this method isn't implemented in most modern devices
-     */
+    /// Return the number of alpha levels supported by the implementation.
+    ///
+    /// #### Returns
+    ///
+    /// the number of alpha levels supported by the implementation
+    ///
+    /// #### Deprecated
+    ///
+    /// this method isn't implemented in most modern devices
     public int numAlphaLevels() {
         return 255;
     }
 
-    /**
-     * Returns the number of colors applicable on the device, note that the API
-     * does not support gray scale devices.
-     *
-     * @return the number of colors applicable on the device
-     * @deprecated this method isn't implemented in most modern devices
-     */
+    /// Returns the number of colors applicable on the device, note that the API
+    /// does not support gray scale devices.
+    ///
+    /// #### Returns
+    ///
+    /// the number of colors applicable on the device
+    ///
+    /// #### Deprecated
+    ///
+    /// this method isn't implemented in most modern devices
     public int numColors() {
         return 65536;
     }
 
-    /**
-     * This method allows customizing/creating a graphics context per component which is useful for
-     * some elaborate implementations of Codename One. This method is only relevant for elborate components
-     * such as container which render their own components rather than invoke repaint()
-     *
-     * @param cmp            component being rendered
-     * @param currentContext the current graphics context
-     * @return a graphics object thats appropriate for the given component.
-     */
+    /// This method allows customizing/creating a graphics context per component which is useful for
+    /// some elaborate implementations of Codename One. This method is only relevant for elborate components
+    /// such as container which render their own components rather than invoke repaint()
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: component being rendered
+    ///
+    /// - `currentContext`: the current graphics context
+    ///
+    /// #### Returns
+    ///
+    /// a graphics object thats appropriate for the given component.
     public Graphics getComponentScreenGraphics(Component cmp, Graphics currentContext) {
         return currentContext;
     }
 
-    /**
-     * Allows for painting an overlay on top of the implementation for notices during
-     * testing etc.
-     *
-     * @param g graphics context on which to draw the overlay
-     */
+    /// Allows for painting an overlay on top of the implementation for notices during
+    /// testing etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context on which to draw the overlay
     protected void paintOverlay(Graphics g) {
     }
 
-    /**
-     * Calculates the paintable bounds of a component.  The paintable bounds is
-     * the bounds (in screen coordinates) that will be vislble on the screen.  This
-     * accounts for possible clipping by parent components.
-     *
-     * @param c   The component whose paintable bounds we are interested in.
-     * @param out A rectangle to return the bounds in.
-     */
+    /// Calculates the paintable bounds of a component.  The paintable bounds is
+    /// the bounds (in screen coordinates) that will be vislble on the screen.  This
+    /// accounts for possible clipping by parent components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The component whose paintable bounds we are interested in.
+    ///
+    /// - `out`: A rectangle to return the bounds in.
     private void getPaintableBounds(Component c, Rectangle out) {
         int x = c.getAbsoluteX() + c.getScrollX();
         int y = c.getAbsoluteY() + c.getScrollY();
@@ -793,9 +777,7 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /**
-     * Invoked by the EDT to paint the dirty regions
-     */
+    /// Invoked by the EDT to paint the dirty regions
     public void paintDirty() {
         int size = 0;
         synchronized (displayLock) {
@@ -855,81 +837,78 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * This method is a callback from the edt before the edt enters to an idle
-     * state
-     *
-     * @param enter true before the edt sleeps and false when exits from the
-     *              idle state
-     */
+    /// This method is a callback from the edt before the edt enters to an idle
+    /// state
+    ///
+    /// #### Parameters
+    ///
+    /// - `enter`: @param enter true before the edt sleeps and false when exits from the
+    ///              idle state
     public void edtIdle(boolean enter) {
     }
 
-    /**
-     * Flush the currently painted drawing onto the screen if using a double buffer
-     *
-     * @param x      position of the dirty region
-     * @param y      position of the dirty region
-     * @param width  width of the dirty region
-     * @param height height of the dirty region
-     */
+    /// Flush the currently painted drawing onto the screen if using a double buffer
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: position of the dirty region
+    ///
+    /// - `y`: position of the dirty region
+    ///
+    /// - `width`: width of the dirty region
+    ///
+    /// - `height`: height of the dirty region
     public abstract void flushGraphics(int x, int y, int width, int height);
 
-    /**
-     * Flush the currently painted drawing onto the screen if using a double buffer
-     */
+    /// Flush the currently painted drawing onto the screen if using a double buffer
     public abstract void flushGraphics();
 
-    /**
-     * Returns a graphics object for use by the painting
-     *
-     * @return a graphics object, either recycled or new, this object will be
-     * used on the EDT
-     */
+    /// Returns a graphics object for use by the painting
+    ///
+    /// #### Returns
+    ///
+    /// @return a graphics object, either recycled or new, this object will be
+    /// used on the EDT
     protected Graphics getCodenameOneGraphics() {
         return codenameOneGraphics;
     }
 
-    /**
-     * Installs the Codename One graphics object into the implementation
-     *
-     * @param g graphics object for use by the implementation
-     */
+    /// Installs the Codename One graphics object into the implementation
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics object for use by the implementation
     public void setCodenameOneGraphics(Graphics g) {
         codenameOneGraphics = g;
     }
 
-    /**
-     * A flag that can be overridden by a platform to indicate that native
-     * peers are rendered behind the main codename one graphics layer.  The main
-     * effect of this is that Graphics will call clearRect() any time a native
-     * component is "painted" to poke a hole through the CN1 layer.
-     *
-     * @return
-     */
+    /// A flag that can be overridden by a platform to indicate that native
+    /// peers are rendered behind the main codename one graphics layer.  The main
+    /// effect of this is that Graphics will call clearRect() any time a native
+    /// component is "painted" to poke a hole through the CN1 layer.
     public boolean paintNativePeersBehind() {
         return false;
     }
 
-    /**
-     * Installs the display lock allowing implementors to synchronize against the
-     * Display mutex, this method is invoked internally and should not be used.
-     *
-     * @param lock the mutex from display
-     */
+    /// Installs the display lock allowing implementors to synchronize against the
+    /// Display mutex, this method is invoked internally and should not be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lock`: the mutex from display
     public void setDisplayLock(Object lock) {
         displayLock = lock;
     }
 
-    /**
-     * Removes an entry from the paint queue if it exists, this is important for cases
-     * in which a component was repainted and immediately removed from its parent container
-     * afterwards. This happens sometimes in cases where a replace() operation changes
-     * a component to a new component that has an animation() the animation might have triggered
-     * a repaint before the removeComponent method was invoked
-     *
-     * @param cmp the component to
-     */
+    /// Removes an entry from the paint queue if it exists, this is important for cases
+    /// in which a component was repainted and immediately removed from its parent container
+    /// afterwards. This happens sometimes in cases where a replace() operation changes
+    /// a component to a new component that has an animation() the animation might have triggered
+    /// a repaint before the removeComponent method was invoked
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to
     public void cancelRepaint(Animation cmp) {
         synchronized (displayLock) {
             for (int iter = 0; iter < paintQueueFill; iter++) {
@@ -942,11 +921,11 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Invoked to add an element to the paintQueue
-     *
-     * @param cmp component or animation to push into the paint queue
-     */
+    /// Invoked to add an element to the paintQueue
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: component or animation to push into the paint queue
     public void repaint(Animation cmp) {
         synchronized (displayLock) {
             for (int iter = 0; iter < paintQueueFill; iter++) {
@@ -977,114 +956,162 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Extracts RGB data from the given native image and places it in the given array
-     *
-     * @param nativeImage native platform image object
-     * @param arr         int array to store RGB data
-     * @param offset      position within the array to start
-     * @param x           x position within the image
-     * @param y           y position within the image
-     * @param width       width to extract
-     * @param height      height to extract
-     */
+    /// Extracts RGB data from the given native image and places it in the given array
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeImage`: native platform image object
+    ///
+    /// - `arr`: int array to store RGB data
+    ///
+    /// - `offset`: position within the array to start
+    ///
+    /// - `x`: x position within the image
+    ///
+    /// - `y`: y position within the image
+    ///
+    /// - `width`: width to extract
+    ///
+    /// - `height`: height to extract
     public abstract void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height);
 
-    /**
-     * Create a platform native image object from the given RGB data
-     *
-     * @param rgb    ARGB data from which to create a platform image
-     * @param width  width for the resulting image
-     * @param height height for the resulting image
-     * @return platform image object
-     */
+    /// Create a platform native image object from the given RGB data
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`: ARGB data from which to create a platform image
+    ///
+    /// - `width`: width for the resulting image
+    ///
+    /// - `height`: height for the resulting image
+    ///
+    /// #### Returns
+    ///
+    /// platform image object
     public abstract Object createImage(int[] rgb, int width, int height);
 
-    /**
-     * Creates a native image from a file in the system jar or file system storage.
-     *
-     * @param path If path begins with {@literal file:} this will load a file from FileSystemStorage.  Otherwise it will load from jar.
-     * @return native system image
-     * @throws java.io.IOException if thrown by loading
-     */
+    /// Creates a native image from a file in the system jar or file system storage.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: If path begins with file: this will load a file from FileSystemStorage.  Otherwise it will load from jar.
+    ///
+    /// #### Returns
+    ///
+    /// native system image
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if thrown by loading
     public abstract Object createImage(String path) throws IOException;
 
-    /**
-     * Creates a native image from a given input stream
-     *
-     * @param i input stream from which to load the image
-     * @return native system image
-     * @throws java.io.IOException if thrown by loading
-     */
+    /// Creates a native image from a given input stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: input stream from which to load the image
+    ///
+    /// #### Returns
+    ///
+    /// native system image
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if thrown by loading
     public abstract Object createImage(InputStream i) throws IOException;
 
-    /**
-     * Creates a modifable native image that can return a graphics object
-     *
-     * @param width     the width of the mutable image
-     * @param height    the height of the mutable image
-     * @param fillColor the ARGB fill color, alpha may be ignored based on the value of
-     *                  isAlphaMutableImageSupported
-     * @return the native image
-     */
+    /// Creates a modifable native image that can return a graphics object
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the width of the mutable image
+    ///
+    /// - `height`: the height of the mutable image
+    ///
+    /// - `fillColor`: @param fillColor the ARGB fill color, alpha may be ignored based on the value of
+    ///                  isAlphaMutableImageSupported
+    ///
+    /// #### Returns
+    ///
+    /// the native image
     public abstract Object createMutableImage(int width, int height, int fillColor);
 
-    /**
-     * Indicates whether mutable images respect alpha values when constructed
-     *
-     * @return true if mutable images can have an alpha value when initially created
-     */
+    /// Indicates whether mutable images respect alpha values when constructed
+    ///
+    /// #### Returns
+    ///
+    /// true if mutable images can have an alpha value when initially created
     public boolean isAlphaMutableImageSupported() {
         return false;
     }
 
-    /**
-     * Create a nativate image from its compressed byte data
-     *
-     * @param bytes  the byte array representing the image data
-     * @param offset offset within the byte array
-     * @param len    the length for the image within the byte array
-     * @return a native image
-     */
+    /// Create a nativate image from its compressed byte data
+    ///
+    /// #### Parameters
+    ///
+    /// - `bytes`: the byte array representing the image data
+    ///
+    /// - `offset`: offset within the byte array
+    ///
+    /// - `len`: the length for the image within the byte array
+    ///
+    /// #### Returns
+    ///
+    /// a native image
     public abstract Object createImage(byte[] bytes, int offset, int len);
 
-    /**
-     * Returns the width of a native image
-     *
-     * @param i the native image
-     * @return the width of the native image
-     */
+    /// Returns the width of a native image
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the native image
+    ///
+    /// #### Returns
+    ///
+    /// the width of the native image
     public abstract int getImageWidth(Object i);
 
-    /**
-     * Returns the height of a native image
-     *
-     * @param i the native image
-     * @return the height of the native image
-     */
+    /// Returns the height of a native image
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the native image
+    ///
+    /// #### Returns
+    ///
+    /// the height of the native image
     public abstract int getImageHeight(Object i);
 
-    /**
-     * Scales a native image and returns the scaled version
-     *
-     * @param nativeImage image to scale
-     * @param width       width of the resulting image
-     * @param height      height of the resulting image
-     * @return scaled image instance
-     */
+    /// Scales a native image and returns the scaled version
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeImage`: image to scale
+    ///
+    /// - `width`: width of the resulting image
+    ///
+    /// - `height`: height of the resulting image
+    ///
+    /// #### Returns
+    ///
+    /// scaled image instance
     public abstract Object scale(Object nativeImage, int width, int height);
 
-    /**
-     * Returns an instance of this image rotated by the given number of degrees. By default 90 degree
-     * angle divisions are supported, anything else is implementation dependent. This method assumes
-     * a square image. Notice that it is inefficient in the current implementation to rotate to
-     * non-square angles,
-     * <p>E.g. rotating an image to 45, 90 and 135 degrees is inefficient. Use rotatate to 45, 90
-     * and then rotate the 45 to another 90 degrees to achieve the same effect with less memory.
-     *
-     * @param degrees A degree in right angle must be larger than 0 and up to 359 degrees
-     * @return new image instance with the closest possible rotation
-     */
+    /// Returns an instance of this image rotated by the given number of degrees. By default 90 degree
+    /// angle divisions are supported, anything else is implementation dependent. This method assumes
+    /// a square image. Notice that it is inefficient in the current implementation to rotate to
+    /// non-square angles,
+    ///
+    /// E.g. rotating an image to 45, 90 and 135 degrees is inefficient. Use rotatate to 45, 90
+    /// and then rotate the 45 to another 90 degrees to achieve the same effect with less memory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `degrees`: A degree in right angle must be larger than 0 and up to 359 degrees
+    ///
+    /// #### Returns
+    ///
+    /// new image instance with the closest possible rotation
     public Object rotate(Object image, int degrees) {
         int width = getImageWidth(image);
         int height = getImageHeight(image);
@@ -1112,13 +1139,17 @@ public abstract class CodenameOneImplementation {
         return createImage(dest, width, height);
     }
 
-    /**
-     * Rotates the given image by 90 degrees while changing the ratio of the picture
-     *
-     * @param image           the image
-     * @param maintainOpacity whether the opacity in the image should be maintained
-     * @return a new image rotated by 90 degrees
-     */
+    /// Rotates the given image by 90 degrees while changing the ratio of the picture
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image
+    ///
+    /// - `maintainOpacity`: whether the opacity in the image should be maintained
+    ///
+    /// #### Returns
+    ///
+    /// a new image rotated by 90 degrees
     public Image rotate90Degrees(Image image, boolean maintainOpacity) {
         int[] rgb = image.getRGB();
         int[] newRGB = new int[rgb.length];
@@ -1136,13 +1167,17 @@ public abstract class CodenameOneImplementation {
         return EncodedImage.createFromRGB(newRGB, height, width, !maintainOpacity);
     }
 
-    /**
-     * Rotates the given image by 180 degrees
-     *
-     * @param image           the image
-     * @param maintainOpacity whether the opacity in the image should be maintained
-     * @return a new image rotated by 180 degrees
-     */
+    /// Rotates the given image by 180 degrees
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image
+    ///
+    /// - `maintainOpacity`: whether the opacity in the image should be maintained
+    ///
+    /// #### Returns
+    ///
+    /// a new image rotated by 180 degrees
     public Image rotate180Degrees(Image image, boolean maintainOpacity) {
         int[] rgb = image.getRGB();
         int[] newRGB = new int[rgb.length];
@@ -1159,13 +1194,17 @@ public abstract class CodenameOneImplementation {
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
     }
 
-    /**
-     * Rotates the given image by 270 degrees while changing the ratio of the picture
-     *
-     * @param image           the image
-     * @param maintainOpacity whether the opacity in the image should be maintained
-     * @return a new image rotated by 270 degrees
-     */
+    /// Rotates the given image by 270 degrees while changing the ratio of the picture
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image
+    ///
+    /// - `maintainOpacity`: whether the opacity in the image should be maintained
+    ///
+    /// #### Returns
+    ///
+    /// a new image rotated by 270 degrees
     public Image rotate270Degrees(Image image, boolean maintainOpacity) {
         int[] rgb = image.getRGB();
         int[] newRGB = new int[rgb.length];
@@ -1182,13 +1221,17 @@ public abstract class CodenameOneImplementation {
         return EncodedImage.createFromRGB(newRGB, height, width, !maintainOpacity);
     }
 
-    /**
-     * Flips the given image on the horizontal axis
-     *
-     * @param image           the image
-     * @param maintainOpacity whether the opacity in the image should be maintained
-     * @return a new image flipped
-     */
+    /// Flips the given image on the horizontal axis
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image
+    ///
+    /// - `maintainOpacity`: whether the opacity in the image should be maintained
+    ///
+    /// #### Returns
+    ///
+    /// a new image flipped
     public Image flipImageHorizontally(Image image, boolean maintainOpacity) {
         int[] rgb = image.getRGB();
         int[] newRGB = new int[rgb.length];
@@ -1204,13 +1247,17 @@ public abstract class CodenameOneImplementation {
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
     }
 
-    /**
-     * Flips the given image on the vertical axis
-     *
-     * @param image           the image
-     * @param maintainOpacity whether the opacity in the image should be maintained
-     * @return a new image flipped
-     */
+    /// Flips the given image on the vertical axis
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image
+    ///
+    /// - `maintainOpacity`: whether the opacity in the image should be maintained
+    ///
+    /// #### Returns
+    ///
+    /// a new image flipped
     public Image flipImageVertically(Image image, boolean maintainOpacity) {
         int[] rgb = image.getRGB();
         int[] newRGB = new int[rgb.length];
@@ -1226,12 +1273,12 @@ public abstract class CodenameOneImplementation {
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
     }
 
-    /**
-     * Tries to grab an OS native screenshot which would include peer components etc.
-     * On fallback draws the current Form object.
-     *
-     * @param callback invoked with the screenshot
-     */
+    /// Tries to grab an OS native screenshot which would include peer components etc.
+    /// On fallback draws the current Form object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: invoked with the screenshot
     public void screenshot(SuccessCallback<Image> callback) {
         Form current = getCurrentForm();
         Image img = Image.createImage(current.getWidth(), current.getHeight());
@@ -1239,40 +1286,46 @@ public abstract class CodenameOneImplementation {
         callback.onSucess(img);
     }
 
-    /**
-     * Notifies the platform that push notification processing is complete.
-     */
+    /// Notifies the platform that push notification processing is complete.
     public void notifyPushCompletion() {
     }
 
-    /**
-     * Returns true if the platform supports a native image cache.  The native image cache
-     * is different than just {@link FileSystemStorage#hasCachesDir()}.  A native image cache
-     * is an image cache that the platform provides that is full transparent to Codename One
-     * with respect to how images are stored, and whether they are cached.  Currently only
-     * the Javascript port supprts a native image cache.
-     *
-     * <p>This is used by {@link URLImage#createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }
-     * to determine if it should use a cached image, or to defer to its storage and filesystem methods.</p>
-     *
-     * @return True on platforms that support a native image cache.  Currently only Javascript.
-     * @see Display#supportsNativeImageCache()
-     */
+    /// Returns true if the platform supports a native image cache.  The native image cache
+    /// is different than just `FileSystemStorage#hasCachesDir()`.  A native image cache
+    /// is an image cache that the platform provides that is full transparent to Codename One
+    /// with respect to how images are stored, and whether they are cached.  Currently only
+    /// the Javascript port supprts a native image cache.
+    ///
+    /// This is used by `java.lang.String, com.codename1.ui.Image, int)`
+    /// to determine if it should use a cached image, or to defer to its storage and filesystem methods.
+    ///
+    /// #### Returns
+    ///
+    /// True on platforms that support a native image cache.  Currently only Javascript.
+    ///
+    /// #### See also
+    ///
+    /// - Display#supportsNativeImageCache()
     public boolean supportsNativeImageCache() {
         return false;
     }
 
-    /**
-     * Downloads an image from a URL to the cache. Platforms
-     * that support a native image cache {@link #supportsNativeImageCache() } (e.g. Javascript) override this method to defer to the
-     * platform's handling of cached images.  Platforms that have a caches directory ({@link FileSystemStorage#hasCachesDir() }
-     * will use that directory to cache the image.  Other platforms will just download to storage.
-     *
-     * @param url       The URL of the image to download.
-     * @param onSuccess Callback on success.
-     * @param onFail    Callback on fail.
-     * @see URLImage#createToCache(com.codename1.ui.EncodedImage, java.lang.String, com.codename1.ui.URLImage.ImageAdapter)
-     */
+    /// Downloads an image from a URL to the cache. Platforms
+    /// that support a native image cache `#supportsNativeImageCache()` (e.g. Javascript) override this method to defer to the
+    /// platform's handling of cached images.  Platforms that have a caches directory (`FileSystemStorage#hasCachesDir()`
+    /// will use that directory to cache the image.  Other platforms will just download to storage.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL of the image to download.
+    ///
+    /// - `onSuccess`: Callback on success.
+    ///
+    /// - `onFail`: Callback on fail.
+    ///
+    /// #### See also
+    ///
+    /// - URLImage#createToCache(com.codename1.ui.EncodedImage, java.lang.String, com.codename1.ui.URLImage.ImageAdapter)
     public void downloadImageToCache(String url, SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail) {
         FileSystemStorage fs = FileSystemStorage.getInstance();
         if (fs.hasCachesDir()) {
@@ -1297,18 +1350,21 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Downloads an image to storage. This will *not* first check to see if the image is located in storage
-     * already.  It will download and overwrite any existing image at the provided location.
-     *
-     * <p>Some platforms may override this method to use platform-level caching.  E.g. Javascript will use
-     * the browser cache for downloading the image.</p>
-     *
-     * @param url       The URL of the image to download.
-     * @param fileName  The storage key to be used to store the image.
-     * @param onSuccess Callback on success.  Will be executed on EDT.
-     * @param onFail    Callback on failure.  Will be executed on EDT.
-     */
+    /// Downloads an image to storage. This will *not* first check to see if the image is located in storage
+    /// already.  It will download and overwrite any existing image at the provided location.
+    ///
+    /// Some platforms may override this method to use platform-level caching.  E.g. Javascript will use
+    /// the browser cache for downloading the image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL of the image to download.
+    ///
+    /// - `fileName`: The storage key to be used to store the image.
+    ///
+    /// - `onSuccess`: Callback on success.  Will be executed on EDT.
+    ///
+    /// - `onFail`: Callback on failure.  Will be executed on EDT.
     public void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
@@ -1319,18 +1375,21 @@ public abstract class CodenameOneImplementation {
         cr.downloadImageToStorage(fileName, onSuccess, onFail);
     }
 
-    /**
-     * Downloads an image to file system. This will *not* first check to see if the file exists already.
-     * It will download and overwrite any existing image at the provided location.
-     *
-     * <p>Some platforms may override this method to use platform-level caching.  E.g. Javascript will use
-     * the browser cache for downloading the image.</p>
-     *
-     * @param url       The URL of the image to download.
-     * @param fileName  The storage key to be used to store the image.
-     * @param onSuccess Callback on success.  Will be executed on EDT.
-     * @param onFail    Callback on failure.  Will be executed on EDT.
-     */
+    /// Downloads an image to file system. This will *not* first check to see if the file exists already.
+    /// It will download and overwrite any existing image at the provided location.
+    ///
+    /// Some platforms may override this method to use platform-level caching.  E.g. Javascript will use
+    /// the browser cache for downloading the image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL of the image to download.
+    ///
+    /// - `fileName`: The storage key to be used to store the image.
+    ///
+    /// - `onSuccess`: Callback on success.  Will be executed on EDT.
+    ///
+    /// - `onFail`: Callback on failure.  Will be executed on EDT.
     public void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
@@ -1341,184 +1400,208 @@ public abstract class CodenameOneImplementation {
         cr.downloadImageToFileSystem(fileName, onSuccess, onFail);
     }
 
-    /**
-     * Returns the number of softkeys on the device
-     *
-     * @return the number of softkey buttons on the device
-     */
+    /// Returns the number of softkeys on the device
+    ///
+    /// #### Returns
+    ///
+    /// the number of softkey buttons on the device
     public abstract int getSoftkeyCount();
 
-    /**
-     * Returns the softkey keycode for the given softkey index
-     *
-     * @param index the index of the softkey
-     * @return the set of keycodes which can indicate the softkey, multiple keycodes
-     * might apply to the same functionality
-     */
+    /// Returns the softkey keycode for the given softkey index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index of the softkey
+    ///
+    /// #### Returns
+    ///
+    /// @return the set of keycodes which can indicate the softkey, multiple keycodes
+    /// might apply to the same functionality
     public abstract int[] getSoftkeyCode(int index);
 
-    /**
-     * Returns the keycode for the clear key
-     *
-     * @return the system key code for this device
-     */
+    /// Returns the keycode for the clear key
+    ///
+    /// #### Returns
+    ///
+    /// the system key code for this device
     public abstract int getClearKeyCode();
 
-    /**
-     * Returns the keycode for the backspace key
-     *
-     * @return the system key code for this device
-     */
+    /// Returns the keycode for the backspace key
+    ///
+    /// #### Returns
+    ///
+    /// the system key code for this device
     public abstract int getBackspaceKeyCode();
 
-    /**
-     * Returns the keycode for the back key
-     *
-     * @return the system key code for this device
-     */
+    /// Returns the keycode for the back key
+    ///
+    /// #### Returns
+    ///
+    /// the system key code for this device
     public abstract int getBackKeyCode();
 
-    /**
-     * Returns the display game action for the given keyCode if applicable to match
-     * the contrct of Codename One for the game action behavior
-     *
-     * @param keyCode the device keycode
-     * @return a game action or 0
-     */
+    /// Returns the display game action for the given keyCode if applicable to match
+    /// the contrct of Codename One for the game action behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the device keycode
+    ///
+    /// #### Returns
+    ///
+    /// a game action or 0
     public abstract int getGameAction(int keyCode);
 
-    /**
-     * Returns a keycode which can be sent to getGameAction
-     *
-     * @param gameAction the game action
-     * @return key code matching the given game action
-     */
+    /// Returns a keycode which can be sent to getGameAction
+    ///
+    /// #### Parameters
+    ///
+    /// - `gameAction`: the game action
+    ///
+    /// #### Returns
+    ///
+    /// key code matching the given game action
     public abstract int getKeyCode(int gameAction);
 
-    /**
-     * Returns true if the device will send touch events
-     *
-     * @return true if the device will send touch events
-     */
+    /// Returns true if the device will send touch events
+    ///
+    /// #### Returns
+    ///
+    /// true if the device will send touch events
     public abstract boolean isTouchDevice();
 
-    /**
-     * Callback before showing a specific form
-     *
-     * @param f the form shown
-     */
+    /// Callback before showing a specific form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form shown
     public void onShow(Form f) {
         if (onCurrentFormChange != null) {
             onCurrentFormChange.run();
         }
     }
 
-    /**
-     * Callback method allowing the implementation to confirm that it controls the
-     * view just before a new form is installed.
-     */
+    /// Callback method allowing the implementation to confirm that it controls the
+    /// view just before a new form is installed.
     public void confirmControlView() {
     }
 
-    /**
-     * Returns the current form, this method is for internal use only and does not
-     * take transitions/menus into consideration
-     *
-     * @return The internal current form
-     */
+    /// Returns the current form, this method is for internal use only and does not
+    /// take transitions/menus into consideration
+    ///
+    /// #### Returns
+    ///
+    /// The internal current form
     public Form getCurrentForm() {
         return currentForm;
     }
 
-    /**
-     * This method is used internally to determine the actual current form
-     * it doesn't perform the logic of transitions etc. and shouldn't be invoked
-     * by developers
-     *
-     * @param f the current form
-     */
+    /// This method is used internally to determine the actual current form
+    /// it doesn't perform the logic of transitions etc. and shouldn't be invoked
+    /// by developers
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the current form
     public void setCurrentForm(Form f) {
         currentForm = f;
     }
 
-    /**
-     * Codename One can translate all coordinates and never requires a call to translate
-     * this works well for some devices which have hairy issues with translate.
-     * However for some platforms where translate can be leveraged with affine transforms
-     * this can be a problem. These platforms can choose to translate on their own
-     *
-     * @return true if the implementation is interested in receiving translate calls
-     * and handling them.
-     */
+    /// Codename One can translate all coordinates and never requires a call to translate
+    /// this works well for some devices which have hairy issues with translate.
+    /// However for some platforms where translate can be leveraged with affine transforms
+    /// this can be a problem. These platforms can choose to translate on their own
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the implementation is interested in receiving translate calls
+    /// and handling them.
     public boolean isTranslationSupported() {
         return false;
     }
 
-    /**
-     * Translates the X/Y location for drawing on the underlying surface. Translation
-     * is incremental so the new value will be added to the current translation and
-     * in order to reset translation we have to invoke
-     * {@code translate(-getTranslateX(), -getTranslateY()) }
-     *
-     * @param graphics the graphics context
-     * @param x        the x coordinate
-     * @param y        the y coordinate
-     */
+    /// Translates the X/Y location for drawing on the underlying surface. Translation
+    /// is incremental so the new value will be added to the current translation and
+    /// in order to reset translation we have to invoke
+    /// `translate(-getTranslateX(), -getTranslateY())`
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: the x coordinate
+    ///
+    /// - `y`: the y coordinate
     public void translate(Object graphics, int x, int y) {
     }
 
-    /**
-     * Returns the current x translate value
-     *
-     * @param graphics the graphics context
-     * @return the current x translate value
-     */
+    /// Returns the current x translate value
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the current x translate value
     public int getTranslateX(Object graphics) {
         return 0;
     }
 
-    /**
-     * Returns the current y translate value
-     *
-     * @param graphics the graphics context
-     * @return the current y translate value
-     */
+    /// Returns the current y translate value
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the current y translate value
     public int getTranslateY(Object graphics) {
         return 0;
     }
 
-    /**
-     * Returns the current color
-     *
-     * @param graphics the graphics context
-     * @return the RGB graphics color
-     */
+    /// Returns the current color
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the RGB graphics color
     public abstract int getColor(Object graphics);
 
-    /**
-     * Sets the current rgb color while ignoring any potential alpha component within
-     * said color value.
-     *
-     * @param graphics the graphics context
-     * @param rgb      the RGB value for the color.
-     */
+    /// Sets the current rgb color while ignoring any potential alpha component within
+    /// said color value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `rgb`: the RGB value for the color.
     public abstract void setColor(Object graphics, int rgb);
 
-    /**
-     * Alpha value from 0-255 can be ignored for some operations
-     *
-     * @param graphics the graphics context
-     * @param alpha    the alpha channel
-     */
+    /// Alpha value from 0-255 can be ignored for some operations
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `alpha`: the alpha channel
     public abstract void setAlpha(Object graphics, int alpha);
 
-    /**
-     * Concatenates alpha value to current alpha.
-     *
-     * @param graphics The graphics context
-     * @param alpha    The alpha to concatenate.
-     * @return The previous alpha value.
-     */
+    /// Concatenates alpha value to current alpha.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: The graphics context
+    ///
+    /// - `alpha`: The alpha to concatenate.
+    ///
+    /// #### Returns
+    ///
+    /// The previous alpha value.
     public final int concatenateAlpha(Object graphics, int alpha) {
         if (alpha == 255) {
             return getAlpha(graphics);
@@ -1528,32 +1611,35 @@ public abstract class CodenameOneImplementation {
         return oldAlpha;
     }
 
-    /**
-     * Alpha value from 0-255 can be ignored for some operations
-     *
-     * @param graphics the graphics context
-     * @return the alpha channel
-     */
+    /// Alpha value from 0-255 can be ignored for some operations
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the alpha channel
     public abstract int getAlpha(Object graphics);
 
-    /**
-     * Returns true if alpha can be applied for all elements globally and efficiently
-     * otherwise alpha should be ignored.
-     * Notice that fillRect MUST always support alpha regardless of the value of this
-     * variable!
-     *
-     * @return true if alpha support is natively implemented
-     */
+    /// Returns true if alpha can be applied for all elements globally and efficiently
+    /// otherwise alpha should be ignored.
+    /// Notice that fillRect MUST always support alpha regardless of the value of this
+    /// variable!
+    ///
+    /// #### Returns
+    ///
+    /// true if alpha support is natively implemented
     public boolean isAlphaGlobal() {
         return false;
     }
 
-    /**
-     * Indicates whether the underlying implementation allows for anti-aliasing in regular
-     * drawing operations
-     *
-     * @return false by default
-     */
+    /// Indicates whether the underlying implementation allows for anti-aliasing in regular
+    /// drawing operations
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isAntiAliasingSupported() {
         return false;
     }
@@ -1562,11 +1648,11 @@ public abstract class CodenameOneImplementation {
         return isAntiAliasingSupported();
     }
 
-    /**
-     * Indicates whether the underlying implementation allows for anti-aliased fonts
-     *
-     * @return false by default
-     */
+    /// Indicates whether the underlying implementation allows for anti-aliased fonts
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isAntiAliasedTextSupported() {
         return false;
     }
@@ -1589,40 +1675,48 @@ public abstract class CodenameOneImplementation {
     }
     */
 
-    /**
-     * Toggles anti-aliasing mode for regular rendering operations
-     *
-     * @param graphics the graphics context
-     * @param a        true to activate Anti-aliasing, false to disable it
-     */
+    /// Toggles anti-aliasing mode for regular rendering operations
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `a`: true to activate Anti-aliasing, false to disable it
     public void setAntiAliased(Object graphics, boolean a) {
     }
 
-    /**
-     * Returns anti-aliasing mode for regular rendering operations
-     *
-     * @param graphics the graphics context
-     * @return true if Anti-aliasing is active, false otherwise
-     */
+    /// Returns anti-aliasing mode for regular rendering operations
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// true if Anti-aliasing is active, false otherwise
     public boolean isAntiAliased(Object graphics) {
         return false;
     }
 
-    /**
-     * Toggles anti-aliasing mode for font rendering operations
-     *
-     * @param graphics the graphics context
-     * @param a        true to activate Anti-aliasing, false to disable it
-     */
+    /// Toggles anti-aliasing mode for font rendering operations
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `a`: true to activate Anti-aliasing, false to disable it
     public void setAntiAliasedText(Object graphics, boolean a) {
     }
 
-    /**
-     * Returns anti-aliasing mode for font rendering operations
-     *
-     * @param graphics the graphics context
-     * @return true if Anti-aliasing is active, false otherwise
-     */
+    /// Returns anti-aliasing mode for font rendering operations
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// true if Anti-aliasing is active, false otherwise
     public boolean isAntiAliasedText(Object graphics) {
         return false;
     }
@@ -1630,200 +1724,249 @@ public abstract class CodenameOneImplementation {
     // ----- BEGIN CLIP STACK METHODS ---  ADDED TO HELP SUPPORT TRANSFORMATIONS
     // in the clip.
 
-    /**
-     * Installs a native font object
-     *
-     * @param graphics the graphics context
-     * @param font     the native font object
-     */
+    /// Installs a native font object
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `font`: the native font object
     public abstract void setNativeFont(Object graphics, Object font);
 
-    /**
-     * Returns the internal clipping rectangle. This method must create a new
-     * rectangle object to prevent corruption by modification.
-     *
-     * @param graphics the graphics context
-     * @return the clipping rectangle.
-     */
+    /// Returns the internal clipping rectangle. This method must create a new
+    /// rectangle object to prevent corruption by modification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the clipping rectangle.
     public Rectangle getClipRect(Object graphics) {
         return new Rectangle(getClipX(graphics), getClipY(graphics), new Dimension(getClipWidth(graphics), getClipHeight(graphics)));
     }
 
-    /**
-     * Returns the clipping coordinate
-     *
-     * @param graphics the graphics context
-     * @return the clipping coordinate
-     */
+    /// Returns the clipping coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the clipping coordinate
     public abstract int getClipX(Object graphics);
 
 
     // ----- END CLIP STACK METHODS
 
-    /**
-     * Returns the clipping coordinate
-     *
-     * @param graphics the graphics context
-     * @return the clipping coordinate
-     */
+    /// Returns the clipping coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the clipping coordinate
     public abstract int getClipY(Object graphics);
 
-    /**
-     * Returns the clipping coordinate
-     *
-     * @param graphics the graphics context
-     * @return the clipping coordinate
-     */
+    /// Returns the clipping coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the clipping coordinate
     public abstract int getClipWidth(Object graphics);
 
-    /**
-     * Returns the clipping coordinate
-     *
-     * @param graphics the graphics context
-     * @return the clipping coordinate
-     */
+    /// Returns the clipping coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// the clipping coordinate
     public abstract int getClipHeight(Object graphics);
 
-    /**
-     * Installs a new clipping rectangle
-     *
-     * @param graphics the graphics context
-     * @param rect     rectangle representing the new clipping area
-     */
+    /// Installs a new clipping rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `rect`: rectangle representing the new clipping area
     public void setClipRect(Object graphics, Rectangle rect) {
         Dimension d = rect.getSize();
         setClip(graphics, rect.getX(), rect.getY(), d.getWidth(), d.getHeight());
     }
 
-    /**
-     * Installs a new clipping rectangle
-     *
-     * @param graphics the graphics context
-     * @param x        coordinate
-     * @param y        coordinate
-     * @param width    size
-     * @param height   size
-     * @param rect     rectangle representing the new clipping area
-     */
+    /// Installs a new clipping rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: coordinate
+    ///
+    /// - `y`: coordinate
+    ///
+    /// - `width`: size
+    ///
+    /// - `height`: size
+    ///
+    /// - `rect`: rectangle representing the new clipping area
     public abstract void setClip(Object graphics, int x, int y, int width, int height);
 
-    /**
-     * Clips the Graphics context to the Shape.
-     *
-     * @param graphics the graphics context
-     * @param shape    The shape to clip.
-     */
+    /// Clips the Graphics context to the Shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `shape`: The shape to clip.
     public void setClip(Object graphics, Shape shape) {
         System.out.println("Shape clip is not supported");
     }
 
-    /**
-     * Changes the current clipping rectangle to subset the current clipping with
-     * the given clipping.
-     *
-     * @param graphics the graphics context
-     * @param rect     rectangle representing the new clipping area
-     */
+    /// Changes the current clipping rectangle to subset the current clipping with
+    /// the given clipping.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `rect`: rectangle representing the new clipping area
     public void clipRect(Object graphics, Rectangle rect) {
         Dimension d = rect.getSize();
         clipRect(graphics, rect.getX(), rect.getY(), d.getWidth(), d.getHeight());
     }
 
-    /**
-     * Changes the current clipping rectangle to subset the current clipping with
-     * the given clipping.
-     *
-     * @param graphics the graphics context
-     * @param x        coordinate
-     * @param y        coordinate
-     * @param width    size
-     * @param height   size
-     * @param rect     rectangle representing the new clipping area
-     */
+    /// Changes the current clipping rectangle to subset the current clipping with
+    /// the given clipping.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: coordinate
+    ///
+    /// - `y`: coordinate
+    ///
+    /// - `width`: size
+    ///
+    /// - `height`: size
+    ///
+    /// - `rect`: rectangle representing the new clipping area
     public abstract void clipRect(Object graphics, int x, int y, int width, int height);
 
-    /**
-     * Pushes the current clip onto the clip stack so that it can be retrieved later
-     * by {@link #popClip}.
-     *
-     * @param graphics The native graphics context.
-     */
+    /// Pushes the current clip onto the clip stack so that it can be retrieved later
+    /// by `#popClip`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: The native graphics context.
     public void pushClip(Object graphics) {
 
     }
 
-    /**
-     * Cleans up resources used by graphics object
-     *
-     * @param graphics
-     */
+    /// Cleans up resources used by graphics object
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`
     public void disposeGraphics(Object graphics) {
 
     }
 
-    /**
-     * Pops the clip from the top of the clip stack and sets it as the current clip.
-     *
-     * @param graphics The native graphics context.
-     * @return The clip that was popped off the top of the clip stack.
-     */
+    /// Pops the clip from the top of the clip stack and sets it as the current clip.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: The native graphics context.
+    ///
+    /// #### Returns
+    ///
+    /// The clip that was popped off the top of the clip stack.
     public void popClip(Object graphics) {
         // NOt implemented yet... need to implement.
 
 
     }
 
-    /**
-     * Draws a line between the 2 X/Y coordinates
-     *
-     * @param graphics the graphics context
-     * @param x1       first x position
-     * @param y1       first y position
-     * @param x2       second x position
-     * @param y2       second y position
-     */
+    /// Draws a line between the 2 X/Y coordinates
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x1`: first x position
+    ///
+    /// - `y1`: first y position
+    ///
+    /// - `x2`: second x position
+    ///
+    /// - `y2`: second y position
     public abstract void drawLine(Object graphics, int x1, int y1, int x2, int y2);
 
 
     // METHODS FOR DEALING WITH 2-D Paths
 
-    /**
-     * Fills the rectangle from the given position according to the width/height
-     * minus 1 pixel according to the convention in Java.
-     *
-     * @param graphics the graphics context
-     * @param x        the x coordinate of the rectangle to be filled.
-     * @param y        the y coordinate of the rectangle to be filled.
-     * @param width    the width of the rectangle to be filled.
-     * @param height   the height of the rectangle to be filled.
-     */
+    /// Fills the rectangle from the given position according to the width/height
+    /// minus 1 pixel according to the convention in Java.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: the x coordinate of the rectangle to be filled.
+    ///
+    /// - `y`: the y coordinate of the rectangle to be filled.
+    ///
+    /// - `width`: the width of the rectangle to be filled.
+    ///
+    /// - `height`: the height of the rectangle to be filled.
     public abstract void fillRect(Object graphics, int x, int y, int width, int height);
 
     public void clearRect(Object graphics, int x, int y, int width, int height) {
         System.out.println("clearRect() not implemented on this platform");
     }
 
-    /**
-     * Draws a rectangle in the given coordinates
-     *
-     * @param graphics the graphics context
-     * @param x        the x coordinate of the rectangle to be drawn.
-     * @param y        the y coordinate of the rectangle to be drawn.
-     * @param width    the width of the rectangle to be drawn.
-     * @param height   the height of the rectangle to be drawn.
-     */
+    /// Draws a rectangle in the given coordinates
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: the x coordinate of the rectangle to be drawn.
+    ///
+    /// - `y`: the y coordinate of the rectangle to be drawn.
+    ///
+    /// - `width`: the width of the rectangle to be drawn.
+    ///
+    /// - `height`: the height of the rectangle to be drawn.
     public abstract void drawRect(Object graphics, int x, int y, int width, int height);
 
-    /**
-     * Draws a rectangle in the given coordinates
-     *
-     * @param graphics  the graphics context
-     * @param x         the x coordinate of the rectangle to be drawn.
-     * @param y         the y coordinate of the rectangle to be drawn.
-     * @param width     the width of the rectangle to be drawn.
-     * @param height    the height of the rectangle to be drawn.
-     * @param thickness the thickness in pixels
-     */
+    /// Draws a rectangle in the given coordinates
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: the x coordinate of the rectangle to be drawn.
+    ///
+    /// - `y`: the y coordinate of the rectangle to be drawn.
+    ///
+    /// - `width`: the width of the rectangle to be drawn.
+    ///
+    /// - `height`: the height of the rectangle to be drawn.
+    ///
+    /// - `thickness`: the thickness in pixels
     public void drawRect(Object graphics, int x, int y, int width, int height, int thickness) {
         width--;
         height--;
@@ -1834,94 +1977,132 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Draws a rounded corner rectangle in the given coordinates with the arcWidth/height
-     * matching the last two arguments respectively.
-     *
-     * @param graphics  the graphics context
-     * @param x         the x coordinate of the rectangle to be drawn.
-     * @param y         the y coordinate of the rectangle to be drawn.
-     * @param width     the width of the rectangle to be drawn.
-     * @param height    the height of the rectangle to be drawn.
-     * @param arcWidth  the horizontal diameter of the arc at the four corners.
-     * @param arcHeight the vertical diameter of the arc at the four corners.
-     */
+    /// Draws a rounded corner rectangle in the given coordinates with the arcWidth/height
+    /// matching the last two arguments respectively.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: the x coordinate of the rectangle to be drawn.
+    ///
+    /// - `y`: the y coordinate of the rectangle to be drawn.
+    ///
+    /// - `width`: the width of the rectangle to be drawn.
+    ///
+    /// - `height`: the height of the rectangle to be drawn.
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
     public abstract void drawRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight);
 
-    /**
-     * Fills a rounded rectangle in the same way as drawRoundRect
-     *
-     * @param graphics  the graphics context
-     * @param x         the x coordinate of the rectangle to be filled.
-     * @param y         the y coordinate of the rectangle to be filled.
-     * @param width     the width of the rectangle to be filled.
-     * @param height    the height of the rectangle to be filled.
-     * @param arcWidth  the horizontal diameter of the arc at the four corners.
-     * @param arcHeight the vertical diameter of the arc at the four corners.
-     * @see #drawRoundRect
-     */
+    /// Fills a rounded rectangle in the same way as drawRoundRect
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: the x coordinate of the rectangle to be filled.
+    ///
+    /// - `y`: the y coordinate of the rectangle to be filled.
+    ///
+    /// - `width`: the width of the rectangle to be filled.
+    ///
+    /// - `height`: the height of the rectangle to be filled.
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// #### See also
+    ///
+    /// - #drawRoundRect
     public abstract void fillRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight);
 
-    /**
-     * Fills a circular or elliptical arc based on the given angles and bounding
-     * box. The resulting arc begins at startAngle and extends for arcAngle
-     * degrees.
-     *
-     * @param graphics   the graphics context
-     * @param x          the x coordinate of the upper-left corner of the arc to be filled.
-     * @param y          the y coordinate of the upper-left corner of the arc to be filled.
-     * @param width      the width of the arc to be filled.
-     * @param height     the height of the arc to be filled.
-     * @param startAngle the beginning angle.
-     * @param arcAngle   the angular extent of the arc, relative to the start angle.
-     */
+    /// Fills a circular or elliptical arc based on the given angles and bounding
+    /// box. The resulting arc begins at startAngle and extends for arcAngle
+    /// degrees.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: the x coordinate of the upper-left corner of the arc to be filled.
+    ///
+    /// - `y`: the y coordinate of the upper-left corner of the arc to be filled.
+    ///
+    /// - `width`: the width of the arc to be filled.
+    ///
+    /// - `height`: the height of the arc to be filled.
+    ///
+    /// - `startAngle`: the beginning angle.
+    ///
+    /// - `arcAngle`: the angular extent of the arc, relative to the start angle.
     public abstract void fillArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle);
 
-    /**
-     * Draws a circular or elliptical arc based on the given angles and bounding
-     * box
-     *
-     * @param graphics   the graphics context
-     * @param x          the x coordinate of the upper-left corner of the arc to be drawn.
-     * @param y          the y coordinate of the upper-left corner of the arc to be drawn.
-     * @param width      the width of the arc to be drawn.
-     * @param height     the height of the arc to be drawn.
-     * @param startAngle the beginning angle.
-     * @param arcAngle   the angular extent of the arc, relative to the start angle.
-     */
+    /// Draws a circular or elliptical arc based on the given angles and bounding
+    /// box
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: the x coordinate of the upper-left corner of the arc to be drawn.
+    ///
+    /// - `y`: the y coordinate of the upper-left corner of the arc to be drawn.
+    ///
+    /// - `width`: the width of the arc to be drawn.
+    ///
+    /// - `height`: the height of the arc to be drawn.
+    ///
+    /// - `startAngle`: the beginning angle.
+    ///
+    /// - `arcAngle`: the angular extent of the arc, relative to the start angle.
     public abstract void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle);
 
-    /**
-     * Draw a string using the current font and color in the x,y coordinates. The font is drawn
-     * from the top position and not the baseline.
-     *
-     * @param graphics the graphics context
-     * @param str      the string to be drawn.
-     * @param x        the x coordinate.
-     * @param y        the y coordinate.
-     */
+    /// Draw a string using the current font and color in the x,y coordinates. The font is drawn
+    /// from the top position and not the baseline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `str`: the string to be drawn.
+    ///
+    /// - `x`: the x coordinate.
+    ///
+    /// - `y`: the y coordinate.
     public abstract void drawString(Object graphics, String str, int x, int y);
 
-    /**
-     * Draws the image so its top left coordinate corresponds to x/y
-     *
-     * @param graphics the graphics context
-     * @param img      the specified native image to be drawn
-     * @param x        the x coordinate.
-     * @param y        the y coordinate.
-     */
+    /// Draws the image so its top left coordinate corresponds to x/y
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `img`: the specified native image to be drawn
+    ///
+    /// - `x`: the x coordinate.
+    ///
+    /// - `y`: the y coordinate.
     public abstract void drawImage(Object graphics, Object img, int x, int y);
 
-    /**
-     * Draws the image so its top left coordinate corresponds to x/y
-     *
-     * @param graphics the graphics context
-     * @param img      the specified native image to be drawn
-     * @param x        the x coordinate.
-     * @param y        the y coordinate.
-     * @param w        the width
-     * @param h        the height
-     */
+    /// Draws the image so its top left coordinate corresponds to x/y
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `img`: the specified native image to be drawn
+    ///
+    /// - `x`: the x coordinate.
+    ///
+    /// - `y`: the y coordinate.
+    ///
+    /// - `w`: the width
+    ///
+    /// - `h`: the height
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
     }
 
@@ -1933,176 +2114,241 @@ public abstract class CodenameOneImplementation {
 
     // END METHODS FOR DEALING WITH 2-D Paths
 
-    /**
-     * Draws outline of shape on the given graphics context.
-     * <p>The last 4 parameters specify a bounding box for drawing the Shape.  The shape's bounds will
-     * be made to fit this box exactly for drawing.  This allows for resizing the shape on the GPU
-     * if graphics acceleration is supported.</p>
-     *
-     * @param graphics the graphics context
-     * @param shape    the shape to draw.
-     * @param stroke   The stroke to use for drawing the contour.
-     * @see isShapeSupported() to determine of the graphics context supports drawing
-     * shapes.
-     */
+    /// Draws outline of shape on the given graphics context.
+    ///
+    /// The last 4 parameters specify a bounding box for drawing the Shape.  The shape's bounds will
+    /// be made to fit this box exactly for drawing.  This allows for resizing the shape on the GPU
+    /// if graphics acceleration is supported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `shape`: the shape to draw.
+    ///
+    /// - `stroke`: The stroke to use for drawing the contour.
+    ///
+    /// #### See also
+    ///
+    /// - @see isShapeSupported() to determine of the graphics context supports drawing
+    /// shapes.
     public void drawShape(Object graphics, Shape shape, Stroke stroke) {
     }
 
-    /**
-     * Fills the given shape in the specified graphics context using the graphics context's
-     * currently selected color and alpha.
-     *
-     * @param graphics
-     * @param shape
-     * @see drawShape To learn what x, y, w, and h do.
-     */
+    /// Fills the given shape in the specified graphics context using the graphics context's
+    /// currently selected color and alpha.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`
+    ///
+    /// - `shape`
+    ///
+    /// #### See also
+    ///
+    /// - drawShape To learn what x, y, w, and h do.
     public void fillShape(Object graphics, Shape shape) {
     }
 
-    /**
-     * Draws a drop shadow for an image onto the given graphics context.
-     *
-     * <p>This is used for the elevation feature.</p>
-     *
-     * <p>Note: This operation is expensive on most platforms as it is not hardware accelerated.  Codename One's elevation functionality
-     * uses this method to generate shadow images which it reuses as much as possible for maximum performance.</p>
-     *
-     * <p>Note: Currently this is not supported on all platforms.  Use {@link #isDrawShadowSupported()} to check for platform support at
-     * runtime.  Use {@link #isDrawShadowFast()} to check for hardware acceleration.</p>
-     *
-     * <p>Note: On iOS, this is only supported for drawing to mutable images - not the global graphics context.</p>
-     *
-     * @param graphics     The graphics context.
-     * @param image        The image whose raster should be used to generate the shadow.  The alpha channel of this image is used as the
-     *                     bases for the shadow projection.
-     * @param x            x-coordinate of the graphics context where shadow should be painted.
-     * @param y            y-coordinate of the graphics context where shadow should be painted.
-     * @param offsetX      The shadow offset X in pixels.
-     * @param offsetY      The shadow offset Y in pixels.
-     * @param blurRadius   The blur radius in pixels.
-     * @param spreadRadius The shadow spread in pixels.
-     * @param color        The shadow color.
-     * @param opacity      The shadow opacity.
-     * @see Component#paintShadows(Graphics, int, int)
-     * @see Container#paintSurfaceShadows(Graphics)
-     * @see #isDrawShadowSupported()
-     * @see #isDrawShadowFast()
-     * @since 8.0
-     */
+    /// Draws a drop shadow for an image onto the given graphics context.
+    ///
+    /// This is used for the elevation feature.
+    ///
+    /// Note: This operation is expensive on most platforms as it is not hardware accelerated.  Codename One's elevation functionality
+    /// uses this method to generate shadow images which it reuses as much as possible for maximum performance.
+    ///
+    /// Note: Currently this is not supported on all platforms.  Use `#isDrawShadowSupported()` to check for platform support at
+    /// runtime.  Use `#isDrawShadowFast()` to check for hardware acceleration.
+    ///
+    /// Note: On iOS, this is only supported for drawing to mutable images - not the global graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: The graphics context.
+    ///
+    /// - `image`: @param image        The image whose raster should be used to generate the shadow.  The alpha channel of this image is used as the
+    ///                     bases for the shadow projection.
+    ///
+    /// - `x`: x-coordinate of the graphics context where shadow should be painted.
+    ///
+    /// - `y`: y-coordinate of the graphics context where shadow should be painted.
+    ///
+    /// - `offsetX`: The shadow offset X in pixels.
+    ///
+    /// - `offsetY`: The shadow offset Y in pixels.
+    ///
+    /// - `blurRadius`: The blur radius in pixels.
+    ///
+    /// - `spreadRadius`: The shadow spread in pixels.
+    ///
+    /// - `color`: The shadow color.
+    ///
+    /// - `opacity`: The shadow opacity.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - Component#paintShadows(Graphics, int, int)
+    ///
+    /// - Container#paintSurfaceShadows(Graphics)
+    ///
+    /// - #isDrawShadowSupported()
+    ///
+    /// - #isDrawShadowFast()
     public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
 
     }
 
-    /**
-     * Checks to see if drawing shadows is supported on this platform.
-     *
-     * @return True if the platform supports drawing shadows.
-     * @see #drawShadow(Object, Object, int, int, int, int, int, int, int, float)
-     * @since 8.0
-     */
+    /// Checks to see if drawing shadows is supported on this platform.
+    ///
+    /// #### Returns
+    ///
+    /// True if the platform supports drawing shadows.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #drawShadow(Object, Object, int, int, int, int, int, int, int, float)
     public boolean isDrawShadowSupported() {
         return false;
     }
 
-    /**
-     * Checks to see if drawing shadows on this platform is hardware accelerated.
-     *
-     * @return True if drawing shadows is hardware accelerated.
-     * @since 8.0
-     */
+    /// Checks to see if drawing shadows on this platform is hardware accelerated.
+    ///
+    /// #### Returns
+    ///
+    /// True if drawing shadows is hardware accelerated.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public boolean isDrawShadowFast() {
         return false;
     }
 
-    /**
-     * Sets the transformation matrix to be applied to all drawing operations. If
-     * originX, originY are non-zero, then the the transformation will first be translated
-     * to the origin, then applied, and then translated back.
-     *
-     * <p>If isTransformSupported() returns false, then this method won't do anything.</p>
-     * <p>If isPerspectiveTransformSupported() returns false, then this method will only
-     * deal with 2D transformation matrices (i.e. the upper left 3x3 matrix of the provided
-     * transformation matrix.</p>
-     *
-     * @param graphics
-     * @param m        The transformation matrix.  Can be 3x3 or 4x4.
-     * @see isTransformSupported() To check if this graphics context supports transformations.
-     * @see isPerspectiveTransformSupported() To check if this graphics context
-     * supports perspective/3D transformations.
-     */
+    /// Sets the transformation matrix to be applied to all drawing operations. If
+    /// originX, originY are non-zero, then the the transformation will first be translated
+    /// to the origin, then applied, and then translated back.
+    ///
+    /// If isTransformSupported() returns false, then this method won't do anything.
+    ///
+    /// If isPerspectiveTransformSupported() returns false, then this method will only
+    /// deal with 2D transformation matrices (i.e. the upper left 3x3 matrix of the provided
+    /// transformation matrix.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`
+    ///
+    /// - `m`: The transformation matrix.  Can be 3x3 or 4x4.
+    ///
+    /// #### See also
+    ///
+    /// - isTransformSupported() To check if this graphics context supports transformations.
+    ///
+    /// - @see isPerspectiveTransformSupported() To check if this graphics context
+    /// supports perspective/3D transformations.
     public void setTransform(Object graphics, Transform transform) {
 
     }
 
-    /**
-     * Gets the current transformation matrix.  This will populate the provided
-     * matrix with the data of the current transformation.
-     *
-     * @param graphics
-     * @see isTransformSupported()
-     * @see isPerspectiveTransformSupported()
-     * @deprecated Use {@link #getTransform(java.lang.Object, com.codename1.ui.Transform) } instead.
-     */
+    /// Gets the current transformation matrix.  This will populate the provided
+    /// matrix with the data of the current transformation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `com.codename1.ui.Transform)` instead.
+    ///
+    /// #### See also
+    ///
+    /// - isTransformSupported()
+    ///
+    /// - isPerspectiveTransformSupported()
     public Transform getTransform(Object graphics) {
         return Transform.makeIdentity();
     }
 
-    /**
-     * Checks if matrix transformations are supported in the provided graphics context.
-     *
-     * @param graphics
-     * @return True if matrix transformations are supported by this graphics context.
-     * @see setTransform()
-     * @see getTransform()
-     * @see isPerspectiveTransformSupported()
-     */
+    /// Checks if matrix transformations are supported in the provided graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`
+    ///
+    /// #### Returns
+    ///
+    /// True if matrix transformations are supported by this graphics context.
+    ///
+    /// #### See also
+    ///
+    /// - setTransform()
+    ///
+    /// - getTransform()
+    ///
+    /// - isPerspectiveTransformSupported()
     public boolean isTransformSupported(Object graphics) {
         return false;
     }
 
-    /**
-     * Checks if 3d/perspective transformations are supported in the provided graphics context.
-     *
-     * @param graphics
-     * @return
-     * @see setTransform()
-     * @see getTransform()
-     * @see isTransformSupported()
-     */
+    /// Checks if 3d/perspective transformations are supported in the provided graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`
+    ///
+    /// #### See also
+    ///
+    /// - setTransform()
+    ///
+    /// - getTransform()
+    ///
+    /// - isTransformSupported()
     public boolean isPerspectiveTransformSupported(Object graphics) {
         return false;
     }
 
-    /**
-     * Checks if drawing shapes is supported by the provided graphics context.
-     *
-     * @param graphics
-     * @return
-     */
+    /// Checks if drawing shapes is supported by the provided graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`
     public boolean isShapeSupported(Object graphics) {
         return false;
     }
 
-    /**
-     * Checks if clipping shapes is supported by the provided graphics context.
-     *
-     * @param graphics
-     * @return
-     */
+    /// Checks if clipping shapes is supported by the provided graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`
     public boolean isShapeClipSupported(Object graphics) {
         return false;
     }
 
-    /**
-     * Allows an implementation to optimize image tiling rendering logic
-     *
-     * @param graphics the graphics object
-     * @param img      the image
-     * @param x        coordinate to tile the image along
-     * @param y        coordinate to tile the image along
-     * @param w        coordinate to tile the image along
-     * @param h        coordinate to tile the image along
-     */
+    /// Allows an implementation to optimize image tiling rendering logic
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics object
+    ///
+    /// - `img`: the image
+    ///
+    /// - `x`: coordinate to tile the image along
+    ///
+    /// - `y`: coordinate to tile the image along
+    ///
+    /// - `w`: coordinate to tile the image along
+    ///
+    /// - `h`: coordinate to tile the image along
     public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
         int iW = getImageWidth(img);
         int iH = getImageHeight(img);
@@ -2133,35 +2379,40 @@ public abstract class CodenameOneImplementation {
         setClip(graphics, clipX, clipY, clipW, clipH);
     }
 
-    /**
-     * Indicates if the native video player includes its own play/pause etc. controls so the movie player
-     * component doesn't need to include them
-     *
-     * @return true if the movie player component doesn't need to include such controls
-     */
+    /// Indicates if the native video player includes its own play/pause etc. controls so the movie player
+    /// component doesn't need to include them
+    ///
+    /// #### Returns
+    ///
+    /// true if the movie player component doesn't need to include such controls
     public boolean isNativeVideoPlayerControlsIncluded() {
         return false;
     }
 
-    /**
-     * Indicates if image scaling on the fly is supported by the platform, if not Codename One will just scale the images on its own before drawing
-     */
+    /// Indicates if image scaling on the fly is supported by the platform, if not Codename One will just scale the images on its own before drawing
     public boolean isScaledImageDrawingSupported() {
         return false;
     }
 
-    /**
-     * Draws a portion of the image
-     *
-     * @param nativeGraphics the graphics context
-     * @param img            the specified native image to be drawn
-     * @param x              the x coordinate.
-     * @param y              the y coordinate.
-     * @param imageX         location within the image to draw
-     * @param imageY         location within the image to draw
-     * @param imageWidth     size of the location within the image to draw
-     * @param imageHeight    size of the location within the image to draw
-     */
+    /// Draws a portion of the image
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: the graphics context
+    ///
+    /// - `img`: the specified native image to be drawn
+    ///
+    /// - `x`: the x coordinate.
+    ///
+    /// - `y`: the y coordinate.
+    ///
+    /// - `imageX`: location within the image to draw
+    ///
+    /// - `imageY`: location within the image to draw
+    ///
+    /// - `imageWidth`: size of the location within the image to draw
+    ///
+    /// - `imageHeight`: size of the location within the image to draw
     public void drawImageArea(Object nativeGraphics, Object img, int x, int y, int imageX, int imageY, int imageWidth, int imageHeight) {
         int clipX = getClipX(nativeGraphics);
         int clipY = getClipY(nativeGraphics);
@@ -2176,398 +2427,440 @@ public abstract class CodenameOneImplementation {
         setClip(nativeGraphics, clipX, clipY, clipWidth, clipHeight);
     }
 
-    /**
-     * Draws the image so its top left coordinate corresponds to x/y with a fast
-     * native rotation in a square angle which must be one of 0, 90, 180 or 270
-     *
-     * @param graphics the graphics context
-     * @param img      the specified native image to be drawn
-     * @param x        the x coordinate.
-     * @param y        the y coordinate.
-     * @param degrees  either 0, 90, 180 or 270 degree rotation for the image drawing
-     */
+    /// Draws the image so its top left coordinate corresponds to x/y with a fast
+    /// native rotation in a square angle which must be one of 0, 90, 180 or 270
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `img`: the specified native image to be drawn
+    ///
+    /// - `x`: the x coordinate.
+    ///
+    /// - `y`: the y coordinate.
+    ///
+    /// - `degrees`: either 0, 90, 180 or 270 degree rotation for the image drawing
     public void drawImageRotated(Object graphics, Object img, int x, int y, int degrees) {
     }
 
-    /**
-     * Indicates whether drawImageRotated is supported by the platform for FAST drawing,
-     * if not then its not worth calling the method which will be unimplemented!
-     *
-     * @return true if drawImageRotated will draw an image
-     */
+    /// Indicates whether drawImageRotated is supported by the platform for FAST drawing,
+    /// if not then its not worth calling the method which will be unimplemented!
+    ///
+    /// #### Returns
+    ///
+    /// true if drawImageRotated will draw an image
     public boolean isRotationDrawingSupported() {
         return false;
     }
 
-    /**
-     * Draws a filled triangle with the given coordinates
-     *
-     * @param graphics the graphics context
-     * @param x1       the x coordinate of the first vertex of the triangle
-     * @param y1       the y coordinate of the first vertex of the triangle
-     * @param x2       the x coordinate of the second vertex of the triangle
-     * @param y2       the y coordinate of the second vertex of the triangle
-     * @param x3       the x coordinate of the third vertex of the triangle
-     * @param y3       the y coordinate of the third vertex of the triangle
-     */
+    /// Draws a filled triangle with the given coordinates
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x1`: the x coordinate of the first vertex of the triangle
+    ///
+    /// - `y1`: the y coordinate of the first vertex of the triangle
+    ///
+    /// - `x2`: the x coordinate of the second vertex of the triangle
+    ///
+    /// - `y2`: the y coordinate of the second vertex of the triangle
+    ///
+    /// - `x3`: the x coordinate of the third vertex of the triangle
+    ///
+    /// - `y3`: the y coordinate of the third vertex of the triangle
     public void fillTriangle(Object graphics, int x1, int y1, int x2, int y2, int x3, int y3) {
         fillPolygon(graphics, new int[]{x1, x2, x3}, new int[]{y1, y2, y3}, 3);
     }
 
-    /**
-     * Draws the RGB values based on the MIDP API of a similar name. Renders a
-     * series of device-independent RGB+transparency values in a specified
-     * region. The values are stored in rgbData in a format with 24 bits of
-     * RGB and an eight-bit alpha value (0xAARRGGBB), with the first value
-     * stored at the specified offset. The scanlength  specifies the relative
-     * offset within the array between the corresponding pixels of consecutive
-     * rows. Any value for scanlength is acceptable (even negative values)
-     * provided that all resulting references are within the bounds of the
-     * rgbData array. The ARGB data is rasterized horizontally from left to
-     * right within each row. The ARGB values are rendered in the region
-     * specified by x, y, width and height, and the operation is subject
-     * to the current clip region and translation for this Graphics object.
-     *
-     * @param graphics     the graphics context
-     * @param rgbData      an array of ARGB values in the format 0xAARRGGBB
-     * @param offset       the array index of the first ARGB value
-     * @param x            the horizontal location of the region to be rendered
-     * @param y            the vertical location of the region to be rendered
-     * @param w            the width of the region to be rendered
-     * @param h            the height of the region to be rendered
-     * @param processAlpha true if rgbData has an alpha channel, false if
-     *                     all pixels are fully opaque
-     */
+    /// Draws the RGB values based on the MIDP API of a similar name. Renders a
+    /// series of device-independent RGB+transparency values in a specified
+    /// region. The values are stored in rgbData in a format with 24 bits of
+    /// RGB and an eight-bit alpha value (0xAARRGGBB), with the first value
+    /// stored at the specified offset. The scanlength  specifies the relative
+    /// offset within the array between the corresponding pixels of consecutive
+    /// rows. Any value for scanlength is acceptable (even negative values)
+    /// provided that all resulting references are within the bounds of the
+    /// rgbData array. The ARGB data is rasterized horizontally from left to
+    /// right within each row. The ARGB values are rendered in the region
+    /// specified by x, y, width and height, and the operation is subject
+    /// to the current clip region and translation for this Graphics object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `rgbData`: an array of ARGB values in the format 0xAARRGGBB
+    ///
+    /// - `offset`: the array index of the first ARGB value
+    ///
+    /// - `x`: the horizontal location of the region to be rendered
+    ///
+    /// - `y`: the vertical location of the region to be rendered
+    ///
+    /// - `w`: the width of the region to be rendered
+    ///
+    /// - `h`: the height of the region to be rendered
+    ///
+    /// - `processAlpha`: @param processAlpha true if rgbData has an alpha channel, false if
+    ///                     all pixels are fully opaque
     public abstract void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha);
 
-    /**
-     * Returns the native graphics object on which all rendering operations occur
-     *
-     * @return a native graphics context
-     */
+    /// Returns the native graphics object on which all rendering operations occur
+    ///
+    /// #### Returns
+    ///
+    /// a native graphics context
     public abstract Object getNativeGraphics();
 
-    /**
-     * Returns the native graphics object on the given native image occur
-     *
-     * @param image the native image on which the graphics will draw
-     * @return a native graphics context
-     */
+    /// Returns the native graphics object on the given native image occur
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the native image on which the graphics will draw
+    ///
+    /// #### Returns
+    ///
+    /// a native graphics context
     public abstract Object getNativeGraphics(Object image);
 
-    /**
-     * Return the width of the given characters in the given native font instance
-     *
-     * @param nativeFont the font for which the string width should be calculated
-     * @param ch         array of characters
-     * @param offset     characters offsets
-     * @param length     characters length
-     * @return the width of the given characters in this font instance
-     */
+    /// Return the width of the given characters in the given native font instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`: the font for which the string width should be calculated
+    ///
+    /// - `ch`: array of characters
+    ///
+    /// - `offset`: characters offsets
+    ///
+    /// - `length`: characters length
+    ///
+    /// #### Returns
+    ///
+    /// the width of the given characters in this font instance
     public abstract int charsWidth(Object nativeFont, char[] ch, int offset, int length);
 
-    /**
-     * Returns the ascent of the specified native font instance.  Should always
-     * return a non-negative value.
-     *
-     * @param nativeFont
-     * @return The ascent of the native font instance
-     */
+    /// Returns the ascent of the specified native font instance.  Should always
+    /// return a non-negative value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`
+    ///
+    /// #### Returns
+    ///
+    /// The ascent of the native font instance
     public int getFontAscent(Object nativeFont) {
         return (int) (((float) getHeight(nativeFont)) * 0.7);
     }
 
-    /**
-     * Returns the descent below the baseline that a font can span.  Should always
-     * be non-negative.
-     *
-     * @param nativeFont
-     * @return
-     */
+    /// Returns the descent below the baseline that a font can span.  Should always
+    /// be non-negative.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`
     public int getFontDescent(Object nativeFont) {
         return getHeight(nativeFont) - getFontAscent(nativeFont);
     }
 
-    /**
-     * Checks whether the implementation supports drawing text on the baseline.
-     *
-     * @return
-     */
+    /// Checks whether the implementation supports drawing text on the baseline.
     public boolean isBaselineTextSupported() {
         return false;
     }
 
-    /**
-     * Return the width of the given string in this font instance
-     *
-     * @param nativeFont the font for which the string width should be calculated
-     * @param str        the given string     *
-     * @return the width of the given string in this font instance
-     */
+    /// Return the width of the given string in this font instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`: the font for which the string width should be calculated
+    ///
+    /// - `str`: the given string     *
+    ///
+    /// #### Returns
+    ///
+    /// the width of the given string in this font instance
     public abstract int stringWidth(Object nativeFont, String str);
 
-    /**
-     * Return the width of the specific character when rendered alone
-     *
-     * @param nativeFont the font for which the string width should be calculated
-     * @param ch         the specific character
-     * @return the width of the specific character when rendered alone
-     */
+    /// Return the width of the specific character when rendered alone
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`: the font for which the string width should be calculated
+    ///
+    /// - `ch`: the specific character
+    ///
+    /// #### Returns
+    ///
+    /// the width of the specific character when rendered alone
     public abstract int charWidth(Object nativeFont, char ch);
 
-    /**
-     * Return the total height of the font
-     *
-     * @param nativeFont the font for which the string width should be calculated
-     * @return the total height of the font
-     */
+    /// Return the total height of the font
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`: the font for which the string width should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the total height of the font
     public abstract int getHeight(Object nativeFont);
 
-    /**
-     * Return the global default font instance, if font is passed as null
-     * this font should be used
-     *
-     * @return the global default font instance
-     */
+    /// Return the global default font instance, if font is passed as null
+    /// this font should be used
+    ///
+    /// #### Returns
+    ///
+    /// the global default font instance
     public abstract Object getDefaultFont();
 
-    /**
-     * Optional operation returning the font face for the font
-     *
-     * @param nativeFont the font for which the string width should be calculated
-     * @return Optional operation returning the font face for system fonts
-     */
+    /// Optional operation returning the font face for the font
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`: the font for which the string width should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// Optional operation returning the font face for system fonts
     public int getFace(Object nativeFont) {
         return 0;
     }
 
-    /**
-     * Optional operation returning the font size for system fonts
-     *
-     * @param nativeFont the font for which the string width should be calculated
-     * @return Optional operation returning the font size for system fonts
-     */
+    /// Optional operation returning the font size for system fonts
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`: the font for which the string width should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// Optional operation returning the font size for system fonts
     public int getSize(Object nativeFont) {
         return 0;
     }
 
-    /**
-     * Optional operation returning the font style for system fonts
-     *
-     * @param nativeFont the font for which the string width should be calculated
-     * @return Optional operation returning the font style for system fonts
-     */
+    /// Optional operation returning the font style for system fonts
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFont`: the font for which the string width should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// Optional operation returning the font style for system fonts
     public int getStyle(Object nativeFont) {
         return 0;
     }
 
-    /**
-     * Creates a new instance of a native font
-     *
-     * @param face  the face of the font, can be one of FACE_SYSTEM,
-     *              FACE_PROPORTIONAL, FACE_MONOSPACE.
-     * @param style the style of the font.
-     *              The value is an OR'ed  combination of STYLE_BOLD, STYLE_ITALIC, and
-     *              STYLE_UNDERLINED; or the value is zero (STYLE_PLAIN).
-     * @param size  the size of the font, can be one of SIZE_SMALL,
-     *              SIZE_MEDIUM, SIZE_LARGE
-     * @return a native font object
-     */
+    /// Creates a new instance of a native font
+    ///
+    /// #### Parameters
+    ///
+    /// - `face`: @param face  the face of the font, can be one of FACE_SYSTEM,
+    ///              FACE_PROPORTIONAL, FACE_MONOSPACE.
+    ///
+    /// - `style`: @param style the style of the font.
+    ///              The value is an OR'ed  combination of STYLE_BOLD, STYLE_ITALIC, and
+    ///              STYLE_UNDERLINED; or the value is zero (STYLE_PLAIN).
+    ///
+    /// - `size`: @param size  the size of the font, can be one of SIZE_SMALL,
+    ///              SIZE_MEDIUM, SIZE_LARGE
+    ///
+    /// #### Returns
+    ///
+    /// a native font object
     public abstract Object createFont(int face, int style, int size);
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param keyCode the key for the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key for the event
     protected void keyPressed(final int keyCode) {
         Display.getInstance().keyPressed(keyCode);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param keyCode the key for the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key for the event
     protected void keyReleased(final int keyCode) {
         Display.getInstance().keyReleased(keyCode);
     }
 
-    /**
-     * Checks if last mouse press was a right click.
-     *
-     * @return True if last mouse press was a right click.
-     * @since 7.0
-     */
+    /// Checks if last mouse press was a right click.
+    ///
+    /// #### Returns
+    ///
+    /// True if last mouse press was a right click.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public boolean isRightMouseButtonDown() {
         return false;
     }
 
-    /**
-     * Checks whether the alt key is currently down.  Only relevant on desktop ports.
-     *
-     * @return
-     */
+    /// Checks whether the alt key is currently down.  Only relevant on desktop ports.
     public boolean isAltKeyDown() {
         return false;
     }
 
-    /**
-     * Checks whether the shift key is currently down.  Only relevant on desktop ports.
-     *
-     * @return
-     */
+    /// Checks whether the shift key is currently down.  Only relevant on desktop ports.
     public boolean isShiftKeyDown() {
         return false;
     }
 
-    /**
-     * Checks whether the altgraph key is currently down.  Only relevant on desktop ports.
-     *
-     * @return
-     */
+    /// Checks whether the altgraph key is currently down.  Only relevant on desktop ports.
     public boolean isAltGraphKeyDown() {
         return false;
     }
 
-    /**
-     * Checks whether the control key is currently down.  Only relevant on desktop ports.
-     *
-     * @return
-     */
+    /// Checks whether the control key is currently down.  Only relevant on desktop ports.
     public boolean isControlKeyDown() {
         return false;
     }
 
-    /**
-     * Checks whether the meta key is currently down.  Only relevant on desktop ports.
-     *
-     * @return
-     */
+    /// Checks whether the meta key is currently down.  Only relevant on desktop ports.
     public boolean isMetaKeyDown() {
         return false;
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerDragged(final int x, final int y) {
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
         pointerDragged(xPointerEvent, yPointerEvent);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerPressed(final int x, final int y) {
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
         pointerPressed(xPointerEvent, yPointerEvent);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerReleased(final int x, final int y) {
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
         pointerReleased(xPointerEvent, yPointerEvent);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerHover(final int[] x, final int[] y) {
         Display.getInstance().pointerHover(x, y);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerHoverReleased(final int[] x, final int[] y) {
         Display.getInstance().pointerHoverReleased(x, y);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerHoverReleased(final int x, final int y) {
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
         pointerHoverReleased(xPointerEvent, yPointerEvent);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerHoverPressed(final int[] x, final int[] y) {
         Display.getInstance().pointerHoverPressed(x, y);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerHoverPressed(final int x, final int y) {
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
         pointerHoverPressed(xPointerEvent, yPointerEvent);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerHover(final int x, final int y) {
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
         pointerHover(xPointerEvent, yPointerEvent);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerDragged(final int[] x, final int[] y) {
         boolean hasDragStartedXY = false;
         if (!dragStarted) {
@@ -2584,30 +2877,38 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * This method can be overriden by subclasses to indicate whether a drag
-     * event has started or whether the device is just sending out "noise".
-     * This method is invoked by pointer dragged to determine whether to propogate
-     * the actual pointer drag event to Codename One.
-     *
-     * @param x the position of the current drag event
-     * @param y the position of the current drag event
-     * @return true if the drag should propagate into Codename One
-     */
+    /// This method can be overriden by subclasses to indicate whether a drag
+    /// event has started or whether the device is just sending out "noise".
+    /// This method is invoked by pointer dragged to determine whether to propogate
+    /// the actual pointer drag event to Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the current drag event
+    ///
+    /// - `y`: the position of the current drag event
+    ///
+    /// #### Returns
+    ///
+    /// true if the drag should propagate into Codename One
     protected boolean hasDragStarted(final int[] x, final int[] y) {
         return hasDragStarted(x[0], y[0]);
     }
 
-    /**
-     * This method can be overriden by subclasses to indicate whether a drag
-     * event has started or whether the device is just sending out "noise".
-     * This method is invoked by pointer dragged to determine whether to propagate
-     * the actual pointer drag event to Codename One.
-     *
-     * @param x the position of the current drag event
-     * @param y the position of the current drag event
-     * @return true if the drag should propagate into Codename One
-     */
+    /// This method can be overriden by subclasses to indicate whether a drag
+    /// event has started or whether the device is just sending out "noise".
+    /// This method is invoked by pointer dragged to determine whether to propagate
+    /// the actual pointer drag event to Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the current drag event
+    ///
+    /// - `y`: the position of the current drag event
+    ///
+    /// #### Returns
+    ///
+    /// true if the drag should propagate into Codename One
     protected boolean hasDragStarted(final int x, final int y) {
         // can happen if a user dragged before init, this happens on iOS during splash screen
         if (getCurrentForm() == null) {
@@ -2695,59 +2996,61 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /**
-     * This method allows us to manipulate the drag started detection logic.
-     * If the pointer was dragged for more than this percentage of the display size it
-     * is safe to assume that a drag is in progress.
-     *
-     * @return motion percentage
-     */
+    /// This method allows us to manipulate the drag started detection logic.
+    /// If the pointer was dragged for more than this percentage of the display size it
+    /// is safe to assume that a drag is in progress.
+    ///
+    /// #### Returns
+    ///
+    /// motion percentage
     public int getDragStartPercentage() {
         return dragStartPercentage;
     }
 
-    /**
-     * This method allows us to manipulate the drag started detection logic.
-     * If the pointer was dragged for more than this percentage of the display size it
-     * is safe to assume that a drag is in progress.
-     *
-     * @param dragStartPercentage percentage of the screen required to initiate drag
-     */
+    /// This method allows us to manipulate the drag started detection logic.
+    /// If the pointer was dragged for more than this percentage of the display size it
+    /// is safe to assume that a drag is in progress.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dragStartPercentage`: percentage of the screen required to initiate drag
     public void setDragStartPercentage(int dragStartPercentage) {
         this.dragStartPercentage = dragStartPercentage;
     }
 
-    /**
-     * This method allows subclasses to manipulate the drag started detection logic.
-     * If more than this number of drag events were delivered it is safe to assume a drag has started
-     * This number must be bigger than 0!
-     *
-     * @return number representing a minimum number of motion events to start a drag operation
-     */
+    /// This method allows subclasses to manipulate the drag started detection logic.
+    /// If more than this number of drag events were delivered it is safe to assume a drag has started
+    /// This number must be bigger than 0!
+    ///
+    /// #### Returns
+    ///
+    /// number representing a minimum number of motion events to start a drag operation
     protected int getDragAutoActivationThreshold() {
         return 7;
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerPressed(final int[] x, final int[] y) {
         pointerPressedX = x[0];
         pointerPressedY = y[0];
         Display.getInstance().pointerPressed(x, y);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param x the position of the event
-     * @param y the position of the event
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
     protected void pointerReleased(final int[] x, final int[] y) {
         // this is a special case designed to detect a "flick" event on some Samsung devices
         // that send a pointerPressed/Released with widely differing X/Y values but don't send
@@ -2764,29 +3067,26 @@ public abstract class CodenameOneImplementation {
         Display.getInstance().pointerReleased(x, y);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     *
-     * @param w the size of the screen
-     * @param h the size of the screen
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the size of the screen
+    ///
+    /// - `h`: the size of the screen
     protected void sizeChanged(int w, int h) {
         Display.getInstance().sizeChanged(w, h);
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
     protected void hideNotify() {
         Display.getInstance().hideNotify();
     }
 
-    /**
-     * Subclasses should invoke this method, it delegates the event to the display and into
-     * Codename One.
-     */
+    /// Subclasses should invoke this method, it delegates the event to the display and into
+    /// Codename One.
     protected void showNotify() {
         Display.getInstance().showNotify();
     }
@@ -2836,23 +3136,32 @@ public abstract class CodenameOneImplementation {
         cache.put(key, createSoftWeakRef(img));
     }
 
-    /**
-     * Draws a radial gradient in the given coordinates with the given colors,
-     * doesn't take alpha into consideration when drawing the gradient.
-     * Notice that a radial gradient will result in a circular shape, to create
-     * a square use fillRect or draw a larger shape and clip to the appropriate size.
-     *
-     * @param graphics     the graphics context
-     * @param startColor   the starting RGB color
-     * @param endColor     the ending RGB color
-     * @param x            the x coordinate
-     * @param y            the y coordinate
-     * @param width        the width of the region to be filled
-     * @param height       the height of the region to be filled
-     * @param relativeX    indicates the relative position of the gradient within the drawing region
-     * @param relativeY    indicates the relative position of the gradient within the drawing region
-     * @param relativeSize indicates the relative size of the gradient within the drawing region
-     */
+    /// Draws a radial gradient in the given coordinates with the given colors,
+    /// doesn't take alpha into consideration when drawing the gradient.
+    /// Notice that a radial gradient will result in a circular shape, to create
+    /// a square use fillRect or draw a larger shape and clip to the appropriate size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `startColor`: the starting RGB color
+    ///
+    /// - `endColor`: the ending RGB color
+    ///
+    /// - `x`: the x coordinate
+    ///
+    /// - `y`: the y coordinate
+    ///
+    /// - `width`: the width of the region to be filled
+    ///
+    /// - `height`: the height of the region to be filled
+    ///
+    /// - `relativeX`: indicates the relative position of the gradient within the drawing region
+    ///
+    /// - `relativeY`: indicates the relative position of the gradient within the drawing region
+    ///
+    /// - `relativeSize`: indicates the relative size of the gradient within the drawing region
     public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
         int centerX = (int) (width * (1 - relativeX));
         int centerY = (int) (height * (1 - relativeY));
@@ -2889,40 +3198,54 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Draws a radial gradient in the given coordinates with the given colors,
-     * doesn't take alpha into consideration when drawing the gradient.
-     * Notice that a radial gradient will result in a circular shape, to create
-     * a square use fillRect or draw a larger shape and clip to the appropriate size.
-     *
-     * @param graphics   the graphics context
-     * @param startColor the starting RGB color
-     * @param endColor   the ending RGB color
-     * @param x          the x coordinate
-     * @param y          the y coordinate
-     * @param width      the width of the region to be filled
-     * @param height     the height of the region to be filled
-     */
+    /// Draws a radial gradient in the given coordinates with the given colors,
+    /// doesn't take alpha into consideration when drawing the gradient.
+    /// Notice that a radial gradient will result in a circular shape, to create
+    /// a square use fillRect or draw a larger shape and clip to the appropriate size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `startColor`: the starting RGB color
+    ///
+    /// - `endColor`: the ending RGB color
+    ///
+    /// - `x`: the x coordinate
+    ///
+    /// - `y`: the y coordinate
+    ///
+    /// - `width`: the width of the region to be filled
+    ///
+    /// - `height`: the height of the region to be filled
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
         fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, 0, 360);
     }
 
-    /**
-     * Draws a radial gradient in the given coordinates with the given colors,
-     * doesn't take alpha into consideration when drawing the gradient.
-     * Notice that a radial gradient will result in a circular shape, to create
-     * a square use fillRect or draw a larger shape and clip to the appropriate size.
-     *
-     * @param graphics   the graphics context
-     * @param startColor the starting RGB color
-     * @param endColor   the ending RGB color
-     * @param x          the x coordinate
-     * @param y          the y coordinate
-     * @param width      the width of the region to be filled
-     * @param height     the height of the region to be filled
-     * @param startAngle the beginning angle.  Zero is at 3 o'clock.  Positive angles are counter-clockwise.
-     * @param arcAngle   the angular extent of the arc, relative to the start angle. Positive angles are counter-clockwise.
-     */
+    /// Draws a radial gradient in the given coordinates with the given colors,
+    /// doesn't take alpha into consideration when drawing the gradient.
+    /// Notice that a radial gradient will result in a circular shape, to create
+    /// a square use fillRect or draw a larger shape and clip to the appropriate size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `startColor`: the starting RGB color
+    ///
+    /// - `endColor`: the ending RGB color
+    ///
+    /// - `x`: the x coordinate
+    ///
+    /// - `y`: the y coordinate
+    ///
+    /// - `width`: the width of the region to be filled
+    ///
+    /// - `height`: the height of the region to be filled
+    ///
+    /// - `startAngle`: the beginning angle.  Zero is at 3 o'clock.  Positive angles are counter-clockwise.
+    ///
+    /// - `arcAngle`: the angular extent of the arc, relative to the start angle. Positive angles are counter-clockwise.
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, startAngle, arcAngle);
     }
@@ -2972,9 +3295,7 @@ public abstract class CodenameOneImplementation {
         setColor(nativeGraphics, color);
     }
 
-    /**
-     * Converts the color channel value according to the offest within the distance
-     */
+    /// Converts the color channel value according to the offest within the distance
     private int calculateGraidentChannel(int sourceChannel, int destChannel, int distance, int offset) {
         if (sourceChannel == destChannel) {
             return sourceChannel;
@@ -2988,19 +3309,26 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Draws a linear gradient in the given coordinates with the given colors,
-     * doesn't take alpha into consideration when drawing the gradient
-     *
-     * @param graphics   the graphics context
-     * @param startColor the starting RGB color
-     * @param endColor   the ending RGB color
-     * @param x          the x coordinate
-     * @param y          the y coordinate
-     * @param width      the width of the region to be filled
-     * @param height     the height of the region to be filled
-     * @param horizontal indicating wheter it is a horizontal fill or vertical
-     */
+    /// Draws a linear gradient in the given coordinates with the given colors,
+    /// doesn't take alpha into consideration when drawing the gradient
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `startColor`: the starting RGB color
+    ///
+    /// - `endColor`: the ending RGB color
+    ///
+    /// - `x`: the x coordinate
+    ///
+    /// - `y`: the y coordinate
+    ///
+    /// - `width`: the width of the region to be filled
+    ///
+    /// - `height`: the height of the region to be filled
+    ///
+    /// - `horizontal`: indicating wheter it is a horizontal fill or vertical
     public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
         // this can happen in the resource editor
         if (width <= 0 || height <= 0) {
@@ -3090,15 +3418,18 @@ public abstract class CodenameOneImplementation {
         return 1;
     }
 
-    /**
-     * Fills a closed polygon defined by arrays of x and y coordinates.
-     * Each pair of (x, y) coordinates defines a point.
-     *
-     * @param graphics the graphics context
-     * @param xPoints  - a an array of x coordinates.
-     * @param yPoints  - a an array of y coordinates.
-     * @param nPoints  - a the total number of points.
-     */
+    /// Fills a closed polygon defined by arrays of x and y coordinates.
+    /// Each pair of (x, y) coordinates defines a point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `xPoints`: - a an array of x coordinates.
+    ///
+    /// - `yPoints`: - a an array of y coordinates.
+    ///
+    /// - `nPoints`: - a the total number of points.
     public void fillPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
 
         int[] intersections = new int[nPoints];
@@ -3151,15 +3482,18 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Draws a closed polygon defined by arrays of x and y coordinates.
-     * Each pair of (x, y) coordinates defines a point.
-     *
-     * @param graphics the graphics context
-     * @param xPoints  - a an array of x coordinates.
-     * @param yPoints  - a an array of y coordinates.
-     * @param nPoints  - a the total number of points.
-     */
+    /// Draws a closed polygon defined by arrays of x and y coordinates.
+    /// Each pair of (x, y) coordinates defines a point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `xPoints`: - a an array of x coordinates.
+    ///
+    /// - `yPoints`: - a an array of y coordinates.
+    ///
+    /// - `nPoints`: - a the total number of points.
     public void drawPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
         for (int i = 1; i < nPoints; i++) {
             drawLine(graphics, xPoints[i - 1], yPoints[i - 1], xPoints[i], yPoints[i]);
@@ -3167,86 +3501,94 @@ public abstract class CodenameOneImplementation {
         drawLine(graphics, xPoints[nPoints - 1], yPoints[nPoints - 1], xPoints[0], yPoints[0]);
     }
 
-    /**
-     * Returns the type of the input device one of:
-     * KEYBOARD_TYPE_UNKNOWN, KEYBOARD_TYPE_NUMERIC, KEYBOARD_TYPE_QWERTY,
-     * KEYBOARD_TYPE_VIRTUAL, KEYBOARD_TYPE_HALF_QWERTY
-     *
-     * @return KEYBOARD_TYPE_UNKNOWN
-     */
+    /// Returns the type of the input device one of:
+    /// KEYBOARD_TYPE_UNKNOWN, KEYBOARD_TYPE_NUMERIC, KEYBOARD_TYPE_QWERTY,
+    /// KEYBOARD_TYPE_VIRTUAL, KEYBOARD_TYPE_HALF_QWERTY
+    ///
+    /// #### Returns
+    ///
+    /// KEYBOARD_TYPE_UNKNOWN
     public int getKeyboardType() {
         return Display.KEYBOARD_TYPE_UNKNOWN;
     }
 
-    /**
-     * Indicates whether the device supports native in place editing in which case
-     * lightweight input logic shouldn't be used for input.
-     *
-     * @return false by default
-     */
+    /// Indicates whether the device supports native in place editing in which case
+    /// lightweight input logic shouldn't be used for input.
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isNativeInputSupported() {
         return false;
     }
 
-    /**
-     * Indicates whether the device should switch to native input immediately on first touch
-     *
-     * @return false by default
-     */
+    /// Indicates whether the device should switch to native input immediately on first touch
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isNativeInputImmediate() {
         return false;
     }
 
-    /**
-     * Indicates whether the device supports multi-touch events, this is only
-     * relevant when touch events are supported
-     *
-     * @return false by default
-     */
+    /// Indicates whether the device supports multi-touch events, this is only
+    /// relevant when touch events are supported
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isMultiTouch() {
         return false;
     }
 
-    /**
-     * Indicates whether the device has a double layer screen thus allowing two
-     * stages to touch events: click and hover. This is true for devices such
-     * as the storm but can also be true for a PC with a mouse pointer floating
-     * on top.
-     * <p>A click touch screen will also send pointer hover events to the underlying
-     * software and will only send the standard pointer events on click.
-     *
-     * @return false by default
-     */
+    /// Indicates whether the device has a double layer screen thus allowing two
+    /// stages to touch events: click and hover. This is true for devices such
+    /// as the storm but can also be true for a PC with a mouse pointer floating
+    /// on top.
+    ///
+    /// A click touch screen will also send pointer hover events to the underlying
+    /// software and will only send the standard pointer events on click.
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isClickTouchScreen() {
         return false;
     }
 
-    /**
-     * Returns true if indexed images should be used natively
-     *
-     * @return true if a native image should be used for indexed images
-     */
+    /// Returns true if indexed images should be used natively
+    ///
+    /// #### Returns
+    ///
+    /// true if a native image should be used for indexed images
     public boolean isNativeIndexed() {
         return false;
     }
 
-    /**
-     * Creates a native image representing the indexed image
-     *
-     * @param image the indexed image
-     * @return a native version of the indexed image
-     */
+    /// Creates a native image representing the indexed image
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the indexed image
+    ///
+    /// #### Returns
+    ///
+    /// a native version of the indexed image
     public Object createNativeIndexed(Image image) {
         return null;
     }
 
-    /**
-     * Returns true if the image was opaque
-     *
-     * @param codenameOneImage the Codename One image
-     * @param nativeImage      the image object to test
-     * @return true if the image is opaque
-     */
+    /// Returns true if the image was opaque
+    ///
+    /// #### Parameters
+    ///
+    /// - `codenameOneImage`: the Codename One image
+    ///
+    /// - `nativeImage`: the image object to test
+    ///
+    /// #### Returns
+    ///
+    /// true if the image is opaque
     public boolean isOpaque(Image codenameOneImage, Object nativeImage) {
         int[] rgb = codenameOneImage.getRGBCached();
         int rlen = rgb.length;
@@ -3258,279 +3600,318 @@ public abstract class CodenameOneImplementation {
         return true;
     }
 
-    /**
-     * Indicates whether the underlying implementation can draw using an affine
-     * transform hence methods such as rotate, scale and shear would work
-     *
-     * @return true if an affine transformation matrix is present
-     */
+    /// Indicates whether the underlying implementation can draw using an affine
+    /// transform hence methods such as rotate, scale and shear would work
+    ///
+    /// #### Returns
+    ///
+    /// true if an affine transformation matrix is present
     public boolean isAffineSupported() {
         return false;
     }
 
-    /**
-     * Resets the affine transform to the default value
-     *
-     * @param nativeGraphics the native graphics object
-     */
+    /// Resets the affine transform to the default value
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: the native graphics object
     public void resetAffine(Object nativeGraphics) {
         System.out.println("Affine unsupported");
     }
 
-    /**
-     * Scales the coordinate system using the affine transform
-     *
-     * @param nativeGraphics the native graphics object
-     * @param x              factor for x
-     * @param y              factor for y
-     */
+    /// Scales the coordinate system using the affine transform
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: the native graphics object
+    ///
+    /// - `x`: factor for x
+    ///
+    /// - `y`: factor for y
     public void scale(Object nativeGraphics, float x, float y) {
         System.out.println("Affine unsupported");
     }
 
-    /**
-     * Rotates the coordinate system around a radian angle using the affine transform
-     *
-     * @param angle          the rotation angle in radians
-     * @param nativeGraphics the native graphics object
-     */
+    /// Rotates the coordinate system around a radian angle using the affine transform
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: the rotation angle in radians
+    ///
+    /// - `nativeGraphics`: the native graphics object
     public void rotate(Object nativeGraphics, float angle) {
         rotate(nativeGraphics, angle, 0, 0);
     }
 
-    /**
-     * Rotates the coordinate system around a radian angle using the affine transform
-     *
-     * @param angle          the rotation angle in radians
-     * @param pivotX         the pivot location
-     * @param pivotY         the pivot location
-     * @param nativeGraphics the native graphics object
-     */
+    /// Rotates the coordinate system around a radian angle using the affine transform
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: the rotation angle in radians
+    ///
+    /// - `pivotX`: the pivot location
+    ///
+    /// - `pivotY`: the pivot location
+    ///
+    /// - `nativeGraphics`: the native graphics object
     public void rotate(Object nativeGraphics, float angle, int pivotX, int pivotY) {
         System.out.println("Affine unsupported");
     }
 
-    /**
-     * Shear the graphics coordinate system using the affine transform
-     *
-     * @param x              factor for x
-     * @param y              factor for y
-     * @param nativeGraphics the native graphics object
-     */
+    /// Shear the graphics coordinate system using the affine transform
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: factor for x
+    ///
+    /// - `y`: factor for y
+    ///
+    /// - `nativeGraphics`: the native graphics object
     public void shear(Object nativeGraphics, float x, float y) {
         System.out.println("Affine unsupported");
     }
 
-    /**
-     * Indicates whether the underlying platform supports creating an SVG Image
-     *
-     * @return true if the method create SVG image would return a valid image object
-     * from an SVG Input stream
-     */
+    /// Indicates whether the underlying platform supports creating an SVG Image
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the method create SVG image would return a valid image object
+    /// from an SVG Input stream
     public boolean isSVGSupported() {
         return false;
     }
 
-    /**
-     * Creates an SVG Image from the given byte array data and the base URL
-     *
-     * @param baseURL URL which is used to resolve relative references within the SVG file
-     * @param data    the content of the SVG file
-     * @return a native image that can be used within the image object
-     * @throws IOException if resource lookup fail SVG is unsupported
-     */
+    /// Creates an SVG Image from the given byte array data and the base URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `baseURL`: URL which is used to resolve relative references within the SVG file
+    ///
+    /// - `data`: the content of the SVG file
+    ///
+    /// #### Returns
+    ///
+    /// a native image that can be used within the image object
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if resource lookup fail SVG is unsupported
     public Object createSVGImage(String baseURL, byte[] data) throws IOException {
         throw new IOException("SVG is not supported by this implementation");
     }
 
-    /**
-     * Returns a platform specific DOM object that can be manipulated by the user
-     * to change the SVG Image
-     *
-     * @param svgImage the underlying image object
-     * @return Platform dependent object, when JSR 226 is supported an SVGSVGElement might
-     * be returned.
-     */
+    /// Returns a platform specific DOM object that can be manipulated by the user
+    /// to change the SVG Image
+    ///
+    /// #### Parameters
+    ///
+    /// - `svgImage`: the underlying image object
+    ///
+    /// #### Returns
+    ///
+    /// @return Platform dependent object, when JSR 226 is supported an SVGSVGElement might
+    /// be returned.
     public Object getSVGDocument(Object svgImage) {
         throw new RuntimeException("SVG is not supported by this implementation");
     }
 
-    /**
-     * Callback to allow images animated by the underlying system to change their state
-     * e.g. for SVG or animated gif support. This method returns true if an animation
-     * state has changed requiring a repaint.
-     *
-     * @param nativeImage a native image used within the image object
-     * @param lastFrame   the time the last frame of animation was shown
-     * @return true if a repaint is required since the image state changed, false otherwise
-     */
+    /// Callback to allow images animated by the underlying system to change their state
+    /// e.g. for SVG or animated gif support. This method returns true if an animation
+    /// state has changed requiring a repaint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeImage`: a native image used within the image object
+    ///
+    /// - `lastFrame`: the time the last frame of animation was shown
+    ///
+    /// #### Returns
+    ///
+    /// true if a repaint is required since the image state changed, false otherwise
     public boolean animateImage(Object nativeImage, long lastFrame) {
         return false;
     }
 
-    /**
-     * Returns a list of the platform names ordered by priority, platform names are
-     * used to choose a font based on platform. Since a platform might support several
-     * layers for choice in narrowing platform font selection
-     *
-     * @return the platform names ordered according to priority.
-     */
+    /// Returns a list of the platform names ordered by priority, platform names are
+    /// used to choose a font based on platform. Since a platform might support several
+    /// layers for choice in narrowing platform font selection
+    ///
+    /// #### Returns
+    ///
+    /// the platform names ordered according to priority.
     public String[] getFontPlatformNames() {
         return new String[]{"MIDP", "MIDP2"};
     }
 
-    /**
-     * Creates a true type font with the given name/filename (font name might be different from the file name
-     * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
-     * order to be detectable. The file name should contain no slashes or any such value.
-     *
-     * @param fontName the name of the font
-     * @param fileName the file name of the font as it appears in the src directory of the project
-     * @return the native font created from the stream
-     */
+    /// Creates a true type font with the given name/filename (font name might be different from the file name
+    /// and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
+    /// order to be detectable. The file name should contain no slashes or any such value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontName`: the name of the font
+    ///
+    /// - `fileName`: the file name of the font as it appears in the src directory of the project
+    ///
+    /// #### Returns
+    ///
+    /// the native font created from the stream
     public Object loadTrueTypeFont(String fontName, String fileName) {
         return null;
     }
 
-    /**
-     * Indicates whether the implementation supports loading a font "natively" to handle one of the common
-     * native prefixes
-     *
-     * @return true if the "native:" prefix is supported by loadTrueTypeFont
-     */
+    /// Indicates whether the implementation supports loading a font "natively" to handle one of the common
+    /// native prefixes
+    ///
+    /// #### Returns
+    ///
+    /// true if the "native:" prefix is supported by loadTrueTypeFont
     public boolean isNativeFontSchemeSupported() {
         return false;
     }
 
-    /**
-     * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
-     * will only work in the case of truetype fonts!
-     *
-     * @param font   the native font instance
-     * @param size   the size of the font in pixels
-     * @param weight PLAIN, BOLD or ITALIC weight based on the constants in this class
-     * @return scaled font instance
-     */
+    /// Creates a font based on this truetype font with the given pixel, **WARNING**! This method
+    /// will only work in the case of truetype fonts!
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: the native font instance
+    ///
+    /// - `size`: the size of the font in pixels
+    ///
+    /// - `weight`: PLAIN, BOLD or ITALIC weight based on the constants in this class
+    ///
+    /// #### Returns
+    ///
+    /// scaled font instance
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         throw new RuntimeException("Unsupported operation");
     }
 
-    /**
-     * Returns true if the system supports dynamically loading truetype fonts from
-     * a file.
-     *
-     * @return true if the system supports dynamically loading truetype fonts from
-     * a file.
-     */
+    /// Returns true if the system supports dynamically loading truetype fonts from
+    /// a file.
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the system supports dynamically loading truetype fonts from
+    /// a file.
     public boolean isTrueTypeSupported() {
         return false;
     }
 
-    /**
-     * Loads a native font based on a lookup for a font name and attributes. Font lookup
-     * values can be separated by commas and thus allow fallback if the primary font
-     * isn't supported by the platform.
-     *
-     * @param lookup string describing the font
-     * @return the native font object
-     */
+    /// Loads a native font based on a lookup for a font name and attributes. Font lookup
+    /// values can be separated by commas and thus allow fallback if the primary font
+    /// isn't supported by the platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lookup`: string describing the font
+    ///
+    /// #### Returns
+    ///
+    /// the native font object
     public Object loadNativeFont(String lookup) {
         return null;
     }
 
-    /**
-     * Indicates whether loading a font by a string is supported by the platform
-     *
-     * @return true if the platform supports font lookup
-     */
+    /// Indicates whether loading a font by a string is supported by the platform
+    ///
+    /// #### Returns
+    ///
+    /// true if the platform supports font lookup
     public boolean isLookupFontSupported() {
         return false;
     }
 
-    /**
-     * Minimizes the current application if minimization is supported by the platform (may fail).
-     * Returns false if minimization failed.
-     *
-     * @return false if minimization failed true if it succeeded or seems to be successful
-     */
+    /// Minimizes the current application if minimization is supported by the platform (may fail).
+    /// Returns false if minimization failed.
+    ///
+    /// #### Returns
+    ///
+    /// false if minimization failed true if it succeeded or seems to be successful
     public boolean minimizeApplication() {
         return false;
     }
 
-    /**
-     * Restore the minimized application if minimization is supported by the platform
-     */
+    /// Restore the minimized application if minimization is supported by the platform
     public void restoreMinimizedApplication() {
     }
 
-    /**
-     * Indicates whether an application is minimized
-     *
-     * @return true if the application is minimized
-     */
+    /// Indicates whether an application is minimized
+    ///
+    /// #### Returns
+    ///
+    /// true if the application is minimized
     public boolean isMinimized() {
         return false;
     }
 
-    /**
-     * Indicates whether the implementation is interested in caching radial gradients for
-     * drawing.
-     *
-     * @return true to activate radial gradient caching
-     */
+    /// Indicates whether the implementation is interested in caching radial gradients for
+    /// drawing.
+    ///
+    /// #### Returns
+    ///
+    /// true to activate radial gradient caching
     protected boolean cacheRadialGradients() {
         return true;
     }
 
-    /**
-     * Indicates whether the implementation is interested in caching linear gradients for
-     * drawing.
-     *
-     * @return true to activate linear gradient caching
-     */
+    /// Indicates whether the implementation is interested in caching linear gradients for
+    /// drawing.
+    ///
+    /// #### Returns
+    ///
+    /// true to activate linear gradient caching
     protected boolean cacheLinearGradients() {
         return true;
     }
 
-    /**
-     * Indicates the default status to apply to the 3rd softbutton variable
-     *
-     * @return true if the 3rd softbutton should be set as true
-     * @see com.codename1.ui.Display#isThirdSoftButton()
-     * @see com.codename1.ui.Display#setThirdSoftButton()
-     */
+    /// Indicates the default status to apply to the 3rd softbutton variable
+    ///
+    /// #### Returns
+    ///
+    /// true if the 3rd softbutton should be set as true
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Display#isThirdSoftButton()
+    ///
+    /// - com.codename1.ui.Display#setThirdSoftButton()
     public boolean isThirdSoftButton() {
         return false;
     }
 
-    /**
-     * Indicates how many drag points are used to calculate dragging speed
-     *
-     * @return the size of points to calculate the speed
-     */
+    /// Indicates how many drag points are used to calculate dragging speed
+    ///
+    /// #### Returns
+    ///
+    /// the size of points to calculate the speed
     public int getDragPathLength() {
         return 10;
     }
 
-    /**
-     * Indicates what drag points are valid for the drag speed calculation.
-     * Points that are older then the current time - the path time are ignored
-     *
-     * @return the relevance time per point
-     */
+    /// Indicates what drag points are valid for the drag speed calculation.
+    /// Points that are older then the current time - the path time are ignored
+    ///
+    /// #### Returns
+    ///
+    /// the relevance time per point
     public int getDragPathTime() {
         return 200;
     }
 
-    /**
-     * This method returns the dragging speed based on the latest dragged
-     * events
-     *
-     * @param points         array of locations
-     * @param dragPathTime   the time difference between each point
-     * @param dragPathOffset the offset in the arrays
-     * @param dragPathLength
-     */
+    /// This method returns the dragging speed based on the latest dragged
+    /// events
+    ///
+    /// #### Parameters
+    ///
+    /// - `points`: array of locations
+    ///
+    /// - `dragPathTime`: the time difference between each point
+    ///
+    /// - `dragPathOffset`: the offset in the arrays
+    ///
+    /// - `dragPathLength`
     public float getDragSpeed(float[] points, long[] dragPathTime,
                               int dragPathOffset, int dragPathLength) {
         long now = System.currentTimeMillis();
@@ -3569,38 +3950,41 @@ public abstract class CodenameOneImplementation {
         return -speed / f;
     }
 
-    /**
-     * Indicates whether Codename One should consider the bidi RTL algorithm
-     * when drawing text or navigating with the text field cursor.
-     *
-     * @return true if the bidi algorithm should be considered
-     */
+    /// Indicates whether Codename One should consider the bidi RTL algorithm
+    /// when drawing text or navigating with the text field cursor.
+    ///
+    /// #### Returns
+    ///
+    /// true if the bidi algorithm should be considered
     public boolean isBidiAlgorithm() {
         return bidi;
     }
 
-    /**
-     * Indicates whether Codename One should consider the bidi RTL algorithm
-     * when drawing text or navigating with the text field cursor.
-     *
-     * @param activate set to true to activate the bidi algorithm, false to
-     *                 disable it
-     */
+    /// Indicates whether Codename One should consider the bidi RTL algorithm
+    /// when drawing text or navigating with the text field cursor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `activate`: @param activate set to true to activate the bidi algorithm, false to
+    ///                 disable it
     public void setBidiAlgorithm(boolean activate) {
         bidi = activate;
     }
 
-    /**
-     * Converts the given string from logical bidi layout to visual bidi layout so
-     * it can be rendered properly on the screen. This method is only necessary
-     * for devices/platforms that don't have "built in" bidi support such as
-     * Sony Ericsson devices.
-     * See <a href="http://www.w3.org/International/articles/inline-bidi-markup/#visual">this</a>
-     * for more on visual vs. logical ordering.
-     *
-     * @param s a "logical" string with RTL characters
-     * @return a "visual" renderable string
-     */
+    /// Converts the given string from logical bidi layout to visual bidi layout so
+    /// it can be rendered properly on the screen. This method is only necessary
+    /// for devices/platforms that don't have "built in" bidi support such as
+    /// Sony Ericsson devices.
+    /// See [this](http://www.w3.org/International/articles/inline-bidi-markup/#visual)
+    /// for more on visual vs. logical ordering.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: a "logical" string with RTL characters
+    ///
+    /// #### Returns
+    ///
+    /// a "visual" renderable string
     public String convertBidiLogicalToVisual(String s) {
         if (bidi && s.length() >= 2) {
             // PMD Fix (CollapsibleIfStatements): Merge bidi activation and length checks prior to processing.
@@ -3611,16 +3995,20 @@ public abstract class CodenameOneImplementation {
         return s;
     }
 
-    /**
-     * Returns the index of the given char within the source string, the actual
-     * index isn't necessarily the same when bidi is involved
-     * See <a href="http://www.w3.org/International/articles/inline-bidi-markup/#visual">this</a>
-     * for more on visual vs. logical ordering.
-     *
-     * @param source the string in which we are looking for the position
-     * @param index  the "logical" location of the cursor
-     * @return the "visual" location of the cursor
-     */
+    /// Returns the index of the given char within the source string, the actual
+    /// index isn't necessarily the same when bidi is involved
+    /// See [this](http://www.w3.org/International/articles/inline-bidi-markup/#visual)
+    /// for more on visual vs. logical ordering.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the string in which we are looking for the position
+    ///
+    /// - `index`: the "logical" location of the cursor
+    ///
+    /// #### Returns
+    ///
+    /// the "visual" location of the cursor
     public int getCharLocation(String source, int index) {
         if (bidi) {
             return swapBidiChars(source.toCharArray(), 0, source.length(), index);
@@ -3632,13 +4020,16 @@ public abstract class CodenameOneImplementation {
         return c == ' ' || (c == '\n') || (c == '\t') || (c == 13);
     }
 
-    /**
-     * Returns true if the given character is an RTL character or a space
-     * character
-     *
-     * @param c character to test
-     * @return true if bidi is active and this is a
-     */
+    /// Returns true if the given character is an RTL character or a space
+    /// character
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: character to test
+    ///
+    /// #### Returns
+    ///
+    /// true if bidi is active and this is a
     public boolean isRTLOrWhitespace(char c) {
         if (bidi) {
             return isRTL(c) || isWhitespace(c);
@@ -3646,12 +4037,15 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /**
-     * Returns true if the given character is an RTL character
-     *
-     * @param c character to test
-     * @return true if the charcter is an RTL character
-     */
+    /// Returns true if the given character is an RTL character
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: character to test
+    ///
+    /// #### Returns
+    ///
+    /// true if the charcter is an RTL character
     public boolean isRTL(char c) {
         return (c >= RTL_RANGE_BEGIN && c <= RTL_RANGE_END);
     }
@@ -3759,15 +4153,19 @@ public abstract class CodenameOneImplementation {
         return ixFound;
     }
 
-    /**
-     * This method is essentially equivalent to cls.getResourceAsStream(String)
-     * however some platforms might define unique ways in which to load resources
-     * within the implementation.
-     *
-     * @param cls      class to load the resource from
-     * @param resource relative/absolute URL based on the Java convention
-     * @return input stream for the resource or null if not found
-     */
+    /// This method is essentially equivalent to cls.getResourceAsStream(String)
+    /// however some platforms might define unique ways in which to load resources
+    /// within the implementation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cls`: class to load the resource from
+    ///
+    /// - `resource`: relative/absolute URL based on the Java convention
+    ///
+    /// #### Returns
+    ///
+    /// input stream for the resource or null if not found
     public InputStream getResourceAsStream(Class cls, String resource) {
         if (cls != null) {
             return cls.getResourceAsStream(resource);
@@ -3775,52 +4173,54 @@ public abstract class CodenameOneImplementation {
         return CodenameOneImplementation.class.getResourceAsStream(resource);
     }
 
-    /**
-     * Animations should return true to allow the native image animation to update
-     *
-     * @param nativeImage underlying native imae
-     * @return true if this is an animation
-     */
+    /// Animations should return true to allow the native image animation to update
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeImage`: underlying native imae
+    ///
+    /// #### Returns
+    ///
+    /// true if this is an animation
     public boolean isAnimation(Object nativeImage) {
         return false;
     }
 
-    /**
-     * Creates a peer component for the given lightweight component
-     *
-     * @param nativeComponent a platform specific "native component"
-     * @return a Codename One peer component that can be manipulated just like any other
-     * Codename One component but would internally encapsulate the given native peer
-     */
+    /// Creates a peer component for the given lightweight component
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeComponent`: a platform specific "native component"
+    ///
+    /// #### Returns
+    ///
+    /// @return a Codename One peer component that can be manipulated just like any other
+    /// Codename One component but would internally encapsulate the given native peer
     public PeerComponent createNativePeer(Object nativeComponent) {
         throw new IllegalArgumentException(nativeComponent.getClass().getName());
     }
 
-    /**
-     * Shows a native Form/Canvas or some other heavyweight native screen
-     *
-     * @param nativeFullScreenPeer the native screen peer
-     */
+    /// Shows a native Form/Canvas or some other heavyweight native screen
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeFullScreenPeer`: the native screen peer
     public void showNativeScreen(Object nativeFullScreenPeer) {
     }
 
-    /**
-     * Places the following commands on the native menu system
-     *
-     * @param commands the Codename One commands to use
-     */
+    /// Places the following commands on the native menu system
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the Codename One commands to use
     public void setNativeCommands(Vector commands) {
     }
 
-    /**
-     * Exits the application...
-     */
+    /// Exits the application...
     public void exitApplication() {
     }
 
-    /**
-     * Exits the application...
-     */
+    /// Exits the application...
     public void exit() {
         if (onExit != null) {
             onExit.run();
@@ -3828,35 +4228,45 @@ public abstract class CodenameOneImplementation {
         exitApplication();
     }
 
-    /**
-     * Returns the property from the underlying platform deployment or the default
-     * value if no deployment values are supported. This is equivalent to the
-     * getAppProperty from the jad file.
-     * <p>The implementation should be responsible for the following keys to return
-     * reasonable valid values for the application:
-     * <ol>
-     * <li>AppName
-     * <li>User-Agent - ideally although not required
-     * <li>AppVersion
-     * <li>Platform - Similar to microedition.platform
-     * </ol>
-     *
-     * @param key          the key of the property
-     * @param defaultValue a default return value
-     * @return the value of the property
-     */
+    /// Returns the property from the underlying platform deployment or the default
+    /// value if no deployment values are supported. This is equivalent to the
+    /// getAppProperty from the jad file.
+    ///
+    /// The implementation should be responsible for the following keys to return
+    /// reasonable valid values for the application:
+    ///
+    /// - AppName
+    ///
+    /// - User-Agent - ideally although not required
+    ///
+    /// - AppVersion
+    ///
+    /// - Platform - Similar to microedition.platform
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the property
+    ///
+    /// - `defaultValue`: a default return value
+    ///
+    /// #### Returns
+    ///
+    /// the value of the property
     public String getProperty(String key, String defaultValue) {
         return defaultValue;
     }
 
-    /**
-     * Returns true if executing this URL should work, returns false if it will not
-     * and null if this is unknown.
-     *
-     * @param url the url that would be executed
-     * @return true if executing this URL should work, returns false if it will not
-     * and null if this is unknown
-     */
+    /// Returns true if executing this URL should work, returns false if it will not
+    /// and null if this is unknown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url that would be executed
+    ///
+    /// #### Returns
+    ///
+    /// @return true if executing this URL should work, returns false if it will not
+    /// and null if this is unknown
     public Boolean canExecute(String url) {
         if (url.startsWith("http:") || url.startsWith("https:")) {
             return Boolean.TRUE;
@@ -3864,35 +4274,36 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
-    /**
-     * Executes the given URL on the native platform
-     *
-     * @param url the url to execute
-     */
+    /// Executes the given URL on the native platform
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url to execute
     public void execute(String url) {
     }
 
-    /**
-     * Executes the given URL on the native platform, this method is useful if
-     * the platform has the ability to send an event to the app when the execution
-     * has ended, currently this works only for Android platform to invoke other
-     * intents.
-     *
-     * @param url      the url to execute
-     * @param response a callback from the platform when this execution returned
-     *                 to the application
-     */
+    /// Executes the given URL on the native platform, this method is useful if
+    /// the platform has the ability to send an event to the app when the execution
+    /// has ended, currently this works only for Android platform to invoke other
+    /// intents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url to execute
+    ///
+    /// - `response`: @param response a callback from the platform when this execution returned
+    ///                 to the application
     public void execute(String url, ActionListener response) {
         execute(url);
     }
 
-    /**
-     * Returns one of the density variables appropriate for this device, notice that
-     * density doesn't always correspond to resolution and an implementation might
-     * decide to change the density based on DPI constraints.
-     *
-     * @return one of the DENSITY constants of Display
-     */
+    /// Returns one of the density variables appropriate for this device, notice that
+    /// density doesn't always correspond to resolution and an implementation might
+    /// decide to change the density based on DPI constraints.
+    ///
+    /// #### Returns
+    ///
+    /// one of the DENSITY constants of Display
     public int getDeviceDensity() {
         int d = getActualDisplayHeight() * getDisplayWidth();
         if (isTablet()) {
@@ -3920,22 +4331,31 @@ public abstract class CodenameOneImplementation {
         return Display.DENSITY_HD;
     }
 
-    /**
-     * This method returns a rectangle defining the "safe" area of the display, which excludes
-     * areas on the screen that are covered by notches, task bars, rounded corners, etc.
-     *
-     * <p>This feature was primarily added to deal with the task bar on the iPhone X, which
-     * is displayed on the screen near the bottom edge, and can interfere with components
-     * that are laid out at the bottom of the screen.</p>
-     *
-     * <p>Most platforms will simply return a Rectangle with bounds (0, 0, displayWidth, displayHeight).  iPhone X
-     * will return a rectangle that excludes the notch, and task bar regions.</p>
-     *
-     * @param rect Out parameter where safe bounds are set.
-     * @return The same rectangle that was passed as a parameter.
-     * @see Form#getSafeArea()
-     * @since 7.0
-     */
+    /// This method returns a rectangle defining the "safe" area of the display, which excludes
+    /// areas on the screen that are covered by notches, task bars, rounded corners, etc.
+    ///
+    /// This feature was primarily added to deal with the task bar on the iPhone X, which
+    /// is displayed on the screen near the bottom edge, and can interfere with components
+    /// that are laid out at the bottom of the screen.
+    ///
+    /// Most platforms will simply return a Rectangle with bounds (0, 0, displayWidth, displayHeight).  iPhone X
+    /// will return a rectangle that excludes the notch, and task bar regions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: Out parameter where safe bounds are set.
+    ///
+    /// #### Returns
+    ///
+    /// The same rectangle that was passed as a parameter.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - Form#getSafeArea()
     public Rectangle getDisplaySafeArea(Rectangle rect) {
         if (rect == null) {
             rect = new Rectangle();
@@ -3944,24 +4364,24 @@ public abstract class CodenameOneImplementation {
         return rect;
     }
 
-    /**
-     * Plays a builtin device sound matching the given identifier, implementations
-     * and themes can offer additional identifiers to the ones that are already built
-     * in.
-     *
-     * @param soundIdentifier the sound identifier which can match one of the
-     *                        common constants in this class or be a user/implementation defined sound
-     */
+    /// Plays a builtin device sound matching the given identifier, implementations
+    /// and themes can offer additional identifiers to the ones that are already built
+    /// in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `soundIdentifier`: @param soundIdentifier the sound identifier which can match one of the
+    ///                        common constants in this class or be a user/implementation defined sound
     public void playBuiltinSound(String soundIdentifier) {
         playUserSound(soundIdentifier);
     }
 
-    /**
-     * Plays a sound defined by the user
-     *
-     * @param soundIdentifier the sound identifier which can match one of the
-     *                        common constants in this class or be a user/implementation defined sound
-     */
+    /// Plays a sound defined by the user
+    ///
+    /// #### Parameters
+    ///
+    /// - `soundIdentifier`: @param soundIdentifier the sound identifier which can match one of the
+    ///                        common constants in this class or be a user/implementation defined sound
     protected void playUserSound(String soundIdentifier) {
         // TODO: Reintroduce builitin sound support
         //Object sound = builtinSounds.get(soundIdentifier);
@@ -3969,24 +4389,30 @@ public abstract class CodenameOneImplementation {
         //playAudio(sound);
     }
 
-    /**
-     * This method allows implementations to store sound objects natively e.g.
-     * in files, byte arrays whatever
-     *
-     * @param data native data object
-     */
+    /// This method allows implementations to store sound objects natively e.g.
+    /// in files, byte arrays whatever
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: native data object
     protected void playNativeBuiltinSound(Object data) {
     }
 
-    /**
-     * Converts a sound object to a form which will be easy for the implementation
-     * to play later on. E.g. a byte array or a file/file name and return an object
-     * that will allow playNativeBuiltinSound() to use
-     *
-     * @param i stream containing a sound file
-     * @return native playback object
-     * @throws java.io.IOException thrown by the stream
-     */
+    /// Converts a sound object to a form which will be easy for the implementation
+    /// to play later on. E.g. a byte array or a file/file name and return an object
+    /// that will allow playNativeBuiltinSound() to use
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: stream containing a sound file
+    ///
+    /// #### Returns
+    ///
+    /// native playback object
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: thrown by the stream
     protected Object convertBuiltinSound(InputStream i) throws IOException {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         byte[] buffer = new byte[4096];
@@ -4000,67 +4426,88 @@ public abstract class CodenameOneImplementation {
         return b.toByteArray();
     }
 
-    /**
-     * Installs a replacement sound as the builtin sound responsible for the given
-     * sound identifier (this will override the system sound if such a sound exists).
-     *
-     * @param soundIdentifier the sound string passed to playBuiltinSound
-     * @param data            an input stream containing platform specific audio file, its usually safe
-     *                        to assume that wav/mp3 would be supported.
-     * @throws IOException if the stream throws an exception
-     */
+    /// Installs a replacement sound as the builtin sound responsible for the given
+    /// sound identifier (this will override the system sound if such a sound exists).
+    ///
+    /// #### Parameters
+    ///
+    /// - `soundIdentifier`: the sound string passed to playBuiltinSound
+    ///
+    /// - `data`: @param data            an input stream containing platform specific audio file, its usually safe
+    ///                        to assume that wav/mp3 would be supported.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the stream throws an exception
     public void installBuiltinSound(String soundIdentifier, InputStream data) throws IOException {
         builtinSounds.put(soundIdentifier, convertBuiltinSound(data));
     }
 
-    /**
-     * Indicates whether a user installed or system sound is available
-     *
-     * @param soundIdentifier the sound string passed to playBuiltinSound
-     * @return true if a sound of this given type is avilable
-     */
+    /// Indicates whether a user installed or system sound is available
+    ///
+    /// #### Parameters
+    ///
+    /// - `soundIdentifier`: the sound string passed to playBuiltinSound
+    ///
+    /// #### Returns
+    ///
+    /// true if a sound of this given type is avilable
     public boolean isBuiltinSoundAvailable(String soundIdentifier) {
         return builtinSounds.containsKey(soundIdentifier);
     }
 
-    /**
-     * Allows muting/unmuting the builtin sounds easily
-     *
-     * @return true if the sound is *not* muted
-     */
+    /// Allows muting/unmuting the builtin sounds easily
+    ///
+    /// #### Returns
+    ///
+    /// true if the sound is *not* muted
     public boolean isBuiltinSoundsEnabled() {
         return builtinSoundEnabled;
     }
 
-    /**
-     * Allows muting/unmuting the builtin sounds easily
-     *
-     * @param enabled indicates whether the sound is muted
-     */
+    /// Allows muting/unmuting the builtin sounds easily
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: indicates whether the sound is muted
     public void setBuiltinSoundsEnabled(boolean enabled) {
         builtinSoundEnabled = enabled;
     }
 
-    /**
-     * Plays the sound in the given URI which is partially platform specific.
-     *
-     * @param uri          the platform specific location for the sound
-     * @param onCompletion invoked when the audio file finishes playing, may be null
-     * @return a handle that can be used to control the playback of the audio
-     * @throws java.io.IOException if the URI access fails
-     */
+    /// Plays the sound in the given URI which is partially platform specific.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: the platform specific location for the sound
+    ///
+    /// - `onCompletion`: invoked when the audio file finishes playing, may be null
+    ///
+    /// #### Returns
+    ///
+    /// a handle that can be used to control the playback of the audio
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the URI access fails
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return null;
     }
 
-    /**
-     * Creates media asynchronously.
-     *
-     * @param uri          the platform specific location for the sound
-     * @param onCompletion invoked when the audio file finishes playing, may be null
-     * @return a handle that can be used to control the playback of the audio
-     * @see #createMedia(java.lang.String, boolean, java.lang.Runnable)
-     */
+    /// Creates media asynchronously.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: the platform specific location for the sound
+    ///
+    /// - `onCompletion`: invoked when the audio file finishes playing, may be null
+    ///
+    /// #### Returns
+    ///
+    /// a handle that can be used to control the playback of the audio
+    ///
+    /// #### See also
+    ///
+    /// - #createMedia(java.lang.String, boolean, java.lang.Runnable)
     public AsyncResource<Media> createMediaAsync(final String uri, final boolean video, final Runnable onCompletion) {
         final AsyncResource<Media> out = new AsyncResource<Media>();
         CN.scheduleBackgroundTask(new Runnable() {
@@ -4076,53 +4523,85 @@ public abstract class CodenameOneImplementation {
         return out;
     }
 
-    /**
-     * Adds a callback to a Media element that will be called when the media finishes playing.
-     *
-     * @param media        The media to add the callback to.
-     * @param onCompletion The callback that will run on the EDT when the playback completes.
-     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
-     * @see Display#addCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
-     */
+    /// Adds a callback to a Media element that will be called when the media finishes playing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `media`: The media to add the callback to.
+    ///
+    /// - `onCompletion`: The callback that will run on the EDT when the playback completes.
+    ///
+    /// #### See also
+    ///
+    /// - #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
+    ///
+    /// - Display#addCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
     public void addCompletionHandler(Media media, Runnable onCompletion) {
     }
 
-    /**
-     * Removes onComplete callback from Media element.
-     *
-     * @param media        The media element.
-     * @param onCompletion The callback.
-     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
-     * @see Display#removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
-     */
+    /// Removes onComplete callback from Media element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `media`: The media element.
+    ///
+    /// - `onCompletion`: The callback.
+    ///
+    /// #### See also
+    ///
+    /// - #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
+    ///
+    /// - Display#removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
     public void removeCompletionHandler(Media media, Runnable onCompletion) {
 
     }
 
-    /**
-     * Plays the sound in the given stream
-     *
-     * @param stream       the stream containing the media data
-     * @param mimeType     the type of the data in the stream
-     * @param onCompletion invoked when the audio file finishes playing, may be null
-     * @return a handle that can be used to control the playback of the audio
-     * @throws java.io.IOException if the URI access fails
-     * @see #createMediaAsync(java.io.InputStream, java.lang.String, java.lang.Runnable)
-     */
+    /// Plays the sound in the given stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `stream`: the stream containing the media data
+    ///
+    /// - `mimeType`: the type of the data in the stream
+    ///
+    /// - `onCompletion`: invoked when the audio file finishes playing, may be null
+    ///
+    /// #### Returns
+    ///
+    /// a handle that can be used to control the playback of the audio
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the URI access fails
+    ///
+    /// #### See also
+    ///
+    /// - #createMediaAsync(java.io.InputStream, java.lang.String, java.lang.Runnable)
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return null;
     }
 
-    /**
-     * Creates media asynchronously.
-     *
-     * @param stream       the stream containing the media data
-     * @param mimeType     the type of the data in the stream
-     * @param onCompletion invoked when the audio file finishes playing, may be null
-     * @return a handle that can be used to control the playback of the audio
-     * @see #createMedia(java.io.InputStream, java.lang.String, java.lang.Runnable)
-     * @since 7.0
-     */
+    /// Creates media asynchronously.
+    ///
+    /// #### Parameters
+    ///
+    /// - `stream`: the stream containing the media data
+    ///
+    /// - `mimeType`: the type of the data in the stream
+    ///
+    /// - `onCompletion`: invoked when the audio file finishes playing, may be null
+    ///
+    /// #### Returns
+    ///
+    /// a handle that can be used to control the playback of the audio
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createMedia(java.io.InputStream, java.lang.String, java.lang.Runnable)
     public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
         final AsyncResource<Media> out = new AsyncResource<Media>();
         CN.scheduleBackgroundTask(new Runnable() {
@@ -4139,15 +4618,21 @@ public abstract class CodenameOneImplementation {
         return out;
     }
 
-    /**
-     * Creates an audio media that can be played in the background.
-     *
-     * @param uri the uri of the media can start with jar://, file://, http://
-     *            (can also use rtsp:// if supported on the platform)
-     * @return Media a Media Object that can be used to control the playback
-     * of the media
-     * @throws IOException if creation of media from the given URI has failed
-     */
+    /// Creates an audio media that can be played in the background.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: @param uri the uri of the media can start with jar://, file://, http://
+    ///            (can also use rtsp:// if supported on the platform)
+    ///
+    /// #### Returns
+    ///
+    /// @return Media a Media Object that can be used to control the playback
+    /// of the media
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if creation of media from the given URI has failed
     public Media createBackgroundMedia(String uri) throws IOException {
         if (uri.startsWith("jar://")) {
             uri = uri.substring(6);
@@ -4174,17 +4659,23 @@ public abstract class CodenameOneImplementation {
         return createMedia(uri, false, null);
     }
 
-    /**
-     * Creates an audio media that can be played in the background.
-     * <p>
-     * This is run asynchronously so that this call does not block.
-     *
-     * @param uri the uri of the media can start with jar://, file://, http://
-     *            (can also use rtsp:// if supported on the platform)
-     * @return Media a Media Object that can be used to control the playback
-     * of the media
-     * @throws IOException if creation of media from the given URI has failed
-     */
+    /// Creates an audio media that can be played in the background.
+    ///
+    /// This is run asynchronously so that this call does not block.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: @param uri the uri of the media can start with jar://, file://, http://
+    ///            (can also use rtsp:// if supported on the platform)
+    ///
+    /// #### Returns
+    ///
+    /// @return Media a Media Object that can be used to control the playback
+    /// of the media
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if creation of media from the given URI has failed
     public AsyncResource<Media> createBackgroundMediaAsync(final String uri) {
 
         if (uri.startsWith("jar://")) {
@@ -4207,25 +4698,31 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Creates a soft/weak reference to an object that allows it to be collected
-     * yet caches it. This method is in the porting layer since CLDC only includes
-     * weak references while some platforms include nothing at all and some include
-     * the superior soft references.
-     *
-     * @param o object to cache
-     * @return a caching object or null  if caching isn't supported
-     */
+    /// Creates a soft/weak reference to an object that allows it to be collected
+    /// yet caches it. This method is in the porting layer since CLDC only includes
+    /// weak references while some platforms include nothing at all and some include
+    /// the superior soft references.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to cache
+    ///
+    /// #### Returns
+    ///
+    /// a caching object or null  if caching isn't supported
     public Object createSoftWeakRef(Object o) {
         return new WeakReference(o);
     }
 
-    /**
-     * Extracts the hard reference from the soft/weak reference given
-     *
-     * @param o the reference returned by createSoftWeakRef
-     * @return the original object submitted or null
-     */
+    /// Extracts the hard reference from the soft/weak reference given
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the reference returned by createSoftWeakRef
+    ///
+    /// #### Returns
+    ///
+    /// the original object submitted or null
     public Object extractHardRef(Object o) {
         WeakReference w = (WeakReference) o;
         if (w != null) {
@@ -4234,283 +4731,350 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
-    /**
-     * This method notifies the implementation about the chosen commands
-     * behavior
-     *
-     * @param commandBehavior see Display.COMMAND_BEHAVIOR...
-     */
+    /// This method notifies the implementation about the chosen commands
+    /// behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `commandBehavior`: see Display.COMMAND_BEHAVIOR...
     public void notifyCommandBehavior(int commandBehavior) {
     }
 
-    /**
-     * Indicates if the implemenetation has a native underlying theme
-     *
-     * @return true if the implementation has a native theme available
-     */
+    /// Indicates if the implemenetation has a native underlying theme
+    ///
+    /// #### Returns
+    ///
+    /// true if the implementation has a native theme available
     public boolean hasNativeTheme() {
         return false;
     }
 
-    /**
-     * Installs the native theme, this is only applicable if hasNativeTheme() returned true. Notice that this method
-     * might replace the DefaultLookAndFeel instance and the default transitions.
-     */
+    /// Installs the native theme, this is only applicable if hasNativeTheme() returned true. Notice that this method
+    /// might replace the DefaultLookAndFeel instance and the default transitions.
     public void installNativeTheme() {
         throw new RuntimeException();
     }
 
-    /**
-     * Performs a clipboard copy operation, if the native clipboard is supported by the implementation it would be used
-     *
-     * @param obj object to copy, while this can be any arbitrary object it is recommended that only Strings or Codename One
-     *            image objects be used to copy
-     */
+    /// Performs a clipboard copy operation, if the native clipboard is supported by the implementation it would be used
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: @param obj object to copy, while this can be any arbitrary object it is recommended that only Strings or Codename One
+    ///            image objects be used to copy
     public void copyToClipboard(Object obj) {
         lightweightClipboard = obj;
     }
 
-    /**
-     * Returns the current content of the clipboard
-     *
-     * @return can be any object or null see copyToClipboard
-     */
+    /// Returns the current content of the clipboard
+    ///
+    /// #### Returns
+    ///
+    /// can be any object or null see copyToClipboard
     public Object getPasteDataFromClipboard() {
         return lightweightClipboard;
     }
 
-    /**
-     * Returns true if the device is currently in portrait mode
-     *
-     * @return true if the device is in portrait mode
-     */
+    /// Returns true if the device is currently in portrait mode
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is in portrait mode
     public boolean isPortrait() {
         return getDisplayWidth() < getActualDisplayHeight();
     }
 
-    /**
-     * Returns true if the device allows forcing the orientation via code, feature phones do not allow this
-     * although some include a jad property allowing for this feature
-     *
-     * @return true if lockOrientation  would work
-     */
+    /// Returns true if the device allows forcing the orientation via code, feature phones do not allow this
+    /// although some include a jad property allowing for this feature
+    ///
+    /// #### Returns
+    ///
+    /// true if lockOrientation  would work
     public boolean canForceOrientation() {
         return false;
     }
 
-    /**
-     * On devices that return true for canForceOrientation() this method can lock the device orientation
-     * either to portrait or landscape mode
-     *
-     * @param portrait true to lock to portrait mode, false to lock to landscape mode
-     */
+    /// On devices that return true for canForceOrientation() this method can lock the device orientation
+    /// either to portrait or landscape mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `portrait`: true to lock to portrait mode, false to lock to landscape mode
     public void lockOrientation(boolean portrait) {
     }
 
-    /**
-     * This is the reverse method for lock orientation allowing orientation lock to be disabled
-     */
+    /// This is the reverse method for lock orientation allowing orientation lock to be disabled
     public void unlockOrientation() {
     }
 
-    /**
-     * An implementation can return true if it supports embedding a native browser widget
-     *
-     * @return true if the implementation supports embedding a native browser widget
-     */
+    /// An implementation can return true if it supports embedding a native browser widget
+    ///
+    /// #### Returns
+    ///
+    /// true if the implementation supports embedding a native browser widget
     public boolean isNativeBrowserComponentSupported() {
         return false;
     }
 
-    /**
-     * Some platforms require that you enable pinch to zoom explicitly. This method has no
-     * effect if pinch to zoom isn't supported by the platform
-     *
-     * @param browserPeer browser instance
-     * @param e           true to enable pinch to zoom, false to disable it
-     */
+    /// Some platforms require that you enable pinch to zoom explicitly. This method has no
+    /// effect if pinch to zoom isn't supported by the platform
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// - `e`: true to enable pinch to zoom, false to disable it
     public void setPinchToZoomEnabled(PeerComponent browserPeer, boolean e) {
     }
 
-    /**
-     * Allows disabling the browsers native scrolling on devices that support it
-     *
-     * @param browserPeer browser instance
-     * @param e           true to enables scrolling and false disables it
-     */
+    /// Allows disabling the browsers native scrolling on devices that support it
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// - `e`: true to enables scrolling and false disables it
     public void setNativeBrowserScrollingEnabled(PeerComponent browserPeer, boolean e) {
     }
 
-    /**
-     * If the implementation supports the creation of a browser component it should be returned in this
-     * method
-     *
-     * @param browserComponent instance of the browser component thru which events should be fired
-     * @return an instance of the native browser peer or null
-     */
+    /// If the implementation supports the creation of a browser component it should be returned in this
+    /// method
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserComponent`: instance of the browser component thru which events should be fired
+    ///
+    /// #### Returns
+    ///
+    /// an instance of the native browser peer or null
     public PeerComponent createBrowserComponent(Object browserComponent) {
         return null;
     }
 
-    /**
-     * Posts a message to the window in a BrowserComponent.  This is intended to be an abstraction of the Javascript postMessage() API.
-     *
-     * <p>This is only overridden by the Javascript port to provide proper CORS handling.  Other ports use the implementation
-     * in BrowserComponent.</p>
-     *
-     * <p>Web pages wishing to receive messages via this mechanism should register a "message" event listener.  See
-     * <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage">Javascript postMessage() docs</a>
-     * for more details about this.</p>
-     *
-     * @param browserComponent The browser component peer.
-     * @param message          The message to send
-     * @param targetOrigin     The target origin for the message.
-     * @return True if the implementation handled the message.  False to let BrowserComponent handle it in its default way.
-     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String)
-     * @see #installMessageListener(java.lang.Object)
-     * @see #uninstallMessageListener(java.lang.Object)
-     * @since 7.0
-     */
+    /// Posts a message to the window in a BrowserComponent.  This is intended to be an abstraction of the Javascript postMessage() API.
+    ///
+    /// This is only overridden by the Javascript port to provide proper CORS handling.  Other ports use the implementation
+    /// in BrowserComponent.
+    ///
+    /// Web pages wishing to receive messages via this mechanism should register a "message" event listener.  See
+    /// [Javascript postMessage() docs](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage)
+    /// for more details about this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserComponent`: The browser component peer.
+    ///
+    /// - `message`: The message to send
+    ///
+    /// - `targetOrigin`: The target origin for the message.
+    ///
+    /// #### Returns
+    ///
+    /// True if the implementation handled the message.  False to let BrowserComponent handle it in its default way.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - BrowserComponent#postMessage(java.lang.String, java.lang.String)
+    ///
+    /// - #installMessageListener(java.lang.Object)
+    ///
+    /// - #uninstallMessageListener(java.lang.Object)
     public boolean postMessage(Object browserComponent, String message, String targetOrigin) {
         return false;
     }
 
-    /**
-     * Installs a message listener to allow webpages inside a browser component to send
-     * messages to CN1 cross-domain.
-     * <p>This will be overridden by the Javascript port only to handle CORS.  Other ports
-     * use the default implementation in {@link BrowserComponent}.
-     *
-     * @param browserComponent The browser component peer.
-     * @return True if a message listener was installed.  False otherwise.
-     * @see #postMessage(java.lang.Object, java.lang.String, java.lang.String)
-     * @see BrowserComponent#onMessage
-     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String)
-     */
+    /// Installs a message listener to allow webpages inside a browser component to send
+    /// messages to CN1 cross-domain.
+    ///
+    /// This will be overridden by the Javascript port only to handle CORS.  Other ports
+    /// use the default implementation in `BrowserComponent`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserComponent`: The browser component peer.
+    ///
+    /// #### Returns
+    ///
+    /// True if a message listener was installed.  False otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #postMessage(java.lang.Object, java.lang.String, java.lang.String)
+    ///
+    /// - BrowserComponent#onMessage
+    ///
+    /// - BrowserComponent#postMessage(java.lang.String, java.lang.String)
     public boolean installMessageListener(Object browserComponent) {
         return false;
     }
 
-    /**
-     * Uninstalls a message listener to allow webpages inside a browser component to send
-     * messages to CN1 cross-domain.
-     * <p>This will be overridden by the Javascript port only to handle CORS.  Other ports
-     * use the default implementation in {@link BrowserComponent}.
-     *
-     * @param browserComponent The browser component peer.
-     * @return True if a message listener was installed.  False otherwise.
-     * @see #postMessage(java.lang.Object, java.lang.String, java.lang.String)
-     * @see BrowserComponent#onMessage
-     * @see BrowserComponent#postMessage(java.lang.String, java.lang.String)
-     */
+    /// Uninstalls a message listener to allow webpages inside a browser component to send
+    /// messages to CN1 cross-domain.
+    ///
+    /// This will be overridden by the Javascript port only to handle CORS.  Other ports
+    /// use the default implementation in `BrowserComponent`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserComponent`: The browser component peer.
+    ///
+    /// #### Returns
+    ///
+    /// True if a message listener was installed.  False otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #postMessage(java.lang.Object, java.lang.String, java.lang.String)
+    ///
+    /// - BrowserComponent#onMessage
+    ///
+    /// - BrowserComponent#postMessage(java.lang.String, java.lang.String)
     public boolean uninstallMessageListener(Object browserComponent) {
         return false;
     }
 
-    /**
-     * <p>Creates a native overlay for the given component. A native overlay is a native component
-     * that is always present over the given component.  It can be used to help processing user
-     * events in a more native way.  In the Javascript port, native overlays are used on TextFields, for example,
-     * so that users can tap on the text field and activate the keyboard.  This was necessary because
-     * iOS doesn't allow us to programmatically activate the keyboard.  Without a native overlay,
-     * the user would first have to tap the lightweight keyboard - upon which we create a native text
-     * field, and then the user would have to tap again to activate the keyboard.  Using native
-     * overlays in that case yields better UX.</p>
-     *
-     * <p>When using native overlays, you will need to implement {@link #createNativeOverlay(com.codename1.ui.Component) },
-     * {@link #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) }, and {@link #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) }.
-     * {@link #createNativeOverlay(com.codename1.ui.Component) } is called in {@link Component#initComponent() } (i.e. when the component is added to the form).
-     * This is where you would create the native view and add it to the native view hierarchy above the CN1 canvas.
-     * {@link #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) } is called in {@link Component#laidOut() } (i.e. when the component is resized/positioned).
-     * This is where you can reposition the native view or change its properties to be appropriate for the "occasion". {@link #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) }
-     * is called in {@link Component#deinitialize() } (i.e. when the component is removed from the form).  You should destroy the native view and remove it from the native view hierarchy here.
-     *
-     * @param cmp The component to create the overlay for.
-     * @return A native object.  The object type/format is decided by the implementation.
-     * @see #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object)
-     * @see #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object)
-     * @see Component#showNativeOverlay()
-     */
+    /// Creates a native overlay for the given component. A native overlay is a native component
+    /// that is always present over the given component.  It can be used to help processing user
+    /// events in a more native way.  In the Javascript port, native overlays are used on TextFields, for example,
+    /// so that users can tap on the text field and activate the keyboard.  This was necessary because
+    /// iOS doesn't allow us to programmatically activate the keyboard.  Without a native overlay,
+    /// the user would first have to tap the lightweight keyboard - upon which we create a native text
+    /// field, and then the user would have to tap again to activate the keyboard.  Using native
+    /// overlays in that case yields better UX.
+    ///
+    /// When using native overlays, you will need to implement `#createNativeOverlay(com.codename1.ui.Component)`,
+    /// `java.lang.Object)`, and `java.lang.Object)`.
+    /// `#createNativeOverlay(com.codename1.ui.Component)` is called in `Component#initComponent()` (i.e. when the component is added to the form).
+    /// This is where you would create the native view and add it to the native view hierarchy above the CN1 canvas.
+    /// `java.lang.Object)` is called in `Component#laidOut()` (i.e. when the component is resized/positioned).
+    /// This is where you can reposition the native view or change its properties to be appropriate for the "occasion". `java.lang.Object)`
+    /// is called in `Component#deinitialize()` (i.e. when the component is removed from the form).  You should destroy the native view and remove it from the native view hierarchy here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to create the overlay for.
+    ///
+    /// #### Returns
+    ///
+    /// A native object.  The object type/format is decided by the implementation.
+    ///
+    /// #### See also
+    ///
+    /// - #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object)
+    ///
+    /// - #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object)
+    ///
+    /// - Component#showNativeOverlay()
     public Object createNativeOverlay(Component cmp) {
         return null;
     }
 
-    /**
-     * Hides the native overlay for a component.
-     *
-     * @param cmp           The component
-     * @param nativeOverlay The native overlay.
-     * @see #createNativeOverlay(com.codename1.ui.Component)
-     * @see #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object)
-     * @see Component#hideNativeOverlay()
-     */
+    /// Hides the native overlay for a component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component
+    ///
+    /// - `nativeOverlay`: The native overlay.
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeOverlay(com.codename1.ui.Component)
+    ///
+    /// - #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object)
+    ///
+    /// - Component#hideNativeOverlay()
     public void hideNativeOverlay(Component cmp, Object nativeOverlay) {
 
     }
 
-    /**
-     * Updates the native overlay after the component has been repositioned.
-     *
-     * @param cmp           The component
-     * @param nativeOverlay The native overlay
-     * @see #createNativeOverlay(com.codename1.ui.Component)
-     * @see #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object)
-     * @see Component#updateNativeOverlay()
-     */
+    /// Updates the native overlay after the component has been repositioned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component
+    ///
+    /// - `nativeOverlay`: The native overlay
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeOverlay(com.codename1.ui.Component)
+    ///
+    /// - #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object)
+    ///
+    /// - Component#updateNativeOverlay()
     public void updateNativeOverlay(Component cmp, Object nativeOverlay) {
 
     }
 
-    /**
-     * This method allows customizing the properties of a web view in various ways including platform specific settings.
-     * When a property isn't supported by a specific platform it is just ignored.
-     *
-     * @param browserPeer browser instance
-     * @param key         see the documentation with the Codename One Implementation for further details
-     * @param value       see the documentation with the Codename One Implementation for further details
-     */
+    /// This method allows customizing the properties of a web view in various ways including platform specific settings.
+    /// When a property isn't supported by a specific platform it is just ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// - `key`: see the documentation with the Codename One Implementation for further details
+    ///
+    /// - `value`: see the documentation with the Codename One Implementation for further details
     public void setBrowserProperty(PeerComponent browserPeer, String key, Object value) {
     }
 
-    /**
-     * The page title
-     *
-     * @param browserPeer browser instance
-     * @return the title
-     */
+    /// The page title
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// #### Returns
+    ///
+    /// the title
     public String getBrowserTitle(PeerComponent browserPeer) {
         return null;
     }
 
-    /**
-     * The page URL
-     *
-     * @param browserPeer browser instance
-     * @return the URL
-     */
+    /// The page URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// #### Returns
+    ///
+    /// the URL
     public String getBrowserURL(PeerComponent browserPeer) {
         return null;
     }
 
-    /**
-     * Captures a screenshot from a browser component asynchronously.
-     *
-     * @param browserPeer The browser instance
-     * @return AsyncResource resolving to an image of the snapshot.  If this returns null,
-     * then {@link BrowserComponent#captureScreenshot() } will just use {@link Component#toImage() }
-     * for screenshots.
-     * @since 7.0
-     */
+    /// Captures a screenshot from a browser component asynchronously.
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: The browser instance
+    ///
+    /// #### Returns
+    ///
+    /// @return AsyncResource resolving to an image of the snapshot.  If this returns null,
+    /// then `BrowserComponent#captureScreenshot()` will just use `Component#toImage()`
+    /// for screenshots.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public AsyncResource<Image> captureBrowserScreenshot(PeerComponent browserPeer) {
         return null;
     }
 
-    /**
-     * Sets a relative URL from the html hierarchy
-     *
-     * @param browserPeer the peer component
-     * @param url         the url relative to the HTML directory
-     */
+    /// Sets a relative URL from the html hierarchy
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: the peer component
+    ///
+    /// - `url`: the url relative to the HTML directory
     public void setBrowserPageInHierarchy(PeerComponent browserPeer, String url) throws IOException {
         installTar();
 
@@ -4526,32 +5090,35 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Sets the page URL, jar: URL's must be supported by the implementation
-     *
-     * @param browserPeer browser instance
-     * @param url         the URL
-     * @param headers     custom headers for the request URL
-     */
+    /// Sets the page URL, jar: URL's must be supported by the implementation
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// - `url`: the URL
+    ///
+    /// - `headers`: custom headers for the request URL
     public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
         throw new RuntimeException();
     }
 
-    /**
-     * Returns true if setBrowserURL with custom headers is supported
-     *
-     * @return returns false by default
-     */
+    /// Returns true if setBrowserURL with custom headers is supported
+    ///
+    /// #### Returns
+    ///
+    /// returns false by default
     public boolean isURLWithCustomHeadersSupported() {
         return false;
     }
 
-    /**
-     * Sets the page URL, jar: URL's must be supported by the implementation
-     *
-     * @param browserPeer browser instance
-     * @param url         the URL
-     */
+    /// Sets the page URL, jar: URL's must be supported by the implementation
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// - `url`: the URL
     public void setBrowserURL(PeerComponent browserPeer, String url) {
         // load from jar:// URL's
         try {
@@ -4580,104 +5147,117 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Reload the current page
-     *
-     * @param browserPeer browser instance
-     */
+    /// Reload the current page
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
     public void browserReload(PeerComponent browserPeer) {
     }
 
-    /**
-     * Indicates whether back is currently available
-     *
-     * @param browserPeer browser instance
-     * @return true if back should work
-     */
+    /// Indicates whether back is currently available
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// #### Returns
+    ///
+    /// true if back should work
     public boolean browserHasBack(PeerComponent browserPeer) {
         return false;
     }
 
-    /**
-     * Indicates whether forward is currently available
-     *
-     * @param browserPeer browser instance
-     * @return true if forward should work
-     */
+    /// Indicates whether forward is currently available
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// #### Returns
+    ///
+    /// true if forward should work
     public boolean browserHasForward(PeerComponent browserPeer) {
         return false;
     }
 
-    /**
-     * Navigates back in the history
-     *
-     * @param browserPeer browser instance
-     */
+    /// Navigates back in the history
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
     public void browserBack(PeerComponent browserPeer) {
     }
 
-    /**
-     * Stops loading the current page
-     *
-     * @param browserPeer browser instance
-     */
+    /// Stops loading the current page
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
     public void browserStop(PeerComponent browserPeer) {
     }
 
-    /**
-     * Release browser native resources
-     *
-     * @param internal browser instance
-     */
+    /// Release browser native resources
+    ///
+    /// #### Parameters
+    ///
+    /// - `internal`: browser instance
     public void browserDestroy(PeerComponent internal) {
     }
 
-    /**
-     * Navigates forward in the history
-     *
-     * @param browserPeer browser instance
-     */
+    /// Navigates forward in the history
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
     public void browserForward(PeerComponent browserPeer) {
     }
 
-    /**
-     * Clears navigation history
-     *
-     * @param browserPeer browser instance
-     */
+    /// Clears navigation history
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
     public void browserClearHistory(PeerComponent browserPeer) {
     }
 
-    /**
-     * Shows the given HTML in the native viewer
-     *
-     * @param browserPeer browser instance
-     * @param html        HTML web page
-     * @param baseUrl     base URL to associate with the HTML
-     */
+    /// Shows the given HTML in the native viewer
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// - `html`: HTML web page
+    ///
+    /// - `baseUrl`: base URL to associate with the HTML
     public void setBrowserPage(PeerComponent browserPeer, String html, String baseUrl) {
     }
 
-    /**
-     * Executes the given JavaScript string within the current context
-     *
-     * @param browserPeer browser instance
-     * @param javaScript  the JavaScript string
-     */
+    /// Executes the given JavaScript string within the current context
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// - `javaScript`: the JavaScript string
     public void browserExecute(PeerComponent browserPeer, String javaScript) {
         setBrowserURL(browserPeer, "javascript:(function(){" + javaScript + "})()");
     }
 
-    /**
-     * Executes javascript and returns string. The default implementation
-     * just wraps the browserExecute() method that doesn't return anything. It will
-     * return null always. You need to override this in the native implementation
-     * to return meaningful values.
-     *
-     * @param internal   The peer browser component.
-     * @param javaScript The javascript to execute.
-     * @return String result of the javascript expression.
-     */
+    /// Executes javascript and returns string. The default implementation
+    /// just wraps the browserExecute() method that doesn't return anything. It will
+    /// return null always. You need to override this in the native implementation
+    /// to return meaningful values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `internal`: The peer browser component.
+    ///
+    /// - `javaScript`: The javascript to execute.
+    ///
+    /// #### Returns
+    ///
+    /// String result of the javascript expression.
     public String browserExecuteAndReturnString(PeerComponent internal, String javaScript) {
         browserExecute(internal, javaScript);
         return null;
@@ -4687,30 +5267,39 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /**
-     * Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods
-     * and access fields on the given object. Notice that on RIM devices which don't support reflection
-     * this object must implement the propriatery Scriptable interface
-     * http://www.blackberry.com/developers/docs/5.0.0api/net/rim/device/api/script/Scriptable.html
-     *
-     * @param browserPeer browser instance
-     * @param o           the object to invoke, notice all public fields and methods would be exposed to JavaScript
-     * @param name        the name to expose within JavaScript
-     * @deprecated This method was never well-supported across platforms other than Android - and it will no longer work
-     * even in Android for SDK &gt;= 17, unless {@literal o}'s class has the {@literal @JavascriptInterface} annotation which
-     * would only be available if implemented inside a Native Interface.  Don't use this.
-     */
+    /// Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods
+    /// and access fields on the given object. Notice that on RIM devices which don't support reflection
+    /// this object must implement the propriatery Scriptable interface
+    /// http://www.blackberry.com/developers/docs/5.0.0api/net/rim/device/api/script/Scriptable.html
+    ///
+    /// #### Parameters
+    ///
+    /// - `browserPeer`: browser instance
+    ///
+    /// - `o`: the object to invoke, notice all public fields and methods would be exposed to JavaScript
+    ///
+    /// - `name`: the name to expose within JavaScript
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated This method was never well-supported across platforms other than Android - and it will no longer work
+    /// even in Android for SDK >= 17, unless o's class has the @JavascriptInterface annotation which
+    /// would only be available if implemented inside a Native Interface.  Don't use this.
     public void browserExposeInJavaScript(PeerComponent browserPeer, Object o, String name) {
     }
 
-    /**
-     * Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
-     * to be relied upon
-     *
-     * @param dipCount   the dips that we will convert to pixels
-     * @param horizontal indicates pixels in the horizontal plane
-     * @return value in pixels
-     */
+    /// Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
+    /// to be relied upon
+    ///
+    /// #### Parameters
+    ///
+    /// - `dipCount`: the dips that we will convert to pixels
+    ///
+    /// - `horizontal`: indicates pixels in the horizontal plane
+    ///
+    /// #### Returns
+    ///
+    /// value in pixels
     public int convertToPixels(int dipCount, boolean horizontal) {
         switch (getDeviceDensity()) {
             case Display.DENSITY_VERY_LOW:
@@ -4730,55 +5319,52 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Indicates whether the device is a tablet, notice that this is often a guess
-     *
-     * @return true if the device is assumed to be a tablet
-     */
+    /// Indicates whether the device is a tablet, notice that this is often a guess
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a tablet
     public boolean isTablet() {
         return false;
     }
 
-    /**
-     * Returns true if this is a desktop application
-     *
-     * @return true if this is a desktop application
-     */
+    /// Returns true if this is a desktop application
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a desktop application
     public boolean isDesktop() {
         return false;
     }
 
-    /**
-     * Returns true if the device has dialing capabilities
-     *
-     * @return false if it cannot dial
-     */
+    /// Returns true if the device has dialing capabilities
+    ///
+    /// #### Returns
+    ///
+    /// false if it cannot dial
     public boolean canDial() {
         return !isTablet() && !isDesktop();
     }
 
-    /**
-     * Allows an implementation to modify setting thread priority, some implementations
-     * don't handle thread priorities well
-     *
-     * @param t the thread
-     * @param p the priority
-     */
+    /// Allows an implementation to modify setting thread priority, some implementations
+    /// don't handle thread priorities well
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the thread
+    ///
+    /// - `p`: the priority
     public void setThreadPriority(Thread t, int p) {
         t.setPriority(p);
     }
 
-    /**
-     * Callback allowing the implementation to perform an operation on the init thread
-     * after initialization was completed
-     */
+    /// Callback allowing the implementation to perform an operation on the init thread
+    /// after initialization was completed
     public void postInit() {
         initDefaultUserAgent();
     }
 
-    /**
-     * Some old platforms might need this but for modern platforms the user agent should "just work".
-     */
+    /// Some old platforms might need this but for modern platforms the user agent should "just work".
     protected void initDefaultUserAgent() {
         //sets the default device user agent if available by the platform, by default
         //we set Nokia, beacause if the user agent is empty it is most likely a J2ME device
@@ -4786,24 +5372,25 @@ public abstract class CodenameOneImplementation {
                 "Mozilla/5.0 (SymbianOS/9.4; Series60/5.0 NokiaN97-1/20.0.019; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebKit/525 (KHTML, like Gecko) BrowserNG/7.1.18124"));
     }
 
-    /**
-     * Allows for easier debugging of native implementations by setting the image name to
-     * the native image object
-     *
-     * @param nativeImage the native image
-     * @param name        the name/file name identifying the image
-     */
+    /// Allows for easier debugging of native implementations by setting the image name to
+    /// the native image object
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeImage`: the native image
+    ///
+    /// - `name`: the name/file name identifying the image
     public void setImageName(Object nativeImage, String name) {
     }
 
-    /**
-     * On most platforms it is quite fast to draw on a mutable image and then render that
-     * image, however some platforms have much slower mutable images in comparison to just
-     * drawing on the screen. These platforms should return false here and Codename One will try
-     * to use less mutable image related optimizations in transitions and other operations.
-     *
-     * @return true if mutable images are fast on this platform
-     */
+    /// On most platforms it is quite fast to draw on a mutable image and then render that
+    /// image, however some platforms have much slower mutable images in comparison to just
+    /// drawing on the screen. These platforms should return false here and Codename One will try
+    /// to use less mutable image related optimizations in transitions and other operations.
+    ///
+    /// #### Returns
+    ///
+    /// true if mutable images are fast on this platform
     public boolean areMutableImagesFast() {
         return true;
     }
@@ -4867,22 +5454,25 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Checks if this platform supports sharing cookies between Native components (e.g. BrowserComponent)
-     * and ConnectionRequests.  Currently only Android and iOS ports support this.
-     *
-     * @return True if platform supports native cookie sharing.
-     * @since 8.0
-     */
+    /// Checks if this platform supports sharing cookies between Native components (e.g. BrowserComponent)
+    /// and ConnectionRequests.  Currently only Android and iOS ports support this.
+    ///
+    /// #### Returns
+    ///
+    /// True if platform supports native cookie sharing.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public boolean isNativeCookieSharingSupported() {
         return false;
     }
 
-    /**
-     * Adds/replaces a cookie to be sent to the given domain
-     *
-     * @param c cookie to add
-     */
+    /// Adds/replaces a cookie to be sent to the given domain
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: cookie to add
     public void addCookie(Cookie c) {
         if (cookies == null) {
             cookies = new Hashtable();
@@ -4901,12 +5491,15 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Returns the domain for the given URL
-     *
-     * @param url a url
-     * @return the domain
-     */
+    /// Returns the domain for the given URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: a url
+    ///
+    /// #### Returns
+    ///
+    /// the domain
     public String getURLDomain(String url) {
         String domain = url.substring(url.indexOf("//") + 2);
         int i = domain.indexOf('/');
@@ -4935,12 +5528,15 @@ public abstract class CodenameOneImplementation {
         return path;
     }
 
-    /**
-     * Returns the cookies for this URL
-     *
-     * @param url the url on which we are checking for cookies
-     * @return the cookies to submit to the given URL
-     */
+    /// Returns the cookies for this URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url on which we are checking for cookies
+    ///
+    /// #### Returns
+    ///
+    /// the cookies to submit to the given URL
     public Vector getCookiesForURL(String url) {
         Vector response = null;
         if (Cookie.isAutoStored()) {
@@ -4993,48 +5589,60 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /**
-     * Connects to a given URL, returns a connection object to be used with the implementation
-     * later
-     *
-     * @param url   the URL to connect to
-     * @param read  indicates whether the connection will be read from
-     * @param write indicates whether writing will occur into the connection
-     * @return a URL instance
-     */
+    /// Connects to a given URL, returns a connection object to be used with the implementation
+    /// later
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL to connect to
+    ///
+    /// - `read`: indicates whether the connection will be read from
+    ///
+    /// - `write`: indicates whether writing will occur into the connection
+    ///
+    /// #### Returns
+    ///
+    /// a URL instance
     public abstract Object connect(String url, boolean read, boolean write) throws IOException;
 
-    /**
-     * Gets the SSL certificates for a connection
-     *
-     * @param connection The connection.
-     * @param url        The url of the connection.
-     * @return String array where each certificate is in form {@literal <ALGORITHM>:<FINGERPRINT>}
-     * @throws IOException
-     */
+    /// Gets the SSL certificates for a connection
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: The connection.
+    ///
+    /// - `url`: The url of the connection.
+    ///
+    /// #### Returns
+    ///
+    /// String array where each certificate is in form :
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public String[] getSSLCertificates(Object connection, String url) throws IOException {
         return new String[0];
     }
 
-    /**
-     * Checks if the platform supports getting SSL certificates.
-     *
-     * @return True if the platform supports SSL certificates.
-     */
+    /// Checks if the platform supports getting SSL certificates.
+    ///
+    /// #### Returns
+    ///
+    /// True if the platform supports SSL certificates.
     public boolean canGetSSLCertificates() {
         return false;
     }
 
-    /**
-     * SSL certificate checks must be performed via a callback from the native side,
-     * rather than explicitly checking as part of NetworkManager's connection
-     * flow.   This is mainly for iOS POST requests.  If we try to get the SSL certs
-     * explicitly, it forces the connection to be sent without a POST body.  Hence
-     * we need to let iOS do the check on the native side, and callback into Java
-     * to run the checkSSLCertificates method of the request.
-     *
-     * @return True if the platform requires a native callback fo check SSL certificates
-     */
+    /// SSL certificate checks must be performed via a callback from the native side,
+    /// rather than explicitly checking as part of NetworkManager's connection
+    /// flow.   This is mainly for iOS POST requests.  If we try to get the SSL certs
+    /// explicitly, it forces the connection to be sent without a POST body.  Hence
+    /// we need to let iOS do the check on the native side, and callback into Java
+    /// to run the checkSSLCertificates method of the request.
+    ///
+    /// #### Returns
+    ///
+    /// True if the platform requires a native callback fo check SSL certificates
     public boolean checkSSLCertificatesRequiresCallbackFromNative() {
         return false;
     }
@@ -5043,69 +5651,79 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /**
-     * This method is called by the NetworkManager when a request is added to the queue.  This allows
-     * the implementation to track the time that the request was queued for diagnostics purposes.
-     * The Simulator's Network monitor uses this information to display stats about each network connection.
-     *
-     * @param req The ConnectionRequest that is queued.
-     */
+    /// This method is called by the NetworkManager when a request is added to the queue.  This allows
+    /// the implementation to track the time that the request was queued for diagnostics purposes.
+    /// The Simulator's Network monitor uses this information to display stats about each network connection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `req`: The ConnectionRequest that is queued.
     public void addConnectionToQueue(ConnectionRequest req) {
 
     }
 
-    /**
-     * Connects to a given URL, returns a connection object to be used with the implementation
-     * later
-     *
-     * @param url     the URL to connect to
-     * @param read    indicates whether the connection will be read from
-     * @param write   indicates whether writing will occur into the connection
-     * @param timeout the timeout version of this method
-     * @return a URL instance
-     */
+    /// Connects to a given URL, returns a connection object to be used with the implementation
+    /// later
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL to connect to
+    ///
+    /// - `read`: indicates whether the connection will be read from
+    ///
+    /// - `write`: indicates whether writing will occur into the connection
+    ///
+    /// - `timeout`: the timeout version of this method
+    ///
+    /// #### Returns
+    ///
+    /// a URL instance
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
         return connect(url, read, write);
     }
 
-    /**
-     * Requests special http method such as put or delete
-     *
-     * @param connection the connection object
-     * @param method     the method string
-     */
+    /// Requests special http method such as put or delete
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// - `method`: the method string
     public void setHttpMethod(Object connection, String method) throws IOException {
     }
 
-    /**
-     * Indicates the HTTP header value for an HTTP connection
-     *
-     * @param connection the connection object
-     * @param key        the key for the header
-     * @param val        the value for the header
-     */
+    /// Indicates the HTTP header value for an HTTP connection
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// - `key`: the key for the header
+    ///
+    /// - `val`: the value for the header
     public abstract void setHeader(Object connection, String key, String val);
 
-    /**
-     * This method is used to enable streaming of a HTTP request body without
-     * internal buffering, when the content length is not known in advance.
-     * In this mode, chunked transfer encoding is used to send the request body.
-     * Note, not all HTTP servers support this mode.
-     * This mode is supported on Android and the Desktop ports.
-     *
-     * @param connection the connection object
-     * @param bufferLen  The number of bytes to write in each chunk. If chunklen
-     *                   is less than or equal to zero, a default value will be used.
-     */
+    /// This method is used to enable streaming of a HTTP request body without
+    /// internal buffering, when the content length is not known in advance.
+    /// In this mode, chunked transfer encoding is used to send the request body.
+    /// Note, not all HTTP servers support this mode.
+    /// This mode is supported on Android and the Desktop ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// - `bufferLen`: @param bufferLen  The number of bytes to write in each chunk. If chunklen
+    ///                   is less than or equal to zero, a default value will be used.
     public void setChunkedStreamingMode(Object connection, int bufferLen) {
     }
 
-    /**
-     * Closes the object (connection, stream etc.) without throwing any exception, even if the
-     * object is null
-     *
-     * @param o Connection, Stream or other closeable object
-     */
+    /// Closes the object (connection, stream etc.) without throwing any exception, even if the
+    /// object is null
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: Connection, Stream or other closeable object
     public void cleanup(Object o) {
         try {
             if (o != null) {
@@ -5136,191 +5754,259 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Checks if this platform supports custom cursors.
-     *
-     * @return True if the platform supports custom cursors.
-     * @see Form#setEnableCursors(boolean)
-     * @see Component#setCursor(int)
-     * @see ComponentSelector#setCursor(int)
-     */
+    /// Checks if this platform supports custom cursors.
+    ///
+    /// #### Returns
+    ///
+    /// True if the platform supports custom cursors.
+    ///
+    /// #### See also
+    ///
+    /// - Form#setEnableCursors(boolean)
+    ///
+    /// - Component#setCursor(int)
+    ///
+    /// - ComponentSelector#setCursor(int)
     public boolean isSetCursorSupported() {
         return false;
     }
 
-    /**
-     * Returns the content length for this connection
-     *
-     * @param connection the connection
-     * @return the content length
-     */
+    /// Returns the content length for this connection
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection
+    ///
+    /// #### Returns
+    ///
+    /// the content length
     public abstract int getContentLength(Object connection);
 
-    /**
-     * Returns an output stream for the given connection
-     *
-     * @param connection the connection to open an output stream on
-     * @return the created output stream
-     * @throws IOException thrown by underlying implemnetation
-     */
+    /// Returns an output stream for the given connection
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to open an output stream on
+    ///
+    /// #### Returns
+    ///
+    /// the created output stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by underlying implemnetation
     public abstract OutputStream openOutputStream(Object connection) throws IOException;
 
-    /**
-     * Returns an output stream for the given connection
-     *
-     * @param connection the connection to open an output stream on
-     * @param offset     position in the file
-     * @return the created output stream
-     * @throws IOException thrown by underlying implemnetation
-     */
+    /// Returns an output stream for the given connection
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to open an output stream on
+    ///
+    /// - `offset`: position in the file
+    ///
+    /// #### Returns
+    ///
+    /// the created output stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by underlying implemnetation
     public abstract OutputStream openOutputStream(Object connection, int offset) throws IOException;
 
-    /**
-     * Returns an input stream for the given connection
-     *
-     * @param connection the connection to open an input stream on
-     * @return the created input stream
-     * @throws IOException thrown by underlying implemnetation
-     */
+    /// Returns an input stream for the given connection
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to open an input stream on
+    ///
+    /// #### Returns
+    ///
+    /// the created input stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by underlying implemnetation
     public abstract InputStream openInputStream(Object connection) throws IOException;
 
-    /**
-     * Returns an output stream for the given file
-     *
-     * @param file the file to which we should open a stream
-     * @return the created output stream
-     * @throws IOException thrown by underlying implemnetation
-     */
+    /// Returns an output stream for the given file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: the file to which we should open a stream
+    ///
+    /// #### Returns
+    ///
+    /// the created output stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by underlying implemnetation
     public OutputStream openFileOutputStream(String file) throws IOException {
         return openOutputStream(file);
     }
 
-    /**
-     * Returns an input stream for the given connection
-     *
-     * @param file the file to which we should open a stream
-     * @return the created input stream
-     * @throws IOException thrown by underlying implemnetation
-     */
+    /// Returns an input stream for the given connection
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: the file to which we should open a stream
+    ///
+    /// #### Returns
+    ///
+    /// the created input stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: thrown by underlying implemnetation
     public InputStream openFileInputStream(String file) throws IOException {
         return openInputStream(file);
     }
 
-    /**
-     * Indicates the whether the request method is GET or POST
-     *
-     * @param connection the connection object
-     * @param p          true for post false for get
-     */
+    /// Indicates the whether the request method is GET or POST
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// - `p`: true for post false for get
     public abstract void setPostRequest(Object connection, boolean p);
 
-    /**
-     * Returns the server response code for the request
-     *
-     * @param connection the connection object
-     * @return a numeric HTTP response code
-     * @throws IOException if the request failed
-     */
+    /// Returns the server response code for the request
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// #### Returns
+    ///
+    /// a numeric HTTP response code
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the request failed
     public abstract int getResponseCode(Object connection) throws IOException;
 
-    /**
-     * Returns the server response message for the request
-     *
-     * @param connection the connection object
-     * @return a text message to go along with the response code
-     * @throws IOException if the request failed
-     */
+    /// Returns the server response message for the request
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// #### Returns
+    ///
+    /// a text message to go along with the response code
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the request failed
     public abstract String getResponseMessage(Object connection) throws IOException;
 
-    /**
-     * Returns the HTTP response header field
-     *
-     * @param name       field name for http header
-     * @param connection the connection object
-     * @return the value of the header field
-     * @throws IOException if the request failed
-     */
+    /// Returns the HTTP response header field
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: field name for http header
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// #### Returns
+    ///
+    /// the value of the header field
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the request failed
     public abstract String getHeaderField(String name, Object connection) throws IOException;
 
-    /**
-     * Returns the HTTP response header field
-     *
-     * @param connection the connection object
-     * @return the value of the header field
-     * @throws IOException if the request failed
-     */
+    /// Returns the HTTP response header field
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// #### Returns
+    ///
+    /// the value of the header field
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the request failed
     public abstract String[] getHeaderFieldNames(Object connection) throws IOException;
 
-    /**
-     * Returns the HTTP response header fields, returns optionally more than one result or null if
-     * no field is present.
-     *
-     * @param name       field name for http header
-     * @param connection the connection object
-     * @return the values of the header fields
-     * @throws IOException if the request failed
-     */
+    /// Returns the HTTP response header fields, returns optionally more than one result or null if
+    /// no field is present.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: field name for http header
+    ///
+    /// - `connection`: the connection object
+    ///
+    /// #### Returns
+    ///
+    /// the values of the header fields
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the request failed
     public abstract String[] getHeaderFields(String name, Object connection) throws IOException;
 
-    /**
-     * Indicates whether the underlying implementation supports the notion of a network operation
-     * timeout. If not timeout is "faked"
-     *
-     * @return true if HTTP timeout can be configured for this IO implementation
-     */
+    /// Indicates whether the underlying implementation supports the notion of a network operation
+    /// timeout. If not timeout is "faked"
+    ///
+    /// #### Returns
+    ///
+    /// true if HTTP timeout can be configured for this IO implementation
     public boolean isTimeoutSupported() {
         return false;
     }
 
-    /**
-     * This will work only if http timeout is supported
-     *
-     * @param t time in milliseconds
-     */
+    /// This will work only if http timeout is supported
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: time in milliseconds
     public void setTimeout(int t) {
     }
 
-    /**
-     * Flush the storage cache allowing implementations that cache storage objects
-     * to store
-     */
+    /// Flush the storage cache allowing implementations that cache storage objects
+    /// to store
     public void flushStorageCache() {
     }
 
-    /**
-     * The storage data is used by some storage implementations (e.g. CDC) to place the
-     * storage object in a "proper" location matching the application name. This needs to
-     * be set by the user, the name might be ignored in platforms (such as MIDP) where storage
-     * is mapped to a native application specific storage.
-     *
-     * @return the name for the storage
-     */
+    /// The storage data is used by some storage implementations (e.g. CDC) to place the
+    /// storage object in a "proper" location matching the application name. This needs to
+    /// be set by the user, the name might be ignored in platforms (such as MIDP) where storage
+    /// is mapped to a native application specific storage.
+    ///
+    /// #### Returns
+    ///
+    /// the name for the storage
     public Object getStorageData() {
         return storageData;
     }
 
-    /**
-     * The storage data is used by some storage implementations (e.g. CDC) to place the
-     * storage object in a "proper" location matching the application name. This needs to
-     * be set by the user, the name might be ignored in platforms (such as MIDP) where storage
-     * is mapped to a native application specific storage.
-     *
-     * @param storageData the name for the storage or its context
-     */
+    /// The storage data is used by some storage implementations (e.g. CDC) to place the
+    /// storage object in a "proper" location matching the application name. This needs to
+    /// be set by the user, the name might be ignored in platforms (such as MIDP) where storage
+    /// is mapped to a native application specific storage.
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageData`: the name for the storage or its context
     public void setStorageData(Object storageData) {
         this.storageData = storageData;
     }
 
-    /**
-     * Deletes the given file name from the storage
-     *
-     * @param name the name of the storage file
-     */
+    /// Deletes the given file name from the storage
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the storage file
     public abstract void deleteStorageFile(String name);
 
-    /**
-     * Deletes all the files in the application storage
-     */
+    /// Deletes all the files in the application storage
     public void clearStorage() {
         String[] l = listStorageEntries();
         int llen = l.length;
@@ -5329,43 +6015,55 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Creates an output stream to the storage with the given name
-     *
-     * @param name the storage file name
-     * @return an output stream of limited capcity
-     */
+    /// Creates an output stream to the storage with the given name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name
+    ///
+    /// #### Returns
+    ///
+    /// an output stream of limited capcity
     public abstract OutputStream createStorageOutputStream(String name) throws IOException;
 
-    /**
-     * Creates an input stream to the given storage source file
-     *
-     * @param name the name of the source file
-     * @return the input stream
-     */
+    /// Creates an input stream to the given storage source file
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the source file
+    ///
+    /// #### Returns
+    ///
+    /// the input stream
     public abstract InputStream createStorageInputStream(String name) throws IOException;
 
-    /**
-     * Returns true if the given storage file exists
-     *
-     * @param name the storage file name
-     * @return true if it exists
-     */
+    /// Returns true if the given storage file exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name
+    ///
+    /// #### Returns
+    ///
+    /// true if it exists
     public abstract boolean storageFileExists(String name);
 
-    /**
-     * Lists the names of the storage files
-     *
-     * @return the names of all the storage files
-     */
+    /// Lists the names of the storage files
+    ///
+    /// #### Returns
+    ///
+    /// the names of all the storage files
     public abstract String[] listStorageEntries();
 
-    /**
-     * Returns the size of the entry in bytes
-     *
-     * @param name the entry name
-     * @return the size
-     */
+    /// Returns the size of the entry in bytes
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the entry name
+    ///
+    /// #### Returns
+    ///
+    /// the size
     public int getStorageEntrySize(String name) {
         long size = -1;
         InputStream i = null; //NOPMD CloseResource
@@ -5387,244 +6085,275 @@ public abstract class CodenameOneImplementation {
         return (int) size;
     }
 
-    /**
-     * Returns the filesystem roots from which the structure of the file system
-     * can be traversed
-     *
-     * @return the roots of the filesystem
-     */
+    /// Returns the filesystem roots from which the structure of the file system
+    /// can be traversed
+    ///
+    /// #### Returns
+    ///
+    /// the roots of the filesystem
     public abstract String[] listFilesystemRoots();
 
-    /**
-     * Lists the files within the given directory, returns relative file names and not
-     * full file names.
-     *
-     * @param directory the directory in which files should be listed
-     * @return array of file names
-     */
+    /// Lists the files within the given directory, returns relative file names and not
+    /// full file names.
+    ///
+    /// #### Parameters
+    ///
+    /// - `directory`: the directory in which files should be listed
+    ///
+    /// #### Returns
+    ///
+    /// array of file names
     public abstract String[] listFiles(String directory) throws IOException;
 
-    /**
-     * Returns the size of the given root directory
-     *
-     * @param root the root directory in the filesystem
-     * @return the byte size of the directory
-     */
+    /// Returns the size of the given root directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root directory in the filesystem
+    ///
+    /// #### Returns
+    ///
+    /// the byte size of the directory
     public abstract long getRootSizeBytes(String root);
 
-    /**
-     * Returns the available space in the given root directory
-     *
-     * @param root the root directory in the filesystem
-     * @return the bytes available in the directory
-     */
+    /// Returns the available space in the given root directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root directory in the filesystem
+    ///
+    /// #### Returns
+    ///
+    /// the bytes available in the directory
     public abstract long getRootAvailableSpace(String root);
 
-    /**
-     * Creates the given directory
-     *
-     * @param directory the directory name to create
-     */
+    /// Creates the given directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `directory`: the directory name to create
     public abstract void mkdir(String directory);
 
-    /**
-     * Deletes the specific file or empty directory.
-     *
-     * @param file file or empty directory to delete
-     */
+    /// Deletes the specific file or empty directory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file or empty directory to delete
     public abstract void deleteFile(String file);
 
-    /**
-     * Indicates the hidden state of the file
-     *
-     * @param file file
-     * @return true for a hidden file
-     */
+    /// Indicates the hidden state of the file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// #### Returns
+    ///
+    /// true for a hidden file
     public abstract boolean isHidden(String file);
 
-    /**
-     * Toggles the hidden state of the file
-     *
-     * @param file file
-     * @param h    hidden state
-     */
+    /// Toggles the hidden state of the file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// - `h`: hidden state
     public abstract void setHidden(String file, boolean h);
 
-    /**
-     * Returns the length of the file
-     *
-     * @param file file
-     * @return length of said file
-     */
+    /// Returns the length of the file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// #### Returns
+    ///
+    /// length of said file
     public abstract long getFileLength(String file);
 
-    /**
-     * Returns the time that the file denoted by this abstract pathname was
-     * last modified.
-     *
-     * @return A long value representing the time the file was last modified,
-     * measured in milliseconds
-     */
+    /// Returns the time that the file denoted by this abstract pathname was
+    /// last modified.
+    ///
+    /// #### Returns
+    ///
+    /// @return A long value representing the time the file was last modified,
+    /// measured in milliseconds
     public long getFileLastModified(String file) {
         return -1;
     }
 
-    /**
-     * Indicates whether the given file is a directory
-     *
-     * @param file file
-     * @return true if its a directory
-     */
+    /// Indicates whether the given file is a directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// #### Returns
+    ///
+    /// true if its a directory
     public abstract boolean isDirectory(String file);
 
-    /**
-     * Indicates whether the given file exists
-     *
-     * @param file file
-     * @return true if it exists
-     */
+    /// Indicates whether the given file exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// #### Returns
+    ///
+    /// true if it exists
     public abstract boolean exists(String file);
 
-    /**
-     * Renames a file to the given name, expects the new name to be relative to the
-     * current directory
-     *
-     * @param file    absolute file name
-     * @param newName relative new name
-     */
+    /// Renames a file to the given name, expects the new name to be relative to the
+    /// current directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: absolute file name
+    ///
+    /// - `newName`: relative new name
     public abstract void rename(String file, String newName);
 
-    /**
-     * Returns the file system separator char normally '/'
-     *
-     * @return the separator char
-     */
+    /// Returns the file system separator char normally '/'
+    ///
+    /// #### Returns
+    ///
+    /// the separator char
     public abstract char getFileSystemSeparator();
 
     public String getLineSeparator() {
         return "\n";
     }
 
-    /**
-     * Indicates whether looking up an access point is supported by this device
-     *
-     * @return true if access point lookup is supported
-     */
+    /// Indicates whether looking up an access point is supported by this device
+    ///
+    /// #### Returns
+    ///
+    /// true if access point lookup is supported
     public boolean isAPSupported() {
         return false;
     }
 
-    /**
-     * Returns the ids of the access points available if supported
-     *
-     * @return ids of access points
-     */
+    /// Returns the ids of the access points available if supported
+    ///
+    /// #### Returns
+    ///
+    /// ids of access points
     public String[] getAPIds() {
         return null;
     }
 
-    /**
-     * Returns the type of the access point
-     *
-     * @param id access point id
-     * @return one of the supported access point types from network manager
-     */
+    /// Returns the type of the access point
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: access point id
+    ///
+    /// #### Returns
+    ///
+    /// one of the supported access point types from network manager
     public int getAPType(String id) {
         return NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
     }
 
-    /**
-     * Returns the user displayable name for the given access point
-     *
-     * @param id the id of the access point
-     * @return the name of the access point
-     */
+    /// Returns the user displayable name for the given access point
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the id of the access point
+    ///
+    /// #### Returns
+    ///
+    /// the name of the access point
     public String getAPName(String id) {
         return null;
     }
 
-    /**
-     * Returns the id of the current access point
-     *
-     * @return id of the current access point
-     */
+    /// Returns the id of the current access point
+    ///
+    /// #### Returns
+    ///
+    /// id of the current access point
     public String getCurrentAccessPoint() {
         return null;
     }
 
-    /**
-     * Returns the id of the current access point
-     *
-     * @param id id of the current access point
-     */
+    /// Returns the id of the current access point
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: id of the current access point
     public void setCurrentAccessPoint(String id) {
     }
 
-    /**
-     * For some reason the standard code for writing UTF8 output in a server request
-     * doesn't work as expected on SE/CDC stacks.
-     *
-     * @return true if the getBytes() approach should be used
-     */
+    /// For some reason the standard code for writing UTF8 output in a server request
+    /// doesn't work as expected on SE/CDC stacks.
+    ///
+    /// #### Returns
+    ///
+    /// true if the getBytes() approach should be used
     public boolean shouldWriteUTFAsGetBytes() {
         return false;
     }
 
-    /**
-     * Some devices need more elaborate thread creation logic e.g. to increase the
-     * default stack size or might use a pooling strategy
-     *
-     * @param name the name of the thread
-     * @param r    the runnable
-     */
+    /// Some devices need more elaborate thread creation logic e.g. to increase the
+    /// default stack size or might use a pooling strategy
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the thread
+    ///
+    /// - `r`: the runnable
     public void startThread(String name, Runnable r) {
         new CodenameOneThread(r, name).start();
     }
 
-    /**
-     * Allows binding logic to occur before closing the output stream
-     * such as syncing
-     *
-     * @param s the closing stream
-     */
+    /// Allows binding logic to occur before closing the output stream
+    /// such as syncing
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the closing stream
     public void closingOutput(OutputStream s) {
     }
 
-    /**
-     * Allows the logger to print the stack trace into the log when the native
-     * platform supports that
-     *
-     * @param t the exception
-     * @param o the writer
-     */
+    /// Allows the logger to print the stack trace into the log when the native
+    /// platform supports that
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the exception
+    ///
+    /// - `o`: the writer
     public void printStackTraceToStream(Throwable t, Writer o) {
     }
 
-    /**
-     * This method is useful strictly for debugging, the logger can use it to track
-     * file opening/closing thus detecting potential file resource leaks that
-     * can cause serious problems in some OS's.
-     *
-     * @param al action listener to receive the callback
-     */
+    /// This method is useful strictly for debugging, the logger can use it to track
+    /// file opening/closing thus detecting potential file resource leaks that
+    /// can cause serious problems in some OS's.
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: action listener to receive the callback
     public void setLogListener(ActionListener al) {
         logger = al;
     }
 
-    /**
-     * Indicates whether logging is turned on
-     *
-     * @return true or false
-     */
+    /// Indicates whether logging is turned on
+    ///
+    /// #### Returns
+    ///
+    /// true or false
     protected boolean isLogged() {
         return logger != null;
     }
 
-    /**
-     * Dispatch the message to the logger
-     *
-     * @param content content of the message
-     */
+    /// Dispatch the message to the logger
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: content of the message
     protected void log(String content) {
         ActionListener l = logger;
         if (l != null) {
@@ -5632,22 +6361,24 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * System print
-     *
-     * @param content
-     */
+    /// System print
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`
     public void systemOut(String content) {
         System.out.println(content);
     }
 
-    /**
-     * Logs the creation of a stream
-     *
-     * @param name    the name of the stream
-     * @param isInput whether the stream is an input or output stream
-     * @param count   the number of streams of this type
-     */
+    /// Logs the creation of a stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the stream
+    ///
+    /// - `isInput`: whether the stream is an input or output stream
+    ///
+    /// - `count`: the number of streams of this type
     public void logStreamCreate(String name, boolean isInput, int count) {
         if (isLogged()) {
             if (isInput) {
@@ -5658,13 +6389,15 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Logs the closing of a stream
-     *
-     * @param name    the name of the stream
-     * @param isInput whether the stream is an input or output stream
-     * @param count   the number of streams of this type
-     */
+    /// Logs the closing of a stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the stream
+    ///
+    /// - `isInput`: whether the stream is an input or output stream
+    ///
+    /// - `count`: the number of streams of this type
     public void logStreamClose(String name, boolean isInput, int count) {
         if (isLogged()) {
             if (isInput) {
@@ -5675,12 +6408,13 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Logs the closing of a stream
-     *
-     * @param name    the name of the stream
-     * @param isInput whether the stream is an input or output stream
-     */
+    /// Logs the closing of a stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the stream
+    ///
+    /// - `isInput`: whether the stream is an input or output stream
     public void logStreamDoubleClose(String name, boolean isInput) {
         if (isLogged()) {
             if (isInput) {
@@ -5691,12 +6425,15 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Returns the type of the root often by guessing
-     *
-     * @param root the root whose type we are checking
-     * @return one of the type constants above
-     */
+    /// Returns the type of the root often by guessing
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root whose type we are checking
+    ///
+    /// #### Returns
+    ///
+    /// one of the type constants above
     public int getRootType(String root) {
         root = root.toLowerCase();
         String sdCard = Display.getInstance().getProperty("sdcard", null);
@@ -5717,38 +6454,44 @@ public abstract class CodenameOneImplementation {
         return FileSystemStorage.ROOT_TYPE_UNKNOWN;
     }
 
-    /**
-     * This method returns the platform Location Control
-     *
-     * @return LocationManager Object
-     */
+    /// This method returns the platform Location Control
+    ///
+    /// #### Returns
+    ///
+    /// LocationManager Object
     public LocationManager getLocationManager() {
         return null;
     }
 
-    /**
-     * Allows buggy implementations (Android) to release image objects
-     *
-     * @param image native image object
-     */
+    /// Allows buggy implementations (Android) to release image objects
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: native image object
     public void releaseImage(Object image) {
     }
 
-    /**
-     * Captures a photo and notifies with the image data when available
-     *
-     * @param response callback for the resulting image
-     */
+    /// Captures a photo and notifies with the image data when available
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: callback for the resulting image
     public void capturePhoto(ActionListener response) {
     }
 
-    /**
-     * Captures a screenshot of the screen.
-     *
-     * @return An image of the screen, or null if it failed.
-     * @since 7.0
-     * @deprecated replaced by screenshot()
-     */
+    /// Captures a screenshot of the screen.
+    ///
+    /// #### Returns
+    ///
+    /// An image of the screen, or null if it failed.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### Deprecated
+    ///
+    /// replaced by screenshot()
     public Image captureScreen() {
         Form form = getCurrentForm();
         if (form != null) {
@@ -5764,17 +6507,20 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /**
-     * Gets a reference to an application-wide shared Javascript context that can be used for running
-     * Javascript commands.  When running in the Javascript port, this Javascript context will be the
-     * same context in which the application itself is running, so it gives you the ability to interact
-     * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
-     *
-     * <p>When running on other platforms, this shared context will be an off-screen browser component.
-     *
-     * @return A shared BrowserComponent
-     * @since 7.0
-     */
+    /// Gets a reference to an application-wide shared Javascript context that can be used for running
+    /// Javascript commands.  When running in the Javascript port, this Javascript context will be the
+    /// same context in which the application itself is running, so it gives you the ability to interact
+    /// with the browser and DOM directly using the familiar `BrowserComponent` API.
+    ///
+    /// When running on other platforms, this shared context will be an off-screen browser component.
+    ///
+    /// #### Returns
+    ///
+    /// A shared BrowserComponent
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public final BrowserComponent getSharedJavscriptContext() {
         if (sharedJavascriptContext == null) {
             sharedJavascriptContext = createSharedJavascriptContext();
@@ -5782,14 +6528,17 @@ public abstract class CodenameOneImplementation {
         return sharedJavascriptContext;
     }
 
-    /**
-     * Creates a shared javascript context.  This can be overridden by ports to
-     * return a special browser component. On the Javascript port it returns a special component
-     * that encapsulates the browser environment that the application is running in.
-     *
-     * @return A shared BrowserComponent
-     * @since 7.0
-     */
+    /// Creates a shared javascript context.  This can be overridden by ports to
+    /// return a special browser component. On the Javascript port it returns a special component
+    /// that encapsulates the browser environment that the application is running in.
+    ///
+    /// #### Returns
+    ///
+    /// A shared BrowserComponent
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected BrowserComponent createSharedJavascriptContext() {
         BrowserComponent out = new BrowserComponent();
         out.setPage("<!doctype html><html><body></body></html>", null);
@@ -5797,11 +6546,11 @@ public abstract class CodenameOneImplementation {
         return out;
     }
 
-    /**
-     * Captures a audio and notifies with the raw data when available
-     *
-     * @param response callback for the resulting data
-     */
+    /// Captures a audio and notifies with the raw data when available
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: callback for the resulting data
 
     public void captureAudio(final MediaRecorderBuilder recordingOptions, final ActionListener<ActionEvent> response) {
         final MediaRecorderBuilder builder = recordingOptions == null ? new MediaRecorderBuilder() : recordingOptions;
@@ -5821,33 +6570,43 @@ public abstract class CodenameOneImplementation {
         //capture(response, new String[] {"wav", "mp3", "aac"}, "*.wav;*.mp3;*.aac");
     }
 
-    /**
-     * Captures a video and notifies with the data when available
-     *
-     * @param response callback for the resulting video
-     */
+    /// Captures a video and notifies with the data when available
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: callback for the resulting video
     public void captureVideo(ActionListener response) {
     }
 
-    /**
-     * Captures a video, and notifies with the data when available.  This version accepts
-     * capture constraints which may be used if the platform supports them.
-     *
-     * @param constraints Constraints for the capture.
-     * @param response    Callback for the resulting video.
-     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener)
-     * @since 7.0
-     */
+    /// Captures a video, and notifies with the data when available.  This version accepts
+    /// capture constraints which may be used if the platform supports them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraints`: Constraints for the capture.
+    ///
+    /// - `response`: Callback for the resulting video.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener)
     public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
         captureVideo(response);
     }
 
-    /**
-     * Checks if the given gallery type is supported on this platform.
-     *
-     * @param type A gallery type constant.  E.g. {@link CN1Constants#GALLERY_IMAGE}, {@link CN1Constants#GALLERY_VIDEO}, {@link CN1Constants#GALLERY_ALL}, {@link CN1Constants#GALLERY_IMAGE_MULTI}, {@link CN1Constants#GALLERY_VIDEO_MULTI}, {@link CN1Constants#GALLERY_ALL_MULTI}
-     * @return True if the gallery type is supported on this platform.
-     */
+    /// Checks if the given gallery type is supported on this platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: A gallery type constant.  E.g. `CN1Constants#GALLERY_IMAGE`, `CN1Constants#GALLERY_VIDEO`, `CN1Constants#GALLERY_ALL`, `CN1Constants#GALLERY_IMAGE_MULTI`, `CN1Constants#GALLERY_VIDEO_MULTI`, `CN1Constants#GALLERY_ALL_MULTI`
+    ///
+    /// #### Returns
+    ///
+    /// True if the gallery type is supported on this platform.
     public boolean isGalleryTypeSupported(int type) {
         switch (type) {
             case Display.GALLERY_IMAGE:
@@ -5860,18 +6619,22 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /**
-     * Opens the device gallery
-     * The method returns immediately and the response will be sent asynchronously
-     * to the given ActionListener Object
-     * <p>
-     * use this in the actionPerformed to retrieve the file path
-     * String path = (String) evt.getSource();
-     *
-     * @param response a callback Object to retrieve the file path
-     * @param type     one of the following GALLERY_IMAGE, GALLERY_VIDEO, GALLERY_ALL
-     * @throws RuntimeException if this feature failed or unsupported on the platform
-     */
+    /// Opens the device gallery
+    /// The method returns immediately and the response will be sent asynchronously
+    /// to the given ActionListener Object
+    ///
+    /// use this in the actionPerformed to retrieve the file path
+    /// String path = (String) evt.getSource();
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: a callback Object to retrieve the file path
+    ///
+    /// - `type`: one of the following GALLERY_IMAGE, GALLERY_VIDEO, GALLERY_ALL
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if this feature failed or unsupported on the platform
     public void openGallery(final ActionListener response, int type) {
         if (!isGalleryTypeSupported(type)) {
             throw new IllegalArgumentException("Gallery type " + type + " not supported on this platform.");
@@ -5908,48 +6671,52 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /**
-     * Opens the device image gallery
-     *
-     * @param response callback for the resulting image
-     */
+    /// Opens the device image gallery
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: callback for the resulting image
     public void openImageGallery(final ActionListener response) {
         openGallery(response, Display.GALLERY_IMAGE);
     }
 
-    /**
-     * Returns a 2-3 letter code representing the platform name for the platform override
-     *
-     * @return the name of the platform e.g. ios, rim, win, and, me
-     */
+    /// Returns a 2-3 letter code representing the platform name for the platform override
+    ///
+    /// #### Returns
+    ///
+    /// the name of the platform e.g. ios, rim, win, and, me
     public abstract String getPlatformName();
 
-    /**
-     * Returns the suffixes for ovr files that should be used when loading a layered resource file on this platform
-     *
-     * @return a string array with the proper order of resource override layers
-     */
+    /// Returns the suffixes for ovr files that should be used when loading a layered resource file on this platform
+    ///
+    /// #### Returns
+    ///
+    /// a string array with the proper order of resource override layers
     public String[] getPlatformOverrides() {
         return new String[0];
     }
 
-    /**
-     * This callback allows highly broken devices like the blackberry to automatically detect the network
-     * type
-     */
+    /// This callback allows highly broken devices like the blackberry to automatically detect the network
+    /// type
     public boolean shouldAutoDetectAccessPoint() {
         return false;
     }
 
-    /**
-     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
-     *
-     * Implementations should override the {@link #getLinkedContactIds(com.codename1.contacts.Contact) } method.
-     * @param c The contact whose "linked" contacts are to be retrieved.
-     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
-     * @see com.codename1.contacts.ContactsManager#getLinkedContacts(com.codename1.contacts.Contact)
-     *
-     */
+    /// Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+    ///
+    /// Implementations should override the `#getLinkedContactIds(com.codename1.contacts.Contact)` method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The contact whose "linked" contacts are to be retrieved.
+    ///
+    /// #### Returns
+    ///
+    /// Array of Contacts.  Should never be null, but may be a zero-sized array.
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.contacts.ContactsManager#getLinkedContacts(com.codename1.contacts.Contact)
     //public final Contact[] getLinkedContacts(Contact c) {
     //    String[] ids = getLinkedContactIds(c);
     //    if (ids != null) {
@@ -5963,48 +6730,52 @@ public abstract class CodenameOneImplementation {
     //    return new Contact[0];
     //}
 
-    /**
-     * Send an email using the platform mail client
-     *
-     * @param recipients array of e-mail addresses
-     * @param subject    e-mail subject
-     * @param msg        the Message to send
-     */
+    /// Send an email using the platform mail client
+    ///
+    /// #### Parameters
+    ///
+    /// - `recipients`: array of e-mail addresses
+    ///
+    /// - `subject`: e-mail subject
+    ///
+    /// - `msg`: the Message to send
     public void sendMessage(String[] recipients, String subject, Message msg) {
     }
 
-    /**
-     * Opens the device Dialer application with the given phone number
-     *
-     * @param phoneNumber
-     */
+    /// Opens the device Dialer application with the given phone number
+    ///
+    /// #### Parameters
+    ///
+    /// - `phoneNumber`
     public void dial(String phoneNumber) {
     }
 
-    /**
-     * Sends a SMS message to the given phone number
-     *
-     * @param phoneNumber to send the sms
-     * @param message     the content of the sms
-     * @throws IOException if for some reason sending failed
-     */
+    /// Sends a SMS message to the given phone number
+    ///
+    /// #### Parameters
+    ///
+    /// - `phoneNumber`: to send the sms
+    ///
+    /// - `message`: the content of the sms
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if for some reason sending failed
     public void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException {
     }
 
-    /**
-     * Indicates the level of SMS support in the platform as one of: SMS_NOT_SUPPORTED (for desktop, tablet etc.),
-     * SMS_SEAMLESS (no UI interaction), SMS_INTERACTIVE (with compose UI), SMS_BOTH.
-     *
-     * @return one of the SMS_* values
-     */
+    /// Indicates the level of SMS support in the platform as one of: SMS_NOT_SUPPORTED (for desktop, tablet etc.),
+    /// SMS_SEAMLESS (no UI interaction), SMS_INTERACTIVE (with compose UI), SMS_BOTH.
+    ///
+    /// #### Returns
+    ///
+    /// one of the SMS_* values
     public int getSMSSupport() {
         return Display.SMS_SEAMLESS;
     }
 
-    /**
-     * Returns an image representing the application icon, or null if not supported. This is used on
-     * Android to support the title bar icon
-     */
+    /// Returns an image representing the application icon, or null if not supported. This is used on
+    /// Android to support the title bar icon
     public Image getApplicationIconImage() {
         InputStream i = getResourceAsStream(getClass(), "/icon.png"); //NOPMD CloseResource
         if (i != null) {
@@ -6019,22 +6790,28 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
-    /**
-     * Gets all contacts from the address book of the device
-     *
-     * @param withNumbers if true returns only contacts that has a number
-     * @return array of contacts unique ids
-     */
+    /// Gets all contacts from the address book of the device
+    ///
+    /// #### Parameters
+    ///
+    /// - `withNumbers`: if true returns only contacts that has a number
+    ///
+    /// #### Returns
+    ///
+    /// array of contacts unique ids
     public String[] getAllContacts(boolean withNumbers) {
         return null;
     }
 
-    /**
-     * Gets the IDs of all contacts that are linked to the provided contact.
-     *
-     * @param c The contact
-     * @return Array of IDs for contacts that are linked to {@code c}.
-     */
+    /// Gets the IDs of all contacts that are linked to the provided contact.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The contact
+    ///
+    /// #### Returns
+    ///
+    /// Array of IDs for contacts that are linked to `c`.
     public String[] getLinkedContactIds(Contact c) {
         if (c == null || c.getId() == null) {
             return new String[0];
@@ -6042,30 +6819,41 @@ public abstract class CodenameOneImplementation {
         return new String[]{c.getId()};
     }
 
-    /**
-     * Get a Contact according to it's contact id.
-     *
-     * @param id unique id of the Contact
-     * @return a Contact Object
-     */
+    /// Get a Contact according to it's contact id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: unique id of the Contact
+    ///
+    /// #### Returns
+    ///
+    /// a Contact Object
     public Contact getContactById(String id) {
         return null;
     }
 
-    /**
-     * Notice: this method might be very slow and should be invoked on a separate thread!
-     * It might have platform specific optimizations over getAllContacts followed by looping
-     * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
-     * information.
-     *
-     * @param withNumbers      if true returns only contacts that has a number
-     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
-     * @param includesPicture  if true try to fetch the Contact Picture if exists
-     * @param includesNumbers  if true try to fetch all Contact numbers
-     * @param includesEmail    if true try to fetch all Contact Emails
-     * @param includeAddress   if true try to fetch all Contact Addresses
-     * @return array of the contacts
-     */
+    /// Notice: this method might be very slow and should be invoked on a separate thread!
+    /// It might have platform specific optimizations over getAllContacts followed by looping
+    /// over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
+    /// information.
+    ///
+    /// #### Parameters
+    ///
+    /// - `withNumbers`: if true returns only contacts that has a number
+    ///
+    /// - `includesFullName`: if true try to fetch the full name of the Contact(not just display name)
+    ///
+    /// - `includesPicture`: if true try to fetch the Contact Picture if exists
+    ///
+    /// - `includesNumbers`: if true try to fetch all Contact numbers
+    ///
+    /// - `includesEmail`: if true try to fetch all Contact Emails
+    ///
+    /// - `includeAddress`: if true try to fetch all Contact Addresses
+    ///
+    /// #### Returns
+    ///
+    /// array of the contacts
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         String[] arr = getAllContacts(withNumbers);
         if (arr == null) {
@@ -6079,150 +6867,170 @@ public abstract class CodenameOneImplementation {
         return retVal;
     }
 
-    /**
-     * Indicates if the getAllContacts is platform optimized, notice that the method
-     * might still take seconds or more to run so you should still use a separate thread!
-     *
-     * @return true if getAllContacts will perform faster that just getting each contact
-     */
+    /// Indicates if the getAllContacts is platform optimized, notice that the method
+    /// might still take seconds or more to run so you should still use a separate thread!
+    ///
+    /// #### Returns
+    ///
+    /// true if getAllContacts will perform faster that just getting each contact
     public boolean isGetAllContactsFast() {
         return false;
     }
 
-    /**
-     * This method returns a Contact by the contact id and fills it's data
-     * according to the given flags
-     *
-     * @param id               of the Contact
-     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
-     * @param includesPicture  if true try to fetch the Contact Picture if exists
-     * @param includesNumbers  if true try to fetch all Contact numbers
-     * @param includesEmail    if ture try to fetch all Contact Emails
-     * @param includeAddress   if ture try to fetch all Contact Addresses
-     * @return a Contact Object
-     */
+    /// This method returns a Contact by the contact id and fills it's data
+    /// according to the given flags
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: of the Contact
+    ///
+    /// - `includesFullName`: if true try to fetch the full name of the Contact(not just display name)
+    ///
+    /// - `includesPicture`: if true try to fetch the Contact Picture if exists
+    ///
+    /// - `includesNumbers`: if true try to fetch all Contact numbers
+    ///
+    /// - `includesEmail`: if ture try to fetch all Contact Emails
+    ///
+    /// - `includeAddress`: if ture try to fetch all Contact Addresses
+    ///
+    /// #### Returns
+    ///
+    /// a Contact Object
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture,
                                   boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         return null;
     }
 
-    /**
-     * Create a contact to the device contacts book
-     *
-     * @param firstName   the Contact firstName
-     * @param surname     the Contact familyName
-     * @param officePhone the Contact work phone or null
-     * @param homePhone   the Contact home phone or null
-     * @param cellPhone   the Contact mobile phone or null
-     * @param email       the Contact email or null
-     * @return the contact id if creation succeeded or null  if failed
-     */
+    /// Create a contact to the device contacts book
+    ///
+    /// #### Parameters
+    ///
+    /// - `firstName`: the Contact firstName
+    ///
+    /// - `surname`: the Contact familyName
+    ///
+    /// - `officePhone`: the Contact work phone or null
+    ///
+    /// - `homePhone`: the Contact home phone or null
+    ///
+    /// - `cellPhone`: the Contact mobile phone or null
+    ///
+    /// - `email`: the Contact email or null
+    ///
+    /// #### Returns
+    ///
+    /// the contact id if creation succeeded or null  if failed
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
         return null;
     }
 
-    /**
-     * Some platforms allow the user to block contacts access on a per application basis (specifically iOS).
-     *
-     * @return true if contacts access is allowed or globally available, false otherwise
-     */
+    /// Some platforms allow the user to block contacts access on a per application basis (specifically iOS).
+    ///
+    /// #### Returns
+    ///
+    /// true if contacts access is allowed or globally available, false otherwise
     public boolean isContactsPermissionGranted() {
         return true;
     }
 
-    /**
-     * removed a contact from the device contacts book
-     *
-     * @param id the contact id to remove
-     * @return true if deletion succeeded false otherwise
-     */
+    /// removed a contact from the device contacts book
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the contact id to remove
+    ///
+    /// #### Returns
+    ///
+    /// true if deletion succeeded false otherwise
     public boolean deleteContact(String id) {
         return false;
     }
 
-    /**
-     * Indicates if the underlying platform supports sharing capabilities
-     *
-     * @return true if the underlying platform handles share.
-     */
+    /// Indicates if the underlying platform supports sharing capabilities
+    ///
+    /// #### Returns
+    ///
+    /// true if the underlying platform handles share.
     public boolean isNativeShareSupported() {
         return false;
     }
 
-    /**
-     * Share the required information using the platform sharing services.
-     * a Sharing service can be: mail, sms, facebook, twitter,...
-     * This method is implemented if isNativeShareSupported() returned true for
-     * a specific platform.
-     *
-     * @param text     String to share.
-     * @param image    file path to the image or null
-     * @param mimeType type of the image or null if no image to share
-     */
+    /// Share the required information using the platform sharing services.
+    /// a Sharing service can be: mail, sms, facebook, twitter,...
+    /// This method is implemented if isNativeShareSupported() returned true for
+    /// a specific platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: String to share.
+    ///
+    /// - `image`: file path to the image or null
+    ///
+    /// - `mimeType`: type of the image or null if no image to share
     public void share(String text, String image, String mimeType) {
         share(text, image, mimeType, null);
     }
 
-    /**
-     * Share the required information using the platform sharing services.
-     * a Sharing service can be: mail, sms, facebook, twitter,...
-     * This method is implemented if isNativeShareSupported() returned true for
-     * a specific platform.
-     *
-     * @param text       String to share.
-     * @param image      file path to the image or null
-     * @param mimeType   type of the image or null if no image to share
-     * @param sourceRect The bounds of the button that was clicked to initiate
-     *                   the share.  This is used by some platforms (e.g. iPad2 on iOS 8 or
-     *                   higher) to dictate where the popover dialog should be placed.
-     */
+    /// Share the required information using the platform sharing services.
+    /// a Sharing service can be: mail, sms, facebook, twitter,...
+    /// This method is implemented if isNativeShareSupported() returned true for
+    /// a specific platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: String to share.
+    ///
+    /// - `image`: file path to the image or null
+    ///
+    /// - `mimeType`: type of the image or null if no image to share
+    ///
+    /// - `sourceRect`: @param sourceRect The bounds of the button that was clicked to initiate
+    ///                   the share.  This is used by some platforms (e.g. iPad2 on iOS 8 or
+    ///                   higher) to dictate where the popover dialog should be placed.
     public void share(String text, String image, String mimeType, Rectangle sourceRect) {
 
     }
 
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
 
-    /**
-     * Called before internal paint of component starts
-     *
-     * @param c the component about to be painted
-     */
+    /// Called before internal paint of component starts
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component about to be painted
     public void beforeComponentPaint(Component c, Graphics g) {
     }
 
-    /**
-     * Called after internal paint of component finishes
-     *
-     * @param c the component that was painted
-     */
+    /// Called after internal paint of component finishes
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component that was painted
     public void afterComponentPaint(Component c, Graphics g) {
     }
 
-    /**
-     * Indicates to the port that the component won't be painted due to clipping
-     *
-     * @param c the component that won't be painted
-     */
+    /// Indicates to the port that the component won't be painted due to clipping
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component that won't be painted
     public void nothingWithinComponentPaint(Component c) {
     }
 
-    /**
-     * Indicates to the port that the component was removed from the view and its
-     * UI should be removed in the next flush operation.
-     *
-     * @param c the removed component.
-     */
+    /// Indicates to the port that the component was removed from the view and its
+    /// UI should be removed in the next flush operation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the removed component.
     public void componentRemoved(Component c) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public abstract L10NManager getLocalizationManager();
 
-    /**
-     * Returns the package name for the application
-     */
+    /// Returns the package name for the application
     protected String getPackageName() {
         if (packageName == null) {
             return Display.getInstance().getProperty("package_name", null);
@@ -6230,28 +7038,31 @@ public abstract class CodenameOneImplementation {
         return packageName;
     }
 
-    /**
-     * Checks if the Transform class can be used on this platform.  This is similar to
-     * {@link #isTransformSupported(java.lang.Object)} but it is more general as it only verifies
-     * that transforms can be performed, but not necessarily that they will be respected
-     * by any particular graphics context.
-     *
-     * @return True if this platform supports transforms.
-     * @see #isTransformSupported(java.lang.Object)
-     */
+    /// Checks if the Transform class can be used on this platform.  This is similar to
+    /// `#isTransformSupported(java.lang.Object)` but it is more general as it only verifies
+    /// that transforms can be performed, but not necessarily that they will be respected
+    /// by any particular graphics context.
+    ///
+    /// #### Returns
+    ///
+    /// True if this platform supports transforms.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported(java.lang.Object)
     public boolean isTransformSupported() {
         return false;
     }
 
-    /**
-     * Checks of the Transform class can be used on this platform to perform perspective transforms.
-     * This is similar to
-     * {@link #isPerspectiveTransformSupported(java.lang.Object)} but it is more general as it only verifies
-     * that transforms can be performed, but not necessarily that they will be respected
-     * by any particular graphics context.
-     *
-     * @return True if this platform supports perspective transforms.
-     */
+    /// Checks of the Transform class can be used on this platform to perform perspective transforms.
+    /// This is similar to
+    /// `#isPerspectiveTransformSupported(java.lang.Object)` but it is more general as it only verifies
+    /// that transforms can be performed, but not necessarily that they will be respected
+    /// by any particular graphics context.
+    ///
+    /// #### Returns
+    ///
+    /// True if this platform supports perspective transforms.
     public boolean isPerspectiveTransformSupported() {
         return false;
     }
@@ -6272,18 +7083,27 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
-    /**
-     * Makes a new native translation transform.  Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     *
-     * @param translateX The x-coordinate of the translation.
-     * @param translateY The y-coordinate of the translation.
-     * @param translateZ The z-coordinate of the translation.
-     * @return A native transform object encapsulating the specified translation.
-     * @see #isTransformSupported()
-     */
+    /// Makes a new native translation transform.  Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `translateX`: The x-coordinate of the translation.
+    ///
+    /// - `translateY`: The y-coordinate of the translation.
+    ///
+    /// - `translateZ`: The z-coordinate of the translation.
+    ///
+    /// #### Returns
+    ///
+    /// A native transform object encapsulating the specified translation.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         throw new RuntimeException("Transforms not supported");
     }
@@ -6293,34 +7113,50 @@ public abstract class CodenameOneImplementation {
         transformTranslate(nativeTransform, translateX, translateY, translateZ);
     }
 
-    /**
-     * Makes a new native scale transform.  Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     *
-     * @param scaleX The x-scale factor of the transform.
-     * @param scaleY The y-scale factor of the transform.
-     * @param scaleZ The z-scale factor of the transform.
-     * @return A native transform object encapsulating the specified scale.
-     * @see #isTransformSupported()
-     */
+    /// Makes a new native scale transform.  Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scaleX`: The x-scale factor of the transform.
+    ///
+    /// - `scaleY`: The y-scale factor of the transform.
+    ///
+    /// - `scaleZ`: The z-scale factor of the transform.
+    ///
+    /// #### Returns
+    ///
+    /// A native transform object encapsulating the specified scale.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
         throw new RuntimeException("Transforms not supported");
     }
 
-    /**
-     * Makes a transform given the specified AffineTransform values.
-     *
-     * @param m00 the X coordinate scaling element of the 3x3 matrix
-     * @param m10 the Y coordinate shearing element of the 3x3 matrix
-     * @param m01 the X coordinate shearing element of the 3x3 matrix
-     * @param m11 the Y coordinate scaling element of the 3x3 matrix
-     * @param m02 the X coordinate translation element of the 3x3 matrix
-     * @param m12 the Y coordinate translation element of the 3x3 matrix
-     * @return
-     * @since 7.0
-     */
+    /// Makes a transform given the specified AffineTransform values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m00`: the X coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m10`: the Y coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m01`: the X coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m11`: the Y coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m02`: the X coordinate translation element of the 3x3 matrix
+    ///
+    /// - `m12`: the Y coordinate translation element of the 3x3 matrix
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public Object makeTransformAffine(double m00,
                                       double m10,
                                       double m01,
@@ -6330,18 +7166,27 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
-    /**
-     * Sets transform to the given specified AffineTransform values.
-     *
-     * @param nativeTransform Platform-specific native transform.
-     * @param m00             the X coordinate scaling element of the 3x3 matrix
-     * @param m10             the Y coordinate shearing element of the 3x3 matrix
-     * @param m01             the X coordinate shearing element of the 3x3 matrix
-     * @param m11             the Y coordinate scaling element of the 3x3 matrix
-     * @param m02             the X coordinate translation element of the 3x3 matrix
-     * @param m12             the Y coordinate translation element of the 3x3 matrix
-     * @since 7.0
-     */
+    /// Sets transform to the given specified AffineTransform values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`: Platform-specific native transform.
+    ///
+    /// - `m00`: the X coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m10`: the Y coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m01`: the X coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m11`: the Y coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m02`: the X coordinate translation element of the 3x3 matrix
+    ///
+    /// - `m12`: the Y coordinate translation element of the 3x3 matrix
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setTransformAffine(Object nativeTransform, double m00,
                                    double m10,
                                    double m01,
@@ -6356,19 +7201,29 @@ public abstract class CodenameOneImplementation {
         transformScale(nativeTransform, scaleX, scaleY, scaleZ);
     }
 
-    /**
-     * Makes a new native rotation transform.  Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     *
-     * @param angle The angle to rotate.
-     * @param x     The x-component of the vector around which to rotate.
-     * @param y     The y-component of the vector around which to rotate.
-     * @param z     The z-component of the vector around which to rotate.
-     * @return A native transform object encapsulating the specified rotation.
-     * @see #isTransformSupported()
-     */
+    /// Makes a new native rotation transform.  Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: The angle to rotate.
+    ///
+    /// - `x`: The x-component of the vector around which to rotate.
+    ///
+    /// - `y`: The y-component of the vector around which to rotate.
+    ///
+    /// - `z`: The z-component of the vector around which to rotate.
+    ///
+    /// #### Returns
+    ///
+    /// A native transform object encapsulating the specified rotation.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public Object makeTransformRotation(float angle, float x, float y, float z) {
         throw new RuntimeException("Transforms not supported");
     }
@@ -6378,19 +7233,29 @@ public abstract class CodenameOneImplementation {
         transformRotate(nativeTransform, angle, x, y, z);
     }
 
-    /**
-     * Makes a new perspective transform. Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * <p>This can only be used if {@link #isPerspectiveTransformSupported()} returns true.</p>
-     *
-     * @param fovy   The y field of view angle.
-     * @param aspect The aspect ratio.
-     * @param zNear  The nearest visible z coordinate.
-     * @param zFar   The farthest z coordinate.
-     * @return A native transform object encapsulating the given perspective.
-     * @see #isPerspectiveTransformSupported()
-     */
+    /// Makes a new perspective transform. Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// This can only be used if `#isPerspectiveTransformSupported()` returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fovy`: The y field of view angle.
+    ///
+    /// - `aspect`: The aspect ratio.
+    ///
+    /// - `zNear`: The nearest visible z coordinate.
+    ///
+    /// - `zFar`: The farthest z coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// A native transform object encapsulating the given perspective.
+    ///
+    /// #### See also
+    ///
+    /// - #isPerspectiveTransformSupported()
     public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
         throw new RuntimeException("Transforms not supported");
     }
@@ -6400,21 +7265,33 @@ public abstract class CodenameOneImplementation {
         copyTransform(persp, nativeTransform);
     }
 
-    /**
-     * Makes a new orthographic projection transform.  Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * <p>This can only be used if {@link #isPerspectiveTransformSupported()} returns true.</p>
-     *
-     * @param left   x-coordinate that is the left edge of the view.
-     * @param right  The x-coordinate that is the right edge of the view.
-     * @param bottom The y-coordinate that is the bottom edge of the view.
-     * @param top    The y-coordinate that is the top edge of the view.
-     * @param near   The nearest visible z-coordinate.
-     * @param far    The farthest visible z-coordinate.
-     * @return A native transform with the provided orthographic projection.
-     * @see #isPerspectiveTransformSupported()
-     */
+    /// Makes a new orthographic projection transform.  Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// This can only be used if `#isPerspectiveTransformSupported()` returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `left`: x-coordinate that is the left edge of the view.
+    ///
+    /// - `right`: The x-coordinate that is the right edge of the view.
+    ///
+    /// - `bottom`: The y-coordinate that is the bottom edge of the view.
+    ///
+    /// - `top`: The y-coordinate that is the top edge of the view.
+    ///
+    /// - `near`: The nearest visible z-coordinate.
+    ///
+    /// - `far`: The farthest visible z-coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// A native transform with the provided orthographic projection.
+    ///
+    /// #### See also
+    ///
+    /// - #isPerspectiveTransformSupported()
     public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
         throw new RuntimeException("Transforms not supported");
     }
@@ -6424,24 +7301,39 @@ public abstract class CodenameOneImplementation {
         copyTransform(ortho, nativeTransform);
     }
 
-    /**
-     * Makes a transform to simulate a camera's perspective at a given location. Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     *
-     * @param eyeX    The x-coordinate of the camera's eye.
-     * @param eyeY    The y-coordinate of the camera's eye.
-     * @param eyeZ    The z-coordinate of the camera's eye.
-     * @param centerX The center x coordinate of the view.
-     * @param centerY The center y coordinate of the view.
-     * @param centerZ The center z coordinate of the view.
-     * @param upX     The x-coordinate of the up vector for the camera.
-     * @param upY     The y-coordinate of the up vector for the camera.
-     * @param upZ     The z-coordinate of the up vector for the camera.
-     * @return A native transform with the provided camera's view perspective.
-     * @see #isPerspectiveTransformSupported()
-     */
+    /// Makes a transform to simulate a camera's perspective at a given location. Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `eyeX`: The x-coordinate of the camera's eye.
+    ///
+    /// - `eyeY`: The y-coordinate of the camera's eye.
+    ///
+    /// - `eyeZ`: The z-coordinate of the camera's eye.
+    ///
+    /// - `centerX`: The center x coordinate of the view.
+    ///
+    /// - `centerY`: The center y coordinate of the view.
+    ///
+    /// - `centerZ`: The center z coordinate of the view.
+    ///
+    /// - `upX`: The x-coordinate of the up vector for the camera.
+    ///
+    /// - `upY`: The y-coordinate of the up vector for the camera.
+    ///
+    /// - `upZ`: The z-coordinate of the up vector for the camera.
+    ///
+    /// #### Returns
+    ///
+    /// A native transform with the provided camera's view perspective.
+    ///
+    /// #### See also
+    ///
+    /// - #isPerspectiveTransformSupported()
     public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
         throw new RuntimeException("Transforms not supported");
     }
@@ -6451,71 +7343,104 @@ public abstract class CodenameOneImplementation {
         copyTransform(cam, nativeTransform);
     }
 
-    /**
-     * Rotates the provided  transform.
-     *
-     * @param nativeTransform The transform to rotate. Each implementation can decide the format
-     *                        to use internally for transforms.  This should return a transform in that internal format.
-     *                        This is used by the {@link com.codename1.ui.Transform} class.
-     *                        <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     * @param angle           The angle to rotate.
-     * @param x               The x-coordinate of the vector around which to rotate.
-     * @param y               The y-coordinate of the vector around which to rotate.
-     * @param z               The z-coordinate of the vector around which to rotate.
-     * @see #isTransformSupported()
-     */
+    /// Rotates the provided  transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`: @param nativeTransform The transform to rotate. Each implementation can decide the format
+    ///                        to use internally for transforms.  This should return a transform in that internal format.
+    ///                        This is used by the `com.codename1.ui.Transform` class.
+    ///
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// - `angle`: The angle to rotate.
+    ///
+    /// - `x`: The x-coordinate of the vector around which to rotate.
+    ///
+    /// - `y`: The y-coordinate of the vector around which to rotate.
+    ///
+    /// - `z`: The z-coordinate of the vector around which to rotate.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
         Object rot = makeTransformRotation(angle, x, y, z);
         concatenateTransform(nativeTransform, rot);
     }
 
-    /**
-     * Translates the transform by the specified amounts.
-     * with the specified translation.
-     *
-     * @param nativeTransform The native transform to translate. Each implementation can decide the format
-     *                        to use internally for transforms.  This should return a transform in that internal format.
-     *                        This is used by the {@link com.codename1.ui.Transform} class.
-     *                        <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     * @param x               The x translation.
-     * @param y               The y translation.
-     * @param z               The z translation.
-     * @see #isTransformSupported()
-     */
+    /// Translates the transform by the specified amounts.
+    /// with the specified translation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`: @param nativeTransform The native transform to translate. Each implementation can decide the format
+    ///                        to use internally for transforms.  This should return a transform in that internal format.
+    ///                        This is used by the `com.codename1.ui.Transform` class.
+    ///
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// - `x`: The x translation.
+    ///
+    /// - `y`: The y translation.
+    ///
+    /// - `z`: The z translation.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
         Object tr = makeTransformTranslation(x, y, z);
         concatenateTransform(nativeTransform, tr);
     }
 
-    /**
-     * Scales the provided transform by the provide scale factors.
-     *
-     * @param nativeTransform Each implementation can decide the format
-     *                        to use internally for transforms.  This should return a transform in that internal format.
-     *                        This is used by the {@link com.codename1.ui.Transform} class.
-     *                        <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     * @param x               The x-scale factor
-     * @param y               The y-scale factor
-     * @param z               The z-scale factor
-     * @see #isTransformSupported()
-     */
+    /// Scales the provided transform by the provide scale factors.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`: @param nativeTransform Each implementation can decide the format
+    ///                        to use internally for transforms.  This should return a transform in that internal format.
+    ///                        This is used by the `com.codename1.ui.Transform` class.
+    ///
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// - `x`: The x-scale factor
+    ///
+    /// - `y`: The y-scale factor
+    ///
+    /// - `z`: The z-scale factor
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public void transformScale(Object nativeTransform, float x, float y, float z) {
         Object scale = makeTransformScale(x, y, z);
         concatenateTransform(nativeTransform, scale);
     }
 
-    /**
-     * Gets the inverse transformation for the provided transform.
-     *
-     * @param nativeTransform The native transform of which to make the inverse.  Each implementation can decide the format
-     *                        to use internally for transforms.  This should return a transform in that internal format.
-     *                        This is used by the {@link com.codename1.ui.Transform} class.
-     *                        <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     * @return The inverse transform as a native transform object.  Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * @see #isTransformSupported()
-     */
+    /// Gets the inverse transformation for the provided transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`: @param nativeTransform The native transform of which to make the inverse.  Each implementation can decide the format
+    ///                        to use internally for transforms.  This should return a transform in that internal format.
+    ///                        This is used by the `com.codename1.ui.Transform` class.
+    ///
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// #### Returns
+    ///
+    /// @return The inverse transform as a native transform object.  Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public Object makeTransformInverse(Object nativeTransform) {
         throw new RuntimeException("Transforms not supported");
     }
@@ -6524,82 +7449,110 @@ public abstract class CodenameOneImplementation {
         copyTransform(makeTransformInverse(nativeTransform), nativeTransform);
     }
 
-    /**
-     * Makes a new identity native transform. Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     *
-     * @return An identity native transform.
-     * @see #isTransformSupported()
-     */
+    /// Makes a new identity native transform. Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// #### Returns
+    ///
+    /// An identity native transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public Object makeTransformIdentity() {
         throw new RuntimeException("Transforms not supported");
     }
 
-    /**
-     * Sets the given native transform to the identiy transform
-     *
-     * @param transform
-     */
+    /// Sets the given native transform to the identiy transform
+    ///
+    /// #### Parameters
+    ///
+    /// - `transform`
     public void setTransformIdentity(Object transform) {
         copyTransform(makeTransformIdentity(), transform);
     }
 
-    /**
-     * Copies the setting of one transform into another.  Each implementation can decide the format
-     * to use internally for transforms.  This should return a transform in that internal format.
-     * This is used by the {@link com.codename1.ui.Transform} class.
-     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     *
-     * @param src  The source native transform.
-     * @param dest The destination native transform.
-     * @see #isTransformSupported()
-     */
+    /// Copies the setting of one transform into another.  Each implementation can decide the format
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `src`: The source native transform.
+    ///
+    /// - `dest`: The destination native transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public void copyTransform(Object src, Object dest) {
         throw new RuntimeException("Transforms not supported");
     }
 
-    /**
-     * Concatenates two transforms and sets the first transform to be the result of the concatenation.
-     * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     *
-     * @param t1 The left native transform.  The result will also be stored in this transform.
-     * @param t2 The right native transform.
-     * @see #isTransformSupported()
-     */
+    /// Concatenates two transforms and sets the first transform to be the result of the concatenation.
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t1`: The left native transform.  The result will also be stored in this transform.
+    ///
+    /// - `t2`: The right native transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public void concatenateTransform(Object t1, Object t2) {
         throw new RuntimeException("Transforms not supported");
     }
 
     // END TRANSFORMATION METHODS-------------------------------------------------------------------- 
 
-    /**
-     * Transforms a point and stores the result in a provided array.
-     *
-     * @param nativeTransform The native transform to use for the transformation. Each implementation can decide the format
-     *                        to use internally for transforms.  This should return a transform in that internal format.
-     *                        <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
-     *                        This is used by the {@link com.codename1.ui.Transform} class.
-     * @param in              A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple to be transformed.
-     * @param out             A 2 or 3 element array (length should match {@var in}) to store the result of the transformation.
-     * @see #isTransformSupported()
-     */
+    /// Transforms a point and stores the result in a provided array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`: @param nativeTransform The native transform to use for the transformation. Each implementation can decide the format
+    ///                        to use internally for transforms.  This should return a transform in that internal format.
+    ///
+    ///
+    /// This can only be used if `#isTransformSupported()` returns true.
+    ///
+    ///                        This is used by the `com.codename1.ui.Transform` class.
+    ///
+    /// - `in`: A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple to be transformed.
+    ///
+    /// - `out`: A 2 or 3 element array (length should match {@var in}) to store the result of the transformation.
+    ///
+    /// #### See also
+    ///
+    /// - #isTransformSupported()
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         throw new RuntimeException("Transforms not supported");
     }
 
-    /**
-     * Transforms a set of points using the provided transform.
-     *
-     * @param nativeTransform The transform to use for transforming the points
-     * @param pointSize       The size of the points (either 2 or 3)
-     * @param in              Input array of points.
-     * @param srcPos          The start position of the input array
-     * @param out             The output array of points
-     * @param destPos         The start position of the output array.
-     * @param numPoints       The number of points to transform.
-     */
+    /// Transforms a set of points using the provided transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`: The transform to use for transforming the points
+    ///
+    /// - `pointSize`: The size of the points (either 2 or 3)
+    ///
+    /// - `in`: Input array of points.
+    ///
+    /// - `srcPos`: The start position of the input array
+    ///
+    /// - `out`: The output array of points
+    ///
+    /// - `destPos`: The start position of the output array.
+    ///
+    /// - `numPoints`: The number of points to transform.
     public void transformPoints(Object nativeTransform, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
         float[] bufIn = new float[pointSize];
         float[] bufOut = new float[pointSize];
@@ -6611,19 +7564,27 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Translates a set of points.
-     *
-     * @param pointSize The size of each point (2 or 3)
-     * @param tX        Size of translation along x-axis
-     * @param tY        Size of translation along y-axis
-     * @param tZ        Size of translation along z-axis (only used if pointSize == 3)
-     * @param in        Input array of points.
-     * @param srcPos    Start position in input array
-     * @param out       Output array of points
-     * @param destPos   Start position in output array
-     * @param numPoints Number of points to translate.
-     */
+    /// Translates a set of points.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointSize`: The size of each point (2 or 3)
+    ///
+    /// - `tX`: Size of translation along x-axis
+    ///
+    /// - `tY`: Size of translation along y-axis
+    ///
+    /// - `tZ`: Size of translation along z-axis (only used if pointSize == 3)
+    ///
+    /// - `in`: Input array of points.
+    ///
+    /// - `srcPos`: Start position in input array
+    ///
+    /// - `out`: Output array of points
+    ///
+    /// - `destPos`: Start position in output array
+    ///
+    /// - `numPoints`: Number of points to translate.
     public void translatePoints(int pointSize, float tX, float tY, float tZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
         int len = numPoints * pointSize;
         for (int i = 0; i < len; i += pointSize) {
@@ -6637,19 +7598,27 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Scales a set of points.
-     *
-     * @param pointSize The size of each point (2 or 3)
-     * @param sX        Scale factor along x-axis
-     * @param sY        Scale factor along y-axis
-     * @param sZ        Scale factor along z-axis (only used if pointSize == 3)
-     * @param in        Input array of points.
-     * @param srcPos    Start position in input array
-     * @param out       Output array of points
-     * @param destPos   Start position in output array
-     * @param numPoints Number of points to translate.
-     */
+    /// Scales a set of points.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointSize`: The size of each point (2 or 3)
+    ///
+    /// - `sX`: Scale factor along x-axis
+    ///
+    /// - `sY`: Scale factor along y-axis
+    ///
+    /// - `sZ`: Scale factor along z-axis (only used if pointSize == 3)
+    ///
+    /// - `in`: Input array of points.
+    ///
+    /// - `srcPos`: Start position in input array
+    ///
+    /// - `out`: Output array of points
+    ///
+    /// - `destPos`: Start position in output array
+    ///
+    /// - `numPoints`: Number of points to translate.
     public void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
         int len = numPoints * pointSize;
         for (int i = 0; i < len; i += pointSize) {
@@ -6663,19 +7632,18 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Clears the addressbook cache.  This is only necessary on iOS since its AddressBookRef is transactional.
-     */
+    /// Clears the addressbook cache.  This is only necessary on iOS since its AddressBookRef is transactional.
     public void refreshContacts() {
 
     }
 
-    /**
-     * Sets the given transform to the current transform in the given graphics object.
-     *
-     * @param nativeGraphics
-     * @param t
-     */
+    /// Sets the given transform to the current transform in the given graphics object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`
+    ///
+    /// - `t`
     public void getTransform(Object nativeGraphics, Transform t) {
         t.setIdentity();
     }
@@ -6684,201 +7652,266 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /**
-     * Blocks or enables copy and paste in the entire app.
-     *
-     * @param blockCopyPaste True to block copy and paste.  False to enable it.
-     */
+    /// Blocks or enables copy and paste in the entire app.
+    ///
+    /// #### Parameters
+    ///
+    /// - `blockCopyPaste`: True to block copy and paste.  False to enable it.
     public void blockCopyPaste(boolean blockCopyPaste) {
 
     }
 
-    /**
-     * Checks if this platform supports custom database paths.  On platforms
-     * where this returns {@literal true}, {@link #openOrCreateDB(java.lang.String) }
-     * will accept a file path (starting with "file://"
-     *
-     * @return True if platform supports custom paths.
-     */
+    /// Checks if this platform supports custom database paths.  On platforms
+    /// where this returns true, `#openOrCreateDB(java.lang.String)`
+    /// will accept a file path (starting with "file://"
+    ///
+    /// #### Returns
+    ///
+    /// True if platform supports custom paths.
     public boolean isDatabaseCustomPathSupported() {
         return false;
     }
 
-    /**
-     * Attempt to enter full-screen mode.  Should be overridden by the
-     * platform implementation.
-     *
-     * @return True if already in full-screen mode, or successfully entered full-screen mode.
-     */
+    /// Attempt to enter full-screen mode.  Should be overridden by the
+    /// platform implementation.
+    ///
+    /// #### Returns
+    ///
+    /// True if already in full-screen mode, or successfully entered full-screen mode.
     public boolean requestFullScreen() {
         return false;
     }
 
-    /**
-     * Exit full-screen mode.
-     *
-     * @return True if already not in full-screen mode or successfully exited full-screen mode.
-     */
+    /// Exit full-screen mode.
+    ///
+    /// #### Returns
+    ///
+    /// True if already not in full-screen mode or successfully exited full-screen mode.
     public boolean exitFullScreen() {
         return false;
     }
 
-    /**
-     * Checks to see if the app is currently running in full-screen mode.
-     *
-     * @return True if the app is currently running in full-screen mode.
-     */
+    /// Checks to see if the app is currently running in full-screen mode.
+    ///
+    /// #### Returns
+    ///
+    /// True if the app is currently running in full-screen mode.
     public boolean isInFullScreenMode() {
         return false;
     }
 
-    /**
-     * Checks if the platform supports full-screen mode.  If this returns true
-     * then a call to {@link #requestFullScreen() } should enter full-screen mode.
-     *
-     * @return
-     */
+    /// Checks if the platform supports full-screen mode.  If this returns true
+    /// then a call to `#requestFullScreen()` should enter full-screen mode.
     public boolean isFullScreenSupported() {
         return false;
     }
 
-    /**
-     * Initializes text selection.  This provides an opportunity for the native
-     * platform to register listeners on text selection to ensure that it works.
-     * <p>
-     * Implementations that implement this method should also implement {@link #deinitializeTextSelection(com.codename1.ui.TextSelection) }
-     *
-     * @param aThis
-     * @see #deinitializeTextSelection(com.codename1.ui.TextSelection)
-     * @since 7.0
-     */
+    /// Initializes text selection.  This provides an opportunity for the native
+    /// platform to register listeners on text selection to ensure that it works.
+    ///
+    /// Implementations that implement this method should also implement `#deinitializeTextSelection(com.codename1.ui.TextSelection)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `aThis`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #deinitializeTextSelection(com.codename1.ui.TextSelection)
     public void initializeTextSelection(TextSelection aThis) {
 
     }
 
-    /**
-     * Deinitializes text selection.
-     *
-     * @param aThis
-     * @see #initializeTextSelection(com.codename1.ui.TextSelection)
-     * @since 7.0
-     */
+    /// Deinitializes text selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aThis`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #initializeTextSelection(com.codename1.ui.TextSelection)
     public void deinitializeTextSelection(TextSelection aThis) {
 
     }
 
-    /**
-     * Creates the native side of a {@link com.codename1.ui.HeavyButton}.  A HeavyButton
-     * is a button that has a native button displayed over top of it.  It is primarily used
-     * in the Javascript port where some functions can only be executed as a direct result
-     * of user interaction.
-     *
-     * @param aThis The lightweight button for which a heavy peer is created
-     * @return Native peer.  Format chosen by implementation.
-     * @see #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener)
-     * @since 7.0
-     */
+    /// Creates the native side of a `com.codename1.ui.HeavyButton`.  A HeavyButton
+    /// is a button that has a native button displayed over top of it.  It is primarily used
+    /// in the Javascript port where some functions can only be executed as a direct result
+    /// of user interaction.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aThis`: The lightweight button for which a heavy peer is created
+    ///
+    /// #### Returns
+    ///
+    /// Native peer.  Format chosen by implementation.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener)
     public Object createHeavyButton(Button aThis) {
         return null;
     }
 
-    /**
-     * Adds an action listener which will be run in response to the native button's
-     * click event.  {@link ActionListener#actionPerformed(com.codename1.ui.events.ActionEvent) } will
-     * be executed on the native UI thread, not the EDT.
-     *
-     * @param peer The peer.
-     * @param l    The action listener.
-     * @see #createHeavyButton(com.codename1.ui.Button)
-     * @see #removeHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener)
-     * @since 7.0
-     */
+    /// Adds an action listener which will be run in response to the native button's
+    /// click event.  `ActionListener#actionPerformed(com.codename1.ui.events.ActionEvent)` will
+    /// be executed on the native UI thread, not the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: The peer.
+    ///
+    /// - `l`: The action listener.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createHeavyButton(com.codename1.ui.Button)
+    ///
+    /// - #removeHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener)
     public void addHeavyActionListener(Object peer, ActionListener l) {
 
     }
 
-    /**
-     * Removes a heavy action listener from a heavy button.
-     *
-     * @param peer THe heavy button peer.
-     * @param l    The action listener.
-     * @see #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener)
-     * @see #createHeavyButton(com.codename1.ui.Button)
-     * @since 7.0
-     */
+    /// Removes a heavy action listener from a heavy button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: THe heavy button peer.
+    ///
+    /// - `l`: The action listener.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener)
+    ///
+    /// - #createHeavyButton(com.codename1.ui.Button)
     public void removeHeavyActionListener(Object peer, ActionListener l) {
 
     }
 
-    /**
-     * Updates the bounds of the native heavy button to match the bounds of the lightweight button.
-     *
-     * @param peer   The heavy peer.
-     * @param x      The absolute X coordinate of the light peer.
-     * @param y      The absolute Y coordinate of the light peer.
-     * @param width  The width of the light peer.
-     * @param height The height of the light peer.
-     * @since 7.0
-     */
+    /// Updates the bounds of the native heavy button to match the bounds of the lightweight button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: The heavy peer.
+    ///
+    /// - `x`: The absolute X coordinate of the light peer.
+    ///
+    /// - `y`: The absolute Y coordinate of the light peer.
+    ///
+    /// - `width`: The width of the light peer.
+    ///
+    /// - `height`: The height of the light peer.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void updateHeavyButtonBounds(Object peer, int x, int y, int width, int height) {
 
     }
 
-    /**
-     * Initializes a heavy button.  This is called whenever the light peer's initComponent() method is called.
-     * It should add the heavy button to the native UI hierarchy.
-     *
-     * @param peer The heavy peer.
-     * @see #createHeavyButton(com.codename1.ui.Button)
-     * @since 7.0
-     */
+    /// Initializes a heavy button.  This is called whenever the light peer's initComponent() method is called.
+    /// It should add the heavy button to the native UI hierarchy.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: The heavy peer.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createHeavyButton(com.codename1.ui.Button)
     public void initHeavyButton(Object peer) {
 
     }
 
-    /**
-     * Deinitializes a heavy button.  This is called whenever the light peer's deinitialize() method is called.  It
-     * should remove the heavy button from the native UI hierarchy.
-     *
-     * @param peer The heavy peer.
-     * @see #initHeavyButton(java.lang.Object)
-     * @see #createHeavyButton(com.codename1.ui.Button)
-     * @since 7.0
-     */
+    /// Deinitializes a heavy button.  This is called whenever the light peer's deinitialize() method is called.  It
+    /// should remove the heavy button from the native UI hierarchy.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: The heavy peer.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #initHeavyButton(java.lang.Object)
+    ///
+    /// - #createHeavyButton(com.codename1.ui.Button)
     public void deinitializeHeavyButton(Object peer) {
 
     }
 
-    /**
-     * Checks whether the current platform requires a heavy button for copy to clipboard functionality to work.
-     * This will be true on the Javascript port.
-     *
-     * @return
-     * @see #createHeavyButton(com.codename1.ui.Button)
-     * @since 7.0
-     */
+    /// Checks whether the current platform requires a heavy button for copy to clipboard functionality to work.
+    /// This will be true on the Javascript port.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createHeavyButton(com.codename1.ui.Button)
     public boolean requiresHeavyButtonForCopyToClipboard() {
         return false;
     }
 
-    /**
-     * Copies the current text selection to the clipboard.
-     *
-     * @param sel The current TextSelection instance for the current form.
-     * @since 7.0
-     */
+    /// Copies the current text selection to the clipboard.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: The current TextSelection instance for the current form.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void copySelectionToClipboard(TextSelection sel) {
         copyToClipboard(sel.getSelectionAsText());
     }
 
-    /**
-     * Sets the rendering hints for a graphics context.
-     *
-     * @param nativeGraphics The native graphics context
-     * @param hints          Hints
-     * @see Graphics#RENDERING_HINT_FAST
-     * @since 7.0
-     */
+    /// Sets the rendering hints for a graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: The native graphics context
+    ///
+    /// - `hints`: Hints
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - Graphics#RENDERING_HINT_FAST
     public void setRenderingHints(Object nativeGraphics, int hints) {
 
     }
@@ -6890,228 +7923,340 @@ public abstract class CodenameOneImplementation {
     // The AppleSignIn.cn1lib bundles its own implementation of a WebBrowser that it
     // uses for logging in because JavaFX's webview doesn't seem to support Apple login.
 
-    /**
-     * Gets the rendering hints for this graphics context
-     *
-     * @param nativeGraphics The native graphics context.
-     * @return The current rendering hints.
-     * @see Graphics#RENDERING_HINT_FAST
-     * @since 7.0
-     */
+    /// Gets the rendering hints for this graphics context
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: The native graphics context.
+    ///
+    /// #### Returns
+    ///
+    /// The current rendering hints.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - Graphics#RENDERING_HINT_FAST
     public int getRenderingHints(Object nativeGraphics) {
         return 0;
     }
 
-    /**
-     * Starts the remote control service.  This should be implemented
-     * in the platform to handle binding the {@link RemoteControlListener} with
-     * the platform's remote control.
-     *
-     * <p>This is executed when the user registers a new listener using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
-     *
-     * @since 7.0
-     */
+    /// Starts the remote control service.  This should be implemented
+    /// in the platform to handle binding the `RemoteControlListener` with
+    /// the platform's remote control.
+    ///
+    /// This is executed when the user registers a new listener using `MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener)`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void startRemoteControl() {
 
     }
 
-    /**
-     * Stops the remote control service.  This should be implemented in the platform
-     * to handle unbinding the {@link RemoteControlListener} with the platform's remote control.
-     * <p>This is executed when a new listener is registered using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
-     *
-     * @since 7.0
-     */
+    /// Stops the remote control service.  This should be implemented in the platform
+    /// to handle unbinding the `RemoteControlListener` with the platform's remote control.
+    ///
+    /// This is executed when a new listener is registered using `MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener)`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void stopRemoteControl() {
 
     }
 
-    /**
-     * Sets the read timeout of a connection.
-     *
-     * @param connection
-     * @param readTimeout
-     * @since 7.0
-     */
+    /// Sets the read timeout of a connection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`
+    ///
+    /// - `readTimeout`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setReadTimeout(Object connection, int readTimeout) {
 
     }
 
-    /**
-     * Sets connection to be insecure.  If platform supports it, this will turn off SSL cerficate checks for validity.
-     *
-     * @param connection
-     * @param insecure   True to make connection insecure.
-     * @see ConnectionRequest#setInsecure(boolean)
-     * @see ConnectionRequest#isInsecure()
-     * @since 7.0
-     */
+    /// Sets connection to be insecure.  If platform supports it, this will turn off SSL cerficate checks for validity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`
+    ///
+    /// - `insecure`: True to make connection insecure.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - ConnectionRequest#setInsecure(boolean)
+    ///
+    /// - ConnectionRequest#isInsecure()
     public void setInsecure(Object connection, boolean insecure) {
 
     }
 
-    /**
-     * Checks if this platform supports read timeout in network connections.
-     *
-     * @return True if the platform supports read timeouts.
-     * @since 7.0
-     */
+    /// Checks if this platform supports read timeout in network connections.
+    ///
+    /// #### Returns
+    ///
+    /// True if the platform supports read timeouts.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public boolean isReadTimeoutSupported() {
         return false;
     }
 
-    /**
-     * Creates a native web browser window object.  Default implementation returns null.
-     * Platform may override this to return its own browser window.
-     *
-     * @param startURL The Start URL to open in the browser window.
-     * @return The browser window object, or null.
-     * @see com.codename1.ui.BrowserWindow
-     * @see #addNativeBrowserWindowOnLoadListener(java.lang.Object, com.codename1.ui.events.ActionListener)
-     * @see #removeNativeBrowserWindowOnLoadListener(java.lang.Object, com.codename1.ui.events.ActionListener)
-     * @see #nativeBrowserWindowAddCloseListener(java.lang.Object, com.codename1.ui.events.ActionListener)
-     * @see #nativeBrowserWindowRemoveCloseListener(java.lang.Object, com.codename1.ui.events.ActionListener)
-     * @see #nativeBrowserWindowCleanup(java.lang.Object)
-     * @see #nativeBrowserWindowHide(java.lang.Object)
-     * @see #nativeBrowserWindowShow(java.lang.Object)
-     * @see #nativeBrowserWindowSetTitle(java.lang.Object, java.lang.String)
-     * @see #nativeBrowserWindowSetSize(java.lang.Object, int, int)
-     * @see #nativeBrowserWindowEval(java.lang.Object, com.codename1.ui.BrowserWindow.EvalRequest)
-     * @since 7.0
-     */
+    /// Creates a native web browser window object.  Default implementation returns null.
+    /// Platform may override this to return its own browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startURL`: The Start URL to open in the browser window.
+    ///
+    /// #### Returns
+    ///
+    /// The browser window object, or null.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.BrowserWindow
+    ///
+    /// - #addNativeBrowserWindowOnLoadListener(java.lang.Object, com.codename1.ui.events.ActionListener)
+    ///
+    /// - #removeNativeBrowserWindowOnLoadListener(java.lang.Object, com.codename1.ui.events.ActionListener)
+    ///
+    /// - #nativeBrowserWindowAddCloseListener(java.lang.Object, com.codename1.ui.events.ActionListener)
+    ///
+    /// - #nativeBrowserWindowRemoveCloseListener(java.lang.Object, com.codename1.ui.events.ActionListener)
+    ///
+    /// - #nativeBrowserWindowCleanup(java.lang.Object)
+    ///
+    /// - #nativeBrowserWindowHide(java.lang.Object)
+    ///
+    /// - #nativeBrowserWindowShow(java.lang.Object)
+    ///
+    /// - #nativeBrowserWindowSetTitle(java.lang.Object, java.lang.String)
+    ///
+    /// - #nativeBrowserWindowSetSize(java.lang.Object, int, int)
+    ///
+    /// - #nativeBrowserWindowEval(java.lang.Object, com.codename1.ui.BrowserWindow.EvalRequest)
     public Object createNativeBrowserWindow(String startURL) {
         return null;
     }
 
-    /**
-     * Adds a load listener to a native browser window.
-     *
-     * @param window The window to add the listener to.
-     * @param l      The listener
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Adds a load listener to a native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window to add the listener to.
+    ///
+    /// - `l`: The listener
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void addNativeBrowserWindowOnLoadListener(Object window, ActionListener l) {
 
     }
 
-    /**
-     * Removes a load listener from a native browser window.
-     *
-     * @param window The window from which to remove the listener.
-     * @param l      The listener
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Removes a load listener from a native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window from which to remove the listener.
+    ///
+    /// - `l`: The listener
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void removeNativeBrowserWindowOnLoadListener(Object window, ActionListener l) {
 
     }
 
-    /**
-     * Sets the size of a native browser window.
-     *
-     * @param window The window
-     * @param width  The width in pixels.
-     * @param height The height in pixels.
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Sets the size of a native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window
+    ///
+    /// - `width`: The width in pixels.
+    ///
+    /// - `height`: The height in pixels.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void nativeBrowserWindowSetSize(Object window, int width, int height) {
 
     }
 
-    /**
-     * Sets the window title of a native browser window.
-     *
-     * @param window The window
-     * @param title  The title
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Sets the window title of a native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window
+    ///
+    /// - `title`: The title
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void nativeBrowserWindowSetTitle(Object window, String title) {
 
     }
 
     // END NATIVE BROWSER WINDOW METHODS--------------------------------------------------
 
-    /**
-     * Shows a native browser window.
-     *
-     * @param window The window
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Shows a native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void nativeBrowserWindowShow(Object window) {
 
     }
 
-    /**
-     * Hides a native browser window.
-     *
-     * @param window The window
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Hides a native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void nativeBrowserWindowHide(Object window) {
 
     }
 
-    /**
-     * Cleans up and disposes of a native browser window.
-     *
-     * @param window The window
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Cleans up and disposes of a native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void nativeBrowserWindowCleanup(Object window) {
 
     }
 
-    /**
-     * Evaluates javascript on native browser window.
-     *
-     * @param window The window
-     * @param req    The javascript eval request.
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Evaluates javascript on native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window
+    ///
+    /// - `req`: The javascript eval request.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void nativeBrowserWindowEval(Object window, BrowserWindow.EvalRequest req) {
         if (!req.isDone()) {
             req.error(new RuntimeException("Not implemented"));
         }
     }
 
-    /**
-     * Adds close listener to native browser window.
-     *
-     * @param window The window.
-     * @param l      The listener
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Adds close listener to native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window.
+    ///
+    /// - `l`: The listener
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void nativeBrowserWindowAddCloseListener(Object window, ActionListener l) {
 
     }
 
-    /**
-     * Removes close listener from native browser window.
-     *
-     * @param window The window.
-     * @param l      The listener
-     * @see #createNativeBrowserWindow(java.lang.String)
-     * @since 7.0
-     */
+    /// Removes close listener from native browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `window`: The window.
+    ///
+    /// - `l`: The listener
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #createNativeBrowserWindow(java.lang.String)
     public void nativeBrowserWindowRemoveCloseListener(Object window, ActionListener l) {
 
     }
 
-    /**
-     * User register to receive push notification
-     *
-     * @param noFallback some devices don't support an efficient push API and will resort to polling
-     *                   to provide push like functionality. If this flag is set to true no polling will occur and
-     *                   the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
-     */
+    /// User register to receive push notification
+    ///
+    /// #### Parameters
+    ///
+    /// - `noFallback`: @param noFallback some devices don't support an efficient push API and will resort to polling
+    ///                   to provide push like functionality. If this flag is set to true no polling will occur and
+    ///                   the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
     public void registerPush(Hashtable metaData, boolean noFallback) {
         if (!noFallback) {
             Preferences.set("PollingPush", true);
@@ -7123,35 +8268,37 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Stop receiving push notifications to this client application
-     */
+    /// Stop receiving push notifications to this client application
     public void deregisterPush() {
         Preferences.delete("PollingPush");
         stopPolling();
     }
 
-    /**
-     * Creates a Media recorder Object which will record from the device mic to
-     * a file in the given path.
-     *
-     * @param path     a file path to where to store the recording, if the file does
-     *                 not exists it will be created.
-     * @param mimeType the output mime type that is supported see
-     *                 getAvailableRecordingMimeTypes()
-     */
+    /// Creates a Media recorder Object which will record from the device mic to
+    /// a file in the given path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: @param path     a file path to where to store the recording, if the file does
+    ///                 not exists it will be created.
+    ///
+    /// - `mimeType`: @param mimeType the output mime type that is supported see
+    ///                 getAvailableRecordingMimeTypes()
     public Media createMediaRecorder(String path, String mimeType) throws IOException {
         return null;
     }
 
-    /**
-     * Creates a Media recorder Object which will record from the device mic to
-     * a file in the given path.
-     *
-     * @param builder THe media builder with settings for the recorder.
-     *                getAvailableRecordingMimeTypes()
-     * @since 7.0
-     */
+    /// Creates a Media recorder Object which will record from the device mic to
+    /// a file in the given path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `builder`: @param builder THe media builder with settings for the recorder.
+    ///                getAvailableRecordingMimeTypes()
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
         return createMediaRecorder(builder.getPath(), builder.getMimeType());
     }
@@ -7168,154 +8315,151 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Sets the frequency for polling the server in case of polling based push notification
-     *
-     * @param freq the frequency in milliseconds
-     * @deprecated we no longer support push polling
-     */
+    /// Sets the frequency for polling the server in case of polling based push notification
+    ///
+    /// #### Parameters
+    ///
+    /// - `freq`: the frequency in milliseconds
+    ///
+    /// #### Deprecated
+    ///
+    /// we no longer support push polling
     public void setPollingFrequency(int freq) {
     }
 
-    /**
-     * Returns the image IO instance that allows scaling image files.
-     *
-     * @return the image IO instance
-     */
+    /// Returns the image IO instance that allows scaling image files.
+    ///
+    /// #### Returns
+    ///
+    /// the image IO instance
     public ImageIO getImageIO() {
         return null;
     }
 
-    /**
-     * Workaround for XMLVM bug
-     */
+    /// Workaround for XMLVM bug
     public boolean instanceofObjArray(Object o) {
         return o instanceof Object[];
     }
 
-    /**
-     * Workaround for XMLVM bug
-     */
+    /// Workaround for XMLVM bug
     public boolean instanceofByteArray(Object o) {
         return o instanceof byte[];
     }
 
-    /**
-     * Workaround for XMLVM bug
-     */
+    /// Workaround for XMLVM bug
     public boolean instanceofShortArray(Object o) {
         return o instanceof short[];
     }
 
-    /**
-     * Workaround for XMLVM bug
-     */
+    /// Workaround for XMLVM bug
     public boolean instanceofLongArray(Object o) {
         return o instanceof long[];
     }
 
-    /**
-     * Workaround for XMLVM bug
-     */
+    /// Workaround for XMLVM bug
     public boolean instanceofIntArray(Object o) {
         return o instanceof int[];
     }
 
-    /**
-     * Workaround for XMLVM bug
-     */
+    /// Workaround for XMLVM bug
     public boolean instanceofFloatArray(Object o) {
         return o instanceof float[];
     }
 
-    /**
-     * Workaround for XMLVM bug
-     */
+    /// Workaround for XMLVM bug
     public boolean instanceofDoubleArray(Object o) {
         return o instanceof double[];
     }
 
-    /**
-     * Gets the available recording MimeTypes
-     */
+    /// Gets the available recording MimeTypes
     public String[] getAvailableRecordingMimeTypes() {
         return new String[]{"audio/amr", "audio/aac"};
     }
 
-    /**
-     * Opens a database or create one if not exists
-     *
-     * @param databaseName the name of the database
-     * @return Database Object or null if not supported on the platform
-     * @throws IOException if database cannot be created
-     */
+    /// Opens a database or create one if not exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// Database Object or null if not supported on the platform
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if database cannot be created
     public Database openOrCreateDB(String databaseName) throws IOException {
         return null;
     }
 
-    /**
-     * Deletes database
-     *
-     * @param databaseName the name of the database
-     * @throws IOException if database cannot be deleted
-     */
+    /// Deletes database
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if database cannot be deleted
     public void deleteDB(String databaseName) throws IOException {
     }
 
-    /**
-     * Indicates weather a database exists
-     *
-     * @param databaseName the name of the database
-     * @return true if database exists
-     */
+    /// Indicates weather a database exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// true if database exists
     public boolean existsDB(String databaseName) {
         return false;
     }
 
-    /**
-     * Returns the file path of the Database if exists and if supported on
-     * the platform.
-     *
-     * @return the file path of the database or null if not exists
-     */
+    /// Returns the file path of the Database if exists and if supported on
+    /// the platform.
+    ///
+    /// #### Returns
+    ///
+    /// the file path of the database or null if not exists
     public String getDatabasePath(String databaseName) {
         return null;
     }
 
-    /**
-     * Indicates if the title of the Form is native title(in android ICS devices
-     * if the command behavior is native the ActionBar is used to display the title
-     * and the menu)
-     *
-     * @return true if platform would like to show the Form title
-     */
+    /// Indicates if the title of the Form is native title(in android ICS devices
+    /// if the command behavior is native the ActionBar is used to display the title
+    /// and the menu)
+    ///
+    /// #### Returns
+    ///
+    /// true if platform would like to show the Form title
     public boolean isNativeTitle() {
         return false;
     }
 
-    /**
-     * if the title is native(e.g the android action bar), notify the native title
-     * that is needs to be refreshed
-     */
+    /// if the title is native(e.g the android action bar), notify the native title
+    /// that is needs to be refreshed
     public void refreshNativeTitle() {
     }
 
-    /**
-     * Indicates the way commands should be added to a form as one of the ocmmand constants defined
-     * in this class
-     *
-     * @return the commandBehavior
-     */
+    /// Indicates the way commands should be added to a form as one of the ocmmand constants defined
+    /// in this class
+    ///
+    /// #### Returns
+    ///
+    /// the commandBehavior
     public int getCommandBehavior() {
         return commandBehavior;
     }
 
-    /**
-     * Indicates the way commands should be added to a form as one of the ocmmand constants defined
-     * in this class
-     *
-     * @param commandBehavior the commandBehavior to set
-     */
+    /// Indicates the way commands should be added to a form as one of the ocmmand constants defined
+    /// in this class
+    ///
+    /// #### Parameters
+    ///
+    /// - `commandBehavior`: the commandBehavior to set
     public void setCommandBehavior(int commandBehavior) {
         if (commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
             if (!isTouchDevice()) {
@@ -7326,141 +8470,159 @@ public abstract class CodenameOneImplementation {
         notifyCommandBehavior(commandBehavior);
     }
 
-    /**
-     * Place a notification on the device status bar (if device has this
-     * functionality).
-     * The notification will re-start the Application.
-     *
-     * @param tickerText   the ticker text of the Notification
-     * @param contentTitle the title of the Notification
-     * @param contentBody  the content of the Notification
-     * @param vibrate      enable/disable notification alert
-     * @param flashLights  enable/disable notification flashing
-     * @param args         additional arguments to the notification
-     * @return a platform native object that allows modifying notification state
-     * @deprecated use scheduleLocalNotification instead
-     */
+    /// Place a notification on the device status bar (if device has this
+    /// functionality).
+    /// The notification will re-start the Application.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tickerText`: the ticker text of the Notification
+    ///
+    /// - `contentTitle`: the title of the Notification
+    ///
+    /// - `contentBody`: the content of the Notification
+    ///
+    /// - `vibrate`: enable/disable notification alert
+    ///
+    /// - `flashLights`: enable/disable notification flashing
+    ///
+    /// - `args`: additional arguments to the notification
+    ///
+    /// #### Returns
+    ///
+    /// a platform native object that allows modifying notification state
+    ///
+    /// #### Deprecated
+    ///
+    /// use scheduleLocalNotification instead
     public Object notifyStatusBar(String tickerText, String contentTitle,
                                   String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
         return null;
     }
 
-    /**
-     * Indicates whether the notify status bar method will present a notification to the user
-     *
-     * @return true if the notify status bar method will present a notification to the user
-     */
+    /// Indicates whether the notify status bar method will present a notification to the user
+    ///
+    /// #### Returns
+    ///
+    /// true if the notify status bar method will present a notification to the user
     public boolean isNotificationSupported() {
         return false;
     }
 
-    /**
-     * Removes the notification previously posted with the notify status bar method
-     *
-     * @param o the object returned from the notifyStatusBar method
-     */
+    /// Removes the notification previously posted with the notify status bar method
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object returned from the notifyStatusBar method
     public void dismissNotification(Object o) {
     }
 
-    /**
-     * Returns true if the underlying OS supports numeric badges on icons. Notice this is only available on iOS
-     * and only when push notification is enabled
-     *
-     * @return true if the underlying OS supports numeric badges
-     */
+    /// Returns true if the underlying OS supports numeric badges on icons. Notice this is only available on iOS
+    /// and only when push notification is enabled
+    ///
+    /// #### Returns
+    ///
+    /// true if the underlying OS supports numeric badges
     public boolean isBadgingSupported() {
         return false;
     }
 
-    /**
-     * Sets the number that appears on the application icon in iOS
-     *
-     * @param number number to show on the icon
-     */
+    /// Sets the number that appears on the application icon in iOS
+    ///
+    /// #### Parameters
+    ///
+    /// - `number`: number to show on the icon
     public void setBadgeNumber(int number) {
     }
 
-    /**
-     * Returns true if the underlying OS supports opening the native navigation
-     * application
-     *
-     * @return true if the underlying OS supports launch of native navigation app
-     */
+    /// Returns true if the underlying OS supports opening the native navigation
+    /// application
+    ///
+    /// #### Returns
+    ///
+    /// true if the underlying OS supports launch of native navigation app
     public boolean isOpenNativeNavigationAppSupported() {
         return false;
     }
 
-    /**
-     * Opens the native navigation app in the given coordinate.
-     *
-     * @param latitude
-     * @param longitude
-     */
+    /// Opens the native navigation app in the given coordinate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `latitude`
+    ///
+    /// - `longitude`
     public void openNativeNavigationApp(double latitude, double longitude) {
     }
 
-    /**
-     * Opens the native navigation app with the given search location
-     *
-     * @param location the location to search for in the native navigation map
-     */
+    /// Opens the native navigation app with the given search location
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the location to search for in the native navigation map
     public void openNativeNavigationApp(String location) {
         execute("http://maps.google.com/?q=" + Util.encodeUrl(location));
     }
 
-    /**
-     * Returns the UDID for devices that support it
-     *
-     * @return the UDID or null
-     */
+    /// Returns the UDID for devices that support it
+    ///
+    /// #### Returns
+    ///
+    /// the UDID or null
     public String getUdid() {
         return getProperty("UDID", null);
     }
 
-    /**
-     * Returns the MSISDN for devices that expose it
-     *
-     * @return the msisdn or null
-     */
+    /// Returns the MSISDN for devices that expose it
+    ///
+    /// #### Returns
+    ///
+    /// the msisdn or null
     public String getMsisdn() {
         return getProperty("MSISDN", null);
     }
 
-    /**
-     * Returns the native OS purchase implementation if applicable, if not this
-     * method will fallback to a cross platform purchase manager.
-     *
-     * @return instance of the purchase class
-     */
+    /// Returns the native OS purchase implementation if applicable, if not this
+    /// method will fallback to a cross platform purchase manager.
+    ///
+    /// #### Returns
+    ///
+    /// instance of the purchase class
     public Purchase getInAppPurchase() {
         return null;
     }
 
-    /**
-     * Returns the native implementation of the code scanner or null
-     *
-     * @return code scanner instance
-     * @deprecated Use cn1-codescan cn1lib instead.
-     */
+    /// Returns the native implementation of the code scanner or null
+    ///
+    /// #### Returns
+    ///
+    /// code scanner instance
+    ///
+    /// #### Deprecated
+    ///
+    /// Use cn1-codescan cn1lib instead.
     public CodeScanner getCodeScanner() {
         return null;
     }
 
-    /**
-     * Converts a FileSystemStorage path to a native path.
-     *
-     * @param path The file system storage path.
-     * @return The native path.
-     */
+    /// Converts a FileSystemStorage path to a native path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: The file system storage path.
+    ///
+    /// #### Returns
+    ///
+    /// The native path.
     public String toNativePath(String path) {
         return path;
     }
 
-    /**
-     * This will return the application home directory.
-     *
-     * @return a writable directory that represent the application home directory
-     */
+    /// This will return the application home directory.
+    ///
+    /// #### Returns
+    ///
+    /// a writable directory that represent the application home directory
     public String getAppHomePath() {
         String home = listFilesystemRoots()[0];
         String name = getProperty("AppName", packageName);
@@ -7474,258 +8636,291 @@ public abstract class CodenameOneImplementation {
         return home;
     }
 
-    /**
-     * Returns true if the device has a directory dedicated for "cache" files
-     *
-     * @return true if a caches style directory exists in this device type
-     */
+    /// Returns true if the device has a directory dedicated for "cache" files
+    ///
+    /// #### Returns
+    ///
+    /// true if a caches style directory exists in this device type
     public boolean hasCachesDir() {
         return false;
     }
 
-    /**
-     * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
-     * is false
-     *
-     * @return file URL or null
-     */
+    /// Returns a device specific directory designed for cache style files, or null if `#hasCachesDir()`
+    /// is false
+    ///
+    /// #### Returns
+    ///
+    /// file URL or null
     public String getCachesDir() {
         return null;
     }
 
-    /**
-     * Uses the native cookie store if applicable, this might break simulator compatibility
-     *
-     * @return the useNativeCookieStore
-     */
+    /// Uses the native cookie store if applicable, this might break simulator compatibility
+    ///
+    /// #### Returns
+    ///
+    /// the useNativeCookieStore
     public boolean isUseNativeCookieStore() {
         return useNativeCookieStore;
     }
 
-    /**
-     * Uses the native cookie store if applicable, this might break simulator compatibility
-     *
-     * @param useNativeCookieStore the useNativeCookieStore to set
-     */
+    /// Uses the native cookie store if applicable, this might break simulator compatibility
+    ///
+    /// #### Parameters
+    ///
+    /// - `useNativeCookieStore`: the useNativeCookieStore to set
     public void setUseNativeCookieStore(boolean useNativeCookieStore) {
         this.useNativeCookieStore = useNativeCookieStore;
     }
 
-    /**
-     * Indicates the implementation is capable of keeping the background painted by being non-destructive.
-     *
-     * @return whether to paint the background
-     */
+    /// Indicates the implementation is capable of keeping the background painted by being non-destructive.
+    ///
+    /// #### Returns
+    ///
+    /// whether to paint the background
     public boolean shouldPaintBackground() {
         return true;
     }
 
-    /**
-     * This method allows a native implementation to implement a native version of a given transition that
-     * can be faster
-     *
-     * @param t the transition that is about to execute
-     * @return the given transition or a native version of that transition
-     */
+    /// This method allows a native implementation to implement a native version of a given transition that
+    /// can be faster
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the transition that is about to execute
+    ///
+    /// #### Returns
+    ///
+    /// the given transition or a native version of that transition
     public Transition getNativeTransition(Transition t) {
         return t;
     }
 
-    /**
-     * Checks if the device supports locking the screen display from dimming, allowing
-     * the developer to keep the screen display on.
-     */
+    /// Checks if the device supports locking the screen display from dimming, allowing
+    /// the developer to keep the screen display on.
     public boolean isScreenLockSupported() {
         return false;
     }
 
-    /**
-     * If Locking isScreenLockSupported() returns true calling this method will
-     * lock the screen display on
-     */
+    /// If Locking isScreenLockSupported() returns true calling this method will
+    /// lock the screen display on
     public void lockScreen() {
     }
 
-    /**
-     * Unlock the screen display allowing the screen to dim.
-     */
+    /// Unlock the screen display allowing the screen to dim.
     public void unlockScreen() {
     }
 
-    /**
-     * Returns true if the device has camera false otherwise.
-     */
+    /// Returns true if the device has camera false otherwise.
     public boolean hasCamera() {
         return true;
     }
 
-    /**
-     * Returns the platform EDT thread priority
-     */
+    /// Returns the platform EDT thread priority
     public int getEDTThreadPriority() {
         return Thread.NORM_PRIORITY + 1;
     }
 
-    /**
-     * This method is used by the JavaSE implementation for performance logging
-     *
-     * @param img the image being drawn
-     */
+    /// This method is used by the JavaSE implementation for performance logging
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the image being drawn
     public void drawingEncodedImage(EncodedImage img) {
     }
 
-    /**
-     * Indicates whether the native picker dialog is supported for the given type
-     * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
-     *
-     * @param pickerType the picker type constant
-     * @return true if the native platform supports this picker type
-     */
+    /// Indicates whether the native picker dialog is supported for the given type
+    /// which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+    ///
+    /// #### Parameters
+    ///
+    /// - `pickerType`: the picker type constant
+    ///
+    /// #### Returns
+    ///
+    /// true if the native platform supports this picker type
     public boolean isNativePickerTypeSupported(int pickerType) {
         return false;
     }
 
-    /**
-     * Shows a native modal dialog allowing us to perform the picking for the given type
-     * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
-     *
-     * @param type         the picker type constant
-     * @param source       the source component (optional) the native dialog will be placed in relation to this
-     *                     component if applicable
-     * @param currentValue the currently selected value
-     * @param data         additional meta data specific to the picker type when applicable
-     * @return the value from the picker or null if the operation was canceled.
-     */
+    /// Shows a native modal dialog allowing us to perform the picking for the given type
+    /// which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the picker type constant
+    ///
+    /// - `source`: @param source       the source component (optional) the native dialog will be placed in relation to this
+    ///                     component if applicable
+    ///
+    /// - `currentValue`: the currently selected value
+    ///
+    /// - `data`: additional meta data specific to the picker type when applicable
+    ///
+    /// #### Returns
+    ///
+    /// the value from the picker or null if the operation was canceled.
     public Object showNativePicker(int type, Component source, Object currentValue, Object data) {
         return null;
     }
 
-    /**
-     * Creates a socket to connect to the given host on the given port
-     *
-     * @param host the host
-     * @param port the port
-     * @return the socket object to use
-     */
+    /// Creates a socket to connect to the given host on the given port
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the host
+    ///
+    /// - `port`: the port
+    ///
+    /// #### Returns
+    ///
+    /// the socket object to use
     public Object connectSocket(String host, int port) {
         return connectSocket(host, port, 0);
     }
 
-    /**
-     * Creates a socket to connect to the given host on the given port
-     *
-     * @param host           the host
-     * @param port           the port
-     * @param connectTimeout connect timeout.  0 for infinite timeout.
-     * @return the socket object to use
-     * @since 7.0
-     */
+    /// Creates a socket to connect to the given host on the given port
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the host
+    ///
+    /// - `port`: the port
+    ///
+    /// - `connectTimeout`: connect timeout.  0 for infinite timeout.
+    ///
+    /// #### Returns
+    ///
+    /// the socket object to use
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public Object connectSocket(String host, int port, int connectTimeout) {
         throw new RuntimeException("Not supported");
     }
 
-    /**
-     * Listens on the given port similar to the accept method of server socket in Java. This method
-     * will only work if isServerSocketAvailable() is true.
-     *
-     * @param port the port to listen on
-     * @return server socket instance
-     */
+    /// Listens on the given port similar to the accept method of server socket in Java. This method
+    /// will only work if isServerSocketAvailable() is true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the port to listen on
+    ///
+    /// #### Returns
+    ///
+    /// server socket instance
     public Object listenSocket(int port) {
         throw new RuntimeException("Not supported");
     }
 
-    /**
-     * Returns the device host or ip address if available
-     *
-     * @return device host or ip
-     */
+    /// Returns the device host or ip address if available
+    ///
+    /// #### Returns
+    ///
+    /// device host or ip
     public String getHostOrIP() {
         return null;
     }
 
-    /**
-     * Disconnects the current socket from the server/client on the other side
-     *
-     * @param socket the socket instance
-     */
+    /// Disconnects the current socket from the server/client on the other side
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket instance
     public void disconnectSocket(Object socket) {
     }
 
-    /**
-     * Indicates whether the socket is currently connected
-     *
-     * @param socket is the socket we are connected to
-     * @return true if the socket is connected
-     */
+    /// Indicates whether the socket is currently connected
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: is the socket we are connected to
+    ///
+    /// #### Returns
+    ///
+    /// true if the socket is connected
     public boolean isSocketConnected(Object socket) {
         return false;
     }
 
-    /**
-     * Indicates whether the underlying implementation supports server sockets
-     *
-     * @return false by default
-     */
+    /// Indicates whether the underlying implementation supports server sockets
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isServerSocketAvailable() {
         return false;
     }
 
-    /**
-     * Indicates whether the underlying implementation supports sockets
-     *
-     * @return false by default
-     */
+    /// Indicates whether the underlying implementation supports sockets
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isSocketAvailable() {
         return false;
     }
 
-    /**
-     * Return the pending error message on the given socket
-     *
-     * @param socket the socket instance
-     * @return the error message if available
-     */
+    /// Return the pending error message on the given socket
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket instance
+    ///
+    /// #### Returns
+    ///
+    /// the error message if available
     public String getSocketErrorMessage(Object socket) {
         return null;
     }
 
-    /**
-     * Returns the pending error code on the given socket
-     *
-     * @param socket the socket instance
-     * @return the error code
-     */
+    /// Returns the pending error code on the given socket
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket instance
+    ///
+    /// #### Returns
+    ///
+    /// the error code
     public int getSocketErrorCode(Object socket) {
         return -1;
     }
 
-    /**
-     * Returns whether data is available for input on the socket
-     *
-     * @param socket the socket instance
-     * @return a none zero value if data is available for input
-     */
+    /// Returns whether data is available for input on the socket
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket instance
+    ///
+    /// #### Returns
+    ///
+    /// a none zero value if data is available for input
     public int getSocketAvailableInput(Object socket) {
         return 0;
     }
 
-    /**
-     * Read pending bytes from the socket
-     *
-     * @param socket the socket object
-     * @return byte array with data read from the socket
-     */
+    /// Read pending bytes from the socket
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket object
+    ///
+    /// #### Returns
+    ///
+    /// byte array with data read from the socket
     public byte[] readFromSocketStream(Object socket) {
         return null;
     }
 
-    /**
-     * Write the following byte array to the socket
-     *
-     * @param socket the socket instance
-     * @param data   the data written
-     */
+    /// Write the following byte array to the socket
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket instance
+    ///
+    /// - `data`: the data written
     public void writeToSocketStream(Object socket, byte[] data) {
     }
 
@@ -7740,9 +8935,7 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /**
-     * Installs a tar file from the build server into the file system storage so it can be used with respect for hierarchy
-     */
+    /// Installs a tar file from the build server into the file system storage so it can be used with respect for hierarchy
     public void installTar() throws IOException {
         String p = Preferences.get("cn1$InstallKey", null);
         String buildKey = Display.getInstance().getProperty("build_key", null);
@@ -7813,27 +9006,32 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Allows detecting development mode so debugging code and special cases can be used to simplify flow
-     *
-     * @return true if we are running in the simulator, false otherwise
-     */
+    /// Allows detecting development mode so debugging code and special cases can be used to simplify flow
+    ///
+    /// #### Returns
+    ///
+    /// true if we are running in the simulator, false otherwise
     public boolean isSimulator() {
         return false;
     }
 
-    /**
-     * Paints the background of a component based on the style values on the
-     * given graphics context, the style could be accessed from the drawing
-     * thread in read only capacity to make the code slightly more efficient
-     *
-     * @param nativeGraphics the graphics context
-     * @param x              coordinate to draw
-     * @param y              coordinate to draw
-     * @param width          coordinate to draw
-     * @param height         coordinate to draw
-     * @param s              the style object to draw
-     */
+    /// Paints the background of a component based on the style values on the
+    /// given graphics context, the style could be accessed from the drawing
+    /// thread in read only capacity to make the code slightly more efficient
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: the graphics context
+    ///
+    /// - `x`: coordinate to draw
+    ///
+    /// - `y`: coordinate to draw
+    ///
+    /// - `width`: coordinate to draw
+    ///
+    /// - `height`: coordinate to draw
+    ///
+    /// - `s`: the style object to draw
     public void paintComponentBackground(Object nativeGraphics, int x, int y, int width, int height, Style s) {
         if (width <= 0 || height <= 0) {
             return;
@@ -8017,16 +9215,21 @@ public abstract class CodenameOneImplementation {
         fillRect(nativeGraphics, x, y, width, height, s.getBgTransparency());
     }
 
-    /**
-     * Fills a rectangle with an optionally translucent fill color
-     *
-     * @param nativeGraphics the underlying native graphics object
-     * @param x              the x coordinate of the rectangle to be filled
-     * @param y              the y coordinate of the rectangle to be filled
-     * @param w              the width of the rectangle to be filled
-     * @param h              the height of the rectangle to be filled
-     * @param alpha          the alpha values specify semitransparency
-     */
+    /// Fills a rectangle with an optionally translucent fill color
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: the underlying native graphics object
+    ///
+    /// - `x`: the x coordinate of the rectangle to be filled
+    ///
+    /// - `y`: the y coordinate of the rectangle to be filled
+    ///
+    /// - `w`: the width of the rectangle to be filled
+    ///
+    /// - `h`: the height of the rectangle to be filled
+    ///
+    /// - `alpha`: the alpha values specify semitransparency
     public void fillRect(Object nativeGraphics, int x, int y, int w, int h, byte alpha) {
         if (alpha != 0) {
             int oldAlpha = getAlpha(nativeGraphics);
@@ -8036,10 +9239,8 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Draws a label on the given graphics context, this method allows optimizing the very common drawing operation
-     * using platform native code
-     */
+    /// Draws a label on the given graphics context, this method allows optimizing the very common drawing operation
+    /// using platform native code
     public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth,
                                    Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl,
                                    boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText,
@@ -8277,10 +9478,8 @@ public abstract class CodenameOneImplementation {
         setAlpha(nativeGraphics, alpha);
     }
 
-    /**
-     * Implements the drawString for the text component and adjust the valign
-     * assuming the icon is in one of the sides
-     */
+    /// Implements the drawString for the text component and adjust the valign
+    /// assuming the icon is in one of the sides
     private int drawLabelStringValign(
             Object nativeGraphics, Object nativeFont, String str, int x, int y, int textSpaceW,
             boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl,
@@ -8296,10 +9495,8 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Implements the drawString for the text component and adjust the valign
-     * assuming the icon is in one of the sides
-     */
+    /// Implements the drawString for the text component and adjust the valign
+    /// assuming the icon is in one of the sides
     private int drawLabelString(Object nativeGraphics, Object nativeFont, String text, int x, int y, int textSpaceW,
                                 boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl, boolean endsWith3Points, int textWidth,
                                 int fontHeight) {
@@ -8325,19 +9522,28 @@ public abstract class CodenameOneImplementation {
         return stringWidth(f, s.substring(0, length)) < width;
     }
 
-    /**
-     * Draws the text of a label
-     *
-     * @param nativeGraphics graphics context
-     * @param textDecoration decoration information for the text
-     * @param text           the text for the label
-     * @param x              position for the label
-     * @param y              position for the label
-     * @param txtW           stringWidth(text) equivalent which is faster than just
-     *                       invoking string width all the time
-     * @param textSpaceW     the width available for the component
-     * @return the space used by the drawing
-     */
+    /// Draws the text of a label
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: graphics context
+    ///
+    /// - `textDecoration`: decoration information for the text
+    ///
+    /// - `text`: the text for the label
+    ///
+    /// - `x`: position for the label
+    ///
+    /// - `y`: position for the label
+    ///
+    /// - `txtW`: @param txtW           stringWidth(text) equivalent which is faster than just
+    ///                       invoking string width all the time
+    ///
+    /// - `textSpaceW`: the width available for the component
+    ///
+    /// #### Returns
+    ///
+    /// the space used by the drawing
     protected int drawLabelText(Object nativeGraphics, int textDecoration, boolean rtl, boolean isTickerRunning,
                                 boolean endsWith3Points, Object nativeFont, int txtW, int textSpaceW, int shiftText, String text, int x, int y, int fontHeight) {
         if ((!isTickerRunning) || rtl) {
@@ -8378,34 +9584,44 @@ public abstract class CodenameOneImplementation {
         return Math.min(txtW, textSpaceW);
     }
 
-    /**
-     * Draw a string using the current font and color in the x,y coordinates.
-     * The font is drawn from the top position and not the baseline.
-     *
-     * @param nativeGraphics the graphics context
-     * @param nativeFont     the font used
-     * @param str            the string to be drawn.
-     * @param x              the x coordinate.
-     * @param y              the y coordinate.
-     * @param textDecoration Text decoration bitmask (See Style's
-     *                       TEXT_DECORATION_* constants)
-     */
+    /// Draw a string using the current font and color in the x,y coordinates.
+    /// The font is drawn from the top position and not the baseline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: the graphics context
+    ///
+    /// - `nativeFont`: the font used
+    ///
+    /// - `str`: the string to be drawn.
+    ///
+    /// - `x`: the x coordinate.
+    ///
+    /// - `y`: the y coordinate.
+    ///
+    /// - `textDecoration`: @param textDecoration Text decoration bitmask (See Style's
+    ///                       TEXT_DECORATION_* constants)
     public void drawString(Object nativeGraphics, Object nativeFont, String str, int x, int y, int textDecoration) {
         drawString(nativeGraphics, nativeFont, str, x, y, textDecoration, getHeight(nativeFont));
     }
 
-    /**
-     * Draw a string using the current font and color in the x,y coordinates.
-     * The font is drawn from the top position and not the baseline.
-     *
-     * @param nativeGraphics the graphics context
-     * @param nativeFont     the font used
-     * @param str            the string to be drawn.
-     * @param x              the x coordinate.
-     * @param y              the y coordinate.
-     * @param textDecoration Text decoration bitmask (See Style's
-     *                       TEXT_DECORATION_* constants)
-     */
+    /// Draw a string using the current font and color in the x,y coordinates.
+    /// The font is drawn from the top position and not the baseline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: the graphics context
+    ///
+    /// - `nativeFont`: the font used
+    ///
+    /// - `str`: the string to be drawn.
+    ///
+    /// - `x`: the x coordinate.
+    ///
+    /// - `y`: the y coordinate.
+    ///
+    /// - `textDecoration`: @param textDecoration Text decoration bitmask (See Style's
+    ///                       TEXT_DECORATION_* constants)
     private void drawString(Object nativeGraphics, Object nativeFont, String str, int x, int y, int textDecoration, int fontHeight) {
         if (str.length() == 0) {
             return;
@@ -8451,9 +9667,7 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /**
-     * Reverses alignment in the case of bidi
-     */
+    /// Reverses alignment in the case of bidi
     private int reverseAlignForBidi(boolean rtl, int align) {
         if (rtl) {
             switch (align) {
@@ -8468,12 +9682,13 @@ public abstract class CodenameOneImplementation {
         return align;
     }
 
-    /**
-     * Makes it easier to pass hints to the underlying implementation for quicker hacks/pipelines
-     *
-     * @param key   the key
-     * @param value the value
-     */
+    /// Makes it easier to pass hints to the underlying implementation for quicker hacks/pipelines
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    ///
+    /// - `value`: the value
     public void setPlatformHint(String key, String value) {
     }
 
@@ -8484,15 +9699,21 @@ public abstract class CodenameOneImplementation {
     public void cancelLocalNotification(String notificationId) {
     }
 
-    /**
-     * Gets the preferred time (in seconds) between background fetches.
-     *
-     * @return The time interval in seconds.
-     * @see #isBackgroundFetchSupported()
-     * @see #setPreferredBackgroundFetchInterval(int)
-     * @see com.codename1.background.BackgroundFetch
-     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
-     */
+    /// Gets the preferred time (in seconds) between background fetches.
+    ///
+    /// #### Returns
+    ///
+    /// The time interval in seconds.
+    ///
+    /// #### See also
+    ///
+    /// - #isBackgroundFetchSupported()
+    ///
+    /// - #setPreferredBackgroundFetchInterval(int)
+    ///
+    /// - com.codename1.background.BackgroundFetch
+    ///
+    /// - com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
     public int getPreferredBackgroundFetchInterval() {
         if (isBackgroundFetchSupported()) {
             return Preferences.get("$$CN1_BACKGROUND_FETCH_INTERVAL", 60 * 60);
@@ -8502,37 +9723,50 @@ public abstract class CodenameOneImplementation {
     }
     //ENDS METHODS FOR DEALING Local Notifications
 
-    /**
-     * Sets the preferred time interval between background fetches.  This is only a
-     * preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign
-     * control over when and if background fetches will be allowed. This number is used
-     * only as a guideline.
-     *
-     * <p><strong>This method must be called in order to activate background fetch.</strong>></p>
-     * <p>Note: If the platform doesn't support background fetch (i.e. {@link #isBackgroundFetchSupported() } returns {@code false},
-     * then this method does nothing.</p>
-     *
-     * @param seconds The time interval in seconds.
-     * @see #isBackgroundFetchSupported()
-     * @see #getPreferredBackgroundFetchInterval()
-     * @see com.codename1.background.BackgroundFetch
-     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
-     */
+    /// Sets the preferred time interval between background fetches.  This is only a
+    /// preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign
+    /// control over when and if background fetches will be allowed. This number is used
+    /// only as a guideline.
+    ///
+    /// **This method must be called in order to activate background fetch.**>
+    ///
+    /// Note: If the platform doesn't support background fetch (i.e. `#isBackgroundFetchSupported()` returns `false`,
+    /// then this method does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: The time interval in seconds.
+    ///
+    /// #### See also
+    ///
+    /// - #isBackgroundFetchSupported()
+    ///
+    /// - #getPreferredBackgroundFetchInterval()
+    ///
+    /// - com.codename1.background.BackgroundFetch
+    ///
+    /// - com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
     public void setPreferredBackgroundFetchInterval(int seconds) {
         if (isBackgroundFetchSupported()) {
             Preferences.set("$$CN1_BACKGROUND_FETCH_INTERVAL", seconds);
         }
     }
 
-    /**
-     * Checks to see if the current platform supports background fetch.
-     *
-     * @return True if the current platform supports background fetch.
-     * @see #setPreferredBackgroundFetchInterval(int)
-     * @see #getPreferredBackgroundFetchInterval()
-     * @see com.codename1.background.BackgroundFetch
-     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
-     */
+    /// Checks to see if the current platform supports background fetch.
+    ///
+    /// #### Returns
+    ///
+    /// True if the current platform supports background fetch.
+    ///
+    /// #### See also
+    ///
+    /// - #setPreferredBackgroundFetchInterval(int)
+    ///
+    /// - #getPreferredBackgroundFetchInterval()
+    ///
+    /// - com.codename1.background.BackgroundFetch
+    ///
+    /// - com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
     public boolean isBackgroundFetchSupported() {
         return false;
     }
@@ -8545,169 +9779,189 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /**
-     * Returns true if this device is jailbroken or rooted, false if not or unknown. Notice that this method isn't
-     * accurate and can't detect all jailbreak/rooting cases
-     *
-     * @return true if this device is jailbroken or rooted, false if not or unknown.
-     */
+    /// Returns true if this device is jailbroken or rooted, false if not or unknown. Notice that this method isn't
+    /// accurate and can't detect all jailbreak/rooting cases
+    ///
+    /// #### Returns
+    ///
+    /// true if this device is jailbroken or rooted, false if not or unknown.
     public boolean isJailbrokenDevice() {
         return false;
     }
 
-    /**
-     * Returns the build hints for the simulator, this will only work in the debug environment and it's
-     * designed to allow extensions/API's to verify user settings/build hints exist
-     *
-     * @return map of the build hints that isn't modified without the codename1.arg. prefix
-     */
+    /// Returns the build hints for the simulator, this will only work in the debug environment and it's
+    /// designed to allow extensions/API's to verify user settings/build hints exist
+    ///
+    /// #### Returns
+    ///
+    /// map of the build hints that isn't modified without the codename1.arg. prefix
     public Map<String, String> getProjectBuildHints() {
         return null;
     }
 
-    /**
-     * Sets a build hint into the settings while overwriting any previous value. This will only work in the
-     * debug environment and it's designed to allow extensions/API's to verify user settings/build hints exist.
-     * Important: this will throw an exception outside of the simulator!
-     *
-     * @param key   the build hint without the codename1.arg. prefix
-     * @param value the value for the hint
-     */
+    /// Sets a build hint into the settings while overwriting any previous value. This will only work in the
+    /// debug environment and it's designed to allow extensions/API's to verify user settings/build hints exist.
+    /// Important: this will throw an exception outside of the simulator!
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the build hint without the codename1.arg. prefix
+    ///
+    /// - `value`: the value for the hint
     public void setProjectBuildHint(String key, String value) {
         throw new RuntimeException();
     }
 
-    /**
-     * Checks to see if you can prompt the user to install the app on their homescreen.
-     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it
-     * only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
-     * previously prompted the user and they have declined, then this will return false.
-     *
-     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified
-     * when you are allowed to prompt the user for installation.  Then call {@link #promptInstallOnHomescreen() }
-     * inside that method - or sometime after.</p>
-     *
-     * <h3>Example</h3>
-     * <pre>{@code
-     * onCanInstallOnHomescreen(()->{
-     *      if (canInstallOnHomescreen()) {
-     *           if (promptInstallOnHomescreen()) {
-     *               // User accepted installation
-     *           } else {
-     *               // user rejected installation
-     *           }
-     *      }
-     * });
-     * }</pre>
-     * <p>
-     * https://developers.google.com/web/fundamentals/app-install-banners/
-     *
-     * @return True if you are able to prompt the user to install the app on their homescreen.
-     * @see #promptInstallOnHomescreen()
-     * @see #onCanInstallOnHomescreen(java.lang.Runnable)
-     */
+    /// Checks to see if you can prompt the user to install the app on their homescreen.
+    /// This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it
+    /// only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
+    /// previously prompted the user and they have declined, then this will return false.
+    ///
+    /// Best practice is to use `#onCanInstallOnHomescreen(java.lang.Runnable)` to be notified
+    /// when you are allowed to prompt the user for installation.  Then call `#promptInstallOnHomescreen()`
+    /// inside that method - or sometime after.
+    ///
+    /// Example
+    ///
+    /// ```java
+    /// `onCanInstallOnHomescreen(()->{
+    ///      if (canInstallOnHomescreen()) {
+    ///           if (promptInstallOnHomescreen()) {
+    ///               // User accepted installation` else {
+    ///               // user rejected installation
+    ///           }
+    ///      }
+    /// });
+    /// }
+    /// ```
+    ///
+    /// https://developers.google.com/web/fundamentals/app-install-banners/
+    ///
+    /// #### Returns
+    ///
+    /// True if you are able to prompt the user to install the app on their homescreen.
+    ///
+    /// #### See also
+    ///
+    /// - #promptInstallOnHomescreen()
+    ///
+    /// - #onCanInstallOnHomescreen(java.lang.Runnable)
     public boolean canInstallOnHomescreen() {
         return false;
     }
 
-    /**
-     * Prompts the user to install this app on their homescreen.  This is only relevant in the
-     * javascript port.
-     *
-     * @return The result of the user prompt.  {@literal true} if the user accepts the installation,
-     * {@literal false} if they reject it.
-     * @see #canInstallOnHomescreen()
-     * @see #onCanInstallOnHomescreen(java.lang.Runnable)
-     */
+    /// Prompts the user to install this app on their homescreen.  This is only relevant in the
+    /// javascript port.
+    ///
+    /// #### Returns
+    ///
+    /// @return The result of the user prompt.  true if the user accepts the installation,
+    /// false if they reject it.
+    ///
+    /// #### See also
+    ///
+    /// - #canInstallOnHomescreen()
+    ///
+    /// - #onCanInstallOnHomescreen(java.lang.Runnable)
     public boolean promptInstallOnHomescreen() {
         return false;
     }
 
-    /**
-     * A callback fired when you are allowed to prompt the user to install the app on their homescreen.
-     * Only relevant in the javascript port.
-     *
-     * @param r Runnable that will be run when/if you are permitted to prompt the user to install
-     *          the app on their homescreen.
-     */
+    /// A callback fired when you are allowed to prompt the user to install the app on their homescreen.
+    /// Only relevant in the javascript port.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: @param r Runnable that will be run when/if you are permitted to prompt the user to install
+    ///          the app on their homescreen.
     public void onCanInstallOnHomescreen(Runnable r) {
 
     }
 
-    /**
-     * Checks whether the platform's native text areas support vertical alignment.
-     *
-     * @return
-     */
+    /// Checks whether the platform's native text areas support vertical alignment.
     public boolean supportsNativeTextAreaVerticalAlignment() {
         return false;
     }
 
-    /**
-     * Posts a message to the native platform.
-     *
-     * @param message The message.
-     * @since 7.0
-     */
+    /// Posts a message to the native platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: The message.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void postMessage(MessageEvent message) {
 
     }
 
-    /**
-     * Returns true if the platform is in dark mode, null is returned for
-     * unknown status
-     *
-     * @return true in case of dark mode
-     */
+    /// Returns true if the platform is in dark mode, null is returned for
+    /// unknown status
+    ///
+    /// #### Returns
+    ///
+    /// true in case of dark mode
     public Boolean isDarkMode() {
         return Boolean.FALSE;
     }
 
-    /**
-     * Manually announces text to native accessibility services, associating the announcement with
-     * a specific component when possible. Components are typically announced automatically when
-     * focused; this hook allows platforms to expose announcements triggered outside the normal
-     * focus lifecycle. The default implementation is a no-op.
-     *
-     * @param cmp  the component related to this announcement or {@code null} for the root context
-     * @param text the message to announce
-     */
+    /// Manually announces text to native accessibility services, associating the announcement with
+    /// a specific component when possible. Components are typically announced automatically when
+    /// focused; this hook allows platforms to expose announcements triggered outside the normal
+    /// focus lifecycle. The default implementation is a no-op.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component related to this announcement or `null` for the root context
+    ///
+    /// - `text`: the message to announce
     public void announceForAccessibility(Component cmp, String text) {
         // No-op by default. Platforms that support accessibility announcements
         // should override this method.
     }
 
-    /**
-     * Returns true if the user has selected larger type fonts in the system settings.
-     * Default implementation returns false.
-     *
-     * @return true when the platform indicates a larger text preference.
-     * @since 7.1
-     */
+    /// Returns true if the user has selected larger type fonts in the system settings.
+    /// Default implementation returns false.
+    ///
+    /// #### Returns
+    ///
+    /// true when the platform indicates a larger text preference.
+    ///
+    /// #### Since
+    ///
+    /// 7.1
     public boolean isLargerTextEnabled() {
         return false;
     }
 
-    /**
-     * Returns a scale factor representing how much larger system fonts should be.
-     * A value of {@code 1.0} indicates the default system font size.
-     *
-     * @return scale factor for larger system fonts.
-     * @since 7.1
-     */
+    /// Returns a scale factor representing how much larger system fonts should be.
+    /// A value of `1.0` indicates the default system font size.
+    ///
+    /// #### Returns
+    ///
+    /// scale factor for larger system fonts.
+    ///
+    /// #### Since
+    ///
+    /// 7.1
     public float getLargerTextScale() {
         return 1.0f;
     }
 
-    /**
-     * Returns the stack trace from the exception on the given
-     * thread. This API isn't supported on all platforms and may
-     * return a blank string when unavailable.
-     *
-     * @param parentThread the thread in which the exception was thrown
-     * @param t            the exception
-     * @return a stack trace string that might be blank
-     */
+    /// Returns the stack trace from the exception on the given
+    /// thread. This API isn't supported on all platforms and may
+    /// return a blank string when unavailable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parentThread`: the thread in which the exception was thrown
+    ///
+    /// - `t`: the exception
+    ///
+    /// #### Returns
+    ///
+    /// a stack trace string that might be blank
     public String getStackTrace(Thread parentThread, Throwable t) {
         System.out.println("CN1SS:ERR:Invoking getStackTrace in CodenameOneImplementation");
         if (parentThread instanceof CodenameOneThread && ((CodenameOneThread) parentThread).hasStackFrame()) {

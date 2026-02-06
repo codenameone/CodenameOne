@@ -22,25 +22,26 @@
  */
 package com.codename1.ui.events;
 
-/**
- * An interface that can be implemented by any class that broadcasts ActionEvents.
- *
- * @author shannah
- * @since 7.0
- */
+/// An interface that can be implemented by any class that broadcasts ActionEvents.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public interface ActionSource<T extends ActionEvent> {
-    /**
-     * Adds ActionListener to receive action events form this source.
-     *
-     * @param l
-     */
+    /// Adds ActionListener to receive action events form this source.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     void addActionListener(ActionListener<T> l);
 
-    /**
-     * Removes ActionListener so that it will no longer receive events
-     * from this source.
-     *
-     * @param l
-     */
+    /// Removes ActionListener so that it will no longer receive events
+    /// from this source.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     void removeActionListener(ActionListener<T> l);
 }

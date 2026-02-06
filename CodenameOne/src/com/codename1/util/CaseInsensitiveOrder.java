@@ -25,16 +25,12 @@ package com.codename1.util;
 
 import java.util.Comparator;
 
-/**
- * A string comparator equivalent to String.CASE_INSENSITIVE_ORDER which isn't available in Codename One
- *
- * @author Shai Almog
- */
+/// A string comparator equivalent to String.CASE_INSENSITIVE_ORDER which isn't available in Codename One
+///
+/// @author Shai Almog
 public class CaseInsensitiveOrder implements Comparator<String> {
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int compare(String s1, String s2) {
         int n1 = s1.length();

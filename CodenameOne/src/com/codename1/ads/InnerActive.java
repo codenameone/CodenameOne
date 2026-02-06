@@ -30,12 +30,10 @@ import com.codename1.ui.events.ActionEvent;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * This is an Ad service implementation by InnerActive see:
- * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
- *
- * @author Chen
- */
+/// This is an Ad service implementation by InnerActive see:
+/// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+///
+/// @author Chen
 public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField removed obsolete field
 
     private static final String protocolVersion = "Sm2m-1.5.3";
@@ -54,27 +52,25 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
         }
     }
 
-    /**
-     * If true and no ads exists the network will return house holds ads
-     *
-     * @param test
-     */
+    /// If true and no ads exists the network will return house holds ads
+    ///
+    /// #### Parameters
+    ///
+    /// - `test`
     public static void setTestAds(boolean test) {
         testAds = test;
     }
 
-    /**
-     * Sets this ads type, by default this a banner type.
-     *
-     * @param banner sets the ads to banners or text ads
-     */
+    /// Sets this ads type, by default this a banner type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `banner`: sets the ads to banners or text ads
     public void setBanner(boolean banner) {
         this.banner = banner;
     }
 
-    /**
-     * initialize the ads service
-     */
+    /// initialize the ads service
     @Override
     public void initService(Ads ads) {
         this.os = Display.getInstance().getPlatformName();
@@ -164,9 +160,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
                 (hid == null ? that.hid == null : hid.equals(that.hid));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         int result = super.hashCode();
@@ -177,9 +171,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
         return result;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void readResponse(InputStream input) throws IOException {
         StringBuffer buf = new StringBuffer();

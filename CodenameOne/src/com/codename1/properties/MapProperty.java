@@ -29,33 +29,33 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Base class for a property as a Map which can contain multiple elements within it
- *
- * @author Shai Almog
- */
+/// Base class for a property as a Map which can contain multiple elements within it
+///
+/// @author Shai Almog
 public class MapProperty<T, J, K> extends PropertyBase<Map.Entry<T, J>, K> implements Iterable<Map.Entry<T, J>> {
     private final LinkedHashMap<T, J> value = new LinkedHashMap<T, J>();
     private Class keyType;
     private Class valueType;
 
-    /**
-     * Constructs a property with the given name
-     *
-     * @param name the name of the property
-     */
+    /// Constructs a property with the given name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
     public MapProperty(String name) {
         super(name);
     }
 
 
-    /**
-     * Constructs a property with the given name
-     *
-     * @param name             the name of the property
-     * @param genericTypeKey   the generic type of the key
-     * @param genericTypeValue the generic type of the value
-     */
+    /// Constructs a property with the given name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `genericTypeKey`: the generic type of the key
+    ///
+    /// - `genericTypeValue`: the generic type of the value
     public MapProperty(String name, Class genericTypeKey, Class genericTypeValue) {
         super(name);
         validateCollectionType(genericTypeKey);
@@ -64,51 +64,55 @@ public class MapProperty<T, J, K> extends PropertyBase<Map.Entry<T, J>, K> imple
         valueType = genericTypeValue;
     }
 
-    /**
-     * Returns the class for the key element if it's defined or null if it isn't
-     *
-     * @return the class matching the map key
-     */
+    /// Returns the class for the key element if it's defined or null if it isn't
+    ///
+    /// #### Returns
+    ///
+    /// the class matching the map key
     public Class getKeyType() {
         return keyType;
     }
 
-    /**
-     * Returns the class for the value element if it's defined or null if it isn't
-     *
-     * @return the class matching the map value
-     */
+    /// Returns the class for the value element if it's defined or null if it isn't
+    ///
+    /// #### Returns
+    ///
+    /// the class matching the map value
     public Class getValueType() {
         return valueType;
     }
 
-    /**
-     * Gets the property value
-     *
-     * @param key the map key
-     * @return the property value
-     */
+    /// Gets the property value
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the map key
+    ///
+    /// #### Returns
+    ///
+    /// the property value
     public J get(T key) {
         internalGet();
         return value.get(key);
     }
 
-    /**
-     * The size of the property list
-     *
-     * @return the number of elements
-     */
+    /// The size of the property list
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements
     public int size() {
         internalGet();
         return value.size();
     }
 
-    /**
-     * Sets the property value and potentially fires a change event
-     *
-     * @param key the key to set
-     * @param v   the new value
-     */
+    /// Sets the property value and potentially fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key to set
+    ///
+    /// - `v`: the new value
     public K set(T key, J v) {
         value.put(key, v);
         firePropertyChanged();
@@ -116,34 +120,38 @@ public class MapProperty<T, J, K> extends PropertyBase<Map.Entry<T, J>, K> imple
         return (K) parent.parent;
     }
 
-    /**
-     * Same as {@link #set(java.lang.Object, java.lang.Object)} here for coding convention convenience
-     * with map code
-     *
-     * @param key the key to set
-     * @param v   the new value
-     */
+    /// Same as `java.lang.Object)` here for coding convention convenience
+    /// with map code
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key to set
+    ///
+    /// - `v`: the new value
     public K put(T key, J v) {
         return set(key, v);
     }
 
-    /**
-     * Removes the item matching the given key
-     *
-     * @param key the key
-     */
+    /// Removes the item matching the given key
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
     public K remove(T key) {
         value.remove(key);
         internalSet();
         return (K) parent.parent;
     }
 
-    /**
-     * Compares this property to another property
-     *
-     * @param obj the other property
-     * @return true if they are equal in name and value
-     */
+    /// Compares this property to another property
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the other property
+    ///
+    /// #### Returns
+    ///
+    /// true if they are equal in name and value
     @Override
     public boolean equals(Object obj) {
         if (!super.equals(obj)) {
@@ -153,61 +161,61 @@ public class MapProperty<T, J, K> extends PropertyBase<Map.Entry<T, J>, K> imple
         return other.value.equals(value);
     }
 
-    /**
-     * Returns the internal hashcode or 0 for null property
-     *
-     * @return the hashcode value
-     */
+    /// Returns the internal hashcode or 0 for null property
+    ///
+    /// #### Returns
+    ///
+    /// the hashcode value
     @Override
     public int hashCode() {
         return value.hashCode();
     }
 
-    /**
-     * Iterate over the elements of the property
-     *
-     * @return an iterator
-     */
+    /// Iterate over the elements of the property
+    ///
+    /// #### Returns
+    ///
+    /// an iterator
     @Override
     public Iterator<Map.Entry<T, J>> iterator() {
         internalGet();
         return value.entrySet().iterator();
     }
 
-    /**
-     * Returns the set of keys in the map property
-     *
-     * @return the keys
-     */
+    /// Returns the set of keys in the map property
+    ///
+    /// #### Returns
+    ///
+    /// the keys
     public Set<T> keySet() {
         return value.keySet();
     }
 
-    /**
-     * Returns the set of values in the map property
-     *
-     * @return the values
-     */
+    /// Returns the set of values in the map property
+    ///
+    /// #### Returns
+    ///
+    /// the values
     public Collection<J> valueSet() {
         return value.values();
     }
 
-    /**
-     * Returns a copy of the content as a new map
-     *
-     * @return a map
-     */
+    /// Returns a copy of the content as a new map
+    ///
+    /// #### Returns
+    ///
+    /// a map
     public Map<T, J> asMap() {
         internalGet();
         return new LinkedHashMap<T, J>(value);
     }
 
-    /**
-     * Returns a copy of the content as a new map but if the value is a PropertyBusinessObject it will
-     * be converted to a Map
-     *
-     * @return a map
-     */
+    /// Returns a copy of the content as a new map but if the value is a PropertyBusinessObject it will
+    /// be converted to a Map
+    ///
+    /// #### Returns
+    ///
+    /// a map
     public Map<T, Object> asExplodedMap() {
         Map<T, Object> m = new LinkedHashMap<T, Object>();
         for (Map.Entry<T, J> entry : value.entrySet()) {
@@ -223,12 +231,15 @@ public class MapProperty<T, J, K> extends PropertyBase<Map.Entry<T, J>, K> imple
         return m;
     }
 
-    /**
-     * Sets the entire content of the property
-     *
-     * @param t the map of elements to set
-     * @return the parent object for chaining
-     */
+    /// Sets the entire content of the property
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the map of elements to set
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
     public K setMap(Map<T, J> t) {
         value.clear();
         value.putAll(t);
@@ -237,9 +248,7 @@ public class MapProperty<T, J, K> extends PropertyBase<Map.Entry<T, J>, K> imple
         return (K) parent.parent;
     }
 
-    /**
-     * Remove all the elements from the map
-     */
+    /// Remove all the elements from the map
     public void clear() {
         internalSet();
         value.clear();

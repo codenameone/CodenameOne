@@ -20,41 +20,33 @@ package com.codename1.util.regex;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * Encapsulates java.io.InputStream as CharacterIterator.
- *
- * @author <a href="mailto:ales.novak@netbeans.com">Ales Novak</a>
- * @version CVS $Id: StreamCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
- */
+/// Encapsulates java.io.InputStream as CharacterIterator.
+///
+/// @author [Ales Novak](mailto:ales.novak@netbeans.com)
+/// @version CVS $Id: StreamCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public final class StreamCharacterIterator implements CharacterIterator {
-    /**
-     * Underlying is
-     */
+    /// Underlying is
     private final InputStream is;
 
-    /**
-     * Buffer of read chars
-     */
+    /// Buffer of read chars
     @SuppressWarnings("PMD.AvoidStringBufferField")
     private final StringBuffer buff;
 
-    /**
-     * read end?
-     */
+    /// read end?
     private boolean closed;
 
-    /**
-     * @param is an InputStream, which is parsed
-     */
+    /// #### Parameters
+    ///
+    /// - `is`: an InputStream, which is parsed
     public StreamCharacterIterator(InputStream is) {
         this.is = is;
         this.buff = new StringBuffer(512);
         this.closed = false;
     }
 
-    /**
-     * @return a substring
-     */
+    /// #### Returns
+    ///
+    /// a substring
     @Override
     public String substring(int beginIndex, int endIndex) {
         try {
@@ -67,9 +59,9 @@ public final class StreamCharacterIterator implements CharacterIterator {
         }
     }
 
-    /**
-     * @return a substring
-     */
+    /// #### Returns
+    ///
+    /// a substring
     @Override
     public String substring(int beginIndex) {
         try {
@@ -83,9 +75,9 @@ public final class StreamCharacterIterator implements CharacterIterator {
     }
 
 
-    /**
-     * @return a character at the specified position.
-     */
+    /// #### Returns
+    ///
+    /// a character at the specified position.
     @Override
     public char charAt(int pos) {
         try {
@@ -98,9 +90,9 @@ public final class StreamCharacterIterator implements CharacterIterator {
         }
     }
 
-    /**
-     * @return <tt>true</tt> iff if the specified index is after the end of the character stream
-     */
+    /// #### Returns
+    ///
+    /// true iff if the specified index is after the end of the character stream
     @Override
     public boolean isEnd(int pos) {
         if (buff.length() > pos) {
@@ -117,9 +109,7 @@ public final class StreamCharacterIterator implements CharacterIterator {
         }
     }
 
-    /**
-     * Reads n characters from the stream and appends them to the buffer
-     */
+    /// Reads n characters from the stream and appends them to the buffer
     private int read(int n) throws IOException {
         if (closed) {
             return 0;
@@ -139,18 +129,14 @@ public final class StreamCharacterIterator implements CharacterIterator {
         return n - i;
     }
 
-    /**
-     * Reads rest of the stream.
-     */
+    /// Reads rest of the stream.
     private void readAll() throws IOException {
         while (!closed) {
             read(1000);
         }
     }
 
-    /**
-     * Reads chars up to the idx
-     */
+    /// Reads chars up to the idx
     private void ensure(int idx) throws IOException {
         if (closed) {
             return;

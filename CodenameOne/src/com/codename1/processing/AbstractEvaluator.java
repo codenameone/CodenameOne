@@ -27,91 +27,97 @@ import com.codename1.util.StringUtil;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Private class, do not use.
- * <p>
- * An abstract predicate evaluator handles common tasks of breaking the
- * expression down to lvalue, rvalue, and comparator, then calling the
- * appropriate abstracted method with the result.
- * <p>
- * Example predicates:
- *
- * <code>
- * Test price attribute:
- * <p>
- * [@price > 45]
- * <p>
- * Test Child node:
- * <p>
- * [town='Exeter']
- * <p>
- * Test attribute exists
- * <p>
- * [@price]
- * <p>
- * Test attribute doesn't exist:
- * <p>
- * [@price = null]
- * <p>
- * Select by index:
- * <p>
- * [3]
- * <p>
- * Select by position:
- * <p>
- * [position() < 5]
- * <p>
- * Select by position:
- * <p>
- * [last() - 5]
- * </code>
- *
- * @author Eric Coolman
- */
+/// Private class, do not use.
+///
+/// An abstract predicate evaluator handles common tasks of breaking the
+/// expression down to lvalue, rvalue, and comparator, then calling the
+/// appropriate abstracted method with the result.
+///
+/// Example predicates:
+///
+/// `Test price attribute:
+///
+///  [@price > 45]
+///
+///  Test Child node:
+///
+///  [town='Exeter']
+///
+///  Test attribute exists
+///
+///  [@price]
+///
+///  Test attribute doesn't exist:
+///
+///  [@price = null]
+///
+///  Select by index:
+///
+///  [3]
+///
+///  Select by position:
+///
+///  [position() < 5]
+///
+///  Select by position:
+///
+///  [last() - 5]`
+///
+/// @author Eric Coolman
 abstract class AbstractEvaluator implements Evaluator {
 
     private final String expr;
 
-    /**
-     * Construct with the full predicate expression.
-     *
-     * @param expr The full predicate expression
-     */
+    /// Construct with the full predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `expr`: The full predicate expression
     protected AbstractEvaluator(String expr) {
         this.expr = expr;
     }
 
-    /**
-     * Evaluate the predicate expression against a given element.
-     *
-     * @param element the element to apply predicate against.
-     */
+    /// Evaluate the predicate expression against a given element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element to apply predicate against.
     @Override
     public Object evaluate(StructuredContent element) {
         return evaluateInternal(element);
     }
 
-    /**
-     * Evaluate the predicate expression against an array of elements.
-     *
-     * @param elements an array of elements to apply predicate against.
-     */
+    /// Evaluate the predicate expression against an array of elements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: an array of elements to apply predicate against.
     @Override
     public Object evaluate(List elements) {
         return evaluateInternal(elements);
     }
 
-    /**
-     * This internal method takes care of determining the style of expression
-     * (less-than, greater-than, equals, etc), and passing on the to next
-     * internal processor.
-     *
-     * @param element source element, either a List or StructuredContent
-     * @return either a List or StructuredContent
-     * @throws ResultException
-     * @see {@link #evaluateInternal(Object, int)}
-     * @see #evaluateSingleInternal(Object)
-     */
+    /// This internal method takes care of determining the style of expression
+    /// (less-than, greater-than, equals, etc), and passing on the to next
+    /// internal processor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: source element, either a List or StructuredContent
+    ///
+    /// #### Returns
+    ///
+    /// either a List or StructuredContent
+    ///
+    /// #### Throws
+    ///
+    /// - `ResultException`
+    ///
+    /// #### See also
+    ///
+    /// - `int)`
+    ///
+    /// - #evaluateSingleInternal(Object)
     private Object evaluateInternal(Object element) {
         if (element == null) {
             return null;
@@ -136,18 +142,27 @@ abstract class AbstractEvaluator implements Evaluator {
 
     }
 
-    /**
-     * This internal method handles breaking down an expression into it's
-     * components (lvalue, rvalue, comparand), and then passing along to the
-     * next internal processor.
-     *
-     * @param element either a List or a StructuredContent object
-     * @param index   pointer to the comparator within the predicate expression
-     * @return either a List or a StructuredContent object
-     * @see #evaluateLeftEqualsRightInternal(Object, String, String)
-     * @see #evaluateLeftGreaterRightInternal(Object, String, String)
-     * @see #evaluateLeftLessRightInternal(Object, String, String)
-     */
+    /// This internal method handles breaking down an expression into it's
+    /// components (lvalue, rvalue, comparand), and then passing along to the
+    /// next internal processor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a List or a StructuredContent object
+    ///
+    /// - `index`: pointer to the comparator within the predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a List or a StructuredContent object
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftEqualsRightInternal(Object, String, String)
+    ///
+    /// - #evaluateLeftGreaterRightInternal(Object, String, String)
+    ///
+    /// - #evaluateLeftLessRightInternal(Object, String, String)
     private Object evaluateInternal(Object element, int index) {
         String lvalue = expr.substring(0, index).trim();
         String rvalue = expr.substring(index + 1).trim();
@@ -166,17 +181,26 @@ abstract class AbstractEvaluator implements Evaluator {
         }
     }
 
-    /**
-     * This internal method simply makes a type safe call the the proper
-     * abstract method based on the type of element passed.
-     *
-     * @param element either a StructuredContent or List object.
-     * @param lvalue  lvalue of predicate expression
-     * @param rvalue  rvalue of predicate expression
-     * @return either a StructuredContent or List object.
-     * @see #evaluateLeftLessRight(StructuredContent, String, String)
-     * @see #evaluateLeftLessRight(List, String, String)
-     */
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftLessRight(StructuredContent, String, String)
+    ///
+    /// - #evaluateLeftLessRight(List, String, String)
     private Object evaluateLeftLessRightInternal(Object element, String lvalue,
                                                  String rvalue) {
         if (element instanceof List) {
@@ -187,17 +211,26 @@ abstract class AbstractEvaluator implements Evaluator {
         }
     }
 
-    /**
-     * This internal method simply makes a type safe call the the proper
-     * abstract method based on the type of element passed.
-     *
-     * @param element either a StructuredContent or List object.
-     * @param lvalue  lvalue of predicate expression
-     * @param rvalue  rvalue of predicate expression
-     * @return either a StructuredContent or List object.
-     * @see #evaluateLeftGreaterRight(StructuredContent, String, String)
-     * @see #evaluateLeftGreaterRight(List, String, String)
-     */
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftGreaterRight(StructuredContent, String, String)
+    ///
+    /// - #evaluateLeftGreaterRight(List, String, String)
     private Object evaluateLeftGreaterRightInternal(Object element, String lvalue,
                                                     String rvalue) {
         if (element instanceof List) {
@@ -208,17 +241,26 @@ abstract class AbstractEvaluator implements Evaluator {
         }
     }
 
-    /**
-     * This internal method simply makes a type safe call the the proper
-     * abstract method based on the type of element passed.
-     *
-     * @param element either a StructuredContent or List object.
-     * @param lvalue  lvalue of predicate expression
-     * @param rvalue  rvalue of predicate expression
-     * @return either a StructuredContent or List object.
-     * @see #evaluateLeftEqualsRight(List, String, String)
-     * @see #evaluateLeftEqualsRight(StructuredContent, String, String)
-     */
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftEqualsRight(List, String, String)
+    ///
+    /// - #evaluateLeftEqualsRight(StructuredContent, String, String)
     private Object evaluateLeftEqualsRightInternal(Object element, String lvalue,
                                                    String rvalue) {
         if (element instanceof List) {
@@ -229,17 +271,26 @@ abstract class AbstractEvaluator implements Evaluator {
         }
     }
 
-    /**
-     * This internal method simply makes a type safe call the the proper
-     * abstract method based on the type of element passed.
-     *
-     * @param element either a StructuredContent or List object.
-     * @param lvalue  lvalue of predicate expression
-     * @param rvalue  rvalue of predicate expression
-     * @return either a StructuredContent or List object.
-     * @see #evaluateLeftContainsRight(List, String, String)
-     * @see #evaluateLeftContainsRight(StructuredContent, String, String)
-     */
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftContainsRight(List, String, String)
+    ///
+    /// - #evaluateLeftContainsRight(StructuredContent, String, String)
     private Object evaluateLeftContainsRightInternal(Object element, String lvalue,
                                                      String rvalue) {
         if (element instanceof List) {
@@ -250,17 +301,26 @@ abstract class AbstractEvaluator implements Evaluator {
         }
     }
 
-    /**
-     * This internal method simply makes a type safe call the the proper
-     * abstract method based on the type of element passed.
-     *
-     * @param element either a StructuredContent or List object.
-     * @param lvalue  lvalue of predicate expression
-     * @param rvalue  rvalue of predicate expression
-     * @return either a StructuredContent or List object.
-     * @see #evaluateSingle(StructuredContent, String)
-     * @see #evaluateSingle(List, String)
-     */
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateSingle(StructuredContent, String)
+    ///
+    /// - #evaluateSingle(List, String)
     private Object evaluateSingleInternal(Object element) {
         if (element instanceof List) {
             return evaluateSingle((List) element, expr);
@@ -269,12 +329,15 @@ abstract class AbstractEvaluator implements Evaluator {
         }
     }
 
-    /**
-     * Utility method for subclasses to determine if an entire string is digits
-     *
-     * @param text value to test
-     * @return true of the value contains only digits.
-     */
+    /// Utility method for subclasses to determine if an entire string is digits
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: value to test
+    ///
+    /// #### Returns
+    ///
+    /// true of the value contains only digits.
     protected boolean isNumeric(String text) {
         text = text.trim();
         int tlen = text.length();
@@ -286,13 +349,16 @@ abstract class AbstractEvaluator implements Evaluator {
         return true;
     }
 
-    /**
-     * Utility method for subclasses to determine strip single/double quotes
-     * from a string
-     *
-     * @param text value to transform
-     * @return the value without quotes.
-     */
+    /// Utility method for subclasses to determine strip single/double quotes
+    /// from a string
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: value to transform
+    ///
+    /// #### Returns
+    ///
+    /// the value without quotes.
     protected String stripQuotes(String rvalue) {
         StringBuffer buf = new StringBuffer();
         int rvlen = rvalue.length();
@@ -305,14 +371,17 @@ abstract class AbstractEvaluator implements Evaluator {
         return buf.toString();
     }
 
-    /**
-     * Utility method for subclasses to convert a string to an array, delimited
-     * by comma, optionally enclosed in brackets, and elements optionally
-     * enclosed in quotes.
-     *
-     * @param text value to transform
-     * @return the value as an array.
-     */
+    /// Utility method for subclasses to convert a string to an array, delimited
+    /// by comma, optionally enclosed in brackets, and elements optionally
+    /// enclosed in quotes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: value to transform
+    ///
+    /// #### Returns
+    ///
+    /// the value as an array.
     protected String[] explode(String arrayAsString) {
         arrayAsString = arrayAsString.trim();
         if (arrayAsString.startsWith("(") && arrayAsString.endsWith(")")) {
@@ -327,30 +396,38 @@ abstract class AbstractEvaluator implements Evaluator {
         return a;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression with no
-     * comparator.
-     *
-     * @param element a single StructuredContent element
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression with no
+    /// comparator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateSingle(StructuredContent element, String expr) {
         return null;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression with no
-     * comparator. By default, this implementation will call evaluateSingle()
-     * against each element of the array, and return an array of all elements
-     * that didn't return null.
-     *
-     * @param element an array of StructuredContent elements
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression with no
+    /// comparator. By default, this implementation will call evaluateSingle()
+    /// against each element of the array, and return an array of all elements
+    /// that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateSingle(List elements, String expr) {
         List array;
         if (elements instanceof java.util.Vector) {
@@ -372,17 +449,21 @@ abstract class AbstractEvaluator implements Evaluator {
         return array;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression where
-     * lvalue < rvalue. By default, this implementation will call
-     * evaluateLeftLessRight() against each element of the array, and return an
-     * array of all elements that didn't return null.
-     *
-     * @param element an array of StructuredContent elements
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue < rvalue. By default, this implementation will call
+    /// evaluateLeftLessRight() against each element of the array, and return an
+    /// array of all elements that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateLeftLessRight(List elements, String lvalue,
                                            String rvalue) {
         List array;
@@ -406,31 +487,39 @@ abstract class AbstractEvaluator implements Evaluator {
         return array;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression where
-     * lvalue < rvalue.
-     *
-     * @param element a single StructuredContent element
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue < rvalue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
         return null;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression where
-     * lvalue > rvalue. By default, this implementation will call
-     * evaluateLeftGreaterRight() against each element of the array, and return
-     * an array of all elements that didn't return null.
-     *
-     * @param element an array of StructuredContent elements
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue > rvalue. By default, this implementation will call
+    /// evaluateLeftGreaterRight() against each element of the array, and return
+    /// an array of all elements that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateLeftGreaterRight(List elements, String lvalue,
                                               String rvalue) {
         List array;
@@ -454,31 +543,39 @@ abstract class AbstractEvaluator implements Evaluator {
         return array;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression where
-     * lvalue > rvalue.
-     *
-     * @param element a single StructuredContent element
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue > rvalue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
         return null;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression where
-     * lvalue = rvalue. By default, this implementation will call
-     * evaluateLeftEqualsRight() against each element of the array, and return
-     * an array of all elements that didn't return null.
-     *
-     * @param element an array of StructuredContent elements
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue = rvalue. By default, this implementation will call
+    /// evaluateLeftEqualsRight() against each element of the array, and return
+    /// an array of all elements that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateLeftEqualsRight(List elements, String lvalue,
                                              String rvalue) {
         List array;
@@ -502,31 +599,39 @@ abstract class AbstractEvaluator implements Evaluator {
         return array;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression where
-     * lvalue = rvalue.
-     *
-     * @param element a single StructuredContent element
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue = rvalue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
         return null;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression where
-     * lvalue % rvalue. By default, this implementation will call
-     * evaluateLeftContainsRight() against each element of the array, and return
-     * an array of all elements that didn't return null.
-     *
-     * @param element an array of StructuredContent elements
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue % rvalue. By default, this implementation will call
+    /// evaluateLeftContainsRight() against each element of the array, and return
+    /// an array of all elements that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateLeftContainsRight(List elements, String lvalue,
                                                String rvalue) {
         List array;
@@ -550,15 +655,19 @@ abstract class AbstractEvaluator implements Evaluator {
         return array;
     }
 
-    /**
-     * Override this element to handle testing a predicate expression where
-     * lvalue % rvalue.
-     *
-     * @param element a single StructuredContent element
-     * @param expr    the full predicate expression
-     * @return either a single StructuredContent or an array (List) of
-     * StructuredContent object.
-     */
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue % rvalue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
     protected Object evaluateLeftContainsRight(StructuredContent element,
                                                String lvalue, String rvalue) {
         return null;

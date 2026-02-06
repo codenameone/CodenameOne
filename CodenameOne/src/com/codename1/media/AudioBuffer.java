@@ -24,51 +24,39 @@ package com.codename1.media;
 
 import java.util.ArrayList;
 
-/**
- * This class can be used to capture raw PCM data from the device's microphone.
- * AudioBuffers should be obtained via the {@link MediaManager#getAudioBuffer(java.lang.String, boolean, int) }
- * method.
- *
- * @author shannah
- */
+/// This class can be used to capture raw PCM data from the device's microphone.
+/// AudioBuffers should be obtained via the `boolean, int)`
+/// method.
+///
+/// @author shannah
 public class AudioBuffer {
     private final Object refLock = new Object();
-    /**
-     * Registered callbacks to be notified when the contents of this buffer changes.
-     */
+    /// Registered callbacks to be notified when the contents of this buffer changes.
     private final ArrayList<AudioBufferCallback> callbacks = new ArrayList<AudioBufferCallback>();
-    /**
-     * The buffer contents.
-     */
+    /// The buffer contents.
     private final float[] buffer;
     private final float[] tmpDownSampleBuffer;
-    /**
-     * Used to store pending add/remove calls while inFireFrame is true.  These are all
-     * executed when the callbacks have all finished firing.
-     */
+    /// Used to store pending add/remove calls while inFireFrame is true.  These are all
+    /// executed when the callbacks have all finished firing.
     private final ArrayList<Runnable> pendingOps = new ArrayList<Runnable>();
     private int refCounter;
-    /**
-     * Internal flag used to indicate that we are currently firing callbacks.  This is used
-     * internally to prevent modification of the callbacks array while we are firing callbacks.
-     * A call is made to addCallback or removeCallback while this flag is set, then,
-     * the add/remove will be delated until after the fireCallback sequence is complete
-     * so we don't get a concurrentModificationException on the callbacks list.
-     */
+    /// Internal flag used to indicate that we are currently firing callbacks.  This is used
+    /// internally to prevent modification of the callbacks array while we are firing callbacks.
+    /// A call is made to addCallback or removeCallback while this flag is set, then,
+    /// the add/remove will be delated until after the fireCallback sequence is complete
+    /// so we don't get a concurrentModificationException on the callbacks list.
     private boolean inFireFrame = false;
-    /**
-     * The current size of the buffer.  Every time the buffer contents are changed, this value
-     * is set.  This is not to be confused with the maximum buffer size.
-     */
+    /// The current size of the buffer.  Every time the buffer contents are changed, this value
+    /// is set.  This is not to be confused with the maximum buffer size.
     private int size;
     private int sampleRate;
     private int numChannels;
 
-    /**
-     * Creates a new AudioBuffer with the given maximum size.
-     *
-     * @param maxSize The maximum size of the buffer.
-     */
+    /// Creates a new AudioBuffer with the given maximum size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxSize`: The maximum size of the buffer.
     public AudioBuffer(int maxSize) {
         buffer = new float[maxSize];
         tmpDownSampleBuffer = new float[maxSize];
@@ -88,34 +76,36 @@ public class AudioBuffer {
         }
     }
 
-    /**
-     * Copies data into the buffer from the given source buffer.  This will trigger the callbacks' {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) }
-     * method.
-     *
-     * @param source The source buffer to copy from.
-     */
+    /// Copies data into the buffer from the given source buffer.  This will trigger the callbacks' `AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer)`
+    /// method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: The source buffer to copy from.
     public void copyFrom(AudioBuffer source) {
         copyFrom(source.getSampleRate(), source.getNumChannels(), source.buffer, 0, source.size);
     }
 
-    /**
-     * Copies data from the source array into this buffer. This will trigger the callbacks' {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) }
-     * method.
-     *
-     * @param source
-     */
+    /// Copies data from the source array into this buffer. This will trigger the callbacks' `AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer)`
+    /// method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`
     public void copyFrom(int sampleRate, int numChannels, float[] source) {
         copyFrom(sampleRate, numChannels, source, 0, source.length);
     }
 
-    /**
-     * Copies data from the source array (in the given range) into the buffer. This will trigger the callbacks' {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) }
-     * method.
-     *
-     * @param source The source array to copy data from.
-     * @param offset The offset in the source array to begin copying from.
-     * @param len    The length of the range to copy.
-     */
+    /// Copies data from the source array (in the given range) into the buffer. This will trigger the callbacks' `AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer)`
+    /// method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: The source array to copy data from.
+    ///
+    /// - `offset`: The offset in the source array to begin copying from.
+    ///
+    /// - `len`: The length of the range to copy.
     public void copyFrom(int sampleRate, int numChannels, float[] source, int offset, int len) {
         if (len > buffer.length) {
             throw new IllegalArgumentException("Buffer size is " + buffer.length + " but attempt to copy " + len + " samples into it");
@@ -127,30 +117,31 @@ public class AudioBuffer {
         fireFrameReceived();
     }
 
-    /**
-     * Copies data to another audio buffer. This will trigger callbacks in the destination.
-     *
-     * @param dest The destination audio buffer.
-     */
+    /// Copies data to another audio buffer. This will trigger callbacks in the destination.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dest`: The destination audio buffer.
     public void copyTo(AudioBuffer dest) {
         dest.copyFrom(this);
     }
 
-    /**
-     * Copies data from this buffer to the given float array.
-     *
-     * @param dest The destination float array to copy to.
-     */
+    /// Copies data from this buffer to the given float array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dest`: The destination float array to copy to.
     public void copyTo(float[] dest) {
         copyTo(dest, 0);
     }
 
-    /**
-     * Copies data from this buffer to the given float array.
-     *
-     * @param dest   The destination float array.
-     * @param offset The offset in the destination array to start copying to.
-     */
+    /// Copies data from this buffer to the given float array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dest`: The destination float array.
+    ///
+    /// - `offset`: The offset in the destination array to start copying to.
     public void copyTo(float[] dest, int offset) {
         int len = size;
         if (dest.length < offset + len) {
@@ -160,28 +151,18 @@ public class AudioBuffer {
         System.arraycopy(buffer, 0, dest, offset, len);
     }
 
-    /**
-     * The current size of the buffer.  This value will be changed each time data is copied into the buffer to reflect the current size of the data.
-     *
-     * @return
-     */
+    /// The current size of the buffer.  This value will be changed each time data is copied into the buffer to reflect the current size of the data.
     public int getSize() {
         return size;
     }
 
-    /**
-     * Gets the maximum size of the buffer.  Trying to copy more than this amount of data into the buffer will result in an IndexOutOfBoundsException.
-     *
-     * @return
-     */
+    /// Gets the maximum size of the buffer.  Trying to copy more than this amount of data into the buffer will result in an IndexOutOfBoundsException.
     public int getMaxSize() {
         return buffer.length;
     }
 
-    /**
-     * Called when a frame is received.  This will call the {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) } method in all
-     * registered callbacks.
-     */
+    /// Called when a frame is received.  This will call the `AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer)` method in all
+    /// registered callbacks.
     private void fireFrameReceived() {
         inFireFrame = true;
 
@@ -198,11 +179,11 @@ public class AudioBuffer {
         }
     }
 
-    /**
-     * Adds a callback to be notified when the contents of this buffer are changed.
-     *
-     * @param l The AudioBufferCallback
-     */
+    /// Adds a callback to be notified when the contents of this buffer are changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: The AudioBufferCallback
     public void addCallback(final AudioBufferCallback l) {
         if (inFireFrame) {
             pendingOps.add(new Runnable() {
@@ -216,11 +197,11 @@ public class AudioBuffer {
         }
     }
 
-    /**
-     * Removes a callback from the audio buffer.
-     *
-     * @param l The callback to remove.
-     */
+    /// Removes a callback from the audio buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: The callback to remove.
     public void removeCallback(final AudioBufferCallback l) {
         if (inFireFrame) {
             pendingOps.add(new Runnable() {
@@ -234,29 +215,29 @@ public class AudioBuffer {
         }
     }
 
-    /**
-     * @return the sampleRate
-     */
+    /// #### Returns
+    ///
+    /// the sampleRate
     public int getSampleRate() {
         return sampleRate;
     }
 
-    /**
-     * @return the numChannels
-     */
+    /// #### Returns
+    ///
+    /// the numChannels
     public int getNumChannels() {
         return numChannels;
     }
 
-    /**
-     * Downsamples the buffer to the given rate.  This will change the result of
-     * {@link #getSize() } and {@link #getSampleRate() }.
-     * <p>
-     * Note:  This should only be called inside the AudioBuffer callback since it is
-     * modifying the contents of the buffer.
-     *
-     * @param targetSampleRate The new target rate.
-     */
+    /// Downsamples the buffer to the given rate.  This will change the result of
+    /// `#getSize()` and `#getSampleRate()`.
+    ///
+    /// Note:  This should only be called inside the AudioBuffer callback since it is
+    /// modifying the contents of the buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `targetSampleRate`: The new target rate.
     public void downSample(int targetSampleRate) {
 
         if (targetSampleRate == sampleRate) {
@@ -310,20 +291,20 @@ public class AudioBuffer {
     }
 
 
-    /**
-     * A callback that can be registered to receive notifications when the contents of the
-     * AudioBuffer is changed.
-     * <p><strong>IMPORTANT:</strong> There are no guarantees what thread this callback will be
-     * run on, and it will almost never occur on the EDT.</p>
-     */
+    /// A callback that can be registered to receive notifications when the contents of the
+    /// AudioBuffer is changed.
+    ///
+    /// **IMPORTANT:** There are no guarantees what thread this callback will be
+    /// run on, and it will almost never occur on the EDT.
     public interface AudioBufferCallback {
-        /**
-         * Method called when the contents of the AudioBuffer are changed.
-         * <p><strong>IMPORTANT:</strong> There are no guarantees what thread this callback will be
-         * run on, and it will almost never occur on the EDT.</p>
-         *
-         * @param buffer
-         */
+        /// Method called when the contents of the AudioBuffer are changed.
+        ///
+        /// **IMPORTANT:** There are no guarantees what thread this callback will be
+        /// run on, and it will almost never occur on the EDT.
+        ///
+        /// #### Parameters
+        ///
+        /// - `buffer`
         void frameReceived(AudioBuffer buffer);
     }
 

@@ -30,14 +30,13 @@ import com.codename1.ui.events.ActionListener;
 import java.util.Enumeration;
 import java.util.Vector;
 
-/**
- * HTMLLink is a simple extension of Button that nullifies all its borders and attaches itself as an ActionListener to respond to link clicks.<br>
- * Since a link can be split on several lines, the concept of parent and child links is introduced here. A parent link is the first segment of the link
- * while the children are all the other segments. Only the parent is focusable (so multiple focuses on the same links will be avoided).
- * When the parent is focused, all the children get setFocus(true). Note that for pointer events, the children are also active.
- *
- * @author Ofir Leitner
- */
+/// HTMLLink is a simple extension of Button that nullifies all its borders and attaches itself as an ActionListener to respond to link clicks.
+///
+/// Since a link can be split on several lines, the concept of parent and child links is introduced here. A parent link is the first segment of the link
+/// while the children are all the other segments. Only the parent is focusable (so multiple focuses on the same links will be avoided).
+/// When the parent is focused, all the children get setFocus(true). Note that for pointer events, the children are also active.
+///
+/// @author Ofir Leitner
 class HTMLLink extends Button implements ActionListener {
 
     String link;
@@ -48,14 +47,17 @@ class HTMLLink extends Button implements ActionListener {
     boolean parentChangesOnFocus;
     boolean isMap; // denotes that this is a server image map (img tag with the ismap property, and a child of the a tag)
 
-    /**
-     * Constructs the HTMLLink
-     *
-     * @param text       The link's text
-     * @param link       The link URL
-     * @param htmlC      The HTMLComponent this link is in
-     * @param parentLink THis link's parent if available
-     */
+    /// Constructs the HTMLLink
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The link's text
+    ///
+    /// - `link`: The link URL
+    ///
+    /// - `htmlC`: The HTMLComponent this link is in
+    ///
+    /// - `parentLink`: THis link's parent if available
     HTMLLink(String text, String link, HTMLComponent htmlC, HTMLLink parentLink, boolean linkVisited) {
         super(text);
         setUIIDFinal("HTMLLink");
@@ -93,11 +95,11 @@ class HTMLLink extends Button implements ActionListener {
         }
     }
 
-    /**
-     * Overrides setFocus in order to focus all associated components
-     *
-     * @param focused true to apply focused style, false to remove
-     */
+    /// Overrides setFocus in order to focus all associated components
+    ///
+    /// #### Parameters
+    ///
+    /// - `focused`: true to apply focused style, false to remove
     @Override
     public void setFocus(boolean focused) {
         if (parentLink != null) {
@@ -109,20 +111,20 @@ class HTMLLink extends Button implements ActionListener {
         }
     }
 
-    /**
-     * Since setFocus calls the setFocus of other children, we need this method to call the super setFocus (which means just focus this specific component, and not its associated component)
-     *
-     * @param focused true to apply focused style, false to remove
-     */
+    /// Since setFocus calls the setFocus of other children, we need this method to call the super setFocus (which means just focus this specific component, and not its associated component)
+    ///
+    /// #### Parameters
+    ///
+    /// - `focused`: true to apply focused style, false to remove
     private void superSetFocus(boolean focused) {
         super.setFocus(focused);
     }
 
-    /**
-     * Applies or removes the focus style to all this link children (if any)
-     *
-     * @param focused true to apply focused style, false to remove
-     */
+    /// Applies or removes the focus style to all this link children (if any)
+    ///
+    /// #### Parameters
+    ///
+    /// - `focused`: true to apply focused style, false to remove
     private void setChildrenFocused(boolean focused) {
         if (parentLink != null) {
             return;
@@ -145,20 +147,18 @@ class HTMLLink extends Button implements ActionListener {
         }
     }
 
-    /**
-     * If this is called it indicates that when the link is focused, its parent should change to focused as well
-     */
+    /// If this is called it indicates that when the link is focused, its parent should change to focused as well
     void setParentChangesOnFocus() {
         if (parentLink == null) {
             parentChangesOnFocus = true;
         }
     }
 
-    /**
-     * Adds the given link as the child of this link
-     *
-     * @param childLink The child link to add
-     */
+    /// Adds the given link as the child of this link
+    ///
+    /// #### Parameters
+    ///
+    /// - `childLink`: The child link to add
     void addChildLink(HTMLLink childLink) {
         if (childLinks == null) {
             childLinks = new Vector();
@@ -166,9 +166,7 @@ class HTMLLink extends Button implements ActionListener {
         childLinks.addElement(childLink);
     }
 
-    /**
-     * Triggered when the link is pressed and then it requests the link (or goes to an anchor within the page)
-     */
+    /// Triggered when the link is pressed and then it requests the link (or goes to an anchor within the page)
     @Override
     public void actionPerformed(ActionEvent evt) {
         if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) && (isMap) && (evt.getX() != -1)) { // process mp1 is checked in assigning ismap as well, but this check here should obfuscate out this method override

@@ -30,43 +30,32 @@ import com.codename1.ui.tree.TreeModel;
 
 import java.util.Vector;
 
-/**
- * A tree model representing the file system as a whole, notice that this class returns absolute
- * file names which would result in an unreadable tree. To fix this you can create a Tree object
- * and override functionality such as the childToDisplayLabel method like this:
- * <code>
- * Tree fileTree = new Tree(new FileTreeModel(true)) {
- * protected String childToDisplayLabel(Object child) {
- * if (((String) child).endsWith("/")) {
- * return ((String) child).substring(((String) child).lastIndexOf('/', ((String) child).length() - 2));
- * }
- * return ((String) child).substring(((String) child).lastIndexOf('/'));
- * }
- * };
- * </code>
- *
- * @author Shai Almog
- */
+/// A tree model representing the file system as a whole, notice that this class returns absolute
+/// file names which would result in an unreadable tree. To fix this you can create a Tree object
+/// and override functionality such as the childToDisplayLabel method like this:
+/// `Tree fileTree = new Tree(new FileTreeModel(true)) { protected String childToDisplayLabel(Object child) { if (((String) child).endsWith("/")) { return ((String) child).substring(((String) child).lastIndexOf('/', ((String) child).length() - 2)); } return ((String) child).substring(((String) child).lastIndexOf('/')); } };`
+///
+/// @author Shai Almog
 public class FileTreeModel implements TreeModel {
 
     private final boolean showFiles;
 
     private Vector ext;
 
-    /**
-     * Construct a filesystem tree model
-     *
-     * @param showFiles indicates whether this is a directory only view or a whole filesystem view
-     */
+    /// Construct a filesystem tree model
+    ///
+    /// #### Parameters
+    ///
+    /// - `showFiles`: indicates whether this is a directory only view or a whole filesystem view
     public FileTreeModel(boolean showFiles) {
         this.showFiles = showFiles;
     }
 
-    /**
-     * Shows only files with the given extension
-     *
-     * @param extension the file extension to display
-     */
+    /// Shows only files with the given extension
+    ///
+    /// #### Parameters
+    ///
+    /// - `extension`: the file extension to display
     public void addExtensionFilter(String extension) {
         if (ext == null) {
             ext = new Vector();
@@ -75,9 +64,7 @@ public class FileTreeModel implements TreeModel {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Vector getChildren(Object parent) {
         Vector response = new Vector();
@@ -124,9 +111,7 @@ public class FileTreeModel implements TreeModel {
         return response;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isLeaf(Object node) {
         return !FileSystemStorage.getInstance().isDirectory((String) node);

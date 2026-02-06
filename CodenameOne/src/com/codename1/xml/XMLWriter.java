@@ -38,12 +38,10 @@ import java.io.Writer;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
-/**
- * <p>{@code XMLWriter} writes an XML {@link com.codename1.xml.Element} into an XML string/file
- * this allowing us to serialize previously parsed and modified XML.</p>
- *
- * @author Paul Harrison Williams<pwillcode@gmail.com>
- */
+/// `XMLWriter` writes an XML `com.codename1.xml.Element` into an XML string/file
+/// this allowing us to serialize previously parsed and modified XML.
+///
+/// @author Paul Harrison Williams
 public class XMLWriter {
 
     private static final String[][] escapes = {
@@ -55,53 +53,63 @@ public class XMLWriter {
     };
     private final boolean encodeText;
 
-    /**
-     * Creates a new XMLWriter.
-     *
-     * @param encodeText Determines whether or not text components (text
-     *                   content, tag names, attribute names, and attribute values) should be
-     *                   encoded with escapes when written. Use false if these values are already
-     *                   encoded.
-     */
+    /// Creates a new XMLWriter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encodeText`: @param encodeText Determines whether or not text components (text
+    ///                   content, tag names, attribute names, and attribute values) should be
+    ///                   encoded with escapes when written. Use false if these values are already
+    ///                   encoded.
     public XMLWriter(boolean encodeText) {
         this.encodeText = encodeText;
     }
 
-    /**
-     * Writes the XML of an Element to a Writer. Note: may output invalid XML if
-     * you created text Elements using un-escaped Strings.
-     *
-     * @param writer  The Writer to which the XML will be written.
-     * @param element The element whose XML will be written.
-     * @throws IOException if a write operation fails.
-     */
+    /// Writes the XML of an Element to a Writer. Note: may output invalid XML if
+    /// you created text Elements using un-escaped Strings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writer`: The Writer to which the XML will be written.
+    ///
+    /// - `element`: The element whose XML will be written.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a write operation fails.
     public void writeXML(Writer writer, Element element) throws IOException {
         writeXML(writer, element, new StringBuilder(), false);
     }
 
-    /**
-     * returns the XML as a String
-     *
-     * @param element the element to write
-     * @return the XML as a String
-     */
+    /// returns the XML as a String
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element to write
+    ///
+    /// #### Returns
+    ///
+    /// the XML as a String
     public String toXML(Element element) {
         StringBuilder writer = new StringBuilder();
         toXML(writer, element, new StringBuilder(), false);
         return writer.toString();
     }
 
-    /**
-     * Writes the XML of an Element to a StringBuilder using a given starting
-     * indentation. Note: may output invalid XML if you created text Elements
-     * using un-escaped Strings.
-     *
-     * @param writer      The StringBuilder that will contain the output
-     * @param element     The element whose XML will be written.
-     * @param indentation A starting indentation for the given Element.
-     * @param isInline    Whether or not the given element Element should be
-     *                    treated as part of in-line content.
-     */
+    /// Writes the XML of an Element to a StringBuilder using a given starting
+    /// indentation. Note: may output invalid XML if you created text Elements
+    /// using un-escaped Strings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writer`: The StringBuilder that will contain the output
+    ///
+    /// - `element`: The element whose XML will be written.
+    ///
+    /// - `indentation`: A starting indentation for the given Element.
+    ///
+    /// - `isInline`: @param isInline    Whether or not the given element Element should be
+    ///                    treated as part of in-line content.
     private void toXML(StringBuilder writer, Element element, StringBuilder indentation, boolean isInline) {
         if (!isInline) {
             writer.append(indentation);
@@ -165,18 +173,24 @@ public class XMLWriter {
         }
     }
 
-    /**
-     * Writes the XML of an Element to a Writer using a given starting
-     * indentation. Note: may output invalid XML if you created text Elements
-     * using un-escaped Strings.
-     *
-     * @param writer      The Writer to which the XML will be written.
-     * @param element     The element whose XML will be written.
-     * @param indentation A starting indentation for the given Element.
-     * @param isInline    Whether or not the given element Element should be
-     *                    treated as part of in-line content.
-     * @throws IOException if a write operation fails.
-     */
+    /// Writes the XML of an Element to a Writer using a given starting
+    /// indentation. Note: may output invalid XML if you created text Elements
+    /// using un-escaped Strings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writer`: The Writer to which the XML will be written.
+    ///
+    /// - `element`: The element whose XML will be written.
+    ///
+    /// - `indentation`: A starting indentation for the given Element.
+    ///
+    /// - `isInline`: @param isInline    Whether or not the given element Element should be
+    ///                    treated as part of in-line content.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a write operation fails.
     private void writeXML(Writer writer, Element element,
                           StringBuilder indentation, boolean isInline) throws IOException {
         if (!isInline) {

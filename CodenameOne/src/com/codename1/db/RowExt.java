@@ -24,16 +24,17 @@ package com.codename1.db;
 
 import java.io.IOException;
 
-/**
- * An extension of the {@link Row} interface to support {@link #wasNull() }.  Not all
- * ports currently implement this interface.  Currently this is supported in iOS, Simulator,
- * UWP, and Android ports.  Use {@link Database#supportsWasNull(com.codename1.db.Row) } to check
- * whether a row supports wasNull(), and use {@link Database#wasNull(com.codename1.db.Row) } as
- * an abstraction to avoid needing to cast a Row to RowExt.
- *
- * @author shannah
- * @since 7.0
- */
+/// An extension of the `Row` interface to support `#wasNull()`.  Not all
+/// ports currently implement this interface.  Currently this is supported in iOS, Simulator,
+/// UWP, and Android ports.  Use `Database#supportsWasNull(com.codename1.db.Row)` to check
+/// whether a row supports wasNull(), and use `Database#wasNull(com.codename1.db.Row)` as
+/// an abstraction to avoid needing to cast a Row to RowExt.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public interface RowExt extends Row {
     // PMD Fix (UnnecessaryModifier): Interface methods inherit public visibility.
     boolean wasNull() throws IOException;

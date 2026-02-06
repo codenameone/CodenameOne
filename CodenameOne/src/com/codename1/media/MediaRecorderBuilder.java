@@ -26,12 +26,13 @@ import com.codename1.ui.Display;
 
 import java.io.IOException;
 
-/**
- * A builder class to generate a Media recorder with specific settings.
- *
- * @author shannah
- * @since 7.0
- */
+/// A builder class to generate a Media recorder with specific settings.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public class MediaRecorderBuilder {
     private int audioChannels = 1,
             bitRate = 64000,
@@ -42,83 +43,104 @@ public class MediaRecorderBuilder {
     private String mimeType = Display.getInstance().getAvailableRecordingMimeTypes()[0],
             path;
 
-    /**
-     * Set the number of audio channels in the media recorder.  Default 1.
-     *
-     * @param numChannels The number of audio channels in the media recorder.
-     * @return Self for chaining
-     */
+    /// Set the number of audio channels in the media recorder.  Default 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `numChannels`: The number of audio channels in the media recorder.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining
     public MediaRecorderBuilder audioChannels(int numChannels) {
         this.audioChannels = numChannels;
         return this;
     }
 
-    /**
-     * Sets the bit rate for the recorder.  Default 64000.
-     *
-     * @param bitRate The bit rate for the recorder.
-     * @return Self for chaining.
-     */
+    /// Sets the bit rate for the recorder.  Default 64000.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bitRate`: The bit rate for the recorder.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public MediaRecorderBuilder bitRate(int bitRate) {
         this.bitRate = bitRate;
         return this;
     }
 
-    /**
-     * Sets the sampling rate for the recorder.  Default 44100
-     *
-     * @param samplingRate The sample rate for the recorder.
-     * @return Self for chaining.
-     */
+    /// Sets the sampling rate for the recorder.  Default 44100
+    ///
+    /// #### Parameters
+    ///
+    /// - `samplingRate`: The sample rate for the recorder.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public MediaRecorderBuilder samplingRate(int samplingRate) {
         this.samplingRate = samplingRate;
         return this;
     }
 
-    /**
-     * Sets the mimetype to use for encoding the audio file.
-     *
-     * @param mimeType The mimetype to use for encoding the audio file.
-     * @return Self for chaining.
-     * @see MediaManager#getAvailableRecordingMimeTypes()
-     */
+    /// Sets the mimetype to use for encoding the audio file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: The mimetype to use for encoding the audio file.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - MediaManager#getAvailableRecordingMimeTypes()
     public MediaRecorderBuilder mimeType(String mimeType) {
         this.mimeType = mimeType;
         return this;
     }
 
-    /**
-     * Sets the output path where the audio recording should be saved.
-     *
-     * @param path The output path where the recording should be saved as
-     *             a {@link com.codename1.io.FileSystemStorage} path
-     * @return Self for chaining.
-     */
+    /// Sets the output path where the audio recording should be saved.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: @param path The output path where the recording should be saved as
+    ///             a `com.codename1.io.FileSystemStorage` path
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public MediaRecorderBuilder path(String path) {
         this.path = path;
         return this;
     }
 
-    /**
-     * Set this flag to {@literal true} to redirect the microphone input to an audio buffer.
-     * This is handy if you just want to capture the raw PCM data from the microphone.
-     *
-     * @param redirect True to redirect output to an audio buffer.  The {@link #path(java.lang.String) }
-     *                 parameter would then be used as the path to the audio buffer instead of the output file.
-     * @return Self for chaining.
-     */
+    /// Set this flag to true to redirect the microphone input to an audio buffer.
+    /// This is handy if you just want to capture the raw PCM data from the microphone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `redirect`: @param redirect True to redirect output to an audio buffer.  The `#path(java.lang.String)`
+    ///                 parameter would then be used as the path to the audio buffer instead of the output file.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public MediaRecorderBuilder redirectToAudioBuffer(boolean redirect) {
         this.redirectToAudioBuffer = redirect;
         return this;
     }
 
-    /**
-     * Builds the MediaRecorder with the given settings.
-     *
-     * @return
-     * @throws IOException
-     * @throws IllegalStateException If {@link #path(java.lang.String) } is not set.
-     */
+    /// Builds the MediaRecorder with the given settings.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    ///
+    /// - `IllegalStateException`: If `#path(java.lang.String)` is not set.
     public Media build() throws IOException {
         if (path == null) {
             throw new IllegalStateException("Must set path for MediaRecorderBuilder");
@@ -127,58 +149,54 @@ public class MediaRecorderBuilder {
         return Display.getInstance().createMediaRecorder(this);
     }
 
-    /**
-     * Gets the current audio channels settings.
-     *
-     * @return the audioChannels
-     */
+    /// Gets the current audio channels settings.
+    ///
+    /// #### Returns
+    ///
+    /// the audioChannels
     public int getAudioChannels() {
         return audioChannels;
     }
 
-    /**
-     * Gets the current bit rate.
-     *
-     * @return the bitRate
-     */
+    /// Gets the current bit rate.
+    ///
+    /// #### Returns
+    ///
+    /// the bitRate
     public int getBitRate() {
         return bitRate;
     }
 
-    /**
-     * Gets the current sampling rate.
-     *
-     * @return the samplingRate
-     */
+    /// Gets the current sampling rate.
+    ///
+    /// #### Returns
+    ///
+    /// the samplingRate
     public int getSamplingRate() {
         return samplingRate;
     }
 
 
-    /**
-     * Gets the current mimetype.
-     *
-     * @return the mimeType
-     */
+    /// Gets the current mimetype.
+    ///
+    /// #### Returns
+    ///
+    /// the mimeType
     public String getMimeType() {
         return mimeType;
     }
 
-    /**
-     * Gets the current output path.
-     *
-     * @return the path
-     */
+    /// Gets the current output path.
+    ///
+    /// #### Returns
+    ///
+    /// the path
     public String getPath() {
         return path;
     }
 
-    /**
-     * True if the media recorder should redirect output to an audio buffer instead
-     * of a file.
-     *
-     * @return
-     */
+    /// True if the media recorder should redirect output to an audio buffer instead
+    /// of a file.
     public boolean isRedirectToAudioBuffer() {
         return redirectToAudioBuffer;
     }

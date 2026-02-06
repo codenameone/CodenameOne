@@ -37,12 +37,10 @@ import com.codename1.ui.layouts.GridLayout;
 
 import java.util.TimerTask;
 
-/**
- * A default implementation of the crash reporter that instantly sends the crash
- * data to the server.
- *
- * @author Shai Almog
- */
+/// A default implementation of the crash reporter that instantly sends the crash
+/// data to the server.
+///
+/// @author Shai Almog
 public final class DefaultCrashReporter implements CrashReport {
     private static String errorText = "The application encountered an error, do you wish to report it?";
     private static String sendButtonText = "Send";
@@ -53,85 +51,86 @@ public final class DefaultCrashReporter implements CrashReport {
     private DefaultCrashReporter() {
     }
 
-    /**
-     * The text for the user prompt dialog
-     *
-     * @return the errorText
-     */
+    /// The text for the user prompt dialog
+    ///
+    /// #### Returns
+    ///
+    /// the errorText
     public static String getErrorText() {
         return errorText;
     }
 
-    /**
-     * The text for the user prompt dialog
-     *
-     * @param aErrorText the errorText to set
-     */
+    /// The text for the user prompt dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `aErrorText`: the errorText to set
     public static void setErrorText(String aErrorText) {
         errorText = aErrorText;
     }
 
-    /**
-     * The text for the user prompt dialog
-     *
-     * @return the sendButtonText
-     */
+    /// The text for the user prompt dialog
+    ///
+    /// #### Returns
+    ///
+    /// the sendButtonText
     public static String getSendButtonText() {
         return sendButtonText;
     }
 
-    /**
-     * The text for the user prompt dialog
-     *
-     * @param aSendButtonText the sendButtonText to set
-     */
+    /// The text for the user prompt dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `aSendButtonText`: the sendButtonText to set
     public static void setSendButtonText(String aSendButtonText) {
         sendButtonText = aSendButtonText;
     }
 
-    /**
-     * The text for the user prompt dialog
-     *
-     * @return the dontSendButtonText
-     */
+    /// The text for the user prompt dialog
+    ///
+    /// #### Returns
+    ///
+    /// the dontSendButtonText
     public static String getDontSendButtonText() {
         return dontSendButtonText;
     }
 
-    /**
-     * The text for the user prompt dialog
-     *
-     * @param aDontSendButtonText the dontSendButtonText to set
-     */
+    /// The text for the user prompt dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDontSendButtonText`: the dontSendButtonText to set
     public static void setDontSendButtonText(String aDontSendButtonText) {
         dontSendButtonText = aDontSendButtonText;
     }
 
-    /**
-     * The text for the user prompt dialog
-     *
-     * @return the checkboxText
-     */
+    /// The text for the user prompt dialog
+    ///
+    /// #### Returns
+    ///
+    /// the checkboxText
     public static String getCheckboxText() {
         return checkboxText;
     }
 
-    /**
-     * The text for the user prompt dialog
-     *
-     * @param aCheckboxText the checkboxText to set
-     */
+    /// The text for the user prompt dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `aCheckboxText`: the checkboxText to set
     public static void setCheckboxText(String aCheckboxText) {
         checkboxText = aCheckboxText;
     }
 
-    /**
-     * Installs a crash reporter within the system
-     *
-     * @param promptUser indicates whether the user should be prompted on crash reporting
-     * @param frequency  the frequency with which we send the log to the server in debug mode in minutes
-     *                   frequency must be at least 1. Any lower level automatically disables this feature
-     */
+    /// Installs a crash reporter within the system
+    ///
+    /// #### Parameters
+    ///
+    /// - `promptUser`: indicates whether the user should be prompted on crash reporting
+    ///
+    /// - `frequency`: @param frequency  the frequency with which we send the log to the server in debug mode in minutes
+    ///                   frequency must be at least 1. Any lower level automatically disables this feature
     public static void init(boolean promptUser, int frequency) {
         if (Preferences.get("$CN1_crashBlocked", false) || Log.getReportingLevel() == Log.REPORTING_NONE) {
             return;
@@ -159,9 +158,7 @@ public final class DefaultCrashReporter implements CrashReport {
         Display.getInstance().setCrashReporter(d);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void exception(Throwable t) {
         Preferences.set("$CN1_pendingCrash", true);

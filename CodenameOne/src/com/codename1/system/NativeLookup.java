@@ -26,54 +26,52 @@ import com.codename1.io.Log;
 
 import java.util.HashMap;
 
-/**
- * Creates an instance of the native interface which will call the underlying
- * platform using the convention documented in the package docs.
- * To understand more
- * about native interfaces you can check out this
- * <a href="https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html">
- * quick "How Do I?" tutorial</a>.<br>
- * Alternatively you can dig deeper into <a href="https://www.codenameone.com/blog/integrating-3rd-party-native-sdks-part-1.html">
- * this tutorial for integrating 3rd party native libraries</a>.
- *
- * @author Shai Almog
- */
+/// Creates an instance of the native interface which will call the underlying
+/// platform using the convention documented in the package docs.
+/// To understand more
+/// about native interfaces you can check out this
+/// [quick "How Do I?" tutorial](https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html).
+///
+/// Alternatively you can dig deeper into [this tutorial for integrating 3rd party native libraries](https://www.codenameone.com/blog/integrating-3rd-party-native-sdks-part-1.html).
+///
+/// @author Shai Almog
 public final class NativeLookup {
     private static final HashMap<Class, Class> interfaceToClassLookup = new HashMap<Class, Class>();
-    /**
-     * Indicates whether stack traces should be printed when lookup fails
-     */
+    /// Indicates whether stack traces should be printed when lookup fails
     private static boolean verbose = true;
 
     private NativeLookup() {
     }
 
-    /**
-     * Indicates whether stack traces should be printed when lookup fails
-     *
-     * @return the verbose
-     */
+    /// Indicates whether stack traces should be printed when lookup fails
+    ///
+    /// #### Returns
+    ///
+    /// the verbose
     public static boolean isVerbose() {
         return verbose;
     }
 
-    /**
-     * Indicates whether stack traces should be printed when lookup fails
-     *
-     * @param aVerbose the verbose to set
-     */
+    /// Indicates whether stack traces should be printed when lookup fails
+    ///
+    /// #### Parameters
+    ///
+    /// - `aVerbose`: the verbose to set
     public static void setVerbose(boolean aVerbose) {
         verbose = aVerbose;
     }
 
-    /**
-     * Creates an instance of the given native interface and returns it for
-     * user callbacks.
-     *
-     * @param c the class of the NativeInterface sub interface
-     * @return an instance of that interface that can be invoked or null if the native interface isn't
-     * present on the underlying platform (e.g. simulator platform).
-     */
+    /// Creates an instance of the given native interface and returns it for
+    /// user callbacks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the class of the NativeInterface sub interface
+    ///
+    /// #### Returns
+    ///
+    /// @return an instance of that interface that can be invoked or null if the native interface isn't
+    /// present on the underlying platform (e.g. simulator platform).
     public static <T extends NativeInterface> T create(Class<T> c) {
         try {
             Class cls = interfaceToClassLookup.get(c);
@@ -90,13 +88,14 @@ public final class NativeLookup {
         return null;
     }
 
-    /**
-     * Do NOT invoke this method. This method is invoked internally by the stub to register the implementation class
-     * that matches a specific interface type.
-     *
-     * @param ni  the native interface
-     * @param cls the stub class matching said interface
-     */
+    /// Do NOT invoke this method. This method is invoked internally by the stub to register the implementation class
+    /// that matches a specific interface type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ni`: the native interface
+    ///
+    /// - `cls`: the stub class matching said interface
     public static void register(Class ni, Class cls) {
         interfaceToClassLookup.put(ni, cls);
     }

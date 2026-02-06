@@ -52,49 +52,37 @@ import java.util.Hashtable;
 import java.util.Map;
 import java.util.Vector;
 
-/**
- * Central point singleton managing the look of the application, this class allows us to
- * customize the styles (themes) as well as the look instance.
- *
- * @author Chen Fishbein
- */
+/// Central point singleton managing the look of the application, this class allows us to
+/// customize the styles (themes) as well as the look instance.
+///
+/// @author Chen Fishbein
 public class UIManager {
 
     static UIManager instance;
-    /**
-     * This member is used by the resource editor
-     */
+    /// This member is used by the resource editor
     static boolean accessible = true;
-    /**
-     * This member is used by the resource editor
-     */
+    /// This member is used by the resource editor
     static boolean localeAccessible = true;
     private final HashMap<String, Style> styles = new HashMap<String, Style>();
     private final HashMap<String, Style> selectedStyles = new HashMap<String, Style>();
     private final HashMap<String, Object> themeConstants = new HashMap<String, Object>();
-    /**
-     * Useful for caching theme images so they are not loaded twice in case
-     * an image reference is used it two places in the theme (e.g. same background
-     * to title and menu bar).
-     */
+    /// Useful for caching theme images so they are not loaded twice in case
+    /// an image reference is used it two places in the theme (e.g. same background
+    /// to title and menu bar).
     private final HashMap<String, Image> imageCache = new HashMap<String, Image>();
     private LookAndFeel current;
     private HashMap<String, Object> themeProps;
     private Style defaultStyle = new Style();
     private Style defaultSelectedStyle = new Style();
     private boolean useLargerTextScale;
-    /**
-     * The resource bundle allows us to implicitly localize the UI on the fly, once its
-     * installed all internal application strings query the resource bundle and extract
-     * their values from this table if applicable.
-     */
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
     private Hashtable resourceBundle;
     private Map<String, String> bundle;
     private boolean wasThemeInstalled;
-    /**
-     * This EventDispatcher holds all listeners who would like to register to
-     * Theme refreshed event
-     */
+    /// This EventDispatcher holds all listeners who would like to register to
+    /// Theme refreshed event
     private EventDispatcher themelisteners;
     // Cache used to keep track of parsed styles.
     private Map<String, String> parseCache;
@@ -111,11 +99,11 @@ public class UIManager {
         resetThemeProps(null);
     }
 
-    /**
-     * Singleton instance method
-     *
-     * @return Instance of the ui manager
-     */
+    /// Singleton instance method
+    ///
+    /// #### Returns
+    ///
+    /// Instance of the ui manager
     public static UIManager getInstance() {
         UIManager currentInstance = instance;
         if (currentInstance == null) {
@@ -130,12 +118,12 @@ public class UIManager {
         return currentInstance;
     }
 
-    /**
-     * This factory method allows creating a new UIManager instance, this is usefull where an application
-     * has some screens with different context
-     *
-     * @return a new UIManager instance
-     */
+    /// This factory method allows creating a new UIManager instance, this is usefull where an application
+    /// has some screens with different context
+    ///
+    /// #### Returns
+    ///
+    /// a new UIManager instance
     public static UIManager createInstance() {
         return new UIManager();
     }
@@ -227,22 +215,26 @@ public class UIManager {
         return null;
     }
 
-    /**
-     * This is a shorthand notation for boilerplate code for initializing the first theme in the given resource file
-     * and catching/doing nothing with the IOException since this would be invoked too early in the program
-     * where we would be out of options if something like that happens. Effectively this is the same as writing:
-     * <pre>
-     * try {
-     * theme = Resources.openLayered(resourceFile);
-     * UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
-     * } catch(IOException e){
-     * e.printStackTrace();
-     * }
-     * </pre>
-     *
-     * @param resourceFile the name of the resource file starting with / and without the res extension
-     * @return the resource file or null in case of a failure
-     */
+    /// This is a shorthand notation for boilerplate code for initializing the first theme in the given resource file
+    /// and catching/doing nothing with the IOException since this would be invoked too early in the program
+    /// where we would be out of options if something like that happens. Effectively this is the same as writing:
+    ///
+    /// ```java
+    /// try {
+    /// theme = Resources.openLayered(resourceFile);
+    /// UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+    /// } catch(IOException e){
+    /// e.printStackTrace();
+    /// }
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceFile`: the name of the resource file starting with / and without the res extension
+    ///
+    /// #### Returns
+    ///
+    /// the resource file or null in case of a failure
     public static Resources initFirstTheme(String resourceFile) {
         try {
             Resources theme = Resources.openLayered(resourceFile);
@@ -255,13 +247,17 @@ public class UIManager {
         return null;
     }
 
-    /**
-     * Same as the initFirstTheme method, but unlike that method this allows specifying the theme resource name
-     *
-     * @param resourceFile the name of the resource file starting with / and without the res extension
-     * @param resName      the name of the theme to use from the file if it contains more than one theme
-     * @return the resource file or null in case of a failure
-     */
+    /// Same as the initFirstTheme method, but unlike that method this allows specifying the theme resource name
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceFile`: the name of the resource file starting with / and without the res extension
+    ///
+    /// - `resName`: the name of the theme to use from the file if it contains more than one theme
+    ///
+    /// #### Returns
+    ///
+    /// the resource file or null in case of a failure
     public static Resources initNamedTheme(String resourceFile, String resName) {
         try {
             Resources theme = Resources.openLayered(resourceFile);
@@ -274,60 +270,61 @@ public class UIManager {
         return null;
     }
 
-    /**
-     * Checks if larger text scaling is enabled.
-     *
-     * @return true if larger text scaling should be applied.
-     */
+    /// Checks if larger text scaling is enabled.
+    ///
+    /// #### Returns
+    ///
+    /// true if larger text scaling should be applied.
     public boolean isUseLargerTextScale() {
         return useLargerTextScale;
     }
 
-    /**
-     * Enables or disables scaling fonts when larger text is enabled on the device.
-     * This can also be enabled via the {@code useLargerTextScaleBool} theme constant.
-     *
-     * @param useLargerTextScale true to apply {@link Display#getLargerTextScale()} when
-     *                           {@link Display#isLargerTextEnabled()} is true.
-     */
+    /// Enables or disables scaling fonts when larger text is enabled on the device.
+    /// This can also be enabled via the `useLargerTextScaleBool` theme constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `useLargerTextScale`: @param useLargerTextScale true to apply `Display#getLargerTextScale()` when
+    ///                           `Display#isLargerTextEnabled()` is true.
     public void setUseLargerTextScale(boolean useLargerTextScale) {
         this.useLargerTextScale = useLargerTextScale;
     }
 
-    /**
-     * Indicates if a theme was previously installed since the last reset
-     *
-     * @return true if setThemeProps was invoked
-     */
+    /// Indicates if a theme was previously installed since the last reset
+    ///
+    /// #### Returns
+    ///
+    /// true if setThemeProps was invoked
     public boolean wasThemeInstalled() {
         return wasThemeInstalled;
     }
 
-    /**
-     * Returns the currently installed look and feel
-     *
-     * @return the currently installed look and feel
-     */
+    /// Returns the currently installed look and feel
+    ///
+    /// #### Returns
+    ///
+    /// the currently installed look and feel
     public LookAndFeel getLookAndFeel() {
         return current;
     }
 
-    /**
-     * Sets the currently installed look and feel
-     *
-     * @param plaf the look and feel for the application
-     */
+    /// Sets the currently installed look and feel
+    ///
+    /// #### Parameters
+    ///
+    /// - `plaf`: the look and feel for the application
     public void setLookAndFeel(LookAndFeel plaf) {
         current.uninstall();
         current = plaf;
     }
 
-    /**
-     * Allows a developer to programmatically install a style into the UI manager
-     *
-     * @param id    the component id matching the given style
-     * @param style the style object to install
-     */
+    /// Allows a developer to programmatically install a style into the UI manager
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id matching the given style
+    ///
+    /// - `style`: the style object to install
     public void setComponentStyle(String id, Style style) {
         if (id == null || id.length() == 0) {
             //if no id return the default style
@@ -339,13 +336,15 @@ public class UIManager {
         styles.put(id, style);
     }
 
-    /**
-     * Allows a developer to programmatically install a style into the UI manager
-     *
-     * @param id    the component id matching the given style
-     * @param style the style object to install
-     * @param type  press, dis or other custom type
-     */
+    /// Allows a developer to programmatically install a style into the UI manager
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id matching the given style
+    ///
+    /// - `style`: the style object to install
+    ///
+    /// - `type`: press, dis or other custom type
     public void setComponentStyle(String id, Style style, String type) {
         if (type != null && type.length() > 0) {
             if (id == null || id.length() == 0) {
@@ -366,12 +365,13 @@ public class UIManager {
         styles.put(id, style);
     }
 
-    /**
-     * Allows a developer to programmatically install a style into the UI manager
-     *
-     * @param id    the component id matching the given style
-     * @param style the style object to install
-     */
+    /// Allows a developer to programmatically install a style into the UI manager
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id matching the given style
+    ///
+    /// - `style`: the style object to install
     public void setComponentSelectedStyle(String id, Style style) {
         if (id == null || id.length() == 0) {
             //if no id return the default style
@@ -383,27 +383,36 @@ public class UIManager {
         selectedStyles.put(id, style);
     }
 
-    /**
-     * Returns the style of the component with the given id or a <b>new instance</b> of the default
-     * style.
-     * This method will always return a new style instance to prevent modification of the global
-     * style object.
-     *
-     * @param id the component id whose style we want
-     * @return the appropriate style (this method never returns null)
-     */
+    /// Returns the style of the component with the given id or a **new instance** of the default
+    /// style.
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id whose style we want
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
     public final Style getComponentStyle(String id) {
         return getComponentStyleImpl(id, false, "");
     }
 
-    /**
-     * Gets the IconUIID for the given UIID.  If the theme defines a style that is named ${id}Icon (i.e. the id with "Icon" suffix)
-     * such that it derives from id, then this style is deemed to be the icon style corresponding with id.
-     *
-     * @param id The UIID to check for a companion UIID.
-     * @return The IconUIID corresponding to the given ID - or null if none is defined in the theme.
-     * @since 8.0
-     */
+    /// Gets the IconUIID for the given UIID.  If the theme defines a style that is named ${id}Icon (i.e. the id with "Icon" suffix)
+    /// such that it derives from id, then this style is deemed to be the icon style corresponding with id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The UIID to check for a companion UIID.
+    ///
+    /// #### Returns
+    ///
+    /// The IconUIID corresponding to the given ID - or null if none is defined in the theme.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public String getIconUIIDFor(String id) {
         if (id == null || id.length() == 0) {
             return null;
@@ -422,92 +431,118 @@ public class UIManager {
 
     }
 
-    /**
-     * Returns the style of the component with the given baseStyle or a <b>new instance</b> of the default
-     * style, but overrides styles based on the directives in the styleStrings.
-     * <p>
-     * This method will always return a new style instance to prevent modification of the global
-     * style object.
-     *
-     * @param theme       Theme file used to retrieve images that are referenced by the styleString
-     * @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
-     *                    overridden by the styles provided in styleString.
-     * @param id          the component id into which the resulting style is to be cached.
-     * @param styleString Array of style strings to override the styles in {@literal baseStyle}.  Style string syntax is
-     *                    is {@literal key1:value1; key2:value2; key3:value3; etc...}.  While this is similar to CSS, it is not CSS.  The keys
-     *                    and values
-     *                    correspond to properties of {@link Style} and their associated values.
-     * @return the appropriate style (this method never returns null)
-     */
+    /// Returns the style of the component with the given baseStyle or a **new instance** of the default
+    /// style, but overrides styles based on the directives in the styleStrings.
+    ///
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
+    ///
+    /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
+    ///                    overridden by the styles provided in styleString.
+    ///
+    /// - `id`: the component id into which the resulting style is to be cached.
+    ///
+    /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
+    ///                    is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    ///                    and values
+    ///                    correspond to properties of `Style` and their associated values.
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
     public Style parseComponentStyle(Resources theme, String baseStyle, String id, String... styleString) {
         return parseStyle(theme, id, "", baseStyle, false, styleString);
     }
 
-    /**
-     * Returns the selected style of the component with the given id or a <b>new instance</b> of the default
-     * style.
-     * This method will always return a new style instance to prevent modification of the global
-     * style object.
-     *
-     * @param id the component id whose selected style we want
-     * @return the appropriate style (this method never returns null)
-     */
+    /// Returns the selected style of the component with the given id or a **new instance** of the default
+    /// style.
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id whose selected style we want
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
     public Style getComponentSelectedStyle(String id) {
         return getComponentStyleImpl(id, true, "sel#");
     }
 
-    /**
-     * Returns the selected style of the component with the given baseStyle or a <b>new instance</b> of the default
-     * style, but overrides styles based on the directives in the styleStrings.
-     * <p>
-     * This method will always return a new style instance to prevent modification of the global
-     * style object.
-     *
-     * @param theme       Theme file used to retrieve images that are referenced by the styleString
-     * @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
-     *                    overridden by the styles provided in styleString.
-     * @param id          the component id into which the resulting style is to be cached.
-     * @param styleString Array of style strings to override the styles in {@literal baseStyle}.  Style string syntax is
-     *                    is {@literal key1:value1; key2:value2; key3:value3; etc...}.  While this is similar to CSS, it is not CSS.  The keys
-     *                    and values
-     *                    correspond to properties of {@link Style} and their associated values.
-     * @return the appropriate style (this method never returns null)
-     */
+    /// Returns the selected style of the component with the given baseStyle or a **new instance** of the default
+    /// style, but overrides styles based on the directives in the styleStrings.
+    ///
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
+    ///
+    /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
+    ///                    overridden by the styles provided in styleString.
+    ///
+    /// - `id`: the component id into which the resulting style is to be cached.
+    ///
+    /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
+    ///                    is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    ///                    and values
+    ///                    correspond to properties of `Style` and their associated values.
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
     public Style parseComponentSelectedStyle(Resources theme, String baseStyle, String id, String... styleString) {
         return parseStyle(theme, id, "sel#", baseStyle, true, styleString);
     }
 
-    /**
-     * Returns a custom style for the component with the given id, this method always returns a
-     * new instance. Custom styles allow us to install application specific or component specific
-     * style attributes such as pressed, disabled, hover etc.
-     *
-     * @param id   the component id whose custom style we want
-     * @param type the style type
-     * @return the appropriate style (this method never returns null)
-     */
+    /// Returns a custom style for the component with the given id, this method always returns a
+    /// new instance. Custom styles allow us to install application specific or component specific
+    /// style attributes such as pressed, disabled, hover etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id whose custom style we want
+    ///
+    /// - `type`: the style type
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
     public Style getComponentCustomStyle(String id, String type) {
         return getComponentStyleImpl(id, false, type + "#");
     }
 
-    /**
-     * Returns the selected style of the component with the given baseStyle or a <b>new instance</b> of the default
-     * style, but overrides styles based on the directives in the styleStrings.
-     * <p>
-     * This method will always return a new style instance to prevent modification of the global
-     * style object.
-     *
-     * @param theme       Theme file used to retrieve images that are referenced by the styleString
-     * @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
-     *                    overridden by the styles provided in styleString.
-     * @param id          the component id into which the resulting style is to be cached.
-     * @param type        the style type
-     * @param styleString Array of style strings to override the styles in {@literal baseStyle}.  Style string syntax is
-     *                    is {@literal key1:value1; key2:value2; key3:value3; etc...}.  While this is similar to CSS, it is not CSS.  The keys
-     *                    and values
-     *                    correspond to properties of {@link Style} and their associated values.
-     * @return the appropriate style (this method never returns null)
-     */
+    /// Returns the selected style of the component with the given baseStyle or a **new instance** of the default
+    /// style, but overrides styles based on the directives in the styleStrings.
+    ///
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
+    ///
+    /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
+    ///                    overridden by the styles provided in styleString.
+    ///
+    /// - `id`: the component id into which the resulting style is to be cached.
+    ///
+    /// - `type`: the style type
+    ///
+    /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
+    ///                    is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    ///                    and values
+    ///                    correspond to properties of `Style` and their associated values.
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
     public Style parseComponentCustomStyle(Resources theme, String baseStyle, String id, String type, String... styleString) {
         return parseStyle(theme, id, type + "#", baseStyle, false, styleString);
     }
@@ -552,9 +587,9 @@ public class UIManager {
         }
     }
 
-    /**
-     * @return the name of the current theme for theme switching UI's
-     */
+    /// #### Returns
+    ///
+    /// the name of the current theme for theme switching UI's
     public String getThemeName() {
         if (themeProps != null) {
             return (String) themeProps.get("name");
@@ -567,11 +602,11 @@ public class UIManager {
         return themeProps;
     }
 
-    /**
-     * Allows manual theme loading from a hashtable of key/value pairs
-     *
-     * @param themeProps the properties of the given theme
-     */
+    /// Allows manual theme loading from a hashtable of key/value pairs
+    ///
+    /// #### Parameters
+    ///
+    /// - `themeProps`: the properties of the given theme
     public void setThemeProps(Hashtable themeProps) {
         if (accessible) {
             setThemePropsImpl(themeProps);
@@ -579,13 +614,13 @@ public class UIManager {
         wasThemeInstalled = true;
     }
 
-    /**
-     * Initializes the theme properties with the current "defaults"
-     *
-     * @param installedTheme the theme to be installed or null, this is used
-     *                       to check if style inheritance is used in which case we must NOT init
-     *                       style defaults for that particular component
-     */
+    /// Initializes the theme properties with the current "defaults"
+    ///
+    /// #### Parameters
+    ///
+    /// - `installedTheme`: @param installedTheme the theme to be installed or null, this is used
+    ///                       to check if style inheritance is used in which case we must NOT init
+    ///                       style defaults for that particular component
     private void resetThemeProps(Hashtable installedTheme) {
         themeProps = new HashMap<String, Object>();
         wasThemeInstalled = false;
@@ -1446,12 +1481,12 @@ public class UIManager {
 
     }
 
-    /**
-     * Adds the given theme properties on top of the existing properties without
-     * clearing the existing theme first
-     *
-     * @param themeProps the properties of the given theme
-     */
+    /// Adds the given theme properties on top of the existing properties without
+    /// clearing the existing theme first
+    ///
+    /// #### Parameters
+    ///
+    /// - `themeProps`: the properties of the given theme
     public void addThemeProps(Hashtable themeProps) {
         if (accessible) {
             buildTheme(themeProps);
@@ -1462,13 +1497,17 @@ public class UIManager {
         }
     }
 
-    /**
-     * Returns a theme constant defined in the resource editor
-     *
-     * @param constantName the name of the constant
-     * @param def          default value
-     * @return the value of the constant or the default if the constant isn't in the theme
-     */
+    /// Returns a theme constant defined in the resource editor
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// - `def`: default value
+    ///
+    /// #### Returns
+    ///
+    /// the value of the constant or the default if the constant isn't in the theme
     public int getThemeConstant(String constantName, int def) {
         String v = (String) themeConstants.get(constantName);
         if (v != null) {
@@ -1481,13 +1520,17 @@ public class UIManager {
         return def;
     }
 
-    /**
-     * Returns a theme constant defined in the resource editor
-     *
-     * @param constantName the name of the constant
-     * @param def          default value
-     * @return the value of the constant or the default if the constant isn't in the theme
-     */
+    /// Returns a theme constant defined in the resource editor
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// - `def`: default value
+    ///
+    /// #### Returns
+    ///
+    /// the value of the constant or the default if the constant isn't in the theme
     public final String getThemeConstant(String constantName, String def) {
         String v = (String) themeConstants.get(constantName);
         if (v != null) {
@@ -1496,13 +1539,17 @@ public class UIManager {
         return def;
     }
 
-    /**
-     * Returns a theme constant defined in the resource editor as a boolean value
-     *
-     * @param constantName the name of the constant
-     * @param def          default value
-     * @return the value of the constant or the default if the constant isn't in the theme
-     */
+    /// Returns a theme constant defined in the resource editor as a boolean value
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// - `def`: default value
+    ///
+    /// #### Returns
+    ///
+    /// the value of the constant or the default if the constant isn't in the theme
     public final boolean isThemeConstant(String constantName, boolean def) {
         String c = getThemeConstant(constantName, null);
         if (c == null) {
@@ -1511,12 +1558,15 @@ public class UIManager {
         return "true".equalsIgnoreCase(c) || "1".equals(c);
     }
 
-    /**
-     * Returns a theme constant defined in the resource editor as a boolean value or null if the constant isn't defined
-     *
-     * @param constantName the name of the constant
-     * @return the value of the constant or null if the constant isn't in the theme
-     */
+    /// Returns a theme constant defined in the resource editor as a boolean value or null if the constant isn't defined
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// #### Returns
+    ///
+    /// the value of the constant or null if the constant isn't in the theme
     public Boolean isThemeConstant(String constantName) {
         String c = getThemeConstant(constantName, null);
         if (c == null) {
@@ -1528,22 +1578,28 @@ public class UIManager {
         return Boolean.FALSE;
     }
 
-    /**
-     * Returns a theme constant defined in the resource editor
-     *
-     * @param constantName the name of the constant
-     * @return the image if defined
-     */
+    /// Returns a theme constant defined in the resource editor
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// #### Returns
+    ///
+    /// the image if defined
     public Image getThemeImageConstant(String constantName) {
         return (Image) themeConstants.get(constantName);
     }
 
-    /**
-     * Returns a theme mask constant
-     *
-     * @param constantName the name of the constant
-     * @return the mask if defined
-     */
+    /// Returns a theme mask constant
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// #### Returns
+    ///
+    /// the mask if defined
     public Object getThemeMaskConstant(String constantName) {
         Object o = themeConstants.get(constantName + "Mask");
         if (o != null) {
@@ -1728,32 +1784,31 @@ public class UIManager {
         }
     }
 
-    /**
-     * Creates a style by providing style strings in a specific format. This method allows for the use of inline styles
-     * to override the styles in {@link com.codename1.ui.Component}
-     *
-     * @param theme       Theme used to retrieve images referenced in the style strings.
-     * @param id          The style ID (UIID) to use to cache the style inside the theme.
-     * @param prefix      Prefix to use for styles.  Corresponds to the {@literal prefix} argument in {@link #getComponentStyleImpl(java.lang.String, boolean, java.lang.String)
-     * @param baseStyle   The style class from which this new style should derive.
-     * @param selected    True if this is for a selected style.
-     * @param styleString Array of style strings to be parsed.  The format is {@literal key1:value1; key2:value2; etc...}.  While this looks similar to CSS, it is important to note that it is NOT
-     *                    CSS.  The keys and values correspond to the properties of {@link com.codename1.ui.plaf.Style} and their associated values.
-     * @return A style object representing the styles that were provided in the styleString.
-     *
-     * <h3>Example Usage</h3>
-     * <p>
-     * {@code
-     * Style s = parseStyle(theme, "Button[MyCustomButton]", "", "Button", false,
-     * "fgColor:ff0000; font:18mm; border: 1px solid ff0000; bgType:none; padding: 3mm; margin: 1mm");
-     * <p>
-     * // Create a 9-piece image border on the fly:
-     * Style s = parseStyle(theme, "Button[MyCustomButton]", "", "Button", false,
-     * "border:splicedImage /notes.png 0.3 0.4 0.3 0.4");
-     * // This splices the image found at /notes.png into 9 pieces.  Splice insets are specified by the 4 floating point values
-     * // at the end of the border directive:  [top] [right] [bottom] [left].
-     * }
-     */
+    /// Creates a style by providing style strings in a specific format. This method allows for the use of inline styles
+    /// to override the styles in `com.codename1.ui.Component`
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: Theme used to retrieve images referenced in the style strings.
+    ///
+    /// - `id`: The style ID (UIID) to use to cache the style inside the theme.
+    ///
+    /// - `prefix`: Prefix to use for styles.  Corresponds to the prefix argument in `boolean, java.lang.String) @param baseStyle The style class from which this new style should derive. @param selected True if this is for a selected style. @param styleString Array of style strings to be parsed. The format is key1:value1; key2:value2; etc.... While this looks similar to CSS, it is important to note that it is NOT CSS. The keys and values correspond to the properties of {@link com.codename1.ui.plaf.Style` and their associated values.
+    ///
+    /// #### Returns
+    ///
+    /// @return A style object representing the styles that were provided in the styleString.
+    ///
+    /// Example Usage
+    ///
+    /// `Style s = parseStyle(theme, "Button[MyCustomButton]", "", "Button", false,
+    /// "fgColor:ff0000; font:18mm; border: 1px solid ff0000; bgType:none; padding: 3mm; margin: 1mm");
+    ///
+    /// // Create a 9-piece image border on the fly:
+    /// Style s = parseStyle(theme, "Button[MyCustomButton]", "", "Button", false,
+    /// "border:splicedImage /notes.png 0.3 0.4 0.3 0.4");
+    /// // This splices the image found at /notes.png into 9 pieces.  Splice insets are specified by the 4 floating point values
+    /// // at the end of the border directive:  [top] [right] [bottom] [left].`
     Style parseStyle(Resources theme, String id, String prefix, String baseStyle, boolean selected, String... styleString) {
         String cacheKey = selected ? id + ".sel" : id + "." + prefix;
         String originalId = id;
@@ -2073,12 +2128,11 @@ public class UIManager {
         return style;
     }
 
-    /**
-     * This method is used to parse the margin and the padding
-     *
-     * @param str
-     * @return
-     */
+    /// This method is used to parse the margin and the padding
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`
     private float[] toFloatArray(String str) {
         float[] retVal = new float[4];
         str = str + ",";
@@ -2090,14 +2144,17 @@ public class UIManager {
         return retVal;
     }
 
-    /**
-     * The resource bundle allows us to implicitly localize the UI on the fly, once its
-     * installed all internal application strings query the resource bundle and extract
-     * their values from this table if applicable.
-     *
-     * @return the localization bundle
-     * @deprecated this method uses the old resource bundle hashtable, use the new getBundle() method
-     */
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    ///
+    /// #### Returns
+    ///
+    /// the localization bundle
+    ///
+    /// #### Deprecated
+    ///
+    /// this method uses the old resource bundle hashtable, use the new getBundle() method
     public Hashtable getResourceBundle() {
         if (resourceBundle == null && bundle != null) {
             resourceBundle = new Hashtable(bundle);
@@ -2105,14 +2162,17 @@ public class UIManager {
         return resourceBundle;
     }
 
-    /**
-     * The resource bundle allows us to implicitly localize the UI on the fly, once its
-     * installed all internal application strings query the resource bundle and extract
-     * their values from this table if applicable.
-     *
-     * @param resourceBundle the localization bundle
-     * @deprecated this method uses the old resource bundle hashtable, use the new setBundle() method
-     */
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceBundle`: the localization bundle
+    ///
+    /// #### Deprecated
+    ///
+    /// this method uses the old resource bundle hashtable, use the new setBundle() method
     public void setResourceBundle(Hashtable resourceBundle) {
         if (localeAccessible) {
             this.resourceBundle = resourceBundle;
@@ -2131,24 +2191,24 @@ public class UIManager {
         }
     }
 
-    /**
-     * The resource bundle allows us to implicitly localize the UI on the fly, once its
-     * installed all internal application strings query the resource bundle and extract
-     * their values from this table if applicable.
-     *
-     * @return the localization bundle
-     */
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    ///
+    /// #### Returns
+    ///
+    /// the localization bundle
     public Map<String, String> getBundle() {
         return bundle;
     }
 
-    /**
-     * The resource bundle allows us to implicitly localize the UI on the fly, once its
-     * installed all internal application strings query the resource bundle and extract
-     * their values from this table if applicable.
-     *
-     * @param resourceBundle the localization bundle
-     */
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceBundle`: the localization bundle
     public void setBundle(Map<String, String> bundle) {
         if (localeAccessible) {
             this.bundle = bundle;
@@ -2201,15 +2261,19 @@ public class UIManager {
         return arr;
     }
 
-    /**
-     * Localizes the given string from the resource bundle if such a String exists in the
-     * resource bundle. If no key exists in the bundle then or a bundle is not installed
-     * the default value is returned.
-     *
-     * @param key          The key used to lookup in the resource bundle
-     * @param defaultValue the value returned if no such key exists
-     * @return either default value or the appropriate value
-     */
+    /// Localizes the given string from the resource bundle if such a String exists in the
+    /// resource bundle. If no key exists in the bundle then or a bundle is not installed
+    /// the default value is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: The key used to lookup in the resource bundle
+    ///
+    /// - `defaultValue`: the value returned if no such key exists
+    ///
+    /// #### Returns
+    ///
+    /// either default value or the appropriate value
     public final String localize(String key, String defaultValue) {
         onLocalize(key, defaultValue);
         if (bundle != null && key != null) {
@@ -2221,21 +2285,22 @@ public class UIManager {
         return defaultValue;
     }
 
-    /**
-     * Callback for subclasses that wish to track localization invocations.
-     *
-     * @param key          The key used to lookup in the resource bundle
-     * @param defaultValue the value returned if no such key exists
-     */
+    /// Callback for subclasses that wish to track localization invocations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: The key used to lookup in the resource bundle
+    ///
+    /// - `defaultValue`: the value returned if no such key exists
     protected void onLocalize(String key, String defaultValue) {
     }
 
-    /**
-     * Adds a Theme refresh listener.
-     * The listenres will get a callback when setThemeProps method is invoked.
-     *
-     * @param l an ActionListener to be added
-     */
+    /// Adds a Theme refresh listener.
+    /// The listenres will get a callback when setThemeProps method is invoked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: an ActionListener to be added
     public void addThemeRefreshListener(ActionListener l) {
 
         if (themelisteners == null) {
@@ -2244,11 +2309,11 @@ public class UIManager {
         themelisteners.addListener(l);
     }
 
-    /**
-     * Removes a Theme refresh listener.
-     *
-     * @param l an ActionListener to be removed
-     */
+    /// Removes a Theme refresh listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: an ActionListener to be removed
     public void removeThemeRefreshListener(ActionListener l) {
 
         if (themelisteners == null) {

@@ -6,9 +6,7 @@ package com.codename1.util;
 
 import java.util.Random;
 
-/**
- * A simplified version of big integer from the bouncy castle implementation
- */
+/// A simplified version of big integer from the bouncy castle implementation
 public class BigInteger {
 
     public static final BigInteger ZERO = new BigInteger(0, new int[0]);
@@ -165,12 +163,10 @@ public class BigInteger {
         return (byte) intValue();
     }
 
-    /**
-     * return whether or not a BigInteger is probably prime with a
-     * probability of 1 - (1/2)**certainty.
-     * <p>
-     * From Knuth Vol 2, pg 395.
-     */
+    /// return whether or not a BigInteger is probably prime with a
+    /// probability of 1 - (1/2)**certainty.
+    ///
+    /// From Knuth Vol 2, pg 395.
     public boolean isProbablePrime(int certainty) {
         return peer.isProbablePrime(certainty);
     }

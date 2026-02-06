@@ -42,17 +42,17 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Collection;
 import java.util.Vector;
 
-/**
- * <p>The on/off switch is a checkbox of sort (although it derives container) that represents its state as
- * a switch each of which has a short label associated with it.
- * It has two types: Android and iOS. The types differ in the way that they are rendered.
- * The Android type (the default) is just a button with a label that can be moved/dragged between
- * the two states. The iOS version is more elaborate due to the look of that platform. </p>
- * <img src="https://www.codenameone.com/img/developer-guide/components-onoffswitch.png" alt="The looks of the on-off switch">
- *
- * @author Shai Almog
- * @deprecated Use new {@link Switch} class instead as it conforms to the latest platform looks and feels.
- */
+/// The on/off switch is a checkbox of sort (although it derives container) that represents its state as
+/// a switch each of which has a short label associated with it.
+/// It has two types: Android and iOS. The types differ in the way that they are rendered.
+/// The Android type (the default) is just a button with a label that can be moved/dragged between
+/// the two states. The iOS version is more elaborate due to the look of that platform.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// Use new `Switch` class instead as it conforms to the latest platform looks and feels.
 public class OnOffSwitch extends Container implements ActionSource {
     private final EventDispatcher dispatcher = new EventDispatcher();
     private String on = "ON";
@@ -70,17 +70,13 @@ public class OnOffSwitch extends Container implements ActionSource {
     private int deltaX;
     private boolean animationLock;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public OnOffSwitch() {
         setUIIDFinal("OnOffSwitch");
         initialize();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         if (iosMode) {
@@ -95,9 +91,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         return super.calcPreferredSize();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void resetFocusable() {
         setFocusable(true);
@@ -144,49 +138,50 @@ public class OnOffSwitch extends Container implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isStickyDrag() {
         return true;
     }
 
-    /**
-     * Adds a listener to the switch which will cause an event to dispatch on click
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Adds a listener to the switch which will cause an event to dispatch on click
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     @Override
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
 
-    /**
-     * Removes the given action listener from the switch
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Removes the given action listener from the switch
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     @Override
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
 
-    /**
-     * Returns a vector containing the action listeners for this button
-     *
-     * @return the action listeners
-     * @deprecated use the version that returns a collection
-     */
+    /// Returns a vector containing the action listeners for this button
+    ///
+    /// #### Returns
+    ///
+    /// the action listeners
+    ///
+    /// #### Deprecated
+    ///
+    /// use the version that returns a collection
     public Vector getActionListeners() {
         return dispatcher.getListenerVector();
     }
 
-    /**
-     * Returns a collection containing the action listeners for this button
-     *
-     * @return the action listeners
-     */
+    /// Returns a collection containing the action listeners for this button
+    ///
+    /// #### Returns
+    ///
+    /// the action listeners
     public Collection getListeners() {
         return dispatcher.getListenerCollection();
     }
@@ -199,9 +194,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         if (iosMode) {
@@ -316,25 +309,19 @@ public class OnOffSwitch extends Container implements ActionSource {
         setValue(!value);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         super.initComponent();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         super.deinitialize();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
         if (iosMode) {
@@ -343,9 +330,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         pressX = x;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
         dragged = true;
@@ -407,9 +392,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         dragged = true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
         if (animationLock) {
@@ -451,58 +434,58 @@ public class OnOffSwitch extends Container implements ActionSource {
         animationLock = false;
     }
 
-    /**
-     * Label for the on mode
-     *
-     * @return the on
-     */
+    /// Label for the on mode
+    ///
+    /// #### Returns
+    ///
+    /// the on
     public String getOn() {
         return on;
     }
 
-    /**
-     * Label for the on mode
-     *
-     * @param on the on to set
-     */
+    /// Label for the on mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `on`: the on to set
     public void setOn(String on) {
         this.on = on;
         initialize();
     }
 
-    /**
-     * Label for the off mode
-     *
-     * @return the off
-     */
+    /// Label for the off mode
+    ///
+    /// #### Returns
+    ///
+    /// the off
     public String getOff() {
         return off;
     }
 
-    /**
-     * Label for the off mode
-     *
-     * @param off the off to set
-     */
+    /// Label for the off mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `off`: the off to set
     public void setOff(String off) {
         this.off = off;
         initialize();
     }
 
-    /**
-     * The value of the switch
-     *
-     * @return the value
-     */
+    /// The value of the switch
+    ///
+    /// #### Returns
+    ///
+    /// the value
     public boolean isValue() {
         return value;
     }
 
-    /**
-     * The value of the switch
-     *
-     * @param value the value to set
-     */
+    /// The value of the switch
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to set
     public void setValue(boolean value) {
         boolean orig = animationLock;
         animationLock = true;
@@ -525,9 +508,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         animationLock = orig;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{
@@ -535,12 +516,12 @@ public class OnOffSwitch extends Container implements ActionSource {
         };
     }
 
-    /**
-     * Some components may optionally generate a state which can then be restored
-     * using setCompnentState(). This method is used by the UIBuilder.
-     *
-     * @return the component state or null for undefined state.
-     */
+    /// Some components may optionally generate a state which can then be restored
+    /// using setCompnentState(). This method is used by the UIBuilder.
+    ///
+    /// #### Returns
+    ///
+    /// the component state or null for undefined state.
     @Override
     public Object getComponentState() {
         if (value) {
@@ -549,20 +530,18 @@ public class OnOffSwitch extends Container implements ActionSource {
         return Boolean.FALSE;
     }
 
-    /**
-     * If getComponentState returned a value the setter can update the value and restore
-     * the prior state.
-     *
-     * @param state the non-null state
-     */
+    /// If getComponentState returned a value the setter can update the value and restore
+    /// the prior state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the non-null state
     @Override
     public void setComponentState(Object state) {
         value = ((Boolean) state).booleanValue();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
@@ -572,9 +551,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("on".equals(name)) {
@@ -592,9 +569,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("on".equals(name)) {
@@ -612,34 +587,39 @@ public class OnOffSwitch extends Container implements ActionSource {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * iOS 7 changed the switch to not include any text
-     *
-     * @return the noTextMode
-     */
+    /// iOS 7 changed the switch to not include any text
+    ///
+    /// #### Returns
+    ///
+    /// the noTextMode
     public boolean isNoTextMode() {
         return noTextMode;
     }
 
-    /**
-     * iOS 7 changed the switch to not include any text
-     *
-     * @param noTextMode the noTextMode to set
-     */
+    /// iOS 7 changed the switch to not include any text
+    ///
+    /// #### Parameters
+    ///
+    /// - `noTextMode`: the noTextMode to set
     public void setNoTextMode(boolean noTextMode) {
         this.noTextMode = noTextMode;
     }
 
-    /**
-     * Gets the image that is used for the "On" state of the switch.
-     *
-     * @return The image that will be used for the "On" state.  If the "onOffIOSModeBool" theme constant
-     * is false and the switchOnImage hasn't been explicitly set by the {@link #setSwitchOnImage(com.codename1.ui.Image) }
-     * method, then this will return null.
-     * @see #setSwitchOnImage(com.codename1.ui.Image)
-     * @see #getSwitchOffImage()
-     * @see #getSwitchMaskImage()
-     */
+    /// Gets the image that is used for the "On" state of the switch.
+    ///
+    /// #### Returns
+    ///
+    /// @return The image that will be used for the "On" state.  If the "onOffIOSModeBool" theme constant
+    /// is false and the switchOnImage hasn't been explicitly set by the `#setSwitchOnImage(com.codename1.ui.Image)`
+    /// method, then this will return null.
+    ///
+    /// #### See also
+    ///
+    /// - #setSwitchOnImage(com.codename1.ui.Image)
+    ///
+    /// - #getSwitchOffImage()
+    ///
+    /// - #getSwitchMaskImage()
     public Image getSwitchOnImage() {
         if (iosMode) {
             return switchOnImage;
@@ -647,34 +627,44 @@ public class OnOffSwitch extends Container implements ActionSource {
         return null;
     }
 
-    /**
-     * Sets the image that should be used for the "Off" state. <b>Note:</b> This option is only used
-     * if the "onOffIOSModeBool" theme constant is enabled.
-     *
-     * <p>Note: If the "onOffIOSModeBool" theme constant is false and you set this image, you must also
-     * set the "Off" image with {@link #setSwitchOffImage(com.codename1.ui.Image) } and the
-     * "Mask" image with {@link #setSwitchMaskImage(com.codename1.ui.Image) }.</p>
-     *
-     * @param switchOnImage the switchOnImage to set
-     * @see #getSwitchOnImage()
-     * @see #setSwitchMaskImage(com.codename1.ui.Image)
-     * @see #setSwitchOffImage(com.codename1.ui.Image)
-     */
+    /// Sets the image that should be used for the "Off" state. **Note:** This option is only used
+    /// if the "onOffIOSModeBool" theme constant is enabled.
+    ///
+    /// Note: If the "onOffIOSModeBool" theme constant is false and you set this image, you must also
+    /// set the "Off" image with `#setSwitchOffImage(com.codename1.ui.Image)` and the
+    /// "Mask" image with `#setSwitchMaskImage(com.codename1.ui.Image)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `switchOnImage`: the switchOnImage to set
+    ///
+    /// #### See also
+    ///
+    /// - #getSwitchOnImage()
+    ///
+    /// - #setSwitchMaskImage(com.codename1.ui.Image)
+    ///
+    /// - #setSwitchOffImage(com.codename1.ui.Image)
     public void setSwitchOnImage(Image switchOnImage) {
         this.switchOnImage = switchOnImage;
         iosMode = true;
     }
 
-    /**
-     * Gets the image that is used for the "Off" state of the switch.
-     *
-     * @return The image that will be used for the "Off" state.  If the "onOffIOSModeBool" theme constant
-     * is false and the switchOffImage hasn't been explicitly set by the {@link #setSwitchOffImage(com.codename1.ui.Image) }
-     * method, then this will return null.
-     * @see #setSwitchOffImage(com.codename1.ui.Image)
-     * @see #getSwitchOnImage()
-     * @see #getSwitchMaskImage()
-     */
+    /// Gets the image that is used for the "Off" state of the switch.
+    ///
+    /// #### Returns
+    ///
+    /// @return The image that will be used for the "Off" state.  If the "onOffIOSModeBool" theme constant
+    /// is false and the switchOffImage hasn't been explicitly set by the `#setSwitchOffImage(com.codename1.ui.Image)`
+    /// method, then this will return null.
+    ///
+    /// #### See also
+    ///
+    /// - #setSwitchOffImage(com.codename1.ui.Image)
+    ///
+    /// - #getSwitchOnImage()
+    ///
+    /// - #getSwitchMaskImage()
     public Image getSwitchOffImage() {
         if (iosMode) {
             return switchOffImage;
@@ -682,41 +672,53 @@ public class OnOffSwitch extends Container implements ActionSource {
         return null;
     }
 
-    /**
-     * Sets the image that should be used for the "Off" state. <b>Note:</b> This option is only used
-     * if the "onOffIOSModeBool" theme constant is enabled.
-     *
-     * <p>Note: If the "onOffIOSModeBool" theme constant is false and you set this image, you must also
-     * set the "On" image with {@link #setSwitchOnImage(com.codename1.ui.Image) } and the
-     * "Mask" image with {@link #setSwitchMaskImage(com.codename1.ui.Image) }.</p>
-     *
-     * @param switchOffImage the switchOffImage to set
-     * @see #getSwitchOffImage()
-     * @see #setSwitchMaskImage(com.codename1.ui.Image)
-     * @see #setSwitchOnImage(com.codename1.ui.Image)
-     */
+    /// Sets the image that should be used for the "Off" state. **Note:** This option is only used
+    /// if the "onOffIOSModeBool" theme constant is enabled.
+    ///
+    /// Note: If the "onOffIOSModeBool" theme constant is false and you set this image, you must also
+    /// set the "On" image with `#setSwitchOnImage(com.codename1.ui.Image)` and the
+    /// "Mask" image with `#setSwitchMaskImage(com.codename1.ui.Image)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `switchOffImage`: the switchOffImage to set
+    ///
+    /// #### See also
+    ///
+    /// - #getSwitchOffImage()
+    ///
+    /// - #setSwitchMaskImage(com.codename1.ui.Image)
+    ///
+    /// - #setSwitchOnImage(com.codename1.ui.Image)
     public void setSwitchOffImage(Image switchOffImage) {
         this.switchOffImage = switchOffImage;
         this.iosMode = true;
     }
 
-    /**
-     * Gets the image that is used for the mask.  <b>Note:</b> This option is only used
-     * if the "onOffIOSModeBool" theme constant is enabled.
-     *
-     * <p>This image will generally
-     * consist of an opaque border/frame with a transparent center such that the
-     * "on" and "off" images can be painted inside the transparent part, and anything
-     * that is outside that center will be painted over by the frame, or clipped.</p>
-     *
-     * @return the switchMaskImage image if the "onOffIOSModeBool" flag is set or the mask
-     * image has been explicitly set on this OnOffSwitch using {@link #setSwitchMaskImage(com.codename1.ui.Image) }
-     * @see #getSwitchOffImage()
-     * @see #getSwitchOffImage()
-     * @see #setSwitchOnImage(com.codename1.ui.Image)
-     * @see #getSwitchMaskImage()
-     * @see #setSwitchMaskImage(com.codename1.ui.Image)
-     */
+    /// Gets the image that is used for the mask.  **Note:** This option is only used
+    /// if the "onOffIOSModeBool" theme constant is enabled.
+    ///
+    /// This image will generally
+    /// consist of an opaque border/frame with a transparent center such that the
+    /// "on" and "off" images can be painted inside the transparent part, and anything
+    /// that is outside that center will be painted over by the frame, or clipped.
+    ///
+    /// #### Returns
+    ///
+    /// @return the switchMaskImage image if the "onOffIOSModeBool" flag is set or the mask
+    /// image has been explicitly set on this OnOffSwitch using `#setSwitchMaskImage(com.codename1.ui.Image)`
+    ///
+    /// #### See also
+    ///
+    /// - #getSwitchOffImage()
+    ///
+    /// - #getSwitchOffImage()
+    ///
+    /// - #setSwitchOnImage(com.codename1.ui.Image)
+    ///
+    /// - #getSwitchMaskImage()
+    ///
+    /// - #setSwitchMaskImage(com.codename1.ui.Image)
     public Image getSwitchMaskImage() {
         if (iosMode) {
             return switchMaskImage;
@@ -724,16 +726,16 @@ public class OnOffSwitch extends Container implements ActionSource {
         return null;
     }
 
-    /**
-     * Sets the image that should be used for the "On" state.
-     *
-     * <p>Note: If the "onOffIOSModeBool" is false and you set this mask, you must also
-     * set the "On" image with {@link #setSwitchOnImage(com.codename1.ui.Image) } and the
-     * "Off" image with {@link #setSwitchOffImage(com.codename1.ui.Image) }.</p>
-     *
-     * @param switchMaskImage the switchMaskImage image to set as the mask for the on-off
-     *                        switch.
-     */
+    /// Sets the image that should be used for the "On" state.
+    ///
+    /// Note: If the "onOffIOSModeBool" is false and you set this mask, you must also
+    /// set the "On" image with `#setSwitchOnImage(com.codename1.ui.Image)` and the
+    /// "Off" image with `#setSwitchOffImage(com.codename1.ui.Image)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `switchMaskImage`: @param switchMaskImage the switchMaskImage image to set as the mask for the on-off
+    ///                        switch.
     public void setSwitchMaskImage(Image switchMaskImage) {
         this.switchMaskImage = switchMaskImage;
         iosMode = true;  // If we are explicitly setting this, then we will enable

@@ -22,19 +22,21 @@
  */
 package com.codename1.util;
 
-/**
- * A callback used by {@link AsyncResource} to be able to handle both the success and error case
- * in a single method.
- *
- * @author shannah
- * @since 7.0
- */
+/// A callback used by `AsyncResource` to be able to handle both the success and error case
+/// in a single method.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public interface AsyncResult<V> {
-    /**
-     * Called when an AsyncResource completes.  If it completes with an error, then error will be non-null.
-     *
-     * @param value The value that the AsyncResource completes with.
-     * @param error The error that is thrown by the AsyncResource.
-     */
+    /// Called when an AsyncResource completes.  If it completes with an error, then error will be non-null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The value that the AsyncResource completes with.
+    ///
+    /// - `error`: The error that is thrown by the AsyncResource.
     void onReady(V value, Throwable error);
 }

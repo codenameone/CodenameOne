@@ -26,20 +26,93 @@ import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InfiniteScrollAdapter;
 import com.codename1.ui.layouts.BoxLayout;
 
-/**
- * <p>This abstract Container can scroll indefinitely (or at least until
- * we run out of data).
- * This class uses the {@link com.codename1.components.InfiniteScrollAdapter} to bring more data and the pull to
- * refresh feature to refresh current displayed data.</p>
- * <p>
- * The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
- * </p>
- * <script src="https://gist.github.com/codenameone/9e2f7984beb22d9e372c.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" />
- * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
- *
- * @author Chen
- */
+/// This abstract Container can scroll indefinitely (or at least until
+/// we run out of data).
+/// This class uses the `com.codename1.components.InfiniteScrollAdapter` to bring more data and the pull to
+/// refresh feature to refresh current displayed data.
+///
+/// The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
+///
+/// ```java
+/// public void showForm() {
+///     Form hi = new Form("InfiniteContainer", new BorderLayout());
+///
+///     Style s = UIManager.getInstance().getComponentStyle("MultiLine1");
+///     FontImage p = FontImage.createMaterial(FontImage.MATERIAL_PORTRAIT, s);
+///     EncodedImage placeholder = EncodedImage.createFromImage(p.scaled(p.getWidth() * 3, p.getHeight() * 3), false);
+///
+///     InfiniteContainer ic = new InfiniteContainer() {
+/// @Override
+///         public Component[] fetchComponents(int index, int amount) {
+///             java.util.List> data = fetchPropertyData("Leeds");
+///             MultiButton[] cmps = new MultiButton[data.size()];
+///             for(int iter = 0 ; iter  currentListing = data.get(iter);
+///                 if(currentListing == null) {
+///                     return null;
+///                 }
+///                 String thumb_url = (String)currentListing.get("thumb_url");
+///                 String guid = (String)currentListing.get("guid");
+///                 String summary = (String)currentListing.get("summary");
+///                 cmps[iter] = new MultiButton(summary);
+///                 cmps[iter].setIcon(URLImage.createToStorage(placeholder, guid, thumb_url));
+///             }
+///             return cmps;
+///         }
+///     };
+///     hi.add(BorderLayout.CENTER, ic);
+///     hi.show();
+/// }
+/// int pageNumber = 1;
+/// java.util.List> fetchPropertyData(String text) {
+///     try {
+///         ConnectionRequest r = new ConnectionRequest();
+///         r.setPost(false);
+///         r.setUrl("http://api.nestoria.co.uk/api");
+///         r.addArgument("pretty", "0");
+///         r.addArgument("action", "search_listings");
+///         r.addArgument("encoding", "json");
+///         r.addArgument("listing_type", "buy");
+///         r.addArgument("page", "" + pageNumber);
+///         pageNumber++;
+///         r.addArgument("country", "uk");
+///         r.addArgument("place_name", text);
+///         NetworkManager.getInstance().addToQueueAndWait(r);
+///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), "UTF-8"));
+///         Map response = (Map)result.get("response");
+///         return (java.util.List>)response.get("listings");
+///     } catch(Exception err) {
+///         Log.e(err);
+///         return null;
+///     }
+/// }
+/// ```
+///
+/// ```java
+/// int pageNumber = 1;
+/// java.util.List> fetchPropertyData(String text) {
+///     try {
+///         ConnectionRequest r = new ConnectionRequest();
+///         r.setPost(false);
+///         r.setUrl("http://api.nestoria.co.uk/api");
+///         r.addArgument("pretty", "0");
+///         r.addArgument("action", "search_listings");
+///         r.addArgument("encoding", "json");
+///         r.addArgument("listing_type", "buy");
+///         r.addArgument("page", "" + pageNumber);
+///         pageNumber++;
+///         r.addArgument("country", "uk");
+///         r.addArgument("place_name", text);
+///         NetworkManager.getInstance().addToQueueAndWait(r);
+///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), "UTF-8"));
+///         Map response = (Map)result.get("response");
+///         return (java.util.List>)response.get("listings");
+///     } catch(Exception err) {
+///         Log.e(err);
+///         return null;
+///     }
+/// }
+/// ```
+/// @author Chen
 public abstract class InfiniteContainer extends Container {
 
     private int amount = 10;
@@ -50,21 +123,19 @@ public abstract class InfiniteContainer extends Container {
     private InfiniteScrollAdapter adapter;
     private boolean initialized;
 
-    /**
-     * Creates the InfiniteContainer.
-     * The InfiniteContainer is created with BoxLayout Y layout.
-     */
+    /// Creates the InfiniteContainer.
+    /// The InfiniteContainer is created with BoxLayout Y layout.
     public InfiniteContainer() {
         setLayout(new BoxLayout(BoxLayout.Y_AXIS));
         setScrollableY(true);
     }
 
-    /**
-     * Creates the InfiniteContainer.
-     * The InfiniteContainer is created with BoxLayout Y layout.
-     *
-     * @param amount the number of items to fetch in each call to fetchComponents
-     */
+    /// Creates the InfiniteContainer.
+    /// The InfiniteContainer is created with BoxLayout Y layout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: the number of items to fetch in each call to fetchComponents
     public InfiniteContainer(int amount) {
         this();
         this.amount = amount;
@@ -103,9 +174,7 @@ public abstract class InfiniteContainer extends Container {
         });
     }
 
-    /**
-     * This refreshes the UI in a similar way to the "pull to refresh" functionality
-     */
+    /// This refreshes the UI in a similar way to the "pull to refresh" functionality
     public void refresh() {
         // prevent exception when refresh() is invoked too soon
         if (!isInitialized()) {
@@ -158,12 +227,10 @@ public abstract class InfiniteContainer extends Container {
         }
     }
 
-    /**
-     * If we previously added returned null when fetching components this
-     * method can continue the process of fetching. This is useful in case of
-     * a networking error. You can end fetching and then restart it based on
-     * user interaction see https://github.com/codenameone/CodenameOne/issues/2721
-     */
+    /// If we previously added returned null when fetching components this
+    /// method can continue the process of fetching. This is useful in case of
+    /// a networking error. You can end fetching and then restart it based on
+    /// user interaction see https://github.com/codenameone/CodenameOne/issues/2721
     public void continueFetching() {
         InfiniteScrollAdapter.continueFetching(this);
     }
@@ -212,37 +279,43 @@ public abstract class InfiniteContainer extends Container {
 
     }
 
-    /**
-     * Indicates whether {@link #fetchComponents(int, int)} should be invoked asynchronously off the EDT
-     *
-     * @return this is set to true for compatibility with older versions of the infinite container
-     */
+    /// Indicates whether `int)` should be invoked asynchronously off the EDT
+    ///
+    /// #### Returns
+    ///
+    /// this is set to true for compatibility with older versions of the infinite container
     protected boolean isAsync() {
         return false;
     }
 
-    /**
-     * <p>This is an abstract method that should be implemented by the sub classes
-     * to fetch the data.</p>
-     * <p><b>When {@link #isAsync()} is overriden to return true this method is invoked on a background thread</b>.
-     * Notice that in this case the method might cause EDT violations warnings, since the
-     * subclasses will need to create the Components off the EDT. While these are EDT violations they
-     * probably won't cause problems for more code.</p>
-     * <p>Sub classes should preform their networking/data fetching here.</p>
-     *
-     * @param index  the index from which to bring data
-     * @param amount the size of components to bring
-     * @return Components array of the returned data, size of the array can be the
-     * size of the amount or smaller, if there is no more data to fetch the method should return null.
-     */
+    /// This is an abstract method that should be implemented by the sub classes
+    /// to fetch the data.
+    ///
+    /// **When `#isAsync()` is overriden to return true this method is invoked on a background thread**.
+    /// Notice that in this case the method might cause EDT violations warnings, since the
+    /// subclasses will need to create the Components off the EDT. While these are EDT violations they
+    /// probably won't cause problems for more code.
+    ///
+    /// Sub classes should preform their networking/data fetching here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index from which to bring data
+    ///
+    /// - `amount`: the size of components to bring
+    ///
+    /// #### Returns
+    ///
+    /// @return Components array of the returned data, size of the array can be the
+    /// size of the amount or smaller, if there is no more data to fetch the method should return null.
     public abstract Component[] fetchComponents(int index, int amount);
 
 
-    /**
-     * Lets us manipulate the infinite progress object e.g. set the animation image etc.
-     *
-     * @return the infinite progress component underlying this container
-     */
+    /// Lets us manipulate the infinite progress object e.g. set the animation image etc.
+    ///
+    /// #### Returns
+    ///
+    /// the infinite progress component underlying this container
     public InfiniteProgress getInfiniteProgress() {
         return adapter.getInfiniteProgress();
     }

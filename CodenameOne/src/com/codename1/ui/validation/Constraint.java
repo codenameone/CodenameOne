@@ -22,25 +22,26 @@
  */
 package com.codename1.ui.validation;
 
-/**
- * To perform validation we add a constraint to a validator, a constraint defines whether a value if valid
- * for a given object
- *
- * @author Shai Almog
- */
+/// To perform validation we add a constraint to a validator, a constraint defines whether a value if valid
+/// for a given object
+///
+/// @author Shai Almog
 public interface Constraint {
-    /**
-     * Indicates if the given value is valid or not
-     *
-     * @param value the value for the object
-     * @return true if the value is valid and false otherwise
-     */
+    /// Indicates if the given value is valid or not
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value for the object
+    ///
+    /// #### Returns
+    ///
+    /// true if the value is valid and false otherwise
     boolean isValid(Object value);
 
-    /**
-     * Includes the error message for the constraint
-     *
-     * @return the text of the error message for a constraint
-     */
+    /// Includes the error message for the constraint
+    ///
+    /// #### Returns
+    ///
+    /// the text of the error message for a constraint
     String getDefaultFailMessage();
 }

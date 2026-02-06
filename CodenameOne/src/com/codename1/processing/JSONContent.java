@@ -30,49 +30,56 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.util.Map;
 
-/**
- * Internal class, do not use.
- * <p>
- * A DOM accessor implementation for working with JSON content.
- *
- * @author Eric Coolman
- */
+/// Internal class, do not use.
+///
+/// A DOM accessor implementation for working with JSON content.
+///
+/// @author Eric Coolman
 class JSONContent extends MapContent {
-    /**
-     * Construct from a parsed JSON dom
-     *
-     * @param content a parsed JSON dom
-     */
+    /// Construct from a parsed JSON dom
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a parsed JSON dom
     public JSONContent(Map content) {
         super(content);
     }
 
-    /**
-     * Construct from a JSON string
-     *
-     * @param content a JSON string
-     * @throws IOException on error reading/parsing string
-     */
+    /// Construct from a JSON string
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON string
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing string
     public JSONContent(String content) throws IOException {
         this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(content))));
     }
 
-    /**
-     * Construct from a JSON input stream
-     *
-     * @param content a JSON input stream
-     * @throws IOException on error reading/parsing the stream
-     */
+    /// Construct from a JSON input stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON input stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing the stream
     public JSONContent(InputStream content) throws IOException {
         this(new JSONParser().parse(com.codename1.io.Util.getReader(content)));
     }
 
-    /**
-     * Construct from a JSON input stream
-     *
-     * @param content a JSON reader
-     * @throws IOException on error reading/parsing the stream
-     */
+    /// Construct from a JSON input stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON reader
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing the stream
     public JSONContent(Reader content) throws IOException {
         this(new JSONParser().parse(content));
     }

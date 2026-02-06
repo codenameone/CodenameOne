@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -24,62 +22,53 @@ import com.codename1.charts.renderers.DefaultRenderer;
 import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.ui.Component;
 
-/**
- * Base class for charts that render circular data representations such as pie
- * charts, doughnut charts or gauges.
- * <p>
- * Subclasses operate on {@link CategorySeries} data and share common
- * functionality for drawing the chart title, legend entries and handling
- * layout. Developers typically work with concrete subclasses such as
- * {@link PieChart} or {@link DoughnutChart} directly.
- */
+/// Base class for charts that render circular data representations such as pie
+/// charts, doughnut charts or gauges.
+///
+/// Subclasses operate on `CategorySeries` data and share common
+/// functionality for drawing the chart title, legend entries and handling
+/// layout. Developers typically work with concrete subclasses such as
+/// `PieChart` or `DoughnutChart` directly.
 public abstract class RoundChart extends AbstractChart {
-    /**
-     * The legend shape width.
-     */
+    /// The legend shape width.
     protected static final int SHAPE_WIDTH = 10;
-    /**
-     * A no value constant.
-     */
+    /// A no value constant.
     protected static final int NO_VALUE = Integer.MAX_VALUE;
-    /**
-     * The series dataset.
-     */
+    /// The series dataset.
     protected CategorySeries mDataset;
-    /**
-     * The series renderer.
-     */
+    /// The series renderer.
     protected DefaultRenderer mRenderer;
-    /**
-     * The chart center X axis.
-     */
+    /// The chart center X axis.
     protected int mCenterX = NO_VALUE;
-    /**
-     * The chart center y axis.
-     */
+    /// The chart center y axis.
     protected int mCenterY = NO_VALUE;
     protected boolean autoCalculateCenter = true;
 
-    /**
-     * Round chart.
-     *
-     * @param dataset  the series dataset
-     * @param renderer the series renderer
-     */
+    /// Round chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the series dataset
+    ///
+    /// - `renderer`: the series renderer
     public RoundChart(CategorySeries dataset, DefaultRenderer renderer) {
         mDataset = dataset;
         mRenderer = renderer;
     }
 
-    /**
-     * The graphical representation of the round chart title.
-     *
-     * @param canvas the canvas to paint to
-     * @param x      the top left x value of the view to draw to
-     * @param y      the top left y value of the view to draw to
-     * @param width  the width of the view to draw to
-     * @param paint  the paint
-     */
+    /// The graphical representation of the round chart title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `paint`: the paint
     public void drawTitle(Canvas canvas, int x, int y, int width, Paint paint) {
         if (mRenderer.isShowLabels()) {
             paint.setColor(mRenderer.getLabelsColor());
@@ -90,27 +79,35 @@ public abstract class RoundChart extends AbstractChart {
         }
     }
 
-    /**
-     * Returns the legend shape width.
-     *
-     * @param seriesIndex the series index
-     * @return the legend shape width
-     */
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
     @Override
     public int getLegendShapeWidth(int seriesIndex) {
         return SHAPE_WIDTH;
     }
 
-    /**
-     * The graphical representation of the legend shape.
-     *
-     * @param canvas      the canvas to paint to
-     * @param renderer    the series renderer
-     * @param x           the x value of the point the shape should be drawn at
-     * @param y           the y value of the point the shape should be drawn at
-     * @param seriesIndex the series index
-     * @param paint       the paint to be used for drawing
-     */
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
@@ -123,47 +120,47 @@ public abstract class RoundChart extends AbstractChart {
         }
     }
 
-    /**
-     * Returns the renderer.
-     *
-     * @return the renderer
-     */
+    /// Returns the renderer.
+    ///
+    /// #### Returns
+    ///
+    /// the renderer
     public DefaultRenderer getRenderer() {
         return mRenderer;
     }
 
-    /**
-     * Returns the center on X axis.
-     *
-     * @return the center on X axis
-     */
+    /// Returns the center on X axis.
+    ///
+    /// #### Returns
+    ///
+    /// the center on X axis
     public int getCenterX() {
         return mCenterX;
     }
 
-    /**
-     * Sets a new center on X axis.
-     *
-     * @param centerX center on X axis
-     */
+    /// Sets a new center on X axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `centerX`: center on X axis
     public void setCenterX(int centerX) {
         mCenterX = centerX;
     }
 
-    /**
-     * Returns the center on Y axis.
-     *
-     * @return the center on Y axis
-     */
+    /// Returns the center on Y axis.
+    ///
+    /// #### Returns
+    ///
+    /// the center on Y axis
     public int getCenterY() {
         return mCenterY;
     }
 
-    /**
-     * Sets a new center on Y axis.
-     *
-     * @param centerY center on Y axis
-     */
+    /// Sets a new center on Y axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `centerY`: center on Y axis
     public void setCenterY(int centerY) {
         mCenterY = centerY;
     }

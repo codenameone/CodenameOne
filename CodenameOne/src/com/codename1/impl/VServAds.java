@@ -43,11 +43,9 @@ import java.io.InputStreamReader;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * The v-serv ad service implements full screen ads
- *
- * @author Shai Almog
- */
+/// The v-serv ad service implements full screen ads
+///
+/// @author Shai Almog
 public class VServAds extends FullScreenAdService {
     public static final int CAT_ID_ACTION_ADVENTURE = 18;
     public static final int CAT_ID_SPORTS = 19;
@@ -82,9 +80,7 @@ public class VServAds extends FullScreenAdService {
     private String renderNotify;
     private String actionNotify;
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected ConnectionRequest createAdRequest() {
         ConnectionRequest con = new ConnectionRequest() {
@@ -166,9 +162,7 @@ public class VServAds extends FullScreenAdService {
         return imageURL != null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void clearPendingAd() {
         imageURL = null;
@@ -176,9 +170,7 @@ public class VServAds extends FullScreenAdService {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Component getPendingAd() {
         if (imageURL == null) {
@@ -236,9 +228,7 @@ public class VServAds extends FullScreenAdService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected String getAdDestination() {
         if (actionNotify != null && actionNotify.length() > 0) {
@@ -251,88 +241,84 @@ public class VServAds extends FullScreenAdService {
         return destination;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean failed() {
         return failed;
     }
 
-    /**
-     * @return the countryCode
-     */
+    /// #### Returns
+    ///
+    /// the countryCode
     public String getCountryCode() {
         return countryCode;
     }
 
-    /**
-     * @param countryCode the countryCode to set
-     */
+    /// #### Parameters
+    ///
+    /// - `countryCode`: the countryCode to set
     public void setCountryCode(String countryCode) {
         this.countryCode = countryCode;
     }
 
-    /**
-     * @return the networkCode
-     */
+    /// #### Returns
+    ///
+    /// the networkCode
     public String getNetworkCode() {
         return networkCode;
     }
 
-    /**
-     * @param networkCode the networkCode to set
-     */
+    /// #### Parameters
+    ///
+    /// - `networkCode`: the networkCode to set
     public void setNetworkCode(String networkCode) {
         this.networkCode = networkCode;
     }
 
-    /**
-     * @return the locale
-     */
+    /// #### Returns
+    ///
+    /// the locale
     public String getLocale() {
         return locale;
     }
 
-    /**
-     * @param locale the locale to set
-     */
+    /// #### Parameters
+    ///
+    /// - `locale`: the locale to set
     public void setLocale(String locale) {
         this.locale = locale;
     }
 
-    /**
-     * @return the category
-     */
+    /// #### Returns
+    ///
+    /// the category
     public int getCategory() {
         return category;
     }
 
-    /**
-     * @param category the category to set
-     */
+    /// #### Parameters
+    ///
+    /// - `category`: the category to set
     public void setCategory(int category) {
         this.category = category;
     }
 
-    /**
-     * @return the zoneId
-     */
+    /// #### Returns
+    ///
+    /// the zoneId
     public String getZoneId() {
         return zoneId;
     }
 
-    /**
-     * @param zoneId the zoneId to set
-     */
+    /// #### Parameters
+    ///
+    /// - `zoneId`: the zoneId to set
     public void setZoneId(String zoneId) {
         this.zoneId = zoneId;
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isAllowSkipping() {
         return true;

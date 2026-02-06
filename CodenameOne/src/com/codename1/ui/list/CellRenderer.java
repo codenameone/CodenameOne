@@ -26,74 +26,94 @@ package com.codename1.ui.list;
 import com.codename1.ui.Component;
 import com.codename1.ui.List;
 
-/**
- * This class is geared to replace the ListCellRenderer in the long run to provide a more
- * generic rendering API.
- * A "rubber stamp" tool that allows us to extract a component (often the same
- * component instance for all invocations) that is initialized to the value
- * of the current item extracted from the model, this component is drawn on the
- * list and discarded. No state of the component is kept and the component is
- * essentially discarded.
- * <p>An instance of a renderer can be developed as such:
- * <pre>
- * <strong>public</strong> <strong>class</strong> <font color="#2040a0">MyYesNoRenderer</font> <strong>extends</strong> <font color="#2040a0">Label</font> <strong>implements</strong> <font color="#2040a0">ListCellRenderer</font> <font color="4444FF"><strong>{</strong></font>
- * <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getListCellRendererComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">List</font> <font color="#2040a0">list</font>, <font color="#2040a0">Object</font> <font color="#2040a0">value</font>, <strong>int</strong> <font color="#2040a0">index</font>, <strong>boolean</strong> <font color="#2040a0">isSelected</font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
- * <strong>if</strong><font color="4444FF"><strong>(</strong></font> <font color="4444FF"><strong>(</strong></font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">Boolean</font><font color="4444FF"><strong>)</strong></font><font color="#2040a0">value</font><font color="4444FF"><strong>)</strong></font>.<font color="#2040a0">booleanValue</font><font color="4444FF"><strong>(</strong></font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
- * <font color="#2040a0">setText</font><font color="4444FF"><strong>(</strong></font><font color="#008000">&quot;Yes&quot;</font><font color="4444FF"><strong>)</strong></font><font color="4444FF">;</font>
- * <font color="4444FF"><strong>}</strong></font> <strong>else</strong> <font color="4444FF"><strong>{</strong></font>
- * <font color="#2040a0">setText</font><font color="4444FF"><strong>(</strong></font><font color="#008000">&quot;No&quot;</font><font color="4444FF"><strong>)</strong></font><font color="4444FF">;</font>
- * <font color="4444FF"><strong>}</strong></font>
- * <strong>return</strong> <strong>this</strong><font color="4444FF">;</font>
- * <font color="4444FF"><strong>}</strong></font>
- * <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getListFocusComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">List</font> <font color="#2040a0">list</font><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
- * <font color="#2040a0">Label label = new label</font><strong>(&quot;&quot;);</strong>
- * <font color="#2040a0">label.getStyle().setBgTransparency(</font><font color="#008000">100</font>);
- * </strong>
- * <strong>return</strong> <font color="#2040a0">label</font><font color="4444FF">;</font>
- * <font color="4444FF"><strong>}</strong></font>
- * <font color="4444FF"><strong>}</strong></font>
- * </pre>
- *
- * <p>It is recommended that the component whose values are manipulated would not
- * support features such as repaint(). This is accomplished by overriding repaint
- * in the subclass with an empty implementation. This is advised for performance
- * reasons, otherwise every change made to the component might trigger a repaint that
- * wouldn't do anything but still cost in terms of processing.
- *
- * @author Chen Fishbein, Shai Almog
- * @see com.codename1.ui.list.GenericListCellRenderer
- * @see com.codename1.ui.list.ListCellRenderer
- * @deprecated this interface was added for ContainerList which is now deprecated. Use GenericListCellRenderer
- * or ListCellRenderer instead
- */
+/// This class is geared to replace the ListCellRenderer in the long run to provide a more
+/// generic rendering API.
+/// A "rubber stamp" tool that allows us to extract a component (often the same
+/// component instance for all invocations) that is initialized to the value
+/// of the current item extracted from the model, this component is drawn on the
+/// list and discarded. No state of the component is kept and the component is
+/// essentially discarded.
+///
+/// An instance of a renderer can be developed as such:
+///
+/// ```java
+/// **public** **class** MyYesNoRenderer **extends** Label **implements** ListCellRenderer **{**
+/// **public** Component getListCellRendererComponent**(**List list, Object value, **int** index, **boolean** isSelected**)** **{**
+/// **if****(** **(****(**Boolean**)**value**)**.booleanValue**(****)** **)** **{**
+/// setText**(**"Yes"**)**;
+/// **}** **else** **{**
+/// setText**(**"No"**)**;
+/// **}**
+/// **return** **this**;
+/// **}**
+/// **public** Component getListFocusComponent**(**List list**)** **{**
+/// Label label = new label**("");**
+/// label.getStyle().setBgTransparency(100);
+/// **
+/// **return** label;
+/// **}**
+/// **}**
+/// ```
+///
+/// It is recommended that the component whose values are manipulated would not
+/// support features such as repaint(). This is accomplished by overriding repaint
+/// in the subclass with an empty implementation. This is advised for performance
+/// reasons, otherwise every change made to the component might trigger a repaint that
+/// wouldn't do anything but still cost in terms of processing.
+///
+/// @author Chen Fishbein, Shai Almog
+///
+/// #### Deprecated
+///
+/// @deprecated this interface was added for ContainerList which is now deprecated. Use GenericListCellRenderer
+/// or ListCellRenderer instead
+///
+/// #### See also
+///
+/// - com.codename1.ui.list.GenericListCellRenderer
+///
+/// - com.codename1.ui.list.ListCellRenderer
 public interface CellRenderer<T> {
-    /**
-     * Returns a component instance that is already set to render "value". While it is not a requirement
-     * many renderes often derive from a component (such as a label) and return "this".
-     * Notice that a null value for the value argument might be sent when refreshing the theme of the
-     * list.
-     *
-     * @param list       the list component
-     * @param model      the model behind the render
-     * @param value      the value to render
-     * @param index      the index in the list
-     * @param isSelected whether the entry is selected
-     * @return a component to paint within the list
-     */
+    /// Returns a component instance that is already set to render "value". While it is not a requirement
+    /// many renderes often derive from a component (such as a label) and return "this".
+    /// Notice that a null value for the value argument might be sent when refreshing the theme of the
+    /// list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list component
+    ///
+    /// - `model`: the model behind the render
+    ///
+    /// - `value`: the value to render
+    ///
+    /// - `index`: the index in the list
+    ///
+    /// - `isSelected`: whether the entry is selected
+    ///
+    /// #### Returns
+    ///
+    /// a component to paint within the list
     Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected);
 
-    /**
-     * Returns a component instance that is painted under the currently focused renderer
-     * and is animated to provide smooth scrolling.
-     * When the selection moves, this component is drawn above/below the list items -
-     * it is recommended to give this component some level of transparency (see above code example).
-     * This method is optional an implementation
-     * can choose to return null.
-     *
-     * @param list the parent list
-     * @return a component to use as focus
-     * @see List#setSmoothScrolling
-     */
+    /// Returns a component instance that is painted under the currently focused renderer
+    /// and is animated to provide smooth scrolling.
+    /// When the selection moves, this component is drawn above/below the list items -
+    /// it is recommended to give this component some level of transparency (see above code example).
+    /// This method is optional an implementation
+    /// can choose to return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the parent list
+    ///
+    /// #### Returns
+    ///
+    /// a component to use as focus
+    ///
+    /// #### See also
+    ///
+    /// - List#setSmoothScrolling
     Component getFocusComponent(Component list);
 
 }

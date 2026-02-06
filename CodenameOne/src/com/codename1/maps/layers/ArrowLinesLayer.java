@@ -27,12 +27,10 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Point;
 import com.codename1.util.MathUtil;
 
-/**
- * This class is responsible for painting arrows that indicates direction
- * of walk on map.
- *
- * @author Michal Koperski
- */
+/// This class is responsible for painting arrows that indicates direction
+/// of walk on map.
+///
+/// @author Michal Koperski
 public class ArrowLinesLayer extends LinesLayer {
 
     private static final int minArrowSementLength = 20;
@@ -40,35 +38,31 @@ public class ArrowLinesLayer extends LinesLayer {
     private int arrowWidth = 5;
     private int arrowHeight = 10;
 
-    /**
-     * Constructor with default projection Mercator.
-     */
+    /// Constructor with default projection Mercator.
     public ArrowLinesLayer() {
         this(new Mercator(), "");
     }
 
-    /**
-     * Constructor with default projection Mercator.
-     */
+    /// Constructor with default projection Mercator.
     public ArrowLinesLayer(String name) {
         this(new Mercator(), name);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public ArrowLinesLayer(Projection p, String name) {
         super(p, name);
     }
 
-    /**
-     * Paints arrows on each segment. arrowSegmentLength decides how many
-     * arrows will be on each segment.
-     *
-     * @param g
-     * @param segment
-     * @param tile
-     */
+    /// Paints arrows on each segment. arrowSegmentLength decides how many
+    /// arrows will be on each segment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
+    ///
+    /// - `segment`
+    ///
+    /// - `tile`
     @Override
     protected void paintSegment(Graphics g, Coord[] segment, Tile tile) {
         super.paintSegment(g, segment, tile);
@@ -105,14 +99,16 @@ public class ArrowLinesLayer extends LinesLayer {
         }
     }
 
-    /**
-     * This method clones arrowHead object which represents arrow and translate
-     * it to position on the map.
-     *
-     * @param g Graphics Object to paint on
-     * @param s starting Point
-     * @param e ending Point
-     */
+    /// This method clones arrowHead object which represents arrow and translate
+    /// it to position on the map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: Graphics Object to paint on
+    ///
+    /// - `s`: starting Point
+    ///
+    /// - `e`: ending Point
     private void drawArrow(Graphics g, Point s, Point e) {
         double aDir = MathUtil.atan2(e.getY() - s.getY(), e.getX() - s.getX());
 
@@ -136,56 +132,56 @@ public class ArrowLinesLayer extends LinesLayer {
         return a * a;
     }
 
-    /**
-     * Returns the arrow height in pixels
-     *
-     * @return the arrow height
-     */
+    /// Returns the arrow height in pixels
+    ///
+    /// #### Returns
+    ///
+    /// the arrow height
     public int getArrowHeight() {
         return arrowHeight;
     }
 
-    /**
-     * Sets the arrow height
-     *
-     * @param arrowHeight
-     */
+    /// Sets the arrow height
+    ///
+    /// #### Parameters
+    ///
+    /// - `arrowHeight`
     public void setArrowHeight(int arrowHeight) {
         this.arrowHeight = arrowHeight;
     }
 
-    /**
-     * Gets the arrow segment length
-     *
-     * @return segment length
-     */
+    /// Gets the arrow segment length
+    ///
+    /// #### Returns
+    ///
+    /// segment length
     public int getArrowSegmentLength() {
         return arrowSegmentLength;
     }
 
-    /**
-     * Sets the arrow segment length
-     *
-     * @param arrowSegmentLength to set
-     */
+    /// Sets the arrow segment length
+    ///
+    /// #### Parameters
+    ///
+    /// - `arrowSegmentLength`: to set
     public void setArrowSegmentLength(int arrowSegmentLength) {
         this.arrowSegmentLength = arrowSegmentLength;
     }
 
-    /**
-     * Gets the arrow width in pixels
-     *
-     * @return the arrow width
-     */
+    /// Gets the arrow width in pixels
+    ///
+    /// #### Returns
+    ///
+    /// the arrow width
     public int getArrowWidth() {
         return arrowWidth;
     }
 
-    /**
-     * Sets the arrow width
-     *
-     * @param arrowWidth to set
-     */
+    /// Sets the arrow width
+    ///
+    /// #### Parameters
+    ///
+    /// - `arrowWidth`: to set
     public void setArrowWidth(int arrowWidth) {
         this.arrowWidth = arrowWidth;
     }

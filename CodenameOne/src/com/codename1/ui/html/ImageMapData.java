@@ -27,11 +27,9 @@ import com.codename1.ui.geom.Rectangle;
 
 import java.util.Hashtable;
 
-/**
- * This class holds the data of the image maps.
- *
- * @author Ofir Leitner
- */
+/// This class holds the data of the image maps.
+///
+/// @author Ofir Leitner
 class ImageMapData {
 
     Hashtable areas;

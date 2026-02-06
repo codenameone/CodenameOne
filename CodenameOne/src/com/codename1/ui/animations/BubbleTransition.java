@@ -33,17 +33,59 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.plaf.Style;
 
-/**
- * <p>A Transitions that animates the destination component as a growing window
- * until the destination is displayed in place.
- * The Bubble window can be round on supported platforms
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/5c44d837d3582b11deed.js"></script>
- * <img src="https://www.codenameone.com/img/blog/bubble-transition.gif" alt="Bubble transition converting a circular button to a Dialog" />
- *
- * @author Chen
- */
+/// A Transitions that animates the destination component as a growing window
+/// until the destination is displayed in place.
+/// The Bubble window can be round on supported platforms
+///
+/// ```java
+/// Form hi = new Form("Bubble");
+/// Button showBubble = new Button("+");
+/// showBubble.setName("BubbleButton");
+/// Style buttonStyle = showBubble.getAllStyles();
+/// buttonStyle.setBorder(Border.createEmpty());
+/// buttonStyle.setFgColor(0xffffff);
+/// buttonStyle.setBgPainter((g, rect) -> {
+///     g.setColor(0xff);
+///     int actualWidth = rect.getWidth();
+///     int actualHeight = rect.getHeight();
+///     int xPos, yPos;
+///     int size;
+///     if(actualWidth > actualHeight) {
+///         yPos = rect.getY();
+///         xPos = rect.getX() + (actualWidth - actualHeight) / 2;
+///         size = actualHeight;
+///     } else {
+///         yPos = rect.getY() + (actualHeight - actualWidth) / 2;
+///         xPos = rect.getX();
+///         size = actualWidth;
+///     }
+///     g.setAntiAliased(true);
+///     g.fillArc(xPos, yPos, size, size, 0, 360);
+/// });
+/// hi.add(showBubble);
+/// hi.setTintColor(0);
+/// showBubble.addActionListener((e) -> {
+///     Dialog dlg = new Dialog("Bubbled");
+///     dlg.setLayout(new BorderLayout());
+///     SpanLabel sl = new SpanLabel("This dialog should appear with a bubble transition from the button", "DialogBody");
+///     sl.getTextUnselectedStyle().setFgColor(0xffffff);
+///     dlg.add(BorderLayout.CENTER, sl);
+///     dlg.setTransitionInAnimator(new BubbleTransition(500, "BubbleButton"));
+///     dlg.setTransitionOutAnimator(new BubbleTransition(500, "BubbleButton"));
+///     dlg.setDisposeWhenPointerOutOfBounds(true);
+///     dlg.getTitleStyle().setFgColor(0xffffff);
+///
+///     Style dlgStyle = dlg.getDialogStyle();
+///     dlgStyle.setBorder(Border.createEmpty());
+///     dlgStyle.setBgColor(0xff);
+///     dlgStyle.setBgTransparency(0xff);
+///     dlg.showPacked(BorderLayout.NORTH, true);
+/// });
+///
+/// hi.show();
+/// ```
+///
+/// @author Chen
 public class BubbleTransition extends Transition {
 
     private Component originSrc;
@@ -61,28 +103,27 @@ public class BubbleTransition extends Transition {
     private GeneralPath bubbleShape;
 
 
-    /**
-     * Creates a Bubble Transition
-     */
+    /// Creates a Bubble Transition
     public BubbleTransition() {
     }
 
-    /**
-     * Creates a Bubble Transition
-     *
-     * @param duration the duration of the transition
-     */
+    /// Creates a Bubble Transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the transition
     public BubbleTransition(int duration) {
         this.duration = duration;
     }
 
-    /**
-     * Creates a Bubble Transition
-     *
-     * @param duration      the duration of the transition
-     * @param componentName the name of the component from the source Form that
-     *                      this transition should start from.
-     */
+    /// Creates a Bubble Transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the transition
+    ///
+    /// - `componentName`: @param componentName the name of the component from the source Form that
+    ///                      this transition should start from.
     public BubbleTransition(int duration, String componentName) {
         this(duration);
         this.componentName = componentName;
@@ -106,12 +147,12 @@ public class BubbleTransition extends Transition {
         return null;
     }
 
-    /**
-     * the name of the component from the source Form that
-     * this transition should start from.
-     *
-     * @param componentName name of the component to start the transition from
-     */
+    /// the name of the component from the source Form that
+    /// this transition should start from.
+    ///
+    /// #### Parameters
+    ///
+    /// - `componentName`: name of the component to start the transition from
     public void setComponentName(String componentName) {
         this.componentName = componentName;
     }
@@ -254,13 +295,13 @@ public class BubbleTransition extends Transition {
         g.setClip(clip);
     }
 
-    /**
-     * Determines if the Bubble is a round circle or a rectangle.
-     * Round bubble apply to platforms who supports shaped clipping.
-     * See Graphics.isShapeClipSupported().
-     *
-     * @param roundBubble true if the bubble should be round
-     */
+    /// Determines if the Bubble is a round circle or a rectangle.
+    /// Round bubble apply to platforms who supports shaped clipping.
+    /// See Graphics.isShapeClipSupported().
+    ///
+    /// #### Parameters
+    ///
+    /// - `roundBubble`: true if the bubble should be round
     public void setRoundBubble(boolean roundBubble) {
         this.roundBubble = roundBubble;
     }
@@ -297,20 +338,20 @@ public class BubbleTransition extends Transition {
         originDest = null;
     }
 
-    /**
-     * The duration for the transition
-     *
-     * @return the duration
-     */
+    /// The duration for the transition
+    ///
+    /// #### Returns
+    ///
+    /// the duration
     public int getDuration() {
         return duration;
     }
 
-    /**
-     * The duration for the transition
-     *
-     * @param duration the duration to set
-     */
+    /// The duration for the transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration to set
     public void setDuration(int duration) {
         this.duration = duration;
     }
@@ -336,12 +377,15 @@ public class BubbleTransition extends Transition {
         return ((Dialog) dlg).getDialogComponent();
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param reverse {@inheritDoc}
-     * @return {@inheritDoc}
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `reverse`: {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// {@inheritDoc}
     @Override
     public Transition copy(boolean reverse) {
         BubbleTransition bt = new BubbleTransition(duration, componentName);

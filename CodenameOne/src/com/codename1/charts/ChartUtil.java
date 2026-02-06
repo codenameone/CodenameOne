@@ -28,24 +28,26 @@ import com.codename1.charts.views.AbstractChart;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * A utility class for painting a chart onto a Graphics context.  This is a low level
- * API.  You should use the {@link ChartComponent} class instead.
- *
- * @author shannah
- */
+/// A utility class for painting a chart onto a Graphics context.  This is a low level
+/// API.  You should use the `ChartComponent` class instead.
+///
+/// @author shannah
 public class ChartUtil {
     private final Canvas c = new Canvas();
 
-    /**
-     * Draws the given chart onto the given graphics
-     *
-     * @param g      the graphics object
-     * @param chart  the chart object
-     * @param bounds the bounds in which the chart should be drawn within the graphics
-     * @param absX
-     * @param absY
-     */
+    /// Draws the given chart onto the given graphics
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the graphics object
+    ///
+    /// - `chart`: the chart object
+    ///
+    /// - `bounds`: the bounds in which the chart should be drawn within the graphics
+    ///
+    /// - `absX`
+    ///
+    /// - `absY`
     public void paintChart(Graphics g, AbstractChart chart, Rectangle bounds, int absX, int absY) {
         c.g = g;
         c.bounds = bounds;

@@ -30,16 +30,17 @@ import com.codename1.ui.events.ActionListener;
 
 import java.io.IOException;
 
-/**
- * Generic "Like" button that enables us to submit a like to facebook, to get the post id
- * required for the like functionality you will need to use a tool such as:
- * <a href="https://developers.facebook.com/tools/explorer/?method=GET&amp;path=me%2Fposts">https://developers.facebook.com/tools/explorer/?method=GET&amp;path=me%2Fposts</a>
- * You can ask it to list your posts and then seek the correct id within the returned JSON
- *
- * @author Chen Fishbein
- * @deprecated This functionality is no longer possible open a BrowserComponent
- * with the link instead, this class will be removed in next version
- */
+/// Generic "Like" button that enables us to submit a like to facebook, to get the post id
+/// required for the like functionality you will need to use a tool such as:
+/// [https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Fposts](https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Fposts)
+/// You can ask it to list your posts and then seek the correct id within the returned JSON
+///
+/// @author Chen Fishbein
+///
+/// #### Deprecated
+///
+/// @deprecated This functionality is no longer possible open a BrowserComponent
+/// with the link instead, this class will be removed in next version
 public class LikeButton extends Button implements ActionListener {
     private String appId = "132970916828080";
     private String redirectURI = "https://www.codenameone.com/";
@@ -47,27 +48,23 @@ public class LikeButton extends Button implements ActionListener {
     private String[] permissions;
     private String postId = "290052831046005_244933438934534";
 
-    /**
-     * Constructor accepting the post id
-     *
-     * @param postId
-     */
+    /// Constructor accepting the post id
+    ///
+    /// #### Parameters
+    ///
+    /// - `postId`
     public LikeButton(String postId) {
         this.postId = postId;
     }
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public LikeButton() {
         setUIIDFinal("LikeButton");
         setText("Like");
         super.addActionListener(this);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void actionPerformed(ActionEvent evt) {
         if (!FaceBookAccess.getInstance().isAuthenticated()) {
@@ -90,48 +87,40 @@ public class LikeButton extends Button implements ActionListener {
         }
     }
 
-    /**
-     * @return the postId
-     */
+    /// #### Returns
+    ///
+    /// the postId
     public String getPostId() {
         return postId;
     }
 
-    /**
-     * @param postId the postId to set
-     */
+    /// #### Parameters
+    ///
+    /// - `postId`: the postId to set
     public void setPostId(String postId) {
         this.postId = postId;
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"appId", "redirectURI", "clientSecret", "postId", "permissions"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, String.class, String.class, String.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "String", "String", "String", "String[]"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("appId".equals(name)) {
@@ -152,9 +141,7 @@ public class LikeButton extends Button implements ActionListener {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("appId".equals(name)) {
@@ -180,58 +167,58 @@ public class LikeButton extends Button implements ActionListener {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * @return the appId
-     */
+    /// #### Returns
+    ///
+    /// the appId
     public String getAppId() {
         return appId;
     }
 
-    /**
-     * @param appId the appId to set
-     */
+    /// #### Parameters
+    ///
+    /// - `appId`: the appId to set
     public void setAppId(String appId) {
         this.appId = appId;
     }
 
-    /**
-     * @return the redirectURI
-     */
+    /// #### Returns
+    ///
+    /// the redirectURI
     public String getRedirectURI() {
         return redirectURI;
     }
 
-    /**
-     * @param redirectURI the redirectURI to set
-     */
+    /// #### Parameters
+    ///
+    /// - `redirectURI`: the redirectURI to set
     public void setRedirectURI(String redirectURI) {
         this.redirectURI = redirectURI;
     }
 
-    /**
-     * @return the clientSecret
-     */
+    /// #### Returns
+    ///
+    /// the clientSecret
     public String getClientSecret() {
         return clientSecret;
     }
 
-    /**
-     * @param clientSecret the clientSecret to set
-     */
+    /// #### Parameters
+    ///
+    /// - `clientSecret`: the clientSecret to set
     public void setClientSecret(String clientSecret) {
         this.clientSecret = clientSecret;
     }
 
-    /**
-     * @return the permissions
-     */
+    /// #### Returns
+    ///
+    /// the permissions
     public String[] getPermissions() {
         return permissions;
     }
 
-    /**
-     * @param permissions the permissions to set
-     */
+    /// #### Parameters
+    ///
+    /// - `permissions`: the permissions to set
     public void setPermissions(String[] permissions) {
         this.permissions = permissions;
     }

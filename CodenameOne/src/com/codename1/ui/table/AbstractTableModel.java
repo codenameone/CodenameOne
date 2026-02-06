@@ -26,22 +26,24 @@ package com.codename1.ui.table;
 import com.codename1.ui.validation.Constraint;
 import com.codename1.ui.validation.Validator;
 
-/**
- * This abstract class extends table model with various capabilities such
- * as type information etc.
- *
- * @author Shai Almog
- */
+/// This abstract class extends table model with various capabilities such
+/// as type information etc.
+///
+/// @author Shai Almog
 public abstract class AbstractTableModel implements TableModel {
     private Validator validator;
 
-    /**
-     * Allows the table to hint the class type of a specific cell
-     *
-     * @param row    the row in the table
-     * @param column the column
-     * @return the class representing this cell
-     */
+    /// Allows the table to hint the class type of a specific cell
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row in the table
+    ///
+    /// - `column`: the column
+    ///
+    /// #### Returns
+    ///
+    /// the class representing this cell
     public Class getCellType(int row, int column) {
         Object o = getValueAt(row, column);
         if (o == null) {
@@ -50,43 +52,51 @@ public abstract class AbstractTableModel implements TableModel {
         return o.getClass();
     }
 
-    /**
-     * If the cell has a validation constraint it's returned here
-     *
-     * @param row    the row
-     * @param column the column for the cell
-     * @return null for no constraints
-     */
+    /// If the cell has a validation constraint it's returned here
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row
+    ///
+    /// - `column`: the column for the cell
+    ///
+    /// #### Returns
+    ///
+    /// null for no constraints
     public Constraint getValidationConstraint(int row, int column) {
         return null;
     }
 
-    /**
-     * Allows the table cell to feature multiple choice for a specific entry
-     *
-     * @param row    the row in the table
-     * @param column the column
-     * @return the string values matching the entries or null if this isn't a multiple
-     * choice option
-     */
+    /// Allows the table cell to feature multiple choice for a specific entry
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row in the table
+    ///
+    /// - `column`: the column
+    ///
+    /// #### Returns
+    ///
+    /// @return the string values matching the entries or null if this isn't a multiple
+    /// choice option
     public String[] getMultipleChoiceOptions(int row, int column) {
         return null;
     }
 
-    /**
-     * A validator can be defined here so a validation constraint can bind to a table model cell
-     *
-     * @return the validator
-     */
+    /// A validator can be defined here so a validation constraint can bind to a table model cell
+    ///
+    /// #### Returns
+    ///
+    /// the validator
     public Validator getValidator() {
         return validator;
     }
 
-    /**
-     * A validator can be defined here so a validation constraint can bind to a table model cell
-     *
-     * @param validator the validator to set
-     */
+    /// A validator can be defined here so a validation constraint can bind to a table model cell
+    ///
+    /// #### Parameters
+    ///
+    /// - `validator`: the validator to set
     public void setValidator(Validator validator) {
         this.validator = validator;
     }

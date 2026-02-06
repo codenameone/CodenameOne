@@ -29,10 +29,8 @@ import com.codename1.util.StringUtil;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * Based on the buffered input stream from the JDK with some minor tweaks to allow
- * external classes to monitor stream status and progress.
- */
+/// Based on the buffered input stream from the JDK with some minor tweaks to allow
+/// external classes to monitor stream status and progress.
 public class BufferedInputStream extends InputStream {
     private static int streamCount = 0;
 
@@ -47,133 +45,142 @@ public class BufferedInputStream extends InputStream {
     private boolean disableBuffering;
     private boolean closed;
     private boolean stopped;
-    /**
-     * The index one greater than the index of the last valid byte in
-     * the buffer.
-     * This value is always
-     * in the range <code>0</code> through <code>buf.length</code>;
-     * elements <code>buf[0]</code>  through <code>buf[count-1]
-     * </code>contain buffered input data obtained
-     * from the underlying  input stream.
-     */
+    /// The index one greater than the index of the last valid byte in
+    /// the buffer.
+    /// This value is always
+    /// in the range `0` through `buf.length`;
+    /// elements `buf[0]`  through `buf[count-1]`contain buffered input data obtained
+    /// from the underlying  input stream.
     private int count;
     private long lastActivityTime;
     private int totalBytesRead;
     private boolean printInput;
     private int yield = -1;
     private long elapsedSinceLastYield;
-    /**
-     * The current position in the buffer. This is the index of the next
-     * character to be read from the <code>buf</code> array.
-     * <p>
-     * This value is always in the range <code>0</code>
-     * through <code>count</code>. If it is less
-     * than <code>count</code>, then  <code>buf[pos]</code>
-     * is the next byte to be supplied as input;
-     * if it is equal to <code>count</code>, then
-     * the  next <code>read</code> or <code>skip</code>
-     * operation will require more bytes to be
-     * read from the contained  input stream.
-     *
-     * @see java.io.BufferedInputStream#buf
-     */
+    /// The current position in the buffer. This is the index of the next
+    /// character to be read from the `buf` array.
+    ///
+    /// This value is always in the range `0`
+    /// through `count`. If it is less
+    /// than `count`, then  `buf[pos]`
+    /// is the next byte to be supplied as input;
+    /// if it is equal to `count`, then
+    /// the  next `read` or `skip`
+    /// operation will require more bytes to be
+    /// read from the contained  input stream.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.BufferedInputStream#buf
     private int pos;
-    /**
-     * The value of the <code>pos</code> field at the time the last
-     * <code>mark</code> method was called.
-     * <p>
-     * This value is always
-     * in the range <code>-1</code> through <code>pos</code>.
-     * If there is no marked position in  the input
-     * stream, this field is <code>-1</code>. If
-     * there is a marked position in the input
-     * stream,  then <code>buf[markpos]</code>
-     * is the first byte to be supplied as input
-     * after a <code>reset</code> operation. If
-     * <code>markpos</code> is not <code>-1</code>,
-     * then all bytes from positions <code>buf[markpos]</code>
-     * through  <code>buf[pos-1]</code> must remain
-     * in the buffer array (though they may be
-     * moved to  another place in the buffer array,
-     * with suitable adjustments to the values
-     * of <code>count</code>,  <code>pos</code>,
-     * and <code>markpos</code>); they may not
-     * be discarded unless and until the difference
-     * between <code>pos</code> and <code>markpos</code>
-     * exceeds <code>marklimit</code>.
-     *
-     * @see java.io.BufferedInputStream#mark(int)
-     * @see java.io.BufferedInputStream#pos
-     */
+    /// The value of the `pos` field at the time the last
+    /// `mark` method was called.
+    ///
+    /// This value is always
+    /// in the range `-1` through `pos`.
+    /// If there is no marked position in  the input
+    /// stream, this field is `-1`. If
+    /// there is a marked position in the input
+    /// stream,  then `buf[markpos]`
+    /// is the first byte to be supplied as input
+    /// after a `reset` operation. If
+    /// `markpos` is not `-1`,
+    /// then all bytes from positions `buf[markpos]`
+    /// through  `buf[pos-1]` must remain
+    /// in the buffer array (though they may be
+    /// moved to  another place in the buffer array,
+    /// with suitable adjustments to the values
+    /// of `count`,  `pos`,
+    /// and `markpos`); they may not
+    /// be discarded unless and until the difference
+    /// between `pos` and `markpos`
+    /// exceeds `marklimit`.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.BufferedInputStream#mark(int)
+    ///
+    /// - java.io.BufferedInputStream#pos
     private int markpos = -1;
-    /**
-     * The maximum read ahead allowed after a call to the
-     * <code>mark</code> method before subsequent calls to the
-     * <code>reset</code> method fail.
-     * Whenever the difference between <code>pos</code>
-     * and <code>markpos</code> exceeds <code>marklimit</code>,
-     * then the  mark may be dropped by setting
-     * <code>markpos</code> to <code>-1</code>.
-     *
-     * @see java.io.BufferedInputStream#mark(int)
-     * @see java.io.BufferedInputStream#reset()
-     */
+    /// The maximum read ahead allowed after a call to the
+    /// `mark` method before subsequent calls to the
+    /// `reset` method fail.
+    /// Whenever the difference between `pos`
+    /// and `markpos` exceeds `marklimit`,
+    /// then the  mark may be dropped by setting
+    /// `markpos` to `-1`.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.BufferedInputStream#mark(int)
+    ///
+    /// - java.io.BufferedInputStream#reset()
     private int marklimit;
 
-    /**
-     * Creates a <code>BufferedInputStream</code>
-     * and saves its  argument, the input stream
-     * <code>in</code>, for later use. An internal
-     * buffer array is created and  stored in <code>buf</code>.
-     *
-     * @param in the underlying input stream.
-     */
+    /// Creates a `BufferedInputStream`
+    /// and saves its  argument, the input stream
+    /// `in`, for later use. An internal
+    /// buffer array is created and  stored in `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the underlying input stream.
     public BufferedInputStream(InputStream in) {
         this(in, defaultBufferSize);
     }
 
-    /**
-     * Creates a <code>BufferedInputStream</code>
-     * and saves its  argument, the input stream
-     * <code>in</code>, for later use. An internal
-     * buffer array is created and  stored in <code>buf</code>.
-     *
-     * @param in   the underlying input stream.
-     * @param name the name of the stream
-     */
+    /// Creates a `BufferedInputStream`
+    /// and saves its  argument, the input stream
+    /// `in`, for later use. An internal
+    /// buffer array is created and  stored in `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the underlying input stream.
+    ///
+    /// - `name`: the name of the stream
     public BufferedInputStream(InputStream in, String name) {
         this(in, defaultBufferSize, name);
     }
 
-    /**
-     * Creates a <code>BufferedInputStream</code>
-     * with the specified buffer size,
-     * and saves its  argument, the input stream
-     * <code>in</code>, for later use.  An internal
-     * buffer array of length  <code>size</code>
-     * is created and stored in <code>buf</code>.
-     *
-     * @param in   the underlying input stream.
-     * @param size the buffer size.
-     * @throws IllegalArgumentException if size <= 0.
-     */
+    /// Creates a `BufferedInputStream`
+    /// with the specified buffer size,
+    /// and saves its  argument, the input stream
+    /// `in`, for later use.  An internal
+    /// buffer array of length  `size`
+    /// is created and stored in `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the underlying input stream.
+    ///
+    /// - `size`: the buffer size.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if size <= 0.
     public BufferedInputStream(InputStream in, int size) {
         this(in, size, "unnamed");
     }
 
-    /**
-     * Creates a <code>BufferedInputStream</code>
-     * with the specified buffer size,
-     * and saves its  argument, the input stream
-     * <code>in</code>, for later use.  An internal
-     * buffer array of length  <code>size</code>
-     * is created and stored in <code>buf</code>.
-     *
-     * @param in   the underlying input stream.
-     * @param size the buffer size.
-     * @param name the name of the stream
-     * @throws IllegalArgumentException if size <= 0.
-     */
+    /// Creates a `BufferedInputStream`
+    /// with the specified buffer size,
+    /// and saves its  argument, the input stream
+    /// `in`, for later use.  An internal
+    /// buffer array of length  `size`
+    /// is created and stored in `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the underlying input stream.
+    ///
+    /// - `size`: the buffer size.
+    ///
+    /// - `name`: the name of the stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if size <= 0.
     public BufferedInputStream(InputStream in, int size, String name) {
         this.in = in;
         if (size <= 0) {
@@ -185,37 +192,35 @@ public class BufferedInputStream extends InputStream {
         Util.getImplementation().logStreamCreate(name, true, streamCount);
     }
 
-    /**
-     * The default size for a stream buffer
-     *
-     * @return the defaultBufferSize
-     */
+    /// The default size for a stream buffer
+    ///
+    /// #### Returns
+    ///
+    /// the defaultBufferSize
     public static int getDefaultBufferSize() {
         return defaultBufferSize;
     }
 
-    /**
-     * The default size for a stream buffer
-     *
-     * @param aDefaultBufferSize the defaultBufferSize to set
-     */
+    /// The default size for a stream buffer
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultBufferSize`: the defaultBufferSize to set
     public static void setDefaultBufferSize(int aDefaultBufferSize) {
         defaultBufferSize = aDefaultBufferSize;
     }
 
-    /**
-     * Indicates the name of the stream for debugging purposes
-     *
-     * @return the name of the stream
-     */
+    /// Indicates the name of the stream for debugging purposes
+    ///
+    /// #### Returns
+    ///
+    /// the name of the stream
     public String getName() {
         return name;
     }
 
-    /**
-     * Check to make sure that the underlying input stream has not been
-     * nulled out due to close; if not return it;
-     */
+    /// Check to make sure that the underlying input stream has not been
+    /// nulled out due to close; if not return it;
     private synchronized InputStream getInIfOpen() throws IOException {
         InputStream input = in;
         if (input == null) {
@@ -224,10 +229,8 @@ public class BufferedInputStream extends InputStream {
         return input;
     }
 
-    /**
-     * Check to make sure that buffer has not been nulled out due to
-     * close; if not return it;
-     */
+    /// Check to make sure that buffer has not been nulled out due to
+    /// close; if not return it;
     private synchronized byte[] getBufIfOpen() throws IOException {
         byte[] buffer = buf;
         if (buffer == null) {
@@ -236,13 +239,11 @@ public class BufferedInputStream extends InputStream {
         return buffer;
     }
 
-    /**
-     * Fills the buffer with more data, taking into account
-     * shuffling and other tricks for dealing with marks.
-     * Assumes that it is being called by a synchronized method.
-     * This method also assumes that all data has already been read in,
-     * hence pos > count.
-     */
+    /// Fills the buffer with more data, taking into account
+    /// shuffling and other tricks for dealing with marks.
+    /// Assumes that it is being called by a synchronized method.
+    /// This method also assumes that all data has already been read in,
+    /// hence pos > count.
     private void fill() throws IOException {
         byte[] buffer = getBufIfOpen();
         if (markpos < 0) {
@@ -285,26 +286,29 @@ public class BufferedInputStream extends InputStream {
         }
     }
 
-    /**
-     * Allows access to the underlying input stream if desired
-     *
-     * @return the internal input stream
-     */
+    /// Allows access to the underlying input stream if desired
+    ///
+    /// #### Returns
+    ///
+    /// the internal input stream
     public InputStream getInternal() {
         return in;
     }
 
-    /**
-     * See
-     * the general contract of the <code>read</code>
-     * method of <code>InputStream</code>.
-     *
-     * @return the next byte of data, or <code>-1</code> if the end of the
-     * stream is reached.
-     * @throws IOException if this input stream has been closed by
-     *                     invoking its {@link #close()} method,
-     *                     or an I/O error occurs.
-     */
+    /// See
+    /// the general contract of the `read`
+    /// method of `InputStream`.
+    ///
+    /// #### Returns
+    ///
+    /// @return the next byte of data, or `-1` if the end of the
+    /// stream is reached.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if this input stream has been closed by
+    ///                     invoking its `#close()` method,
+    ///                     or an I/O error occurs.
     @Override
     public synchronized int read() throws IOException {
         if (stopped) {
@@ -342,10 +346,8 @@ public class BufferedInputStream extends InputStream {
         }
     }
 
-    /**
-     * Read characters into a portion of an array, reading from the underlying
-     * stream at most once if necessary.
-     */
+    /// Read characters into a portion of an array, reading from the underlying
+    /// stream at most once if necessary.
     private int read1(byte[] b, int off, int len) throws IOException {
         int avail = count - pos;
         if (avail <= 0) {
@@ -394,43 +396,51 @@ public class BufferedInputStream extends InputStream {
         }
     }
 
-    /**
-     * Reads bytes from this byte-input stream into the specified byte array,
-     * starting at the given offset.
-     *
-     * <p> This method implements the general contract of the corresponding
-     * <code>{@link InputStream#read(byte[], int, int) read}</code> method of
-     * the <code>{@link InputStream}</code> class.  As an additional
-     * convenience, it attempts to read as many bytes as possible by repeatedly
-     * invoking the <code>read</code> method of the underlying stream.  This
-     * iterated <code>read</code> continues until one of the following
-     * conditions becomes true: <ul>
-     *
-     * <li> The specified number of bytes have been read,
-     *
-     * <li> The <code>read</code> method of the underlying stream returns
-     * <code>-1</code>, indicating end-of-file, or
-     *
-     * <li> The <code>available</code> method of the underlying stream
-     * returns zero, indicating that further input requests would block.
-     *
-     * </ul> If the first <code>read</code> on the underlying stream returns
-     * <code>-1</code> to indicate end-of-file then this method returns
-     * <code>-1</code>.  Otherwise this method returns the number of bytes
-     * actually read.
-     *
-     * <p> Subclasses of this class are encouraged, but not required, to
-     * attempt to read as many bytes as possible in the same fashion.
-     *
-     * @param b   destination buffer.
-     * @param off offset at which to start storing bytes.
-     * @param len maximum number of bytes to read.
-     * @return the number of bytes read, or <code>-1</code> if the end of
-     * the stream has been reached.
-     * @throws IOException if this input stream has been closed by
-     *                     invoking its {@link #close()} method,
-     *                     or an I/O error occurs.
-     */
+    /// Reads bytes from this byte-input stream into the specified byte array,
+    /// starting at the given offset.
+    ///
+    ///  This method implements the general contract of the corresponding
+    /// ```int, int) read``` method of
+    /// the ```InputStream``` class.  As an additional
+    /// convenience, it attempts to read as many bytes as possible by repeatedly
+    /// invoking the `read` method of the underlying stream.  This
+    /// iterated `read` continues until one of the following
+    /// conditions becomes true:
+    ///
+    /// -  The specified number of bytes have been read,
+    ///
+    /// -  The `read` method of the underlying stream returns
+    /// `-1`, indicating end-of-file, or
+    ///
+    /// -  The `available` method of the underlying stream
+    /// returns zero, indicating that further input requests would block.
+    ///
+    ///  If the first `read` on the underlying stream returns
+    /// `-1` to indicate end-of-file then this method returns
+    /// `-1`.  Otherwise this method returns the number of bytes
+    /// actually read.
+    ///
+    ///  Subclasses of this class are encouraged, but not required, to
+    /// attempt to read as many bytes as possible in the same fashion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: destination buffer.
+    ///
+    /// - `off`: offset at which to start storing bytes.
+    ///
+    /// - `len`: maximum number of bytes to read.
+    ///
+    /// #### Returns
+    ///
+    /// @return the number of bytes read, or `-1` if the end of
+    /// the stream has been reached.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if this input stream has been closed by
+    ///                     invoking its `#close()` method,
+    ///                     or an I/O error occurs.
     @Override
     public synchronized int read(byte[] b, int off, int len)
             throws IOException {
@@ -493,15 +503,15 @@ public class BufferedInputStream extends InputStream {
         return n;
     }
 
-    /**
-     * See the general contract of the <code>skip</code>
-     * method of <code>InputStream</code>.
-     *
-     * @throws IOException if the stream does not support seek,
-     *                     or if this input stream has been closed by
-     *                     invoking its {@link #close()} method, or an
-     *                     I/O error occurs.
-     */
+    /// See the general contract of the `skip`
+    /// method of `InputStream`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if the stream does not support seek,
+    ///                     or if this input stream has been closed by
+    ///                     invoking its `#close()` method, or an
+    ///                     I/O error occurs.
     @Override
     public synchronized long skip(long n) throws IOException {
         if (disableBuffering) {
@@ -538,23 +548,26 @@ public class BufferedInputStream extends InputStream {
         return skipped;
     }
 
-    /**
-     * Returns an estimate of the number of bytes that can be read (or
-     * skipped over) from this input stream without blocking by the next
-     * invocation of a method for this input stream. The next invocation might be
-     * the same thread or another thread.  A single read or skip of this
-     * many bytes will not block, but may read or skip fewer bytes.
-     * <p>
-     * This method returns the sum of the number of bytes remaining to be read in
-     * the buffer (<code>count&nbsp;- pos</code>) and the result of calling the
-     * {@link java.io.FilterInputStream#in in}.available().
-     *
-     * @return an estimate of the number of bytes that can be read (or skipped
-     * over) from this input stream without blocking.
-     * @throws IOException if this input stream has been closed by
-     *                     invoking its close() method,
-     *                     or an I/O error occurs.
-     */
+    /// Returns an estimate of the number of bytes that can be read (or
+    /// skipped over) from this input stream without blocking by the next
+    /// invocation of a method for this input stream. The next invocation might be
+    /// the same thread or another thread.  A single read or skip of this
+    /// many bytes will not block, but may read or skip fewer bytes.
+    ///
+    /// This method returns the sum of the number of bytes remaining to be read in
+    /// the buffer (`count - pos`) and the result of calling the
+    /// `in`.available().
+    ///
+    /// #### Returns
+    ///
+    /// @return an estimate of the number of bytes that can be read (or skipped
+    /// over) from this input stream without blocking.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if this input stream has been closed by
+    ///                     invoking its close() method,
+    ///                     or an I/O error occurs.
     @Override
     public synchronized int available() throws IOException {
         if (disableBuffering) {
@@ -563,34 +576,34 @@ public class BufferedInputStream extends InputStream {
         return superAvailable() + (count - pos);
     }
 
-    /**
-     * See the general contract of the <code>mark</code>
-     * method of <code>InputStream</code>.
-     *
-     * @param readlimit the maximum limit of bytes that can be read before
-     *                  the mark position becomes invalid.
-     */
+    /// See the general contract of the `mark`
+    /// method of `InputStream`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `readlimit`: @param readlimit the maximum limit of bytes that can be read before
+    ///                  the mark position becomes invalid.
     @Override
     public synchronized void mark(int readlimit) {
         marklimit = readlimit;
         markpos = pos;
     }
 
-    /**
-     * See the general contract of the <code>reset</code>
-     * method of <code>InputStream</code>.
-     * <p>
-     * If <code>markpos</code> is <code>-1</code>
-     * (no mark has been set or the mark has been
-     * invalidated), an <code>IOException</code>
-     * is thrown. Otherwise, <code>pos</code> is
-     * set equal to <code>markpos</code>.
-     *
-     * @throws IOException if this stream has not been marked or,
-     *                     if the mark has been invalidated, or the stream
-     *                     has been closed by invoking its {@link #close()}
-     *                     method, or an I/O error occurs.
-     */
+    /// See the general contract of the `reset`
+    /// method of `InputStream`.
+    ///
+    /// If `markpos` is `-1`
+    /// (no mark has been set or the mark has been
+    /// invalidated), an `IOException`
+    /// is thrown. Otherwise, `pos` is
+    /// set equal to `markpos`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if this stream has not been marked or,
+    ///                     if the mark has been invalidated, or the stream
+    ///                     has been closed by invoking its `#close()`
+    ///                     method, or an I/O error occurs.
     @Override
     public synchronized void reset() throws IOException {
         getBufIfOpen(); // Cause exception if closed
@@ -600,17 +613,21 @@ public class BufferedInputStream extends InputStream {
         pos = markpos;
     }
 
-    /**
-     * Tests if this input stream supports the <code>mark</code>
-     * and <code>reset</code> methods. The <code>markSupported</code>
-     * method of <code>BufferedInputStream</code> returns
-     * <code>true</code>.
-     *
-     * @return a <code>boolean</code> indicating if this stream type supports
-     * the <code>mark</code> and <code>reset</code> methods.
-     * @see java.io.InputStream#mark(int)
-     * @see java.io.InputStream#reset()
-     */
+    /// Tests if this input stream supports the `mark`
+    /// and `reset` methods. The `markSupported`
+    /// method of `BufferedInputStream` returns
+    /// `true`.
+    ///
+    /// #### Returns
+    ///
+    /// @return a `boolean` indicating if this stream type supports
+    /// the `mark` and `reset` methods.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.InputStream#mark(int)
+    ///
+    /// - java.io.InputStream#reset()
     @Override
     public boolean markSupported() {
         return in.markSupported();
@@ -628,15 +645,15 @@ public class BufferedInputStream extends InputStream {
         }
     }
 
-    /**
-     * Closes this input stream and releases any system resources
-     * associated with the stream.
-     * Once the stream has been closed, further read(), available(), reset(),
-     * or skip() invocations will throw an IOException.
-     * Closing a previously closed stream has no effect.
-     *
-     * @throws IOException if an I/O error occurs.
-     */
+    /// Closes this input stream and releases any system resources
+    /// associated with the stream.
+    /// Once the stream has been closed, further read(), available(), reset(),
+    /// or skip() invocations will throw an IOException.
+    /// Closing a previously closed stream has no effect.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
     @Override
     public void close() throws IOException {
         if (closed) {
@@ -660,117 +677,113 @@ public class BufferedInputStream extends InputStream {
         }
     }
 
-    /**
-     * Returns the time of the last activity
-     *
-     * @return time of the last activity on this stream
-     */
+    /// Returns the time of the last activity
+    ///
+    /// #### Returns
+    ///
+    /// time of the last activity on this stream
     public synchronized long getLastActivityTime() {
         return lastActivityTime;
     }
 
-    /**
-     * Returns the total number of bytes read from this stream so far
-     *
-     * @return the total number of bytes read from this stream so far
-     */
+    /// Returns the total number of bytes read from this stream so far
+    ///
+    /// #### Returns
+    ///
+    /// the total number of bytes read from this stream so far
     public synchronized int getTotalBytesRead() {
         return totalBytesRead;
     }
 
-    /**
-     * Sets the callback for IO updates from a buffered stream
-     *
-     * @param progressListener the progressListener to set
-     */
+    /// Sets the callback for IO updates from a buffered stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `progressListener`: the progressListener to set
     public void setProgressListener(IOProgressListener progressListener) {
         this.progressListener = progressListener;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int read(byte[] b) throws IOException {
         return read(b, 0, b.length);
     }
 
-    /**
-     * If applicable this member represents the connection object for the stream
-     *
-     * @return the connection
-     */
+    /// If applicable this member represents the connection object for the stream
+    ///
+    /// #### Returns
+    ///
+    /// the connection
     public Object getConnection() {
         return connection;
     }
 
-    /**
-     * If applicable this member represents the connection object for the stream
-     *
-     * @param connection the connection to set
-     */
+    /// If applicable this member represents the connection object for the stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to set
     public void setConnection(Object connection) {
         this.connection = connection;
     }
 
-    /**
-     * @return the disableBuffering
-     */
+    /// #### Returns
+    ///
+    /// the disableBuffering
     public synchronized boolean isDisableBuffering() {
         return disableBuffering;
     }
 
-    /**
-     * @param disableBuffering the disableBuffering to set
-     */
+    /// #### Parameters
+    ///
+    /// - `disableBuffering`: the disableBuffering to set
     public synchronized void setDisableBuffering(boolean disableBuffering) {
         this.disableBuffering = disableBuffering;
     }
 
-    /**
-     * Prints out all the data that passes through this stream to the console.
-     * This is a very useful debugging tool.
-     *
-     * @return the printInput
-     */
+    /// Prints out all the data that passes through this stream to the console.
+    /// This is a very useful debugging tool.
+    ///
+    /// #### Returns
+    ///
+    /// the printInput
     public synchronized boolean isPrintInput() {
         return printInput;
     }
 
-    /**
-     * Prints out all the data that passes through this stream to the console.
-     * This is a very useful debugging tool.
-     *
-     * @param printInput the printInput to set
-     */
+    /// Prints out all the data that passes through this stream to the console.
+    /// This is a very useful debugging tool.
+    ///
+    /// #### Parameters
+    ///
+    /// - `printInput`: the printInput to set
     public synchronized void setPrintInput(boolean printInput) {
         this.printInput = printInput;
     }
 
-    /**
-     * Allows setting a yield duration for this stream which is useful for background
-     * operations to release CPU
-     *
-     * @return the yield
-     */
+    /// Allows setting a yield duration for this stream which is useful for background
+    /// operations to release CPU
+    ///
+    /// #### Returns
+    ///
+    /// the yield
     public synchronized int getYield() {
         return yield;
     }
 
-    /**
-     * Allows setting a yield duration for this stream which is useful for background
-     * operations to release CPU
-     *
-     * @param yield the yield to set
-     */
+    /// Allows setting a yield duration for this stream which is useful for background
+    /// operations to release CPU
+    ///
+    /// #### Parameters
+    ///
+    /// - `yield`: the yield to set
     public synchronized void setYield(int yield) {
         this.yield = yield;
     }
 
-    /**
-     * Stop reading from the stream, invoking this will cause the read() to
-     * return -1
-     */
+    /// Stop reading from the stream, invoking this will cause the read() to
+    /// return -1
     public synchronized void stop() {
         stopped = true;
     }

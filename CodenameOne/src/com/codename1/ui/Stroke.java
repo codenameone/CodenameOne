@@ -22,69 +22,77 @@
  */
 package com.codename1.ui;
 
-/**
- * Encapsulates the stroke used for drawing paths.
- *
- * @author Steve Hannah
- * @see Graphics#setStroke
- * @see Graphics#getStroke
- */
+/// Encapsulates the stroke used for drawing paths.
+///
+/// @author Steve Hannah
+///
+/// #### See also
+///
+/// - Graphics#setStroke
+///
+/// - Graphics#getStroke
 public class Stroke {
 
     // Constants for the type of join to use for the stroke
 
-    /**
-     * Join style constant to join strokes MITER (i.e. pointy)
-     * Examples can be seen at <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm">here</a>.
-     *
-     * @see #setJoinStyle
-     * @see #getJoinStyle
-     */
+    /// Join style constant to join strokes MITER (i.e. pointy)
+    /// Examples can be seen at [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm).
+    ///
+    /// #### See also
+    ///
+    /// - #setJoinStyle
+    ///
+    /// - #getJoinStyle
     public static final int JOIN_MITER = 0;
 
-    /**
-     * Join style constant to join strokes rounded.
-     * Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm">here</a>.
-     *
-     * @see #setJoinStyle
-     * @see #getJoinStyle
-     */
+    /// Join style constant to join strokes rounded.
+    /// Examples can be seen [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm).
+    ///
+    /// #### See also
+    ///
+    /// - #setJoinStyle
+    ///
+    /// - #getJoinStyle
     public static final int JOIN_ROUND = 1;
 
-    /**
-     * Join style constant to join strokes bevel.
-     * Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm">here</a>.
-     *
-     * @see #setJoinStyle
-     * @see #getJoinStyle
-     */
+    /// Join style constant to join strokes bevel.
+    /// Examples can be seen [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm).
+    ///
+    /// #### See also
+    ///
+    /// - #setJoinStyle
+    ///
+    /// - #getJoinStyle
     public static final int JOIN_BEVEL = 2;
 
-    /**
-     * Cap style constant to cap strokes with a butt (or flat).
-     * Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm">here</a>.
-     *
-     * @see #setCapStyle
-     * @see #getCapStyle
-     */
+    /// Cap style constant to cap strokes with a butt (or flat).
+    /// Examples can be seen [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm).
+    ///
+    /// #### See also
+    ///
+    /// - #setCapStyle
+    ///
+    /// - #getCapStyle
     public static final int CAP_BUTT = 0;
 
-    /**
-     * Cap style constant to cap strokes with a round end.
-     * Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm">here</a>
-     *
-     * @see #setCapStyle
-     * @see #getCapStyle
-     */
+    /// Cap style constant to cap strokes with a round end.
+    /// Examples can be seen [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm)
+    ///
+    /// #### See also
+    ///
+    /// - #setCapStyle
+    ///
+    /// - #getCapStyle
     public static final int CAP_ROUND = 1;
 
-    /**
-     * Cap style constant to cap strokes with a square end.
-     * Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm">here</a>
-     *
-     * @see #setCapStyle
-     * @see #getCapStyle
-     */
+    /// Cap style constant to cap strokes with a square end.
+    /// Examples can be seen [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm)
+    ///
+    /// #### See also
+    ///
+    /// - #setCapStyle
+    ///
+    /// - #getCapStyle
     public static final int CAP_SQUARE = 2;
 
 
@@ -93,14 +101,17 @@ public class Stroke {
     private float lineWidth = 1f;
     private float miterLimit = 4f;
 
-    /**
-     * Creates a stroke with the specified characteristics.
-     *
-     * @param lineWidth  The width of the stroke pixels.
-     * @param capStyle   The cap style of the stroke.  Should be one of {@link #CAP_BUTT}, {@link #CAP_ROUND}, or {@link #CAP_SQUARE}.
-     * @param joinStyle  The join style of the strokes.  Should be one of {@link #JOIN_MITER}, {@link #JOIN_ROUND}, or {@link #JOIN_BEVEL}.
-     * @param miterLimit The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
-     */
+    /// Creates a stroke with the specified characteristics.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lineWidth`: The width of the stroke pixels.
+    ///
+    /// - `capStyle`: The cap style of the stroke.  Should be one of `#CAP_BUTT`, `#CAP_ROUND`, or `#CAP_SQUARE`.
+    ///
+    /// - `joinStyle`: The join style of the strokes.  Should be one of `#JOIN_MITER`, `#JOIN_ROUND`, or `#JOIN_BEVEL`.
+    ///
+    /// - `miterLimit`: The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
     public Stroke(float lineWidth, int capStyle, int joinStyle, float miterLimit) {
         this.lineWidth = lineWidth;
         this.capStyle = capStyle;
@@ -108,24 +119,21 @@ public class Stroke {
         this.miterLimit = miterLimit;
     }
 
-    /**
-     * Creates a stroke with default settings.  Default settings are:
-     * <table>
-     *  <tr><td>Join style</td><td>{@link #JOIN_MITER}</td></tr>
-     *  <tr><td>Cap style</td><td>{@link #CAP_BUTT}</td></tr>
-     *  <tr><td>Line Width</td><td>1.0</td></tr>
-     *  <tr><td>Miter Limit</td><td>4.0</td></tr>
-     * </table>
-     */
+    /// Creates a stroke with default settings.  Default settings are:
+    ///
+    ///  Join style`#JOIN_MITER`
+    ///  Cap style`#CAP_BUTT`
+    ///  Line Width1.0
+    ///  Miter Limit4.0
     public Stroke() {
 
     }
 
-    /**
-     * Copies the properties of {@code stroke} into this stroke.
-     *
-     * @param stroke The stroke whose properties we wish to copy into the current stroke.
-     */
+    /// Copies the properties of `stroke` into this stroke.
+    ///
+    /// #### Parameters
+    ///
+    /// - `stroke`: The stroke whose properties we wish to copy into the current stroke.
     public void setStroke(Stroke stroke) {
         this.lineWidth = stroke.lineWidth;
         this.capStyle = stroke.capStyle;
@@ -133,92 +141,112 @@ public class Stroke {
         this.miterLimit = stroke.miterLimit;
     }
 
-    /**
-     * Returns the join style used for this stroke.
-     * See visual examples of join styles <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm">here</a>.
-     *
-     * @return the joinStyle This will be one of {@link #JOIN_MITER},
-     * {@link #JOIN_ROUND}, and {@link #JOIN_BEVEL}.
-     * @see #JOIN_MITER
-     * @see #JOIN_BEVEL
-     * @see #JOIN_ROUND
-     */
+    /// Returns the join style used for this stroke.
+    /// See visual examples of join styles [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm).
+    ///
+    /// #### Returns
+    ///
+    /// @return the joinStyle This will be one of `#JOIN_MITER`,
+    /// `#JOIN_ROUND`, and `#JOIN_BEVEL`.
+    ///
+    /// #### See also
+    ///
+    /// - #JOIN_MITER
+    ///
+    /// - #JOIN_BEVEL
+    ///
+    /// - #JOIN_ROUND
     public int getJoinStyle() {
         return joinStyle;
     }
 
-    /**
-     * Sets the join style of the stroke.
-     * See visual examples of join styles <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm">here</a>.
-     *
-     * @param joinStyle the joinStyle to set.  This should be one of {@link #JOIN_MITER},
-     *                  {@link #JOIN_ROUND}, and {@link #JOIN_BEVEL}.
-     * @see #JOIN_MITER
-     * @see #JOIN_BEVEL
-     * @see #JOIN_ROUND
-     */
+    /// Sets the join style of the stroke.
+    /// See visual examples of join styles [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm).
+    ///
+    /// #### Parameters
+    ///
+    /// - `joinStyle`: @param joinStyle the joinStyle to set.  This should be one of `#JOIN_MITER`,
+    ///                  `#JOIN_ROUND`, and `#JOIN_BEVEL`.
+    ///
+    /// #### See also
+    ///
+    /// - #JOIN_MITER
+    ///
+    /// - #JOIN_BEVEL
+    ///
+    /// - #JOIN_ROUND
     public void setJoinStyle(int joinStyle) {
         this.joinStyle = joinStyle;
     }
 
-    /**
-     * Gets the cap style of the stroke.
-     * See visual examples of cap styles <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm">here</a>.
-     *
-     * @return the capStyle.  This will be one of {@link #CAP_BUTT}, {@link #CAP_ROUND}, and {@link #CAP_SQUARE}.
-     * @see #CAP_BUTT
-     * @see #CAP_SQUARE
-     * @see #CAP_ROUND
-     */
+    /// Gets the cap style of the stroke.
+    /// See visual examples of cap styles [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm).
+    ///
+    /// #### Returns
+    ///
+    /// the capStyle.  This will be one of `#CAP_BUTT`, `#CAP_ROUND`, and `#CAP_SQUARE`.
+    ///
+    /// #### See also
+    ///
+    /// - #CAP_BUTT
+    ///
+    /// - #CAP_SQUARE
+    ///
+    /// - #CAP_ROUND
     public int getCapStyle() {
         return capStyle;
     }
 
-    /**
-     * Gets the cap style of the stroke.
-     * See visual examples of cap styles <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm">here</a>.
-     *
-     * @param capStyle the capStyle to set. This will be one of {@link #CAP_BUTT}, {@link #CAP_ROUND}, and {@link #CAP_SQUARE}.
-     * @see #CAP_BUTT
-     * @see #CAP_SQUARE
-     * @see #CAP_ROUND
-     */
+    /// Gets the cap style of the stroke.
+    /// See visual examples of cap styles [here](http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm).
+    ///
+    /// #### Parameters
+    ///
+    /// - `capStyle`: the capStyle to set. This will be one of `#CAP_BUTT`, `#CAP_ROUND`, and `#CAP_SQUARE`.
+    ///
+    /// #### See also
+    ///
+    /// - #CAP_BUTT
+    ///
+    /// - #CAP_SQUARE
+    ///
+    /// - #CAP_ROUND
     public void setCapStyle(int capStyle) {
         this.capStyle = capStyle;
     }
 
-    /**
-     * Returns the line width of the stroke.
-     *
-     * @return the lineWidth
-     */
+    /// Returns the line width of the stroke.
+    ///
+    /// #### Returns
+    ///
+    /// the lineWidth
     public float getLineWidth() {
         return lineWidth;
     }
 
-    /**
-     * Sets the line width of the stroke.
-     *
-     * @param lineWidth the lineWidth to set
-     */
+    /// Sets the line width of the stroke.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lineWidth`: the lineWidth to set
     public void setLineWidth(float lineWidth) {
         this.lineWidth = lineWidth;
     }
 
-    /**
-     * Gets the miter limit of the stroke. The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
-     *
-     * @return the miterLimit
-     */
+    /// Gets the miter limit of the stroke. The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
+    ///
+    /// #### Returns
+    ///
+    /// the miterLimit
     public float getMiterLimit() {
         return miterLimit;
     }
 
-    /**
-     * Sets the miter limit of the stroke. The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
-     *
-     * @param miterLimit the miterLimit to set
-     */
+    /// Sets the miter limit of the stroke. The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
+    ///
+    /// #### Parameters
+    ///
+    /// - `miterLimit`: the miterLimit to set
     public void setMiterLimit(float miterLimit) {
         this.miterLimit = miterLimit;
     }

@@ -41,9 +41,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * @author Chen
- */
+/// @author Chen
 class ShareForm extends Form {
 
     private final TextField to = new TextField();

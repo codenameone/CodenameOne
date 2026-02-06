@@ -34,18 +34,14 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.Arrays;
 
-/**
- * Implementation of the HTML components document request handler to allow simple
- * HTML support in CodenameOne.
- *
- * @author Shai Almog
- */
+/// Implementation of the HTML components document request handler to allow simple
+/// HTML support in CodenameOne.
+///
+/// @author Shai Almog
 public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandler {
     protected static final Object LOCK = new Object();
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
         String url = docInfo.getUrl();
@@ -57,9 +53,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
         resourceRequested(docInfo, callback);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public InputStream resourceRequested(DocumentInfo docInfo) {
         return null;

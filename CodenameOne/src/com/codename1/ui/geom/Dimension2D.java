@@ -23,84 +23,79 @@
  */
 package com.codename1.ui.geom;
 
-/**
- * Utility class that holds a width and height that represents a dimension of
- * a component or element
- *
- * @author Nir Shabi
- */
+/// Utility class that holds a width and height that represents a dimension of
+/// a component or element
+///
+/// @author Nir Shabi
 public class Dimension2D {
 
     private double width;
 
     private double height;
 
-    /**
-     * Creates a new instance of Dimension
-     */
+    /// Creates a new instance of Dimension
     public Dimension2D() {
     }
 
-    /**
-     * Creates a new instance of Dimension with a predefine dimension
-     *
-     * @param d Dimension to copy
-     */
+    /// Creates a new instance of Dimension with a predefine dimension
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: Dimension to copy
     public Dimension2D(Dimension2D d) {
         this.width = d.width;
         this.height = d.height;
     }
 
-    /**
-     * CCreates a new instance of Dimension with width and height
-     *
-     * @param width  the dimention width
-     * @param height the dimention height
-     */
+    /// CCreates a new instance of Dimension with width and height
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the dimention width
+    ///
+    /// - `height`: the dimention height
     public Dimension2D(double width, double height) {
         this.width = width;
         this.height = height;
     }
 
-    /**
-     * Returns the width of the dimension
-     *
-     * @return width of the dimension
-     */
+    /// Returns the width of the dimension
+    ///
+    /// #### Returns
+    ///
+    /// width of the dimension
     public double getWidth() {
         return width;
     }
 
-    /**
-     * Set the width of the dimension
-     *
-     * @param width the dimention width
-     */
+    /// Set the width of the dimension
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the dimention width
     public void setWidth(double width) {
         this.width = width;
     }
 
-    /**
-     * Return the height of the dimension
-     *
-     * @return height of the dimension
-     */
+    /// Return the height of the dimension
+    ///
+    /// #### Returns
+    ///
+    /// height of the dimension
     public double getHeight() {
         return height;
     }
 
-    /**
-     * Set the height of the dimension
-     *
-     * @param height the dimention height
-     */
+    /// Set the height of the dimension
+    ///
+    /// #### Parameters
+    ///
+    /// - `height`: the dimention height
     public void setHeight(double height) {
         this.height = height;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "width = " + width + " height = " + height;

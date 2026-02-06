@@ -25,20 +25,23 @@ package com.codename1.ui.scene;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * Interface for painting the content of a node in the Scene graph.
- *
- * @author Steve Hannah
- * @deprecated For internal use only
- */
+/// Interface for painting the content of a node in the Scene graph.
+///
+/// @author Steve Hannah
+///
+/// #### Deprecated
+///
+/// For internal use only
 public interface NodePainter {
 
-    /**
-     * Paints node content in the given bounding rect on the provided Graphics context for the given node.
-     *
-     * @param g      The graphics context to paint onto.
-     * @param bounds The bounding rect to paint into.
-     * @param node   The node whose content we are painting.
-     */
+    /// Paints node content in the given bounding rect on the provided Graphics context for the given node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics context to paint onto.
+    ///
+    /// - `bounds`: The bounding rect to paint into.
+    ///
+    /// - `node`: The node whose content we are painting.
     void paint(Graphics g, Rectangle bounds, Node node);
 }

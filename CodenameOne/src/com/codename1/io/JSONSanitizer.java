@@ -14,125 +14,117 @@
 
 package com.codename1.io;
 
-/**
- * Given JSON-like content, converts it to valid JSON.
- * This can be attached at either end of a data-pipeline to help satisfy
- * Postel's principle:
- * <blockquote>
- * be conservative in what you do, be liberal in what you accept from others
- * </blockquote>
- * <p>
- * Applied to JSON-like content from others, it will produce well-formed JSON
- * that should satisfy any parser you use.
- * <p>
- * Applied to your output before you send, it will coerce minor mistakes in
- * encoding and make it easier to embed your JSON in HTML and XML.
- *
- * <h3>Input</h3>
- * The sanitizer takes JSON like content, and interprets it as JS eval would.
- * Specifically, it deals with these non-standard constructs.
- * <ul>
- * <li>{@code '...'} Single quoted strings are converted to JSON strings.
- * <li>{@code \xAB} Hex escapes are converted to JSON unicode escapes.
- * <li>{@code \012} Octal escapes are converted to JSON unicode escapes.
- * <li>{@code 0xAB} Hex integer literals are converted to JSON decimal numbers.
- * <li>{@code 012} Octal integer literals are converted to JSON decimal numbers.
- * <li>{@code +.5} Decimal numbers are coerced to JSON's stricter format.
- * <li>{@code [0,,2]} Elisions in arrays are filled with {@code null}.
- * <li>{@code [1,2,3,]} Trailing commas are removed.
- * <li><code>{foo:"bar"}</code> Unquoted property names are quoted.
- * <li><code>//comments</code> JS style line and block comments are removed.
- * <li><code>(...)</code> Grouping parentheses are removed.
- * </ul>
- * <p>
- * The sanitizer fixes missing punctuation, end quotes, and mismatched or
- * missing close brackets. If an input contains only white-space then the valid
- * JSON string {@code null} is substituted.
- *
- * <h3>Output</h3>
- * The output is well-formed JSON as defined by
- * <a href="http://www.ietf.org/rfc/rfc4627.txt">RFC 4627</a>.
- * The output satisfies three additional properties:
- * <ol>
- * <li>The output will not contain the substring (case-insensitively)
- *   {@code "</script"} so can be embedded inside an HTML script element without
- *   further encoding.
- * <li>The output will not contain the substring {@code "]]>"} so can be
- *   embedded inside an XML CDATA section without further encoding.</li>
- * <li>The output is a valid Javascript expression, so can be parsed by
- *   Javascript's <code>eval</code> builtin (after being wrapped in parentheses)
- *   or by <code>JSON.parse</code>.
- *   Specifically, the output will not contain any string literals with embedded
- *   JS newlines (U+2028 Paragraph separator or U+2029 Line separator).
- * <li>The output contains only valid Unicode scalar values
- *   (no isolated UTF-16 surrogates) that are
- *   <a href="http://www.w3.org/TR/xml/#charsets">allowed in XML</a> unescaped.
- * </ol>
- *
- * <h3>Security</h3>
- * Since the output is well-formed JSON, passing it to <code>eval</code> will
- * have no side-effects and no free variables, so is neither a code-injection
- * vector, nor a vector for exfiltration of secrets.
- *
- * <p>This library only ensures that the JSON string &rarr; Javascript object
- * phase has no side effects and resolves no free variables, and cannot control
- * how other client side code later interprets the resulting Javascript object.
- * So if client-side code takes a part of the parsed data that is controlled by
- * an attacker and passes it back through a powerful interpreter like
- * {@code eval} or {@code innerHTML} then that client-side code might suffer
- * unintended side-effects.
- *
- * <h3>Efficiency</h3>
- * The sanitize method will return the input string without allocating a new
- * buffer when the input is already valid JSON that satisfies the properties
- * above.  Thus, if used on input that is usually well formed, it has minimal
- * memory overhead.
- * <p>The sanitize method takes O(n) time where n is the length in UTF-16
- * code-units.
- */
+/// Given JSON-like content, converts it to valid JSON.
+/// This can be attached at either end of a data-pipeline to help satisfy
+/// Postel's principle:
+///
+/// be conservative in what you do, be liberal in what you accept from others
+///
+/// Applied to JSON-like content from others, it will produce well-formed JSON
+/// that should satisfy any parser you use.
+///
+/// Applied to your output before you send, it will coerce minor mistakes in
+/// encoding and make it easier to embed your JSON in HTML and XML.
+///
+/// Input
+/// The sanitizer takes JSON like content, and interprets it as JS eval would.
+/// Specifically, it deals with these non-standard constructs.
+///
+/// - `'...'` Single quoted strings are converted to JSON strings.
+///
+/// - `\xAB` Hex escapes are converted to JSON unicode escapes.
+///
+/// - `\012` Octal escapes are converted to JSON unicode escapes.
+///
+/// - `0xAB` Hex integer literals are converted to JSON decimal numbers.
+///
+/// - `012` Octal integer literals are converted to JSON decimal numbers.
+///
+/// - `+.5` Decimal numbers are coerced to JSON's stricter format.
+///
+/// - `[0,,2]` Elisions in arrays are filled with `null`.
+///
+/// - `[1,2,3,]` Trailing commas are removed.
+///
+/// - `{foo:"bar"}` Unquoted property names are quoted.
+///
+/// - `//comments` JS style line and block comments are removed.
+///
+/// - `(...)` Grouping parentheses are removed.
+///
+/// The sanitizer fixes missing punctuation, end quotes, and mismatched or
+/// missing close brackets. If an input contains only white-space then the valid
+/// JSON string `null` is substituted.
+///
+/// Output
+/// The output is well-formed JSON as defined by
+/// [RFC 4627](http://www.ietf.org/rfc/rfc4627.txt).
+/// The output satisfies three additional properties:
+///
+/// - The output will not contain the substring (case-insensitively)
+///   `""` so can be
+///   embedded inside an XML CDATA section without further encoding.
+///
+/// - The output is a valid Javascript expression, so can be parsed by
+///   Javascript's `eval` builtin (after being wrapped in parentheses)
+///   or by `JSON.parse`.
+///   Specifically, the output will not contain any string literals with embedded
+///   JS newlines (U+2028 Paragraph separator or U+2029 Line separator).
+///
+/// - The output contains only valid Unicode scalar values
+///   (no isolated UTF-16 surrogates) that are
+///   [allowed in XML](http://www.w3.org/TR/xml/#charsets) unescaped.
+///
+/// Security
+/// Since the output is well-formed JSON, passing it to `eval` will
+/// have no side-effects and no free variables, so is neither a code-injection
+/// vector, nor a vector for exfiltration of secrets.
+///
+/// This library only ensures that the JSON string → Javascript object
+/// phase has no side effects and resolves no free variables, and cannot control
+/// how other client side code later interprets the resulting Javascript object.
+/// So if client-side code takes a part of the parsed data that is controlled by
+/// an attacker and passes it back through a powerful interpreter like
+/// `eval` or `innerHTML` then that client-side code might suffer
+/// unintended side-effects.
+///
+/// Efficiency
+/// The sanitize method will return the input string without allocating a new
+/// buffer when the input is already valid JSON that satisfies the properties
+/// above.  Thus, if used on input that is usually well formed, it has minimal
+/// memory overhead.
+///
+/// The sanitize method takes O(n) time where n is the length in UTF-16
+/// code-units.
 final class JSONSanitizer {
 
-    /**
-     * The default for the maximumNestingDepth constructor parameter.
-     */
+    /// The default for the maximumNestingDepth constructor parameter.
     public static final int DEFAULT_NESTING_DEPTH = 64;
 
-    /**
-     * The maximum value for the maximumNestingDepth constructor parameter.
-     */
+    /// The maximum value for the maximumNestingDepth constructor parameter.
     public static final int MAXIMUM_NESTING_DEPTH = 4096;
     private static final boolean SUPER_VERBOSE_AND_SLOW_LOGGING = false;
     private static final char[] HEX_DIGITS = new char[]{
             '0', '1', '2', '3', '4', '5', '6', '7',
             '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
     };
-    /**
-     * The maximum nesting depth. According to RFC4627 it is implementation-specific.
-     */
+    /// The maximum nesting depth. According to RFC4627 it is implementation-specific.
     private final int maximumNestingDepth;
     private final String jsonish;
-    /**
-     * The number of brackets that have been entered and not subsequently exited.
-     * Also, the length of the used prefix of {@link #isMap}.
-     */
+    /// The number of brackets that have been entered and not subsequently exited.
+    /// Also, the length of the used prefix of `#isMap`.
     private int bracketDepth;
-    /**
-     * {@code isMap[i]} when {@code 0 <= i && i < bracketDepth} is true iff
-     * the i-th open bracket was a <code>'{'</code>, not a <code>'['</code>.
-     */
+    /// `isMap[i]` when `0 <= i && i < bracketDepth` is true iff
+    /// the i-th open bracket was a `'{'`, not a `'['`.
     private boolean[] isMap;
-    /**
-     * If non-null, then contains the sanitized form of
-     * {@code jsonish.substring(0, cleaned)}.
-     * If {@code null}, then no unclean constructs have been found in
-     * {@code jsonish} yet.
-     */
+    /// If non-null, then contains the sanitized form of
+    /// `jsonish.substring(0, cleaned)`.
+    /// If `null`, then no unclean constructs have been found in
+    /// `jsonish` yet.
     @SuppressWarnings("PMD.AvoidStringBufferField")
     private StringBuilder sanitizedJson;
-    /**
-     * The length of the prefix of {@link #jsonish} that has been written onto
-     * {@link #sanitizedJson}.
-     */
+    /// The length of the prefix of `#jsonish` that has been written onto
+    /// `#sanitizedJson`.
     private int cleaned;
 
     JSONSanitizer(String jsonish) {
@@ -147,36 +139,41 @@ final class JSONSanitizer {
         this.jsonish = jsonish != null ? jsonish : "null";
     }
 
-    /**
-     * Given JSON-like content, produces a string of JSON that is safe to embed,
-     * safe to pass to JavaScript's {@code eval} operator.
-     *
-     * @param jsonish JSON-like content.
-     * @return embeddable JSON
-     */
+    /// Given JSON-like content, produces a string of JSON that is safe to embed,
+    /// safe to pass to JavaScript's `eval` operator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `jsonish`: JSON-like content.
+    ///
+    /// #### Returns
+    ///
+    /// embeddable JSON
     public static String sanitize(String jsonish) {
         return sanitize(jsonish, DEFAULT_NESTING_DEPTH);
     }
 
-    /**
-     * Same as {@link JsonSanitizer#sanitize(String)}, but allows to set a custom
-     * maximum nesting depth.
-     *
-     * @param jsonish             JSON-like content.
-     * @param maximumNestingDepth maximum nesting depth.
-     * @return embeddable JSON
-     */
+    /// Same as `JsonSanitizer#sanitize(String)`, but allows to set a custom
+    /// maximum nesting depth.
+    ///
+    /// #### Parameters
+    ///
+    /// - `jsonish`: JSON-like content.
+    ///
+    /// - `maximumNestingDepth`: maximum nesting depth.
+    ///
+    /// #### Returns
+    ///
+    /// embeddable JSON
     public static String sanitize(String jsonish, int maximumNestingDepth) {
         JSONSanitizer s = new JSONSanitizer(jsonish, maximumNestingDepth);
         s.sanitize();
         return s.toString();
     }
 
-    /**
-     * The position past the last character within the quotes of the quoted
-     * string starting at {@code s.charAt(start)}.  Does not assume that the
-     * quoted string is properly closed.
-     */
+    /// The position past the last character within the quotes of the quoted
+    /// string starting at `s.charAt(start)`.  Does not assume that the
+    /// quoted string is properly closed.
     private static int endOfQuotedString(String s, int start) {
         char quote = s.charAt(start);
         for (int i = start; (i = s.indexOf(quote, i + 1)) >= 0; ) { //NOPMD AssignmentInOperand
@@ -193,11 +190,15 @@ final class JSONSanitizer {
         return s.length();
     }
 
-    /**
-     * @param sanStart the start (inclusive) of the number on sanitizedJson.
-     * @param sanEnd   the end (exclusive) of the number on sanitizedJson.
-     * @return true when the number could be canonicalized.
-     */
+    /// #### Parameters
+    ///
+    /// - `sanStart`: the start (inclusive) of the number on sanitizedJson.
+    ///
+    /// - `sanEnd`: the end (exclusive) of the number on sanitizedJson.
+    ///
+    /// #### Returns
+    ///
+    /// true when the number could be canonicalized.
     private static boolean canonicalizeNumber(
             StringBuilder sanitizedJson, int sanStart, int sanEnd) {
         // Now we perform several steps.
@@ -729,23 +730,27 @@ final class JSONSanitizer {
         return state;
     }
 
-    /**
-     * Ensures that the output corresponding to {@code jsonish[start:end]} is a
-     * valid JSON string that has the same meaning when parsed by Javascript
-     * {@code eval}.
-     * <ul>
-     *   <li>Making sure that it is fully quoted with double-quotes.
-     *   <li>Escaping any Javascript newlines : CR, LF, U+2028, U+2029
-     *   <li>Escaping HTML special characters to allow it to be safely embedded
-     *       in HTML {@code <script>} elements and XML {@code <!CDATA[...]]>}
-     *       sections.
-     *   <li>Rewrite hex, octal, and other escapes that are valid in Javascript
-     *       but not in JSON.
-     * </ul>
-     *
-     * @param start inclusive
-     * @param end   exclusive
-     */
+    /// Ensures that the output corresponding to `jsonish[start:end]` is a
+    /// valid JSON string that has the same meaning when parsed by Javascript
+    /// `eval`.
+    ///
+    ///
+    /// - Making sure that it is fully quoted with double-quotes.
+    ///
+    /// - Escaping any Javascript newlines : CR, LF, U+2028, U+2029
+    ///
+    /// - Escaping HTML special characters to allow it to be safely embedded
+    ///       in HTML `` elements and XML ``
+    ///       sections.
+    ///
+    /// - Rewrite hex, octal, and other escapes that are valid in Javascript
+    ///       but not in JSON.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: inclusive
+    ///
+    /// - `end`: exclusive
     private void sanitizeString(int start, int end) {
         boolean closed = false;
         for (int i = start; i < end; ++i) {
@@ -1013,19 +1018,21 @@ final class JSONSanitizer {
                 "Trailing comma not found in " + jsonish + " or " + sanitizedJson);
     }
 
-    /**
-     * Ensures that the given run of characters is a valid JSON number.  This is
-     * less aggressive than {@link #canonicalizeNumber} since it can be called
-     * on inputs that are valid JSON so is on the fast path.
-     * <p>
-     * JS numbers differ from JSON numbers in several ways:<ul>
-     * <li>They can have '+' as a sign prefix:  +1
-     * <li>They allow a 0x... hexadecimal form: 0xA4
-     * <li>They allow a 0... octal form:        012
-     * <li>The integer part can be empty:       .5
-     * <li>The fraction part can be empty:      1.
-     * </ul>
-     */
+    /// Ensures that the given run of characters is a valid JSON number.  This is
+    /// less aggressive than `#canonicalizeNumber` since it can be called
+    /// on inputs that are valid JSON so is on the fast path.
+    ///
+    /// JS numbers differ from JSON numbers in several ways:
+    ///
+    /// - They can have '+' as a sign prefix:  +1
+    ///
+    /// - They allow a 0x... hexadecimal form: 0xA4
+    ///
+    /// - They allow a 0... octal form:        012
+    ///
+    /// - The integer part can be empty:       .5
+    ///
+    /// - The fraction part can be empty:      1.
     private void normalizeNumber(int start, int end) {
         int pos = start;
         // Sign
@@ -1144,12 +1151,12 @@ final class JSONSanitizer {
         }
     }
 
-    /**
-     * Converts a run of characters that form a JS number to its canonical form
-     * which happens to also be a valid JSON number.
-     *
-     * @return true when the number could be canonicalized.
-     */
+    /// Converts a run of characters that form a JS number to its canonical form
+    /// which happens to also be a valid JSON number.
+    ///
+    /// #### Returns
+    ///
+    /// true when the number could be canonicalized.
     private boolean canonicalizeNumber(int start, int end) {
         elide(start, start);
         int sanStart = sanitizedJson.length();
@@ -1233,51 +1240,31 @@ final class JSONSanitizer {
     }
 
 
-    /**
-     * Describes where we are in a state machine that consists of transitions on
-     * complete values, colons, commas, and brackets.
-     */
+    /// Describes where we are in a state machine that consists of transitions on
+    /// complete values, colons, commas, and brackets.
     private enum State {
-        /**
-         * Immediately after '[' and
-         * {@link #BEFORE_ELEMENT before the first element}.
-         */
+        /// Immediately after '[' and
+        /// `before the first element`.
         START_ARRAY,
-        /**
-         * Before a JSON value in an array or at the top level.
-         */
+        /// Before a JSON value in an array or at the top level.
         BEFORE_ELEMENT,
-        /**
-         * After a JSON value in an array or at the top level, and before any
-         * following comma or close bracket.
-         */
+        /// After a JSON value in an array or at the top level, and before any
+        /// following comma or close bracket.
         AFTER_ELEMENT,
-        /**
-         * Immediately after '{' and {@link #BEFORE_KEY before the first key}.
-         */
+        /// Immediately after '{' and `before the first key`.
         START_MAP,
-        /**
-         * Before a key in a key-value map.
-         */
+        /// Before a key in a key-value map.
         BEFORE_KEY,
-        /**
-         * After a key in a key-value map but before the required colon.
-         */
+        /// After a key in a key-value map but before the required colon.
         AFTER_KEY,
-        /**
-         * Before a value in a key-value map.
-         */
+        /// Before a value in a key-value map.
         BEFORE_VALUE,
-        /**
-         * After a value in a key-value map but before any following comma or
-         * close bracket.
-         */
+        /// After a value in a key-value map but before any following comma or
+        /// close bracket.
         AFTER_VALUE,
     }
 
-    /**
-     * Indicates that a comma was seen at the top level.
-     */
+    /// Indicates that a comma was seen at the top level.
     private static final class UnbracketedComma extends Exception {
         private static final long serialVersionUID = 783239978717247850L;
         // No members.  Used for nominal type.

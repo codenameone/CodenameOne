@@ -24,10 +24,11 @@ package com.codename1.media;
 
 import com.codename1.ui.CN;
 
-/**
- * @author shannah
- * @deprecated for internal use only.
- */
+/// @author shannah
+///
+/// #### Deprecated
+///
+/// for internal use only.
 abstract class RemoteControlCallback {
     private static final RemoteControlListener nullListener = new RemoteControlListener();
 

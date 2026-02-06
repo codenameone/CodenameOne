@@ -23,24 +23,18 @@
 
 package com.codename1.util;
 
-/**
- * Adapter for the {Callback} interface.
- *
- * @author shannah
- */
+/// Adapter for the {Callback} interface.
+///
+/// @author shannah
 public class CallbackAdapter<T> implements Callback<T> {
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void onSucess(T value) {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
 

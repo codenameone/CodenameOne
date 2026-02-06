@@ -25,65 +25,61 @@ package com.codename1.facebook;
 
 import java.util.Hashtable;
 
-/**
- * This is a base class for all FaceBook Objects
- *
- * @author Chen Fishbein
- */
+/// This is a base class for all FaceBook Objects
+///
+/// @author Chen Fishbein
 public class FBObject {
 
     private String id;
 
     private String name;
 
-    /**
-     * Empty Contructor
-     */
+    /// Empty Contructor
     public FBObject() {
     }
 
-    /**
-     * This contructor initialize it's attributes from the given Hashtable
-     *
-     * @param props an Hashtable which contains the Object data
-     */
+    /// This contructor initialize it's attributes from the given Hashtable
+    ///
+    /// #### Parameters
+    ///
+    /// - `props`: an Hashtable which contains the Object data
     public FBObject(Hashtable props) {
         init(props);
     }
 
-    /**
-     * Simple getter
-     *
-     * @return the facebook object id
-     */
+    /// Simple getter
+    ///
+    /// #### Returns
+    ///
+    /// the facebook object id
     public String getId() {
         return id;
     }
 
-    /**
-     * Simple setter
-     *
-     * @param id the Object Id, each facebook element had an id
-     */
+    /// Simple setter
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the Object Id, each facebook element had an id
     public void setId(String id) {
         this.id = id;
     }
 
-    /**
-     * Simple getter
-     *
-     * @return the FB Object name
-     */
+    /// Simple getter
+    ///
+    /// #### Returns
+    ///
+    /// the FB Object name
     public String getName() {
         return name;
     }
 
 
-    /**
-     * copies the relevant values from the given hashtable
-     *
-     * @param props an hashtable to copy from
-     */
+    /// copies the relevant values from the given hashtable
+    ///
+    /// #### Parameters
+    ///
+    /// - `props`: an hashtable to copy from
     public void copy(Hashtable props) {
         init(props);
     }
@@ -93,9 +89,7 @@ public class FBObject {
         name = (String) props.get("name");
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -111,9 +105,7 @@ public class FBObject {
         return id.equals(other.id);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         return id != null ? id.hashCode() : 0;

@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -32,40 +30,42 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * Shows each value from a {@link CategorySeries} as a slice of a circle.
- * <p>
- * Combine this chart with a {@link DefaultRenderer} to control colours, labels
- * and gradients. The resulting {@code PieChart} can be embedded in a form via a
- * {@link com.codename1.charts.ChartComponent}.
- */
+/// Shows each value from a `CategorySeries` as a slice of a circle.
+///
+/// Combine this chart with a `DefaultRenderer` to control colours, labels
+/// and gradients. The resulting `PieChart` can be embedded in a form via a
+/// `com.codename1.charts.ChartComponent`.
 public class PieChart extends RoundChart {
-    /**
-     * Handles returning values when tapping on PieChart.
-     */
+    /// Handles returning values when tapping on PieChart.
     private final PieMapper mPieMapper;
 
-    /**
-     * Builds a new pie chart instance.
-     *
-     * @param dataset  the series dataset
-     * @param renderer the series renderer
-     */
+    /// Builds a new pie chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the series dataset
+    ///
+    /// - `renderer`: the series renderer
     public PieChart(CategorySeries dataset, DefaultRenderer renderer) {
         super(dataset, renderer);
         mPieMapper = new PieMapper();
     }
 
-    /**
-     * The graphical representation of the pie chart.
-     *
-     * @param canvas the canvas to paint to
-     * @param x      the top left x value of the view to draw to
-     * @param y      the top left y value of the view to draw to
-     * @param width  the width of the view to draw to
-     * @param height the height of the view to draw to
-     * @param paint  the paint
-     */
+    /// The graphical representation of the pie chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `height`: the height of the view to draw to
+    ///
+    /// - `paint`: the paint
     @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
         paint.setAntiAlias(mRenderer.isAntialiasing());
@@ -176,12 +176,15 @@ public class PieChart extends RoundChart {
     }
 
 
-    /**
-     * Gets the shape of a pie segment given its point index.
-     *
-     * @param pointIndex The point index representing the pie segment.
-     * @return A shape of the outline of the segment.
-     */
+    /// Gets the shape of a pie segment given its point index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointIndex`: The point index representing the pie segment.
+    ///
+    /// #### Returns
+    ///
+    /// A shape of the outline of the segment.
     public Shape getSegmentShape(int pointIndex) {
         return mPieMapper.getSegmentShape(pointIndex);
     }

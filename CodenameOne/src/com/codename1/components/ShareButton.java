@@ -39,22 +39,37 @@ import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.Vector;
 
-/**
- * <p>The share button allows sharing a String or an image either thru the defined
- * sharing services or thru the native OS sharing support. On Android &amp; iOS the native
- * sharing API is invoked for this class.<br>
- * The code below demonstrates image sharing, notice that an image must be stored using
- * the {@link com.codename1.io.FileSystemStorage} API and shouldn't use a different API
- * like {@link com.codename1.io.Storage}!</p>
- *
- * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-sharebutton.png" alt="Share on the simulator" />
- *
- * <h4>Notice that share looks different on a device</h4>
- * <img src="https://www.codenameone.com/img/developer-guide/components-sharebutton-android.png" alt="Share on the device" />
- *
- * @author Chen Fishbein
- */
+/// The share button allows sharing a String or an image either thru the defined
+/// sharing services or thru the native OS sharing support. On Android & iOS the native
+/// sharing API is invoked for this class.
+///
+/// The code below demonstrates image sharing, notice that an image must be stored using
+/// the `com.codename1.io.FileSystemStorage` API and shouldn't use a different API
+/// like `com.codename1.io.Storage`!
+///
+/// ```java
+/// Form hi = new Form("ShareButton");
+/// ShareButton sb = new ShareButton();
+/// sb.setText("Share Screenshot");
+/// hi.add(sb);
+///
+/// Image screenshot = Image.createImage(hi.getWidth(), hi.getHeight());
+/// hi.revalidate();
+/// hi.setVisible(true);
+/// hi.paintComponent(screenshot.getGraphics(), true);
+///
+/// String imageFile = FileSystemStorage.getInstance().getAppHomePath() + "screenshot.png";
+/// try(OutputStream os = FileSystemStorage.getInstance().openOutputStream(imageFile)) {
+///     ImageIO.getImageIO().save(screenshot, os, ImageIO.FORMAT_PNG, 1);
+/// } catch(IOException err) {
+///     Log.e(err);
+/// }
+/// sb.setImageToShare(imageFile, "image/png");
+/// ```
+///
+/// Notice that share looks different on a device
+///
+/// @author Chen Fishbein
 public class ShareButton extends Button implements ActionListener {
 
     private final Vector shareServices = new Vector();
@@ -62,9 +77,7 @@ public class ShareButton extends Button implements ActionListener {
     private String imageToShare;
     private String imageMimeType;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public ShareButton() {
         setUIIDFinal("ShareButton");
         //Image shareIcon =  Resources.getSystemResource().getImage("share.png");
@@ -76,62 +89,55 @@ public class ShareButton extends Button implements ActionListener {
         shareServices.addElement(new FacebookShare());
     }
 
-    /**
-     * Gets the text to share
-     *
-     * @return
-     */
+    /// Gets the text to share
     public String getTextToShare() {
         return textToShare;
     }
 
-    /**
-     * Sets the information to share
-     *
-     * @param textToShare
-     */
+    /// Sets the information to share
+    ///
+    /// #### Parameters
+    ///
+    /// - `textToShare`
     public void setTextToShare(String textToShare) {
         this.textToShare = textToShare;
     }
 
-    /**
-     * Sets the image to share.
-     * Notice some sharing services cannot share image and a text, therefore if
-     * setTextToShare(...) is also used, the sharing service gives image sharing
-     * higher priority.
-     *
-     * @param imagePath     the full file path
-     * @param imageMimeType the image mime type e.g. image/png, image/jpeg
-     */
+    /// Sets the image to share.
+    /// Notice some sharing services cannot share image and a text, therefore if
+    /// setTextToShare(...) is also used, the sharing service gives image sharing
+    /// higher priority.
+    ///
+    /// #### Parameters
+    ///
+    /// - `imagePath`: the full file path
+    ///
+    /// - `imageMimeType`: the image mime type e.g. image/png, image/jpeg
     public void setImageToShare(String imagePath, String imageMimeType) {
         this.imageToShare = imagePath;
         this.imageMimeType = imageMimeType;
     }
 
-    /**
-     * Gets the image path to share
-     *
-     * @return
-     */
+    /// Gets the image path to share
     public String getImagePathToShare() {
         return imageToShare;
     }
 
 
-    /**
-     * Adds a sharing service.
-     *
-     * @param share ShareService
-     */
+    /// Adds a sharing service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `share`: ShareService
     public void addShareService(ShareService share) {
         shareServices.addElement(share);
     }
 
-    /**
-     * invoked when the button is pressed
-     *
-     * @param evt
-     */
+    /// invoked when the button is pressed
+    ///
+    /// #### Parameters
+    ///
+    /// - `evt`
     @Override
     public void actionPerformed(ActionEvent evt) {
         // postpone the share button action to the next EDT cycle to allow action listeners on the button to 
@@ -184,25 +190,19 @@ public class ShareButton extends Button implements ActionListener {
         });
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"textToShare"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("textToShare".equals(name)) {
@@ -211,9 +211,7 @@ public class ShareButton extends Button implements ActionListener {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("textToShare".equals(name)) {

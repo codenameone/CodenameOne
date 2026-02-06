@@ -28,13 +28,14 @@ import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 
-/**
- * A spinner class that allows arbitrary values, this is effectively a combo box replacement for platforms
- * where a combo box is not available
- *
- * @author Shai Almog
- * @deprecated use Picker instead
- */
+/// A spinner class that allows arbitrary values, this is effectively a combo box replacement for platforms
+/// where a combo box is not available
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
 public class GenericSpinner extends BaseSpinner {
     private Spinner[] spin;
     private ListModel[] model = new ListModel[]{new DefaultListModel("Value 1", "Value 2", "Value 3")};
@@ -42,9 +43,7 @@ public class GenericSpinner extends BaseSpinner {
     private Object[] value;
     private String[] renderingPrototype;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public GenericSpinner() {
         SpinnerRenderer<Object> render = (SpinnerRenderer<Object>) renderer[0];
         render.setShowNumbers(false);
@@ -79,29 +78,29 @@ public class GenericSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * Returns the rendering prototype
-     *
-     * @return the prototype
-     */
+    /// Returns the rendering prototype
+    ///
+    /// #### Returns
+    ///
+    /// the prototype
     public String getRenderingPrototype() {
         return getRenderingPrototype(0);
     }
 
-    /**
-     * The rendering prototype
-     *
-     * @param pr the prototype
-     */
+    /// The rendering prototype
+    ///
+    /// #### Parameters
+    ///
+    /// - `pr`: the prototype
     public void setRenderingPrototype(String pr) {
         setRenderingPrototype(0, pr);
     }
 
-    /**
-     * Returns the rendering prototype
-     *
-     * @return the prototype
-     */
+    /// Returns the rendering prototype
+    ///
+    /// #### Returns
+    ///
+    /// the prototype
     public String getRenderingPrototype(int column) {
         if (renderingPrototype == null) {
             return null;
@@ -109,12 +108,13 @@ public class GenericSpinner extends BaseSpinner {
         return renderingPrototype[column];
     }
 
-    /**
-     * The rendering prototype
-     *
-     * @param column the column
-     * @param pr     the prototype
-     */
+    /// The rendering prototype
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column
+    ///
+    /// - `pr`: the prototype
     public void setRenderingPrototype(int column, String pr) {
         if (renderingPrototype == null) {
             renderingPrototype = new String[model.length];
@@ -122,20 +122,20 @@ public class GenericSpinner extends BaseSpinner {
         renderingPrototype[column] = pr;
     }
 
-    /**
-     * Return the column count
-     *
-     * @return the number of columns in the spinner
-     */
+    /// Return the column count
+    ///
+    /// #### Returns
+    ///
+    /// the number of columns in the spinner
     public int getColumns() {
         return model.length;
     }
 
-    /**
-     * Sets the column count
-     *
-     * @return the number of columns in the spinner
-     */
+    /// Sets the column count
+    ///
+    /// #### Returns
+    ///
+    /// the number of columns in the spinner
     public void setColumns(int columns) {
         if (model.length != columns) {
             ListModel[] lm = new ListModel[columns];
@@ -164,29 +164,29 @@ public class GenericSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * The value for the spinner
-     *
-     * @return the value
-     */
+    /// The value for the spinner
+    ///
+    /// #### Returns
+    ///
+    /// the value
     public Object getValue() {
         return getValue(0);
     }
 
-    /**
-     * The value for the spinner
-     *
-     * @param value the value to set
-     */
+    /// The value for the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to set
     public void setValue(Object value) {
         setValue(0, value);
     }
 
-    /**
-     * The value for the spinner
-     *
-     * @return the value
-     */
+    /// The value for the spinner
+    ///
+    /// #### Returns
+    ///
+    /// the value
     public Object getValue(int offset) {
         if (spin != null && spin[offset] != null) {
             return spin[offset].getModel().getItemAt(spin[offset].getModel().getSelectedIndex());
@@ -197,11 +197,11 @@ public class GenericSpinner extends BaseSpinner {
         return value;
     }
 
-    /**
-     * The value for the spinner
-     *
-     * @param value the value to set
-     */
+    /// The value for the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to set
     public void setValue(int offset, Object value) {
         if (this.value == null) {
             this.value = new Object[model.length];
@@ -226,33 +226,25 @@ public class GenericSpinner extends BaseSpinner {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"model", "renderer", "items", "columns"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{ListModel.class, ListCellRenderer.class, com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), Integer.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"ListModel", "ListCellRenderer", "String[]", "int"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("items".equals(name)) {
@@ -279,9 +271,7 @@ public class GenericSpinner extends BaseSpinner {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("items".equals(name)) {
@@ -303,30 +293,30 @@ public class GenericSpinner extends BaseSpinner {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * @return the model
-     */
+    /// #### Returns
+    ///
+    /// the model
     public ListModel getModel() {
         return model[0];
     }
 
-    /**
-     * @param model the model to set
-     */
+    /// #### Parameters
+    ///
+    /// - `model`: the model to set
     public void setModel(ListModel model) {
         setModel(0, model);
     }
 
-    /**
-     * @return the model
-     */
+    /// #### Returns
+    ///
+    /// the model
     public ListModel getModel(int offset) {
         return model[offset];
     }
 
-    /**
-     * @param model the model to set
-     */
+    /// #### Parameters
+    ///
+    /// - `model`: the model to set
     public void setModel(int offset, ListModel model) {
         this.model[offset] = model;
         if (spin != null && spin[offset] != null) {
@@ -334,16 +324,16 @@ public class GenericSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the renderer
-     */
+    /// #### Returns
+    ///
+    /// the renderer
     public ListCellRenderer getRenderer(int offset) {
         return renderer[offset];
     }
 
-    /**
-     * @param renderer the renderer to set
-     */
+    /// #### Parameters
+    ///
+    /// - `renderer`: the renderer to set
     public void setRenderer(int offset, ListCellRenderer renderer) {
         this.renderer[offset] = renderer;
         if (spin != null && spin[offset] != null) {
@@ -351,26 +341,26 @@ public class GenericSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the renderer
-     */
+    /// #### Returns
+    ///
+    /// the renderer
     public ListCellRenderer getRenderer() {
         return getRenderer(0);
     }
 
-    /**
-     * @param renderer the renderer to set
-     */
+    /// #### Parameters
+    ///
+    /// - `renderer`: the renderer to set
     public void setRenderer(ListCellRenderer renderer) {
         setRenderer(0, renderer);
     }
 
-    /**
-     * Some components may optionally generate a state which can then be restored
-     * using setCompnentState(). This method is used by the UIBuilder.
-     *
-     * @return the component state or null for undefined state.
-     */
+    /// Some components may optionally generate a state which can then be restored
+    /// using setCompnentState(). This method is used by the UIBuilder.
+    ///
+    /// #### Returns
+    ///
+    /// the component state or null for undefined state.
     @Override
     public Object getComponentState() {
         if (getColumns() == 1) {
@@ -384,12 +374,12 @@ public class GenericSpinner extends BaseSpinner {
         return o;
     }
 
-    /**
-     * If getComponentState returned a value the setter can update the value and restore
-     * the prior state.
-     *
-     * @param state the non-null state
-     */
+    /// If getComponentState returned a value the setter can update the value and restore
+    /// the prior state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the non-null state
     @Override
     public void setComponentState(Object state) {
         if (getColumns() == 1) {

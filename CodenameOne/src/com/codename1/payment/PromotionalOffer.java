@@ -22,8 +22,6 @@
  */
 package com.codename1.payment;
 
-/**
- * A marker interface representing a promotional offer for in-app purchase.
- */
+/// A marker interface representing a promotional offer for in-app purchase.
 public interface PromotionalOffer {
 }

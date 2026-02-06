@@ -24,17 +24,16 @@ package com.codename1.ui.html;
 
 import java.io.InputStream;
 
-/**
- * This interface is implemented by HTMLComponent and ResourceThread (The two classes using the AsyncDocumentRequestHandler)
- */
+/// This interface is implemented by HTMLComponent and ResourceThread (The two classes using the AsyncDocumentRequestHandler)
 public interface IOCallback {
 
-    /**
-     * Called when the stream of the document is ready
-     *
-     * @param is      The ready InputStream
-     * @param docInfo A DocumentInfo object representing the fetched InputStream
-     */
+    /// Called when the stream of the document is ready
+    ///
+    /// #### Parameters
+    ///
+    /// - `is`: The ready InputStream
+    ///
+    /// - `docInfo`: A DocumentInfo object representing the fetched InputStream
     void streamReady(InputStream is, DocumentInfo docInfo);
 
 }

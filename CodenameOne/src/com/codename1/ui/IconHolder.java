@@ -22,104 +22,127 @@
  */
 package com.codename1.ui;
 
-/**
- * An interface implemented by {@link Component} classes that can display an icon.  E.g. {@link Label}, {@link SpanLabel}, {@link SpanButton}, etc..
- *
- * @author shannah
- * @since 7.0
- */
+/// An interface implemented by `Component` classes that can display an icon.  E.g. `Label`, `SpanLabel`, `SpanButton`, etc..
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public interface IconHolder {
 
-    /**
-     * Returns the labels icon
-     *
-     * @return the labels icon
-     */
+    /// Returns the labels icon
+    ///
+    /// #### Returns
+    ///
+    /// the labels icon
     Image getIcon();
 
-    /**
-     * Sets the Label icon, if the icon is unmodified a repaint would not be triggered
-     *
-     * @param icon the image that the label presents.
-     */
+    /// Sets the Label icon, if the icon is unmodified a repaint would not be triggered
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the image that the label presents.
     void setIcon(Image icon);
 
-    /**
-     * Returns the gap in pixels between the icon/text to the Label boundaries
-     *
-     * @return the gap in pixels between the icon/text to the Label boundaries
-     */
+    /// Returns the gap in pixels between the icon/text to the Label boundaries
+    ///
+    /// #### Returns
+    ///
+    /// the gap in pixels between the icon/text to the Label boundaries
     int getGap();
 
-    /**
-     * Set the gap in pixels between the icon/text to the Label boundaries
-     *
-     * @param gap the gap in pixels
-     */
+    /// Set the gap in pixels between the icon/text to the Label boundaries
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: the gap in pixels
     void setGap(int gap);
 
-    /**
-     * Returns The position of the text relative to the icon
-     *
-     * @return The position of the text relative to the icon, one of: LEFT, RIGHT, BOTTOM, TOP
-     * @see #LEFT
-     * @see #RIGHT
-     * @see #BOTTOM
-     * @see #TOP
-     */
+    /// Returns The position of the text relative to the icon
+    ///
+    /// #### Returns
+    ///
+    /// The position of the text relative to the icon, one of: LEFT, RIGHT, BOTTOM, TOP
+    ///
+    /// #### See also
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    ///
+    /// - #BOTTOM
+    ///
+    /// - #TOP
     int getTextPosition();
 
-    /**
-     * Sets the position of the text relative to the icon if exists
-     *
-     * @param textPosition alignment value (LEFT, RIGHT, BOTTOM or TOP)
-     * @see #LEFT
-     * @see #RIGHT
-     * @see #BOTTOM
-     * @see #TOP
-     */
+    /// Sets the position of the text relative to the icon if exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `textPosition`: alignment value (LEFT, RIGHT, BOTTOM or TOP)
+    ///
+    /// #### See also
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    ///
+    /// - #BOTTOM
+    ///
+    /// - #TOP
     void setTextPosition(int textPosition);
 
-    /**
-     * Gets the UIID used for styling material icons on this component.
-     *
-     * @return
-     */
+    /// Gets the UIID used for styling material icons on this component.
     String getIconUIID();
 
-    /**
-     * Sets a UIID to be used for the material icon style.
-     *
-     * @param uiid The uiid to use for the material icon style.
-     * @since 7.0
-     */
+    /// Sets a UIID to be used for the material icon style.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: The uiid to use for the material icon style.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     void setIconUIID(String uiid);
 
-    /**
-     * Gets the component that should be used for styling material the material icon.  If {@link #setIconUIID(java.lang.String) } has been used
-     * to set a custom UIID for the icon, then this will return a component with that UIID.  Otherwise this will just return this component
-     * itself.
-     *
-     * @return The component to use for styling the material icon.
-     * @since 7.0
-     */
+    /// Gets the component that should be used for styling material the material icon.  If `#setIconUIID(java.lang.String)` has been used
+    /// to set a custom UIID for the icon, then this will return a component with that UIID.  Otherwise this will just return this component
+    /// itself.
+    ///
+    /// #### Returns
+    ///
+    /// The component to use for styling the material icon.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     Component getIconStyleComponent();
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
-     *
-     * @param c    one of the constants from {@link com.codename1.ui.FontImage}
-     * @param size the size of the icon in millimeters
-     * @since 8.0
-     */
+    /// This method is shorthand for `char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from `com.codename1.ui.FontImage`
+    ///
+    /// - `size`: the size of the icon in millimeters
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     void setMaterialIcon(char c, float size);
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
-     *
-     * @param c    one of the constants from the font
-     * @param size the size of the icon in millimeters
-     * @since 8.0
-     */
+    /// This method is shorthand for `com.codename1.ui.Font, char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from the font
+    ///
+    /// - `size`: the size of the icon in millimeters
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     void setFontIcon(Font font, char c, float size);
 }

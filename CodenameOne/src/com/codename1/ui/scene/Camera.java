@@ -25,12 +25,13 @@ package com.codename1.ui.scene;
 import com.codename1.properties.Property;
 import com.codename1.ui.Transform;
 
-/**
- * Encapsulates a camera.
- *
- * @author Steve Hannah
- * @deprecated For internal use only.
- */
+/// Encapsulates a camera.
+///
+/// @author Steve Hannah
+///
+/// #### Deprecated
+///
+/// For internal use only.
 public class Camera {
     public final Property<Double, Camera> farClip;
     public final Property<Double, Camera> nearClip;

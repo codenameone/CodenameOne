@@ -32,16 +32,14 @@ import com.codename1.util.Callback;
 
 import java.util.Arrays;
 
-/**
- * Invokes the native bundled facebook SDK to login/logout of facebook, notice
- * that in order for this to work server build arguments must indicate that you
- * are using the facebook sdk! To accomplish this just define:
- * facebook.appId=YourAppId in your build arguments. In order to obtain the app
- * ID you need to create a native Android/iOS application and generate the right
- * app id.
- *
- * @author Shai Almog
- */
+/// Invokes the native bundled facebook SDK to login/logout of facebook, notice
+/// that in order for this to work server build arguments must indicate that you
+/// are using the facebook sdk! To accomplish this just define:
+/// facebook.appId=YourAppId in your build arguments. In order to obtain the app
+/// ID you need to create a native Android/iOS application and generate the right
+/// app id.
+///
+/// @author Shai Almog
 public class FacebookConnect extends Login {
 
     private static final Object INSTANCE_LOCK = new Object();
@@ -54,12 +52,12 @@ public class FacebookConnect extends Login {
     }
 
 
-    /**
-     * Gets the FacebookConnect singleton instance
-     * .
-     *
-     * @return the FacebookConnect instance
-     */
+    /// Gets the FacebookConnect singleton instance
+    /// .
+    ///
+    /// #### Returns
+    ///
+    /// the FacebookConnect instance
     public static FacebookConnect getInstance() {
         synchronized (INSTANCE_LOCK) {
             if (instance == null) {
@@ -82,32 +80,30 @@ public class FacebookConnect extends Login {
         FacebookConnect.implClass = implClass;
     }
 
-    /**
-     * Indicates whether the native platform supports native facebook login
-     *
-     * @return true if supported
-     */
+    /// Indicates whether the native platform supports native facebook login
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
     public boolean isFacebookSDKSupported() {
         return false;
     }
 
-    /**
-     * Logs into facebook, notice that this call might suspend the application
-     * which might trigger repeated invocations of stop()/start() etc. This is
-     * due to the facebook SDK spawning a separate process to perform the login
-     * then returning to the application. Once logged in the facebook
-     * credentials will be available.
-     *
-     * @deprecated use doLogin
-     */
+    /// Logs into facebook, notice that this call might suspend the application
+    /// which might trigger repeated invocations of stop()/start() etc. This is
+    /// due to the facebook SDK spawning a separate process to perform the login
+    /// then returning to the application. Once logged in the facebook
+    /// credentials will be available.
+    ///
+    /// #### Deprecated
+    ///
+    /// use doLogin
     public void login() {
         throw new RuntimeException("Native facebook unsupported");
     }
 
 
-    /**
-     * Logs out the current user from facebook
-     */
+    /// Logs out the current user from facebook
     @Override
     public void doLogout() {
         super.doLogout();
@@ -116,11 +112,11 @@ public class FacebookConnect extends Login {
         }
     }
 
-    /**
-     * The facebook token that can be used to access facebook functionality
-     *
-     * @return the token
-     */
+    /// The facebook token that can be used to access facebook functionality
+    ///
+    /// #### Returns
+    ///
+    /// the token
     @Override
     public AccessToken getAccessToken() {
         AccessToken t = super.getAccessToken();
@@ -134,48 +130,48 @@ public class FacebookConnect extends Login {
         }
     }
 
-    /**
-     * Indicates if the user is currently logged in
-     *
-     * @return true if logged in
-     * @deprecated use isUserLoggedIn() instead
-     */
+    /// Indicates if the user is currently logged in
+    ///
+    /// #### Returns
+    ///
+    /// true if logged in
+    ///
+    /// #### Deprecated
+    ///
+    /// use isUserLoggedIn() instead
     public boolean isLoggedIn() {
         throw new RuntimeException("Native facebook unsupported, if you are running on the Simulator use isUserLoggedIn");
     }
 
-    /**
-     * The facebook token that can be used to access facebook functionality
-     *
-     * @return the token
-     * @deprecated use getAccessToken instead
-     */
+    /// The facebook token that can be used to access facebook functionality
+    ///
+    /// #### Returns
+    ///
+    /// the token
+    ///
+    /// #### Deprecated
+    ///
+    /// use getAccessToken instead
     public String getToken() {
         throw new RuntimeException("Native facebook unsupported, if you are running on the Simulator use getAccessToken");
     }
 
-    /**
-     * Logs out the current user from facebook
-     *
-     * @deprecated use doLogout instead
-     */
+    /// Logs out the current user from facebook
+    ///
+    /// #### Deprecated
+    ///
+    /// use doLogout instead
     public void logout() {
         throw new RuntimeException("Native facebook unsupported, if you are running on the Simulator use doLogout");
     }
 
-    /**
-     * Asks for publish permissions, this call might suspend the application
-     * which might trigger repeated invocations of stop()/start().
-     */
+    /// Asks for publish permissions, this call might suspend the application
+    /// which might trigger repeated invocations of stop()/start().
     public void askPublishPermissions(LoginCallback lc) {
         throw new RuntimeException("Native facebook unsupported");
     }
 
-    /**
-     * Returns true if the current session already has publish permissions
-     *
-     * @return
-     */
+    /// Returns true if the current session already has publish permissions
     public boolean hasPublishPermissions() {
         throw new RuntimeException("Native facebook unsupported");
     }
@@ -211,44 +207,53 @@ public class FacebookConnect extends Login {
     }
 
 
-    /**
-     * Opens and invite dialog to invite friends to the app
-     * https://developers.facebook.com/docs/app-invites
-     *
-     * @param appLinkUrl      App Link for what should be opened when the recipient
-     *                        clicks on the install/play button on the app invite page.
-     * @param previewImageUrl url to an image to be used in the invite, can be null
-     * @deprecated The Facebook SDK no longer supports app invites. https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
-     */
+    /// Opens and invite dialog to invite friends to the app
+    /// https://developers.facebook.com/docs/app-invites
+    ///
+    /// #### Parameters
+    ///
+    /// - `appLinkUrl`: @param appLinkUrl      App Link for what should be opened when the recipient
+    ///                        clicks on the install/play button on the app invite page.
+    ///
+    /// - `previewImageUrl`: url to an image to be used in the invite, can be null
+    ///
+    /// #### Deprecated
+    ///
+    /// The Facebook SDK no longer supports app invites. https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
     public void inviteFriends(String appLinkUrl, String previewImageUrl) {
     }
 
-    /**
-     * Opens and invite dialog to invite friends to the app
-     * https://developers.facebook.com/docs/app-invites
-     *
-     * @param appLinkUrl      App Link for what should be opened when the recipient
-     *                        clicks on the install/play button on the app invite page.
-     * @param previewImageUrl url to an image to be used in the invite, can be null
-     * @param cb              a Callback to be used when we need to know if the Facebook invite was successful.
-     *                        If the invite was successful the onSucess method will be called
-     *                        If the user canceled the onError method will be called with error code -1.
-     *                        If an error occurred the onError method will be called with error code 0.
-     * @deprecated The Facebook SDK no longer supports app invites https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
-     */
+    /// Opens and invite dialog to invite friends to the app
+    /// https://developers.facebook.com/docs/app-invites
+    ///
+    /// #### Parameters
+    ///
+    /// - `appLinkUrl`: @param appLinkUrl      App Link for what should be opened when the recipient
+    ///                        clicks on the install/play button on the app invite page.
+    ///
+    /// - `previewImageUrl`: url to an image to be used in the invite, can be null
+    ///
+    /// - `cb`: @param cb              a Callback to be used when we need to know if the Facebook invite was successful.
+    ///                        If the invite was successful the onSucess method will be called
+    ///                        If the user canceled the onError method will be called with error code -1.
+    ///                        If an error occurred the onError method will be called with error code 0.
+    ///
+    /// #### Deprecated
+    ///
+    /// The Facebook SDK no longer supports app invites https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
     public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
     }
 
-    /**
-     * Returns true if inviteFriends is implemented, it is supported on iOS and
-     * Android
-     *
-     * <p><em>NOTE:</em> Since updating to Facebook SDK 5.6.0 (April 1, 2020), invite friends is no longer
-     * supported on iOS.  It will eventually be removed from Android as well, as Facebook
-     * no longer supports App invites in its native SDKs.</p>
-     *
-     * @return true if inviteFriends is implemented
-     */
+    /// Returns true if inviteFriends is implemented, it is supported on iOS and
+    /// Android
+    ///
+    /// *NOTE:* Since updating to Facebook SDK 5.6.0 (April 1, 2020), invite friends is no longer
+    /// supported on iOS.  It will eventually be removed from Android as well, as Facebook
+    /// no longer supports App invites in its native SDKs.
+    ///
+    /// #### Returns
+    ///
+    /// true if inviteFriends is implemented
     public boolean isInviteFriendsSupported() {
         return false;
     }

@@ -25,74 +25,76 @@ package com.codename1.ui;
 
 import com.codename1.ui.events.ActionEvent;
 
-/**
- * The NavigationCommand is a Command that navigates to a given Form.
- * The NavigationCommand calls the show() on the Form object that is returned from
- * getNextForm().
- *
- * @author Chen
- */
+/// The NavigationCommand is a Command that navigates to a given Form.
+/// The NavigationCommand calls the show() on the Form object that is returned from
+/// getNextForm().
+///
+/// @author Chen
 public class NavigationCommand extends Command {
 
     private Form nextForm;
 
-    /**
-     * Creates a new instance of NavigationCommand
-     *
-     * @param command the string that will be placed on the Soft buttons\Menu
-     */
+    /// Creates a new instance of NavigationCommand
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
     public NavigationCommand(String command) {
         super(command);
     }
 
-    /**
-     * Creates a new instance of NavigationCommand
-     *
-     * @param command the string that will be placed on the Soft buttons\Menu
-     * @param icon    the icon representing the command
-     */
+    /// Creates a new instance of NavigationCommand
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `icon`: the icon representing the command
     public NavigationCommand(String command, Image icon) {
         super(command, icon);
     }
 
-    /**
-     * Creates a new instance of NavigationCommand
-     *
-     * @param command the string that will be placed on the Soft buttons\Menu
-     * @param id      user defined ID for a command simplifying switch statement code
-     *                working with a command
-     */
+    /// Creates a new instance of NavigationCommand
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `id`: @param id      user defined ID for a command simplifying switch statement code
+    ///                working with a command
     public NavigationCommand(String command, int id) {
         super(command, id);
     }
 
-    /**
-     * Creates a new instance of NavigationCommand
-     *
-     * @param command the string that will be placed on the Soft buttons\Menu
-     * @param icon    the icon representing the command
-     * @param id      user defined ID for a command simplifying switch statement code
-     *                working with a command
-     */
+    /// Creates a new instance of NavigationCommand
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `icon`: the icon representing the command
+    ///
+    /// - `id`: @param id      user defined ID for a command simplifying switch statement code
+    ///                working with a command
     public NavigationCommand(String command, Image icon, int id) {
         super(command, icon, id);
     }
 
-    /**
-     * Gets the next Form
-     *
-     * @return the next Form
-     */
+    /// Gets the next Form
+    ///
+    /// #### Returns
+    ///
+    /// the next Form
     public Form getNextForm() {
         return nextForm;
     }
 
-    /**
-     * Sets the Form to navigate to when the actionPerformed is invoked on this
-     * Command
-     *
-     * @param nextForm The next Form
-     */
+    /// Sets the Form to navigate to when the actionPerformed is invoked on this
+    /// Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `nextForm`: The next Form
     public void setNextForm(Form nextForm) {
         this.nextForm = nextForm;
     }
@@ -108,9 +110,7 @@ public class NavigationCommand extends Command {
                 (nextForm == null ? that.nextForm == null : nextForm.equals(that.nextForm));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         int result = super.hashCode();

@@ -27,13 +27,11 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.animations.Animation;
 
-/**
- * Simple timer callback that is invoked on the CodenameOne EDT thread rather
- * than on a separate thread. Notice that the accuracy of this timer is very low!
- * A timer must be linked to a specific form
- *
- * @author Shai Almog
- */
+/// Simple timer callback that is invoked on the CodenameOne EDT thread rather
+/// than on a separate thread. Notice that the accuracy of this timer is very low!
+/// A timer must be linked to a specific form
+///
+/// @author Shai Almog
 public class UITimer {
     private final Internal i = new Internal();
     private Runnable internalRunnable;
@@ -42,57 +40,68 @@ public class UITimer {
     private int ms;
     private boolean repeat;
 
-    /**
-     * This constructor is useful when deriving this class to implement a timer.
-     */
+    /// This constructor is useful when deriving this class to implement a timer.
     protected UITimer() {
     }
 
-    /**
-     * Constructor that accepts a runnable to invoke on timer elapse
-     *
-     * @param r runnable instance
-     */
+    /// Constructor that accepts a runnable to invoke on timer elapse
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: runnable instance
     public UITimer(Runnable r) {
         internalRunnable = r;
     }
 
-    /**
-     * Convenience method to schedule a UITimer more easily
-     *
-     * @param timeMillis the time from now in milliseconds
-     * @param repeat     whether the timer repeats
-     * @param parent     the form to which the timer is bound
-     * @param r          callback when the timer elapses
-     * @return the timer instance
-     */
+    /// Convenience method to schedule a UITimer more easily
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeMillis`: the time from now in milliseconds
+    ///
+    /// - `repeat`: whether the timer repeats
+    ///
+    /// - `parent`: the form to which the timer is bound
+    ///
+    /// - `r`: callback when the timer elapses
+    ///
+    /// #### Returns
+    ///
+    /// the timer instance
     public static UITimer timer(int timeMillis, boolean repeat, Form parent, Runnable r) {
         UITimer uit = new UITimer(r);
         uit.schedule(timeMillis, repeat, parent);
         return uit;
     }
 
-    /**
-     * Convenience method to schedule a UITimer more easily on the current form
-     *
-     * @param timeMillis the time from now in milliseconds
-     * @param repeat     whether the timer repeats
-     * @param r          callback when the timer elapses
-     * @return the timer instance
-     */
+    /// Convenience method to schedule a UITimer more easily on the current form
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeMillis`: the time from now in milliseconds
+    ///
+    /// - `repeat`: whether the timer repeats
+    ///
+    /// - `r`: callback when the timer elapses
+    ///
+    /// #### Returns
+    ///
+    /// the timer instance
     public static UITimer timer(int timeMillis, boolean repeat, Runnable r) {
         UITimer uit = new UITimer(r);
         uit.schedule(timeMillis, repeat, Display.getInstance().getCurrent());
         return uit;
     }
 
-    /**
-     * Binds the timer to start at the given schedule
-     *
-     * @param timeMillis the time from now in milliseconds
-     * @param repeat     whether the timer repeats
-     * @param bound      the form to which the timer is bound
-     */
+    /// Binds the timer to start at the given schedule
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeMillis`: the time from now in milliseconds
+    ///
+    /// - `repeat`: whether the timer repeats
+    ///
+    /// - `bound`: the form to which the timer is bound
     public void schedule(int timeMillis, boolean repeat, Form bound) {
         lastEllapse = System.currentTimeMillis();
         ms = timeMillis;
@@ -101,9 +110,7 @@ public class UITimer {
         bound.registerAnimated(i);
     }
 
-    /**
-     * Stops executing the timer
-     */
+    /// Stops executing the timer
     public void cancel() {
         if (bound != null) {
             bound.deregisterAnimated(i);
@@ -124,25 +131,19 @@ public class UITimer {
 
 
     class Internal implements Runnable, Animation {
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public boolean animate() {
             testEllapse();
             return false;
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public void paint(Graphics g) {
         }
 
-        /**
-         * Invoked when the timer elapses
-         */
+        /// Invoked when the timer elapses
         @Override
         public void run() {
             if (internalRunnable != null) {

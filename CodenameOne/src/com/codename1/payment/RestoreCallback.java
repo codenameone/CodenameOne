@@ -23,37 +23,33 @@
 
 package com.codename1.payment;
 
-/**
- * Callback interface that the main class must implement in order for the restore
- * option of in-app-purchasing to work. Once the main class implements this
- * interface the methods within it are invoked to indicate the various restore states.
- *
- * @author Steve Hannah
- */
+/// Callback interface that the main class must implement in order for the restore
+/// option of in-app-purchasing to work. Once the main class implements this
+/// interface the methods within it are invoked to indicate the various restore states.
+///
+/// @author Steve Hannah
 public interface RestoreCallback {
-    /**
-     * Indicates a the given SKU was restored by a user. When restoring multiple
-     * SKU's at once multiple calls to this method will be performed.
-     *
-     * @param sku the sku purchased
-     */
+    /// Indicates a the given SKU was restored by a user. When restoring multiple
+    /// SKU's at once multiple calls to this method will be performed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the sku purchased
     void itemRestored(String sku);
 
-    /**
-     * Indicates that a {@link Purchase#restore()} request was completed without
-     * errors.  It doesn't mean that any particular products were restored, only
-     * that the request completed.  After a call to {@link Purchase#restore()},
-     * either this or {@link #restoreRequestError} will be called at some point.
-     */
+    /// Indicates that a `Purchase#restore()` request was completed without
+    /// errors.  It doesn't mean that any particular products were restored, only
+    /// that the request completed.  After a call to `Purchase#restore()`,
+    /// either this or `#restoreRequestError` will be called at some point.
     void restoreRequestComplete();
 
-    /**
-     * Indicates that a {@link Purchase#restore()} request was completed with
-     * errors.  It doesn't mean that any particular products were restored, only
-     * that the request completed.  After a call to {@link Purchase#restore()},
-     * either this or {@link #restoreRequestComplete} will be called at some point.
-     *
-     * @param message The error message.
-     */
+    /// Indicates that a `Purchase#restore()` request was completed with
+    /// errors.  It doesn't mean that any particular products were restored, only
+    /// that the request completed.  After a call to `Purchase#restore()`,
+    /// either this or `#restoreRequestComplete` will be called at some point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: The error message.
     void restoreRequestError(String message);
 }

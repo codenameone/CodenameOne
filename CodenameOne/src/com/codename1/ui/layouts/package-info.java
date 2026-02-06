@@ -1,75 +1,35 @@
-/**
- * <p>
- *     Layout managers allow a {@link com.codename1.ui.Container} to
- *     arrange its components by a set of rules that adapt to specific
- *     densities (ppi - pixels per inch). A layout manager is an arranging algorithm encapsulated
- *     by an abstract class implementation that places components absolutely based
- *     on the "hints" received.
- * </p>
- * <h2>Layout Managers that ship with Codename One</h2>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.FlowLayout} is default layout manager, simple, flexible and with a few caveats.
- * </p>
- * <img alt="Simple FlowLayout" src="https://www.codenameone.com/img/developer-guide/flow-layout.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.BorderLayout} is ubiquitous thru Codename One code.
- * </p>
- * <img alt="Border Layout" src="https://www.codenameone.com/img/developer-guide/border-layout.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.BorderLayout} can also behave differently based on the center behavior flag
- * </p>
- * <img alt="Border Layout Center" src="https://www.codenameone.com/img/developer-guide/border-layout-center.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.BoxLayout} Y axis is a the work-horse of component lists
- * </p>
- * <img alt="Box Layout Y" src="https://www.codenameone.com/img/developer-guide/box-layout-y.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.BoxLayout} X axis is a simpler replacement to flow layout and has grow/no grow
- *     variants.
- * </p>
- * <img alt="Box Layout X" src="https://www.codenameone.com/img/developer-guide/box-layout-x.png"/><br>
- * <img alt="Box Layout X No Grow" src="https://www.codenameone.com/img/developer-guide/box-layout-x-no-grow.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.GridLayout} arranges elements in a grid where all elements have an equal size. It
- *     can auto adapt
- *     the column count.
- * </p>
- * <img alt="Grid Layout 2x2" src="https://www.codenameone.com/img/developer-guide/grid-layout-2x2.png"/>
- * <img alt="Grid Layout autofit landscape"
- *      src="https://www.codenameone.com/img/developer-guide/grid-layout-autofit-landscape.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.table.TableLayout} is similar in many regards to HTML tables. Notice that its
- *     in the <code>com.codename1.ui.table</code> package and not in this package.
- * </p>
- * <img alt="TableLayout that grows the last column"
- *      src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png"/>
- * <img alt="TableLayout with complex constraints"
- *      src="https://www.codenameone.com/img/developer-guide/table-layout-constraints.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.LayeredLayout} is unique in the sense that it is meant to costruct layers
- *     and not the UI positions. It only lays out on the Z axis.
- * </p>
- * <img alt="The X on this button was placed there using the layered layout code below"
- *      src="https://www.codenameone.com/img/developer-guide/layered-layout.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.GridBagLayout} was added to Codename One to ease the porting of Swing/AWT
- *     applications.
- * </p>
- * <img alt="Sample gridbag layout usage" src="https://www.codenameone.com/img/developer-guide/gridbag-layout.png"/>
- *
- * <p>
- *     {@link com.codename1.ui.layouts.mig.MigLayout} is a popular 3rd party layout manager its Codename One
- *     port is experimental.
- * </p>
- * <img alt="MiG Layout" src="https://www.codenameone.com/img/developer-guide/mig-layout.png"/>
- */
+/// Layout managers allow a `com.codename1.ui.Container` to
+///     arrange its components by a set of rules that adapt to specific
+///     densities (ppi - pixels per inch). A layout manager is an arranging algorithm encapsulated
+///     by an abstract class implementation that places components absolutely based
+///     on the "hints" received.
+///
+/// Layout Managers that ship with Codename One
+///
+///     `com.codename1.ui.layouts.FlowLayout` is default layout manager, simple, flexible and with a few caveats.
+///
+///     `com.codename1.ui.layouts.BorderLayout` is ubiquitous thru Codename One code.
+///
+///     `com.codename1.ui.layouts.BorderLayout` can also behave differently based on the center behavior flag
+///
+///     `com.codename1.ui.layouts.BoxLayout` Y axis is a the work-horse of component lists
+///
+///     `com.codename1.ui.layouts.BoxLayout` X axis is a simpler replacement to flow layout and has grow/no grow
+///     variants.
+///
+///     `com.codename1.ui.layouts.GridLayout` arranges elements in a grid where all elements have an equal size. It
+///     can auto adapt
+///     the column count.
+///
+///     `com.codename1.ui.table.TableLayout` is similar in many regards to HTML tables. Notice that its
+///     in the `com.codename1.ui.table` package and not in this package.
+///
+///     `com.codename1.ui.layouts.LayeredLayout` is unique in the sense that it is meant to costruct layers
+///     and not the UI positions. It only lays out on the Z axis.
+///
+///     `com.codename1.ui.layouts.GridBagLayout` was added to Codename One to ease the porting of Swing/AWT
+///     applications.
+///
+///     `com.codename1.ui.layouts.mig.MigLayout` is a popular 3rd party layout manager its Codename One
+///     port is experimental.
 package com.codename1.ui.layouts;

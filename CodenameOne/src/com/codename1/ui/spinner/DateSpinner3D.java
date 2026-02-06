@@ -37,13 +37,11 @@ import java.util.Date;
 
 import static com.codename1.ui.CN.convertToPixels;
 
-/**
- * A date spinner allows selecting a date value within the given date range
- * <p>
- * This is used by the Picker when in lightweight mode.
- *
- * @author Steve Hannah
- */
+/// A date spinner allows selecting a date value within the given date range
+///
+/// This is used by the Picker when in lightweight mode.
+///
+/// @author Steve Hannah
 class DateSpinner3D extends Container implements InternalPickerWidget {
     private final SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
     private final Container wrapper = new Container(BoxLayout.x());
@@ -74,9 +72,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private boolean monthDayYear = true;
     private boolean numericMonths = false;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public DateSpinner3D() {
         setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
         add(BorderLayout.CENTER, wrapper);
@@ -197,14 +193,18 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         day.setModel(new SpinnerNumberModel(startDay, endDay, Math.max(startDay, Math.min(endDay, currentDay)), 1));
     }
 
-    /**
-     * Sets the start and end dates in this spinner.  Month range is only limited if the year of the start and end dates are the same.  Day range is only limited if
-     * both the year and month  of the start and end dates are the same.
-     *
-     * @param start The start date.
-     * @param end   The end date
-     * @since 6.0
-     */
+    /// Sets the start and end dates in this spinner.  Month range is only limited if the year of the start and end dates are the same.  Day range is only limited if
+    /// both the year and month  of the start and end dates are the same.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: The start date.
+    ///
+    /// - `end`: The end date
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public void setDateRange(Date start, Date end) {
         explicitStartMonth = true;
         explicitEndMonth = true;
@@ -245,92 +245,89 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
 
     }
 
-    /**
-     * Since CLDC11 doesn't have {@link Date#getDate() }, this returns the date of the given date as {@link Date#getDate() } would have.
-     *
-     * @param dt The date
-     * @return The day of month.
-     */
+    /// Since CLDC11 doesn't have `Date#getDate()`, this returns the date of the given date as `Date#getDate()` would have.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dt`: The date
+    ///
+    /// #### Returns
+    ///
+    /// The day of month.
     private int getDate(Date dt) {
         tmpCal.setTime(dt);
         return tmpCal.get(Calendar.DAY_OF_MONTH);
     }
 
-    /**
-     * Since CLDC11 doesn't have {@link Date#getMonth() }, this returns the month of the given date as {@link Date#getMonth()} would have.
-     *
-     * @param dt
-     * @return
-     */
+    /// Since CLDC11 doesn't have `Date#getMonth()`, this returns the month of the given date as `Date#getMonth()` would have.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dt`
     private int getMonth(Date dt) {
         tmpCal.setTime(dt);
         return tmpCal.get(Calendar.MONTH);
     }
 
-    /**
-     * Since CLDC doesn't have {@link Date#getYear() }, this returns the year of the given date as {@link Date#getYear() } would have.  E.g.
-     * this returns 0 for year 1900
-     *
-     * @param dt
-     * @return
-     */
+    /// Since CLDC doesn't have `Date#getYear()`, this returns the year of the given date as `Date#getYear()` would have.  E.g.
+    /// this returns 0 for year 1900
+    ///
+    /// #### Parameters
+    ///
+    /// - `dt`
     private int getYear(Date dt) {
         tmpCal.setTime(dt);
         return tmpCal.get(Calendar.YEAR) - 1900;
     }
 
-    /**
-     * Gets the start month of this Spinner.
-     *
-     * @return
-     * @since 6.0
-     */
+    /// Gets the start month of this Spinner.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public int getStartMonth() {
         return startMonth;
     }
 
 
-    /**
-     * Gets the end month of this spinner.
-     *
-     * @return
-     * @since 6.0
-     */
+    /// Gets the end month of this spinner.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public int getEndMonth() {
         return endMonth;
     }
 
 
-    /**
-     * Gets the start day of month.
-     *
-     * @return
-     * @since 6.0
-     */
+    /// Gets the start day of month.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public int getStartDay() {
         return startDay;
     }
 
-    /**
-     * Gets the end day of month.
-     *
-     * @return
-     * @since 6.0
-     */
+    /// Gets the end day of month.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public int getEndDay() {
         return endDay;
     }
 
-    /**
-     * @return the startYear
-     */
+    /// #### Returns
+    ///
+    /// the startYear
     public int getStartYear() {
         return startYear;
     }
 
-    /**
-     * @param startYear the startYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `startYear`: the startYear to set
     public void setStartYear(int startYear) {
         this.startYear = startYear;
         this.currentYear = Math.max(this.startYear, this.currentYear);
@@ -340,16 +337,16 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the endYear
-     */
+    /// #### Returns
+    ///
+    /// the endYear
     public int getEndYear() {
         return endYear;
     }
 
-    /**
-     * @param endYear the endYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `endYear`: the endYear to set
     public void setEndYear(int endYear) {
         this.endYear = endYear;
         this.currentYear = Math.min(this.endYear, this.currentYear);
@@ -359,9 +356,9 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the currentYear
-     */
+    /// #### Returns
+    ///
+    /// the currentYear
     public int getCurrentYear() {
         if (year != null) {
             return ((Integer) year.getValue()).intValue();
@@ -369,9 +366,9 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         return currentYear;
     }
 
-    /**
-     * @param currentYear the currentYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentYear`: the currentYear to set
     public void setCurrentYear(int currentYear) {
         this.currentYear = currentYear;
         explicitCurrentYear = true;
@@ -392,17 +389,17 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the currentDay
-     */
+    /// #### Returns
+    ///
+    /// the currentDay
     public int getCurrentDay() {
         Integer i = (Integer) day.getValue();
         return i.intValue();
     }
 
-    /**
-     * @param currentDay the currentDay to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentDay`: the currentDay to set
     public void setCurrentDay(int currentDay) {
         this.currentDay = currentDay;
         if (!explicitStartDay && startDay > currentDay) {
@@ -422,9 +419,9 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the currentMonth
-     */
+    /// #### Returns
+    ///
+    /// the currentMonth
     public int getCurrentMonth() {
         if (month != null) {
             Integer i = ((Integer) month.getValue() - 1) % 12 + 1;
@@ -433,9 +430,9 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         return currentMonth;
     }
 
-    /**
-     * @param currentMonth the currentMonth to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentMonth`: the currentMonth to set
     public void setCurrentMonth(int currentMonth) {
         this.currentMonth = currentMonth;
         if (!explicitStartMonth && startMonth > currentMonth) {
@@ -455,32 +452,32 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the monthDayYear
-     */
+    /// #### Returns
+    ///
+    /// the monthDayYear
     public boolean isMonthDayYear() {
         return monthDayYear;
     }
 
-    /**
-     * @param monthDayYear the monthDayYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `monthDayYear`: the monthDayYear to set
     public void setMonthDayYear(boolean monthDayYear) {
         this.monthDayYear = monthDayYear;
         wrapper.removeAll();
         addComponents();
     }
 
-    /**
-     * @return the numericMonths
-     */
+    /// #### Returns
+    ///
+    /// the numericMonths
     public boolean isNumericMonths() {
         return numericMonths;
     }
 
-    /**
-     * @param numericMonths the numericMonths to set
-     */
+    /// #### Parameters
+    ///
+    /// - `numericMonths`: the numericMonths to set
     public void setNumericMonths(boolean numericMonths) {
         this.numericMonths = numericMonths;
         if (month != null) {
@@ -489,25 +486,19 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"startYear", "endYear", "currentYear", "currentDay", "currentMonth", "monthDayYear", "numericMonths"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("startYear".equals(name)) {
@@ -534,9 +525,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("startYear".equals(name)) {

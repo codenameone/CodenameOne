@@ -30,27 +30,28 @@ import java.util.Map;
 
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * A container that allows you to use the same component on multiple forms.  This is most
- * useful for adding a global footer or sidebar that appears on multiple forms, or even the
- * whole app.  For example, the Twitter app has tabs for "Home", "Search", "Messages", etc.. that
- * are always shown in the app, and are fixed in place, even between forms.  This container
- * allows you to achieve a similar thing with Codename One apps.
- *
- * <p>Note that the InterFormContainer object itself cannot be added to multiple forms.   You
- * need to create two InterFormContainer instances that share the same content.</p>
- *
- * @author shannah
- * @since 7.0
- */
+/// A container that allows you to use the same component on multiple forms.  This is most
+/// useful for adding a global footer or sidebar that appears on multiple forms, or even the
+/// whole app.  For example, the Twitter app has tabs for "Home", "Search", "Messages", etc.. that
+/// are always shown in the app, and are fixed in place, even between forms.  This container
+/// allows you to achieve a similar thing with Codename One apps.
+///
+/// Note that the InterFormContainer object itself cannot be added to multiple forms.   You
+/// need to create two InterFormContainer instances that share the same content.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public class InterFormContainer extends Container {
     private final Component content;
 
-    /**
-     * Creates an interform container with the provided content.
-     *
-     * @param content The component that is to be shared across multiple forms.
-     */
+    /// Creates an interform container with the provided content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: The component that is to be shared across multiple forms.
     public InterFormContainer(Component content) {
         this.content = content;
         setLayout(new BorderLayout());
@@ -58,14 +59,18 @@ public class InterFormContainer extends Container {
 
     }
 
-    /**
-     * Finds common InterFormContainers in two different component trees.
-     *
-     * @param root1 The root of the first component tree to search.
-     * @param root2 The root of the second component tree to search.
-     * @return A Map that maps an InterFormContainer from the first tree to its corresponding container from the second
-     * tree.
-     */
+    /// Finds common InterFormContainers in two different component trees.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root1`: The root of the first component tree to search.
+    ///
+    /// - `root2`: The root of the second component tree to search.
+    ///
+    /// #### Returns
+    ///
+    /// @return A Map that maps an InterFormContainer from the first tree to its corresponding container from the second
+    /// tree.
     public static Map<InterFormContainer, InterFormContainer> findCommonContainers(Component root1, Component root2) {
         final Map<Component, InterFormContainer> set1 = new HashMap<Component, InterFormContainer>();
         final Map<Component, InterFormContainer> set2 = new HashMap<Component, InterFormContainer>();
@@ -91,15 +96,20 @@ public class InterFormContainer extends Container {
 
     }
 
-    /**
-     * Injects the given "content" as an InterFormContainer inside the component hierarchy
-     * rooted at "root"
-     *
-     * @param selector A selector to identify the component to add the container to.  See {@link ComponentSelector}.
-     * @param root     The root container serving as a starting point for the selector search.
-     * @param content  The content to inject.
-     * @return The InterFormContainer that was injected, or null if the selector didn't match any containers.
-     */
+    /// Injects the given "content" as an InterFormContainer inside the component hierarchy
+    /// rooted at "root"
+    ///
+    /// #### Parameters
+    ///
+    /// - `selector`: A selector to identify the component to add the container to.  See `ComponentSelector`.
+    ///
+    /// - `root`: The root container serving as a starting point for the selector search.
+    ///
+    /// - `content`: The content to inject.
+    ///
+    /// #### Returns
+    ///
+    /// The InterFormContainer that was injected, or null if the selector didn't match any containers.
     public static InterFormContainer inject(String selector, Container root, Component content) {
         for (Component c : $(selector, root)) {
             if (c instanceof Container) {
@@ -118,9 +128,7 @@ public class InterFormContainer extends Container {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         if (content.getParent() != this) { //NOPMD CompareObjectsWithEquals
@@ -131,13 +139,16 @@ public class InterFormContainer extends Container {
         super.initComponent();
     }
 
-    /**
-     * Finds any InterformContainer instances in the UI hierarchy rooted at {@literal root}
-     * that contains the same content as this container.
-     *
-     * @param root A component/container whose UI hierarchy is to be searched.
-     * @return An InterFormContainer with the same content as this container, or null if none is found.
-     */
+    /// Finds any InterformContainer instances in the UI hierarchy rooted at root
+    /// that contains the same content as this container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: A component/container whose UI hierarchy is to be searched.
+    ///
+    /// #### Returns
+    ///
+    /// An InterFormContainer with the same content as this container, or null if none is found.
     public InterFormContainer findPeer(Component root) {
         if (root.getClass() == InterFormContainer.class) {
             InterFormContainer cnt = (InterFormContainer) root;
@@ -158,9 +169,7 @@ public class InterFormContainer extends Container {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         if (!isVisible()) {
@@ -181,9 +190,7 @@ public class InterFormContainer extends Container {
         g.translate(content.getX() - getX(), content.getY() - getY());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         return new Dimension(content.getPreferredW() + content.getStyle().getHorizontalMargins(), content.getPreferredH() + content.getStyle().getVerticalMargins());

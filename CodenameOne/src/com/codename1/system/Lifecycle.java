@@ -36,19 +36,17 @@ import com.codename1.ui.util.Resources;
 
 import static com.codename1.ui.CN.addNetworkErrorListener;
 
-/**
- * Optional helper class that implements the Codename One lifecycle methods with reasonable default
- * implementations to help keep sample code smaller.
- */
+/// Optional helper class that implements the Codename One lifecycle methods with reasonable default
+/// implementations to help keep sample code smaller.
 public class Lifecycle {
     private Form current;
     private Resources theme;
 
-    /**
-     * Invoked when the app is "cold launched", this acts like a constructor
-     *
-     * @param context some OSs might pass a native object representing platform internal information
-     */
+    /// Invoked when the app is "cold launched", this acts like a constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `context`: some OSs might pass a native object representing platform internal information
     public void init(Object context) {
         // use two network threads instead of one
         CN.updateNetworkThreadCount(getNetworkThreadCount());
@@ -68,47 +66,45 @@ public class Lifecycle {
         });
     }
 
-    /**
-     * Callback that can be overriden to disable or modify crash protection
-     */
+    /// Callback that can be overriden to disable or modify crash protection
     protected void bindCrashProtection() {
         // Pro only feature
         Log.bindCrashProtection(true);
     }
 
-    /**
-     * Returns the default number of network thread count
-     *
-     * @return currently two threads
-     */
+    /// Returns the default number of network thread count
+    ///
+    /// #### Returns
+    ///
+    /// currently two threads
     protected int getNetworkThreadCount() {
         return 2;
     }
 
-    /**
-     * Returns the name of the global theme file, by default it's "/theme". Can be overriden by subclasses to
-     * load a different file name
-     *
-     * @return "/theme"
-     */
+    /// Returns the name of the global theme file, by default it's "/theme". Can be overriden by subclasses to
+    /// load a different file name
+    ///
+    /// #### Returns
+    ///
+    /// "/theme"
     protected String getThemeName() {
         return "/theme";
     }
 
-    /**
-     * The theme instance
-     *
-     * @return the theme
-     */
+    /// The theme instance
+    ///
+    /// #### Returns
+    ///
+    /// the theme
     public Resources getTheme() {
         return theme;
     }
 
-    /**
-     * Invoked on a network error callback
-     *
-     * @param err the network error event
-     */
+    /// Invoked on a network error callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the network error event
     protected void handleNetworkError(NetworkEvent err) {
         // prevent the event from propagating
         err.consume();
@@ -119,9 +115,7 @@ public class Lifecycle {
         Dialog.show("Connection Error", "There was a networking error in the connection to " + err.getConnectionRequest().getUrl(), "OK", null);
     }
 
-    /**
-     * Default start callback that's invoked on application resume
-     */
+    /// Default start callback that's invoked on application resume
     public void start() {
         if (current != null) {
             current.show();
@@ -132,9 +126,7 @@ public class Lifecycle {
     }
 
 
-    /**
-     * This method is invoked by start to show the first form of the application
-     */
+    /// This method is invoked by start to show the first form of the application
     public void runApp() {
         Form hello = new Form("Hello", BoxLayout.y());
         hello.add(new Label("You should override runApp() with your code"));
@@ -142,9 +134,7 @@ public class Lifecycle {
     }
 
 
-    /**
-     * Callback when the app is suspended
-     */
+    /// Callback when the app is suspended
     public void stop() {
         current = CN.getCurrentForm();
         if (current instanceof Dialog) {
@@ -153,24 +143,20 @@ public class Lifecycle {
         }
     }
 
-    /**
-     * Callback when the app is destroyed
-     */
+    /// Callback when the app is destroyed
     public void destroy() {
     }
 
-    /**
-     * The current form within the application lifecycle which possibly differs from the one in the implementation
-     */
+    /// The current form within the application lifecycle which possibly differs from the one in the implementation
     protected Form getCurrentForm() {
         return current;
     }
 
-    /**
-     * The current form within the application lifecycle which possibly differs from the one in the implementation
-     *
-     * @param current the new current Form
-     */
+    /// The current form within the application lifecycle which possibly differs from the one in the implementation
+    ///
+    /// #### Parameters
+    ///
+    /// - `current`: the new current Form
     protected void setCurrentForm(Form current) {
         this.current = current;
     }

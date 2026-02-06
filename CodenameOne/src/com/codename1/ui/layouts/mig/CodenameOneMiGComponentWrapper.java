@@ -53,19 +53,13 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.spinner.BaseSpinner;
 import com.codename1.ui.table.Table;
 
-/**
- *
- */
+///
 class CodenameOneMiGComponentWrapper implements ComponentWrapper {
-    /**
-     * Cache.
-     */
+    /// Cache.
     //private final static IdentityHashMap<FontMetrics, Point.Float> FM_MAP = new IdentityHashMap<FontMetrics, Point.Float>(4);
     private final static Font SUBST_FONT = Font.getDefaultFont();
 
-    /**
-     * Debug color for component bounds outline.
-     */
+    /// Debug color for component bounds outline.
     //private static final Color DB_COMP_OUTLINE = new Color(0, 0, 200);
     private static boolean maxSet = false;
     private static boolean vp = true;
@@ -76,38 +70,38 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         this.c = c;
     }
 
-    /**
-     * @deprecated Java 1.4 is not supported anymore
-     */
+    /// #### Deprecated
+    ///
+    /// Java 1.4 is not supported anymore
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static boolean isMaxSizeSetOn1_4() {
         return isMaxSizeSetOn14();
     }
 
-    /**
-     * @deprecated Java 1.4 is not supported anymore
-     */
+    /// #### Deprecated
+    ///
+    /// Java 1.4 is not supported anymore
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static void setMaxSizeSetOn1_4(boolean b) {
         setMaxSizeSetOn14(b);
     }
 
-    /**
-     * Java 1.4 is not supported anymore.
-     *
-     * @return whether max size was set for legacy mode
-     */
+    /// Java 1.4 is not supported anymore.
+    ///
+    /// #### Returns
+    ///
+    /// whether max size was set for legacy mode
     public static boolean isMaxSizeSetOn14() {
         return maxSet;
     }
 
-    /**
-     * Java 1.4 is not supported anymore.
-     *
-     * @param b whether max size was set for legacy mode
-     */
+    /// Java 1.4 is not supported anymore.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: whether max size was set for legacy mode
     public static void setMaxSizeSetOn14(boolean b) {
         maxSet = b;
     }

@@ -49,13 +49,11 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 
-/**
- * This is a utility class that allows Oauth2 authentication This utility uses
- * the Codename One XHTML Component to display the authentication pages.
- * http://tools.ietf.org/pdf/draft-ietf-oauth-v2-12.pdf
- *
- * @author Chen Fishbein
- */
+/// This is a utility class that allows Oauth2 authentication This utility uses
+/// the Codename One XHTML Component to display the authentication pages.
+/// http://tools.ietf.org/pdf/draft-ietf-oauth-v2-12.pdf
+///
+/// @author Chen Fishbein
 public class Oauth2 {
     public static final String TOKEN = "access_token";
     private static String expires;
@@ -74,55 +72,69 @@ public class Oauth2 {
     private Hashtable additionalParams;
     private Dialog login;
 
-    /**
-     * Simple constructor
-     *
-     * @param oauth2URL   the authentication url of the service
-     * @param clientId    the client id that would like to use the service
-     * @param redirectURI the redirect uri
-     */
+    /// Simple constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `oauth2URL`: the authentication url of the service
+    ///
+    /// - `clientId`: the client id that would like to use the service
+    ///
+    /// - `redirectURI`: the redirect uri
     public Oauth2(String oauth2URL, String clientId, String redirectURI) {
         this(oauth2URL, clientId, redirectURI, null, null, null);
     }
 
-    /**
-     * Simple constructor
-     *
-     * @param oauth2URL   the authentication url of the service
-     * @param clientId    the client id that would like to use the service
-     * @param redirectURI the redirect uri
-     * @param scope       the authentication scope
-     */
+    /// Simple constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `oauth2URL`: the authentication url of the service
+    ///
+    /// - `clientId`: the client id that would like to use the service
+    ///
+    /// - `redirectURI`: the redirect uri
+    ///
+    /// - `scope`: the authentication scope
     public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope) {
         this(oauth2URL, clientId, redirectURI, scope, null, null);
     }
 
-    /**
-     * Simple constructor
-     *
-     * @param oauth2URL    the authentication url of the service
-     * @param clientId     the client id that would like to use the service
-     * @param redirectURI  the redirect uri
-     * @param scope        the authentication scope
-     * @param clientSecret the client secret
-     */
+    /// Simple constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `oauth2URL`: the authentication url of the service
+    ///
+    /// - `clientId`: the client id that would like to use the service
+    ///
+    /// - `redirectURI`: the redirect uri
+    ///
+    /// - `scope`: the authentication scope
+    ///
+    /// - `clientSecret`: the client secret
     public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope,
                   String tokenRequestURL, String clientSecret) {
         this(oauth2URL, clientId, redirectURI, scope, tokenRequestURL, clientSecret, null);
     }
 
 
-    /**
-     * Simple constructor
-     *
-     * @param oauth2URL        the authentication url of the service
-     * @param clientId         the client id that would like to use the service
-     * @param redirectURI      the redirect uri
-     * @param scope            the authentication scope
-     * @param clientSecret     the client secret
-     * @param additionalParams hashtable of additional parameters to the
-     *                         authentication request
-     */
+    /// Simple constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `oauth2URL`: the authentication url of the service
+    ///
+    /// - `clientId`: the client id that would like to use the service
+    ///
+    /// - `redirectURI`: the redirect uri
+    ///
+    /// - `scope`: the authentication scope
+    ///
+    /// - `clientSecret`: the client secret
+    ///
+    /// - `additionalParams`: @param additionalParams hashtable of additional parameters to the
+    ///                         authentication request
     public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope, String tokenRequestURL, String clientSecret, Hashtable additionalParams) {
         this.oauth2URL = oauth2URL;
         this.redirectURI = redirectURI;
@@ -133,20 +145,20 @@ public class Oauth2 {
         this.additionalParams = additionalParams;
     }
 
-    /**
-     * Enables going back to the parent form after login is completed
-     *
-     * @return the backToParent
-     */
+    /// Enables going back to the parent form after login is completed
+    ///
+    /// #### Returns
+    ///
+    /// the backToParent
     public static boolean isBackToParent() {
         return backToParent;
     }
 
-    /**
-     * Enables going back to the parent form after login is completed
-     *
-     * @param aBackToParent the backToParent to set
-     */
+    /// Enables going back to the parent form after login is completed
+    ///
+    /// #### Parameters
+    ///
+    /// - `aBackToParent`: the backToParent to set
     public static void setBackToParent(boolean aBackToParent) {
         backToParent = aBackToParent;
     }
@@ -174,28 +186,38 @@ public class Oauth2 {
 
     }
 
-    /**
-     * Returns the expiry for the token received via oauth
-     *
-     * @return the expires argument for the token
-     */
+    /// Returns the expiry for the token received via oauth
+    ///
+    /// #### Returns
+    ///
+    /// the expires argument for the token
     public static String getExpires() {
         return expires;
     }
 
-    /**
-     * When using the {@link #setUseRedirectForWeb(boolean) } option you should call this method at the beginning of your app's
-     * {@code start()} method.  If the app was loaded as a result of redirecting from an Oauth login, then this method will handle the login
-     * and will call the callback method on complete.
-     *
-     * @param callback a listener that will receive at its source either a token for
-     *                 the service or an exception in case of a failure
-     * @return True the redirect was handled.  False if it was not handled.  If this returns {@literal true}, then you should just return from the start() method, and instead
-     * handle control flow in your callback.
-     * @see #setUseRedirectForWeb(boolean)
-     * @see #isUseRedirectForWeb()
-     * @since 7.0
-     */
+    /// When using the `#setUseRedirectForWeb(boolean)` option you should call this method at the beginning of your app's
+    /// `start()` method.  If the app was loaded as a result of redirecting from an Oauth login, then this method will handle the login
+    /// and will call the callback method on complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: @param callback a listener that will receive at its source either a token for
+    ///                 the service or an exception in case of a failure
+    ///
+    /// #### Returns
+    ///
+    /// @return True the redirect was handled.  False if it was not handled.  If this returns true, then you should just return from the start() method, and instead
+    /// handle control flow in your callback.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setUseRedirectForWeb(boolean)
+    ///
+    /// - #isUseRedirectForWeb()
     public static boolean handleRedirect(ActionListener callback) {
         Oauth2 request = fetchSerializedOauth2Request();
         if (request == null) {
@@ -223,17 +245,23 @@ public class Oauth2 {
         s.writeObject("__oauth2Params", params);
     }
 
-    /**
-     * This method preforms the actual authentication, this method is a blocking
-     * method that will display the user the html authentication pages.
-     *
-     * @return the method if passes authentication will return the access token
-     * or null if authentication failed.
-     * @throws IOException the method will throw an IOException if something
-     *                     went wrong in the communication.
-     * @deprecated use createAuthComponent or showAuthentication which work
-     * asynchronously and adapt better to different platforms
-     */
+    /// This method preforms the actual authentication, this method is a blocking
+    /// method that will display the user the html authentication pages.
+    ///
+    /// #### Returns
+    ///
+    /// @return the method if passes authentication will return the access token
+    /// or null if authentication failed.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException the method will throw an IOException if something
+    ///                     went wrong in the communication.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated use createAuthComponent or showAuthentication which work
+    /// asynchronously and adapt better to different platforms
     public String authenticate() {
 
         if (token == null) {
@@ -256,82 +284,105 @@ public class Oauth2 {
         return token;
     }
 
-    /**
-     * Checks if this component will use an external web browser window for the login process.
-     *
-     * @return True if this component will use an external web browser window.
-     * @since 7.0
-     */
+    /// Checks if this component will use an external web browser window for the login process.
+    ///
+    /// #### Returns
+    ///
+    /// True if this component will use an external web browser window.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public boolean isUseBrowserWindow() {
         return useBrowserWindow;
     }
 
-    /**
-     * Set this OAuth2 object to use a {@link BrowserWindow} for the login process.  You can set the global default via the "oauth2.useBrowserWindow"
-     * display property with either a "true" or "false" value.
-     *
-     * <p>When this property is set, the login prompt will be displayed in a separate Window containing a web browser on the desktop.  Platforms that
-     * don't have windows (e.g. iOS/Android) will fall back to a separate Form with a webview).</p>
-     *
-     * @param useBrowserWindow True to use a browser window for the login process.
-     * @since 7.0
-     */
+    /// Set this OAuth2 object to use a `BrowserWindow` for the login process.  You can set the global default via the "oauth2.useBrowserWindow"
+    /// display property with either a "true" or "false" value.
+    ///
+    /// When this property is set, the login prompt will be displayed in a separate Window containing a web browser on the desktop.  Platforms that
+    /// don't have windows (e.g. iOS/Android) will fall back to a separate Form with a webview).
+    ///
+    /// #### Parameters
+    ///
+    /// - `useBrowserWindow`: True to use a browser window for the login process.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setUseBrowserWindow(boolean useBrowserWindow) {
         this.useBrowserWindow = useBrowserWindow;
     }
 
-    /**
-     * Checks wither this Oauth component is configured to use a redirect for Oauth login when running on the web.
-     *
-     * @return True if this component will use a redirect for Oauth login.
-     * @see #setUseRedirectForWeb(boolean)
-     * @see #handleRedirect(com.codename1.ui.events.ActionListener)
-     * @since 7.0
-     */
+    /// Checks wither this Oauth component is configured to use a redirect for Oauth login when running on the web.
+    ///
+    /// #### Returns
+    ///
+    /// True if this component will use a redirect for Oauth login.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setUseRedirectForWeb(boolean)
+    ///
+    /// - #handleRedirect(com.codename1.ui.events.ActionListener)
     public boolean isUseRedirectForWeb() {
         return useRedirectForWeb;
     }
 
-    /**
-     * Sets thisOAuth2 object to use a redirect for login instead of an iframe when running on the Web (via the Javascript port).  Some
-     * Oauth providers won't work inside an iframe.
-     *
-     * <p>Using this option will cause the browser to navigate away from the app to go to the login page.  The Oauth
-     * login will redirect back to the app after login is complete.</p>
-     *
-     * <p><strong>Warning</strong>: If the user has unsaved changes in the app, navigating away from the app may cause them to lose their changes.  You should provide
-     * a warning, or confirmation prompt for the user in such cases.  The usual onbeforeunload handler is disabled when using this action so the user
-     * won't receive any warnings other than what you explicitly prompt.</p>
-     *
-     * @param redirect Set to true to use a redirect for Oauth login instead of an iframe when running on the web.
-     * @see #isUseRedirectForWeb()
-     * @see #handleRedirect(com.codename1.ui.events.ActionListener)
-     * @since 7.0
-     */
+    /// Sets thisOAuth2 object to use a redirect for login instead of an iframe when running on the Web (via the Javascript port).  Some
+    /// Oauth providers won't work inside an iframe.
+    ///
+    /// Using this option will cause the browser to navigate away from the app to go to the login page.  The Oauth
+    /// login will redirect back to the app after login is complete.
+    ///
+    /// **Warning**: If the user has unsaved changes in the app, navigating away from the app may cause them to lose their changes.  You should provide
+    /// a warning, or confirmation prompt for the user in such cases.  The usual onbeforeunload handler is disabled when using this action so the user
+    /// won't receive any warnings other than what you explicitly prompt.
+    ///
+    /// #### Parameters
+    ///
+    /// - `redirect`: Set to true to use a redirect for Oauth login instead of an iframe when running on the web.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #isUseRedirectForWeb()
+    ///
+    /// - #handleRedirect(com.codename1.ui.events.ActionListener)
     public void setUseRedirectForWeb(boolean redirect) {
         this.useRedirectForWeb = redirect;
     }
 
-    /**
-     * This method creates a component which can authenticate. You will receive
-     * either the authentication key or an Exception object within the
-     * ActionListener callback method.
-     *
-     * @param al a listener that will receive at its source either a token for
-     *           the service or an exception in case of a failure
-     * @return a component that should be displayed to the user in order to
-     * perform the authentication
-     */
+    /// This method creates a component which can authenticate. You will receive
+    /// either the authentication key or an Exception object within the
+    /// ActionListener callback method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: @param al a listener that will receive at its source either a token for
+    ///           the service or an exception in case of a failure
+    ///
+    /// #### Returns
+    ///
+    /// @return a component that should be displayed to the user in order to
+    /// perform the authentication
     public Component createAuthComponent(ActionListener al) {
         return createLoginComponent(al, null, null, null);
     }
 
-    /**
-     * This method shows an authentication for login form
-     *
-     * @param al a listener that will receive at its source either a token for
-     *           the service or an exception in case of a failure
-     */
+    /// This method shows an authentication for login form
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: @param al a listener that will receive at its source either a token for
+    ///           the service or an exception in case of a failure
     public void showAuthentication(final ActionListener<ActionEvent> al) {
 
 
@@ -417,14 +468,17 @@ public class Oauth2 {
         return web[0];
     }
 
-    /**
-     * Processes token request responses that are formatted as a JSON object.  May be overridden
-     * by subclasses, but subclass implementations should call super.handleTokenRequestResponse()
-     * so that the default implementation can parse out the token, expires, and refreshToken fields.
-     *
-     * @param map Parsed JSON object of response.
-     * @since 7.0
-     */
+    /// Processes token request responses that are formatted as a JSON object.  May be overridden
+    /// by subclasses, but subclass implementations should call super.handleTokenRequestResponse()
+    /// so that the default implementation can parse out the token, expires, and refreshToken fields.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: Parsed JSON object of response.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected void handleTokenRequestResponse(Map map) {
         token = (String) map.get("access_token");
         Object ex = map.get("expires_in");
@@ -439,14 +493,17 @@ public class Oauth2 {
 
     }
 
-    /**
-     * Processes token request responses that are formatted as HTTP query strings.  May be
-     * overridden by subclass, but subclass implementations should call super.handleTokenRequestResponse()
-     * so that the default implementation can parse out the token, expires, and refreshToken fields.
-     *
-     * @param t The query string.
-     * @since 7.0
-     */
+    /// Processes token request responses that are formatted as HTTP query strings.  May be
+    /// overridden by subclass, but subclass implementations should call super.handleTokenRequestResponse()
+    /// so that the default implementation can parse out the token, expires, and refreshToken fields.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: The query string.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected void handleTokenRequestResponse(String t) {
         token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
         int off = t.indexOf("expires=");
@@ -475,13 +532,13 @@ public class Oauth2 {
         }
     }
 
-    /**
-     * Method that can be overridden by subclasses to intercept parameters extracted from
-     * the redirect URL when the login flow reaches the redirect URL.  This will give subclasses
-     * an opportunity to parse out special information that the OAuth2 service provides in the callback.
-     *
-     * @param params Parsed query parameters passed to the redirect URL.
-     */
+    /// Method that can be overridden by subclasses to intercept parameters extracted from
+    /// the redirect URL when the login flow reaches the redirect URL.  This will give subclasses
+    /// an opportunity to parse out special information that the OAuth2 service provides in the callback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `params`: Parsed query parameters passed to the redirect URL.
     protected void handleRedirectURLParams(Map params) {
 
     }

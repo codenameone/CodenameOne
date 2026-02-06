@@ -36,22 +36,16 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * HTMLForm is an object that holds all the data related to a form within HTML.
- * Note that it is not related in any way to Codename One's Form.
- *
- * @author Ofir Leitner
- */
+/// HTMLForm is an object that holds all the data related to a form within HTML.
+/// Note that it is not related in any way to Codename One's Form.
+///
+/// @author Ofir Leitner
 class HTMLForm {
 
-    /**
-     * The default text on forms' submit button
-     */
+    /// The default text on forms' submit button
     static final String DEFAULT_SUBMIT_TEXT = "Submit";
 
-    /**
-     * The default text on forms' reset button
-     */
+    /// The default text on forms' reset button
     static final String DEFAULT_RESET_TEXT = "Clear";
 
     Hashtable comps = new Hashtable();
@@ -69,13 +63,15 @@ class HTMLForm {
     boolean isPostMethod;
     boolean hasSubmitButton;
 
-    /**
-     * Constructs the HTMLForm
-     *
-     * @param htmlC  The HTMLComponent containing this form
-     * @param action The action of this form (the URL)
-     * @param method The method of this form (get/post)
-     */
+    /// Constructs the HTMLForm
+    ///
+    /// #### Parameters
+    ///
+    /// - `htmlC`: The HTMLComponent containing this form
+    ///
+    /// - `action`: The action of this form (the URL)
+    ///
+    /// - `method`: The method of this form (get/post)
     HTMLForm(HTMLComponent htmlC, String action, String method, String encType) {
         this.htmlC = htmlC;
         this.action = htmlC.convertURL(action);
@@ -90,12 +86,15 @@ class HTMLForm {
         this.isPostMethod = ((method != null) && ("post".equalsIgnoreCase(method)));
     }
 
-    /**
-     * Creates a reset command associated with this form
-     *
-     * @param value The reset button display name, if null or empty DEFAULT_RESET_TEXT will be assigned to it
-     * @return The reset command
-     */
+    /// Creates a reset command associated with this form
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The reset button display name, if null or empty DEFAULT_RESET_TEXT will be assigned to it
+    ///
+    /// #### Returns
+    ///
+    /// The reset command
     Command createResetCommand(String value) {
         if ((value == null) || ("".equals(value))) {
             value = htmlC.getUIManager().localize("html.reset", HTMLForm.DEFAULT_RESET_TEXT);
@@ -103,13 +102,17 @@ class HTMLForm {
         return new NamedCommand(null, value, this, false);
     }
 
-    /**
-     * Creates a submit command associated with this form
-     *
-     * @param name  The submit command name (i.e. it's NAME attribute, or null if none specified)
-     * @param value The submit button display name, if null or empty DEFAULT_SUBMIT_TEXT will be assigned to it
-     * @return The reset command
-     */
+    /// Creates a submit command associated with this form
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The submit command name (i.e. it's NAME attribute, or null if none specified)
+    ///
+    /// - `value`: The submit button display name, if null or empty DEFAULT_SUBMIT_TEXT will be assigned to it
+    ///
+    /// #### Returns
+    ///
+    /// The reset command
     Command createSubmitCommand(String name, String value) {
         hasSubmitButton = true;
         if ((value == null) || ("".equals(value))) {
@@ -118,13 +121,15 @@ class HTMLForm {
         return new NamedCommand(name, value, this, true);
     }
 
-    /**
-     * Adds an input field to the form, note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
-     *
-     * @param key          The input field's name/id
-     * @param input        The field itself (either the component or the value for a hidden field)
-     * @param defaultValue The default value of the field (or null if none)
-     */
+    /// Adds an input field to the form, note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: The input field's name/id
+    ///
+    /// - `input`: The field itself (either the component or the value for a hidden field)
+    ///
+    /// - `defaultValue`: The default value of the field (or null if none)
     void addInput(String key, Object input, String defaultValue) {
         if (defaultValue != null) { // Default values are added even before the key is checked, since even if the input component is unnamed, the form still needs to be able to reset it
             defaultValues.put(input, defaultValue);
@@ -142,20 +147,22 @@ class HTMLForm {
         }
     }
 
-    /**
-     * @param ta          The textarea/field
-     * @param inputFormat An input format verifier (or null if none)
-     */
+    /// #### Parameters
+    ///
+    /// - `ta`: The textarea/field
+    ///
+    /// - `inputFormat`: An input format verifier (or null if none)
     void setInputFormat(TextArea ta, HTMLInputFormat inputFormat) {
         inputFormats.put(ta, inputFormat);
     }
 
-    /**
-     * Sets whether the specified input field can be left empty or not
-     *
-     * @param ta The TextArea
-     * @param ok true if can be left empty, false otherwise
-     */
+    /// Sets whether the specified input field can be left empty or not
+    ///
+    /// #### Parameters
+    ///
+    /// - `ta`: The TextArea
+    ///
+    /// - `ok`: true if can be left empty, false otherwise
     void setEmptyOK(TextArea ta, boolean ok) {
         if (ok) {
             emptyOk.addElement(ta);
@@ -165,26 +172,29 @@ class HTMLForm {
     }
 
 
-    /**
-     * Sets the default value for the specified input field
-     *
-     * @param input        The input field to set the default value to
-     * @param defaultValue The default value
-     */
+    /// Sets the default value for the specified input field
+    ///
+    /// #### Parameters
+    ///
+    /// - `input`: The input field to set the default value to
+    ///
+    /// - `defaultValue`: The default value
     void setDefaultValue(Object input, Object defaultValue) {
         if ((input != null) && (defaultValue != null)) {
             defaultValues.put(input, defaultValue);
         }
     }
 
-    /**
-     * Adds the specified CheckBox to the form.
-     * Note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
-     *
-     * @param key   The CheckBox's name/id
-     * @param cb    The CheckBox
-     * @param value The value of the checkbox
-     */
+    /// Adds the specified CheckBox to the form.
+    /// Note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: The CheckBox's name/id
+    ///
+    /// - `cb`: The CheckBox
+    ///
+    /// - `value`: The value of the checkbox
     void addCheckBox(String key, CheckBox cb, String value) {
         if (cb.isSelected()) {
             defaultCheckedButtons.addElement(cb);
@@ -204,14 +214,16 @@ class HTMLForm {
         internal.put(cb, value);
     }
 
-    /**
-     * Adds the specified RadioButton to the form.
-     * Note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
-     *
-     * @param key   The CheckBox's name/id
-     * @param rb    The RadioButton to add
-     * @param value The value of the checkbox
-     */
+    /// Adds the specified RadioButton to the form.
+    /// Note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: The CheckBox's name/id
+    ///
+    /// - `rb`: The RadioButton to add
+    ///
+    /// - `value`: The value of the checkbox
     void addRadioButton(String key, RadioButton rb, String value) {
         if (rb.isSelected()) {
             defaultCheckedButtons.addElement(rb);
@@ -240,20 +252,18 @@ class HTMLForm {
 
     }
 
-    /**
-     * Returns the number of fields in the form
-     *
-     * @return the number of fields in the form
-     */
+    /// Returns the number of fields in the form
+    ///
+    /// #### Returns
+    ///
+    /// the number of fields in the form
     int getNumFields() {
         return comps.size();
     }
 
 
-    /**
-     * Called when the a form submit is needed.
-     * This querys all form fields, creates a URL accordingly and sets it to the HTMLComponent
-     */
+    /// Called when the a form submit is needed.
+    /// This querys all form fields, creates a URL accordingly and sets it to the HTMLComponent
     void submit(String submitKey, String submitVal) {
         if (action == null) {
             return;
@@ -365,9 +375,7 @@ class HTMLForm {
         }
     }
 
-    /**
-     * Called when a form reset is needed and resets all the form fields to their default values.
-     */
+    /// Called when a form reset is needed and resets all the form fields to their default values.
     void reset() {
         for (Enumeration e = defaultValues.keys(); e.hasMoreElements(); ) {
             Object input = e.nextElement();
@@ -404,12 +412,13 @@ class HTMLForm {
 
     }
 
-    /**
-     * A convenience method used in reset()
-     *
-     * @param button   The button to set (CheckBox/RadioButton)
-     * @param checkedX true to check, false to uncheck
-     */
+    /// A convenience method used in reset()
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: The button to set (CheckBox/RadioButton)
+    ///
+    /// - `checkedX`: true to check, false to uncheck
     private void setButton(Button button, boolean checkedX) {
         if (button instanceof RadioButton) {
             ((RadioButton) button).setSelected(checkedX);
@@ -418,11 +427,9 @@ class HTMLForm {
         }
     }
 
-    /**
-     * A simple class adding the option to change the name of a command
-     *
-     * @author Ofir Leitner
-     */
+    /// A simple class adding the option to change the name of a command
+    ///
+    /// @author Ofir Leitner
     static class NamedCommand extends Command {
 
         HTMLForm htmlForm;
@@ -473,9 +480,7 @@ class HTMLForm {
                     (value == null ? that.value == null : value.equals(that.value));
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public int hashCode() {
             int result = super.hashCode();

@@ -25,43 +25,29 @@ package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
 
-/**
- * Encapsulates a 3D transform that can be used in {@link com.codename1.ui.Graphics} contexts
- * or with {@link com.codename1.ui.geom.Shape}s to transform in various ways.
- * <p>
- * Use the {@link #isSupported} and {@link #isPerspectiveSupported} to check if transforms and
- * perspective transforms are supported on this platform.  If they are not supported, this
- * class will throw RuntimeExceptions if you try to use it.
- *
- * @author shannah
- */
+/// Encapsulates a 3D transform that can be used in `com.codename1.ui.Graphics` contexts
+/// or with `com.codename1.ui.geom.Shape`s to transform in various ways.
+///
+/// Use the `#isSupported` and `#isPerspectiveSupported` to check if transforms and
+/// perspective transforms are supported on this platform.  If they are not supported, this
+/// class will throw RuntimeExceptions if you try to use it.
+///
+/// @author shannah
 public class Transform {
 
-    /**
-     * Constant for transform type. Transform is not a special matrix.
-     */
+    /// Constant for transform type. Transform is not a special matrix.
     public static final int TYPE_UNKNOWN = -1;
-    /**
-     * Constant for transform type.  Transform is the identity transform.
-     */
+    /// Constant for transform type.  Transform is the identity transform.
     public static final int TYPE_IDENTITY = 0;
-    /**
-     * Constant for transform type.  Transform is a translation transform
-     * only.
-     */
+    /// Constant for transform type.  Transform is a translation transform
+    /// only.
     public static final int TYPE_TRANSLATION = 1;
-    /**
-     * Constant for transform type.  Transform is a scale transform only.
-     */
+    /// Constant for transform type.  Transform is a scale transform only.
     public static final int TYPE_SCALE = 2;
-    /**
-     * Reference to the native transform.  This should only be used by the implementation.
-     */
+    /// Reference to the native transform.  This should only be used by the implementation.
     private Object nativeTransform;
-    /**
-     * The type of transform.  This allows us to cut corners in transformation
-     * when using a special matrix like a translation, scale, or identity matrix.
-     */
+    /// The type of transform.  This allows us to cut corners in transformation
+    /// when using a special matrix like a translation, scale, or identity matrix.
     private int type = TYPE_UNKNOWN;
     private Transform inverse;
     private boolean inverseDirty = true;
@@ -73,20 +59,20 @@ public class Transform {
     private float scaleZ = 1f;
     private boolean dirty = true;
     private CodenameOneImplementation impl = null;
-    /**
-     * Private constructor
-     *
-     * @param nativeTransform
-     */
+    /// Private constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`
     private Transform(Object nativeTransform) {
         this.nativeTransform = nativeTransform;
         impl();
 
     }
 
-    /**
-     * @deprecated Use {@link #identity()}.
-     */
+    /// #### Deprecated
+    ///
+    /// Use `#identity()`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static Transform IDENTITY() {
@@ -103,28 +89,38 @@ public class Transform {
         return identity;
     }
 
-    /**
-     * Makes a new identity transform.
-     *
-     * @return An identity transform.
-     */
+    /// Makes a new identity transform.
+    ///
+    /// #### Returns
+    ///
+    /// An identity transform.
     public static Transform makeIdentity() {
         Transform out = new Transform(null);
         out.type = TYPE_IDENTITY;
         return out;
     }
 
-    /**
-     * Makes a new rotation transformation.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param angle The angle of the rotation in radians.
-     * @param x     The x component of the vector around which the rotation occurs.
-     * @param y     The y component of the vector around which the rotation occurs.
-     * @param z     The z component of the vector around which the rotation occurs.
-     * @return A transform that makes the appropriate rotation.
-     * @throws RuntimeException If {@link #isSupported()} is false.
-     */
+    /// Makes a new rotation transformation.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: The angle of the rotation in radians.
+    ///
+    /// - `x`: The x component of the vector around which the rotation occurs.
+    ///
+    /// - `y`: The y component of the vector around which the rotation occurs.
+    ///
+    /// - `z`: The z component of the vector around which the rotation occurs.
+    ///
+    /// #### Returns
+    ///
+    /// A transform that makes the appropriate rotation.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: If `#isSupported()` is false.
     public static Transform makeRotation(float angle, float x, float y, float z) {
         Object t = Display.impl.makeTransformRotation(angle, x, y, z);
         return new Transform(t);
@@ -138,14 +134,19 @@ public class Transform {
 
     }
 
-    /**
-     * Makes a new translation transformation.
-     *
-     * @param x The x component of the translation.
-     * @param y The y component of the translation.
-     * @param z The z component of the translation.
-     * @return A transform that makes the specified translation.
-     */
+    /// Makes a new translation transformation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x component of the translation.
+    ///
+    /// - `y`: The y component of the translation.
+    ///
+    /// - `z`: The z component of the translation.
+    ///
+    /// #### Returns
+    ///
+    /// A transform that makes the specified translation.
     public static Transform makeTranslation(float x, float y, float z) {
         Transform out = new Transform(null);
         out.translateX = x;
@@ -159,14 +160,19 @@ public class Transform {
         return makeTranslation(x, y, 0);
     }
 
-    /**
-     * Makes a new scale transformation.
-     *
-     * @param x The x scale factor.
-     * @param y The y scale factor.
-     * @param z The z scale factor.
-     * @return A transform that scales values according to the provided scale factors.
-     */
+    /// Makes a new scale transformation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x scale factor.
+    ///
+    /// - `y`: The y scale factor.
+    ///
+    /// - `z`: The z scale factor.
+    ///
+    /// #### Returns
+    ///
+    /// A transform that scales values according to the provided scale factors.
     public static Transform makeScale(float x, float y, float z) {
         if (x == 1 && y == 1 && z == 1) {
             return makeIdentity();
@@ -179,13 +185,17 @@ public class Transform {
         return out;
     }
 
-    /**
-     * Creates a new scale transform.
-     *
-     * @param x Factor to scale in x axis.
-     * @param y Factor to scale by in y axis.
-     * @return A new transform with the specified scale.
-     */
+    /// Creates a new scale transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Factor to scale in x axis.
+    ///
+    /// - `y`: Factor to scale by in y axis.
+    ///
+    /// #### Returns
+    ///
+    /// A new transform with the specified scale.
     public static Transform makeScale(float x, float y) {
         return makeScale(x, y, 1);
     }
@@ -200,54 +210,82 @@ public class Transform {
 
     }
 
-    /**
-     * Makes a new perspective transform.
-     * <p>Note: If {@link #isPerspectiveSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param fovy   The y field of view angle.
-     * @param aspect The aspect ratio.
-     * @param zNear  The nearest visible z coordinate.
-     * @param zFar   The farthest z coordinate.
-     * @return A transform for the given perspective.
-     */
+    /// Makes a new perspective transform.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fovy`: The y field of view angle.
+    ///
+    /// - `aspect`: The aspect ratio.
+    ///
+    /// - `zNear`: The nearest visible z coordinate.
+    ///
+    /// - `zFar`: The farthest z coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// A transform for the given perspective.
     public static Transform makePerspective(float fovy, float aspect, float zNear, float zFar) {
         Object t = Display.impl.makeTransformPerspective(fovy, aspect, zNear, zFar);
         return new Transform(t);
     }
 
-    /**
-     * Makes a new orthographic projection transform.
-     * <p>Note: If {@link #isPerspectiveSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param left   x-coordinate that is the left edge of the view.
-     * @param right  The x-coordinate that is the right edge of the view.
-     * @param bottom The y-coordinate that is the bottom edge of the view.
-     * @param top    The y-coordinate that is the top edge of the view.
-     * @param near   The nearest visible z-coordinate.
-     * @param far    The farthest visible z-coordinate.
-     * @return A transform with the provided orthographic projection.
-     */
+    /// Makes a new orthographic projection transform.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `left`: x-coordinate that is the left edge of the view.
+    ///
+    /// - `right`: The x-coordinate that is the right edge of the view.
+    ///
+    /// - `bottom`: The y-coordinate that is the bottom edge of the view.
+    ///
+    /// - `top`: The y-coordinate that is the top edge of the view.
+    ///
+    /// - `near`: The nearest visible z-coordinate.
+    ///
+    /// - `far`: The farthest visible z-coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// A transform with the provided orthographic projection.
     public static Transform makeOrtho(float left, float right, float bottom, float top,
                                       float near, float far) {
         Object t = Display.impl.makeTransformOrtho(left, right, bottom, top, near, far);
         return new Transform(t);
     }
 
-    /**
-     * Makes a transform to simulate a camera's perspective at a given location.
-     * <p>Note: If {@link #isPerspectiveSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param eyeX    The x-coordinate of the camera's eye.
-     * @param eyeY    The y-coordinate of the camera's eye.
-     * @param eyeZ    The z-coordinate of the camera's eye.
-     * @param centerX The center x coordinate of the view.
-     * @param centerY The center y coordinate of the view.
-     * @param centerZ The center z coordinate of the view.
-     * @param upX     The x-coordinate of the up vector for the camera.
-     * @param upY     The y-coordinate of the up vector for the camera.
-     * @param upZ     The z-coordinate of the up vector for the camera.
-     * @return A transform with the provided camera's view perspective.
-     */
+    /// Makes a transform to simulate a camera's perspective at a given location.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `eyeX`: The x-coordinate of the camera's eye.
+    ///
+    /// - `eyeY`: The y-coordinate of the camera's eye.
+    ///
+    /// - `eyeZ`: The z-coordinate of the camera's eye.
+    ///
+    /// - `centerX`: The center x coordinate of the view.
+    ///
+    /// - `centerY`: The center y coordinate of the view.
+    ///
+    /// - `centerZ`: The center z coordinate of the view.
+    ///
+    /// - `upX`: The x-coordinate of the up vector for the camera.
+    ///
+    /// - `upY`: The y-coordinate of the up vector for the camera.
+    ///
+    /// - `upZ`: The z-coordinate of the up vector for the camera.
+    ///
+    /// #### Returns
+    ///
+    /// A transform with the provided camera's view perspective.
     public static Transform makeCamera(float eyeX, float eyeY, float eyeZ,
                                        float centerX, float centerY, float centerZ, float upX, float upY,
                                        float upZ) {
@@ -255,22 +293,22 @@ public class Transform {
         return new Transform(t);
     }
 
-    /**
-     * Checks if transforms are supported on this platform.  If this returns false,
-     * you cannot use this class.
-     *
-     * @return True if and only if this platform supports transforms.
-     */
+    /// Checks if transforms are supported on this platform.  If this returns false,
+    /// you cannot use this class.
+    ///
+    /// #### Returns
+    ///
+    /// True if and only if this platform supports transforms.
     public static boolean isSupported() {
         return Display.impl.isTransformSupported();
     }
 
-    /**
-     * Checks if perspective transforms are supported on this platform.  If this returns false,
-     * you cannot use this class.
-     *
-     * @return True if and only if this platform supports transforms.
-     */
+    /// Checks if perspective transforms are supported on this platform.  If this returns false,
+    /// you cannot use this class.
+    ///
+    /// #### Returns
+    ///
+    /// True if and only if this platform supports transforms.
     public static boolean isPerspectiveSupported() {
         return Display.impl.isPerspectiveTransformSupported();
     }
@@ -282,14 +320,12 @@ public class Transform {
         return impl;
     }
 
-    /**
-     * Initializes the native transform with appropriate values.  For efficiency,
-     * some special kinds of transforms don't keep the native transform in sync
-     * (or even created at all).  Before accessing, the native transform from the
-     * implementation, the native transform needs to be initialized.  This method
-     * is called internally in the appropriate places to ensure that the native
-     * transform is kept in sync when it is needed.
-     */
+    /// Initializes the native transform with appropriate values.  For efficiency,
+    /// some special kinds of transforms don't keep the native transform in sync
+    /// (or even created at all).  Before accessing, the native transform from the
+    /// implementation, the native transform needs to be initialized.  This method
+    /// is called internally in the appropriate places to ensure that the native
+    /// transform is kept in sync when it is needed.
     private void initNativeTransform() {
         if (nativeTransform == null) {
             nativeTransform = impl.makeTransformIdentity();
@@ -317,11 +353,11 @@ public class Transform {
         dirty = false;
     }
 
-    /**
-     * Checks if this transform is the identity transform.
-     *
-     * @return True if the transform is the identity.
-     */
+    /// Checks if this transform is the identity transform.
+    ///
+    /// #### Returns
+    ///
+    /// True if the transform is the identity.
     public boolean isIdentity() {
         if (type == TYPE_IDENTITY) {
             return true;
@@ -333,110 +369,129 @@ public class Transform {
         return false;
     }
 
-    /**
-     * Checks if this transform is a translation transform.
-     *
-     * @return True if this transform performs translation only.  Note that this
-     * will return false if the transform is the identity (i.e. is actually
-     * a translation of (0,0,0).
-     */
+    /// Checks if this transform is a translation transform.
+    ///
+    /// #### Returns
+    ///
+    /// @return True if this transform performs translation only.  Note that this
+    /// will return false if the transform is the identity (i.e. is actually
+    /// a translation of (0,0,0).
     public boolean isTranslation() {
         return (type == TYPE_TRANSLATION);
     }
 
-    /**
-     * Gets the x scale factor of this transformation.  This value is only reliable
-     * if the transform is a scale transform.
-     *
-     * @return The x scale factor of this transformation.
-     * @see #isScale()
-     * @see #setScale()
-     */
+    /// Gets the x scale factor of this transformation.  This value is only reliable
+    /// if the transform is a scale transform.
+    ///
+    /// #### Returns
+    ///
+    /// The x scale factor of this transformation.
+    ///
+    /// #### See also
+    ///
+    /// - #isScale()
+    ///
+    /// - #setScale()
     public float getScaleX() {
         return scaleX;
     }
 
-    /**
-     * Gets the y scale factor of this transformation.  This value is only reliable
-     * if the transform is a scale transform.
-     *
-     * @return The y scale factor of this transformation.
-     * @return
-     * @see #isScale()
-     * @see #setScale()
-     */
+    /// Gets the y scale factor of this transformation.  This value is only reliable
+    /// if the transform is a scale transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isScale()
+    ///
+    /// - #setScale()
     public float getScaleY() {
         return scaleY;
     }
 
-    /**
-     * Gets the z scale factor of this transformation.  This value is only reliable
-     * if the transform is a scale transform.
-     *
-     * @return The z scale factor of this transformation.
-     * @return
-     * @see #isScale()
-     * @see #setScale()
-     */
+    /// Gets the z scale factor of this transformation.  This value is only reliable
+    /// if the transform is a scale transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isScale()
+    ///
+    /// - #setScale()
     public float getScaleZ() {
         return scaleZ;
     }
 
-    /**
-     * Gets the x translation of this transformation.  This value is only reliable
-     * if the transform is a translation transform.
-     *
-     * @return The x translation of this transform.
-     * @see #isTranslation()
-     * @see #setTranslation()
-     * @see #translate()
-     */
+    /// Gets the x translation of this transformation.  This value is only reliable
+    /// if the transform is a translation transform.
+    ///
+    /// #### Returns
+    ///
+    /// The x translation of this transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTranslation()
+    ///
+    /// - #setTranslation()
+    ///
+    /// - #translate()
     public float getTranslateX() {
         return translateX;
     }
 
-    /**
-     * Gets the y translation of this transformation.  This value is only reliable
-     * if the transform is a translation transform.
-     *
-     * @return The y translation of this transform.
-     * @see #isTranslation()
-     * @see #setTranslation()
-     * @see #translate()
-     */
+    /// Gets the y translation of this transformation.  This value is only reliable
+    /// if the transform is a translation transform.
+    ///
+    /// #### Returns
+    ///
+    /// The y translation of this transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTranslation()
+    ///
+    /// - #setTranslation()
+    ///
+    /// - #translate()
     public float getTranslateY() {
         return translateY;
     }
 
-    /**
-     * Gets the z translation of this transformation.  This value is only reliable
-     * if the transform is a translation transform.
-     *
-     * @return The z translation of this transform.
-     * @see #isTranslation()
-     * @see #setTranslation()
-     * @see #translate()
-     */
+    /// Gets the z translation of this transformation.  This value is only reliable
+    /// if the transform is a translation transform.
+    ///
+    /// #### Returns
+    ///
+    /// The z translation of this transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTranslation()
+    ///
+    /// - #setTranslation()
+    ///
+    /// - #translate()
     public float getTranslateZ() {
         return translateZ;
     }
 
-    /**
-     * Checks if this transform is a scale transformation .
-     *
-     * @return Returns true if and only if this is a non-identity scale transformation.
-     */
+    /// Checks if this transform is a scale transformation .
+    ///
+    /// #### Returns
+    ///
+    /// Returns true if and only if this is a non-identity scale transformation.
     public boolean isScale() {
         return (type == TYPE_SCALE);
     }
 
-    /**
-     * Resets the transformation to a scale transformation.
-     *
-     * @param x x-axis scaling
-     * @param y y-axis scaling
-     * @param z z-axis scaling
-     */
+    /// Resets the transformation to a scale transformation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x-axis scaling
+    ///
+    /// - `y`: y-axis scaling
+    ///
+    /// - `z`: z-axis scaling
     public void setScale(float x, float y, float z) {
         if (x == 1 && y == 1 && z == 1) {
             setIdentity();
@@ -449,26 +504,34 @@ public class Transform {
         out.type = TYPE_SCALE;
     }
 
-    /**
-     * Resets the transformation to scale transform.
-     *
-     * @param x x-axis scaling.
-     * @param y y-axis scaling.
-     */
+    /// Resets the transformation to scale transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x-axis scaling.
+    ///
+    /// - `y`: y-axis scaling.
     public void setScale(float x, float y) {
         setScale(x, y, 1);
     }
 
-    /**
-     * Rotates the current transform.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param angle The angle to rotate in radians.
-     * @param x     The x-coordinate of the vector around which to rotate.
-     * @param y     The y-coordinate of the vector around which to rotate.
-     * @param z     The z-coordinate of the vector around which to rotate.
-     * @see #setRotation
-     */
+    /// Rotates the current transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: The angle to rotate in radians.
+    ///
+    /// - `x`: The x-coordinate of the vector around which to rotate.
+    ///
+    /// - `y`: The y-coordinate of the vector around which to rotate.
+    ///
+    /// - `z`: The z-coordinate of the vector around which to rotate.
+    ///
+    /// #### See also
+    ///
+    /// - #setRotation
     public void rotate(float angle, float x, float y, float z) {
         initNativeTransform();
         Display.impl.transformRotate(nativeTransform, angle, x, y, z);
@@ -481,17 +544,24 @@ public class Transform {
         translate(-px, -py, 0);
     }
 
-    /**
-     * Sets the transform to be the provided rotation. This replaces the current transform
-     * whereas {@link #rotate()} further rotates the current transform.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param angle The angle to rotate in radians.
-     * @param x     The x-coordinate of the vector around which to rotate.
-     * @param y     The y-coordinate of the vector around which to rotate.
-     * @param z     The z-coordinate of the vector around which to rotate.
-     * @see #rotate()
-     */
+    /// Sets the transform to be the provided rotation. This replaces the current transform
+    /// whereas `#rotate()` further rotates the current transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: The angle to rotate in radians.
+    ///
+    /// - `x`: The x-coordinate of the vector around which to rotate.
+    ///
+    /// - `y`: The y-coordinate of the vector around which to rotate.
+    ///
+    /// - `z`: The z-coordinate of the vector around which to rotate.
+    ///
+    /// #### See also
+    ///
+    /// - #rotate()
     public void setRotation(float angle, float x, float y, float z) {
         initNativeTransform();
         setTransform(makeRotation(angle, x, y, z));
@@ -504,9 +574,7 @@ public class Transform {
         type = TYPE_UNKNOWN;
     }
 
-    /**
-     * Sets the transform to the identity transform.
-     */
+    /// Sets the transform to the identity transform.
     public void setIdentity() {
         type = TYPE_IDENTITY;
         scaleX = 1f;
@@ -525,17 +593,23 @@ public class Transform {
         return "" + nativeTransform;
     }
 
-    /**
-     * Translates the transform by the specified amounts.  This adds additional
-     * translations to whereas {@link #setTranslation()} replaces the transform
-     * with the specified translation.
-     * <p>Note: If {@link #isSupported()} is false, then this may throw a Runtime Exception.</p>
-     *
-     * @param x The x translation.
-     * @param y The y translation.
-     * @param z The z translation.
-     * @see #setTranslation()
-     */
+    /// Translates the transform by the specified amounts.  This adds additional
+    /// translations to whereas `#setTranslation()` replaces the transform
+    /// with the specified translation.
+    ///
+    /// Note: If `#isSupported()` is false, then this may throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x translation.
+    ///
+    /// - `y`: The y translation.
+    ///
+    /// - `z`: The z translation.
+    ///
+    /// #### See also
+    ///
+    /// - #setTranslation()
     public void translate(float x, float y, float z) {
         if (type == TYPE_IDENTITY) {
             type = TYPE_TRANSLATION;
@@ -560,16 +634,21 @@ public class Transform {
         translate(x, y, 0);
     }
 
-    /**
-     * Sets the current transform to be the specified translation.  This replaces the current
-     * transform with the given translation whereas {@link #translate()} adds additional translation
-     * to the existing translation.
-     *
-     * @param x The x translation.
-     * @param y The y translation.
-     * @param z The z translation.
-     * @see #translate()
-     */
+    /// Sets the current transform to be the specified translation.  This replaces the current
+    /// transform with the given translation whereas `#translate()` adds additional translation
+    /// to the existing translation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x translation.
+    ///
+    /// - `y`: The y translation.
+    ///
+    /// - `z`: The z translation.
+    ///
+    /// #### See also
+    ///
+    /// - #translate()
     public void setTranslation(float x, float y, float z) {
         type = TYPE_TRANSLATION;
         inverseDirty = true;
@@ -589,16 +668,22 @@ public class Transform {
         setTranslation(x, y, 0);
     }
 
-    /**
-     * Scales the current transform by the provide scale factors.  Not to be confused with
-     * {@link #setScale()} which replaces the transform.
-     * <p>Note: If {@link #isSupported()} is false, then this may throw a Runtime Exception.</p>
-     *
-     * @param x The x-scale factor
-     * @param y The y-scale factor
-     * @param z The z-scale factor
-     * @see #setScale()
-     */
+    /// Scales the current transform by the provide scale factors.  Not to be confused with
+    /// `#setScale()` which replaces the transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this may throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x-scale factor
+    ///
+    /// - `y`: The y-scale factor
+    ///
+    /// - `z`: The z-scale factor
+    ///
+    /// #### See also
+    ///
+    /// - #setScale()
     public void scale(float x, float y, float z) {
         if (type == TYPE_IDENTITY) {
             type = TYPE_SCALE;
@@ -626,13 +711,17 @@ public class Transform {
         scale(x, y, 1);
     }
 
-    /**
-     * Gets the inverse transformation for this transform.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @return The inverse transform.
-     * @deprecated Use {@link #getInverse(com.codename1.ui.Transform) } instead.
-     */
+    /// Gets the inverse transformation for this transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Returns
+    ///
+    /// The inverse transform.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#getInverse(com.codename1.ui.Transform)` instead.
     public Transform getInverse() {
         return makeInverse();
     }
@@ -676,12 +765,13 @@ public class Transform {
         }
     }
 
-    /**
-     * Sets the current transform to be identical to the provided transform.
-     * <p>Note: If {@link #isSupported()} is false, then this will may throw a Runtime Exception.</p>
-     *
-     * @param t A transform to copy into the current transform.
-     */
+    /// Sets the current transform to be identical to the provided transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will may throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: A transform to copy into the current transform.
     public void setTransform(Transform t) {
         type = t.type;
         scaleX = t.scaleX;
@@ -707,29 +797,37 @@ public class Transform {
 
     }
 
-    /**
-     * Sets the current transform to be the concatenation of the current transform and
-     * the provided transform.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param t The transform to concatenate to this one.
-     */
+    /// Sets the current transform to be the concatenation of the current transform and
+    /// the provided transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: The transform to concatenate to this one.
     public void concatenate(Transform t) {
         inverseDirty = true;
         impl.concatenateTransform(getNativeTransform(), t.getNativeTransform());
         type = TYPE_UNKNOWN;
     }
 
-    /**
-     * Sets the transform to be the specified perspective transformation.
-     * <p>Note: If {@link #isPerspectiveSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param fovy   Y-field of view angle.
-     * @param aspect Apspect ratio of the view window.
-     * @param zNear  Nearest visible z-coordinate.
-     * @param zFar   Farthest visible z-coordinate.
-     * @see #makePerspective()
-     */
+    /// Sets the transform to be the specified perspective transformation.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fovy`: Y-field of view angle.
+    ///
+    /// - `aspect`: Apspect ratio of the view window.
+    ///
+    /// - `zNear`: Nearest visible z-coordinate.
+    ///
+    /// - `zFar`: Farthest visible z-coordinate.
+    ///
+    /// #### See also
+    ///
+    /// - #makePerspective()
     public void setPerspective(float fovy, float aspect, float zNear, float zFar) {
         type = TYPE_UNKNOWN;
         inverseDirty = true;
@@ -747,17 +845,23 @@ public class Transform {
         impl.setTransformAffine(getNativeTransform(), m00, m10, m01, m11, m02, m12);
     }
 
-    /**
-     * Sets the transform to be the specified orthogonal view.
-     * <p>Note: If {@link #isPerspectiveSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param left   Left x-coord of view.
-     * @param right  Right x-coord of view.
-     * @param bottom Bottom y-coord of view.
-     * @param top    Top y-coord of view.
-     * @param near   Nearest visible z-coordinate
-     * @param far    Farthest visible z-coordinate
-     */
+    /// Sets the transform to be the specified orthogonal view.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `left`: Left x-coord of view.
+    ///
+    /// - `right`: Right x-coord of view.
+    ///
+    /// - `bottom`: Bottom y-coord of view.
+    ///
+    /// - `top`: Top y-coord of view.
+    ///
+    /// - `near`: Nearest visible z-coordinate
+    ///
+    /// - `far`: Farthest visible z-coordinate
     public void setOrtho(float left, float right, float bottom, float top,
                          float near, float far) {
         type = TYPE_UNKNOWN;
@@ -765,36 +869,50 @@ public class Transform {
         impl.setTransformOrtho(getNativeTransform(), left, right, bottom, top, near, far);
     }
 
-    /**
-     * Sets the transform to the specified camera's perspective.
-     * <p>Note: If {@link #isPerspectiveSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param eyeX    The x-coordinate of the camera's eye.
-     * @param eyeY    The y-coordinate of the camera's eye.
-     * @param eyeZ    The z-coordinate of the camera's eye.
-     * @param centerX The center x coordinate of the view.
-     * @param centerY The center y coordinate of the view.
-     * @param centerZ The center z coordinate of the view.
-     * @param upX     The x-coordinate of the up vector for the camera.
-     * @param upY     The y-coordinate of the up vector for the camera.
-     * @param upZ     The z-coordinate of the up vector for the camera.
-     */
+    /// Sets the transform to the specified camera's perspective.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `eyeX`: The x-coordinate of the camera's eye.
+    ///
+    /// - `eyeY`: The y-coordinate of the camera's eye.
+    ///
+    /// - `eyeZ`: The z-coordinate of the camera's eye.
+    ///
+    /// - `centerX`: The center x coordinate of the view.
+    ///
+    /// - `centerY`: The center y coordinate of the view.
+    ///
+    /// - `centerZ`: The center z coordinate of the view.
+    ///
+    /// - `upX`: The x-coordinate of the up vector for the camera.
+    ///
+    /// - `upY`: The y-coordinate of the up vector for the camera.
+    ///
+    /// - `upZ`: The z-coordinate of the up vector for the camera.
     public void setCamera(float eyeX, float eyeY, float eyeZ,
                           float centerX, float centerY, float centerZ, float upX, float upY,
                           float upZ) {
         setTransform(makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ));
     }
 
-    /**
-     * Transforms a set of points using the current transform.
-     *
-     * @param pointSize The size of the points to transform (2 or 3)
-     * @param in        Input array of points.
-     * @param srcPos    Start position in input array
-     * @param out       Output array of points
-     * @param destPos   Start position in output array
-     * @param numPoints Number of points to transform.
-     */
+    /// Transforms a set of points using the current transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointSize`: The size of the points to transform (2 or 3)
+    ///
+    /// - `in`: Input array of points.
+    ///
+    /// - `srcPos`: Start position in input array
+    ///
+    /// - `out`: Output array of points
+    ///
+    /// - `destPos`: Start position in output array
+    ///
+    /// - `numPoints`: Number of points to transform.
     public void transformPoints(int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
         switch (type) {
             case TYPE_TRANSLATION:
@@ -812,26 +930,32 @@ public class Transform {
         }
     }
 
-    /**
-     * Transforms a provided point.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param point 2 or 3 element array representing either an (x,y) or (x,y,z) tuple.
-     * @return A 3-element array representing transformed (x,y,z) tuple.
-     */
+    /// Transforms a provided point.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `point`: 2 or 3 element array representing either an (x,y) or (x,y,z) tuple.
+    ///
+    /// #### Returns
+    ///
+    /// A 3-element array representing transformed (x,y,z) tuple.
     public float[] transformPoint(float[] point) {
         float[] out = new float[3];
         transformPoint(point, out);
         return out;
     }
 
-    /**
-     * Transforms a provided point and places the result in the provided array.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @param in  A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple.
-     * @param out A 2 or 3 element array in which the transformed point will be stored.  Should match the length of the in array.
-     */
+    /// Transforms a provided point and places the result in the provided array.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple.
+    ///
+    /// - `out`: A 2 or 3 element array in which the transformed point will be stored.  Should match the length of the in array.
     public void transformPoint(float[] in, float[] out) {
         int len = in.length;
         int olen = out.length;
@@ -868,13 +992,14 @@ public class Transform {
 
     }
 
-    /**
-     * Gets the native transform object.  This object is implementation dependent so this
-     * method should really only be used by the implementation.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @return The native transform object.
-     */
+    /// Gets the native transform object.  This object is implementation dependent so this
+    /// method should really only be used by the implementation.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Returns
+    ///
+    /// The native transform object.
     public Object getNativeTransform() {
         if (dirty) {
             initNativeTransform();
@@ -882,12 +1007,13 @@ public class Transform {
         return nativeTransform;
     }
 
-    /**
-     * Creates a copy of the current transform.
-     * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
-     *
-     * @return A copy of the current transform.
-     */
+    /// Creates a copy of the current transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Returns
+    ///
+    /// A copy of the current transform.
     public Transform copy() {
         Transform out = new Transform(null);
         out.setTransform(this);

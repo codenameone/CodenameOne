@@ -28,21 +28,25 @@ import com.codename1.plugin.event.PluginEvent;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Support class for implementing plugins in codename one.
- *
- * @author Steve Hannah
- * @since 8.0
- */
+/// Support class for implementing plugins in codename one.
+///
+/// @author Steve Hannah
+///
+/// #### Since
+///
+/// 8.0
 public class PluginSupport {
     private final List<Plugin> plugins = new ArrayList<Plugin>();
 
-    /**
-     * Registers a plugin with the Codename One runtime.
-     *
-     * @param plugin The plugin to register.
-     * @since 8.0
-     */
+    /// Registers a plugin with the Codename One runtime.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plugin`: The plugin to register.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void registerPlugin(Plugin plugin) {
         synchronized (this) {
             plugins.add(plugin);
@@ -50,26 +54,33 @@ public class PluginSupport {
 
     }
 
-    /**
-     * Deregisters a plugin from the Codename One runtime.
-     *
-     * @param plugin The plugin to deregister
-     * @since 8.0
-     */
+    /// Deregisters a plugin from the Codename One runtime.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plugin`: The plugin to deregister
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void deregisterPlugin(Plugin plugin) {
         synchronized (this) {
             plugins.remove(plugin);
         }
     }
 
-    /**
-     * Fires a plugin event to give plugins an opportunity to handle it before default behaviour
-     * is resumed.
-     *
-     * @param event The event to fire.
-     * @param <T>   The event class
-     * @return The event
-     */
+    /// Fires a plugin event to give plugins an opportunity to handle it before default behaviour
+    /// is resumed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `event`: The event to fire.
+    ///
+    /// - `The`: event class
+    ///
+    /// #### Returns
+    ///
+    /// The event
     public <T extends PluginEvent> T firePluginEvent(T event) {
         List<Plugin> localListeners;
 

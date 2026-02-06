@@ -29,42 +29,32 @@ import com.codename1.ui.geom.Point;
 
 import java.util.Vector;
 
-/**
- * This is a Lines Layer
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This is a Lines Layer
+///
+/// @author Roman Kamyk
 public class LinesLayer extends AbstractLayer {
 
     private final Vector _lineSegments;
     protected int _lineColor;
 
-    /**
-     * Constructor with default projection Mercator.
-     */
+    /// Constructor with default projection Mercator.
     public LinesLayer() {
         this(new Mercator(), "");
     }
 
-    /**
-     * Constructor with default projection Mercator.
-     */
+    /// Constructor with default projection Mercator.
     public LinesLayer(String name) {
         this(new Mercator(), name);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public LinesLayer(Projection p, String name) {
         super(p, name);
         _lineSegments = new Vector();
         _lineColor = 0x000000;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g, Tile screenTile) {
         g.setColor(_lineColor);
@@ -75,13 +65,15 @@ public class LinesLayer extends AbstractLayer {
         }
     }
 
-    /**
-     * Paint a segment.
-     *
-     * @param g       a Graphics Object to paint on
-     * @param segment array of Coord to draw a Line.
-     * @param tile
-     */
+    /// Paint a segment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: a Graphics Object to paint on
+    ///
+    /// - `segment`: array of Coord to draw a Line.
+    ///
+    /// - `tile`
     protected void paintSegment(Graphics g, Coord[] segment, Tile tile) {
         int pointsNo = segment.length;
         for (int i = 1; i < pointsNo; i++) {
@@ -98,11 +90,11 @@ public class LinesLayer extends AbstractLayer {
         }
     }
 
-    /**
-     * Adds a Line segment to the Layer
-     *
-     * @param coords
-     */
+    /// Adds a Line segment to the Layer
+    ///
+    /// #### Parameters
+    ///
+    /// - `coords`
     public void addLineSegment(Coord[] coords) {
         if (coords == null || coords.length <= 1) {
             return;
@@ -113,18 +105,16 @@ public class LinesLayer extends AbstractLayer {
         _lineSegments.addElement(coords);
     }
 
-    /**
-     * Sets the color of the Lines
-     *
-     * @param rgb
-     */
+    /// Sets the color of the Lines
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`
     public void lineColor(int rgb) {
         _lineColor = rgb;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public BoundingBox boundingBox() {
         BoundingBox bbox = null;

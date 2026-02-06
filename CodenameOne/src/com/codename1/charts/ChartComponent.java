@@ -42,160 +42,188 @@ import com.codename1.ui.geom.Shape;
 import java.util.ArrayList;
 
 
-/**
- * <p>The top level component for displaying charts</p>
- * <p>
- * The <code>charts</code> package enables Codename One developers to add charts
- * and visualizations to their apps without having to include external libraries
- * or embedding web views. We also wanted to harness the new features in the
- * graphics pipeline to maximize performance.</p>
- * <h4>Features</h4>
- * <ol>
- * <li><strong>Built-in support for many common types of charts</strong>
- * including bar charts, line charts, stacked charts, scatter charts, pie charts
- * and more.</li>
- * <li><strong>Pinch Zoom</strong> - The
- * {@link com.codename1.charts,ChartComponent} class includes optional pinch
- * zoom support.</li>
- * <li><strong>Panning Support</strong> - The
- * {@link com.codename1.charts,ChartComponent} class includes optional support
- * for panning.</li>
- * </ol>
- *
- * <h4>Chart Types</h4>
- * <p>
- * The <code>com.codename1.charts</code> package includes models and renderers
- * for many different types of charts. It is also extensible so that you can add
- * your own chart types if required. The following screen shots demonstrate a
- * small sampling of the types of charts that can be created.
- * </p>
- * <img src="https://www.codenameone.com/img/developer-guide/line_chart.png" alt="Line Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/line_chart_cubic_multi.png" alt="Cubic Line Charts">  *
- *  <img src="https://www.codenameone.com/img/developer-guide/bar_chart.png" alt="Bar Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/bar_chart_stacked.png" alt="Stacked Bar Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/range_bar_chart.png" alt="Range Bar Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/pie_chart.png" alt="Pie Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/doughnut_chart.png" alt="Doughnut Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/scatter_chart.png" alt="Scatter Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/dial_chart.png" alt="Dial Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/combined.png" alt="Combined Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/bubble_chart.png" alt="Bubble Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/time_chart.png" alt="Time Charts">
- *       <table>
- * <tbody><tr> <td class="icon"> <i class="fa icon-note" title="Note"></i> </td>
- * <td class="content">
- * The above screenshots were taken from the
- * <a href="https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo">ChartsDemo
- * app</a>. Y ou can start playing with this app by checking it out from our git
- * repository. </td> </tr>
- * </tbody>
- * </table>
- *       <h4>How to Create A Chart</h4>
- * <p>
- * Adding a chart to your app involves four steps:</p>
- * <ol>
- * <li><strong>Build the model</strong>. You can construct a model (aka data
- * set) for the chart using one of the existing model classes in the
- * <code>com.codename1.charts.models</code> package. Essentially, this is just
- * where you add the data that you want to display.</li>
- * <li> <strong>Set up a renderer</strong>. You can create a renderer for your
- * chart using one of the existing renderer classes in the
- * <code>com.codename1.charts.renderers</code> package. The renderer allows you
- * to specify how the chart should look. E.g. the colors, fonts, styles, to use.
- * </li>
- * <li> <strong>Create the Chart View</strong>. Use one of the existing
- * <em>view</em> classes in the
- * <code>com.codename1.charts.views</code> package.
- * </li>
- * <li> <strong>Create a {@link com.codename1.charts,ChartComponent} </strong>.
- * In order to add your chart to the UI, you need to wrap it in a
- * {@link com.codename1.charts,ChartComponent} object.</li>
- * </ol>
- *
- * <p>
- * You can check out the
- * <a href="https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo">ChartsDemo</a>
- * app for specific examples, but here is a high level view of some code that
- * creates a Pie Chart.</p>
- *
- * <script src="https://gist.github.com/codenameone/c5b5bf22cd1db36d8c07.js"></script>
- *
- * <p>
- * The charts package is derived work from the excellent
- * <a href="http://www.achartengine.org/">open source aChartEngine API.</a>
- * </p>
- *
- * @author shannah
- */
+/// The top level component for displaying charts
+///
+/// The `charts` package enables Codename One developers to add charts
+/// and visualizations to their apps without having to include external libraries
+/// or embedding web views. We also wanted to harness the new features in the
+/// graphics pipeline to maximize performance.
+///
+/// Features
+///
+/// - **Built-in support for many common types of charts**
+/// including bar charts, line charts, stacked charts, scatter charts, pie charts
+/// and more.
+///
+/// - **Pinch Zoom** - The
+/// `com.codename1.charts,ChartComponent` class includes optional pinch
+/// zoom support.
+///
+/// - **Panning Support** - The
+/// `com.codename1.charts,ChartComponent` class includes optional support
+/// for panning.
+///
+/// Chart Types
+///
+/// The `com.codename1.charts` package includes models and renderers
+/// for many different types of charts. It is also extensible so that you can add
+/// your own chart types if required. The following screen shots demonstrate a
+/// small sampling of the types of charts that can be created.
+///
+///   *
+///
+///
+///
+///   **
+///
+/// The above screenshots were taken from the
+/// [ChartsDemo app](https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo). Y ou can start playing with this app by checking it out from our git
+/// repository.
+///
+///       How to Create A Chart
+///
+/// Adding a chart to your app involves four steps:
+///
+/// - **Build the model**. You can construct a model (aka data
+/// set) for the chart using one of the existing model classes in the
+/// `com.codename1.charts.models` package. Essentially, this is just
+/// where you add the data that you want to display.
+///
+/// -  **Set up a renderer**. You can create a renderer for your
+/// chart using one of the existing renderer classes in the
+/// `com.codename1.charts.renderers` package. The renderer allows you
+/// to specify how the chart should look. E.g. the colors, fonts, styles, to use.
+///
+/// -  **Create the Chart View**. Use one of the existing
+/// *view* classes in the
+/// `com.codename1.charts.views` package.
+///
+/// -  **Create a `com.codename1.charts,ChartComponent` **.
+/// In order to add your chart to the UI, you need to wrap it in a
+/// `com.codename1.charts,ChartComponent` object.
+///
+/// You can check out the
+/// [ChartsDemo](https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo)
+/// app for specific examples, but here is a high level view of some code that
+/// creates a Pie Chart.
+///
+/// ```java
+/// /**
+///  * Creates a renderer for the specified colors.
+///  */
+/// private DefaultRenderer buildCategoryRenderer(int[] colors) {
+///     DefaultRenderer renderer = new DefaultRenderer();
+///     renderer.setLabelsTextSize(15);
+///     renderer.setLegendTextSize(15);
+///     renderer.setMargins(new int[]{20, 30, 15, 0});
+///     for (int color : colors) {
+///         SimpleSeriesRenderer r = new SimpleSeriesRenderer();
+///         r.setColor(color);
+///         renderer.addSeriesRenderer(r);
+///     }
+///     return renderer;
+/// }
+///
+/// /**
+///  * Builds a category series using the provided values.
+///  *
+///  * @param titles the series titles
+///  * @param values the values
+///  * @return the category series
+///  */
+/// protected CategorySeries buildCategoryDataset(String title, double[] values) {
+///     CategorySeries series = new CategorySeries(title);
+///     int k = 0;
+///     for (double value : values) {
+///         series.add("Project " + ++k, value);
+///     }
+///
+///     return series;
+/// }
+///
+/// public Form createPieChartForm() {
+///     // Generate the values
+///     double[] values = new double[]{12, 14, 11, 10, 19};
+///
+///     // Set up the renderer
+///     int[] colors = new int[]{ColorUtil.BLUE, ColorUtil.GREEN, ColorUtil.MAGENTA, ColorUtil.YELLOW, ColorUtil.CYAN};
+///     DefaultRenderer renderer = buildCategoryRenderer(colors);
+///     renderer.setZoomButtonsVisible(true);
+///     renderer.setZoomEnabled(true);
+///     renderer.setChartTitleTextSize(20);
+///     renderer.setDisplayValues(true);
+///     renderer.setShowLabels(true);
+///     SimpleSeriesRenderer r = renderer.getSeriesRendererAt(0);
+///     r.setGradientEnabled(true);
+///     r.setGradientStart(0, ColorUtil.BLUE);
+///     r.setGradientStop(0, ColorUtil.GREEN);
+///     r.setHighlighted(true);
+///
+///     // Create the chart ... pass the values and renderer to the chart object.
+///     PieChart chart = new PieChart(buildCategoryDataset("Project budget", values), renderer);
+///
+///     // Wrap the chart in a Component so we can add it to a form
+///     ChartComponent c = new ChartComponent(chart);
+///
+///     // Create a form and show it.
+///     Form f = new Form("Budget", new BorderLayout());
+///     f.add(BorderLayout.CENTER, c);
+///     return f;
+///
+/// }
+/// ```
+///
+/// The charts package is derived work from the excellent
+/// [open source aChartEngine API.](http://www.achartengine.org/)
+///
+/// @author shannah
 public class ChartComponent extends Component {
 
-    /**
-     * Util object for rendering the chart.
-     */
+    /// Util object for rendering the chart.
     private final ChartUtil util = new ChartUtil();
     private final ArrayList<IZoomTransition> animations = new ArrayList<IZoomTransition>();
-    /**
-     * The chart that is to be rendered in this component.
-     */
+    /// The chart that is to be rendered in this component.
     private AbstractChart chart;
-    /**
-     * The transform for the chart.  This can be used to scale, translate, and
-     * rotate the chart.  This transform assumes its origin at the (absoluteX, absoluteY)
-     * of the component at the time it is drawn rather than the screen's origin as is
-     * normally the case with transforms.  This allows the transform to be applied consistently
-     * with respect to the chart's coordinates even when the component is moved around the screen.
-     */
+    /// The transform for the chart.  This can be used to scale, translate, and
+    /// rotate the chart.  This transform assumes its origin at the (absoluteX, absoluteY)
+    /// of the component at the time it is drawn rather than the screen's origin as is
+    /// normally the case with transforms.  This allows the transform to be applied consistently
+    /// with respect to the chart's coordinates even when the component is moved around the screen.
     private Transform transform = null;
 
-    /**
-     * The transform that was applied during the last paint() method.
-     * This is generally the {@link #transform} concatenated with a
-     * translation to the screen origin from the component's origin.  This
-     * is used to convert chart coordinates to screen coordinates and respond
-     * properly to events.
-     */
+    /// The transform that was applied during the last paint() method.
+    /// This is generally the `#transform` concatenated with a
+    /// translation to the screen origin from the component's origin.  This
+    /// is used to convert chart coordinates to screen coordinates and respond
+    /// properly to events.
     private Transform currentTransform = null;
 
-    /**
-     * Flag to enable panning the chart.  Default is false.
-     */
+    /// Flag to enable panning the chart.  Default is false.
     private boolean panEnabled = false;
 
-    /**
-     * During a pan operation, used to store the transform as it was before
-     * the start of the pan.
-     */
+    /// During a pan operation, used to store the transform as it was before
+    /// the start of the pan.
     private Transform dragTransformStart = null;
 
     private Transform tmpTransform = null;
 
-    /**
-     * The starting position of a pan operation.
-     */
+    /// The starting position of a pan operation.
     private Point dragStart = null;
 
-    /**
-     * Flag to enable pinch zoom.
-     */
+    /// Flag to enable pinch zoom.
     private boolean zoomEnabled = false;
 
-    /**
-     * During a pinch zoom operation, this is the middle point between the
-     * two touch points at the start of the zoom operation.  This is in
-     * screen coordinates.
-     */
+    /// During a pinch zoom operation, this is the middle point between the
+    /// two touch points at the start of the zoom operation.  This is in
+    /// screen coordinates.
     private Point zoomStart = null;
 
-    /**
-     * During a pinch zoom operation, this is the transform as it was at the start
-     * of the zoom.
-     */
+    /// During a pinch zoom operation, this is the transform as it was at the start
+    /// of the zoom.
     private Transform zoomTransformStart = null;
 
-    /**
-     * During a pinch zoom operation, this is the distance between the two touch
-     * points at the start of the zoom operation.
-     */
+    /// During a pinch zoom operation, this is the distance between the two touch
+    /// points at the start of the zoom operation.
     private double zoomDistStart = 0;
     private BBox dragStartBBox;
     private BBox zoomStartBBox;
@@ -203,11 +231,11 @@ public class ChartComponent extends Component {
     private double zoomDistStartY;
     private BBox initialZoomBBox;
 
-    /**
-     * Creates a new chart component to display the provided chart.
-     *
-     * @param chart The chart to be displayed in this component.
-     */
+    /// Creates a new chart component to display the provided chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `chart`: The chart to be displayed in this component.
     public ChartComponent(AbstractChart chart) {
         setUIIDFinal("ChartComponent");
         this.chart = chart;
@@ -218,20 +246,16 @@ public class ChartComponent extends Component {
         }
     }
 
-    /**
-     * Gets the chart that is being displayed in this component.
-     *
-     * @return
-     */
+    /// Gets the chart that is being displayed in this component.
     public AbstractChart getChart() {
         return chart;
     }
 
-    /**
-     * Sets the chart to be displayed in this component.
-     *
-     * @param chart
-     */
+    /// Sets the chart to be displayed in this component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `chart`
     public void setChart(AbstractChart chart) {
         this.chart = chart;
     }
@@ -244,11 +268,11 @@ public class ChartComponent extends Component {
         );
     }
 
-    /**
-     * Paints the chart.
-     *
-     * @param g
-     */
+    /// Paints the chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
     @Override
     public void paint(Graphics g) {
         super.paint(g);
@@ -286,13 +310,17 @@ public class ChartComponent extends Component {
         g.setAntiAliased(oldAntialias);
     }
 
-    /**
-     * Converts screen coordinates to chart coordinates.
-     *
-     * @param x screen x position
-     * @param y screen y position
-     * @return The chart coordinate corresponding to the given screen coordinate.
-     */
+    /// Converts screen coordinates to chart coordinates.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: screen x position
+    ///
+    /// - `y`: screen y position
+    ///
+    /// #### Returns
+    ///
+    /// The chart coordinate corresponding to the given screen coordinate.
     public Point screenToChartCoord(int x, int y) {
         if (currentTransform != null) {
             Transform inverse = currentTransform.getInverse();
@@ -304,13 +332,17 @@ public class ChartComponent extends Component {
         return new Point(x - getAbsoluteX(), y - getAbsoluteY());
     }
 
-    /**
-     * Returns the screen position from a chart coordinate
-     *
-     * @param x the x position within the chart
-     * @param y the y position within the chart
-     * @return a position within the screen
-     */
+    /// Returns the screen position from a chart coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x position within the chart
+    ///
+    /// - `y`: the y position within the chart
+    ///
+    /// #### Returns
+    ///
+    /// a position within the screen
     public Point chartToScreenCoord(int x, int y) {
         x += getAbsoluteX();
         y += getAbsoluteY();
@@ -323,12 +355,15 @@ public class ChartComponent extends Component {
         return new Point(x, y);
     }
 
-    /**
-     * Converts a chart coordinate spaced shape to the same shape in the screen coordinate space
-     *
-     * @param s shape in screen coordinates
-     * @return same shape using chart space coordinates
-     */
+    /// Converts a chart coordinate spaced shape to the same shape in the screen coordinate space
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: shape in screen coordinates
+    ///
+    /// #### Returns
+    ///
+    /// same shape using chart space coordinates
     public Shape screenToChartShape(Shape s) {
         GeneralPath p = new GeneralPath();
         Transform t = Transform.makeIdentity();
@@ -340,12 +375,15 @@ public class ChartComponent extends Component {
         return p;
     }
 
-    /**
-     * Converts a screen coordinate spaced shape to the same shape in the chart  coordinate space
-     *
-     * @param s shape in chart  coordinates
-     * @return same shape using screen coordinate space
-     */
+    /// Converts a screen coordinate spaced shape to the same shape in the chart  coordinate space
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: shape in chart  coordinates
+    ///
+    /// #### Returns
+    ///
+    /// same shape using screen coordinate space
     public Shape chartToScreenShape(Shape s) {
         GeneralPath p = new GeneralPath();
         Transform inverse = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());
@@ -357,41 +395,49 @@ public class ChartComponent extends Component {
         return p;
     }
 
-    /**
-     * Zooms the view port to show a specified shape.  The shape should be
-     * expressed in chart coordinates (not screen coordinates).
-     *
-     * @param s The shape that should be shown.
-     */
+    /// Zooms the view port to show a specified shape.  The shape should be
+    /// expressed in chart coordinates (not screen coordinates).
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The shape that should be shown.
     public void zoomToShapeInChartCoords(Shape s) {
         zoomToShapeInChartCoords(s, 1);
 
     }
 
-    /**
-     * Zooms the view port to show a specified shape.  The shape should be
-     * expressed in chart coordinates (not screen coordinates).
-     *
-     * @param s        The shape that should be shown.
-     * @param duration The duration of the transition.
-     * @see #zoomTo(double, double, double, double, int)
-     */
+    /// Zooms the view port to show a specified shape.  The shape should be
+    /// expressed in chart coordinates (not screen coordinates).
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The shape that should be shown.
+    ///
+    /// - `duration`: The duration of the transition.
+    ///
+    /// #### See also
+    ///
+    /// - #zoomTo(double, double, double, double, int)
     public void zoomToShapeInChartCoords(Shape s, int duration) {
         Rectangle r = s.getBounds();
         zoomTransition(r.getX(), r.getX() + r.getWidth(), r.getY(), r.getY() + r.getHeight(), duration);
     }
 
-    /**
-     * Zooms the chart in an animated fashion to the specified axis ranges.  This is effectively
-     * the same as using {@link #zoomToShapeInChartCoords(com.codename1.ui.geom.Shape, int) } except
-     * it allows you to specify coordinates as doubles.
-     *
-     * @param minX     The lower bound of the X-axis after zoom.
-     * @param maxX     The upper bound of the X-axis after zoom.
-     * @param minY     The lower bound of the Y-axis after zoom.
-     * @param maxY     THe upper bound of the Y-axis after zoom.
-     * @param duration Transition time (ms).
-     */
+    /// Zooms the chart in an animated fashion to the specified axis ranges.  This is effectively
+    /// the same as using `int)` except
+    /// it allows you to specify coordinates as doubles.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minX`: The lower bound of the X-axis after zoom.
+    ///
+    /// - `maxX`: The upper bound of the X-axis after zoom.
+    ///
+    /// - `minY`: The lower bound of the Y-axis after zoom.
+    ///
+    /// - `maxY`: THe upper bound of the Y-axis after zoom.
+    ///
+    /// - `duration`: Transition time (ms).
     public void zoomTo(double minX, double maxX, double minY, double maxY, int duration) {
         zoomTransition(minX, maxX, minY, maxY, duration);
     }
@@ -411,12 +457,12 @@ public class ChartComponent extends Component {
 
     }
 
-    /**
-     * Called when a pointer is pressed on a series in the chart.  This can be
-     * overridden by subclasses to respond to this event.
-     *
-     * @param sel
-     */
+    /// Called when a pointer is pressed on a series in the chart.  This can be
+    /// overridden by subclasses to respond to this event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`
     protected void seriesPressed(SeriesSelection sel) {
 
     }
@@ -442,34 +488,34 @@ public class ChartComponent extends Component {
         super.pointerReleased(x, y); //To change body of generated methods, choose Tools | Templates.
     }
 
-    /**
-     * Called when a pointer is released from a series in the chart.  This can be
-     * overridden in subclasses to handle these events.
-     *
-     * @param sel
-     */
+    /// Called when a pointer is released from a series in the chart.  This can be
+    /// overridden in subclasses to handle these events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`
     protected void seriesReleased(SeriesSelection sel) {
 
     }
 
-    /**
-     * Gets the transform for the chart.  This can be used to scale, translate, and
-     * rotate the chart.  This transform assumes its origin at the (absoluteX, absoluteY)
-     * of the component at the time it is drawn rather than the screen's origin as is
-     * normally the case with transforms.  This allows the transform to be applied consistently
-     * with respect to the chart's coordinates even when the component is moved around the screen.
-     *
-     * @return The transform for the chart in component coordinates.
-     */
+    /// Gets the transform for the chart.  This can be used to scale, translate, and
+    /// rotate the chart.  This transform assumes its origin at the (absoluteX, absoluteY)
+    /// of the component at the time it is drawn rather than the screen's origin as is
+    /// normally the case with transforms.  This allows the transform to be applied consistently
+    /// with respect to the chart's coordinates even when the component is moved around the screen.
+    ///
+    /// #### Returns
+    ///
+    /// The transform for the chart in component coordinates.
     public Transform getTransform() {
         return transform;
     }
 
-    /**
-     * Sets the transform for the chart.  Transforms origin assumed to be at (getAbsoluteX, getAbsoluteY).
-     *
-     * @param transform the transform to set
-     */
+    /// Sets the transform for the chart.  Transforms origin assumed to be at (getAbsoluteX, getAbsoluteY).
+    ///
+    /// #### Parameters
+    ///
+    /// - `transform`: the transform to set
     public void setTransform(Transform transform) {
         this.transform = transform;
     }
@@ -677,11 +723,11 @@ public class ChartComponent extends Component {
     }
 
 
-    /**
-     * Checks if panning is enabled.
-     *
-     * @return the panEnabled
-     */
+    /// Checks if panning is enabled.
+    ///
+    /// #### Returns
+    ///
+    /// the panEnabled
     public boolean isPanEnabled() {
         if (chart instanceof XYChart) {
             return ((XYChart) chart).getRenderer().isPanEnabled();
@@ -689,9 +735,9 @@ public class ChartComponent extends Component {
         return panEnabled;
     }
 
-    /**
-     * @param panEnabled the panEnabled to set
-     */
+    /// #### Parameters
+    ///
+    /// - `panEnabled`: the panEnabled to set
     public void setPanEnabled(boolean panEnabled) {
         this.panEnabled = panEnabled;
         if (chart instanceof XYChart) {
@@ -700,12 +746,13 @@ public class ChartComponent extends Component {
         }
     }
 
-    /**
-     * Enables or disables pan on x and y axes separately.
-     *
-     * @param panXEnabled True to enable panning along the x-axis.
-     * @param panYEnabled True to enable panning along the y-axis.
-     */
+    /// Enables or disables pan on x and y axes separately.
+    ///
+    /// #### Parameters
+    ///
+    /// - `panXEnabled`: True to enable panning along the x-axis.
+    ///
+    /// - `panYEnabled`: True to enable panning along the y-axis.
     public void setPanEnabled(boolean panXEnabled, boolean panYEnabled) {
         this.panEnabled = panXEnabled || panYEnabled;
         if (chart instanceof XYChart) {
@@ -714,11 +761,7 @@ public class ChartComponent extends Component {
         }
     }
 
-    /**
-     * Checks whether panning is enabled along the X-axis.
-     *
-     * @return
-     */
+    /// Checks whether panning is enabled along the X-axis.
     public boolean isPanXEnabled() {
         if (chart instanceof XYChart) {
             return ((XYChart) chart).getRenderer().isPanXEnabled();
@@ -726,11 +769,7 @@ public class ChartComponent extends Component {
         return panEnabled;
     }
 
-    /**
-     * Checks whether panning is enabled along the Y-axis.
-     *
-     * @return
-     */
+    /// Checks whether panning is enabled along the Y-axis.
     public boolean isPanYEnabled() {
         if (chart instanceof XYChart) {
             return ((XYChart) chart).getRenderer().isPanYEnabled();
@@ -738,14 +777,17 @@ public class ChartComponent extends Component {
         return panEnabled;
     }
 
-    /**
-     * Sets the pan limits if panning is enabled.
-     *
-     * @param minX The minimum X-axis value for panning.
-     * @param maxX The maximum X-axis value for panning.
-     * @param minY The minimum Y-axis value for panning.
-     * @param maxY The maximum Y-axis value for panning.
-     */
+    /// Sets the pan limits if panning is enabled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minX`: The minimum X-axis value for panning.
+    ///
+    /// - `maxX`: The maximum X-axis value for panning.
+    ///
+    /// - `minY`: The minimum Y-axis value for panning.
+    ///
+    /// - `maxY`: The maximum Y-axis value for panning.
     public void setPanLimits(double minX, double maxX, double minY, double maxY) {
         if (chart instanceof XYChart) {
             XYChart xyChart = (XYChart) chart;
@@ -756,20 +798,18 @@ public class ChartComponent extends Component {
         }
     }
 
-    /**
-     * Removes the pan limits which may have been previously set with {@link #setPanLimits(double, double, double, double) }
-     */
+    /// Removes the pan limits which may have been previously set with `double, double, double)`
     public void clearPanLimits() {
         if (chart instanceof XYChart) {
             ((XYChart) chart).getRenderer().setPanLimits(null);
         }
     }
 
-    /**
-     * Checks whether zoom is enabled.
-     *
-     * @return the zoomEnabled
-     */
+    /// Checks whether zoom is enabled.
+    ///
+    /// #### Returns
+    ///
+    /// the zoomEnabled
     public boolean isZoomEnabled() {
         if (chart instanceof XYChart) {
             return ((XYChart) chart).getRenderer().isZoomEnabled();
@@ -777,11 +817,11 @@ public class ChartComponent extends Component {
         return zoomEnabled;
     }
 
-    /**
-     * Enables or disables zoom on both x and y axes.
-     *
-     * @param zoomEnabled the zoomEnabled to set
-     */
+    /// Enables or disables zoom on both x and y axes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoomEnabled`: the zoomEnabled to set
     public void setZoomEnabled(boolean zoomEnabled) {
         this.zoomEnabled = zoomEnabled;
         setFocusable(isFocusable() || zoomEnabled);
@@ -791,11 +831,7 @@ public class ChartComponent extends Component {
         }
     }
 
-    /**
-     * Checks whether zoom is enabled on the X-axis.
-     *
-     * @return
-     */
+    /// Checks whether zoom is enabled on the X-axis.
     public boolean isZoomXEnabled() {
         if (chart instanceof XYChart) {
             return ((XYChart) chart).getRenderer().isZoomXEnabled();
@@ -803,11 +839,7 @@ public class ChartComponent extends Component {
         return zoomEnabled;
     }
 
-    /**
-     * Checks whether zoom is enabled on the Y-axis.
-     *
-     * @return
-     */
+    /// Checks whether zoom is enabled on the Y-axis.
     public boolean isZoomYEnabled() {
         if (chart instanceof XYChart) {
             return ((XYChart) chart).getRenderer().isZoomYEnabled();
@@ -815,21 +847,24 @@ public class ChartComponent extends Component {
         return zoomEnabled;
     }
 
-    /**
-     * Sets the zoom limits.
-     *
-     * <p><strong>NOTE: This method is only applicable when showing an {@link XYChart }</strong>  It will throw a
-     * RuntimeException if called while a different kind of chart is being shown.</p>
-     *
-     * @param minRangeX The minimum distance from {@link XYMultipleSeriesRenderer#getXAxisMin() } to
-     *                  {@link XYMultipleSeriesRenderer#getXAxisMax() } that can be achieved by zooming in.  {@literal 0} means no limit.
-     * @param maxRangeX The maximum distance from {@link XYMultipleSeriesRenderer#getXAxisMin() } to
-     *                  {@link XYMultipleSeriesRenderer#getXAxisMax() } that can be achieved by zooming out.  {@literal 0} means no limit.
-     * @param minRangeY The minimum distance from {@link XYMultipleSeriesRenderer#getYAxisMin() } to
-     *                  {@link XYMultipleSeriesRenderer#getYAxisMax() } that can be achieved by zooming in. {@literal 0} means no limit.
-     * @param maxRangeY The maximum distance from {@link XYMultipleSeriesRenderer#getYAxisMin() } to
-     *                  {@link XYMultipleSeriesRenderer#getYAxisMax() } that can be achieved by zooming out. {@literal 0} means no limit.
-     */
+    /// Sets the zoom limits.
+    ///
+    /// **NOTE: This method is only applicable when showing an `XYChart`**  It will throw a
+    /// RuntimeException if called while a different kind of chart is being shown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minRangeX`: @param minRangeX The minimum distance from `XYMultipleSeriesRenderer#getXAxisMin()` to
+    ///                  `XYMultipleSeriesRenderer#getXAxisMax()` that can be achieved by zooming in.  0 means no limit.
+    ///
+    /// - `maxRangeX`: @param maxRangeX The maximum distance from `XYMultipleSeriesRenderer#getXAxisMin()` to
+    ///                  `XYMultipleSeriesRenderer#getXAxisMax()` that can be achieved by zooming out.  0 means no limit.
+    ///
+    /// - `minRangeY`: @param minRangeY The minimum distance from `XYMultipleSeriesRenderer#getYAxisMin()` to
+    ///                  `XYMultipleSeriesRenderer#getYAxisMax()` that can be achieved by zooming in. 0 means no limit.
+    ///
+    /// - `maxRangeY`: @param maxRangeY The maximum distance from `XYMultipleSeriesRenderer#getYAxisMin()` to
+    ///                  `XYMultipleSeriesRenderer#getYAxisMax()` that can be achieved by zooming out. 0 means no limit.
     public void setZoomLimits(double minRangeX, double maxRangeX, double minRangeY, double maxRangeY) {
         if (chart instanceof XYChart) {
             XYChart xyChart = (XYChart) chart;
@@ -840,12 +875,13 @@ public class ChartComponent extends Component {
 
     }
 
-    /**
-     * Enables or disables zoom on x and y axes separately.
-     *
-     * @param zoomX True to enable zooming x axis.
-     * @param zoomY True to enable zooming y axis.
-     */
+    /// Enables or disables zoom on x and y axes separately.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoomX`: True to enable zooming x axis.
+    ///
+    /// - `zoomY`: True to enable zooming y axis.
     public void setZoomEnabled(boolean zoomX, boolean zoomY) {
         this.zoomEnabled = zoomX || zoomY;
         setFocusable(isFocusable() || zoomEnabled);
@@ -937,10 +973,8 @@ public class ChartComponent extends Component {
         return out;
     }
 
-    /**
-     * Subclasses can override this method to be informed when the chart bounds change
-     * due to panning or zooming.
-     */
+    /// Subclasses can override this method to be informed when the chart bounds change
+    /// due to panning or zooming.
     protected void chartBoundsChanged() {
 
     }

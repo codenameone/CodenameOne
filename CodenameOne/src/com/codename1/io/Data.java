@@ -26,30 +26,37 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 
-/**
- * An interface that can be implemented by any object to allow it to be treated as data.  Data
- * has a size, and can be appended to an OutputStream.  It is useful primarily for adding a custom
- * body to a ConnectionRequest.
- *
- * @author shannah
- * @since 7.0
- */
+/// An interface that can be implemented by any object to allow it to be treated as data.  Data
+/// has a size, and can be appended to an OutputStream.  It is useful primarily for adding a custom
+/// body to a ConnectionRequest.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public interface Data {
 
-    /**
-     * Appends the data's content to an output stream.
-     *
-     * @param output The output stream to append to.
-     * @throws IOException
-     */
+    /// Appends the data's content to an output stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `output`: The output stream to append to.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     void appendTo(OutputStream output) throws IOException;
 
-    /**
-     * Gets the size of the data content.
-     *
-     * @return Size of content in bytes.
-     * @throws IOException
-     */
+    /// Gets the size of the data content.
+    ///
+    /// #### Returns
+    ///
+    /// Size of content in bytes.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     long getSize() throws IOException;
 
     class StringData implements Data {
@@ -80,104 +87,92 @@ public interface Data {
 
     }
 
-    /**
-     * Wraps a File as a Data object.
-     *
-     * @since 7.0
-     */
+    /// Wraps a File as a Data object.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     class FileData implements Data {
         private final File file;
 
-        /**
-         * Creates a new Data wrapper for a file.
-         *
-         * @param file The file to be wrapped.
-         */
+        /// Creates a new Data wrapper for a file.
+        ///
+        /// #### Parameters
+        ///
+        /// - `file`: The file to be wrapped.
         public FileData(File file) {
             this.file = file;
         }
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         public void appendTo(OutputStream output) throws IOException {
             FileSystemStorage fs = FileSystemStorage.getInstance();
             Util.copyNoClose(fs.openInputStream(file.getAbsolutePath()), output, 8192);
         }
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         public long getSize() throws IOException {
             return file.length();
         }
     }
 
-    /**
-     * Wraps a Storage object as a Data object.
-     *
-     * @since 7.0
-     */
+    /// Wraps a Storage object as a Data object.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     class StorageData implements Data {
         private final String key;
 
-        /**
-         * Creates a new Data wrapper for a storage key.
-         *
-         * @param key The storage key.
-         */
+        /// Creates a new Data wrapper for a storage key.
+        ///
+        /// #### Parameters
+        ///
+        /// - `key`: The storage key.
         public StorageData(String key) {
             this.key = key;
         }
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         public void appendTo(OutputStream output) throws IOException {
             Util.copyNoClose(Storage.getInstance().createInputStream(key), output, 8192);
         }
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         public long getSize() throws IOException {
             return Storage.getInstance().entrySize(key);
         }
     }
 
-    /**
-     * Wraps a byte[] array as a Data object.
-     *
-     * @since 7.0
-     */
+    /// Wraps a byte[] array as a Data object.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     class ByteData implements Data {
         private final byte[] bytes;
 
 
-        /**
-         * Creates a new Data object that wraps a byte array.
-         *
-         * @param bytes
-         */
+        /// Creates a new Data object that wraps a byte array.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bytes`
         public ByteData(byte[] bytes) {
             this.bytes = bytes;
         }
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         public void appendTo(OutputStream output) throws IOException {
             output.write(bytes);
         }
 
-        /**
-         * {@inheritDoc }
-         */
+        /// {@inheritDoc }
         @Override
         public long getSize() throws IOException {
             return bytes.length;

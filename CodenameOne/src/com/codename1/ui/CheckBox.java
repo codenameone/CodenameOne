@@ -32,17 +32,28 @@ import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.util.EventDispatcher;
 
-/**
- * <p>CheckBox is a button that can be selected or deselected and displays
- * its state to the user. Check out {@link com.codename1.ui.RadioButton} for
- * a more exclusive selection approach. Both components support a toggle button
- * mode using the {@link com.codename1.ui.Button#setToggle(boolean)} API.</p>
- *
- * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
- *
- * @author Chen Fishbein
- */
+/// CheckBox is a button that can be selected or deselected and displays
+/// its state to the user. Check out `com.codename1.ui.RadioButton` for
+/// a more exclusive selection approach. Both components support a toggle button
+/// mode using the `com.codename1.ui.Button#setToggle(boolean)` API.
+///
+/// ```java
+/// CheckBox cb1 = new CheckBox("CheckBox No Icon");
+/// cb1.setSelected(true);
+/// CheckBox cb2 = new CheckBox("CheckBox With Icon", icon);
+/// CheckBox cb3 = new CheckBox("CheckBox Opposite True", icon);
+/// CheckBox cb4 = new CheckBox("CheckBox Opposite False", icon);
+/// cb3.setOppositeSide(true);
+/// cb4.setOppositeSide(false);
+/// RadioButton rb1 = new RadioButton("Radio 1");
+/// RadioButton rb2 = new RadioButton("Radio 2");
+/// RadioButton rb3 = new RadioButton("Radio 3", icon);
+/// new ButtonGroup(rb1, rb2, rb3);
+/// rb2.setSelected(true);
+/// hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
+/// ```
+///
+/// @author Chen Fishbein
 public class CheckBox extends Button {
 
     private boolean selected = false;
@@ -51,98 +62,107 @@ public class CheckBox extends Button {
     private EventDispatcher bindListeners = null;
     private EventDispatcher changeListeners;
 
-    /**
-     * Constructs a checkbox with the given text
-     *
-     * @param text to display next to the checkbox
-     */
+    /// Constructs a checkbox with the given text
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: to display next to the checkbox
     public CheckBox(String text) {
         this(text, null);
     }
 
-    /**
-     * Constructs a checkbox with no text
-     */
+    /// Constructs a checkbox with no text
     public CheckBox() {
         this("");
     }
 
-    /**
-     * Constructs a checkbox with the given icon
-     *
-     * @param icon icon to display next to the checkbox
-     */
+    /// Constructs a checkbox with the given icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: icon to display next to the checkbox
     public CheckBox(Image icon) {
         this("", icon);
     }
 
-    /**
-     * Constructs a checkbox with the given text and icon
-     *
-     * @param text to display next to the checkbox
-     * @param icon icon to display next to the text
-     */
+    /// Constructs a checkbox with the given text and icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: to display next to the checkbox
+    ///
+    /// - `icon`: icon to display next to the text
     public CheckBox(String text, Image icon) {
         super(text, icon);
         setUIIDFinal("CheckBox");
         updateSide();
     }
 
-    /**
-     * Shorthand for creating the check box setting the icon/text and making it into
-     * a toggle button
-     *
-     * @param text the text for the button
-     * @param icon the icon for the button
-     * @return a check box
-     */
+    /// Shorthand for creating the check box setting the icon/text and making it into
+    /// a toggle button
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text for the button
+    ///
+    /// - `icon`: the icon for the button
+    ///
+    /// #### Returns
+    ///
+    /// a check box
     public static CheckBox createToggle(String text, Image icon) {
         CheckBox cb = new CheckBox(text, icon);
         cb.setToggle(true);
         return cb;
     }
 
-    /**
-     * Shorthand for creating the check box setting the icon/text and making it into
-     * a toggle button
-     *
-     * @param text the text for the button
-     * @return a check box
-     */
+    /// Shorthand for creating the check box setting the icon/text and making it into
+    /// a toggle button
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text for the button
+    ///
+    /// #### Returns
+    ///
+    /// a check box
     public static CheckBox createToggle(String text) {
         CheckBox cb = new CheckBox(text, null);
         cb.setToggle(true);
         return cb;
     }
 
-    /**
-     * Shorthand for creating the check box setting the icon/text and making it into
-     * a toggle button
-     *
-     * @param icon the icon for the button
-     * @return a check box
-     */
+    /// Shorthand for creating the check box setting the icon/text and making it into
+    /// a toggle button
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon for the button
+    ///
+    /// #### Returns
+    ///
+    /// a check box
     public static CheckBox createToggle(Image icon) {
         CheckBox cb = new CheckBox("", icon);
         cb.setToggle(true);
         return cb;
     }
 
-    /**
-     * Return true if the checkbox is selected
-     *
-     * @return true if the checkbox is selected
-     */
+    /// Return true if the checkbox is selected
+    ///
+    /// #### Returns
+    ///
+    /// true if the checkbox is selected
     @Override
     public boolean isSelected() {
         return selected;
     }
 
-    /**
-     * Selects the current checkbox
-     *
-     * @param selected value for selection
-     */
+    /// Selects the current checkbox
+    ///
+    /// #### Parameters
+    ///
+    /// - `selected`: value for selection
     public void setSelected(boolean selected) {
         boolean changed = selected != this.selected;
         this.selected = selected;
@@ -152,18 +172,14 @@ public class CheckBox extends Button {
         repaint();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void released(int x, int y) {
         setSelected(!isSelected());
         super.released(x, y);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireActionEvent(int x, int y) {
         super.fireActionEvent(x, y);
@@ -176,9 +192,7 @@ public class CheckBox extends Button {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         if (isToggle()) {
@@ -188,17 +202,13 @@ public class CheckBox extends Button {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getCheckBoxPreferredSize(this);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected String paramString() {
         return super.paramString() + ", selected = " + selected;
@@ -211,9 +221,7 @@ public class CheckBox extends Button {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -236,46 +244,42 @@ public class CheckBox extends Button {
         return super.getAvaliableSpaceForText() - (getHeight() + getGap());
     }
 
-    /**
-     * Places the check box on the opposite side at the far end
-     *
-     * @return the oppositeSide
-     */
+    /// Places the check box on the opposite side at the far end
+    ///
+    /// #### Returns
+    ///
+    /// the oppositeSide
     @Override
     public boolean isOppositeSide() {
         return oppositeSide;
     }
 
-    /**
-     * Places the check box on the opposite side at the far end
-     *
-     * @param oppositeSide the oppositeSide to set
-     */
+    /// Places the check box on the opposite side at the far end
+    ///
+    /// #### Parameters
+    ///
+    /// - `oppositeSide`: the oppositeSide to set
     public void setOppositeSide(boolean oppositeSide) {
         this.oppositeSide = oppositeSide;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getBindablePropertyNames() {
         return new String[]{"selected"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getBindablePropertyTypes() {
         return new Class[]{Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated uses the deprecated BindTarget interface
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
     @Override
     public void bindProperty(String prop, BindTarget target) {
         if ("selected".equals(prop)) {
@@ -288,11 +292,11 @@ public class CheckBox extends Button {
         super.bindProperty(prop, target);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated uses the deprecated BindTarget interface
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
     @Override
     public void unbindProperty(String prop, BindTarget target) {
         if ("selected".equals(prop)) {
@@ -308,9 +312,7 @@ public class CheckBox extends Button {
         super.unbindProperty(prop, target);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getBoundPropertyValue(String prop) {
         if ("selected".equals(prop)) {
@@ -322,9 +324,7 @@ public class CheckBox extends Button {
         return super.getBoundPropertyValue(prop);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setBoundPropertyValue(String prop, Object value) {
         if ("selected".equals(prop)) {
@@ -334,16 +334,22 @@ public class CheckBox extends Button {
         super.setBoundPropertyValue(prop, value);
     }
 
-    /**
-     * Adds a listener to be notified when the the checkbox's selected value changes.  The difference
-     * between a change listener and an action listener is that a change listener is fired
-     * whenever there is a change, but action events are only fired when the change is a result
-     * of the user clicking on the checkbox.
-     *
-     * @param l Listener to be notified when selected value changes.
-     * @see #removeChangeListener(com.codename1.ui.events.ActionListener)
-     * @since 6.0
-     */
+    /// Adds a listener to be notified when the the checkbox's selected value changes.  The difference
+    /// between a change listener and an action listener is that a change listener is fired
+    /// whenever there is a change, but action events are only fired when the change is a result
+    /// of the user clicking on the checkbox.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: Listener to be notified when selected value changes.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #removeChangeListener(com.codename1.ui.events.ActionListener)
     public void addChangeListener(ActionListener l) {
         if (changeListeners == null) {
             changeListeners = new EventDispatcher();
@@ -351,13 +357,19 @@ public class CheckBox extends Button {
         changeListeners.addListener(l);
     }
 
-    /**
-     * Removes a change change listener.
-     *
-     * @param l
-     * @see #addChangeListener(com.codename1.ui.events.ActionListener)
-     * @since 6.0
-     */
+    /// Removes a change change listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #addChangeListener(com.codename1.ui.events.ActionListener)
     public void removeChangeListeners(ActionListener l) {
         if (changeListeners != null) {
             changeListeners.removeListener(l);

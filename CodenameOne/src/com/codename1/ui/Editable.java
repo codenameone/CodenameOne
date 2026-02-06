@@ -22,40 +22,31 @@
  */
 package com.codename1.ui;
 
-/**
- * An interface that can be implemented to provide editing capabilities for any component
- * in the UI.  {@link Component} implements this interface, but only with empty
- * methods.  You can provide an alternative editing implementation for any Component by
- * passing an Editable object to {@link Component#setEditingDelegate(com.codename1.ui.Editable) }.
- *
- * @author shannah
- * @since 6.0
- */
+/// An interface that can be implemented to provide editing capabilities for any component
+/// in the UI.  `Component` implements this interface, but only with empty
+/// methods.  You can provide an alternative editing implementation for any Component by
+/// passing an Editable object to `Component#setEditingDelegate(com.codename1.ui.Editable)`.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 6.0
 public interface Editable {
-    /**
-     * Checks whether the component is editable.
-     *
-     * @return
-     */
+    /// Checks whether the component is editable.
     boolean isEditable();
 
-    /**
-     * Checks whether editing is currently in progress.
-     *
-     * @return
-     */
+    /// Checks whether editing is currently in progress.
     boolean isEditing();
 
-    /**
-     * Starts editing the component.
-     */
+    /// Starts editing the component.
     void startEditingAsync();
 
-    /**
-     * Stops editing the component.
-     *
-     * @param onComplete Optional callback that will be called after the editing
-     *                   is finished (as stopping may take some time for the native side to do cleanup).
-     */
+    /// Stops editing the component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onComplete`: @param onComplete Optional callback that will be called after the editing
+    ///                   is finished (as stopping may take some time for the native side to do cleanup).
     void stopEditing(Runnable onComplete);
 }

@@ -31,11 +31,9 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
-/**
- * A duration Spinner widget  Used by the Picker in lightweight mode.
- *
- * @author Steve Hannah
- */
+/// A duration Spinner widget  Used by the Picker in lightweight mode.
+///
+/// @author Steve Hannah
 class DurationSpinner3D extends Container implements InternalPickerWidget {
     public static final int FIELD_YEAR = 0;
     public static final int FIELD_MONTH = 1;

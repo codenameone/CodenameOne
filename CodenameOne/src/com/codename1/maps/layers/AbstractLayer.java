@@ -22,51 +22,50 @@ package com.codename1.maps.layers;
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Projection;
 
-/**
- * This class represents an abstract layer on the map.
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This class represents an abstract layer on the map.
+///
+/// @author Roman Kamyk
 public abstract class AbstractLayer implements Layer {
 
     protected final String name;
     protected Projection projection;
 
-    /**
-     * Creates an abstract layer.
-     *
-     * @param p    the projection system of this Layer
-     * @param name the name of this Layer
-     */
+    /// Creates an abstract layer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the projection system of this Layer
+    ///
+    /// - `name`: the name of this Layer
     public AbstractLayer(Projection p, String name) {
         this.name = name;
         projection = p;
     }
 
-    /**
-     * Gets the name of this Layer
-     *
-     * @return the name of this Layer
-     */
+    /// Gets the name of this Layer
+    ///
+    /// #### Returns
+    ///
+    /// the name of this Layer
     @Override
     public String getName() {
         return name;
     }
 
-    /**
-     * The projection of this Layer
-     *
-     * @return the projection of this Layer
-     */
+    /// The projection of this Layer
+    ///
+    /// #### Returns
+    ///
+    /// the projection of this Layer
     public Projection getProjection() {
         return projection;
     }
 
-    /**
-     * The bounding box of this Layer
-     *
-     * @return the Layer bounding box
-     */
+    /// The bounding box of this Layer
+    ///
+    /// #### Returns
+    ///
+    /// the Layer bounding box
     @Override
     public abstract BoundingBox boundingBox();
 

@@ -25,62 +25,64 @@ package com.codename1.properties;
 
 import com.codename1.compat.java.util.Objects;
 
-/**
- * Base class for a property, it can store a generic value of any type and broadcast change events to
- * external listeners
- *
- * @author Shai Almog
- */
+/// Base class for a property, it can store a generic value of any type and broadcast change events to
+/// external listeners
+///
+/// @author Shai Almog
 public class Property<T, K> extends PropertyBase<T, K> {
     private T value;
 
-    /**
-     * Constructs a property with the given name and value
-     *
-     * @param name  the name of the property
-     * @param value the default value for the property
-     */
+    /// Constructs a property with the given name and value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `value`: the default value for the property
     public Property(String name, T value) {
         super(name);
         this.value = value;
     }
 
-    /**
-     * Constructs a property with the given name and value
-     *
-     * @param name        the name of the property
-     * @param genericType the type of the property
-     * @param value       the default value for the property
-     */
+    /// Constructs a property with the given name and value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `genericType`: the type of the property
+    ///
+    /// - `value`: the default value for the property
     public Property(String name, Class genericType, T value) {
         super(name, genericType);
         this.value = value;
     }
 
-    /**
-     * Constructs a property with null value
-     *
-     * @param name the name of the property
-     */
+    /// Constructs a property with null value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
     public Property(String name) {
         super(name);
     }
 
-    /**
-     * Constructs a property with null value
-     *
-     * @param genericType the type of the property
-     * @param name        the name of the property
-     */
+    /// Constructs a property with null value
+    ///
+    /// #### Parameters
+    ///
+    /// - `genericType`: the type of the property
+    ///
+    /// - `name`: the name of the property
     public Property(String name, Class genericType) {
         super(name, genericType);
     }
 
-    /**
-     * Gets the property value
-     *
-     * @return the property value
-     */
+    /// Gets the property value
+    ///
+    /// #### Returns
+    ///
+    /// the property value
     @Override
     public T get() {
         internalGet();
@@ -88,11 +90,11 @@ public class Property<T, K> extends PropertyBase<T, K> {
     }
 
 
-    /**
-     * Sets the property value and potentially fires a change event
-     *
-     * @param value the new value
-     */
+    /// Sets the property value and potentially fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the new value
     public K set(T value) {
         if (!(Objects.equals(this.value, value))) {
             this.value = value;
@@ -106,12 +108,15 @@ public class Property<T, K> extends PropertyBase<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Compares this property to another property
-     *
-     * @param obj the other property
-     * @return true if they are equal in name and value
-     */
+    /// Compares this property to another property
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the other property
+    ///
+    /// #### Returns
+    ///
+    /// true if they are equal in name and value
     @Override
     public boolean equals(Object obj) {
         if (!super.equals(obj)) {
@@ -125,11 +130,11 @@ public class Property<T, K> extends PropertyBase<T, K> {
         return otherval != null && otherval.equals(value);
     }
 
-    /**
-     * Returns the internal hashcode or 0 for null property
-     *
-     * @return the hashcode value
-     */
+    /// Returns the internal hashcode or 0 for null property
+    ///
+    /// #### Returns
+    ///
+    /// the hashcode value
     @Override
     public int hashCode() {
         if (value == null) {

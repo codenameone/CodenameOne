@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.util;
 
 import com.codename1.io.Log;
@@ -23,30 +21,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * Utility class for math operations.
- */
+/// Utility class for math operations.
 public final class MathHelper {
-    /**
-     * A value that is used a null value.
-     */
+    /// A value that is used a null value.
     public static final double NULL_VALUE = -Double.MAX_VALUE + 1;
-    /**
-     * A number formatter to be used to make sure we have a maximum number of
-     * fraction digits in the labels.
-     */
+    /// A number formatter to be used to make sure we have a maximum number of
+    /// fraction digits in the labels.
     private static final NumberFormat FORMAT = NumberFormat.getNumberInstance();
 
     private MathHelper() {
         // empty constructor
     }
 
-    /**
-     * Calculate the minimum and maximum values out of a list of doubles.
-     *
-     * @param values the input values
-     * @return an array with the minimum and maximum values
-     */
+    /// Calculate the minimum and maximum values out of a list of doubles.
+    ///
+    /// #### Parameters
+    ///
+    /// - `values`: the input values
+    ///
+    /// #### Returns
+    ///
+    /// an array with the minimum and maximum values
     public static double[] minmax(List<Double> values) {
         if (values.isEmpty()) {
             return new double[2];
@@ -62,15 +57,20 @@ public final class MathHelper {
         return new double[]{min, max};
     }
 
-    /**
-     * Computes a reasonable set of labels for a data interval and number of
-     * labels.
-     *
-     * @param start           start value
-     * @param end             final value
-     * @param approxNumLabels desired number of labels
-     * @return collection containing the label values
-     */
+    /// Computes a reasonable set of labels for a data interval and number of
+    /// labels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: start value
+    ///
+    /// - `end`: final value
+    ///
+    /// - `approxNumLabels`: desired number of labels
+    ///
+    /// #### Returns
+    ///
+    /// collection containing the label values
     public static List<Double> getLabels(final double start, final double end,
                                          final int approxNumLabels) {
         List<Double> labels = new ArrayList<Double>();
@@ -99,14 +99,19 @@ public final class MathHelper {
         return labels;
     }
 
-    /**
-     * Computes a reasonable number of labels for a data range.
-     *
-     * @param start           start value
-     * @param end             final value
-     * @param approxNumLabels desired number of labels
-     * @return double[] array containing {start value, end value, increment}
-     */
+    /// Computes a reasonable number of labels for a data range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: start value
+    ///
+    /// - `end`: final value
+    ///
+    /// - `approxNumLabels`: desired number of labels
+    ///
+    /// #### Returns
+    ///
+    /// double[] array containing {start value, end value, increment}
     private static double[] computeLabels(final double start, final double end,
                                           final int approxNumLabels) {
         if (Math.abs(start - end) < 0.0000001f) {
@@ -131,11 +136,11 @@ public final class MathHelper {
         return new double[]{xStart, xEnd, xStep};
     }
 
-    /**
-     * Given a number, round up to the nearest power of ten times 1, 2, or 5.
-     *
-     * @param val the number, it must be strictly positive
-     */
+    /// Given a number, round up to the nearest power of ten times 1, 2, or 5.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: the number, it must be strictly positive
     private static double roundUp(final double val) {
         int exponent = (int) Math.floor(MathUtil.log10(val));
         double rval = val * MathUtil.pow(10, -exponent);

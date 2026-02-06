@@ -42,130 +42,123 @@ import com.codename1.ui.util.UITimer;
 
 import java.util.ArrayList;
 
-/**
- * <p>An optionally multi-line editable region that can display text and allow a user to edit it.
- * By default the text area will grow based on its content.<br>
- * {@code TextArea} is useful both for text input and for displaying multi-line data, it is used internally
- * by components such as {@link com.codename1.components.SpanLabel} &amp;
- * {@link com.codename1.components.SpanButton}.</p>
- *
- * <p>
- * {@code TextArea} &amp; {@link com.codename1.ui.TextField} are very similar, we discuss the main differences
- * between the two {@link com.codename1.ui.TextField here}.  In fact they are so similar that our sample code
- * below was written for {@link com.codename1.ui.TextField} but should be interchangeable with {@code TextArea}.
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/fb63dd5d6efdb95932be.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-text-component.png" alt="Text field input sample" />
- *
- * @author Chen Fishbein
- */
+/// An optionally multi-line editable region that can display text and allow a user to edit it.
+/// By default the text area will grow based on its content.
+///
+/// `TextArea` is useful both for text input and for displaying multi-line data, it is used internally
+/// by components such as `com.codename1.components.SpanLabel` &
+/// `com.codename1.components.SpanButton`.
+///
+/// `TextArea` & `com.codename1.ui.TextField` are very similar, we discuss the main differences
+/// between the two `here`.  In fact they are so similar that our sample code
+/// below was written for `com.codename1.ui.TextField` but should be interchangeable with `TextArea`.
+///
+/// ```java
+/// TableLayout tl;
+/// int spanButton = 2;
+/// if(Display.getInstance().isTablet()) {
+///     tl = new TableLayout(7, 2);
+/// } else {
+///     tl = new TableLayout(14, 1);
+///     spanButton = 1;
+/// }
+/// tl.setGrowHorizontally(true);
+/// hi.setLayout(tl);
+///
+/// TextField firstName = new TextField("", "First Name", 20, TextArea.ANY);
+/// TextField surname = new TextField("", "Surname", 20, TextArea.ANY);
+/// TextField email = new TextField("", "E-Mail", 20, TextArea.EMAILADDR);
+/// TextField url = new TextField("", "URL", 20, TextArea.URL);
+/// TextField phone = new TextField("", "Phone", 20, TextArea.PHONENUMBER);
+///
+/// TextField num1 = new TextField("", "1234", 4, TextArea.NUMERIC);
+/// TextField num2 = new TextField("", "1234", 4, TextArea.NUMERIC);
+/// TextField num3 = new TextField("", "1234", 4, TextArea.NUMERIC);
+/// TextField num4 = new TextField("", "1234", 4, TextArea.NUMERIC);
+///
+/// Button submit = new Button("Submit");
+/// TableLayout.Constraint cn = tl.createConstraint();
+/// cn.setHorizontalSpan(spanButton);
+/// cn.setHorizontalAlign(Component.RIGHT);
+/// hi.add("First Name").add(firstName).
+///         add("Surname").add(surname).
+///         add("E-Mail").add(email).
+///         add("URL").add(url).
+///         add("Phone").add(phone).
+///         add("Credit Card").
+///                 add(GridLayout.encloseIn(4, num1, num2, num3, num4)).
+///         add(cn, submit);
+/// ```
+///
+/// @author Chen Fishbein
 public class TextArea extends Component implements ActionSource, TextHolder {
-    /**
-     * Allows any type of input into a text field, if a constraint is not supported
-     * by an underlying implementation this will be the default.
-     */
+    /// Allows any type of input into a text field, if a constraint is not supported
+    /// by an underlying implementation this will be the default.
     public static final int ANY = 0;
-    /**
-     * The user is allowed to enter an e-mail address.
-     */
+    /// The user is allowed to enter an e-mail address.
     public static final int EMAILADDR = 1;
-    /**
-     * The user is allowed to enter only an integer value.
-     */
+    /// The user is allowed to enter only an integer value.
     public static final int NUMERIC = 2;
-    /**
-     * The user is allowed to enter a phone number.
-     */
+    /// The user is allowed to enter a phone number.
     public static final int PHONENUMBER = 3;
-    /**
-     * The user is allowed to enter a URL.
-     */
+    /// The user is allowed to enter a URL.
     public static final int URL = 4;
-    /**
-     * The user is allowed to enter numeric values with optional decimal
-     * fractions, for example "-123", "0.123", or ".5".
-     */
+    /// The user is allowed to enter numeric values with optional decimal
+    /// fractions, for example "-123", "0.123", or ".5".
     public static final int DECIMAL = 5;
-    /**
-     * Indicates that the text entered is confidential data that should be
-     * obscured whenever possible.
-     */
+    /// Indicates that the text entered is confidential data that should be
+    /// obscured whenever possible.
     public static final int PASSWORD = 0x10000;
-    /**
-     * Indicates that editing is currently disallowed.
-     */
+    /// Indicates that editing is currently disallowed.
     public static final int UNEDITABLE = 0x20000;
-    /**
-     * Indicates that the text entered is sensitive data that the
-     * implementation must never store into a dictionary or table for use
-     * in predictive, auto-completing, or other accelerated input schemes.
-     */
+    /// Indicates that the text entered is sensitive data that the
+    /// implementation must never store into a dictionary or table for use
+    /// in predictive, auto-completing, or other accelerated input schemes.
     public static final int SENSITIVE = 0x40000;
-    /**
-     * Indicates that the text entered does not consist of words that are
-     * likely to be found in dictionaries typically used by predictive input
-     * schemes.
-     */
+    /// Indicates that the text entered does not consist of words that are
+    /// likely to be found in dictionaries typically used by predictive input
+    /// schemes.
     public static final int NON_PREDICTIVE = 0x80000;
-    /**
-     * This flag is a hint to the implementation that during text editing,
-     * the initial letter of each word should be capitalized.
-     */
+    /// This flag is a hint to the implementation that during text editing,
+    /// the initial letter of each word should be capitalized.
     public static final int INITIAL_CAPS_WORD = 0x100000;
-    /**
-     * This flag is a hint to the implementation that during text editing,
-     * the initial letter of each sentence should be capitalized.
-     */
+    /// This flag is a hint to the implementation that during text editing,
+    /// the initial letter of each sentence should be capitalized.
     public static final int INITIAL_CAPS_SENTENCE = 0x200000;
-    /**
-     * This flag is a hint to the implementation that this field contains
-     * a username.
-     */
+    /// This flag is a hint to the implementation that this field contains
+    /// a username.
     public static final int USERNAME = 0x400000;
-    /**
-     * This flag is a hint to the implementation that the text in this
-     * field should be upper case
-     */
+    /// This flag is a hint to the implementation that the text in this
+    /// field should be upper case
     public static final int UPPERCASE = 0x800000;
-    /**
-     * Indicates the enter key to be used for editing the text area and by the
-     * text field
-     */
+    /// Indicates the enter key to be used for editing the text area and by the
+    /// text field
     private static final char ENTER_KEY = '\n';
     private static final boolean hadSuccessfulEdit = false;
     private static int defaultValign = TOP;
     private static int defaultMaxSize = 124;
     private static boolean autoDegradeMaxSize = false;
-    /**
-     * By default text area uses charWidth since its much faster on some devices
-     * than string width. However, with some fonts and especially some languages (such
-     * as Arabic, Korean etc.) the width of the string drawn might not equal the summary
-     * of the width of the chars. Hence for portability to those languages/fonts this
-     * flag must be set to true.
-     */
+    /// By default text area uses charWidth since its much faster on some devices
+    /// than string width. However, with some fonts and especially some languages (such
+    /// as Arabic, Korean etc.) the width of the string drawn might not equal the summary
+    /// of the width of the chars. Hence for portability to those languages/fonts this
+    /// flag must be set to true.
     private static boolean useStringWidth;
-    /**
-     * Indicates the widest character in the alphabet, this is useful for detecting
-     * linebreaks internally. In CJK languages the widest char is different than W
-     * hence this functionality is exposed to developers.
-     */
+    /// Indicates the widest character in the alphabet, this is useful for detecting
+    /// linebreaks internally. In CJK languages the widest char is different than W
+    /// hence this functionality is exposed to developers.
     private static char widestChar = 'W';
     private final EventDispatcher listeners = new EventDispatcher();
     private ActionListener doneListener;
     private int valign = defaultValign;
     private int linesToScroll = 1;
     //private int modifierFlag = 0x00000;
-    /**
-     * Unsupported characters is a string that contains characters that cause issues
-     * when rendering on some problematic fonts. The rendering engine can thus remove them
-     * when drawing.
-     */
+    /// Unsupported characters is a string that contains characters that cause issues
+    /// when rendering on some problematic fonts. The rendering engine can thus remove them
+    /// when drawing.
     private String unsupportedChars = "\t\r";
-    /**
-     * Input constraint which should be one of ANY, NUMERIC,
-     * PHONENUMBER, URL or EMAIL
-     */
+    /// Input constraint which should be one of ANY, NUMERIC,
+    /// PHONENUMBER, URL or EMAIL
     private int constraint = INITIAL_CAPS_SENTENCE;
     private String text = "";
     private boolean editable = true;
@@ -174,10 +167,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private int columns = 3;
     private int growLimit = -1;
     private boolean endsWith3Points = false;
-    /**
-     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
-     * this might make it slower as a result
-     */
+    /// This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+    /// this might make it slower as a result
     private boolean actAsLabel;
     private ArrayList rowStrings;
 
@@ -190,34 +181,26 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private EventDispatcher bindListeners = null;
     private EventDispatcher closeListeners = null;
     private String lastTextValue = "";
-    /**
-     * Indicates that the text area should "grow" in height based on the content beyond the
-     * limits indicate by the rows variable
-     */
+    /// Indicates that the text area should "grow" in height based on the content beyond the
+    /// limits indicate by the rows variable
     private boolean growByContent = true;
-    /**
-     * Indicates whether this is a single line text area, in which case "growing" won't
-     * work as expected.
-     */
+    /// Indicates whether this is a single line text area, in which case "growing" won't
+    /// work as expected.
     private boolean singleLineTextArea;
     private int currentRowWidth;
     private Label hintLabel;
-    /**
-     * Flag to indicate whether the action event is suppressed.
-     * FocusLost will trigger an action event if editing is in progress,
-     * and then set this flag.
-     * The flag should be unset on focus gained, and on start editing.
-     */
+    /// Flag to indicate whether the action event is suppressed.
+    /// FocusLost will trigger an action event if editing is in progress,
+    /// and then set this flag.
+    /// The flag should be unset on focus gained, and on start editing.
     private boolean suppressActionEvent;
-    /**
-     * To work around race conditions in UI bindings (on Android at least), we want to
-     * send action events early.  Even the focusLost() event isn't early enough to ensure
-     * that the action event is sent before an action event in a button that would trigger
-     * focus lost.  We add this form press listener to the form when we add the textarea
-     * and remove it when we remove the textarea.
-     * <p>
-     * Reference bug https://github.com/codenameone/CodenameOne/issues/2472
-     */
+    /// To work around race conditions in UI bindings (on Android at least), we want to
+    /// send action events early.  Even the focusLost() event isn't early enough to ensure
+    /// that the action event is sent before an action event in a button that would trigger
+    /// focus lost.  We add this form press listener to the form when we add the textarea
+    /// and remove it when we remove the textarea.
+    ///
+    /// Reference bug https://github.com/codenameone/CodenameOne/issues/2472
     private final ActionListener formPressListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
@@ -234,104 +217,130 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private TextSelection.Spans span;
     private TextSelection.TextSelectionSupport textSelectionSupport;
 
-    /**
-     * Creates an area with the given rows and columns
-     *
-     * @param rows    the number of rows
-     * @param columns - the number of columns
-     * @throws IllegalArgumentException if rows <= 0 or columns <= 1
-     */
+    /// Creates an area with the given rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows <= 0 or columns <= 1
     public TextArea(int rows, int columns) {
         this("", defaultMaxSize, rows, columns, ANY);
     }
 
-    /**
-     * Creates an area with the given rows, columns and constraint
-     *
-     * @param rows       the number of rows
-     * @param columns    - the number of columns
-     * @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
-     *                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
-     *                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
-     * @throws IllegalArgumentException if rows <= 0 or columns <= 1
-     */
+    /// Creates an area with the given rows, columns and constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
+    ///                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    ///                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows <= 0 or columns <= 1
     public TextArea(int rows, int columns, int constraint) {
         this("", defaultMaxSize, rows, columns, constraint);
     }
 
-    /**
-     * Creates an area with the given text, rows and columns
-     *
-     * @param text    the text to be displayed; if text is null, the empty
-     *                string "" will be displayed
-     * @param rows    the number of rows
-     * @param columns - the number of columns
-     * @throws IllegalArgumentException if rows <= 0 or columns <= 1
-     */
+    /// Creates an area with the given text, rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text    the text to be displayed; if text is null, the empty
+    ///                string "" will be displayed
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows <= 0 or columns <= 1
     public TextArea(String text, int rows, int columns) {
         this(text, defaultMaxSize, rows, columns, ANY); //String , maxSize, constraints= 0 (ANY)
     }
 
-    /**
-     * Creates an area with the given text, rows, columns and constraint
-     *
-     * @param text       the text to be displayed; if text is null, the empty
-     *                   string "" will be displayed
-     * @param rows       the number of rows
-     * @param columns    - the number of columns
-     * @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
-     *                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
-     *                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
-     * @throws IllegalArgumentException if rows <= 0 or columns <= 1
-     */
+    /// Creates an area with the given text, rows, columns and constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text       the text to be displayed; if text is null, the empty
+    ///                   string "" will be displayed
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
+    ///                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    ///                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows <= 0 or columns <= 1
     public TextArea(String text, int rows, int columns, int constraint) {
         this(text, defaultMaxSize, rows, columns, constraint);
     }
 
-    /**
-     * Creates an area with the given text and maximum size, this constructor
-     * will create a single line text area similar to a text field!
-     *
-     * @param text    the text to be displayed; if text is null, the empty
-     *                string "" will be displayed
-     * @param maxSize text area maximum size
-     */
+    /// Creates an area with the given text and maximum size, this constructor
+    /// will create a single line text area similar to a text field!
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text    the text to be displayed; if text is null, the empty
+    ///                string "" will be displayed
+    ///
+    /// - `maxSize`: text area maximum size
     public TextArea(String text, int maxSize) {
         this(text, maxSize, 1, 3, ANY);
     }
 
-    /**
-     * Creates an area with the given text, this constructor
-     * will create a single line text area similar to a text field!
-     *
-     * @param text the text to be displayed; if text is null, the empty
-     *             string "" will be displayed
-     */
+    /// Creates an area with the given text, this constructor
+    /// will create a single line text area similar to a text field!
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text the text to be displayed; if text is null, the empty
+    ///             string "" will be displayed
     public TextArea(String text) {
         this(text, Math.max(defaultMaxSize, nl(text)), 1, numCols(text), ANY);
     }
 
-    /**
-     * Creates an empty text area, this constructor
-     * will create a single line text area similar to a text field!
-     */
+    /// Creates an empty text area, this constructor
+    /// will create a single line text area similar to a text field!
     public TextArea() {
         this("");
     }
 
-    /**
-     * Creates an area with the given text, maximum size, rows, columns and constraint
-     *
-     * @param text       the text to be displayed; if text is null, the empty
-     *                   string "" will be displayed
-     * @param maxSize    text area maximum size
-     * @param rows       the number of rows
-     * @param columns    - the number of columns
-     * @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
-     *                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
-     *                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
-     * @throws IllegalArgumentException if rows <= 0 or columns <= 1
-     */
+    /// Creates an area with the given text, maximum size, rows, columns and constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text       the text to be displayed; if text is null, the empty
+    ///                   string "" will be displayed
+    ///
+    /// - `maxSize`: text area maximum size
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
+    ///                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    ///                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows <= 0 or columns <= 1
     private TextArea(String text, int maxSize, int rows, int columns, int constraint) {
         setUIIDFinal("TextArea");
         setPreferredTabIndex(0);
@@ -349,20 +358,20 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         setCursor(Component.TEXT_CURSOR);
     }
 
-    /**
-     * Indicates the default vertical alignment for a text field, only applies to single line text fields
-     *
-     * @return the defaultValign
-     */
+    /// Indicates the default vertical alignment for a text field, only applies to single line text fields
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValign
     public static int getDefaultValign() {
         return defaultValign;
     }
 
-    /**
-     * Indicates the default vertical alignment for a text field, only applies to single line text fields
-     *
-     * @param aDefaultValign the defaultValign to set
-     */
+    /// Indicates the default vertical alignment for a text field, only applies to single line text fields
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValign`: the defaultValign to set
     public static void setDefaultValign(int aDefaultValign) {
         defaultValign = aDefaultValign;
     }
@@ -388,65 +397,65 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return t.length();
     }
 
-    /**
-     * Sets the default limit for the native text box size
-     *
-     * @param value default value for the size of the native text box
-     */
+    /// Sets the default limit for the native text box size
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: default value for the size of the native text box
     public static void setDefaultMaxSize(int value) {
         defaultMaxSize = value;
     }
 
-    /**
-     * Indicates whether a high value for default maxSize will be reduced to a lower
-     * value if the underlying platform throws an exception.
-     *
-     * @return value for autoDegradeMaxSize
-     */
+    /// Indicates whether a high value for default maxSize will be reduced to a lower
+    /// value if the underlying platform throws an exception.
+    ///
+    /// #### Returns
+    ///
+    /// value for autoDegradeMaxSize
     public static boolean isAutoDegradeMaxSize() {
         return autoDegradeMaxSize;
     }
 
-    /**
-     * Indicates whether a high value for default maxSize will be reduced to a lower
-     * value if the underlying platform throws an exception.
-     *
-     * @param value new value for autoDegradeMaxSize
-     */
+    /// Indicates whether a high value for default maxSize will be reduced to a lower
+    /// value if the underlying platform throws an exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: new value for autoDegradeMaxSize
     public static void setAutoDegradeMaxSize(boolean value) {
         autoDegradeMaxSize = value;
     }
 
-    /**
-     * Indicates the widest character in the alphabet, this is useful for detecting
-     * linebreaks internally. In CJK languages the widest char is different than W
-     * hence this functionality is exposed to developers.
-     *
-     * @return the widest character
-     */
+    /// Indicates the widest character in the alphabet, this is useful for detecting
+    /// linebreaks internally. In CJK languages the widest char is different than W
+    /// hence this functionality is exposed to developers.
+    ///
+    /// #### Returns
+    ///
+    /// the widest character
     public static char getWidestChar() {
         return widestChar;
     }
 
-    /**
-     * Indicates the widest character in the alphabet, this is useful for detecting
-     * linebreaks internally. In CJK languages the widest char is different than W
-     * hence this functionality is exposed to developers.
-     *
-     * @param widestC the widest character
-     */
+    /// Indicates the widest character in the alphabet, this is useful for detecting
+    /// linebreaks internally. In CJK languages the widest char is different than W
+    /// hence this functionality is exposed to developers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `widestC`: the widest character
     public static void setWidestChar(char widestC) {
         widestChar = widestC;
     }
 
-    /**
-     * Searches the given string for the widest character using char width, this operation should only
-     * be performed once and it solves cases where a devices language might have a char bigger than 'W'
-     * that isn't consistently bigger.
-     * Notice that this method will use the TextArea style font which might differ when switching themes etc.
-     *
-     * @param s string to search using charWidth
-     */
+    /// Searches the given string for the widest character using char width, this operation should only
+    /// be performed once and it solves cases where a devices language might have a char bigger than 'W'
+    /// that isn't consistently bigger.
+    /// Notice that this method will use the TextArea style font which might differ when switching themes etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: string to search using charWidth
     public static void autoDetectWidestChar(String s) {
         Font f = UIManager.getInstance().getComponentStyle("TextArea").getFont();
         int widest = 0;
@@ -461,28 +470,28 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * By default text area uses charWidth since its much faster on some devices
-     * than string width. However, with some fonts and especially some languages (such
-     * as Arabic, Korean etc.) the width of the string drawn might not equal the summary
-     * of the width of the chars. Hence for portability to those languages/fonts this
-     * flag must be set to true.
-     *
-     * @return the value of useStringWidth
-     */
+    /// By default text area uses charWidth since its much faster on some devices
+    /// than string width. However, with some fonts and especially some languages (such
+    /// as Arabic, Korean etc.) the width of the string drawn might not equal the summary
+    /// of the width of the chars. Hence for portability to those languages/fonts this
+    /// flag must be set to true.
+    ///
+    /// #### Returns
+    ///
+    /// the value of useStringWidth
     public static boolean isUseStringWidth() {
         return useStringWidth;
     }
 
-    /**
-     * By default text area uses charWidth since its much faster on some devices
-     * than string width. However, with some fonts and especially some languages (such
-     * as Arabic, Korean etc.) the width of the string drawn might not equal the summary
-     * of the width of the chars. Hence for portability to those languages/fonts this
-     * flag must be set to true.
-     *
-     * @param aUseStringWidth the new value for useStringWidth
-     */
+    /// By default text area uses charWidth since its much faster on some devices
+    /// than string width. However, with some fonts and especially some languages (such
+    /// as Arabic, Korean etc.) the width of the string drawn might not equal the summary
+    /// of the width of the chars. Hence for portability to those languages/fonts this
+    /// flag must be set to true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aUseStringWidth`: the new value for useStringWidth
     public static void setUseStringWidth(boolean aUseStringWidth) {
         useStringWidth = aUseStringWidth;
     }
@@ -509,9 +518,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         super.deinitialize();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -520,31 +527,32 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         setSmoothScrolling(laf.isDefaultSmoothScrolling());
     }
 
-    /**
-     * Returns the editing constraint value
-     *
-     * @return the editing constraint value
-     * @see #setConstraint
-     */
+    /// Returns the editing constraint value
+    ///
+    /// #### Returns
+    ///
+    /// the editing constraint value
+    ///
+    /// #### See also
+    ///
+    /// - #setConstraint
     public int getConstraint() {
         return constraint;
     }
 
-    /**
-     * Sets the constraint which provides a hint to the virtual keyboard input, notice this <b>doesn't</b>
-     * limit input type in any way!
-     *
-     * @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
-     *                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
-     *                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
-     */
+    /// Sets the constraint which provides a hint to the virtual keyboard input, notice this **doesn't**
+    /// limit input type in any way!
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
+    ///                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    ///                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
     public void setConstraint(int constraint) {
         this.constraint = constraint;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setWidth(int width) {
         if (width != getWidth()) {
@@ -556,21 +564,21 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         super.setWidth(width);
     }
 
-    /**
-     * Returns the text in the text area
-     *
-     * @return the text in the text area
-     */
+    /// Returns the text in the text area
+    ///
+    /// #### Returns
+    ///
+    /// the text in the text area
     @Override
     public String getText() {
         return text;
     }
 
-    /**
-     * Sets the text within this text area
-     *
-     * @param t new value for the text area
-     */
+    /// Sets the text within this text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: new value for the text area
     @Override
     public void setText(String t) {
         String old = this.text;
@@ -602,13 +610,16 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         repaint();
     }
 
-    /**
-     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
-     * text field isn't a number
-     *
-     * @param invalid in case the text isn't an integer this number will be returned
-     * @return the int value of the text field
-     */
+    /// Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
+    /// text field isn't a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `invalid`: in case the text isn't an integer this number will be returned
+    ///
+    /// #### Returns
+    ///
+    /// the int value of the text field
     public int getAsInt(int invalid) {
         try {
             return Integer.parseInt(text);
@@ -617,13 +628,16 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
-     * text field isn't a number
-     *
-     * @param invalid in case the text isn't a long this number will be returned
-     * @return the long value of the text field
-     */
+    /// Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
+    /// text field isn't a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `invalid`: in case the text isn't a long this number will be returned
+    ///
+    /// #### Returns
+    ///
+    /// the long value of the text field
     public long getAsLong(long invalid) {
         try {
             return Long.parseLong(text);
@@ -632,13 +646,16 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
-     * text field isn't a number
-     *
-     * @param invalid in case the text isn't an double this number will be returned
-     * @return the double value of the text field
-     */
+    /// Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
+    /// text field isn't a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `invalid`: in case the text isn't an double this number will be returned
+    ///
+    /// #### Returns
+    ///
+    /// the double value of the text field
     public double getAsDouble(double invalid) {
         try {
             return Double.parseDouble(text);
@@ -647,21 +664,21 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Returns true if this area is editable
-     *
-     * @return true if this area is editable
-     */
+    /// Returns true if this area is editable
+    ///
+    /// #### Returns
+    ///
+    /// true if this area is editable
     @Override
     public boolean isEditable() {
         return editable;
     }
 
-    /**
-     * Sets this text area to be editable or readonly
-     *
-     * @param b true is text are is editable; otherwise false
-     */
+    /// Sets this text area to be editable or readonly
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true is text are is editable; otherwise false
     public void setEditable(boolean b) {
         editable = b;
         updateCursor();
@@ -679,27 +696,25 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         setCursor(isEditable() || isTextSelectionEnabled() ? TEXT_CURSOR : DEFAULT_CURSOR);
     }
 
-    /**
-     * Returns the maximum size for the text area
-     *
-     * @return the maximum size for the text area
-     */
+    /// Returns the maximum size for the text area
+    ///
+    /// #### Returns
+    ///
+    /// the maximum size for the text area
     public int getMaxSize() {
         return maxSize;
     }
 
-    /**
-     * Sets the maximum size of the text area
-     *
-     * @param maxSize the maximum size of the text area
-     */
+    /// Sets the maximum size of the text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxSize`: the maximum size of the text area
     public void setMaxSize(int maxSize) {
         this.maxSize = maxSize;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int keyCode) {
         super.keyPressed(keyCode);
@@ -738,17 +753,13 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireClicked() {
         onClick();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isSelectableInteraction() {
         return editable;
@@ -758,9 +769,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return code > 0;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
         int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);
@@ -779,9 +788,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isScrollableY() {
         return isFocusable() && getScrollDimension().getHeight() > getHeight();
@@ -815,9 +822,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerHover(int[] x, int[] y) {
         if (!Display.getInstance().isDesktop()) {
@@ -825,9 +830,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerHoverReleased(int[] x, int[] y) {
         if (!Display.getInstance().isDesktop()) {
@@ -839,9 +842,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
         // prevent a drag operation from going into edit mode
@@ -870,9 +871,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void focusGainedInternal() {
         setSuppressActionEvent(false);
@@ -881,9 +880,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void focusLostInternal() {
         super.focusLostInternal();
@@ -894,31 +891,31 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Returns the number of columns in the text area
-     *
-     * @return the number of columns in the text area
-     */
+    /// Returns the number of columns in the text area
+    ///
+    /// #### Returns
+    ///
+    /// the number of columns in the text area
     public int getColumns() {
         return columns;
     }
 
-    /**
-     * Sets the number of columns in the text area
-     *
-     * @param columns number of columns
-     */
+    /// Sets the number of columns in the text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: number of columns
     public void setColumns(int columns) {
         setShouldCalcPreferredSize(true);
         this.columns = columns;
     }
 
-    /**
-     * Returns the number of actual rows in the text area taking into consideration
-     * growsByContent
-     *
-     * @return the number of rows in the text area
-     */
+    /// Returns the number of actual rows in the text area taking into consideration
+    /// growsByContent
+    ///
+    /// #### Returns
+    ///
+    /// the number of rows in the text area
     public int getActualRows() {
         if (growByContent) {
             if (growLimit > -1) {
@@ -929,20 +926,20 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return rows;
     }
 
-    /**
-     * Returns the number of rows in the text area
-     *
-     * @return the number of rows in the text area
-     */
+    /// Returns the number of rows in the text area
+    ///
+    /// #### Returns
+    ///
+    /// the number of rows in the text area
     public int getRows() {
         return rows;
     }
 
-    /**
-     * Sets the number of rows in the text area
-     *
-     * @param rows number of rows
-     */
+    /// Sets the number of rows in the text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: number of rows
     public void setRows(int rows) {
         setShouldCalcPreferredSize(true);
         this.rows = rows;
@@ -962,11 +959,11 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return rowStrings;
     }
 
-    /**
-     * Returns the number of text lines in the TextArea
-     *
-     * @return the number of text lines in the TextArea
-     */
+    /// Returns the number of text lines in the TextArea
+    ///
+    /// #### Returns
+    ///
+    /// the number of text lines in the TextArea
     public int getLines() {
         int retVal;
         ArrayList v = getRowStrings();
@@ -974,12 +971,15 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return retVal;
     }
 
-    /**
-     * Returns the text in the given row of the text box
-     *
-     * @param line the line number in the text box
-     * @return the text of the line
-     */
+    /// Returns the text in the given row of the text box
+    ///
+    /// #### Parameters
+    ///
+    /// - `line`: the line number in the text box
+    ///
+    /// #### Returns
+    ///
+    /// the text of the line
     public String getTextAt(int line) {
         ArrayList rowsV = getRowStrings();
         int size = rowsV.size();
@@ -1002,14 +1002,17 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return -1;
     }
 
-    /**
-     * Override this to modify the text for rendering in cases of invalid characters
-     * for display, this method allows the developer to replace such characters e.g.:
-     * replace "\\t" with 4 spaces
-     *
-     * @param text the text to process
-     * @return the given string as a processed char array ready for rendering
-     */
+    /// Override this to modify the text for rendering in cases of invalid characters
+    /// for display, this method allows the developer to replace such characters e.g.:
+    /// replace "\\t" with 4 spaces
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to process
+    ///
+    /// #### Returns
+    ///
+    /// the given string as a processed char array ready for rendering
     protected char[] preprocess(String text) {
         return text.toCharArray();
     }
@@ -1301,27 +1304,25 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Gets the num of pixels gap between the rows
-     *
-     * @return the gap between rows in pixels
-     */
+    /// Gets the num of pixels gap between the rows
+    ///
+    /// #### Returns
+    ///
+    /// the gap between rows in pixels
     public int getRowsGap() {
         return rowsGap;
     }
 
-    /**
-     * The gap in pixels between rows
-     *
-     * @param rowsGap num of pixels to gap between rows
-     */
+    /// The gap in pixels between rows
+    ///
+    /// #### Parameters
+    ///
+    /// - `rowsGap`: num of pixels to gap between rows
     public void setRowsGap(int rowsGap) {
         this.rowsGap = rowsGap;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
 
@@ -1344,9 +1345,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         super.paintHint(g);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         if (shouldShowHint()) {
@@ -1360,21 +1359,19 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return getUIManager().getLookAndFeel().getTextAreaSize(this, true);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcScrollSize() {
         return getUIManager().getLookAndFeel().getTextAreaSize(this, false);
     }
 
-    /**
-     * Add an action listener which is invoked when the text area was modified not during
-     * modification. A text <b>field</b> might never fire an action event if it is edited
-     * in place and the user never leaves the text field!
-     *
-     * @param a actionListener
-     */
+    /// Add an action listener which is invoked when the text area was modified not during
+    /// modification. A text **field** might never fire an action event if it is edited
+    /// in place and the user never leaves the text field!
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: actionListener
     @Override
     public void addActionListener(ActionListener a) {
         if (actionListeners == null) {
@@ -1383,11 +1380,11 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         actionListeners.addListener(a);
     }
 
-    /**
-     * Removes an action listener
-     *
-     * @param a actionListener
-     */
+    /// Removes an action listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: actionListener
     @Override
     public void removeActionListener(ActionListener a) {
         if (actionListeners == null) {
@@ -1399,32 +1396,26 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Checks to see if the action event is suppressed.
-     *
-     * @return
-     */
+    /// Checks to see if the action event is suppressed.
     boolean isSuppressActionEvent() {
         return suppressActionEvent;
     }
 
-    /**
-     * Since the action event is triggered on the end of editing, and that may not
-     * happen until a couple of EDT cycles after the onFocus event, we want to be
-     * able to fire the action event in focus lost, and then suppress the normal
-     * action event that would be fired on editing end.  We use this flag to
-     * suppress action events.
-     *
-     * @param suppress
-     */
+    /// Since the action event is triggered on the end of editing, and that may not
+    /// happen until a couple of EDT cycles after the onFocus event, we want to be
+    /// able to fire the action event in focus lost, and then suppress the normal
+    /// action event that would be fired on editing end.  We use this flag to
+    /// suppress action events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `suppress`
     void setSuppressActionEvent(boolean suppress) {
         suppressActionEvent = suppress;
 
     }
 
-    /**
-     * Notifies listeners of a change to the text area
-     */
+    /// Notifies listeners of a change to the text area
     @Override
     void fireActionEvent() {
         if (suppressActionEvent) {
@@ -1441,13 +1432,16 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Adds a listener to be called with this TextArea is "closed".  I.e. when it is
-     * no longer the active virtual input device for the form.
-     *
-     * @param l
-     * @see Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
-     */
+    /// Adds a listener to be called with this TextArea is "closed".  I.e. when it is
+    /// no longer the active virtual input device for the form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### See also
+    ///
+    /// - Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
     public void addCloseListener(ActionListener l) {
         if (closeListeners == null) {
             closeListeners = new EventDispatcher();
@@ -1455,13 +1449,17 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         closeListeners.addListener(l);
     }
 
-    /**
-     * Removes close listener.
-     *
-     * @param l
-     * @see #addCloseListener(com.codename1.ui.events.ActionListener)
-     * @see Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
-     */
+    /// Removes close listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### See also
+    ///
+    /// - #addCloseListener(com.codename1.ui.events.ActionListener)
+    ///
+    /// - Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
     public void removeCloseListener(ActionListener l) {
         if (closeListeners != null && closeListeners.hasListeners()) {
             closeListeners.removeListener(l);
@@ -1471,12 +1469,12 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Fires a close event.  This is fired when the TextArea is no longer the active
-     * virtual input device for the form.
-     *
-     * @see Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
-     */
+    /// Fires a close event.  This is fired when the TextArea is no longer the active
+    /// virtual input device for the form.
+    ///
+    /// #### See also
+    ///
+    /// - Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
     void fireCloseEvent() {
         if (closeListeners != null && closeListeners.hasListeners()) {
             ActionEvent evt = new ActionEvent(this);
@@ -1484,9 +1482,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void onEditComplete(String text) {
         if (!Display.getInstance().getImplementation().isAsyncEditMode()) {
@@ -1497,62 +1493,62 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Indicates that the text area should "grow" in height based on the content beyond the
-     * limits indicate by the rows variable
-     *
-     * @return true if the text component should grow and false otherwise
-     */
+    /// Indicates that the text area should "grow" in height based on the content beyond the
+    /// limits indicate by the rows variable
+    ///
+    /// #### Returns
+    ///
+    /// true if the text component should grow and false otherwise
     public boolean isGrowByContent() {
         return growByContent;
     }
 
-    /**
-     * Indicates that the text area should "grow" in height based on the content beyond the
-     * limits indicate by the rows variable
-     *
-     * @param growByContent true if the text component should grow and false otherwise
-     */
+    /// Indicates that the text area should "grow" in height based on the content beyond the
+    /// limits indicate by the rows variable
+    ///
+    /// #### Parameters
+    ///
+    /// - `growByContent`: true if the text component should grow and false otherwise
     public void setGrowByContent(boolean growByContent) {
         this.growByContent = growByContent;
     }
 
-    /**
-     * Unsupported characters is a string that contains characters that cause issues
-     * when rendering on some problematic fonts. The rendering engine can thus remove them
-     * when drawing.
-     *
-     * @return unsupported characters string
-     */
+    /// Unsupported characters is a string that contains characters that cause issues
+    /// when rendering on some problematic fonts. The rendering engine can thus remove them
+    /// when drawing.
+    ///
+    /// #### Returns
+    ///
+    /// unsupported characters string
     public String getUnsupportedChars() {
         return unsupportedChars;
     }
 
-    /**
-     * Unsupported characters is a string that contains characters that cause issues
-     * when rendering on some problematic fonts. The rendering engine can thus remove them
-     * when drawing.
-     *
-     * @param unsupportedChars the unsupported character string
-     */
+    /// Unsupported characters is a string that contains characters that cause issues
+    /// when rendering on some problematic fonts. The rendering engine can thus remove them
+    /// when drawing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unsupportedChars`: the unsupported character string
     public void setUnsupportedChars(String unsupportedChars) {
         this.unsupportedChars = unsupportedChars;
     }
 
-    /**
-     * Indicates the number of lines to scroll with every scroll operation
-     *
-     * @return number bigger or equal to 1
-     */
+    /// Indicates the number of lines to scroll with every scroll operation
+    ///
+    /// #### Returns
+    ///
+    /// number bigger or equal to 1
     public int getLinesToScroll() {
         return linesToScroll;
     }
 
-    /**
-     * Indicates the number of lines to scroll with every scroll operation
-     *
-     * @param linesToScroll number bigger or equal to 1
-     */
+    /// Indicates the number of lines to scroll with every scroll operation
+    ///
+    /// #### Parameters
+    ///
+    /// - `linesToScroll`: number bigger or equal to 1
     public void setLinesToScroll(int linesToScroll) {
         if (linesToScroll < 1) {
             throw new IllegalArgumentException("lines to scroll has to be >= 1");
@@ -1560,62 +1556,86 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         this.linesToScroll = linesToScroll;
     }
 
-    /**
-     * Indicates whether this is a single line text area, in which case "growing" won't
-     * work as expected.
-     *
-     * @return true if this is a single line text area
-     */
+    /// Indicates whether this is a single line text area, in which case "growing" won't
+    /// work as expected.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a single line text area
     public boolean isSingleLineTextArea() {
         return singleLineTextArea;
     }
 
-    /**
-     * Indicates whether this is a single line text area, in which case "growing" won't
-     * work as expected.
-     *
-     * @param singleLineTextArea set to true to force a single line text
-     */
+    /// Indicates whether this is a single line text area, in which case "growing" won't
+    /// work as expected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `singleLineTextArea`: set to true to force a single line text
     public void setSingleLineTextArea(boolean singleLineTextArea) {
         this.singleLineTextArea = singleLineTextArea;
     }
 
-    /**
-     * Returns the alignment of the TextArea
-     *
-     * @return the alignment of the TextArea one of: CENTER, LEFT, RIGHT
-     * @see #CENTER
-     * @see #LEFT
-     * @see #RIGHT
-     * @deprecated use Style.getAlignment instead
-     */
+    /// Returns the alignment of the TextArea
+    ///
+    /// #### Returns
+    ///
+    /// the alignment of the TextArea one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Deprecated
+    ///
+    /// use Style.getAlignment instead
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
     public int getAlignment() {
         return getStyle().getAlignment();
     }
 
-    /**
-     * Sets the Alignment of the TextArea to one of: CENTER, LEFT, RIGHT
-     *
-     * @param align alignment value
-     * @see #CENTER
-     * @see #LEFT
-     * @see #RIGHT
-     * @deprecated use Style.setAlignment instead
-     */
+    /// Sets the Alignment of the TextArea to one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: alignment value
+    ///
+    /// #### Deprecated
+    ///
+    /// use Style.setAlignment instead
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
     public void setAlignment(int align) {
         getAllStyles().setAlignment(align);
     }
 
-    /**
-     * Returns the absolute alignment of the TextArea
-     * In RTL LEFT alignment is actually RIGHT, but this method returns the actual alignment
-     *
-     * @return the alignment of the TextArea one of: CENTER, LEFT, RIGHT
-     * @see #CENTER
-     * @see #LEFT
-     * @see #RIGHT
-     * @deprecated this method is redundant and no longer used
-     */
+    /// Returns the absolute alignment of the TextArea
+    /// In RTL LEFT alignment is actually RIGHT, but this method returns the actual alignment
+    ///
+    /// #### Returns
+    ///
+    /// the alignment of the TextArea one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is redundant and no longer used
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
     public int getAbsoluteAlignment() {
         int a = getAlignment();
         if (isRTL()) {
@@ -1632,148 +1652,149 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return a;
     }
 
-    /**
-     * Returns true if the text field is waiting for a commit on editing
-     *
-     * @return true if a commit is pending
-     */
+    /// Returns true if the text field is waiting for a commit on editing
+    ///
+    /// #### Returns
+    ///
+    /// true if a commit is pending
     public boolean isPendingCommit() {
         return false;
     }
 
-    /**
-     * Returns the position of the cursor char position
-     *
-     * @return the cursor position
-     */
+    /// Returns the position of the cursor char position
+    ///
+    /// #### Returns
+    ///
+    /// the cursor position
     public int getCursorPosition() {
         return -1;
     }
 
-    /**
-     * Returns the position of the cursor line position
-     *
-     * @return the cursor line position
-     */
+    /// Returns the position of the cursor line position
+    ///
+    /// #### Returns
+    ///
+    /// the cursor line position
     public int getCursorY() {
         return -1;
     }
 
-    /**
-     * Returns the position of the cursor char position in the current line.
-     *
-     * @return the cursor char position in the current line
-     */
+    /// Returns the position of the cursor char position in the current line.
+    ///
+    /// #### Returns
+    ///
+    /// the cursor char position in the current line
     public int getCursorX() {
         return -1;
     }
 
-    /**
-     * True is this is a qwerty device or a device that is currently in
-     * qwerty mode.
-     *
-     * @return currently defaults to false
-     */
+    /// True is this is a qwerty device or a device that is currently in
+    /// qwerty mode.
+    ///
+    /// #### Returns
+    ///
+    /// currently defaults to false
     public boolean isQwertyInput() {
         return false;
     }
 
-    /**
-     * Returns the currently selected input mode
-     *
-     * @return the display name of the input mode by default the following modes
-     * are supported: Abc, ABC, abc, 123
-     */
+    /// Returns the currently selected input mode
+    ///
+    /// #### Returns
+    ///
+    /// @return the display name of the input mode by default the following modes
+    /// are supported: Abc, ABC, abc, 123
     public String getInputMode() {
         return null;
     }
 
-    /**
-     * Returns the order in which input modes are toggled
-     *
-     * @return the order of the input modes
-     */
+    /// Returns the order in which input modes are toggled
+    ///
+    /// #### Returns
+    ///
+    /// the order of the input modes
     public String[] getInputModeOrder() {
         return null;
     }
 
-    /**
-     * Indicates whether text field input should scroll to the right side when no
-     * more room for the input is present.
-     *
-     * @return true if scrolling is enabled
-     */
+    /// Indicates whether text field input should scroll to the right side when no
+    /// more room for the input is present.
+    ///
+    /// #### Returns
+    ///
+    /// true if scrolling is enabled
     public boolean isEnableInputScroll() {
         return false;
     }
 
-    /**
-     * Indicates the enter key to be used for editing the text area and by the
-     * text field
-     *
-     * @param keyCode the key tested
-     */
+    /// Indicates the enter key to be used for editing the text area and by the
+    /// text field
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key tested
     protected boolean isEnterKey(int keyCode) {
         return keyCode == ENTER_KEY;
     }
 
-    /**
-     * Returns the hint text
-     *
-     * @return the hint text or null
-     */
+    /// Returns the hint text
+    ///
+    /// #### Returns
+    ///
+    /// the hint text or null
     @Override
     public String getHint() {
         return super.getHint();
     }
 
-    /**
-     * Sets the TextArea hint text, the hint text  is displayed on the TextArea
-     * When there is no text in the TextArea
-     *
-     * @param hint the hint text to display
-     */
+    /// Sets the TextArea hint text, the hint text  is displayed on the TextArea
+    /// When there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the hint text to display
     public void setHint(String hint) {
         super.setHint(hint, getHintIcon());
     }
 
-    /**
-     * Returns the hint icon
-     *
-     * @return the hint icon
-     */
+    /// Returns the hint icon
+    ///
+    /// #### Returns
+    ///
+    /// the hint icon
     @Override
     public Image getHintIcon() {
         return super.getHintIcon();
     }
 
-    /**
-     * Sets the TextArea hint icon, the hint is displayed on the TextArea
-     * When there is no text in the TextArea
-     *
-     * @param icon the icon
-     */
+    /// Sets the TextArea hint icon, the hint is displayed on the TextArea
+    /// When there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon
     public void setHintIcon(Image icon) {
         setHint(getHint(), icon);
     }
 
-    /**
-     * Sets the TextArea hint text and Icon, the hint text and icon are
-     * displayed on the TextArea when there is no text in the TextArea
-     *
-     * @param hint the hint text to display
-     * @param icon the hint icon to display
-     */
+    /// Sets the TextArea hint text and Icon, the hint text and icon are
+    /// displayed on the TextArea when there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the hint text to display
+    ///
+    /// - `icon`: the hint icon to display
     @Override
     public void setHint(String hint, Image icon) {
         super.setHint(hint, icon);
     }
 
-    /**
-     * Returns the hint label component that can be customized directly
-     *
-     * @return hint label component
-     */
+    /// Returns the hint label component that can be customized directly
+    ///
+    /// #### Returns
+    ///
+    /// hint label component
     public Label getHintLabel() {
         return getHintLabelImpl();
     }
@@ -1793,19 +1814,24 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return "".equals(getText());
     }
 
-    /**
-     * Returns the vertical alignment of the text field, this only applies to single line text field
-     *
-     * <p><strong>NOTE:</strong> If the text area is an editable, multi-line text field,
-     * and the platform doesn't support vertical alignment with its native text editor,
-     * then this will always return {@link Component#TOP}.  Currently no platforms support
-     * vertical alignment of multiline text areas.</p>
-     *
-     * @return the vertical alignment of the TextField one of: CENTER, TOP, BOTTOM
-     * @see #CENTER
-     * @see #TOP
-     * @see #BOTTOM
-     */
+    /// Returns the vertical alignment of the text field, this only applies to single line text field
+    ///
+    /// **NOTE:** If the text area is an editable, multi-line text field,
+    /// and the platform doesn't support vertical alignment with its native text editor,
+    /// then this will always return `Component#TOP`.  Currently no platforms support
+    /// vertical alignment of multiline text areas.
+    ///
+    /// #### Returns
+    ///
+    /// the vertical alignment of the TextField one of: CENTER, TOP, BOTTOM
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #TOP
+    ///
+    /// - #BOTTOM
     public int getVerticalAlignment() {
         if (valign != TOP && !isSingleLineTextArea() && isEditable() && !Display.impl.supportsNativeTextAreaVerticalAlignment()) {
             // If this is a multiline text field, then most platforms don't support
@@ -1819,21 +1845,27 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return valign;
     }
 
-    /**
-     * Sets the vertical alignment of the text field to one of: CENTER, TOP, BOTTOM<br>
-     * only applies to single line text field
-     *
-     * <p><strong>NOTE:</strong> If the text area is an editable, multi-line text field,
-     * and the platform doesn't support vertical alignment with its native text editor,
-     * then {@link #getVerticalAlignment() } will always return {@link Component#TOP}, no
-     * matter what value you set here.  Currently no platforms support
-     * vertical alignment of multiline text areas.</p>
-     *
-     * @param valign alignment value
-     * @see #CENTER
-     * @see #TOP
-     * @see #BOTTOM
-     */
+    /// Sets the vertical alignment of the text field to one of: CENTER, TOP, BOTTOM
+    ///
+    /// only applies to single line text field
+    ///
+    /// **NOTE:** If the text area is an editable, multi-line text field,
+    /// and the platform doesn't support vertical alignment with its native text editor,
+    /// then `#getVerticalAlignment()` will always return `Component#TOP`, no
+    /// matter what value you set here.  Currently no platforms support
+    /// vertical alignment of multiline text areas.
+    ///
+    /// #### Parameters
+    ///
+    /// - `valign`: alignment value
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #TOP
+    ///
+    /// - #BOTTOM
     public void setVerticalAlignment(int valign) {
         if (valign != CENTER && valign != TOP && valign != BOTTOM) {
             throw new IllegalArgumentException("Alignment can't be set to " + valign);
@@ -1841,27 +1873,23 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         this.valign = valign;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getBindablePropertyNames() {
         return new String[]{"text"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getBindablePropertyTypes() {
         return new Class[]{String.class};
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated uses the deprecated BindTarget interface
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
     @Override
     public void bindProperty(String prop, BindTarget target) {
         if ("text".equals(prop)) {
@@ -1874,11 +1902,11 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         super.bindProperty(prop, target);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated uses the deprecated BindTarget interface
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
     @Override
     public void unbindProperty(String prop, BindTarget target) {
         if ("text".equals(prop)) {
@@ -1894,9 +1922,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         super.unbindProperty(prop, target);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getBoundPropertyValue(String prop) {
         if ("text".equals(prop)) {
@@ -1905,9 +1931,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return super.getBoundPropertyValue(prop);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setBoundPropertyValue(String prop, Object value) {
         if ("text".equals(prop)) {
@@ -1921,54 +1945,54 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         super.setBoundPropertyValue(prop, value);
     }
 
-    /**
-     * Indicates the maximum number of rows in a text area after it has grown, -1 indicates no limit
-     *
-     * @return the growLimit
-     */
+    /// Indicates the maximum number of rows in a text area after it has grown, -1 indicates no limit
+    ///
+    /// #### Returns
+    ///
+    /// the growLimit
     public int getGrowLimit() {
         return growLimit;
     }
 
-    /**
-     * Indicates the maximum number of rows in a text area after it has grown, -1 indicates no limit
-     *
-     * @param growLimit the growLimit to set
-     */
+    /// Indicates the maximum number of rows in a text area after it has grown, -1 indicates no limit
+    ///
+    /// #### Parameters
+    ///
+    /// - `growLimit`: the growLimit to set
     public void setGrowLimit(int growLimit) {
         this.growLimit = growLimit;
     }
 
-    /**
-     * If the TextArea text is too long to fit the text to the widget this will add "..."
-     * at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
-     * E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated
-     * and end with 3 points. By default this is set to false
-     *
-     * @return true if this TextArea adds "..." when the text is too long
-     */
+    /// If the TextArea text is too long to fit the text to the widget this will add "..."
+    /// at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
+    /// E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated
+    /// and end with 3 points. By default this is set to false
+    ///
+    /// #### Returns
+    ///
+    /// true if this TextArea adds "..." when the text is too long
     public boolean isEndsWith3Points() {
         return endsWith3Points;
     }
 
-    /**
-     * If the TextArea text is too long to fit the text to the widget this will add "..."
-     * at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
-     * E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated
-     * and end with 3 points. By default this is set to false
-     *
-     * @param endsWith3Points true if text should add "..." at the end
-     */
+    /// If the TextArea text is too long to fit the text to the widget this will add "..."
+    /// at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
+    /// E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated
+    /// and end with 3 points. By default this is set to false
+    ///
+    /// #### Parameters
+    ///
+    /// - `endsWith3Points`: true if text should add "..." at the end
     public void setEndsWith3Points(boolean endsWith3Points) {
         this.endsWith3Points = endsWith3Points;
     }
 
-    /**
-     * Registers this TextArea as the current input device for the current form.
-     *
-     * @deprecated Don't call this method directly, unless you really know what you're doing.  It is used
-     * primarily by implementation APIs.
-     */
+    /// Registers this TextArea as the current input device for the current form.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated Don't call this method directly, unless you really know what you're doing.  It is used
+    /// primarily by implementation APIs.
     public void registerAsInputDevice() {
         Form f = this.getComponentForm();
 
@@ -1999,9 +2023,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Launches the text field editing, notice that calling this in a callSerially is generally considered good practice
-     */
+    /// Launches the text field editing, notice that calling this in a callSerially is generally considered good practice
     public void startEditing() {
         if (!Display.getInstance().isTextEditing(this)) {
             //registerAsInputDevice();
@@ -2009,9 +2031,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Launches the text field editing in a callserially call
-     */
+    /// Launches the text field editing in a callserially call
     @Override
     public void startEditingAsync() {
         if (!Display.getInstance().isTextEditing(this)) {
@@ -2048,30 +2068,28 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * Indicates whether we are currently editing this text area
-     *
-     * @return true if Display.getInstance().isTextEditing(this)
-     */
+    /// Indicates whether we are currently editing this text area
+    ///
+    /// #### Returns
+    ///
+    /// true if Display.getInstance().isTextEditing(this)
     @Override
     public boolean isEditing() {
         return Display.getInstance().isTextEditing(this);
     }
 
-    /**
-     * Stops text editing of this field if it is being edited
-     */
+    /// Stops text editing of this field if it is being edited
     public void stopEditing() {
         if (isEditing()) {
             Display.getInstance().stopEditing(this);
         }
     }
 
-    /**
-     * Stops text editing of this field if it is being edited
-     *
-     * @param onFinish invoked when editing stopped
-     */
+    /// Stops text editing of this field if it is being edited
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: invoked when editing stopped
     @Override
     public void stopEditing(Runnable onFinish) {
         if (isEditing()) {
@@ -2083,12 +2101,12 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     * We override get style here to return the selected style when editing
-     *
-     * @return the selected style if editing, <code>super.getStyle()</code> otherwise
-     */
+    /// {@inheritDoc}
+    /// We override get style here to return the selected style when editing
+    ///
+    /// #### Returns
+    ///
+    /// the selected style if editing, `super.getStyle()` otherwise
     @Override
     public Style getStyle() {
         if (isEditing()) {
@@ -2097,82 +2115,87 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return super.getStyle();
     }
 
-    /**
-     * Adds a listener for data change events it will be invoked for every change
-     * made to the text field, notice most platforms will invoke only the
-     * DataChangedListener.CHANGED event
-     *
-     * @param d the listener
-     */
+    /// Adds a listener for data change events it will be invoked for every change
+    /// made to the text field, notice most platforms will invoke only the
+    /// DataChangedListener.CHANGED event
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
     public void addDataChangedListener(DataChangedListener d) {
         listeners.addListener(d);
     }
 
-    /**
-     * Removes the listener for data change events
-     *
-     * @param d the listener
-     */
+    /// Removes the listener for data change events
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
     public void removeDataChangedListener(DataChangedListener d) {
         listeners.removeListener(d);
     }
 
-    /**
-     * Adds a listener for data change events it will be invoked for every change
-     * made to the text field, notice most platforms will invoke only the
-     * DataChangedListener.CHANGED event
-     *
-     * @param d the listener
-     * @deprecated use #addDataChangedListener(DataChangedListener) instead
-     */
+    /// Adds a listener for data change events it will be invoked for every change
+    /// made to the text field, notice most platforms will invoke only the
+    /// DataChangedListener.CHANGED event
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
+    ///
+    /// #### Deprecated
+    ///
+    /// use #addDataChangedListener(DataChangedListener) instead
     public void addDataChangeListener(DataChangedListener d) {
         listeners.addListener(d);
     }
 
-    /**
-     * Removes the listener for data change events
-     *
-     * @param d the listener
-     * @deprecated use #removeDataChangedListener(DataChangedListener) instead
-     */
+    /// Removes the listener for data change events
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
+    ///
+    /// #### Deprecated
+    ///
+    /// use #removeDataChangedListener(DataChangedListener) instead
     public void removeDataChangeListener(DataChangedListener d) {
         listeners.removeListener(d);
     }
 
-    /**
-     * Alert the TextField listeners the text has been changed on the TextField
-     *
-     * @param type  the event type: Added, Removed or Change
-     * @param index cursor location of the event
-     */
+    /// Alert the TextField listeners the text has been changed on the TextField
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the event type: Added, Removed or Change
+    ///
+    /// - `index`: cursor location of the event
     public void fireDataChanged(int type, int index) {
         if (listeners != null) {
             listeners.fireDataChangeEvent(index, type);
         }
     }
 
-    /**
-     * Gets the done listener of this TextField.
-     *
-     * @return the done listener or null if not exists
-     */
+    /// Gets the done listener of this TextField.
+    ///
+    /// #### Returns
+    ///
+    /// the done listener or null if not exists
     public ActionListener getDoneListener() {
         return doneListener;
     }
 
-    /**
-     * Sets a Done listener on the TextField - notice this listener will be called
-     * only on supported platforms that supports done action on the keyboard
-     *
-     * @param l the listener
-     */
+    /// Sets a Done listener on the TextField - notice this listener will be called
+    /// only on supported platforms that supports done action on the keyboard
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
     public void setDoneListener(ActionListener l) {
         doneListener = l;
     }
 
-    /**
-     * Fire the done event to done listener
-     */
+    /// Fire the done event to done listener
     public void fireDoneEvent() {
         fireDoneEvent(-1);
     }
@@ -2193,81 +2216,91 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     }
 
-    /**
-     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
-     * this might make it slower as a result
-     *
-     * @return the actAsLabel
-     */
+    /// This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+    /// this might make it slower as a result
+    ///
+    /// #### Returns
+    ///
+    /// the actAsLabel
     public boolean isActAsLabel() {
         return actAsLabel;
     }
 
-    /**
-     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
-     * this might make it slower as a result
-     *
-     * @param actAsLabel the actAsLabel to set
-     */
+    /// This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+    /// this might make it slower as a result
+    ///
+    /// #### Parameters
+    ///
+    /// - `actAsLabel`: the actAsLabel to set
     public void setActAsLabel(boolean actAsLabel) {
         this.actAsLabel = actAsLabel;
     }
 
-    /**
-     * Special case for text components, if they are editing they should always render the selected state
-     * {@inheritDoc}
-     *
-     * @return true if editing
-     */
+    /// Special case for text components, if they are editing they should always render the selected state
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// true if editing
     @Override
     protected boolean shouldRenderComponentSelection() {
         return isEditing() || super.shouldRenderComponentSelection();
     }
 
-    /**
-     * Calculates the spans for the the given text selection.  This should generally
-     * just delegate to the appropriate method in the look and feel for performing the
-     * layout calculation.
-     *
-     * @param sel The TextSelection
-     * @return
-     * @since 7.0
-     */
+    /// Calculates the spans for the the given text selection.  This should generally
+    /// just delegate to the appropriate method in the look and feel for performing the
+    /// layout calculation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: The TextSelection
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected Spans calculateTextSelectionSpan(TextSelection sel) {
         return getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, this);
     }
 
-    /**
-     * Returns true if text selection is enabled on this label.  Default is {@literal false}.  To enable text selection,
-     * you must enable text selection on the Form with {@link Form#getTextSelection() } and {@link TextSelection#setEnabled(boolean) },
-     * and also ensure that the label's text selection is enabled via {@link #setTextSelectionEnabled(boolean) }.
-     *
-     * @return
-     * @see #setTextSelectionEnabled(boolean)
-     * @since 7.0
-     */
+    /// Returns true if text selection is enabled on this label.  Default is false.  To enable text selection,
+    /// you must enable text selection on the Form with `Form#getTextSelection()` and `TextSelection#setEnabled(boolean)`,
+    /// and also ensure that the label's text selection is enabled via `#setTextSelectionEnabled(boolean)`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setTextSelectionEnabled(boolean)
     public boolean isTextSelectionEnabled() {
         return textSelectionEnabled;
     }
 
-    /**
-     * Enables text selection on this TextArea.  Text selection must also be enabled on the Form in order to
-     * text selection to be activated.
-     *
-     * @param enabled
-     * @see #setTextSelectionEnabled(boolean)
-     * @see Form#getTextSelection()
-     * @see TextSelection#setEnabled(boolean)
-     * @since 7.0
-     */
+    /// Enables text selection on this TextArea.  Text selection must also be enabled on the Form in order to
+    /// text selection to be activated.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setTextSelectionEnabled(boolean)
+    ///
+    /// - Form#getTextSelection()
+    ///
+    /// - TextSelection#setEnabled(boolean)
     public void setTextSelectionEnabled(boolean enabled) {
         this.textSelectionEnabled = enabled;
         updateCursor();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public TextSelection.TextSelectionSupport getTextSelectionSupport() {
         if (textSelectionSupport == null) {

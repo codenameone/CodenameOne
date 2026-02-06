@@ -32,26 +32,35 @@ import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
-/**
- * <p>RadioButton is a {@link Button} that maintains a selection state exclusively
- * within a specific {@link ButtonGroup}. Check out {@link com.codename1.ui.CheckBox} for
- * a looser selection approach. Both components support a toggle button
- * mode using the {@link com.codename1.ui.Button#setToggle(boolean)} API.</p>
- *
- * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
- *
- * @author Chen Fishbein
- */
+/// RadioButton is a `Button` that maintains a selection state exclusively
+/// within a specific `ButtonGroup`. Check out `com.codename1.ui.CheckBox` for
+/// a looser selection approach. Both components support a toggle button
+/// mode using the `com.codename1.ui.Button#setToggle(boolean)` API.
+///
+/// ```java
+/// CheckBox cb1 = new CheckBox("CheckBox No Icon");
+/// cb1.setSelected(true);
+/// CheckBox cb2 = new CheckBox("CheckBox With Icon", icon);
+/// CheckBox cb3 = new CheckBox("CheckBox Opposite True", icon);
+/// CheckBox cb4 = new CheckBox("CheckBox Opposite False", icon);
+/// cb3.setOppositeSide(true);
+/// cb4.setOppositeSide(false);
+/// RadioButton rb1 = new RadioButton("Radio 1");
+/// RadioButton rb2 = new RadioButton("Radio 2");
+/// RadioButton rb3 = new RadioButton("Radio 3", icon);
+/// new ButtonGroup(rb1, rb2, rb3);
+/// rb2.setSelected(true);
+/// hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
+/// ```
+///
+/// @author Chen Fishbein
 public class RadioButton extends Button {
 
     private boolean unselectAllowed;
 
     private boolean selected;
 
-    /**
-     * The group in which this button is a part
-     */
+    /// The group in which this button is a part
     private ButtonGroup group;
 
     private boolean oppositeSide;
@@ -59,51 +68,55 @@ public class RadioButton extends Button {
     private EventDispatcher bindListeners;
     private EventDispatcher changeListeners;
 
-    /**
-     * Constructs a radio with the given text
-     *
-     * @param text to display next to the button
-     */
+    /// Constructs a radio with the given text
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: to display next to the button
     public RadioButton(String text) {
         this(text, null);
     }
 
-    /**
-     * Creates an empty radio button
-     */
+    /// Creates an empty radio button
     public RadioButton() {
         this("");
     }
 
-    /**
-     * Constructs a radio with the given icon
-     *
-     * @param icon icon to show next to the button
-     */
+    /// Constructs a radio with the given icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: icon to show next to the button
     public RadioButton(Image icon) {
         this("", icon);
     }
 
-    /**
-     * Constructs a radio with the given text and icon
-     *
-     * @param text to display next to the button
-     * @param icon icon to show next to the button
-     */
+    /// Constructs a radio with the given text and icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: to display next to the button
+    ///
+    /// - `icon`: icon to show next to the button
     public RadioButton(String text, Image icon) {
         super(text, icon);
         setUIIDFinal("RadioButton");
     }
 
-    /**
-     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
-     * a toggle button
-     *
-     * @param text the text for the button
-     * @param icon the icon for the button
-     * @param bg   the button group
-     * @return a radio button
-     */
+    /// Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
+    /// a toggle button
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text for the button
+    ///
+    /// - `icon`: the icon for the button
+    ///
+    /// - `bg`: the button group
+    ///
+    /// #### Returns
+    ///
+    /// a radio button
     public static RadioButton createToggle(String text, Image icon, ButtonGroup bg) {
         RadioButton rb = new RadioButton(text, icon);
         bg.add(rb);
@@ -111,38 +124,50 @@ public class RadioButton extends Button {
         return rb;
     }
 
-    /**
-     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
-     * a toggle button
-     *
-     * @param text the text for the button
-     * @param bg   the button group
-     * @return a radio button
-     */
+    /// Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
+    /// a toggle button
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text for the button
+    ///
+    /// - `bg`: the button group
+    ///
+    /// #### Returns
+    ///
+    /// a radio button
     public static RadioButton createToggle(String text, ButtonGroup bg) {
         return createToggle(text, null, bg);
     }
 
-    /**
-     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
-     * a toggle button
-     *
-     * @param icon the icon for the button
-     * @param bg   the button group
-     * @return a radio button
-     */
+    /// Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
+    /// a toggle button
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon for the button
+    ///
+    /// - `bg`: the button group
+    ///
+    /// #### Returns
+    ///
+    /// a radio button
     public static RadioButton createToggle(Image icon, ButtonGroup bg) {
         return createToggle(null, icon, bg);
     }
 
-    /**
-     * Shorthand for creating the radio button, adding it to a group, setting the command and making it into
-     * a toggle button
-     *
-     * @param cmd the command
-     * @param bg  the button group
-     * @return a radio button
-     */
+    /// Shorthand for creating the radio button, adding it to a group, setting the command and making it into
+    /// a toggle button
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command
+    ///
+    /// - `bg`: the button group
+    ///
+    /// #### Returns
+    ///
+    /// a radio button
     public static RadioButton createToggle(Command cmd, ButtonGroup bg) {
         RadioButton rb = new RadioButton(cmd.getCommandName(), cmd.getIcon());
         rb.setCommand(cmd);
@@ -151,9 +176,7 @@ public class RadioButton extends Button {
         return rb;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -164,9 +187,7 @@ public class RadioButton extends Button {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireActionEvent(int x, int y) {
         super.fireActionEvent(x, y);
@@ -180,9 +201,7 @@ public class RadioButton extends Button {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "Radio Button " + getText();
@@ -204,21 +223,21 @@ public class RadioButton extends Button {
         return super.getAvaliableSpaceForText() - (getHeight() + getGap());
     }
 
-    /**
-     * Returns true if the radio button is selected
-     *
-     * @return true if the radio button is selected
-     */
+    /// Returns true if the radio button is selected
+    ///
+    /// #### Returns
+    ///
+    /// true if the radio button is selected
     @Override
     public boolean isSelected() {
         return selected;
     }
 
-    /**
-     * Selects the current radio button
-     *
-     * @param selected value for selection
-     */
+    /// Selects the current radio button
+    ///
+    /// #### Parameters
+    ///
+    /// - `selected`: value for selection
     public void setSelected(boolean selected) {
         setSelectedImpl(selected);
         if (group != null && selected) {
@@ -235,28 +254,26 @@ public class RadioButton extends Button {
         repaint();
     }
 
-    /**
-     * Returns true if this RadioButton can be unselected
-     *
-     * @return true to allow deselection of radio buttons
-     */
+    /// Returns true if this RadioButton can be unselected
+    ///
+    /// #### Returns
+    ///
+    /// true to allow deselection of radio buttons
     public boolean isUnselectAllowed() {
         return unselectAllowed;
     }
 
-    /**
-     * Allows unselecting a selected RadioButton.
-     * This is useful for when implementing a ButtonGroup that allows no selection or a single selection.,
-     *
-     * @param unselectAllowed true to allow deselection of a radio button, false for the default behavior
-     */
+    /// Allows unselecting a selected RadioButton.
+    /// This is useful for when implementing a ButtonGroup that allows no selection or a single selection.,
+    ///
+    /// #### Parameters
+    ///
+    /// - `unselectAllowed`: true to allow deselection of a radio button, false for the default behavior
     public void setUnselectAllowed(boolean unselectAllowed) {
         this.unselectAllowed = unselectAllowed;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void released(int x, int y) {
         // prevent the radio button from being "turned off" unless unselectAllowed
@@ -266,9 +283,7 @@ public class RadioButton extends Button {
         super.released(x, y);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         if (isToggle()) {
@@ -278,35 +293,31 @@ public class RadioButton extends Button {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getRadioButtonPreferredSize(this);
     }
 
-    /**
-     * Returns the parent button group
-     *
-     * @return the parent button group
-     */
+    /// Returns the parent button group
+    ///
+    /// #### Returns
+    ///
+    /// the parent button group
     public ButtonGroup getButtonGroup() {
         return group;
     }
 
-    /**
-     * Setting a new button group
-     *
-     * @param group a new button group
-     */
+    /// Setting a new button group
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: a new button group
     void setButtonGroup(ButtonGroup group) {
         this.group = group;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void fireActionEvent() {
         if (group != null) {
@@ -336,65 +347,61 @@ public class RadioButton extends Button {
         }
     }
 
-    /**
-     * This is a helper method to ease the usage of button groups
-     *
-     * @return the name of the group
-     */
+    /// This is a helper method to ease the usage of button groups
+    ///
+    /// #### Returns
+    ///
+    /// the name of the group
     public String getGroup() {
         return (String) getClientProperty("$group");
     }
 
-    /**
-     * This is a helper method to ease the usage of button groups
-     *
-     * @param groupName a name for the goup
-     */
+    /// This is a helper method to ease the usage of button groups
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupName`: a name for the goup
     public void setGroup(String groupName) {
         putClientProperty("$group", groupName);
         initNamedGroup();
     }
 
-    /**
-     * Places the radio box on the opposite side at the far end
-     *
-     * @return the oppositeSide
-     */
+    /// Places the radio box on the opposite side at the far end
+    ///
+    /// #### Returns
+    ///
+    /// the oppositeSide
     @Override
     public boolean isOppositeSide() {
         return oppositeSide;
     }
 
-    /**
-     * Places the radio box on the opposite side at the far end
-     *
-     * @param oppositeSide the oppositeSide to set
-     */
+    /// Places the radio box on the opposite side at the far end
+    ///
+    /// #### Parameters
+    ///
+    /// - `oppositeSide`: the oppositeSide to set
     public void setOppositeSide(boolean oppositeSide) {
         this.oppositeSide = oppositeSide;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getBindablePropertyNames() {
         return new String[]{"selected"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getBindablePropertyTypes() {
         return new Class[]{Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated uses the deprecated BindTarget interface
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
     @Override
     public void bindProperty(String prop, BindTarget target) {
         if ("selected".equals(prop)) {
@@ -407,11 +414,11 @@ public class RadioButton extends Button {
         super.bindProperty(prop, target);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @deprecated uses the deprecated BindTarget interface
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
     @Override
     public void unbindProperty(String prop, BindTarget target) {
         if ("selected".equals(prop)) {
@@ -427,9 +434,7 @@ public class RadioButton extends Button {
         super.unbindProperty(prop, target);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getBoundPropertyValue(String prop) {
         if ("selected".equals(prop)) {
@@ -441,9 +446,7 @@ public class RadioButton extends Button {
         return super.getBoundPropertyValue(prop);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setBoundPropertyValue(String prop, Object value) {
         if ("selected".equals(prop)) {
@@ -453,16 +456,22 @@ public class RadioButton extends Button {
         super.setBoundPropertyValue(prop, value);
     }
 
-    /**
-     * Adds a listener to be notified when the the checkbox's selected value changes.  The difference
-     * between a change listener and an action listener is that a change listener is fired
-     * whenever there is a change, but action events are only fired when the change is a result
-     * of the user clicking on the checkbox.
-     *
-     * @param l Listener to be notified when selected value changes.
-     * @see #removeChangeListener(com.codename1.ui.events.ActionListener)
-     * @since 6.0
-     */
+    /// Adds a listener to be notified when the the checkbox's selected value changes.  The difference
+    /// between a change listener and an action listener is that a change listener is fired
+    /// whenever there is a change, but action events are only fired when the change is a result
+    /// of the user clicking on the checkbox.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: Listener to be notified when selected value changes.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #removeChangeListener(com.codename1.ui.events.ActionListener)
     public void addChangeListener(ActionListener l) {
         if (changeListeners == null) {
             changeListeners = new EventDispatcher();
@@ -470,13 +479,19 @@ public class RadioButton extends Button {
         changeListeners.addListener(l);
     }
 
-    /**
-     * Removes a change change listener.
-     *
-     * @param l
-     * @see #addChangeListener(com.codename1.ui.events.ActionListener)
-     * @since 6.0
-     */
+    /// Removes a change change listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #addChangeListener(com.codename1.ui.events.ActionListener)
     public void removeChangeListeners(ActionListener l) {
         if (changeListeners != null) {
             changeListeners.removeListener(l);

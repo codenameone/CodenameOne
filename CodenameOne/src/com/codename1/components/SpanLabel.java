@@ -40,14 +40,25 @@ import static com.codename1.ui.CN.EAST;
 import static com.codename1.ui.CN.WEST;
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * <p>A multi line label component that can be easily localized, this is simply based
- * on a text area combined with a label.</p>
- * <script src="https://gist.github.com/codenameone/55b73c621fea0263638a.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-spanlabel.png" alt="SpanLabel Sample" />
- *
- * @author Shai Almog
- */
+/// A multi line label component that can be easily localized, this is simply based
+/// on a text area combined with a label.
+///
+/// ```java
+/// SpanLabel d = new SpanLabel("Default SpanLabel that can seamlessly line break when the text is really long.");
+/// d.setIcon(icon);
+/// SpanLabel l = new SpanLabel("NORTH Positioned Icon SpanLabel that can seamlessly line break when the text is really long.");
+/// l.setIcon(icon);
+/// l.setIconPosition(BorderLayout.NORTH);
+/// SpanLabel r = new SpanLabel("SOUTH Positioned Icon SpanLabel that can seamlessly line break when the text is really long.");
+/// r.setIcon(icon);
+/// r.setIconPosition(BorderLayout.SOUTH);
+/// SpanLabel c = new SpanLabel("EAST Positioned Icon SpanLabel that can seamlessly line break when the text is really long.");
+/// c.setIcon(icon);
+/// c.setIconPosition(BorderLayout.EAST);
+/// hi.add(d).add(l).add(r).add(c);
+/// ```
+///
+/// @author Shai Almog
 public class SpanLabel extends Container implements IconHolder, TextHolder {
     private final Label icon;
     private final Container iconWrapper;
@@ -56,19 +67,18 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     private boolean shouldLocalize = true;
     private int preferredW = -1;
 
-    /**
-     * Default constructor will be useful when adding this to the GUI builder
-     */
+    /// Default constructor will be useful when adding this to the GUI builder
     public SpanLabel() {
         this("");
     }
 
-    /**
-     * Constructor accepting default text and uiid for the text
-     *
-     * @param txt      the text
-     * @param textUiid the new text UIID
-     */
+    /// Constructor accepting default text and uiid for the text
+    ///
+    /// #### Parameters
+    ///
+    /// - `txt`: the text
+    ///
+    /// - `textUiid`: the new text UIID
     public SpanLabel(String txt, String textUiid) {
         this(txt);
         text.setUIID(textUiid);
@@ -76,9 +86,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         updateGap();
     }
 
-    /**
-     * Constructor accepting default text
-     */
+    /// Constructor accepting default text
     public SpanLabel(String txt) {
         setUIIDFinal("Container");
         super.setLayout(new BorderLayout());
@@ -139,9 +147,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         }
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public int getPreferredW() {
         if (preferredW != -1) {
@@ -150,9 +156,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         return super.getPreferredW();
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public void setPreferredW(int preferredW) {
         //We need to override preferredW for this component because the default
@@ -161,22 +165,25 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         this.preferredW = preferredW;
     }
 
-    /**
-     * Gets the component used for styling font icons on this SpanLabel.
-     *
-     * @return The component used for styling font icons on this SpanLabel.
-     * @since 7.0
-     */
+    /// Gets the component used for styling font icons on this SpanLabel.
+    ///
+    /// #### Returns
+    ///
+    /// The component used for styling font icons on this SpanLabel.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Component getIconStyleComponent() {
         return icon.getIconStyleComponent();
     }
 
-    /**
-     * Returns the TextArea holding the actual text
-     *
-     * @return the component
-     */
+    /// Returns the TextArea holding the actual text
+    ///
+    /// #### Returns
+    ///
+    /// the component
     public TextArea getTextComponent() {
         return text;
     }
@@ -192,125 +199,131 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         }
     }
 
-    /**
-     * Returns the uiid of the actual text
-     *
-     * @return the uiid
-     */
+    /// Returns the uiid of the actual text
+    ///
+    /// #### Returns
+    ///
+    /// the uiid
     public String getTextUIID() {
         return text.getUIID();
     }
 
-    /**
-     * Sets the UIID for the actual text
-     *
-     * @param uiid the uiid
-     */
+    /// Sets the UIID for the actual text
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the uiid
     public void setTextUIID(String uiid) {
         text.setUIID(uiid);
     }
 
-    /**
-     * Returns the Style proxy object for the text of this span button.
-     *
-     * @return The Style object for the text of this span button.
-     */
+    /// Returns the Style proxy object for the text of this span button.
+    ///
+    /// #### Returns
+    ///
+    /// The Style object for the text of this span button.
     public Style getTextAllStyles() {
         return text.getAllStyles();
     }
 
-    /**
-     * Returns the text elements style object
-     *
-     * @return the style object
-     */
+    /// Returns the text elements style object
+    ///
+    /// #### Returns
+    ///
+    /// the style object
     public Style getTextUnselectedStyle() {
         return text.getUnselectedStyle();
     }
 
-    /**
-     * The text elements style object
-     *
-     * @param t the style object
-     */
+    /// The text elements style object
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the style object
     public void setTextUnselectedStyle(Style t) {
         text.setUnselectedStyle(t);
     }
 
-    /**
-     * Returns the text elements style object
-     *
-     * @return the style object
-     */
+    /// Returns the text elements style object
+    ///
+    /// #### Returns
+    ///
+    /// the style object
     public Style getTextSelectedStyle() {
         return text.getSelectedStyle();
     }
 
-    /**
-     * The text elements style object
-     *
-     * @param t the style object
-     */
+    /// The text elements style object
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the style object
     public void setTextSelectedStyle(Style t) {
         text.setSelectedStyle(t);
     }
 
-    /**
-     * Returns the UIID for the icon
-     *
-     * @return the uiid
-     */
+    /// Returns the UIID for the icon
+    ///
+    /// #### Returns
+    ///
+    /// the uiid
     @Override
     public String getIconUIID() {
         return icon.getUIID();
     }
 
-    /**
-     * Sets the uiid for the icon if present
-     *
-     * @param uiid the uiid for the icon
-     */
+    /// Sets the uiid for the icon if present
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the uiid for the icon
     @Override
     public void setIconUIID(String uiid) {
         icon.setUIID(uiid);
         updateGap();
     }
 
-    /**
-     * Gets the vertical alignment of the icon with respect to the text of the span label.
-     *
-     * @return The alignment.  One of {@link #TOP}, {@link #BOTTOM}, or {@link #CENTER}.
-     * @since 7.0
-     */
+    /// Gets the vertical alignment of the icon with respect to the text of the span label.
+    ///
+    /// #### Returns
+    ///
+    /// The alignment.  One of `#TOP`, `#BOTTOM`, or `#CENTER`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public int getIconValign() {
         return ((FlowLayout) iconWrapper.getLayout()).getValign();
     }
 
-    /**
-     * Sets the vertical alignment of the icon with respect to the text of the span label.  Default value is {@link #CENTER}
-     *
-     * @param align One of {@link #TOP}, {@link #BOTTOM}, or {@link #CENTER}.
-     * @since 7.0
-     */
+    /// Sets the vertical alignment of the icon with respect to the text of the span label.  Default value is `#CENTER`
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: One of `#TOP`, `#BOTTOM`, or `#CENTER`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setIconValign(int align) {
         ((FlowLayout) iconWrapper.getLayout()).setValign(align);
     }
 
-    /**
-     * Returns the text of the label
-     *
-     * @return the text
-     */
+    /// Returns the text of the label
+    ///
+    /// #### Returns
+    ///
+    /// the text
     @Override
     public String getText() {
         return text.getText();
     }
 
-    /**
-     * Set the text of the label
-     *
-     * @param t text of the label
-     */
+    /// Set the text of the label
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text of the label
     @Override
     public void setText(String t) {
         t = shouldLocalize ? getUIManager().localize(t, t) : t;
@@ -320,11 +333,11 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         text.setColumns(text.getText().length() + 1);
     }
 
-    /**
-     * Returns the alignment of the whole text block and not the text within it!
-     *
-     * @return -1 for unaligned otherwise one of Component.LEFT/RIGHT/CENTER
-     */
+    /// Returns the alignment of the whole text block and not the text within it!
+    ///
+    /// #### Returns
+    ///
+    /// -1 for unaligned otherwise one of Component.LEFT/RIGHT/CENTER
     public int getTextBlockAlign() {
         if (text.getParent() == this) { //NOPMD CompareObjectsWithEquals
             return -1;
@@ -332,14 +345,14 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         return ((FlowLayout) text.getParent().getLayout()).getAlign();
     }
 
-    /**
-     * Indicates the alignment of the whole text block, this is different from setting the alignment of the text within
-     * the block since the UIID might have a border or other design element that won't be affected by such alignment.
-     * The default is none (-1) which means no alignment takes place and the text block takes the whole width.
-     *
-     * @param align valid values are Component.LEFT, Component.RIGHT, Component.CENTER. Anything else will
-     *              stretch the text block
-     */
+    /// Indicates the alignment of the whole text block, this is different from setting the alignment of the text within
+    /// the block since the UIID might have a border or other design element that won't be affected by such alignment.
+    /// The default is none (-1) which means no alignment takes place and the text block takes the whole width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: @param align valid values are Component.LEFT, Component.RIGHT, Component.CENTER. Anything else will
+    ///              stretch the text block
     public void setTextBlockAlign(int align) {
         switch (align) {
             case LEFT:
@@ -376,41 +389,41 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         }
     }
 
-    /**
-     * Returns the image of the icon
-     *
-     * @return the icon
-     */
+    /// Returns the image of the icon
+    ///
+    /// #### Returns
+    ///
+    /// the icon
     @Override
     public Image getIcon() {
         return icon.getIcon();
     }
 
-    /**
-     * Sets the icon for the label
-     *
-     * @param i the icon
-     */
+    /// Sets the icon for the label
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
     @Override
     public void setIcon(Image i) {
         icon.setIcon(i);
         updateGap();
     }
 
-    /**
-     * Returns the icon position based on border layout constraints
-     *
-     * @return position either North/South/East/West
-     */
+    /// Returns the icon position based on border layout constraints
+    ///
+    /// #### Returns
+    ///
+    /// position either North/South/East/West
     public String getIconPosition() {
         return (String) getLayout().getComponentConstraint(iconWrapper);
     }
 
-    /**
-     * Sets the icon position based on border layout constraints
-     *
-     * @param t position either North/South/East/West
-     */
+    /// Sets the icon position based on border layout constraints
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: position either North/South/East/West
     public void setIconPosition(String t) {
         removeComponent(iconWrapper);
         addComponent(t, iconWrapper);
@@ -419,9 +432,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{
@@ -429,9 +440,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
@@ -443,17 +452,13 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "Image", "String", "String", "String"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("text".equals(name)) {
@@ -474,9 +479,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("text".equals(name)) {
@@ -502,54 +505,62 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * Indicates if text should be localized when set to the component, by default
-     * all text is localized so this allows disabling automatic localization for
-     * a specific component.
-     *
-     * @return the shouldLocalize value
-     */
+    /// Indicates if text should be localized when set to the component, by default
+    /// all text is localized so this allows disabling automatic localization for
+    /// a specific component.
+    ///
+    /// #### Returns
+    ///
+    /// the shouldLocalize value
     public boolean isShouldLocalize() {
         return shouldLocalize;
     }
 
-    /**
-     * Indicates if text should be localized when set to the component, by default
-     * all text is localized so this allows disabling automatic localization for
-     * a specific component.
-     *
-     * @param shouldLocalize the shouldLocalize to set
-     */
+    /// Indicates if text should be localized when set to the component, by default
+    /// all text is localized so this allows disabling automatic localization for
+    /// a specific component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shouldLocalize`: the shouldLocalize to set
     public void setShouldLocalize(boolean shouldLocalize) {
         this.shouldLocalize = shouldLocalize;
     }
 
-    /**
-     * Checks if text selection is enabled on this SpanLabel.  Note that the Form must also have text selection enabled
-     * for text selection to work.
-     *
-     * @return True if text selection is enabled on this element.
-     * @see Form#getTextSelection()
-     * @see TextSelection#setEnabled(boolean)
-     * @since 7.0
-     */
+    /// Checks if text selection is enabled on this SpanLabel.  Note that the Form must also have text selection enabled
+    /// for text selection to work.
+    ///
+    /// #### Returns
+    ///
+    /// True if text selection is enabled on this element.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - Form#getTextSelection()
+    ///
+    /// - TextSelection#setEnabled(boolean)
     public boolean isTextSelectionEnabled() {
         return text.isTextSelectionEnabled();
     }
 
-    /**
-     * Enables or disables text selection on this span label.  Default is off.
-     *
-     * @param enabled True to enable text selection on this label.
-     * @since 7.0
-     */
+    /// Enables or disables text selection on this span label.  Default is off.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: True to enable text selection on this label.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setTextSelectionEnabled(boolean enabled) {
         text.setTextSelectionEnabled(enabled);
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public void setWidth(int width) {
         int w = getWidth();
@@ -572,21 +583,21 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public int getGap() {
         return gap;
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setGap(int gap) {
         if (gap != this.gap) {
@@ -595,11 +606,11 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         }
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public int getTextPosition() {
         String iconPosition = getIconPosition();
@@ -619,11 +630,11 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setTextPosition(int textPosition) {
         switch (textPosition) {
@@ -659,89 +670,91 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         }
     }
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
-     *
-     * @param c one of the constants from the font
-     */
+    /// This method is shorthand for `com.codename1.ui.Font, char)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from the font
     public void setFontIcon(Font font, char c) {
         icon.setFontIcon(font, c);
     }
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
-     *
-     * @param c    one of the constants from {@link com.codename1.ui.FontImage}
-     * @param size the size of the icon in millimeters
-     */
+    /// This method is shorthand for `char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from `com.codename1.ui.FontImage`
+    ///
+    /// - `size`: the size of the icon in millimeters
     @Override
     public void setMaterialIcon(char c, float size) {
         icon.setMaterialIcon(c, size);
     }
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
-     *
-     * @param c    one of the constants from the font
-     * @param size the size of the icon in millimeters
-     */
+    /// This method is shorthand for `com.codename1.ui.Font, char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from the font
+    ///
+    /// - `size`: the size of the icon in millimeters
     @Override
     public void setFontIcon(Font font, char c, float size) {
         icon.setFontIcon(font, c, size);
     }
 
-    /**
-     * Returns the material icon assigned to this component or 0 if not applicable
-     *
-     * @return the material icon
-     */
+    /// Returns the material icon assigned to this component or 0 if not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon
     public char getMaterialIcon() {
         return icon.getMaterialIcon();
     }
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char)}
-     *
-     * @param c one of the constants from {@link com.codename1.ui.FontImage}
-     */
+    /// This method is shorthand for `char)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from `com.codename1.ui.FontImage`
     public void setMaterialIcon(char c) {
         icon.setMaterialIcon(c);
     }
 
-    /**
-     * Returns the font icon assigned to this component or 0 if not applicable
-     *
-     * @return the material icon
-     */
+    /// Returns the font icon assigned to this component or 0 if not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon
     public char getFontIcon() {
         return icon.getFontIcon();
     }
 
-    /**
-     * Returns the material icon size assigned to this component or 0/-1 if
-     * not applicable
-     *
-     * @return the material icon size
-     */
+    /// Returns the material icon size assigned to this component or 0/-1 if
+    /// not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon size
     public float getMaterialIconSize() {
         return icon.getMaterialIconSize();
     }
 
-    /**
-     * Returns the icon size assigned to this component or 0/-1 if
-     * not applicable
-     *
-     * @return the icon size
-     */
+    /// Returns the icon size assigned to this component or 0/-1 if
+    /// not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the icon size
     public float getFontIconSize() {
         return icon.getFontIconSize();
     }
 
-    /**
-     * Returns the font for the icon font or null if not font set
-     *
-     * @return the material icon size
-     */
+    /// Returns the font for the icon font or null if not font set
+    ///
+    /// #### Returns
+    ///
+    /// the material icon size
     public Font getIconFont() {
         return icon.getIconFont();
     }

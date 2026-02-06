@@ -24,12 +24,13 @@ package com.codename1.plugin.event;
 
 import com.codename1.ui.events.ActionListener;
 
-/**
- * Event triggered when {@link Display#openGallery(com.codename1.ui.events.ActionListener, int)} is called.
- *
- * @author Steve Hannah
- * @since 8.0
- */
+/// Event triggered when `int)` is called.
+///
+/// @author Steve Hannah
+///
+/// #### Since
+///
+/// 8.0
 public class OpenGalleryEvent extends PluginEvent<Void> {
     private final ActionListener response;
 
@@ -41,24 +42,36 @@ public class OpenGalleryEvent extends PluginEvent<Void> {
         this.type = type;
     }
 
-    /**
-     * Gets the response listener that will be called when the gallery is closed.
-     *
-     * @return The response listener.
-     * @see Display#openGallery(com.codename1.ui.events.ActionListener, int)
-     * @since 8.0
-     */
+    /// Gets the response listener that will be called when the gallery is closed.
+    ///
+    /// #### Returns
+    ///
+    /// The response listener.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - Display#openGallery(com.codename1.ui.events.ActionListener, int)
     public ActionListener getResponse() {
         return response;
     }
 
-    /**
-     * Gets the type of gallery to open.
-     *
-     * @return The type of gallery to open.
-     * @see Display#openGallery(com.codename1.ui.events.ActionListener, int)
-     * @since 8.0
-     */
+    /// Gets the type of gallery to open.
+    ///
+    /// #### Returns
+    ///
+    /// The type of gallery to open.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - Display#openGallery(com.codename1.ui.events.ActionListener, int)
     public int getType() {
         return type;
     }

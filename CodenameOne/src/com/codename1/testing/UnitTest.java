@@ -22,43 +22,40 @@
  */
 package com.codename1.testing;
 
-/**
- * A Codename One unit test interface, you would normally like to derive from
- * AbstractTest which is less verbose and contains many helper methods.
- *
- * @author Shai Almog
- */
+/// A Codename One unit test interface, you would normally like to derive from
+/// AbstractTest which is less verbose and contains many helper methods.
+///
+/// @author Shai Almog
 public interface UnitTest {
-    /**
-     * Runs a unit test, if it returns true it passed. If it threw an exception or returned
-     * false it failed.
-     *
-     * @return whether it passed
-     * @throws Exception thrown if it failed
-     */
+    /// Runs a unit test, if it returns true it passed. If it threw an exception or returned
+    /// false it failed.
+    ///
+    /// #### Returns
+    ///
+    /// whether it passed
+    ///
+    /// #### Throws
+    ///
+    /// - `Exception`: thrown if it failed
     boolean runTest() throws Exception;
 
-    /**
-     * Prepares the unit test for execution
-     */
+    /// Prepares the unit test for execution
     void prepare();
 
-    /**
-     * Cleanup after a test case executed
-     */
+    /// Cleanup after a test case executed
     void cleanup();
 
-    /**
-     * Returns the time in milliseconds after which the test should be automatically failed.
-     *
-     * @return time in milliseconds
-     */
+    /// Returns the time in milliseconds after which the test should be automatically failed.
+    ///
+    /// #### Returns
+    ///
+    /// time in milliseconds
     int getTimeoutMillis();
 
-    /**
-     * Returns true to indicate that the test expects to be executed on the EDT
-     *
-     * @return whether the test should execute on the EDT or the testing thread
-     */
+    /// Returns true to indicate that the test expects to be executed on the EDT
+    ///
+    /// #### Returns
+    ///
+    /// whether the test should execute on the EDT or the testing thread
     boolean shouldExecuteOnEDT();
 }

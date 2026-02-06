@@ -24,12 +24,13 @@ package com.codename1.ui.spinner;
 
 import java.util.Date;
 
-/**
- * The date and time spinner extends the time spinner by allowing to pick a specific day as well
- *
- * @author Shai Almog
- * @deprecated use Picker instead
- */
+/// The date and time spinner extends the time spinner by allowing to pick a specific day as well
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
 public class DateTimeSpinner extends TimeSpinner {
     private final Date today = new Date();
     private final int off;
@@ -40,9 +41,7 @@ public class DateTimeSpinner extends TimeSpinner {
     private boolean markToday = true;
     private boolean includeYear;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public DateTimeSpinner() {
         off = 0;
     }
@@ -78,9 +77,9 @@ public class DateTimeSpinner extends TimeSpinner {
         }
     }
 
-    /**
-     * @return the currentDate
-     */
+    /// #### Returns
+    ///
+    /// the currentDate
     public Date getCurrentDate() {
         if (date != null) {
             return (Date) date.getValue();
@@ -88,9 +87,9 @@ public class DateTimeSpinner extends TimeSpinner {
         return currentDate;
     }
 
-    /**
-     * @param currentDate the currentDate to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentDate`: the currentDate to set
     public void setCurrentDate(Date currentDate) {
         this.currentDate = currentDate;
         if (date != null) {
@@ -98,16 +97,16 @@ public class DateTimeSpinner extends TimeSpinner {
         }
     }
 
-    /**
-     * @return the startDate
-     */
+    /// #### Returns
+    ///
+    /// the startDate
     public Date getStartDate() {
         return startDate;
     }
 
-    /**
-     * @param startDate the startDate to set
-     */
+    /// #### Parameters
+    ///
+    /// - `startDate`: the startDate to set
     public void setStartDate(Date startDate) {
         this.startDate = startDate;
         if (date != null) {
@@ -115,16 +114,16 @@ public class DateTimeSpinner extends TimeSpinner {
         }
     }
 
-    /**
-     * @return the endDate
-     */
+    /// #### Returns
+    ///
+    /// the endDate
     public Date getEndDate() {
         return endDate;
     }
 
-    /**
-     * @param endDate the endDate to set
-     */
+    /// #### Parameters
+    ///
+    /// - `endDate`: the endDate to set
     public void setEndDate(Date endDate) {
         this.endDate = endDate;
         if (date != null) {
@@ -132,16 +131,16 @@ public class DateTimeSpinner extends TimeSpinner {
         }
     }
 
-    /**
-     * @return the markToday
-     */
+    /// #### Returns
+    ///
+    /// the markToday
     public boolean isMarkToday() {
         return markToday;
     }
 
-    /**
-     * @param markToday the markToday to set
-     */
+    /// #### Parameters
+    ///
+    /// - `markToday`: the markToday to set
     public void setMarkToday(boolean markToday) {
         this.markToday = markToday;
         if (date != null) {
@@ -149,16 +148,16 @@ public class DateTimeSpinner extends TimeSpinner {
         }
     }
 
-    /**
-     * @return the includeYear
-     */
+    /// #### Returns
+    ///
+    /// the includeYear
     public boolean isIncludeYear() {
         return includeYear;
     }
 
-    /**
-     * @param includeYear the includeYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `includeYear`: the includeYear to set
     public void setIncludeYear(boolean includeYear) {
         this.includeYear = includeYear;
         if (date != null) {
@@ -172,27 +171,21 @@ public class DateTimeSpinner extends TimeSpinner {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem",
                 "currentDate", "startDate", "endDate", "markToday", "includeYear"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class,
                 Date.class, Date.class, Date.class, Boolean.class, Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("currentDate".equals(name)) {
@@ -213,9 +206,7 @@ public class DateTimeSpinner extends TimeSpinner {
         return super.getPropertyValue(name);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("currentDate".equals(name)) {

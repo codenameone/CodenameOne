@@ -4,9 +4,5 @@
     Author     : Shai Almog
 */
 
-/**
- * <p>
- *     The Layers are elements that are displayed on the map.
- * </p>
- */
+/// The Layers are elements that are displayed on the map.
 package com.codename1.maps.layers;

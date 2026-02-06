@@ -25,32 +25,44 @@ package com.codename1.ui;
 
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * <p>{@code Painter} can be used to draw on components backgrounds.
- * The use of this interface allows reuse of a background {@code Painter} for various
- * components. <br>
- * A simple example of a background painter is shown here to draw a circle background:
- *
- * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
- *
- * <p>
- * Painters can also be used to draw the glasspane which is layered on top of the form.
- * The example shows a glasspane running on top of a field to show a validation hint,
- * notice that for real world usage you should probably look into {@link com.codename1.ui.validation.Validator}.
- * Also notice that this example uses the shorter Java 8 lambda syntax to represent the glasspane.
- * </p>
- * <script src="https://gist.github.com/codenameone/f5b83373088600b19610.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/graphics-glasspane.png" alt="Sample of glasspane" />
- *
- * @author Chen Fishbein
- */
+/// `Painter` can be used to draw on components backgrounds.
+/// The use of this interface allows reuse of a background `Painter` for various
+/// components.
+///
+/// A simple example of a background painter is shown here to draw a circle background:
+///
+/// ```java
+/// Painter p = new Painter(cmp) {
+///     public void paint(Graphics g, Rectangle rect) {
+///         boolean antiAliased = g.isAntiAliased();
+///         g.setAntiAliased(true);
+///         int r = Math.min(rect.getWidth(), rect.getHeight())/2;
+///         int x = rect.getX() + rect.getWidth()/2 - r;
+///         int y = rect.getY() + rect.getHeight()/2 - r;
+///         switch (style) {
+///             case CircleButtonStrokedDark:
+///             case CircleButtonStrokedLight: {
+///                 if (cmp.getStyle().getBgTransparency() != 0) {
+///                     int alpha = cmp.getStyle().getBgTransparency();
+///                     if (alpha  {
+///     int x = tf1.getAbsoluteX() + tf1.getWidth();
+///     int y = tf1.getAbsoluteY();
+///     x -= warningImage.getWidth() / 2;
+///     y += (tf1.getHeight() / 2 - warningImage.getHeight() / 2);
+///     g.drawImage(warningImage, x, y);
+/// });
+/// hi.show();
+/// ```
+///
+/// @author Chen Fishbein
 public interface Painter {
 
-    /**
-     * Draws inside the given rectangle clipping area.
-     *
-     * @param g    the {@link Graphics} object
-     * @param rect the given rectangle cliping area
-     */
+    /// Draws inside the given rectangle clipping area.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the `Graphics` object
+    ///
+    /// - `rect`: the given rectangle cliping area
     void paint(Graphics g, Rectangle rect);
 }

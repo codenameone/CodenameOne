@@ -23,35 +23,36 @@
  */
 package com.codename1.ui;
 
-/**
- * An image that stores its data as an integer RGB array internally,
- * this image cannot be manipulated via Graphics primitives however its
- * array is accessible and modifiable programmatically. This is very useful
- * for 2 distinct use cases.
- * <p>The first use case allows us to manipulate images in
- * a custom way while still preserving alpha information where applicable.
- * <p>The second use case allows us to store images in the Java heap which is useful
- * for some constrained devices. In small devices images are often stored
- * in a separate "heap" which runs out eventually, this allows us to place
- * the image in the Java heap which is potentially more wasteful but might
- * sometimes be more abundant.
- * <p>Note that unless specified otherwise most methods inherited from Image will
- * fail when invoked on this subclass often with a NullPointerException. This
- * image can be drawn on graphics as usual
- *
- * @author Shai Almog
- */
+/// An image that stores its data as an integer RGB array internally,
+/// this image cannot be manipulated via Graphics primitives however its
+/// array is accessible and modifiable programmatically. This is very useful
+/// for 2 distinct use cases.
+///
+/// The first use case allows us to manipulate images in
+/// a custom way while still preserving alpha information where applicable.
+///
+/// The second use case allows us to store images in the Java heap which is useful
+/// for some constrained devices. In small devices images are often stored
+/// in a separate "heap" which runs out eventually, this allows us to place
+/// the image in the Java heap which is potentially more wasteful but might
+/// sometimes be more abundant.
+///
+/// Note that unless specified otherwise most methods inherited from Image will
+/// fail when invoked on this subclass often with a NullPointerException. This
+/// image can be drawn on graphics as usual
+///
+/// @author Shai Almog
 public class RGBImage extends Image {
     private int width;
     private int height;
     private int[] rgb;
     private boolean opaque;
 
-    /**
-     * Converts an image to an RGB image after which the original image can be GC'd
-     *
-     * @param img the image to convert to an RGB image
-     */
+    /// Converts an image to an RGB image after which the original image can be GC'd
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the image to convert to an RGB image
     public RGBImage(Image img) {
         super(null);
         width = img.getWidth();
@@ -59,14 +60,16 @@ public class RGBImage extends Image {
         rgb = img.getRGBCached();
     }
 
-    /**
-     * Creates an RGB image from scratch the array isn't copied and can be saved
-     * and manipulated
-     *
-     * @param rgb    AARRGGBB array
-     * @param width  width of image
-     * @param height height of image
-     */
+    /// Creates an RGB image from scratch the array isn't copied and can be saved
+    /// and manipulated
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`: AARRGGBB array
+    ///
+    /// - `width`: width of image
+    ///
+    /// - `height`: height of image
     public RGBImage(int[] rgb, int width, int height) {
         super(null);
         this.width = width;
@@ -74,9 +77,7 @@ public class RGBImage extends Image {
         this.rgb = rgb;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
         int[] arr = new int[width * height];
@@ -91,9 +92,7 @@ public class RGBImage extends Image {
         return new RGBImage(arr, width, height);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Image scaled(int width, int height) {
         int srcWidth = getWidth();
@@ -111,9 +110,7 @@ public class RGBImage extends Image {
         return new RGBImage(destinationArray, width, height);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void scale(int width, int height) {
         int srcWidth = getWidth();
@@ -132,17 +129,13 @@ public class RGBImage extends Image {
         this.rgb = destinationArray;
     }
 
-    /**
-     * Unsupported in the current version, this method will be implemented in a future release
-     */
+    /// Unsupported in the current version, this method will be implemented in a future release
     @Override
     public Image rotate(int degrees) {
         throw new RuntimeException("The rotate method is not supported by RGB images at the moment");
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Image modifyAlpha(byte alpha) {
         int[] arr = new int[rgb.length];
@@ -157,29 +150,25 @@ public class RGBImage extends Image {
         return new RGBImage(arr, width, height);
     }
 
-    /**
-     * This method is unsupported in this image type
-     */
+    /// This method is unsupported in this image type
     @Override
     public Graphics getGraphics() {
         throw new RuntimeException("RGBImage objects can't be modified via graphics");
     }
 
 
-    /**
-     * Returns a mutable array that can be used to change the appearance of the image
-     * arranged as AARRGGBB.
-     *
-     * @return ARGB int array
-     */
+    /// Returns a mutable array that can be used to change the appearance of the image
+    /// arranged as AARRGGBB.
+    ///
+    /// #### Returns
+    ///
+    /// ARGB int array
     @Override
     public int[] getRGB() {
         return rgb;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void getRGB(int[] rgbData,
                 int offset,
@@ -197,50 +186,38 @@ public class RGBImage extends Image {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         g.drawRGB(rgb, 0, x, y, width, height, !opaque);
     }
 
-    /**
-     * Indicates if an image should be treated as opaque, this can improve support
-     * for fast drawing of RGB images without alpha support.
-     */
+    /// Indicates if an image should be treated as opaque, this can improve support
+    /// for fast drawing of RGB images without alpha support.
     @Override
     public boolean isOpaque() {
         return opaque;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setOpaque(boolean opaque) {
         this.opaque = opaque;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getWidth() {
         return width;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getHeight() {
         return height;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean requiresDrawImage() {
         return true;

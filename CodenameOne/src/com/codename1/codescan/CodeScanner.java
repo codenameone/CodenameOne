@@ -24,39 +24,40 @@ package com.codename1.codescan;
 
 import com.codename1.ui.Display;
 
-/**
- * Deprecated!!:  Please use the <a href="https://github.com/codenameone/cn1-codescan">cn1-codescan library</a> instead.
- *
- * <p>A barcode/qrcode scanner API, this class is a singleton, notice that this
- * API might not be implemented for all platforms in which case the getInstance()
- * method will return null!</p>
- *
- * @author Shai Almog
- * @deprecated Use the cn1-codescanner cn1lib.
- */
+/// Deprecated!!:  Please use the [cn1-codescan library](https://github.com/codenameone/cn1-codescan) instead.
+///
+/// A barcode/qrcode scanner API, this class is a singleton, notice that this
+/// API might not be implemented for all platforms in which case the getInstance()
+/// method will return null!
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// Use the cn1-codescanner cn1lib.
 public abstract class CodeScanner {
 
-    /**
-     * Returns the instance of the code scanner, notice that this method is equivalent
-     * to Display.getInstance().getCodeScanner().
-     *
-     * @return instance of the code scanner
-     */
+    /// Returns the instance of the code scanner, notice that this method is equivalent
+    /// to Display.getInstance().getCodeScanner().
+    ///
+    /// #### Returns
+    ///
+    /// instance of the code scanner
     public static CodeScanner getInstance() {
         return Display.getInstance().getCodeScanner();
     }
 
-    /**
-     * Scans based on the settings in this class and returns the results
-     *
-     * @param callback scan results
-     */
+    /// Scans based on the settings in this class and returns the results
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: scan results
     public abstract void scanQRCode(ScanResult callback);
 
-    /**
-     * Scans based on the settings in this class and returns the results
-     *
-     * @param callback scan results
-     */
+    /// Scans based on the settings in this class and returns the results
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: scan results
     public abstract void scanBarCode(ScanResult callback);
 }

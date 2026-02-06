@@ -25,17 +25,16 @@ package com.codename1.ui.html;
 
 import java.util.Hashtable;
 
-/**
- * This class contains several useful static methods for HTML
- *
- * @author Ofir Leitner
- * @deprecated the HTML package is no longer used or maintained and may be removed in a future revision
- */
+/// This class contains several useful static methods for HTML
+///
+/// @author Ofir Leitner
+///
+/// #### Deprecated
+///
+/// the HTML package is no longer used or maintained and may be removed in a future revision
 public final class HTMLUtils {
 
-    /**
-     * The char entities strings supported in XML. When a char entity is found these will be compared against first.
-     */
+    /// The char entities strings supported in XML. When a char entity is found these will be compared against first.
     private static final String[] XML_CHAR_ENTITIES = {
             "lt", // lesser-than
             "gt", // greater-than
@@ -45,9 +44,7 @@ public final class HTMLUtils {
             //"bull", //bullet
             //"euro" //euro
     };
-    /**
-     * The numericals value of char entities strings above.
-     */
+    /// The numericals value of char entities strings above.
     private static final int[] XML_CHAR_ENTITIES_VALS = {
             60, // "lt", // lesser-than
             62, // "gt", // greater-than
@@ -57,9 +54,7 @@ public final class HTMLUtils {
             //8226, // "bull", //bullet
             //8364 // "euro"}; //euro
     };
-    /**
-     * This is a list of ISO 8859-1 Symbols that can be used as HTML char entities
-     */
+    /// This is a list of ISO 8859-1 Symbols that can be used as HTML char entities
     private static final String[] HTML_BASIC_CHAR_ENTITY_STRINGS = {
             "nbsp", "iexcl", "cent", "pound", "curren", "yen", "brvbar", "sect", "uml", "copy", "ordf", "laquo", "not", "shy", "reg", "macr", "deg", "plusmn", "sup2", "sup3", "acute",
             "micro", "para", "middot", "cedil", "sup1", "ordm", "raquo", "frac14", "frac12", "frac34", "iquest", "Agrave", "Aacute", "Acirc", "Atilde", "Auml", "Aring", "AElig",
@@ -73,38 +68,49 @@ public final class HTMLUtils {
 
     }
 
-    /**
-     * Converts an XML char entity to the matching character or string.
-     * This is a convenience method that uses convertCharEntity with false for lookupHTMLentities and a null userDefinedCharEntities
-     *
-     * @param charEntity The char entity to convert (Not including the &amp; and ;)
-     * @return A string containing a single char, or the original char entity string  (with &amp; and ;) if the char entity couldn't be resolved
-     */
+    /// Converts an XML char entity to the matching character or string.
+    /// This is a convenience method that uses convertCharEntity with false for lookupHTMLentities and a null userDefinedCharEntities
+    ///
+    /// #### Parameters
+    ///
+    /// - `charEntity`: The char entity to convert (Not including the & and ;)
+    ///
+    /// #### Returns
+    ///
+    /// A string containing a single char, or the original char entity string  (with & and ;) if the char entity couldn't be resolved
     public static String convertXMLCharEntity(String charEntity) {
         return convertCharEntity(charEntity, false, null);
     }
 
-    /**
-     * Converts an HTML char entity to the matching character or string.
-     * This is a convenience method that uses convertCharEntity with true for lookupHTMLentities and a null userDefinedCharEntities
-     *
-     * @param charEntity The char entity to convert (Not including the &amp; and ;)
-     * @return A string containing a single char, or the original char entity string  (with &amp; and ;) if the char entity couldn't be resolved
-     */
+    /// Converts an HTML char entity to the matching character or string.
+    /// This is a convenience method that uses convertCharEntity with true for lookupHTMLentities and a null userDefinedCharEntities
+    ///
+    /// #### Parameters
+    ///
+    /// - `charEntity`: The char entity to convert (Not including the & and ;)
+    ///
+    /// #### Returns
+    ///
+    /// A string containing a single char, or the original char entity string  (with & and ;) if the char entity couldn't be resolved
     public static String convertHTMLCharEntity(String charEntity) {
         return convertCharEntity(charEntity, true, null);
     }
 
 
-    /**
-     * Converts a char entity to the matching character or string.
-     * This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
-     *
-     * @param charEntity              The char entity to convert (Not including the &amp; and ;)
-     * @param lookupHTMLentities      true to include the basic HTML named char entities (unicode 160-255), false otherwise
-     * @param userDefinedCharEntities A hashtable containing (String,int) dentoing the char entity name and its unicode
-     * @return A string containing a single char, or the original char entity string  (with &amp; and ;) if the char entity couldn't be resolved
-     */
+    /// Converts a char entity to the matching character or string.
+    /// This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
+    ///
+    /// #### Parameters
+    ///
+    /// - `charEntity`: The char entity to convert (Not including the & and ;)
+    ///
+    /// - `lookupHTMLentities`: true to include the basic HTML named char entities (unicode 160-255), false otherwise
+    ///
+    /// - `userDefinedCharEntities`: A hashtable containing (String,int) dentoing the char entity name and its unicode
+    ///
+    /// #### Returns
+    ///
+    /// A string containing a single char, or the original char entity string  (with & and ;) if the char entity couldn't be resolved
     @SuppressWarnings("PMD.EmptyCatchBlock")
     public static String convertCharEntity(String charEntity, boolean lookupHTMLentities, Hashtable userDefinedCharEntities) {
         int charCode = -1;
@@ -168,13 +174,16 @@ public final class HTMLUtils {
         }
     }
 
-    /**
-     * Encodes the specified string to "percent-encoding" or URL encoding.
-     * This encodes reserved, unsafe and unicode characters
-     *
-     * @param str The string to be encoded
-     * @return A percent-encoding of the string (safe characters remain the same)
-     */
+    /// Encodes the specified string to "percent-encoding" or URL encoding.
+    /// This encodes reserved, unsafe and unicode characters
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The string to be encoded
+    ///
+    /// #### Returns
+    ///
+    /// A percent-encoding of the string (safe characters remain the same)
     public static String encodeString(String str) {
         if (str == null) {
             return "";
@@ -229,50 +238,70 @@ public final class HTMLUtils {
     }
 
 
-    /**
-     * Matches the given string to the given options and returns the matching value, or -1 if none found.
-     *
-     * @param str     The string to compare
-     * @param options The options to match the string against
-     * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, the int X will be returned. If the string didn't match any of the options -1 is returned.
-     */
+    /// Matches the given string to the given options and returns the matching value, or -1 if none found.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The string to compare
+    ///
+    /// - `options`: The options to match the string against
+    ///
+    /// #### Returns
+    ///
+    /// The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, the int X will be returned. If the string didn't match any of the options -1 is returned.
     static int getStringVal(String str, String[] options) {
         return getStringVal(str, options, null, -1);
     }
 
-    /**
-     * Matches the given string to the given options and returns the matching value, or -1 if none found.
-     *
-     * @param str     The string to compare
-     * @param options The options to match the string against
-     * @param vals    The values to match to each option (According to the position in the array), this can be null.
-     * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, this returns the value in the X position of the vals array, or simply X if vals is null. If the string didn't match any of the options -1 is returned.
-     */
+    /// Matches the given string to the given options and returns the matching value, or -1 if none found.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The string to compare
+    ///
+    /// - `options`: The options to match the string against
+    ///
+    /// - `vals`: The values to match to each option (According to the position in the array), this can be null.
+    ///
+    /// #### Returns
+    ///
+    /// The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, this returns the value in the X position of the vals array, or simply X if vals is null. If the string didn't match any of the options -1 is returned.
     static int getStringVal(String str, String[] options, int[] vals) {
         return getStringVal(str, options, vals, -1);
     }
 
-    /**
-     * Matches the given string to the given options and returns the matching value, or the default one if none found.
-     *
-     * @param str          The string to compare
-     * @param options      The options to match the string against
-     * @param defaultValue The default value to return if the string was null or not found among the options
-     * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, the int X will be returned. If the string didn't match any of the options the defaultValue is returned.
-     */
+    /// Matches the given string to the given options and returns the matching value, or the default one if none found.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The string to compare
+    ///
+    /// - `options`: The options to match the string against
+    ///
+    /// - `defaultValue`: The default value to return if the string was null or not found among the options
+    ///
+    /// #### Returns
+    ///
+    /// The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, the int X will be returned. If the string didn't match any of the options the defaultValue is returned.
     static int getStringVal(String str, String[] options, int defaultValue) {
         return getStringVal(str, options, null, defaultValue);
     }
 
-    /**
-     * Matches the given string to the given options and returns the matching value, or the default one if none found.
-     *
-     * @param str          The string to compare
-     * @param options      The options to match the string against
-     * @param vals         The values to match to each option (According to the position in the array), this can be null.
-     * @param defaultValue The default value to return if the string was null or not found among the options
-     * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, this returns the value in the X position of the vals array, or simply X if vals is null. If the string didn't match any of the options the defaultValue is returned.
-     */
+    /// Matches the given string to the given options and returns the matching value, or the default one if none found.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The string to compare
+    ///
+    /// - `options`: The options to match the string against
+    ///
+    /// - `vals`: The values to match to each option (According to the position in the array), this can be null.
+    ///
+    /// - `defaultValue`: The default value to return if the string was null or not found among the options
+    ///
+    /// #### Returns
+    ///
+    /// The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, this returns the value in the X position of the vals array, or simply X if vals is null. If the string didn't match any of the options the defaultValue is returned.
     static int getStringVal(String str, String[] options, int[] vals, int defaultValue) {
         if (str != null) {
             for (int i = 0; i < options.length; i++) {

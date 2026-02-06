@@ -21,9 +21,7 @@ package com.codename1.maps;
 
 import com.codename1.ui.geom.Point;
 
-/**
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// @author Roman Kamyk
 class PositionedTile {
 
     private final Point _position;

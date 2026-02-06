@@ -30,43 +30,42 @@ import com.codename1.ui.geom.Rectangle;
 
 import java.util.Vector;
 
-/**
- * A painter chain allows us to chain together several painters to provide a
- * "layer" effect where each painter only draws one element.
- *
- * @author Shai Almog
- */
+/// A painter chain allows us to chain together several painters to provide a
+/// "layer" effect where each painter only draws one element.
+///
+/// @author Shai Almog
 public class PainterChain implements Painter {
 
     private Painter[] chain;
 
-    /**
-     * Create a new painter chain which will paint all of the elements in the chain
-     * in sequence from 0 to the last element
-     *
-     * @param chain the chain of components in the painter
-     */
+    /// Create a new painter chain which will paint all of the elements in the chain
+    /// in sequence from 0 to the last element
+    ///
+    /// #### Parameters
+    ///
+    /// - `chain`: the chain of components in the painter
     public PainterChain(Painter[] chain) {
         this.chain = chain;
     }
 
-    /**
-     * Create a new painter chain which will paint all of the elements in the chain
-     * in sequence from 0 to the last element
-     *
-     * @param painter the chain first Painter
-     */
+    /// Create a new painter chain which will paint all of the elements in the chain
+    /// in sequence from 0 to the last element
+    ///
+    /// #### Parameters
+    ///
+    /// - `painter`: the chain first Painter
     public PainterChain(Painter painter) {
         this.chain = new Painter[]{painter};
     }
 
-    /**
-     * Installs a glass pane on the given form making sure to make it a painter
-     * chain only if required by existing painter
-     *
-     * @param f form on which to install the chain
-     * @param p painter to install
-     */
+    /// Installs a glass pane on the given form making sure to make it a painter
+    /// chain only if required by existing painter
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: form on which to install the chain
+    ///
+    /// - `p`: painter to install
     public static void installGlassPane(Form f, Painter p) {
         Painter existing = f.getGlassPane();
         if (existing == null) {
@@ -81,13 +80,14 @@ public class PainterChain implements Painter {
         }
     }
 
-    /**
-     * Removes a glass pane from the given form, this is the opposite operation for the
-     * install glass pane
-     *
-     * @param f form from which to remove the chain
-     * @param p painter to remove
-     */
+    /// Removes a glass pane from the given form, this is the opposite operation for the
+    /// install glass pane
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: form from which to remove the chain
+    ///
+    /// - `p`: painter to remove
     public static void removeGlassPane(Form f, Painter p) {
         Painter existing = f.getGlassPane();
         if (existing == null) {
@@ -124,13 +124,16 @@ public class PainterChain implements Painter {
         }
     }
 
-    /**
-     * Creates a new chain based on the existing chain with the new element added
-     * at the end
-     *
-     * @param p new painter
-     * @return new chain element
-     */
+    /// Creates a new chain based on the existing chain with the new element added
+    /// at the end
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: new painter
+    ///
+    /// #### Returns
+    ///
+    /// new chain element
     public PainterChain addPainter(Painter p) {
         if (chain.length != 0) {
             Painter[] newChain = new Painter[chain.length + 1];
@@ -141,13 +144,16 @@ public class PainterChain implements Painter {
         return new PainterChain(new Painter[]{p});
     }
 
-    /**
-     * Creates a new chain based on the existing chain with the new element added
-     * at the beginning
-     *
-     * @param p new painter
-     * @return new chain element
-     */
+    /// Creates a new chain based on the existing chain with the new element added
+    /// at the beginning
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: new painter
+    ///
+    /// #### Returns
+    ///
+    /// new chain element
     public PainterChain prependPainter(Painter p) {
         Painter[] newChain = new Painter[chain.length + 1];
         System.arraycopy(chain, 1, newChain, 0, chain.length);
@@ -155,9 +161,7 @@ public class PainterChain implements Painter {
         return new PainterChain(newChain);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g, Rectangle rect) {
         int clen = chain.length;
@@ -166,11 +170,11 @@ public class PainterChain implements Painter {
         }
     }
 
-    /**
-     * Allows us to traverse the painter chain
-     *
-     * @return the internal painter chain
-     */
+    /// Allows us to traverse the painter chain
+    ///
+    /// #### Returns
+    ///
+    /// the internal painter chain
     public Painter[] getChain() {
         return chain;
     }

@@ -22,33 +22,37 @@
  */
 package com.codename1.notifications;
 
-/**
- * <p>An interface that can be implemented by the application's main class (i.e.
- * the class with <code>start()</code>, <code>stop()</code> etc..) to respond
- * to local notifications.  This interface only works when it is implemented
- * by the main class.  It will never be called otherwise.</p>
- *
- * <p><em>IMPORTANT:  THIS CALLBACK IS CALLED OFF THE EDT.  ANY UPDATES TO THE UI
- * WILL NEED TO OCCUR INSIDE A <code>callSerially()</code> block.</em></p>
- *
- * @author shannah
- * @see LocalNotification
- */
+/// An interface that can be implemented by the application's main class (i.e.
+/// the class with `start()`, `stop()` etc..) to respond
+/// to local notifications.  This interface only works when it is implemented
+/// by the main class.  It will never be called otherwise.
+///
+/// *IMPORTANT:  THIS CALLBACK IS CALLED OFF THE EDT.  ANY UPDATES TO THE UI
+/// WILL NEED TO OCCUR INSIDE A `callSerially()` block.*
+///
+/// @author shannah
+///
+/// #### See also
+///
+/// - LocalNotification
 public interface LocalNotificationCallback {
 
-    /**
-     * <p>Callback method that is called when a local notification is received AND
-     * the application is active. This won't necessarily be called when the
-     * notification is received.  If the app is in the background, for example,
-     * the notification will manifest itself as a message to the user's task bar
-     * (or equivalent).  If the user then clicks on the notification message, the
-     * app will be activated, and this callback method will be called.</p>
-     *
-     * <p><em>IMPORTANT:  THIS CALLBACK IS CALLED OFF THE EDT.  ANY UPDATES TO THE UI
-     * WILL NEED TO OCCUR INSIDE A <code>callSerially()</code> block.</em></p>
-     *
-     * @param notificationId The notification ID of the notification that was received.
-     * @see LocalNotification
-     */
+    /// Callback method that is called when a local notification is received AND
+    /// the application is active. This won't necessarily be called when the
+    /// notification is received.  If the app is in the background, for example,
+    /// the notification will manifest itself as a message to the user's task bar
+    /// (or equivalent).  If the user then clicks on the notification message, the
+    /// app will be activated, and this callback method will be called.
+    ///
+    /// *IMPORTANT:  THIS CALLBACK IS CALLED OFF THE EDT.  ANY UPDATES TO THE UI
+    /// WILL NEED TO OCCUR INSIDE A `callSerially()` block.*
+    ///
+    /// #### Parameters
+    ///
+    /// - `notificationId`: The notification ID of the notification that was received.
+    ///
+    /// #### See also
+    ///
+    /// - LocalNotification
     void localNotificationReceived(String notificationId);
 }

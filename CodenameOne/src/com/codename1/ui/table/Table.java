@@ -48,42 +48,73 @@ import com.codename1.util.CaseInsensitiveOrder;
 import java.util.Comparator;
 import java.util.Date;
 
-/**
- * <p>The {@code Table} class represents a grid of data that can be used for rendering a grid
- * of components/labels. The table reflects and updates the underlying model data.
- * {@code Table} relies heavily on the {@link com.codename1.ui.table.TableLayout} class and
- * {@link com.codename1.ui.table.TableModel} interface to present its UI. Unlike a
- * {@link com.codename1.ui.List} a {@code Table} doesn't feature a separate renderer
- * and instead allows developers to derive the class.
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/6b106772ad1d58c50270.js"></script>
- *
- * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png" alt="Table with customize cells using the pinstripe effect" />
- * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe-edit.png" alt="Picker table cell during edit" />
- *
- * @author Shai Almog
- */
+/// The `Table` class represents a grid of data that can be used for rendering a grid
+/// of components/labels. The table reflects and updates the underlying model data.
+/// `Table` relies heavily on the `com.codename1.ui.table.TableLayout` class and
+/// `com.codename1.ui.table.TableModel` interface to present its UI. Unlike a
+/// `com.codename1.ui.List` a `Table` doesn't feature a separate renderer
+/// and instead allows developers to derive the class.
+///
+/// ```java
+/// Form hi = new Form("Table", new BorderLayout());
+/// TableModel model = new DefaultTableModel(new String[] {"Col 1", "Col 2", "Col 3"}, new Object[][] {
+///     {"Row 1", "Row A", "Row X"},
+///     {"Row 2", "Row B can now stretch", null},
+///     {"Row 3", "Row C", "Row Z"},
+///     {"Row 4", "Row D", "Row K"},
+///     }) {
+///         public boolean isCellEditable(int row, int col) {
+///             return col != 0;
+///         }
+///     };
+/// Table table = new Table(model) {
+/// @Override
+///     protected Component createCell(Object value, int row, int column, boolean editable) { // (1)
+///         Component cell;
+///         if(row == 1 && column == 1) { // (2)
+///             Picker p = new Picker();
+///             p.setType(Display.PICKER_TYPE_STRINGS);
+///             p.setStrings("Row B can now stretch", "This is a good value", "So Is This", "Better than text field");
+///             p.setSelectedString((String)value); // (3)
+///             p.setUIID("TableCell");
+///             p.addActionListener((e) -> getModel().setValueAt(row, column, p.getSelectedString())); // (4)
+///             cell = p;
+///         } else {
+///             cell = super.createCell(value, row, column, editable);
+///         }
+///         if(row > -1 && row % 2 == 0) { // (5)
+///             // pinstripe effect
+///             cell.getAllStyles().setBgColor(0xeeeeee);
+///             cell.getAllStyles().setBgTransparency(255);
+///         }
+///         return cell;
+///     }
+/// @Override
+///     protected TableLayout.Constraint createCellConstraint(Object value, int row, int column) {
+///         TableLayout.Constraint con =  super.createCellConstraint(value, row, column);
+///         if(row == 1 && column == 1) {
+///             con.setHorizontalSpan(2);
+///         }
+///         con.setWidthPercentage(33);
+///         return con;
+///     }
+/// };
+/// hi.add(BorderLayout.CENTER, table);
+/// hi.show();
+/// ```
+/// @author Shai Almog
 public class Table extends Container {
 
-    /**
-     * Constant denoting that inner borders should not be drawn at all
-     */
+    /// Constant denoting that inner borders should not be drawn at all
     public static final int INNER_BORDERS_NONE = 0;
 
-    /**
-     * Constant denoting that only inner borders rows should be drawn
-     */
+    /// Constant denoting that only inner borders rows should be drawn
     public static final int INNER_BORDERS_ROWS = 1;
 
-    /**
-     * Constant denoting that only inner borders columns should be drawn
-     */
+    /// Constant denoting that only inner borders columns should be drawn
     public static final int INNER_BORDERS_COLS = 2;
 
-    /**
-     * Constant denoting that inner borders should be drawn fully
-     */
+    /// Constant denoting that inner borders should be drawn fully
     public static final int INNER_BORDERS_ALL = 3;
     private final Listener listener = new Listener();
     private TableModel model;
@@ -95,37 +126,31 @@ public class Table extends Container {
     private boolean includeHeader = true;
     private int innerBorder = INNER_BORDERS_ALL;
 
-    /**
-     * Indicates the alignment of the title see label alignment for details
-     *
-     * @see com.codename1.ui.Label#setAlignment(int)
-     */
+    /// Indicates the alignment of the title see label alignment for details
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
     private int titleAlignment = Label.CENTER;
 
-    /**
-     * Indicates the alignment of the cells see label alignment for details
-     *
-     * @see com.codename1.ui.Label#setAlignment(int)
-     */
+    /// Indicates the alignment of the cells see label alignment for details
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
     private int cellAlignment = Label.LEFT;
 
-    /**
-     * This flag allows us to workaround issue 275 without incurring too many updateModel calls
-     */
+    /// This flag allows us to workaround issue 275 without incurring too many updateModel calls
     private boolean potentiallyDirtyModel;
 
-    /**
-     * Sort support can be toggled with this flag
-     */
+    /// Sort support can be toggled with this flag
     private boolean sortSupported;
 
     private int sortedColumn = -1;
     private boolean ascending;
 
-    /**
-     * Constructor for usage by GUI builder and automated tools, normally one
-     * should use the version that accepts the model
-     */
+    /// Constructor for usage by GUI builder and automated tools, normally one
+    /// should use the version that accepts the model
     public Table() {
         this(new DefaultTableModel(new String[]{"Col1", "Col2"}, new String[][]{
                 {"1", "2"},
@@ -133,23 +158,24 @@ public class Table extends Container {
     }
 
 
-    /**
-     * Create a table with a new model
-     *
-     * @param model the model underlying this table
-     */
+    /// Create a table with a new model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model underlying this table
     public Table(TableModel model) {
         setUIIDFinal("Table");
         this.model = model;
         updateModel();
     }
 
-    /**
-     * Create a table with a new model
-     *
-     * @param model         the model underlying this table
-     * @param includeHeader Indicates whether the table should render a table header as the first row
-     */
+    /// Create a table with a new model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model underlying this table
+    ///
+    /// - `includeHeader`: Indicates whether the table should render a table header as the first row
     public Table(TableModel model, boolean includeHeader) {
         setUIIDFinal("Table");
         this.includeHeader = includeHeader;
@@ -157,11 +183,11 @@ public class Table extends Container {
         updateModel();
     }
 
-    /**
-     * Returns the selected row in the table
-     *
-     * @return the offset of the selected row in the table if a selection exists
-     */
+    /// Returns the selected row in the table
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the selected row in the table if a selection exists
     public int getSelectedRow() {
         Form f = getComponentForm();
         if (f != null) {
@@ -173,21 +199,21 @@ public class Table extends Container {
         return -1;
     }
 
-    /**
-     * By default createCell/constraint won't be invoked for null values by overriding this method to return true
-     * you can replace this behavior
-     *
-     * @return false by default
-     */
+    /// By default createCell/constraint won't be invoked for null values by overriding this method to return true
+    /// you can replace this behavior
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     protected boolean includeNullValues() {
         return false;
     }
 
-    /**
-     * Returns the selected column in the table
-     *
-     * @return the offset of the selected column in the table if a selection exists
-     */
+    /// Returns the selected column in the table
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the selected column in the table if a selection exists
     public int getSelectedColumn() {
         Form f = getComponentForm();
         if (f != null) {
@@ -248,9 +274,7 @@ public class Table extends Container {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void paintGlass(Graphics g) {
         if ((drawBorder) && (innerBorder != INNER_BORDERS_NONE)) {
@@ -422,24 +446,28 @@ public class Table extends Container {
         return c;
     }
 
-    /**
-     * Returns a generic comparator that tries to work in a way that will sort columns with similar object types.
-     * This method can be overridden to create custom sort orders or return null and thus disable sorting for a
-     * specific column
-     *
-     * @param column the column that's sorted
-     * @return the comparator instance
-     */
+    /// Returns a generic comparator that tries to work in a way that will sort columns with similar object types.
+    /// This method can be overridden to create custom sort orders or return null and thus disable sorting for a
+    /// specific column
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column that's sorted
+    ///
+    /// #### Returns
+    ///
+    /// the comparator instance
     protected Comparator<Object> createColumnSortComparator(int column) {
         return new ColumnSortComparator(new CaseInsensitiveOrder());
     }
 
-    /**
-     * Sorts the given column programmatically
-     *
-     * @param column    the column to sort
-     * @param ascending true to sort in ascending order
-     */
+    /// Sorts the given column programmatically
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column to sort
+    ///
+    /// - `ascending`: true to sort in ascending order
     public void sort(int column, boolean ascending) {
         sortedColumn = column;
         Comparator<Object> cmp = createColumnSortComparator(column);
@@ -449,15 +477,21 @@ public class Table extends Container {
         setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));
     }
 
-    /**
-     * Creates a cell based on the given value
-     *
-     * @param value    the new value object
-     * @param row      row number, -1 for the header rows
-     * @param column   column number
-     * @param editable true if the cell is editable
-     * @return cell component instance
-     */
+    /// Creates a cell based on the given value
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the new value object
+    ///
+    /// - `row`: row number, -1 for the header rows
+    ///
+    /// - `column`: column number
+    ///
+    /// - `editable`: true if the cell is editable
+    ///
+    /// #### Returns
+    ///
+    /// cell component instance
     protected Component createCell(Object value, int row, final int column, boolean editable) {
         if (row == -1) {
             Button header = new Button((String) value, getUIID() + "Header");
@@ -553,9 +587,7 @@ public class Table extends Container {
         return cell;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void initComponent() {
         // this can happen if deinitialize is invoked due to a menu command which modifies
@@ -567,9 +599,7 @@ public class Table extends Container {
         model.addDataChangeListener(listener);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void deinitialize() {
         // we unbind the listener to prevent a memory leak for the use case of keeping
@@ -583,11 +613,11 @@ public class Table extends Container {
         }
     }
 
-    /**
-     * Returns the model instance
-     *
-     * @return the model instance
-     */
+    /// Returns the model instance
+    ///
+    /// #### Returns
+    ///
+    /// the model instance
     public TableModel getModel() {
         if (sortedColumn > -1) {
             return ((SortableTableModel) model).getUnderlying();
@@ -595,31 +625,31 @@ public class Table extends Container {
         return model;
     }
 
-    /**
-     * Replaces the underlying model
-     *
-     * @param model the new model
-     */
+    /// Replaces the underlying model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the new model
     public void setModel(TableModel model) {
         this.model = model;
         updateModel();
         revalidate();
     }
 
-    /**
-     * Indicates whether the table border should be drawn
-     *
-     * @return the drawBorder
-     */
+    /// Indicates whether the table border should be drawn
+    ///
+    /// #### Returns
+    ///
+    /// the drawBorder
     public boolean isDrawBorder() {
         return drawBorder;
     }
 
-    /**
-     * Indicates whether the table border should be drawn
-     *
-     * @param drawBorder the drawBorder to set
-     */
+    /// Indicates whether the table border should be drawn
+    ///
+    /// #### Parameters
+    ///
+    /// - `drawBorder`: the drawBorder to set
     public void setDrawBorder(boolean drawBorder) {
         if (this.drawBorder != drawBorder) {
             this.drawBorder = drawBorder;
@@ -628,21 +658,21 @@ public class Table extends Container {
         }
     }
 
-    /**
-     * Returns the current inner border mode
-     *
-     * @return the current inner border mode (one of the INNER_BORDER_* constants)
-     */
+    /// Returns the current inner border mode
+    ///
+    /// #### Returns
+    ///
+    /// the current inner border mode (one of the INNER_BORDER_* constants)
     public int getInnerBorderMode() {
         return innerBorder;
     }
 
-    /**
-     * Sets how to draw the inner border (All of it, only rows/columns, none, groups)
-     * Note that setting to any mode other than NONE/ALL will result in the border drawing as collapsed whether this is a collpased border or not
-     *
-     * @param innerBorder one of the INNER_BORDER_* constants
-     */
+    /// Sets how to draw the inner border (All of it, only rows/columns, none, groups)
+    /// Note that setting to any mode other than NONE/ALL will result in the border drawing as collapsed whether this is a collpased border or not
+    ///
+    /// #### Parameters
+    ///
+    /// - `innerBorder`: one of the INNER_BORDER_* constants
     public void setInnerBorderMode(int innerBorder) {
         if ((innerBorder < INNER_BORDERS_NONE) || (innerBorder > INNER_BORDERS_ALL)) {
             throw new IllegalArgumentException("Inner border mode must be one of the INNER_BORDER_* constants");
@@ -655,23 +685,26 @@ public class Table extends Container {
         }
     }
 
-    /**
-     * Returns whether an inner border should be drawn after the specified row.
-     * This allows customization in subclasses to create for example the effects of segments in atable, i.e. instead of a line after each row - lines after "chunks" of rows.
-     * Note that this is queried only when the inner border mode is set to INNER_BORDER_ROWS
-     *
-     * @param row The row in question
-     * @return true to draw inner border, false otherwise
-     */
+    /// Returns whether an inner border should be drawn after the specified row.
+    /// This allows customization in subclasses to create for example the effects of segments in atable, i.e. instead of a line after each row - lines after "chunks" of rows.
+    /// Note that this is queried only when the inner border mode is set to INNER_BORDER_ROWS
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: The row in question
+    ///
+    /// #### Returns
+    ///
+    /// true to draw inner border, false otherwise
     protected boolean shouldDrawInnerBorderAfterRow(int row) {
         return true;
     }
 
-    /**
-     * Indicates whether the borders of the cells should collapse to form a one line border
-     *
-     * @param collapseBorder true to collapse (default), false for separate borders
-     */
+    /// Indicates whether the borders of the cells should collapse to form a one line border
+    ///
+    /// #### Parameters
+    ///
+    /// - `collapseBorder`: true to collapse (default), false for separate borders
     public void setCollapseBorder(boolean collapseBorder) {
         if (this.collapseBorder != collapseBorder) {
             this.collapseBorder = collapseBorder;
@@ -682,22 +715,23 @@ public class Table extends Container {
         }
     }
 
-    /**
-     * Indicates whether empty cells should have borders (relevant only for separate borders and not for collapsed)
-     *
-     * @param drawEmptyCellsBorder - true to draw (default), false otherwise
-     */
+    /// Indicates whether empty cells should have borders (relevant only for separate borders and not for collapsed)
+    ///
+    /// #### Parameters
+    ///
+    /// - `drawEmptyCellsBorder`: - true to draw (default), false otherwise
     public void setDrawEmptyCellsBorder(boolean drawEmptyCellsBorder) {
         this.drawEmptyCellsBorder = drawEmptyCellsBorder;
         repaint();
     }
 
-    /**
-     * Sets the spacing of cells border (relevant only for separate borders and not for collapsed)
-     *
-     * @param horizontal - The horizontal spacing
-     * @param vertical   - The vertical spacing
-     */
+    /// Sets the spacing of cells border (relevant only for separate borders and not for collapsed)
+    ///
+    /// #### Parameters
+    ///
+    /// - `horizontal`: - The horizontal spacing
+    ///
+    /// - `vertical`: - The vertical spacing
     public void setBorderSpacing(int horizontal, int vertical) {
         horizontalBorderSpacing = horizontal;
         verticalBorderSpacing = vertical;
@@ -734,22 +768,28 @@ public class Table extends Container {
     }
 
 
-    /**
-     * Indicates the alignment of the title see label alignment for details
-     *
-     * @return the title alignment
-     * @see com.codename1.ui.Label#setAlignment(int)
-     */
+    /// Indicates the alignment of the title see label alignment for details
+    ///
+    /// #### Returns
+    ///
+    /// the title alignment
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
     public int getTitleAlignment() {
         return titleAlignment;
     }
 
-    /**
-     * Indicates the alignment of the title see label alignment for details
-     *
-     * @param titleAlignment the title alignment
-     * @see com.codename1.ui.Label#setAlignment(int)
-     */
+    /// Indicates the alignment of the title see label alignment for details
+    ///
+    /// #### Parameters
+    ///
+    /// - `titleAlignment`: the title alignment
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
     public void setTitleAlignment(int titleAlignment) {
         this.titleAlignment = titleAlignment;
         for (int iter = 0; iter < model.getColumnCount(); iter++) {
@@ -758,12 +798,15 @@ public class Table extends Container {
     }
 
 
-    /**
-     * Returns the column in which the given cell is placed
-     *
-     * @param cell the component representing the cell placed in the table
-     * @return the column in which the cell was placed in the table
-     */
+    /// Returns the column in which the given cell is placed
+    ///
+    /// #### Parameters
+    ///
+    /// - `cell`: the component representing the cell placed in the table
+    ///
+    /// #### Returns
+    ///
+    /// the column in which the cell was placed in the table
     public int getCellColumn(Component cell) {
         Integer i = ((Integer) cell.getClientProperty("column"));
         if (i != null) {
@@ -772,12 +815,15 @@ public class Table extends Container {
         return -1;
     }
 
-    /**
-     * Returns the row in which the given cell is placed
-     *
-     * @param cell the component representing the cell placed in the table
-     * @return the row in which the cell was placed in the table
-     */
+    /// Returns the row in which the given cell is placed
+    ///
+    /// #### Parameters
+    ///
+    /// - `cell`: the component representing the cell placed in the table
+    ///
+    /// #### Returns
+    ///
+    /// the row in which the cell was placed in the table
     public int getCellRow(Component cell) {
         Integer i = ((Integer) cell.getClientProperty("row"));
         if (i != null) {
@@ -786,55 +832,66 @@ public class Table extends Container {
         return -1;
     }
 
-    /**
-     * Indicates the alignment of the cells see label alignment for details
-     *
-     * @return the cell alignment
-     * @see com.codename1.ui.Label#setAlignment(int)
-     */
+    /// Indicates the alignment of the cells see label alignment for details
+    ///
+    /// #### Returns
+    ///
+    /// the cell alignment
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
     public int getCellAlignment() {
         return cellAlignment;
     }
 
-    /**
-     * Indicates the alignment of the cells see label alignment for details
-     *
-     * @param cellAlignment the table cell alignment
-     * @see com.codename1.ui.Label#setAlignment(int)
-     */
+    /// Indicates the alignment of the cells see label alignment for details
+    ///
+    /// #### Parameters
+    ///
+    /// - `cellAlignment`: the table cell alignment
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
     public void setCellAlignment(int cellAlignment) {
         this.cellAlignment = cellAlignment;
         repaint();
     }
 
-    /**
-     * Indicates whether the table should render a table header as the first row
-     *
-     * @return the includeHeader
-     */
+    /// Indicates whether the table should render a table header as the first row
+    ///
+    /// #### Returns
+    ///
+    /// the includeHeader
     public boolean isIncludeHeader() {
         return includeHeader;
     }
 
-    /**
-     * Indicates whether the table should render a table header as the first row
-     *
-     * @param includeHeader the includeHeader to set
-     */
+    /// Indicates whether the table should render a table header as the first row
+    ///
+    /// #### Parameters
+    ///
+    /// - `includeHeader`: the includeHeader to set
     public void setIncludeHeader(boolean includeHeader) {
         this.includeHeader = includeHeader;
         updateModel();
     }
 
-    /**
-     * Creates the table cell constraint for the given cell, this method can be overriden for
-     * the purposes of modifying the table constraints.
-     *
-     * @param value  the value of the cell
-     * @param row    the table row
-     * @param column the table column
-     * @return the table constraint
-     */
+    /// Creates the table cell constraint for the given cell, this method can be overriden for
+    /// the purposes of modifying the table constraints.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value of the cell
+    ///
+    /// - `row`: the table row
+    ///
+    /// - `column`: the table column
+    ///
+    /// #### Returns
+    ///
+    /// the table constraint
     protected TableLayout.Constraint createCellConstraint(Object value, int row, int column) {
         if (includeHeader) {
             row++;
@@ -843,34 +900,26 @@ public class Table extends Container {
         return t.createConstraint(row, column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"data", "header"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArray2DClass(),
                 com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String[][]", "String[]"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("data".equals(name)) {
@@ -898,9 +947,7 @@ public class Table extends Container {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("data".equals(name)) {
@@ -914,15 +961,18 @@ public class Table extends Container {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * If the table is sorted returns the position of the row in the actual
-     * underlying model
-     *
-     * @param row the row as it visually appears in the table or in the
-     *            {@code createCell} method
-     * @return the position of the row in the physical model, this will be
-     * the same value if the table isn't sorted
-     */
+    /// If the table is sorted returns the position of the row in the actual
+    /// underlying model
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: @param row the row as it visually appears in the table or in the
+    ///            `createCell` method
+    ///
+    /// #### Returns
+    ///
+    /// @return the position of the row in the physical model, this will be
+    /// the same value if the table isn't sorted
     public int translateSortedRowToModelRow(int row) {
         if (model instanceof SortableTableModel) {
             return ((SortableTableModel) model).getSortedPosition(row);
@@ -930,20 +980,20 @@ public class Table extends Container {
         return row;
     }
 
-    /**
-     * Sort support can be toggled with this flag
-     *
-     * @return the sortSupported
-     */
+    /// Sort support can be toggled with this flag
+    ///
+    /// #### Returns
+    ///
+    /// the sortSupported
     public boolean isSortSupported() {
         return sortSupported;
     }
 
-    /**
-     * Sort support can be toggled with this flag
-     *
-     * @param sortSupported the sortSupported to set
-     */
+    /// Sort support can be toggled with this flag
+    ///
+    /// #### Parameters
+    ///
+    /// - `sortSupported`: the sortSupported to set
     public void setSortSupported(boolean sortSupported) {
         if (this.sortSupported != sortSupported) {
             this.sortSupported = sortSupported;
@@ -994,9 +1044,7 @@ public class Table extends Container {
         private int editingColumn = -1;
         private int editingRow = -1;
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public final void dataChanged(int row, int column) {
             if (row == Integer.MIN_VALUE) {

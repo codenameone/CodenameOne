@@ -24,71 +24,58 @@
 
 package com.codename1.io;
 
-/**
- * The event based parser allows parsing without creating an object tree by
- * receiving callbacks to this class.
- *
- * @author Shai Almog
- */
+/// The event based parser allows parsing without creating an object tree by
+/// receiving callbacks to this class.
+///
+/// @author Shai Almog
 public interface JSONParseCallback {
-    /**
-     * Indicates that the parser ran into an opening bracket event {
-     */
+    /// Indicates that the parser ran into an opening bracket event {
     void startBlock(String blockName);
 
-    /**
-     * Indicates that the parser ran into an ending bracket event }
-     */
+    /// Indicates that the parser ran into an ending bracket event }
     void endBlock(String blockName);
 
-    /**
-     * Indicates that the parser ran into an opening bracket event [
-     */
+    /// Indicates that the parser ran into an opening bracket event [
     void startArray(String arrayName);
 
-    /**
-     * Indicates that the parser ran into an ending bracket event ]
-     */
+    /// Indicates that the parser ran into an ending bracket event ]
     void endArray(String arrayName);
 
-    /**
-     * Submits a token from the JSON data as a java string, this token is always a string value
-     */
+    /// Submits a token from the JSON data as a java string, this token is always a string value
     void stringToken(String tok);
 
-    /**
-     * Submits a numeric token from the JSON data
-     *
-     * @param tok the token value
-     */
+    /// Submits a numeric token from the JSON data
+    ///
+    /// #### Parameters
+    ///
+    /// - `tok`: the token value
     void numericToken(double tok);
 
-    /**
-     * Submits a boolean token from the JSON data
-     *
-     * @param tok the token value
-     */
+    /// Submits a boolean token from the JSON data
+    ///
+    /// #### Parameters
+    ///
+    /// - `tok`: the token value
     void booleanToken(boolean tok);
 
-    /**
-     * Submits a numeric token from the JSON data
-     */
+    /// Submits a numeric token from the JSON data
     void longToken(long tok);
 
-    /**
-     * This method is called when a string key/value pair is detected within the json
-     * it is essentially redundant when following string/numeric token.
-     *
-     * @param key   the key
-     * @param value a string value
-     */
+    /// This method is called when a string key/value pair is detected within the json
+    /// it is essentially redundant when following string/numeric token.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    ///
+    /// - `value`: a string value
     void keyValue(String key, String value);
 
-    /**
-     * This method indicates to the Parser if this Callback is still alive
-     *
-     * @return true if the Callback is still interested to get the JSON parse
-     * events from the JSONParser
-     */
+    /// This method indicates to the Parser if this Callback is still alive
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the Callback is still interested to get the JSON parse
+    /// events from the JSONParser
     boolean isAlive();
 }

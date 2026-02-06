@@ -4,9 +4,5 @@
     Author     : Shai Almog
 */
 
-/**
- * <p>
- *     A simple regular expression API that is portable across all platforms
- * </p>
- */
+/// A simple regular expression API that is portable across all platforms
 package com.codename1.util.regex;

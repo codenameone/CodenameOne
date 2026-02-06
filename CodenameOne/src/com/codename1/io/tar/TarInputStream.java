@@ -1,22 +1,18 @@
-/**
- * Copyright 2012 Kamran Zafar
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright 2012 Kamran Zafar
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
-/**
- * The original source has been modified by Paul Williams.
- */
+/// The original source has been modified by Paul Williams.
 
 package com.codename1.io.tar;
 
@@ -25,9 +21,7 @@ import com.codename1.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * @author Kamran Zafar
- */
+/// @author Kamran Zafar
 public class TarInputStream extends BufferedInputStream {
 
     private static final int SKIP_BUFFER_SIZE = 2048;
@@ -47,26 +41,22 @@ public class TarInputStream extends BufferedInputStream {
         return false;
     }
 
-    /**
-     * Not supported
-     */
+    /// Not supported
     @Override
     public synchronized void mark(int readlimit) {
     }
 
-    /**
-     * Not supported
-     */
+    /// Not supported
     @Override
     public synchronized void reset() throws IOException {
         throw new IOException("mark/reset not supported");
     }
 
-    /**
-     * Read a byte
-     *
-     * @see java.io.FilterInputStream#read()
-     */
+    /// Read a byte
+    ///
+    /// #### See also
+    ///
+    /// - java.io.FilterInputStream#read()
     @Override
     public int read() throws IOException {
         byte[] buf = new byte[1];
@@ -80,12 +70,12 @@ public class TarInputStream extends BufferedInputStream {
         return res;
     }
 
-    /**
-     * Checks if the bytes being read exceed the entry size and adjusts the byte
-     * array length. Updates the byte counters
-     *
-     * @see java.io.FilterInputStream#read(byte[], int, int)
-     */
+    /// Checks if the bytes being read exceed the entry size and adjusts the byte
+    /// array length. Updates the byte counters
+    ///
+    /// #### See also
+    ///
+    /// - java.io.FilterInputStream#read(byte[], int, int)
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
         if (currentEntry != null) {
@@ -109,12 +99,15 @@ public class TarInputStream extends BufferedInputStream {
         return br;
     }
 
-    /**
-     * Returns the next entry in the tar file
-     *
-     * @return TarEntry
-     * @throws IOException
-     */
+    /// Returns the next entry in the tar file
+    ///
+    /// #### Returns
+    ///
+    /// TarEntry
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public TarEntry getNextEntry() throws IOException {
         closeCurrentEntry();
 
@@ -151,11 +144,11 @@ public class TarInputStream extends BufferedInputStream {
         return currentEntry;
     }
 
-    /**
-     * Closes the current tar entry
-     *
-     * @throws IOException
-     */
+    /// Closes the current tar entry
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     protected void closeCurrentEntry() throws IOException {
         if (currentEntry != null) {
             if (currentEntry.getSize() > currentFileSize) {
@@ -178,11 +171,11 @@ public class TarInputStream extends BufferedInputStream {
         }
     }
 
-    /**
-     * Skips the pad at the end of each tar entry file content
-     *
-     * @throws IOException
-     */
+    /// Skips the pad at the end of each tar entry file content
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     protected void skipPad() throws IOException {
         if (bytesRead > 0) {
             int extra = (int) (bytesRead % TarConstants.DATA_BLOCK);
@@ -197,10 +190,9 @@ public class TarInputStream extends BufferedInputStream {
         }
     }
 
-    /**
-     * Skips 'n' bytes on the InputStream<br>
-     * Overrides default implementation of skip
-     */
+    /// Skips 'n' bytes on the InputStream
+    ///
+    /// Overrides default implementation of skip
     @Override
     public long skip(long n) throws IOException {
         if (defaultSkip) {

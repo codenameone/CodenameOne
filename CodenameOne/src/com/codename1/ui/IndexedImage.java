@@ -32,16 +32,17 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * An indexed image is an image "compressed" in memory to occupy as little memory
- * as possible in this sense it is slower to draw and only a single indexed image
- * can be drawn at any given time. However, this allows images with low color counts
- * to use as little as one byte per pixel which can save up to 4 times of the memory
- * overhead.
- *
- * @author Shai Almog
- * @deprecated This class should no longer be referenced directly. Use Image.createIndexed instead
- */
+/// An indexed image is an image "compressed" in memory to occupy as little memory
+/// as possible in this sense it is slower to draw and only a single indexed image
+/// can be drawn at any given time. However, this allows images with low color counts
+/// to use as little as one byte per pixel which can save up to 4 times of the memory
+/// overhead.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// This class should no longer be referenced directly. Use Image.createIndexed instead
 class IndexedImage extends Image {
     private static final Object LINE_CACHE_LOCK = new Object();
     static int[] lineCache;
@@ -51,15 +52,21 @@ class IndexedImage extends Image {
     private int width;
     private int height;
 
-    /**
-     * Creates an indexed image with byte data
-     *
-     * @param width   image width
-     * @param height  image height
-     * @param palette the color palette to use with the byte data
-     * @param data    byte data containing palette offsets to map to ARGB colors
-     * @deprecated use Image.createIndexed instead
-     */
+    /// Creates an indexed image with byte data
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: image width
+    ///
+    /// - `height`: image height
+    ///
+    /// - `palette`: the color palette to use with the byte data
+    ///
+    /// - `data`: byte data containing palette offsets to map to ARGB colors
+    ///
+    /// #### Deprecated
+    ///
+    /// use Image.createIndexed instead
     public IndexedImage(int width, int height, int[] palette, byte[] data) {
         super(null);
         this.width = width;
@@ -69,9 +76,7 @@ class IndexedImage extends Image {
         initOpaque();
     }
 
-    /**
-     * Converts an image to a package image after which the original image can be GC'd
-     */
+    /// Converts an image to a package image after which the original image can be GC'd
     private IndexedImage(int width, int height, int[] palette, int[] rgb) {
         super(null);
 
@@ -88,25 +93,36 @@ class IndexedImage extends Image {
         initOpaque();
     }
 
-    /**
-     * Packs the image loaded by MIDP
-     *
-     * @param imageName a name to load using Image.createImage()
-     * @return a packed image
-     * @throws IOException when create fails
-     */
+    /// Packs the image loaded by MIDP
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageName`: a name to load using Image.createImage()
+    ///
+    /// #### Returns
+    ///
+    /// a packed image
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when create fails
     public static Image pack(String imageName) throws IOException {
         return pack(Image.createImage(imageName));
     }
 
-    /**
-     * Packs the source rgba image and returns null if it fails
-     *
-     * @param rgb    array containing ARGB data
-     * @param width  width of the image in the rgb array
-     * @param height height of the image
-     * @return a packed image or null
-     */
+    /// Packs the source rgba image and returns null if it fails
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`: array containing ARGB data
+    ///
+    /// - `width`: width of the image in the rgb array
+    ///
+    /// - `height`: height of the image
+    ///
+    /// #### Returns
+    ///
+    /// a packed image or null
     public static IndexedImage pack(int[] rgb, int width, int height) {
         int arrayLength = width * height;
 
@@ -135,13 +151,16 @@ class IndexedImage extends Image {
         return new IndexedImage(width, height, tempPalette, rgb);
     }
 
-    /**
-     * Tries to pack the given image and would return the packed image or source
-     * image if packing failed
-     *
-     * @param sourceImage the image which would be converted to a packed image if possible
-     * @return the source image if packing failed or a newly packed image if it succeeded
-     */
+    /// Tries to pack the given image and would return the packed image or source
+    /// image if packing failed
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceImage`: the image which would be converted to a packed image if possible
+    ///
+    /// #### Returns
+    ///
+    /// the source image if packing failed or a newly packed image if it succeeded
     public static Image pack(final Image sourceImage) {
         int width = sourceImage.getWidth();
         int height = sourceImage.getHeight();
@@ -154,10 +173,8 @@ class IndexedImage extends Image {
         return i;
     }
 
-    /**
-     * Searches the array up to "length" and returns true if value is within the
-     * array up to that point.
-     */
+    /// Searches the array up to "length" and returns true if value is within the
+    /// array up to that point.
     private static boolean contains(int[] array, int length, int value) {
         for (int iter = 0; iter < length; iter++) {
             if (array[iter] == value) {
@@ -167,12 +184,15 @@ class IndexedImage extends Image {
         return false;
     }
 
-    /**
-     * Loads a packaged image that was stored in a stream using the toByteArray method
-     *
-     * @param data previously stored image data
-     * @return newly created packed image
-     */
+    /// Loads a packaged image that was stored in a stream using the toByteArray method
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: previously stored image data
+    ///
+    /// #### Returns
+    ///
+    /// newly created packed image
     public static IndexedImage load(byte[] data) {
         try {
             DataInputStream input = new DataInputStream(new ByteArrayInputStream(data));
@@ -207,12 +227,15 @@ class IndexedImage extends Image {
         }
     }
 
-    /**
-     * Finds the offset within the palette of the given rgb value
-     *
-     * @param value ARGB value from the image
-     * @return offset within the palette array
-     */
+    /// Finds the offset within the palette of the given rgb value
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: ARGB value from the image
+    ///
+    /// #### Returns
+    ///
+    /// offset within the palette array
     private int paletteOffset(int rgb) {
         int plen = palette.length;
         for (int iter = 0; iter < plen; iter++) {
@@ -223,9 +246,7 @@ class IndexedImage extends Image {
         throw new IllegalStateException("Invalid palette request in paletteOffset");
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
         byte[] arr = new byte[width * height];
@@ -240,17 +261,13 @@ class IndexedImage extends Image {
         return new IndexedImage(width, height, palette, arr);
     }
 
-    /**
-     * Unsupported in the current version, this method will be implemented in a future release
-     */
+    /// Unsupported in the current version, this method will be implemented in a future release
     @Override
     public Image rotate(int degrees) {
         throw new RuntimeException("The rotate method is not supported by indexed images at the moment");
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Image modifyAlpha(byte alpha) {
         int[] newPalette = new int[palette.length];
@@ -265,17 +282,13 @@ class IndexedImage extends Image {
         return new IndexedImage(width, height, newPalette, imageDataByte);
     }
 
-    /**
-     * This method is unsupported in this image type
-     */
+    /// This method is unsupported in this image type
     @Override
     public Graphics getGraphics() {
         throw new RuntimeException("Indexed image objects are immutable");
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void getRGB(int[] rgbData,
                 int offset,
@@ -295,9 +308,7 @@ class IndexedImage extends Image {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         synchronized (LINE_CACHE_LOCK) {
@@ -332,25 +343,19 @@ class IndexedImage extends Image {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getWidth() {
         return width;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getHeight() {
         return height;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void scale(int width, int height) {
         IndexedImage p = (IndexedImage) scaled(width, height);
@@ -359,9 +364,7 @@ class IndexedImage extends Image {
         this.height = height;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Image scaled(int width, int height) {
         int srcWidth = getWidth();
@@ -415,9 +418,7 @@ class IndexedImage extends Image {
         return destinationArray;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     int[] getRGBImpl() {
         int rlen = width * height;
@@ -430,30 +431,30 @@ class IndexedImage extends Image {
         return rgb;
     }
 
-    /**
-     * Retrieves the palette for the indexed image drawing
-     *
-     * @return the palette data
-     */
+    /// Retrieves the palette for the indexed image drawing
+    ///
+    /// #### Returns
+    ///
+    /// the palette data
     public final int[] getPalette() {
         return palette;
     }
 
-    /**
-     * Retrieves the image data as offsets into the palette array
-     *
-     * @return the image data
-     */
+    /// Retrieves the image data as offsets into the palette array
+    ///
+    /// #### Returns
+    ///
+    /// the image data
     public final byte[] getImageDataByte() {
         return imageDataByte;
     }
 
-    /**
-     * This method allows us to store a package image into a persistent stream easily
-     * thus allowing us to store the image in RMS.
-     *
-     * @return a byte array that can be loaded using the load method
-     */
+    /// This method allows us to store a package image into a persistent stream easily
+    /// thus allowing us to store the image in RMS.
+    ///
+    /// #### Returns
+    ///
+    /// a byte array that can be loaded using the load method
     public byte[] toByteArray() {
         try {
             ByteArrayOutputStream array = new ByteArrayOutputStream();
@@ -475,9 +476,7 @@ class IndexedImage extends Image {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean requiresDrawImage() {
         return true;
