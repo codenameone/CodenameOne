@@ -339,6 +339,18 @@
                         <show>protected</show>
                         <failOnError>false</failOnError>
                         <doclint>none</doclint>
+                        <top><![CDATA[
+<script src="script-files/highlight.min.js"></script>
+<script src="script-files/javadoc-highlight-init.js"></script>
+                        ]]></top>
+                        <additionalOptions>
+                            <additionalOption>--add-stylesheet</additionalOption>
+                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
+                            <additionalOption>--add-script</additionalOption>
+                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.min.js</additionalOption>
+                            <additionalOption>--add-script</additionalOption>
+                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/javadoc-highlight-init.js</additionalOption>
+                        </additionalOptions>
                     </configuration>
                 </plugin>
                 <plugin>
