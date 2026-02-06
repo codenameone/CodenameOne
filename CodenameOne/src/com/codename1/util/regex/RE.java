@@ -250,7 +250,7 @@ import java.util.ArrayList;
 ///      If it ever is fixed, test #137 in RETest.txt should be updated.
 ///
 /// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
-/// @author [Tobias Schäfer](mailto:ts@sch-fer.de)
+/// @author [Tobias Schafer](mailto:ts@sch-fer.de)
 ///
 /// #### See also
 ///

@@ -34,7 +34,7 @@ To save some time/effort we suggest using the ready made resource files linked i
 
 You will need a gamedata.res file that contains all the 52 cards as multi images using the naming convention of ‘rank suite.png’ example: 10c.png (10 of clubs) or ad.png (Ace of diamonds).
 
-To accomplish this we can create 52 images of roughly 153x217 pixels for all the cards then use the designer tool and select “Quick Add MultiImages” from the menu. When prompted select HD resolution. This effectively created 52 multi-images for all relevant resolutions.
+To accomplish this we can create 52 images of roughly 153x217 pixels for all the cards then use the designer tool and select "Quick Add MultiImages" from the menu. When prompted select HD resolution. This effectively created 52 multi-images for all relevant resolutions.
 
 You can also modify the default theme that ships with the  application in small ways to create the white over green color scheme. Open it in the designer tool by double clicking it and select the theme.
 
@@ -52,7 +52,7 @@ The first step is creating the splash animation as you can see in the screenshot
 .Animation stages for the splash screen opening animation
 image::img/gaming-fig2.png[Figure 2,scaledwidth=40%]
 
-The animation in the splash screen and most of the following animations are achieved using the simple tool of layout animations. In Codename One components are automatically arranged into position using layout managers, however this isn’t implicit unless the device is rotated. A layout animation relies on this fact, it allows you to place components in a position (whether by using a layout manager or by using `setX`/`setY`) then invoke the layout animation code so they will slide into their “proper” position based on the layout manager rules.
+The animation in the splash screen and most of the following animations are achieved using the simple tool of layout animations. In Codename One components are automatically arranged into position using layout managers, however this isn’t implicit unless the device is rotated. A layout animation relies on this fact, it allows you to place components in a position (whether by using a layout manager or by using `setX`/`setY`) then invoke the layout animation code so they will slide into their "proper" position based on the layout manager rules.
 
 You can see how we achieved the splash screen animation of the cards sliding into place in Listing 1 within the `showSplashScreen()` method. After we change the layout to a box X layout we just invoke animateHierarchy to animate the cards into place.
 
@@ -73,7 +73,7 @@ This animation is really easy to accomplish although it does have several stages
 
 Notice that here we use `animateLayoutAndWait`, which effectively blocks the calling thread until the animation is completed. This is a VERY important and tricky subject!
 
-Codename One is for the most part a single threaded API, it supports working on other threads but it is your responsibility to invoke everything on the EDT (Event Dispatch Thread). Since the EDT does the entire rendering, events etc. if you block it you will effectively stop Codename One in its place! However, there is a trick: invokeAndBlock is a feature that allows you to stop the EDT and do stuff then restore the EDT without “really” stopping it. Its tricky, I won’t get into this in this article (this subject deserves an article of its own) but the gist of it is that you can’t just invoke Thread.sleep() in a Codename One application (at least not on the EDT) but you can use clever methods such as `Dialog.show()`, `animateLayoutAndWait` etc. and they will block the EDT for you. This is really convenient since you can just write code serially without requiring event handling for every single feature.
+Codename One is for the most part a single threaded API, it supports working on other threads but it is your responsibility to invoke everything on the EDT (Event Dispatch Thread). Since the EDT does the entire rendering, events etc. if you block it you will effectively stop Codename One in its place! However, there is a trick: invokeAndBlock is a feature that allows you to stop the EDT and do stuff then restore the EDT without "really" stopping it. Its tricky, I won’t get into this in this article (this subject deserves an article of its own) but the gist of it is that you can’t just invoke Thread.sleep() in a Codename One application (at least not on the EDT) but you can use clever methods such as `Dialog.show()`, `animateLayoutAndWait` etc. and they will block the EDT for you. This is really convenient since you can just write code serially without requiring event handling for every single feature.
 
 Now that we got that out of the way, the rest of the code is clearer. Now we understand that `animateLayoutAndWait` will literally wait for the animation to complete and the next lines can do the next animation. Indeed after that we invoke the `dealCard` method that hands the cards to the players. This method is also blocking (using and `wait` methods internally) it also marks the cards as draggable and adds that drag and drop logic which we will later use to swap cards.
 

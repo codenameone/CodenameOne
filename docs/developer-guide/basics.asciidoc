@@ -225,7 +225,7 @@ To sum this up, we can use layout managers and nesting to create elaborate UI's 
 .Flow Layout
 image::img/flow-layout.png[Flow Layout,scaledwidth=20%]
 
-link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[Flow layout] lets the components “flow” horizontally and break a line when reaching the edge of the container. It's the default layout manager for containers. Because it's so flexible it's also problematic as it can result in incorrect preferred size values for the parent https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container].  This can create a reflow issue, as a result we recommend using flow layout only for trivial cases. Avoid it for things such as text input etc. As the size of the text input can vary in runtime.
+link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[Flow layout] lets the components "flow" horizontally and break a line when reaching the edge of the container. It's the default layout manager for containers. Because it's so flexible it's also problematic as it can result in incorrect preferred size values for the parent https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container].  This can create a reflow issue, as a result we recommend using flow layout only for trivial cases. Avoid it for things such as text input etc. As the size of the text input can vary in runtime.
 
 [source,java]
 ----
@@ -595,7 +595,7 @@ When working in the non-android environment we use a `BoxLayout` on the Y axis a
 
 ==== Layered Layout
 
-When used without constraints, the https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] places the components in order one on top of the other and sizes them all to the size of the largest component. This is useful when trying to create an overlay on top of an existing component. E.g. an “x” button to allow removing the component.
+When used without constraints, the https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] places the components in order one on top of the other and sizes them all to the size of the largest component. This is useful when trying to create an overlay on top of an existing component. E.g. an "x" button to allow removing the component.
 
 .The X on this button was placed there using the layered layout code below
 image::img/layered-layout.png[The X on this button was placed there using the layered layout code below,scaledwidth=20%]

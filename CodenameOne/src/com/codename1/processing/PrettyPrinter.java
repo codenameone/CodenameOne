@@ -120,8 +120,8 @@ final class PrettyPrinter {
     ///
     /// @return a printable, displayable, transmittable
     /// representation of the object, beginning
-    /// with `{` (left brace) and ending
-    /// with `}` (right brace).
+    /// with `{` (left brace) and ending
+    /// with `}` (right brace).
     static String valueToString(Object value, int indentFactor, int indent) {
         if (value == null) {
             return "null";
@@ -280,8 +280,8 @@ final class PrettyPrinter {
     ///
     /// @return a printable, displayable, portable, transmittable
     /// representation of the object, beginning
-    /// with `{` (left brace) and ending
-    /// with `}` (right brace).
+    /// with `{` (left brace) and ending
+    /// with `}` (right brace).
     public String toString(int indentFactor) {
         return toString(indentFactor, 0);
     }
@@ -301,8 +301,8 @@ final class PrettyPrinter {
     ///
     /// @return a printable, displayable, transmittable
     /// representation of the object, beginning
-    /// with `{` (left brace) and ending
-    /// with `}` (right brace).
+    /// with `{` (left brace) and ending
+    /// with `}` (right brace).
     String toString(int indentFactor, int indent) {
         int i;
         int n = length();

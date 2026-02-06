@@ -92,7 +92,7 @@ Next, drag a list into the center of the layout and you should now have a functi
 .Drag list onto form
 image::img/gb-create-list-2.png[Drag list onto form,scaledwidth=40%]
 
-Next, we will create the Renderer, which indicates how an individual item in the list appears, start by pressing the Add New GUI Element button and select the “Blank Container” option!  Fill the name as “MyRenderer” or anything like that.
+Next, we will create the Renderer, which indicates how an individual item in the list appears, start by pressing the Add New GUI Element button and select the "Blank Container" option!  Fill the name as "MyRenderer" or anything like that.
 
 .Set list renderer
 image::img/gb-create-list3.png[Set list renderer,scaledwidth=40%]

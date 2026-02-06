@@ -55,7 +55,7 @@ You can learn more about lead components in <<lead-component-section,here>>.
 
 === Form
 
-https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] is the top-level container of Codename One, `Form` derives from `Container` and is the element we “show”. Only one form can be visible at any given time. We can get the currently visible `Form` using the code:
+https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] is the top-level container of Codename One, `Form` derives from `Container` and is the element we "show". Only one form can be visible at any given time. We can get the currently visible `Form` using the code:
 
 [source,java]
 ----
@@ -75,7 +75,7 @@ myForm.getContentPane().add(...);
 .Form layout graphic
 image::img/perspective-form-layers.png[Form layout graphic,scaledwidth=20%]
 
-You can see that every `Form` has space allocated for the title area. If you don’t set the title it won’t show up (its size will be zero), but it will still be there. The same isn’t always true for the case of the menu bar, which can vary significantly. Effectively, the section that matters is the content pane, so the form tries to do the “right thing” by pretending to be the content pane. However, this isn’t always seamless and sometimes code needs to just invoke `getContentPane()` in order to work directly with the container.
+You can see that every `Form` has space allocated for the title area. If you don’t set the title it won’t show up (its size will be zero), but it will still be there. The same isn’t always true for the case of the menu bar, which can vary significantly. Effectively, the section that matters is the content pane, so the form tries to do the "right thing" by pretending to be the content pane. However, this isn’t always seamless and sometimes code needs to just invoke `getContentPane()` in order to work directly with the container.
 
 TIP: A good example for such a case is with layout animations. Animating the form might not produce the right results. When in doubt its pretty easy to just use `getContentPane` instead of working with the `Form` directly.
 
@@ -428,7 +428,7 @@ image::img/components-label-text-position.png[Label positions,scaledwidth=20%]
 
 TIP: <<SpanLabel,SpanLabel>> supports multiple lines with a single label, notice that it does carry a performance penalty for this functionality.
 
-Labels support tickering and the ability to end with “...” if there isn't enough space to render the label. Developers can determine the placement of the label relatively to its icon in quite a few powerful ways.
+Labels support tickering and the ability to end with "..." if there isn't enough space to render the label. Developers can determine the placement of the label relatively to its icon in quite a few powerful ways.
 
 ==== Label Gap
 
@@ -486,7 +486,7 @@ Codename One.
 - https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html#setDoneListener-com.codename1.ui.events.ActionListener-[Done listener] is only available in the `TextField`
 - Different `UIID`
 
-NOTE: The semantic difference between `TextField` & `TextArea` dates back to the ancestor of Codename One: LWUIT. Feature phones don’t have “proper” in-place editing capabilities & thus `TextField` was introduced to allow such input.
+NOTE: The semantic difference between `TextField` & `TextArea` dates back to the ancestor of Codename One: LWUIT. Feature phones don’t have "proper" in-place editing capabilities & thus `TextField` was introduced to allow such input.
 
 Because it lacks the blinking cursor capability `TextArea` is often used as a multi-line label and is used internally in `SpanLabel`, `SpanButton` etc.
 
@@ -2965,20 +2965,20 @@ Codename One 4.0 introduced a new API for interacting with Javascript in Codenam
 
 ===== So what was wrong with the old API?
 
-The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of `invokeAndBlock()` underneath the covers.  This resulted in a very nice API with high-level abstractions that played nicely with a synchronous programming model, but it came with a price-tag in terms of performance, complexity, and predictability.  Let’s take a simple example,   getting a reference to the “window” object:
+The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of `invokeAndBlock()` underneath the covers.  This resulted in a very nice API with high-level abstractions that played nicely with a synchronous programming model, but it came with a price-tag in terms of performance, complexity, and predictability.  Let’s take a simple example,   getting a reference to the "window" object:
 
 [source,java]
 ----
 JSObject window = ctx.get("window");
 ----
 
-This code looks harmless enough, but this is actually quite expensive.  It issues a command to the `BrowserComponent`, and uses `invokeAndBlock()` to wait for the command to go through and send back a response.  `invokeAndBlock()` is a magical tool that allows you to “block” without blocking the EDT, but it has its costs, and shouldn’t be overused.  Most of the Codename One APIs that use `invokeAndBlock()` indicate this in their name.  E.g. `Component.animateLayoutAndWait()`.   This gives you the expectation that this call could take some time, and helps to alert you to the underlying cost.
+This code looks harmless enough, but this is actually quite expensive.  It issues a command to the `BrowserComponent`, and uses `invokeAndBlock()` to wait for the command to go through and send back a response.  `invokeAndBlock()` is a magical tool that allows you to "block" without blocking the EDT, but it has its costs, and shouldn’t be overused.  Most of the Codename One APIs that use `invokeAndBlock()` indicate this in their name.  E.g. `Component.animateLayoutAndWait()`.   This gives you the expectation that this call could take some time, and helps to alert you to the underlying cost.
 
 The problem with the `ctx.get("window")` call is that it looks the same as a call to `Map.get(key)`.  There’s no indication that this call is expensive and could take time.  One call like this probably isn’t a big deal, but it doesn’t take long before you have dozens or even hundreds of calls like this littered throughout your codebase, and they can be hard to pick out.
 
 ===== The New API
 
-The new API fully embraces the asynchronous nature of Javascript.  It uses callbacks instead of return values, and provides convenience wrappers with the appropriate “AndWait()” naming convention to allow for synchronous usage.  Let’s look at a simple example:
+The new API fully embraces the asynchronous nature of Javascript.  It uses callbacks instead of return values, and provides convenience wrappers with the appropriate "AndWait()" naming convention to allow for synchronous usage.  Let’s look at a simple example:
 
 NOTE: In all of the sample code below, you can assume that variables named `bc` represent an instance of https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent].
 
@@ -2990,7 +2990,7 @@ bc.execute(
 );
 ----
 
-This code should output “The result was 7” to the console.  It is fully asynchronous, so you can include this code anywhere without worrying about it “bogging down” your code.  The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute-java.lang.String-com.codename1.util.SuccessCallback-[execute()] method is:
+This code should output "The result was 7" to the console.  It is fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code.  The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute-java.lang.String-com.codename1.util.SuccessCallback-[execute()] method is:
 
 [source,java]
 ----
@@ -3015,13 +3015,13 @@ JSRef res = bc.executeAndWait("callback.onSuccess(3+4)");
 Log.p("The result was "+res.Int());
 ----
 
-Prints “The result was 7”.
+Prints "The result was 7".
 
 IMPORTANT:  When using the `andWait()` variant, it is *extremely* important that your Javascript calls your callback method at some point - otherwise it will block *indefinitely*.    We provide variants of executeAndWait() that include a timeout in case you want to hedge against this possibility.
 
 ===== Multi-use Callbacks
 
-The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks.  You can’t, for example, store the `callback` variable on the javascript side for later use (e.g. to respond to a button click event).  If you need a “multi-use” callback, you should use the `addJSCallback()` method instead.  Its usage looks identical to `execute()`, the only difference is that the callback will life on after its first use.  E.g.  Consider the following code:
+The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks.  You can’t, for example, store the `callback` variable on the javascript side for later use (e.g. to respond to a button click event).  If you need a "multi-use" callback, you should use the `addJSCallback()` method instead.  Its usage looks identical to `execute()`, the only difference is that the callback will life on after its first use.  E.g.  Consider the following code:
 
 [source,java]
 ----
@@ -3031,9 +3031,9 @@ bc.execute(
 );
 ----
 
-The above example, assumes that jQuery is loaded in the webpage that we are interacting with, and we are adding a click handler to a button with ID “somebutton”.  The click handler calls our callback.
+The above example, assumes that jQuery is loaded in the webpage that we are interacting with, and we are adding a click handler to a button with ID "somebutton".  The click handler calls our callback.
 
-If you run this example, the first time the button is clicked, you’ll see “Button was clicked” printed to the console as expected.  However, the 2nd time, you’ll just get an exception.  This is because the callback passed to `execute()` is only single-use.
+If you run this example, the first time the button is clicked, you’ll see "Button was clicked" printed to the console as expected.  However, the 2nd time, you’ll just get an exception.  This is because the callback passed to `execute()` is only single-use.
 
 We need to modify this code to use the `addJSCallback()` method as follows:
 

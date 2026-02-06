@@ -234,7 +234,7 @@
 ///    }
 ///
 ///    protected void buildRequestBody(OutputStream os) {
-///         // writes post data, by default this “just works” but if you want to write this
+///         // writes post data, by default this "just works" but if you want to write this
 ///        // manually then override this
 ///    }
 /// };

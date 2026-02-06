@@ -31,13 +31,13 @@
 ///     arbitrary database file using syntax such as:
 ///
 /// ```java
-/// Database db = Display.getInstance().openOrCreate(“databaseName”);
+/// Database db = Display.getInstance().openOrCreate("databaseName");
 /// ```
 ///
 /// Some SQLite apps ship with a "ready made" database. We allow you to replace the DB file by using the code:
 ///
 /// ```java
-/// String path = Display.getInstance().getDatabasePath(“databaseName”);
+/// String path = Display.getInstance().getDatabasePath("databaseName");
 /// ```
 ///
 /// You can then use the `com.codename1.io.FileSystemStorage` class to write the content of your

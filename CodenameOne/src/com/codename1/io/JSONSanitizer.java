@@ -80,7 +80,7 @@ package com.codename1.io;
 /// have no side-effects and no free variables, so is neither a code-injection
 /// vector, nor a vector for exfiltration of secrets.
 ///
-/// This library only ensures that the JSON string → Javascript object
+/// This library only ensures that the JSON string -> Javascript object
 /// phase has no side effects and resolves no free variables, and cannot control
 /// how other client side code later interprets the resulting Javascript object.
 /// So if client-side code takes a part of the parsed data that is controlled by

@@ -123,7 +123,7 @@ There are two types of EDT violations:
 
 Codename One provides a tool to help you detect some of these violations some caveats may apply though…
 
-It’s an imperfect tool. It might fire “false positives” meaning it might detect a violation for perfectly legal code and it might miss some illegal calls. However, it is a valuable tool in the process of detecting hard to track bugs that are sometimes only reproducible on the devices (due to race condition behavior).
+It’s an imperfect tool. It might fire "false positives" meaning it might detect a violation for perfectly legal code and it might miss some illegal calls. However, it is a valuable tool in the process of detecting hard to track bugs that are sometimes only reproducible on the devices (due to race condition behavior).
 
 To activate this tool just select the Debug EDT menu option in the simulator and pick the level of output you wish to receive:
 

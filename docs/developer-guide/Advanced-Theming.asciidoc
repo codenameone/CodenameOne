@@ -735,9 +735,9 @@ Adding a standard JPEG/PNG image to the resource file is straight forward, and t
 The density of the devices varies significantly and Codename One tries to simplify the process by unifying everything into one set of values to indicate density. For simplicity's sake, density is sometimes expressed in terms of pixels, however it is mapped internally to actual screen measurements where possible.
 
 A multi-image is an image that has multiple varieties for different densities, and thus looks sharp in all the
-densities. Since scaling on the device can’t interpolate the data (due to performance considerations), significant scaling on the device becomes impractical. However, a multi-image will just provide the “right” resolution image for the given device type.
+densities. Since scaling on the device can’t interpolate the data (due to performance considerations), significant scaling on the device becomes impractical. However, a multi-image will just provide the "right" resolution image for the given device type.
 
-From the programming perspective this is mostly seamless, a developer just accesses one image and has no ability to access the images in the different resolutions. Within the designer, however, we can explicitly define images for multiple resolutions and perform high quality scaling so the “right” image is available.
+From the programming perspective this is mostly seamless, a developer just accesses one image and has no ability to access the images in the different resolutions. Within the designer, however, we can explicitly define images for multiple resolutions and perform high quality scaling so the "right" image is available.
 
 We can use two basic methods to add a multi-image: quick add and standard add.
 
@@ -760,7 +760,7 @@ on the closest alternative.
 
 The percentage value will change the entire column, and it means the percentage of the screen. E.g. We know
 the icon is 128 for the very high resolution, we can just move the percentage until we reach something close to
-128 in the “Very High” row and the other rows will represent a size that should be pretty close in terms of physical
+128 in the "Very High" row and the other rows will represent a size that should be pretty close in terms of physical
 size to the 128 figure.
 
 At runtime, you can always find the host device's approximate pixel density using the `Display.getDeviceDensity()`
