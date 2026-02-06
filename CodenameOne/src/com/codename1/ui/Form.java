@@ -23,7 +23,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.Animation;

@@ -24,7 +24,6 @@
 package com.codename1.ui.list;
 
 import com.codename1.ui.Component;
-import com.codename1.ui.List;
 
 /// This class is geared to replace the ListCellRenderer in the long run to provide a more
 /// generic rendering API.

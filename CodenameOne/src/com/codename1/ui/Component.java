@@ -26,7 +26,6 @@ package com.codename1.ui;
 import com.codename1.cloud.BindTarget;
 import com.codename1.compat.java.util.Objects;
 import com.codename1.components.InfiniteProgress;
-import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.TextSelectionSupport;

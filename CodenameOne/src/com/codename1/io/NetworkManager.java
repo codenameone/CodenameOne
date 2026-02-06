@@ -25,7 +25,6 @@
 package com.codename1.io;
 
 import com.codename1.annotations.Async;
-import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;

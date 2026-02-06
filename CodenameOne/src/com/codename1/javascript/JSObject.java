@@ -23,7 +23,6 @@
 package com.codename1.javascript;
 
 
-import com.codename1.ui.BrowserComponent;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.StringUtil;

@@ -23,7 +23,6 @@
 
 package com.codename1.ui.animations;
 
-import com.codename1.ui.AnimationManager;
 import com.codename1.ui.Container;
 
 import java.util.ArrayList;

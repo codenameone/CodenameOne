@@ -26,7 +26,6 @@ package com.codename1.ui.plaf;
 import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
-import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;

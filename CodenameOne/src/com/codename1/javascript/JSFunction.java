@@ -22,7 +22,6 @@
  */
 package com.codename1.javascript;
 
-import com.codename1.ui.BrowserComponent;
 
 /// The JSFunction interface allows you to implement functions in Java that can
 /// be called from Javascript. You can assign any JSFunction object to be a member

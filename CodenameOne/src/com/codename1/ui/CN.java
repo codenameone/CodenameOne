@@ -36,7 +36,6 @@ import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.plaf.Style;
 import com.codename1.util.RunnableWithResultSync;
 
 import java.io.IOException;

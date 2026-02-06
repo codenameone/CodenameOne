@@ -23,7 +23,6 @@
 package com.codename1.ui;
 
 import com.codename1.ui.geom.Rectangle2D;
-import com.codename1.ui.geom.Shape;
 import com.codename1.util.MathUtil;
 
 import static com.codename1.ui.MultipleGradientPaint.CycleMethod.REFLECT;

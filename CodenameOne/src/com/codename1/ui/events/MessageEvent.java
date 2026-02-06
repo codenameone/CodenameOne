@@ -22,7 +22,6 @@
  */
 package com.codename1.ui.events;
 
-import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
 /// Encapsulates an event that either originates outside the App (e.g. from the webpage that
