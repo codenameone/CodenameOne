@@ -910,9 +910,9 @@ public class Container extends Component implements Iterable<Component> {
     /// #### Parameters
     ///
     /// - `constraints`: @param constraints this method is useful when the Layout requires a constraint
-    ///                    such as the BorderLayout.
-    ///                    In this case you need to specify an additional data when you add a Component,
-    ///                    such as "CENTER", "NORTH"...
+    /// such as the BorderLayout.
+    /// In this case you need to specify an additional data when you add a Component,
+    /// such as "CENTER", "NORTH"...
     ///
     /// - `cmp`: component to add
     public void addComponent(final Object constraints, final Component cmp) {
@@ -927,9 +927,9 @@ public class Container extends Component implements Iterable<Component> {
     /// - `index`: location to insert the Component
     ///
     /// - `constraints`: @param constraints this method is useful when the Layout requires a constraint
-    ///                    such as the BorderLayout.
-    ///                    In this case you need to specify an additional data when you add a Component,
-    ///                    such as "CENTER", "NORTH"...
+    /// such as the BorderLayout.
+    /// In this case you need to specify an additional data when you add a Component,
+    /// such as "CENTER", "NORTH"...
     ///
     /// - `cmp`: component to add
     public void addComponent(int index, Object constraints, Component cmp) {
@@ -1031,7 +1031,7 @@ public class Container extends Component implements Iterable<Component> {
     /// - `ArrayIndexOutOfBoundsException`: if index is out of bounds
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException       if Component is already contained or
-    ///                                        the cmp is a Form Component
+    /// the cmp is a Form Component
     public void addComponent(int index, Component cmp) {
         insertComponentAt(index, null, cmp);
     }
@@ -1047,7 +1047,7 @@ public class Container extends Component implements Iterable<Component> {
     /// - `next`: a Component that replaces the current Component
     ///
     /// - `t`: @param t       a Transition between the add and removal of the Components
-    ///                a Transition can be null
+    /// a Transition can be null
     public void replaceAndWait(final Component current, final Component next, final Transition t) {
         replaceComponents(current, next, t, true, null, 0, 0, true);
     }
@@ -1063,7 +1063,7 @@ public class Container extends Component implements Iterable<Component> {
     /// - `next`: a Component that replaces the current Component
     ///
     /// - `t`: @param t                    a Transition between the add and removal of the Components
-    ///                             a Transition can be null
+    /// a Transition can be null
     ///
     /// - `layoutAnimationSpeed`: the speed of the layout animation after replace  is completed
     public void replaceAndWait(final Component current, final Component next, final Transition t, int layoutAnimationSpeed) {
@@ -1085,13 +1085,13 @@ public class Container extends Component implements Iterable<Component> {
     /// - `next`: a Component that replaces the current Component
     ///
     /// - `t`: @param t         a Transition between the add and removal of the Components
-    ///                  a Transition can be null
+    /// a Transition can be null
     ///
     /// - `onFinish`: invoked when the replace operation is completed, may be null
     ///
     /// - `growSpeed`: @param growSpeed after replace is completed the component can gradually grow/shrink to fill up
-    ///                  available room, set this to 0 for immediate growth or any larger number for gradual animation. -1 indicates
-    ///                  a special case where no validation occurs
+    /// available room, set this to 0 for immediate growth or any larger number for gradual animation. -1 indicates
+    /// a special case where no validation occurs
     public void replace(final Component current, final Component next, final Transition t, Runnable onFinish, int growSpeed) {
         replaceComponents(current, next, t, false, onFinish, growSpeed, 0, true);
     }
@@ -1107,10 +1107,10 @@ public class Container extends Component implements Iterable<Component> {
     /// - `next`: a Component that replaces the current Component
     ///
     /// - `t`: @param t          a Transition between the add and removal of the Components
-    ///                   a Transition can be null
+    /// a Transition can be null
     ///
     /// - `dropEvents`: @param dropEvents indicates if the display should drop all events
-    ///                   while this Component replacing is happening
+    /// while this Component replacing is happening
     public void replaceAndWait(final Component current, final Component next,
                                final Transition t, boolean dropEvents) {
         replaceComponents(current, next, t, true, null, 0, 0, true);
@@ -1127,7 +1127,7 @@ public class Container extends Component implements Iterable<Component> {
     /// - `next`: a Component that replaces the current Component
     ///
     /// - `t`: @param t       a Transition between the add and removal of the Components
-    ///                a Transition can be null
+    /// a Transition can be null
     public void replace(final Component current, final Component next, final Transition t) {
         replaceComponents(current, next, t, false, null, 0, 0, true);
     }
@@ -1143,7 +1143,7 @@ public class Container extends Component implements Iterable<Component> {
     /// - `next`: a Component that replaces the current Component
     ///
     /// - `t`: @param t       a Transition between the add and removal of the Components
-    ///                a Transition can be null
+    /// a Transition can be null
     ///
     /// #### Returns
     ///
@@ -1796,7 +1796,7 @@ public class Container extends Component implements Iterable<Component> {
     /// #### Parameters
     ///
     /// - `pos`: @param pos    The starting position to search.  It is assumed that this starting
-    ///               position is in the visible region.
+    /// position is in the visible region.
     ///
     /// - `clipY2`: The bottom bounds of the region to search. (0,0) is the top left corner of the container.
     ///
@@ -1943,7 +1943,7 @@ public class Container extends Component implements Iterable<Component> {
     /// - `g`: THe graphics context
     ///
     /// - `useIntersection`: @param useIntersection                  Enable intersection checking.  This is used when trying to paint components above and below other components,
-    ///                                         as it checks the intersection for painting.
+    /// as it checks the intersection for painting.
     ///
     /// - `intersectionX`: IntersectionX in abs screen coords.
     ///
@@ -1954,10 +1954,10 @@ public class Container extends Component implements Iterable<Component> {
     /// - `intersectionHeight`: The intersection height in abs screen coords
     ///
     /// - `elevationThreshold`: @param elevationThreshold               The elevation threshold used when useIntersection is true. If above is true, then this threshold is used to paint
-    ///                                         only the components on the same elevation level and higher.
+    /// only the components on the same elevation level and higher.
     ///
     /// - `elevationComponentIndexThreshold`: @param elevationComponentIndexThreshold The elevation component index threshold used when useIntersection is true.  This is used to differentiate the
-    ///                                         z-index of components in the same elevation level.
+    /// z-index of components in the same elevation level.
     ///
     /// - `above`: Indicate whether to render components above or below the thresholds specified by elevationThreshold and elevationComponentIndexThreshold.  Only used if useIntersection is true.
     void paintElevatedPane(Graphics g, final boolean useIntersection, int intersectionX, int intersectionY, int intersectionWidth, int intersectionHeight, int elevationThreshold, int elevationComponentIndexThreshold, boolean above) {
@@ -2724,7 +2724,7 @@ public class Container extends Component implements Iterable<Component> {
     /// #### Parameters
     ///
     /// - `direction`: @param direction is the direction of the navigation (Display.GAME_UP,
-    ///                  Display.GAME_DOWN, ...)
+    /// Display.GAME_DOWN, ...)
     ///
     /// - `next`: the Component to move the scroll towards.
     ///
@@ -3333,7 +3333,7 @@ public class Container extends Component implements Iterable<Component> {
     /// #### Parameters
     ///
     /// - `scrollable`: @param scrollable whether the component should/could scroll on the
-    ///                   X and Y axis
+    /// X and Y axis
     ///
     /// #### Deprecated
     ///

@@ -138,7 +138,7 @@ public class FlipTransition extends Transition {
     /// #### Parameters
     ///
     /// - `bgColor`: @param bgColor the color to paint in the background when the transition
-    ///                paints, use -1 to not paint a background color
+    /// paints, use -1 to not paint a background color
     public FlipTransition(int bgColor) {
         this.bgColor = bgColor;
     }
@@ -148,7 +148,7 @@ public class FlipTransition extends Transition {
     /// #### Parameters
     ///
     /// - `bgColor`: @param bgColor  the color to paint in the background when the transition
-    ///                 paints, use -1 to not paint a background color
+    /// paints, use -1 to not paint a background color
     ///
     /// - `duration`: the duration of the transition
     public FlipTransition(int bgColor, int duration) {

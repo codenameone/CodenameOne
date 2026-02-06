@@ -123,7 +123,7 @@ public class BubbleTransition extends Transition {
     /// - `duration`: the duration of the transition
     ///
     /// - `componentName`: @param componentName the name of the component from the source Form that
-    ///                      this transition should start from.
+    /// this transition should start from.
     public BubbleTransition(int duration, String componentName) {
         this(duration);
         this.componentName = componentName;

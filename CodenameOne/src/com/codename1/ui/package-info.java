@@ -1,15 +1,15 @@
 /// Main widget package containing the component/container "composite" similar
-///     both in terminology and design to Swing/AWT.
+/// both in terminology and design to Swing/AWT.
 ///
 /// Component/Container Relationship
 ///
-///     Containers can be nested one within the other to form elaborate UI's. Containers use
-///     `com.codename1.ui.layouts` to arrange the components within. This is important
-///     as it allows a container can adapt to changing resolution, DPI, orientation, font size etc.
+/// Containers can be nested one within the other to form elaborate UI's. Containers use
+/// `com.codename1.ui.layouts` to arrange the components within. This is important
+/// as it allows a container can adapt to changing resolution, DPI, orientation, font size etc.
 ///
-///     A container doesn't implicitly reflow its elements and in that regard follows the direction of AWT/Swing. As
-///     a result the layout can be animated to create a flowing effect for UI changes. This also provides improved
-///     performance as a bonus. See this sample of `Container` animation:
+/// A container doesn't implicitly reflow its elements and in that regard follows the direction of AWT/Swing. As
+/// a result the layout can be animated to create a flowing effect for UI changes. This also provides improved
+/// performance as a bonus. See this sample of `Container` animation:
 ///
 /// ```java
 /// Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));

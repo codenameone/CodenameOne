@@ -286,13 +286,13 @@ public final class LC {
     ///
     /// - `mode`: @param mode The mode:
     ///
-    ///             0 == Normal. Bounds will be calculated as if the component was visible.
+    /// 0 == Normal. Bounds will be calculated as if the component was visible.
     ///
-    ///             1 == If hidden the size will be 0, 0 but the gaps remain.
+    /// 1 == If hidden the size will be 0, 0 but the gaps remain.
     ///
-    ///             2 == If hidden the size will be 0, 0 and gaps set to zero.
+    /// 2 == If hidden the size will be 0, 0 and gaps set to zero.
     ///
-    ///             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+    /// 3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
     public void setHideMode(int mode) {
         if (mode < 0 || mode > 3) {
             throw new IllegalArgumentException("Wrong hideMode: " + mode);
@@ -321,7 +321,7 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `ins`: @param ins The new insets. Must be of length 4 (top, left, bottom, right) or `null`. The elements (1 to 4) may be `null` to use
-    ///            the platform default for that side. The array is copied for storage.
+    /// the platform default for that side. The array is copied for storage.
     ///
     /// #### See also
     ///
@@ -347,7 +347,7 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `b`: @param b `Boolean.TRUE` to force left-to-right. `Boolean.FALSE` to force tight-to-left. `null`
-    ///          for the default "let the current Locale decide".
+    /// for the default "let the current Locale decide".
     public void setLeftToRight(Boolean b) {
         this.leftToRight = b;
     }
@@ -421,7 +421,7 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `count`: @param count After what cell the grid should always auto wrap. If `0` the number of columns/rows in the
-    ///              `net.miginfocom.layout.AC` is used. `LayoutUtil.INF` is used for no auto wrap.
+    /// `net.miginfocom.layout.AC` is used. `LayoutUtil.INF` is used for no auto wrap.
     public void setWrapAfter(int count) {
         this.wrapAfter = count;
     }
@@ -594,7 +594,7 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `size`: @param size The width for the container that this layout constraint is set for. `null` is translated to
-    ///             a bound size containing only null sizes.
+    /// a bound size containing only null sizes.
     ///
     /// #### Since
     ///
@@ -626,7 +626,7 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `size`: @param size The height for the container that this layout constraint is set for. `null` is translated to
-    ///             a bound size containing only null sizes.
+    /// a bound size containing only null sizes.
     ///
     /// #### Since
     ///
@@ -904,7 +904,7 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `allSides`: @param allSides The unit value to set for all sides. May be `null` which means that the default panel insets
-    ///                 for the platform is used.
+    /// for the platform is used.
     ///
     /// #### Returns
     ///
@@ -948,16 +948,16 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `top`: @param top    The top inset. E.g. "10px" or "10mm" or "related". May be `null` in which case the default inset for this
-    ///               side for the platform will be used.
+    /// side for the platform will be used.
     ///
     /// - `left`: @param left   The left inset. E.g. "10px" or "10mm" or "related". May be `null` in which case the default inset for this
-    ///               side for the platform will be used.
+    /// side for the platform will be used.
     ///
     /// - `bottom`: @param bottom The bottom inset. E.g. "10px" or "10mm" or "related". May be `null` in which case the default inset for this
-    ///               side for the platform will be used.
+    /// side for the platform will be used.
     ///
     /// - `right`: @param right  The right inset. E.g. "10px" or "10mm" or "related". May be `null` in which case the default inset for this
-    ///               side for the platform will be used.
+    /// side for the platform will be used.
     ///
     /// #### Returns
     ///
@@ -1055,7 +1055,7 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `boundsSize`: @param boundsSize The `BoundSize` of the gap. This is a minimum and/or preferred and/or maximum size. E.g.
-    ///                   `"50:100:200"` or `"100px"`.
+    /// `"50:100:200"` or `"100px"`.
     ///
     /// #### Returns
     ///
@@ -1077,7 +1077,7 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `boundsSize`: @param boundsSize The `BoundSize` of the gap. This is a minimum and/or preferred and/or maximum size. E.g.
-    ///                   `"50:100:200"` or `"100px"`.
+    /// `"50:100:200"` or `"100px"`.
     ///
     /// #### Returns
     ///
@@ -1098,10 +1098,10 @@ public final class LC {
     /// #### Parameters
     ///
     /// - `gapx`: @param gapx The `BoundSize` of the gap. This is a minimum and/or preferred and/or maximum size. E.g.
-    ///             `"50:100:200"` or `"100px"`.
+    /// `"50:100:200"` or `"100px"`.
     ///
     /// - `gapy`: @param gapy The `BoundSize` of the gap. This is a minimum and/or preferred and/or maximum size. E.g.
-    ///             `"50:100:200"` or `"100px"`.
+    /// `"50:100:200"` or `"100px"`.
     ///
     /// #### Returns
     ///
@@ -1166,13 +1166,13 @@ public final class LC {
     ///
     /// - `mode`: @param mode The mode:
     ///
-    ///             0 == Normal. Bounds will be calculated as if the component was visible.
+    /// 0 == Normal. Bounds will be calculated as if the component was visible.
     ///
-    ///             1 == If hidden the size will be 0, 0 but the gaps remain.
+    /// 1 == If hidden the size will be 0, 0 but the gaps remain.
     ///
-    ///             2 == If hidden the size will be 0, 0 and gaps set to zero.
+    /// 2 == If hidden the size will be 0, 0 and gaps set to zero.
     ///
-    ///             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+    /// 3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
     ///
     /// #### Returns
     ///

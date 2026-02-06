@@ -86,28 +86,28 @@ import java.util.Vector;
 /// The constraint class supports the following attributes:
 ///
 ///
-///         column        The column for the table cell. This defaults to -1 which will just place the component in the next available cell
+/// column        The column for the table cell. This defaults to -1 which will just place the component in the next available cell
 ///
 ///
-///         row              Similar to column, defaults to -1 as well
+/// row              Similar to column, defaults to -1 as well
 ///
 ///
-///        width            The column width in percentages, -1 will use the preferred size. -2 for width will take up the rest of the available space
+/// width            The column width in percentages, -1 will use the preferred size. -2 for width will take up the rest of the available space
 ///
 ///
-///        height           The row height in percentages, -1 will use the preferred size. -2 for height will take up the rest of the available space
+/// height           The row height in percentages, -1 will use the preferred size. -2 for height will take up the rest of the available space
 ///
 ///
-///        spanHorizontal   The cells that should be occupied horizontally defaults to 1 and can't exceed the column count - current offset.
+/// spanHorizontal   The cells that should be occupied horizontally defaults to 1 and can't exceed the column count - current offset.
 ///
 ///
-///        spanVertical     Similar to spanHorizontal with the same limitations
+/// spanVertical     Similar to spanHorizontal with the same limitations
 ///
 ///
-///        horizontalAlign  The horizontal alignment of the content within the cell, defaults to the special case -1 value to take up all the cell space can be either `-1`, `Component.LEFT`, `Component.RIGHT` or `Component.CENTER`
+/// horizontalAlign  The horizontal alignment of the content within the cell, defaults to the special case -1 value to take up all the cell space can be either `-1`, `Component.LEFT`, `Component.RIGHT` or `Component.CENTER`
 ///
 ///
-///        verticalAlign    Similar to horizontalAlign can be one of `-1`, `Component.TOP`, `Component.BOTTOM` or `Component.CENTER`
+/// verticalAlign    Similar to horizontalAlign can be one of `-1`, `Component.TOP`, `Component.BOTTOM` or `Component.CENTER`
 ///
 ///
 ///  Notice that you only need to set `width`/`height` to one cell in a column/row.

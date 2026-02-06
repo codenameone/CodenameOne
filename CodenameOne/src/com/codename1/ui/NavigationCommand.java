@@ -61,7 +61,7 @@ public class NavigationCommand extends Command {
     /// - `command`: the string that will be placed on the Soft buttons\Menu
     ///
     /// - `id`: @param id      user defined ID for a command simplifying switch statement code
-    ///                working with a command
+    /// working with a command
     public NavigationCommand(String command, int id) {
         super(command, id);
     }
@@ -75,7 +75,7 @@ public class NavigationCommand extends Command {
     /// - `icon`: the icon representing the command
     ///
     /// - `id`: @param id      user defined ID for a command simplifying switch statement code
-    ///                working with a command
+    /// working with a command
     public NavigationCommand(String command, Image icon, int id) {
         super(command, icon, id);
     }

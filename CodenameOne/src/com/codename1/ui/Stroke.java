@@ -166,7 +166,7 @@ public class Stroke {
     /// #### Parameters
     ///
     /// - `joinStyle`: @param joinStyle the joinStyle to set.  This should be one of `#JOIN_MITER`,
-    ///                  `#JOIN_ROUND`, and `#JOIN_BEVEL`.
+    /// `#JOIN_ROUND`, and `#JOIN_BEVEL`.
     ///
     /// #### See also
     ///

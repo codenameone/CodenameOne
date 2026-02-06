@@ -235,7 +235,7 @@ public class InfiniteProgress extends Component {
     /// #### Parameters
     ///
     /// - `force`: @param force If false, then the animation is only updated if the progress is visible and on
-    ///              the current form.  True will force the update.
+    /// the current form.  True will force the update.
     ///
     /// #### Returns
     ///

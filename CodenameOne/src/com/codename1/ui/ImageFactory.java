@@ -68,7 +68,7 @@ public abstract class ImageFactory {
     /// #### Parameters
     ///
     /// - `cmp`: @param cmp The context from which to load the image factory.  Use null to get the global
-    ///            default factory.
+    /// default factory.
     ///
     /// #### Returns
     ///
@@ -90,7 +90,7 @@ public abstract class ImageFactory {
     /// #### Parameters
     ///
     /// - `cmp`: @param cmp The component to set the ImageFactory for.  If this parameter is null, then
-    ///            this method will set the default global ImageFactory
+    /// this method will set the default global ImageFactory
     ///
     /// - `f`: The ImageFactory to assign to the component.
     ///

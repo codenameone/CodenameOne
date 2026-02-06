@@ -337,7 +337,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
     /// #### Parameters
     ///
     /// - `layout`: @param layout The layout to use.  Only layouts that don't require constraints in `com.codename1.ui.Component)`
-    ///               may be used.  E.g. `FlowLayout`, `BoxLyout`, `TableLayout`, `GridLayout` are all fine.
+    /// may be used.  E.g. `FlowLayout`, `BoxLyout`, `TableLayout`, `GridLayout` are all fine.
     @Override
     public void setLayout(Layout layout) {
         if (layout != this.getLayout()) { //NOPMD CompareObjectsWithEquals
@@ -567,7 +567,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
     /// - `The`: type used for the model item.
     ///
     /// - `The`: @param  The type used for the view.  For RadioList T would be RadioButton.  For CheckBoxList, T would be CheckBox.  For SwitchList it's different because
-    ///            the Switch uses a wrapper component.
+    /// the Switch uses a wrapper component.
     public interface Decorator<M, V extends Component> { // PMD Fix: UnnecessaryModifier removed redundant static
         void decorate(M modelItem, V viewItem); // PMD Fix: UnnecessaryModifier removed redundant public
 

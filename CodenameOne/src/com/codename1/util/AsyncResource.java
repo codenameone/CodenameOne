@@ -601,8 +601,8 @@ public class AsyncResource<V> extends Observable {
     /// #### Parameters
     ///
     /// - `onResult`: @param onResult A callback that handles both the ready() case and the except() case.  Use `#isCancelled(java.lang.Throwable)`
-    ///                 to test the error parameter of `java.lang.Throwable)` to see if
-    ///                 if was caused by a cancellation.
+    /// to test the error parameter of `java.lang.Throwable)` to see if
+    /// if was caused by a cancellation.
     ///
     /// #### Since
     ///

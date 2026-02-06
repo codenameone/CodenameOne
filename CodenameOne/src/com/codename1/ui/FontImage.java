@@ -6828,7 +6828,7 @@ public final class FontImage extends Image {
     /// #### Parameters
     ///
     /// - `cmp`: @param cmp  the component, currently supports Labels, MultiButton & SpanButton. If the type isn't supported
-    ///             this method return false
+    /// this method return false
     ///
     /// - `icon`: the material icon
     ///
@@ -6851,7 +6851,7 @@ public final class FontImage extends Image {
     /// #### Parameters
     ///
     /// - `cmp`: @param cmp   the component, currently supports Labels, MultiButton & SpanButton. If the type isn't supported
-    ///              this method return false
+    /// this method return false
     ///
     /// - `icons`: icons List of icons to use.  [Unselected, Selected, Pressed, Pressed-Selected, Disabled].  If fewer icons are supplied than requested, it will use the last icon.
     ///
@@ -6964,7 +6964,7 @@ public final class FontImage extends Image {
     /// - `font`: The font with icons.
     ///
     /// - `icons`: @param icons List of icons to use.  [Unselected, Selected, Pressed, Pressed-Selected, Disabled].  If fewer icons are supplied than requested, it will use the last icon,
-    ///              in the list for the remaining expected icons.
+    /// in the list for the remaining expected icons.
     ///
     /// - `size`: The font size.
     ///
@@ -6988,7 +6988,7 @@ public final class FontImage extends Image {
     /// - `font`: The font with icons.
     ///
     /// - `icons`: @param icons List of icons to use.  [Unselected, Selected, Pressed, Pressed-Selected, Disabled].  If fewer icons are supplied than requested, it will use the last icon,
-    ///              in the list for the remaining expected icons.
+    /// in the list for the remaining expected icons.
     ///
     /// - `size`: The font size.
     ///

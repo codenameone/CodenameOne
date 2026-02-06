@@ -213,7 +213,7 @@ public class FacebookConnect extends Login {
     /// #### Parameters
     ///
     /// - `appLinkUrl`: @param appLinkUrl      App Link for what should be opened when the recipient
-    ///                        clicks on the install/play button on the app invite page.
+    /// clicks on the install/play button on the app invite page.
     ///
     /// - `previewImageUrl`: url to an image to be used in the invite, can be null
     ///
@@ -229,14 +229,14 @@ public class FacebookConnect extends Login {
     /// #### Parameters
     ///
     /// - `appLinkUrl`: @param appLinkUrl      App Link for what should be opened when the recipient
-    ///                        clicks on the install/play button on the app invite page.
+    /// clicks on the install/play button on the app invite page.
     ///
     /// - `previewImageUrl`: url to an image to be used in the invite, can be null
     ///
     /// - `cb`: @param cb              a Callback to be used when we need to know if the Facebook invite was successful.
-    ///                        If the invite was successful the onSucess method will be called
-    ///                        If the user canceled the onError method will be called with error code -1.
-    ///                        If an error occurred the onError method will be called with error code 0.
+    /// If the invite was successful the onSucess method will be called
+    /// If the user canceled the onError method will be called with error code -1.
+    /// If an error occurred the onError method will be called with error code 0.
     ///
     /// #### Deprecated
     ///

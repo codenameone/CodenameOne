@@ -269,14 +269,14 @@ public class Dialog extends Form {
     /// - `text`: the text displayed in the dialog
     ///
     /// - `type`: @param type       the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                   TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
     /// - `okText`: the text to appear in the command dismissing the dialog
     ///
     /// - `cancelText`: @param cancelText optionally null for a text to appear in the cancel command
-    ///                   for canceling the dialog
+    /// for canceling the dialog
     ///
     /// #### Returns
     ///
@@ -294,14 +294,14 @@ public class Dialog extends Form {
     /// - `text`: the text displayed in the dialog
     ///
     /// - `type`: @param type       the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                   TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
     /// - `okText`: the text to appear in the command dismissing the dialog
     ///
     /// - `cancelText`: @param cancelText optionally null for a text to appear in the cancel command
-    ///                   for canceling the dialog
+    /// for canceling the dialog
     ///
     /// - `timeout`: a timeout after which null would be returned if timeout is 0 inifinite time is used
     ///
@@ -328,10 +328,10 @@ public class Dialog extends Form {
     /// - `text`: the text displayed in the dialog
     ///
     /// - `cmds`: @param cmds    commands that are added to the form any click on any command
-    ///                will dispose the form
+    /// will dispose the form
     ///
     /// - `type`: @param type    the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
@@ -355,10 +355,10 @@ public class Dialog extends Form {
     /// - `defaultCommand`: command to be assigned as the default command or null
     ///
     /// - `cmds`: @param cmds           commands that are added to the form any click on any command
-    ///                       will dispose the form
+    /// will dispose the form
     ///
     /// - `type`: @param type           the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                       TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
@@ -380,10 +380,10 @@ public class Dialog extends Form {
     /// - `text`: the text displayed in the dialog
     ///
     /// - `cmds`: @param cmds       commands that are added to the form any click on any command
-    ///                   will dispose the form
+    /// will dispose the form
     ///
     /// - `type`: @param type       the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                   TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
@@ -409,10 +409,10 @@ public class Dialog extends Form {
     /// - `defaultCommand`: command to be assigned as the default command or null
     ///
     /// - `cmds`: @param cmds           commands that are added to the form any click on any command
-    ///                       will dispose the form
+    /// will dispose the form
     ///
     /// - `type`: @param type           the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                       TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
@@ -448,7 +448,7 @@ public class Dialog extends Form {
     /// - `okText`: the text to appear in the command dismissing the dialog
     ///
     /// - `cancelText`: @param cancelText optionally null for a text to appear in the cancel command
-    ///                   for canceling the dialog
+    /// for canceling the dialog
     ///
     /// #### Returns
     ///
@@ -467,7 +467,7 @@ public class Dialog extends Form {
     /// - `body`: component placed in the center of the dialog
     ///
     /// - `cmds`: @param cmds  commands that are added to the form any click on any command
-    ///              will dispose the form
+    /// will dispose the form
     ///
     /// #### Returns
     ///
@@ -486,7 +486,7 @@ public class Dialog extends Form {
     /// - `body`: text placed in the center of the dialog
     ///
     /// - `cmds`: @param cmds  commands that are added to the form any click on any command
-    ///              will dispose the form
+    /// will dispose the form
     ///
     /// #### Returns
     ///
@@ -508,10 +508,10 @@ public class Dialog extends Form {
     /// - `body`: component placed in the center of the dialog
     ///
     /// - `cmds`: @param cmds  commands that are added to the form any click on any command
-    ///              will dispose the form
+    /// will dispose the form
     ///
     /// - `type`: @param type  the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///              TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
@@ -532,10 +532,10 @@ public class Dialog extends Form {
     /// - `body`: component placed in the center of the dialog
     ///
     /// - `cmds`: @param cmds    commands that are added to the form any click on any command
-    ///                will dispose the form
+    /// will dispose the form
     ///
     /// - `type`: @param type    the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
@@ -558,10 +558,10 @@ public class Dialog extends Form {
     /// - `body`: component placed in the center of the dialog
     ///
     /// - `cmds`: @param cmds       commands that are added to the form any click on any command
-    ///                   will dispose the form
+    /// will dispose the form
     ///
     /// - `type`: @param type       the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                   TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
@@ -588,10 +588,10 @@ public class Dialog extends Form {
     /// - `defaultCommand`: command to be assigned as the default command or null
     ///
     /// - `cmds`: @param cmds           commands that are added to the form any click on any command
-    ///                       will dispose the form
+    /// will dispose the form
     ///
     /// - `type`: @param type           the type of the alert one of TYPE_WARNING, TYPE_INFO,
-    ///                       TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     ///
     /// - `icon`: the icon for the dialog, can be null
     ///
@@ -999,7 +999,7 @@ public class Dialog extends Form {
     /// - `right`: space in pixels between the right of the screen and the form
     ///
     /// - `includeTitle`: @param includeTitle whether the title should hang in the top of the screen or
-    ///                     be glued onto the content pane
+    /// be glued onto the content pane
     ///
     /// #### Returns
     ///
@@ -1070,10 +1070,10 @@ public class Dialog extends Form {
     /// - `right`: space in pixels between the right of the screen and the form
     ///
     /// - `includeTitle`: @param includeTitle whether the title should hang in the top of the screen or
-    ///                     be glued onto the content pane
+    /// be glued onto the content pane
     ///
     /// - `modal`: @param modal        indicates the dialog should be modal set to false for modeless dialog
-    ///                     which is useful for some use cases
+    /// which is useful for some use cases
     ///
     /// #### Returns
     ///
@@ -1120,7 +1120,7 @@ public class Dialog extends Form {
     /// - `right`: space in pixels between the right of the screen and the form
     ///
     /// - `modal`: @param modal  indicates the dialog should be modal set to false for modeless dialog
-    ///               which is useful for some use cases
+    /// which is useful for some use cases
     ///
     /// #### Returns
     ///
@@ -1894,7 +1894,7 @@ public class Dialog extends Form {
     /// #### Parameters
     ///
     /// - `dialogType`: @param dialogType can be one of TYPE_WARNING, TYPE_INFO,
-    ///                   TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
     public void setDialogType(int dialogType) {
         this.dialogType = dialogType;
     }

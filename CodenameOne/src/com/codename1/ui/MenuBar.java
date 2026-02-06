@@ -1491,7 +1491,7 @@ public class MenuBar extends Container implements ActionListener {
     /// #### Parameters
     ///
     /// - `grid`: @param grid container that will be arranged in the grid containing the
-    ///             components
+    /// components
     ///
     /// #### Returns
     ///

@@ -70,7 +70,7 @@ import java.util.Map;
 /// - transparency - The background transparency as an integer. 0-255.
 ///
 /// - textDecoration - The text decoration.  One of underline, overline,
-///      3d, 3d_lowered, 3d_shadow_north, strikethru, or none.
+/// 3d, 3d_lowered, 3d_shadow_north, strikethru, or none.
 ///
 /// - opacity - The opacity as an integer.  0-255
 ///
@@ -1639,7 +1639,7 @@ public abstract class StyleParser {
         /// #### Parameters
         ///
         /// - `image`: @param image Either the path to an image on the classpath (signified by a leading '/', or
-        ///              the name of an image that can be found in the theme resource file.
+        /// the name of an image that can be found in the theme resource file.
         public ImageInfo(String image) {
             this.image = image;
         }
@@ -1654,7 +1654,7 @@ public abstract class StyleParser {
         /// #### Parameters
         ///
         /// - `theme`: @param theme The theme resource file to use to get the image.  Note: If the image name has a leading '/', then
-        ///              the image will be loaded from the classpath.  Otherwise the theme resource file will be used.
+        /// the image will be loaded from the classpath.  Otherwise the theme resource file will be used.
         public Image getImage(Resources theme) {
             return StyleParser.getImage(theme, image);
         }

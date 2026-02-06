@@ -58,7 +58,7 @@ public class Push {
     /// #### Parameters
     ///
     /// - `token`: @param token      the authorization token from the account settings in the CodenameOne website, this is used
-    ///                   to associate push quotas with your app
+    /// to associate push quotas with your app
     ///
     /// - `body`: the body of the message
     ///
@@ -120,7 +120,7 @@ public class Push {
     /// - `iosCertificatePassword`: the password for the push certificate
     ///
     /// - `bbUrl`: @param bbUrl                  the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
-    ///                               for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+    /// for production you will need to apply at https://cp310.pushapi.na.blackberry.com
     ///
     /// - `bbApp`: the application id to authenticate on push for RIM devices
     ///
@@ -188,7 +188,7 @@ public class Push {
     /// - `iosCertificatePassword`: the password for the push certificate
     ///
     /// - `bbUrl`: @param bbUrl                  the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
-    ///                               for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+    /// for production you will need to apply at https://cp310.pushapi.na.blackberry.com
     ///
     /// - `bbApp`: the application id to authenticate on push for RIM devices
     ///
@@ -258,7 +258,7 @@ public class Push {
     /// #### Parameters
     ///
     /// - `token`: @param token                  the authorization token from the account settings in the CodenameOne website, this is used
-    ///                               to associate push quotas with your app
+    /// to associate push quotas with your app
     ///
     /// - `body`: the body of the message
     ///
@@ -294,7 +294,7 @@ public class Push {
     /// #### Parameters
     ///
     /// - `token`: @param token                  the authorization token from the account settings in the CodenameOne website, this is used
-    ///                               to associate push quotas with your app
+    /// to associate push quotas with your app
     ///
     /// - `body`: the body of the message
     ///
@@ -307,7 +307,7 @@ public class Push {
     /// - `iosCertificatePassword`: the password for the push certificate
     ///
     /// - `pushType`: @param pushType               the type for the push in the server, this is useful for sending hidden pushes (type 2) should default
-    ///                               to 0 or 1
+    /// to 0 or 1
     ///
     /// - `deviceKey`: set of devices that should receive the push
     ///
@@ -333,7 +333,7 @@ public class Push {
     /// #### Parameters
     ///
     /// - `token`: @param token                  the authorization token from the account settings in the CodenameOne website, this is used
-    ///                               to associate push quotas with your app
+    /// to associate push quotas with your app
     ///
     /// - `body`: the body of the message
     ///
@@ -348,7 +348,7 @@ public class Push {
     /// - `iosCertificatePassword`: the password for the push certificate
     ///
     /// - `bbUrl`: @param bbUrl                  the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
-    ///                               for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+    /// for production you will need to apply at https://cp310.pushapi.na.blackberry.com
     ///
     /// - `bbApp`: the application id to authenticate on push for RIM devices
     ///
@@ -378,7 +378,7 @@ public class Push {
     /// #### Parameters
     ///
     /// - `token`: @param token                  the authorization token from the account settings in the CodenameOne website, this is used
-    ///                               to associate push quotas with your app
+    /// to associate push quotas with your app
     ///
     /// - `body`: the body of the message
     ///
@@ -407,7 +407,7 @@ public class Push {
     /// #### Parameters
     ///
     /// - `token`: @param token                  the authorization token from the account settings in the CodenameOne website, this is used
-    ///                               to associate push quotas with your app
+    /// to associate push quotas with your app
     ///
     /// - `body`: the body of the message
     ///
@@ -422,7 +422,7 @@ public class Push {
     /// - `iosCertificatePassword`: the password for the push certificate
     ///
     /// - `bbUrl`: @param bbUrl                  the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
-    ///                               for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+    /// for production you will need to apply at https://cp310.pushapi.na.blackberry.com
     ///
     /// - `bbApp`: the application id to authenticate on push for RIM devices
     ///

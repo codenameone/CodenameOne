@@ -43,8 +43,8 @@ import java.util.ArrayList;
 /// This class supports several theme constants:
 ///
 /// - `textComponentErrorColor` a hex RGB color which defaults to null in which case this has no effect.
-///      When defined this will change the color of the border and label to the given color to match the material design
-///      styling.
+/// When defined this will change the color of the border and label to the given color to match the material design
+/// styling.
 ///
 /// - `textComponentErrorLineBorderBool` when set to `false`, this will prevent the text component from
 /// applying an underline border when there is a validation error. Defaults to `true`.
@@ -52,7 +52,7 @@ import java.util.ArrayList;
 /// - `textComponentOnTopBool` toggles the on top mode see `#onTopMode(boolean)`
 ///
 /// - `textComponentFieldUIID` sets the UIID of the text field to something other than `TextField`
-///      which is useful for platforms such as iOS where the look of the text field is different within the text component
+/// which is useful for platforms such as iOS where the look of the text field is different within the text component
 ///
 /// - `inputComponentErrorMultilineBool` sets the error label to multiline when activated
 ///
@@ -120,7 +120,7 @@ public abstract class InputComponent extends Container {
     /// #### Parameters
     ///
     /// - `cmps`: @param cmps a list of components if it's a text component that is not in the on top mode the width of the labels
-    ///             will be aligned
+    /// will be aligned
     public static void group(Component... cmps) {
         ArrayList<Component> al = new ArrayList<Component>();
         for (Component c : cmps) {

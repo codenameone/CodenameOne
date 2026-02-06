@@ -767,9 +767,9 @@ class CSSElement extends HTMLElement {
     ///
     /// @return the selector's name
     ///
-    ///     public String getName() {
-    ///     return name;
-    ///     }
+    /// public String getName() {
+    /// return name;
+    /// }
 
     /// Returns the language code of the specified element (or one of its ancestors)
     /// This implementation is optimized for minimal storage but not for performance - each element checks its ancestors for any lang definition

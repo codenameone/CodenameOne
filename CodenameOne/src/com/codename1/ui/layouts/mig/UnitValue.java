@@ -272,10 +272,10 @@ public final class UnitValue {
     /// - `refValue`: The reference value. Normally the size of the parent. For unit `#ALIGN` the current size of the component should be sent in.
     ///
     /// - `parent`: @param parent   The parent. May be `null` for testing the validity of the value, but should normally not and are not
-    ///                 required to return any usable value if `null`.
+    /// required to return any usable value if `null`.
     ///
     /// - `comp`: @param comp     The component, if any, that the value is for. Might be `null` if the value is not
-    ///                 connected to any component.
+    /// connected to any component.
     ///
     /// #### Returns
     ///
@@ -291,10 +291,10 @@ public final class UnitValue {
     /// - `refValue`: The reference value. Normally the size of the parent. For unit `#ALIGN` the current size of the component should be sent in.
     ///
     /// - `parent`: @param parent   The parent. May be `null` for testing the validity of the value, but should normally not and are not
-    ///                 required to return any usable value if `null`.
+    /// required to return any usable value if `null`.
     ///
     /// - `comp`: @param comp     The component, if any, that the value is for. Might be `null` if the value is not
-    ///                 connected to any component.
+    /// connected to any component.
     ///
     /// #### Returns
     ///

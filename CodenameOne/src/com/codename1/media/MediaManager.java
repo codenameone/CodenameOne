@@ -343,7 +343,7 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `path`: @param path The path to the Audio buffer.  This path doesn't correspond to a real file.  It is just
-    ///             used as a key to map to the audio buffer so that it can be addressed.
+    /// used as a key to map to the audio buffer so that it can be addressed.
     ///
     /// #### Returns
     ///
@@ -361,10 +361,10 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `path`: @param path   The path to the Audio buffer.  This path doesn't correspond to a real file.  It is just
-    ///               used as a key to map to the audio buffer so that it can be addressed.
+    /// used as a key to map to the audio buffer so that it can be addressed.
     ///
     /// - `create`: @param create If this flag is true and no buffer exists at the given path,
-    ///               then the buffer will be created.
+    /// then the buffer will be created.
     ///
     /// - `size`: The maximum size of the buffer.
     ///
@@ -469,7 +469,7 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `uri`: @param uri the uri of the media can start with jar://, file://, http://
-    ///            (can also use rtsp:// if supported on the platform)
+    /// (can also use rtsp:// if supported on the platform)
     ///
     /// #### Returns
     ///
@@ -488,7 +488,7 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `uri`: @param uri the uri of the media can start with jar://, file://, http://
-    ///            (can also use rtsp:// if supported on the platform)
+    /// (can also use rtsp:// if supported on the platform)
     ///
     /// #### Returns
     ///
@@ -507,7 +507,7 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `uri`: @param uri     the uri of the media can start with file://, http:// (can also
-    ///                use rtsp:// although may not be supported on all target platforms)
+    /// use rtsp:// although may not be supported on all target platforms)
     ///
     /// - `isVideo`: a boolean flag to indicate if this is a video media
     ///
@@ -570,7 +570,7 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `uri`: @param uri          the uri of the media can start with file://, http:// (can also
-    ///                     use rtsp:// although may not be supported on all target platforms)
+    /// use rtsp:// although may not be supported on all target platforms)
     ///
     /// - `isVideo`: a boolean flag to indicate if this is a video media
     ///
@@ -593,7 +593,7 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `uri`: @param uri          the uri of the media can start with file://, http:// (can also
-    ///                     use rtsp:// although may not be supported on all target platforms)
+    /// use rtsp:// although may not be supported on all target platforms)
     ///
     /// - `isVideo`: a boolean flag to indicate if this is a video media
     ///
@@ -671,7 +671,7 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `path`: @param path a file path to where to store the recording, if the file does
-    ///             not exists it will be created.
+    /// not exists it will be created.
     ///
     /// #### Deprecated
     ///
@@ -705,10 +705,10 @@ public abstract class MediaManager {
     /// #### Parameters
     ///
     /// - `path`: @param path     a file path to where to store the recording, if the file does
-    ///                 not exists it will be created.
+    /// not exists it will be created.
     ///
     /// - `mimeType`: @param mimeType the output mime type that is supported see
-    ///                 getAvailableRecordingMimeTypes()
+    /// getAvailableRecordingMimeTypes()
     ///
     /// #### Throws
     ///

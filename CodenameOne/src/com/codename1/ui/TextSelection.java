@@ -980,8 +980,8 @@ public class TextSelection {
         /// - `h`: The height of the intersection box.
         ///
         /// - `withFlow`: @param withFlow If true, this will also include any characters that should logically be selected if the
-        ///                 user dragged over the given rectangle.  E.g. If the selection began above the span, and stretches below it,
-        ///                 the entire span should be selected (included in the intersection).
+        /// user dragged over the given rectangle.  E.g. If the selection began above the span, and stretches below it,
+        /// the entire span should be selected (included in the intersection).
         ///
         /// #### Returns
         ///
@@ -1025,8 +1025,8 @@ public class TextSelection {
         /// - `bounds`: The bounds of the intersection box, relative to `#getSelectionRoot()`
         ///
         /// - `withFlow`: @param withFlow If true, this will also include any characters that should logically be selected if the
-        ///                 user dragged over the given rectangle.  E.g. If the selection began above the span, and stretches below it,
-        ///                 the entire span should be selected (included in the intersection).
+        /// user dragged over the given rectangle.  E.g. If the selection began above the span, and stretches below it,
+        /// the entire span should be selected (included in the intersection).
         ///
         /// #### Returns
         ///

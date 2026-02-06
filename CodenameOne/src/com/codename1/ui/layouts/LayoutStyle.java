@@ -75,7 +75,7 @@ public class LayoutStyle {
     /// #### Parameters
     ///
     /// - `layout`: @param layout the LayoutStyle to use; a value of null indicates
-    ///               the default should be used
+    /// the default should be used
     public static void setSharedInstance(LayoutStyle layout) {
         layoutStyle = layout;
     }
@@ -98,18 +98,18 @@ public class LayoutStyle {
     /// of gap being requested.  It can be one of the following values:
     ///
     /// `RELATED`
-    ///     If the two components will be contained in
-    ///         the same parent and are showing similar logically related
-    ///         items, use `RELATED`.
+    /// If the two components will be contained in
+    /// the same parent and are showing similar logically related
+    /// items, use `RELATED`.
     /// `UNRELATED`
-    ///     If the two components will be
-    ///          contained in the same parent but show logically unrelated items
-    ///          use `UNRELATED`.
+    /// If the two components will be
+    /// contained in the same parent but show logically unrelated items
+    /// use `UNRELATED`.
     /// `INDENT`
-    ///     Used to obtain the preferred distance to indent a component
-    ///         relative to another.  For example, if you want to horizontally
-    ///         indent a JCheckBox relative to a JLabel use `INDENT`.
-    ///         This is only useful for the horizontal axis.
+    /// Used to obtain the preferred distance to indent a component
+    /// relative to another.  For example, if you want to horizontally
+    /// indent a JCheckBox relative to a JLabel use `INDENT`.
+    /// This is only useful for the horizontal axis.
     ///
     /// It's important to note that some look and feels may not distinguish
     /// between `RELATED` and `UNRELATED`.
@@ -124,21 +124,21 @@ public class LayoutStyle {
     /// #### Parameters
     ///
     /// - `component1`: @param component1 the `JComponent`
-    ///                   `component2` is being placed relative to
+    /// `component2` is being placed relative to
     ///
     /// - `component2`: the `JComponent` being placed
     ///
     /// - `type`: how the two components are being placed
     ///
     /// - `position`: @param position   the position `component2` is being placed
-    ///                   relative to `component1`; one of
-    ///                   `SwingConstants.NORTH`,
-    ///                   `SwingConstants.SOUTH`,
-    ///                   `SwingConstants.EAST` or
-    ///                   `SwingConstants.WEST`
+    /// relative to `component1`; one of
+    /// `SwingConstants.NORTH`,
+    /// `SwingConstants.SOUTH`,
+    /// `SwingConstants.EAST` or
+    /// `SwingConstants.WEST`
     ///
     /// - `parent`: @param parent     the parent of `component2`; this may differ
-    ///                   from the actual parent and may be null
+    /// from the actual parent and may be null
     ///
     /// #### Returns
     ///
@@ -147,13 +147,13 @@ public class LayoutStyle {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `position` is not
-    ///                                  one of `SwingConstants.NORTH`,
-    ///                                  `SwingConstants.SOUTH`,
-    ///                                  `SwingConstants.EAST` or
-    ///                                  `SwingConstants.WEST`; `type` not one
-    ///                                  of `INDENT`, `RELATED`
-    ///                                  or `UNRELATED`; or `component1` or
-    ///                                  `component2` is null
+    /// one of `SwingConstants.NORTH`,
+    /// `SwingConstants.SOUTH`,
+    /// `SwingConstants.EAST` or
+    /// `SwingConstants.WEST`; `type` not one
+    /// of `INDENT`, `RELATED`
+    /// or `UNRELATED`; or `component1` or
+    /// `component2` is null
     public int getPreferredGap(Component component1, Component component2,
                                int type, int position, Container parent) {
         if (position != GroupLayout.NORTH &&
@@ -190,14 +190,14 @@ public class LayoutStyle {
     /// - `component`: the `Component` being positioned
     ///
     /// - `position`: @param position  the position `component` is being placed
-    ///                  relative to its parent; one of
-    ///                  `SwingConstants.NORTH`,
-    ///                  `SwingConstants.SOUTH`,
-    ///                  `SwingConstants.EAST` or
-    ///                  `SwingConstants.WEST`
+    /// relative to its parent; one of
+    /// `SwingConstants.NORTH`,
+    /// `SwingConstants.SOUTH`,
+    /// `SwingConstants.EAST` or
+    /// `SwingConstants.WEST`
     ///
     /// - `parent`: @param parent    the parent of `component`; this may differ
-    ///                  from the actual parent and may be null
+    /// from the actual parent and may be null
     ///
     /// #### Returns
     ///
@@ -207,11 +207,11 @@ public class LayoutStyle {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `position` is not
-    ///                                  one of `SwingConstants.NORTH`,
-    ///                                  `SwingConstants.SOUTH`,
-    ///                                  `SwingConstants.EAST` or
-    ///                                  `SwingConstants.WEST`;
-    ///                                  or `component` is null
+    /// one of `SwingConstants.NORTH`,
+    /// `SwingConstants.SOUTH`,
+    /// `SwingConstants.EAST` or
+    /// `SwingConstants.WEST`;
+    /// or `component` is null
     public int getContainerGap(Component component, int position,
                                Container parent) {
         if (position != GroupLayout.NORTH &&

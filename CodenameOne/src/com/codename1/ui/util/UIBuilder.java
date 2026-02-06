@@ -1876,8 +1876,8 @@ public class UIBuilder { //implements Externalizable {
     /// #### Parameters
     ///
     /// - `f`: @param f the form for which the background thread was constructed, notice
-    ///          that most methods are not threadsafe and one should use callSerially* in this
-    ///          method when mutating the form.
+    /// that most methods are not threadsafe and one should use callSerially* in this
+    /// method when mutating the form.
     ///
     /// #### Returns
     ///
@@ -2137,8 +2137,8 @@ public class UIBuilder { //implements Externalizable {
     /// #### Parameters
     ///
     /// - `sourceComponent`: @param sourceComponent the component that triggered the back command which effectively
-    ///                        allows us to find the EmbeddedContainer for a case of container navigation. Null
-    ///                        can be used if not applicable.
+    /// allows us to find the EmbeddedContainer for a case of container navigation. Null
+    /// can be used if not applicable.
     public void back(Component sourceComponent) {
         Vector formNavigationStack = getFormNavigationStackForComponent(sourceComponent);
         if (formNavigationStack != null && !formNavigationStack.isEmpty()) {

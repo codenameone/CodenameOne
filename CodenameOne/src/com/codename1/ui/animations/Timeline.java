@@ -63,7 +63,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /// - `animations`: the animation objects that are part of this timeline
     ///
     /// - `size`: @param size       size of the animation in virtual pixels, if the size differs the animation would be
-    ///                   scaled on the fly
+    /// scaled on the fly
     ///
     /// #### Returns
     ///

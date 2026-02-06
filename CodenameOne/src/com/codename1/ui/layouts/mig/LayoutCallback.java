@@ -44,7 +44,7 @@ public abstract class LayoutCallback {
     /// #### Parameters
     ///
     /// - `comp`: @param comp The component wrapper that holds the actual component (JComponent is Swing and Control in SWT).
-    ///             **Should not be altered.**
+    /// **Should not be altered.**
     ///
     /// #### Returns
     ///
@@ -65,7 +65,7 @@ public abstract class LayoutCallback {
     /// #### Parameters
     ///
     /// - `comp`: @param comp The component wrapper that holds the actual component (JComponent is Swing and Control in SWT).
-    ///             **Should not be altered.**
+    /// **Should not be altered.**
     ///
     /// #### Returns
     ///

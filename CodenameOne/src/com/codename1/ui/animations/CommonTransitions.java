@@ -192,8 +192,8 @@ public final class CommonTransitions extends Transition {
     /// #### Parameters
     ///
     /// - `forward`: @param forward  forward is a boolean value, represent the directions of
-    ///                 switching forms, for example for a horizontally type, true means
-    ///                 horizontally movement to right.
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
     ///
     /// - `duration`: represent the time the transition should take in millisecond
     public static CommonTransitions createSlideFadeTitle(boolean forward, int duration) {
@@ -217,11 +217,11 @@ public final class CommonTransitions extends Transition {
     /// #### Parameters
     ///
     /// - `type`: @param type     type can be either vertically or horizontally, which means
-    ///                 the movement direction of the transition
+    /// the movement direction of the transition
     ///
     /// - `forward`: @param forward  forward is a boolean value, represent the directions of
-    ///                 switching forms, for example for a horizontally type, true means
-    ///                 horizontally movement to right.
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
     ///
     /// - `duration`: represent the time the transition should take in millisecond
     ///
@@ -244,11 +244,11 @@ public final class CommonTransitions extends Transition {
     /// #### Parameters
     ///
     /// - `type`: @param type     type can be either vertically or horizontally, which means
-    ///                 the movement direction of the transition
+    /// the movement direction of the transition
     ///
     /// - `forward`: @param forward  forward is a boolean value, represent the directions of
-    ///                 switching forms, for example for a horizontally type, true means
-    ///                 horizontally movement to right.
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
     ///
     /// - `duration`: represent the time the transition should take in millisecond
     ///
@@ -264,17 +264,17 @@ public final class CommonTransitions extends Transition {
     /// #### Parameters
     ///
     /// - `type`: @param type           type can be either vertically or horizontally, which means
-    ///                       the movement direction of the transition
+    /// the movement direction of the transition
     ///
     /// - `forward`: @param forward        forward is a boolean value, represent the directions of
-    ///                       switching forms, for example for a horizontally type, true means
-    ///                       horizontally movement to right.
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
     ///
     /// - `duration`: represent the time the transition should take in millisecond
     ///
     /// - `drawDialogMenu`: @param drawDialogMenu indicates that the menu (softkey area) of the dialog
-    ///                       should be kept during a slide transition. This is only relevant for
-    ///                       dialog in/out transitions.
+    /// should be kept during a slide transition. This is only relevant for
+    /// dialog in/out transitions.
     ///
     /// #### Returns
     ///
@@ -294,11 +294,11 @@ public final class CommonTransitions extends Transition {
     /// #### Parameters
     ///
     /// - `type`: @param type     type can be either vertically or horizontally, which means
-    ///                 the movement direction of the transition
+    /// the movement direction of the transition
     ///
     /// - `forward`: @param forward  forward is a boolean value, represent the directions of
-    ///                 switching forms, for example for a horizontally type, true means
-    ///                 horizontally movement to right.
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
     ///
     /// - `duration`: represent the time the transition should take in millisecond
     ///
@@ -319,11 +319,11 @@ public final class CommonTransitions extends Transition {
     /// #### Parameters
     ///
     /// - `type`: @param type     type can be either vertically or horizontally, which means
-    ///                 the movement direction of the transition
+    /// the movement direction of the transition
     ///
     /// - `forward`: @param forward  forward is a boolean value, represent the directions of
-    ///                 switching forms, for example for a horizontally type, true means
-    ///                 horizontally movement to right.
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
     ///
     /// - `duration`: represent the time the transition should take in millisecond
     ///
@@ -348,17 +348,17 @@ public final class CommonTransitions extends Transition {
     /// #### Parameters
     ///
     /// - `type`: @param type           type can be either vertically or horizontally, which means
-    ///                       the movement direction of the transition
+    /// the movement direction of the transition
     ///
     /// - `forward`: @param forward        forward is a boolean value, represent the directions of
-    ///                       switching forms, for example for a horizontally type, true means
-    ///                       horizontally movement to right.
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
     ///
     /// - `duration`: represent the time the transition should take in millisecond
     ///
     /// - `drawDialogMenu`: @param drawDialogMenu indicates that the menu (softkey area) of the dialog
-    ///                       should be kept during a slide transition. This is only relevant for
-    ///                       dialog in/out transitions.
+    /// should be kept during a slide transition. This is only relevant for
+    /// dialog in/out transitions.
     ///
     /// #### Returns
     ///

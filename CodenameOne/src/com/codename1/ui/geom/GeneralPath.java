@@ -137,7 +137,7 @@ public final class GeneralPath implements Shape {
     /// #### Parameters
     ///
     /// - `rule`: @param rule The winding rule. One of `#WIND_NON_ZERO` and
-    ///             `#WIND_EVEN_ODD`
+    /// `#WIND_EVEN_ODD`
     ///
     /// #### See also
     ///
@@ -155,7 +155,7 @@ public final class GeneralPath implements Shape {
     /// #### Parameters
     ///
     /// - `rule`: @param rule            The winding rule. (`#WIND_NON_ZERO` or
-    ///                        `#WIND_EVEN_ODD`).
+    /// `#WIND_EVEN_ODD`).
     ///
     /// - `initialCapacity`: the inital capacity, in path segments
     public GeneralPath(int rule, int initialCapacity) {
@@ -765,20 +765,20 @@ public final class GeneralPath implements Shape {
     /// - `sweepAngleRadians`: How long to make the total arc (in radians).
     ///
     /// - `pointsOnCircle`: @param pointsOnCircle    Defines a *threshold* (360? /`pointsOnCircle`) to split the Bezier arc to
-    ///                          better approximate a circular arc, depending also on the value of `overlapPoints`.
-    ///                          The suggested number to have a reasonable approximation of a circle is at least 4 (90?).
-    ///                          Less than 1 will be ignored (the arc will not be split).
+    /// better approximate a circular arc, depending also on the value of `overlapPoints`.
+    /// The suggested number to have a reasonable approximation of a circle is at least 4 (90?).
+    /// Less than 1 will be ignored (the arc will not be split).
     ///
     /// - `overlapPoints`: @param overlapPoints     Given the *threshold* defined through `pointsOnCircle`:
     ///
     ///
     ///
     /// - if `true`, split the arc on every angle which is a multiple of the
-    ///                          *threshold* (yields better results if drawing precision is required,
-    ///                          especially when stacking multiple arcs, but can potentially use more points)
+    /// *threshold* (yields better results if drawing precision is required,
+    /// especially when stacking multiple arcs, but can potentially use more points)
     ///
     /// - if `false`, split the arc equally so that each part is shorter than
-    ///                          the *threshold*
+    /// the *threshold*
     ///
     /// - `addToPath`: An existing path where to add the arc to, or `null` to create a new path.
     ///
@@ -1089,14 +1089,14 @@ public final class GeneralPath implements Shape {
     /// #### Parameters
     ///
     /// - `path`: @param path    the PathIterator specifying which segments shall be appended
-    ///                (null not permitted).
+    /// (null not permitted).
     ///
     /// - `connect`: @param connect true for substituting the initial
-    ///                `PathIterator#SEG_MOVETO` segment by a
-    ///                `PathIterator#SEG_LINETO`, or false for not performing any
-    ///                substitution. If this `GeneralPath` is currently empty, connect is
-    ///                assumed to be false, thus leaving the initial
-    ///                `PathIterator#SEG_MOVETO` unchanged.
+    /// `PathIterator#SEG_MOVETO` segment by a
+    /// `PathIterator#SEG_LINETO`, or false for not performing any
+    /// substitution. If this `GeneralPath` is currently empty, connect is
+    /// assumed to be false, thus leaving the initial
+    /// `PathIterator#SEG_MOVETO` unchanged.
     public void append(PathIterator path, boolean connect) {
         float[] coords = createFloatArrayFromPool(6); //new float[6];
         append(path, connect, coords);

@@ -306,7 +306,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// #### Parameters
     ///
     /// - `badgeText`: @param badgeText The text to include in the badge.   null or empty strings will result in the
-    ///                  badge not being rendered.
+    /// badge not being rendered.
     ///
     /// #### Since
     ///

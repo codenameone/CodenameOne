@@ -1,12 +1,12 @@
 /// XPath based expression language designed to assist in JSON/XML parsing/generating
 ///
-///     The `com.codename1.processing.Result` class provides a subset of
-///     [XPath](http://www.w3schools.com/xsl/xpath_intro.asp), but it is not limited to just XML
-///     documents, it can also work with JSON documents, and even with raw `java.util.Map` objects.
+/// The `com.codename1.processing.Result` class provides a subset of
+/// [XPath](http://www.w3schools.com/xsl/xpath_intro.asp), but it is not limited to just XML
+/// documents, it can also work with JSON documents, and even with raw `java.util.Map` objects.
 ///
-///     As an example, we'll demonstrate how to process a response from the
-///     [Google Reverse Geocoder API](https://developers.google.com/maps/documentation/geocoding/).
-///     Lets start with this XML snippet:
+/// As an example, we'll demonstrate how to process a response from the
+/// [Google Reverse Geocoder API](https://developers.google.com/maps/documentation/geocoding/).
+/// Lets start with this XML snippet:
 ///
 /// ```java
 ///
@@ -35,7 +35,7 @@
 ///
 /// ```
 ///
-///     We want to extract some of the data above into simpler string results. We can do this using:
+/// We want to extract some of the data above into simpler string results. We can do this using:
 ///
 /// ```java
 /// Result result = Result.fromContent(input, Result.XML);
@@ -44,11 +44,11 @@
 /// String city = result.getAsString("/result/address_component[type='locality']/long_name");
 /// ```
 ///
-///     If you are at all familiar with processing responses from webservices, you will notice that what would
-///     normally require several lines of code of selecting and testing nodes in regular java can now be
-///     done in a single line using the new path expressions.
+/// If you are at all familiar with processing responses from webservices, you will notice that what would
+/// normally require several lines of code of selecting and testing nodes in regular java can now be
+/// done in a single line using the new path expressions.
 ///
-///     In the code above, input can be any of:
+/// In the code above, input can be any of:
 ///
 ///
 /// - `java.lang.InputStream` directly from `com.codename1.io.ConnectionRequest#readResponse(java.io.InputStream)`
@@ -60,8 +60,8 @@
 ///
 /// - JSON DOM `java.util.Map` returned from `com.codename1.io.JSONParser`
 ///
-///     To use the expression processor when calling a webservice, you could use something like the following to
-///     parse JSON (notice this is interchangeable between JSON and XML):
+/// To use the expression processor when calling a webservice, you could use something like the following to
+/// parse JSON (notice this is interchangeable between JSON and XML):
 ///
 /// ```java
 /// Form hi = new Form("Location", new BoxLayout(BoxLayout.Y_AXIS));
@@ -102,7 +102,7 @@
 /// hi.show();
 /// ```
 ///
-///     The returned JSON looks something like this (notice it's snipped because the data is too long):
+/// The returned JSON looks something like this (notice it's snipped because the data is too long):
 ///
 /// ```java
 /// {
@@ -207,7 +207,7 @@
 /// ```
 ///
 /// The XML processor currently handles global selections by using a double slash anywhere within the
-///     expression, for example:
+/// expression, for example:
 ///
 /// ```java
 /// // get all address_component names anywhere in the document with a type "political"
@@ -218,13 +218,13 @@
 /// ```
 ///
 /// **NOTE:** Notice that Google's JSON webservice uses plural form for each of
-///     the node names in that API (ie. results, address_components, and types) where they don't in the XML services
-///     (ie result, address_component etc.).
+/// the node names in that API (ie. results, address_components, and types) where they don't in the XML services
+/// (ie result, address_component etc.).
 ///
 /// Example 2
 ///
 /// It also possible to do some more complex expressions. We'll use the following XML fragment for the next batch of
-///     examples:
+/// examples:
 ///
 /// ```java
 ///
@@ -254,15 +254,15 @@
 /// ```
 ///
 /// Above, if you want to select the IDs of all players that are ranked in the top 2, you can use an
-///     expression like:
+/// expression like:
 ///
 /// ```java
 /// int top2[] = result.getAsIntegerArray("//player[@rank < 3]/@id");
 /// ```
 ///
 /// (Notice above that the expression is using an attribute for selecting both rank and id. In JSON
-///     documents, if you attempt to select an attribute, it will look for a child node under the attribute name you ask
-///     for).
+/// documents, if you attempt to select an attribute, it will look for a child node under the attribute name you ask
+/// for).
 ///
 /// If a document is ordered, you might want to select nodes by their position, for example:
 ///
@@ -279,8 +279,8 @@
 /// ```
 ///
 /// Above, we globally find a lastname element with a value of 'Hewitt', then grab the parent node of
-///     lastname which happens to be the player node, then grab the id attribute from the player node.
-///     Alternatively, you could get the same result from the following simpler statement:
+/// lastname which happens to be the player node, then grab the id attribute from the player node.
+/// Alternatively, you could get the same result from the following simpler statement:
 ///
 /// ```java
 /// int id = result.getAsInteger("//player[lastname='Hewitt']/@id");
@@ -293,10 +293,10 @@
 /// ```
 ///
 /// In the above example, if the player node had an address object, we'd be selecting all players from Canada.
-///     This is a simple example of a nested expression, but they can get much more complex, which will be
-///     required as the documents themselves get more complex.
+/// This is a simple example of a nested expression, but they can get much more complex, which will be
+/// required as the documents themselves get more complex.
 ///  Moving on, to select a node based
-///     on the existence of an attribute:
+/// on the existence of an attribute:
 ///
 /// ```java
 /// int id[] = result.getAsIntegerArray("//player[@rank]/@id");
@@ -310,7 +310,7 @@
 ///
 /// (Logical not (!) operators currently are not implemented).
 /// You can also select by the existence
-///     of a child node.
+/// of a child node.
 ///
 /// ```java
 /// int id[] = result.getAsIntegerArray("//player[middlename]/@id");
@@ -318,6 +318,6 @@
 ///
 ///  Above, we selected all players that have a middle name.
 ///
-///     Keep in mind that the Codename One path expression language is not a full implementation of
-///     XPath 1.0, but does already handle many of the most useful features of the specification.
+/// Keep in mind that the Codename One path expression language is not a full implementation of
+/// XPath 1.0, but does already handle many of the most useful features of the specification.
 package com.codename1.processing;

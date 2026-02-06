@@ -180,7 +180,7 @@ public final class Result {
     /// - `content`: structured content document as a string.
     ///
     /// - `format`: @param format  an identifier for the type of content passed (ie. xml,
-    ///                json, etc).
+    /// json, etc).
     ///
     /// #### Returns
     ///
@@ -189,7 +189,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException thrown if null content or format is
-    ///                                  passed.
+    /// passed.
     public static Result fromContent(String content, String format)
             throws IllegalArgumentException {
         if (content == null) {
@@ -226,7 +226,7 @@ public final class Result {
     /// - `content`: structured content document as a string.
     ///
     /// - `format`: @param format  an identifier for the type of content passed (ie. xml,
-    ///                json, etc).
+    /// json, etc).
     ///
     /// #### Returns
     ///
@@ -235,7 +235,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException thrown if null content or format is
-    ///                                  passed.
+    /// passed.
     public static Result fromContent(InputStream content, String format)
             throws IllegalArgumentException, IOException {
         if (content == null) {
@@ -274,7 +274,7 @@ public final class Result {
     /// - `content`: structured content document as a string.
     ///
     /// - `format`: @param format  an identifier for the type of content passed (ie. xml,
-    ///                json, etc).
+    /// json, etc).
     ///
     /// #### Returns
     ///
@@ -283,7 +283,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException thrown if null content or format is
-    ///                                  passed.
+    /// passed.
     public static Result fromContent(Reader content, String format)
             throws IllegalArgumentException, IOException {
         if (content == null) {
@@ -405,7 +405,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     public boolean getAsBoolean(final String path)
             throws IllegalArgumentException {
         String s = getAsString(path);
@@ -452,7 +452,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalException`: @throws IllegalException on error traversing the document, ie. traversing
-    ///                          into an array without using subscripts.
+    /// into an array without using subscripts.
     public int getAsInteger(final String path) throws IllegalArgumentException {
         String s = getAsString(path);
         if (s == null) {
@@ -498,7 +498,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     public long getAsLong(final String path) throws IllegalArgumentException {
         String s = getAsString(path);
         if (s == null) {
@@ -564,7 +564,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     public double getAsDouble(final String path)
             throws IllegalArgumentException {
         String s = getAsString(path);
@@ -611,7 +611,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     public String getAsString(final String path)
             throws IllegalArgumentException {
         Object o = internalGet(path);
@@ -714,7 +714,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     public int getSizeOfArray(final String path)
             throws IllegalArgumentException {
         final List array = internalGetAsArray(path);
@@ -769,7 +769,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     public String[] getAsStringArray(final String path)
             throws IllegalArgumentException {
         final List jarr = internalGetAsArray(path);
@@ -835,10 +835,10 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
-    ///                                  to an integer.
+    /// to an integer.
     public int[] getAsIntegerArray(final String path)
             throws IllegalArgumentException {
         final List jarr = internalGetAsArray(path);
@@ -873,10 +873,10 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
-    ///                                  to a long.
+    /// to a long.
     public long[] getAsLongArray(final String path)
             throws IllegalArgumentException {
         final List jarr = internalGetAsArray(path);
@@ -911,10 +911,10 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
-    ///                                  to a double.
+    /// to a double.
     public double[] getAsDoubleArray(final String path)
             throws IllegalArgumentException {
         final List jarr = internalGetAsArray(path);
@@ -945,7 +945,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     public boolean[] getAsBooleanArray(final String path)
             throws IllegalArgumentException {
         final List jarr = internalGetAsArray(path);
@@ -981,10 +981,10 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
-    ///                                  to a short.
+    /// to a short.
     public short[] getAsShortArray(final String path)
             throws IllegalArgumentException {
         final List jarr = internalGetAsArray(path);
@@ -1018,10 +1018,10 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
-    ///                                  to a float.
+    /// to a float.
     public float[] getAsFloatArray(final String path)
             throws IllegalArgumentException {
         final List jarr = internalGetAsArray(path);
@@ -1051,10 +1051,10 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
-    ///                                  to a byte.
+    /// to a byte.
     public byte[] getAsByteArray(final String path)
             throws IllegalArgumentException {
         final List jarr = internalGetAsArray(path);
@@ -1114,7 +1114,7 @@ public final class Result {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
-    ///                                  traversing into an array without using subscripts.
+    /// traversing into an array without using subscripts.
     public List getAsArray(final String path) throws IllegalArgumentException {
         List array = internalGetAsArray(path);
         for (int i = 0; i < array.size(); i++) {

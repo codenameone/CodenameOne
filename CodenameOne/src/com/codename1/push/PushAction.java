@@ -38,7 +38,7 @@ public class PushAction {
     /// #### Parameters
     ///
     /// - `id`: @param id    The ID of the action.  This is the id that will be available in `PushContent#getActionId()` if the user
-    ///              selected this action on the push notification.
+    /// selected this action on the push notification.
     ///
     /// - `title`: The title of the action.  This is the button label in the push notification.
     ///
@@ -53,7 +53,7 @@ public class PushAction {
     /// #### Parameters
     ///
     /// - `id`: @param id                   The ID of the action.  This is the id that will be available in `PushContent#getActionId()` if the user
-    ///                             selected this action on the push notification.
+    /// selected this action on the push notification.
     ///
     /// - `title`: The title of the action.  This is the button label in the push notification.
     ///
@@ -76,7 +76,7 @@ public class PushAction {
     /// #### Parameters
     ///
     /// - `id`: @param id    The ID of the action.  This is the id that will be available in `PushContent#getActionId()` if the user
-    ///              selected this action on the push notification.
+    /// selected this action on the push notification.
     ///
     /// - `title`: The title of the action.  This is the button label in the push notification.
     public PushAction(String id, String title) {

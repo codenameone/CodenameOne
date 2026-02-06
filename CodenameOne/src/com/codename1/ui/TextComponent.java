@@ -40,8 +40,8 @@ import com.codename1.ui.layouts.LayeredLayout;
 /// This class supports several theme constants:
 ///
 /// - `textComponentErrorColor` a hex RGB color which defaults to null in which case this has no effect.
-///      When defined this will change the color of the border and label to the given color to match the material design
-///      styling.
+/// When defined this will change the color of the border and label to the given color to match the material design
+/// styling.
 ///
 /// - `textComponentErrorLineBorderBool` when set to `false`, this will prevent the text component from
 /// applying an underline border when there is a validation error. Defaults to `true`.
@@ -51,7 +51,7 @@ import com.codename1.ui.layouts.LayeredLayout;
 /// - `textComponentAnimBool` toggles the animation mode see `#focusAnimation(boolean)`
 ///
 /// - `textComponentFieldUIID` sets the UIID of the text field to something other than `TextField`
-///      which is useful for platforms such as iOS where the look of the text field is different within the text component
+/// which is useful for platforms such as iOS where the look of the text field is different within the text component
 ///
 /// The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
 /// validation errors
@@ -442,7 +442,7 @@ public class TextComponent extends InputComponent {
     /// #### Parameters
     ///
     /// - `constraint`: @param constraint one of the constants from the `com.codename1.ui.TextArea` class see
-    ///                   `com.codename1.ui.TextArea#setConstraint(int)`
+    /// `com.codename1.ui.TextArea#setConstraint(int)`
     ///
     /// #### Returns
     ///

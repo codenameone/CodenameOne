@@ -719,13 +719,13 @@ public final class CC {
     /// #### Parameters
     ///
     /// - `mode`: @param mode The mode. Default to the mode in the `net.miginfocom.layout.LC`.
-    ///             0 == Normal. Bounds will be calculated as if the component was visible.
+    /// 0 == Normal. Bounds will be calculated as if the component was visible.
     ///
-    ///             1 == If hidden the size will be 0, 0 but the gaps remain.
+    /// 1 == If hidden the size will be 0, 0 but the gaps remain.
     ///
-    ///             2 == If hidden the size will be 0, 0 and gaps set to zero.
+    /// 2 == If hidden the size will be 0, 0 and gaps set to zero.
     ///
-    ///             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+    /// 3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
     ///
     /// #### Returns
     ///
@@ -742,7 +742,7 @@ public final class CC {
     /// #### Parameters
     ///
     /// - `s`: @param s The id or `null`. May consist of a groupID and a componentID which are separated by a dot: ".". E.g. "grp1.id1".
-    ///          The dot should never be first or last if present.
+    /// The dot should never be first or last if present.
     ///
     /// #### Returns
     ///
@@ -1354,8 +1354,8 @@ public final class CC {
     /// #### Parameters
     ///
     /// - `gapSize`: @param gapSize The gap size that will override the gap size in the row/colum constraints if `!= null`. E.g. "5px" or "unrel".
-    ///                If `null` or `""` the newline size will be set to the default size and turned on. This is different compared to
-    ///                `#setNewlineGapSize(BoundSize)`.
+    /// If `null` or `""` the newline size will be set to the default size and turned on. This is different compared to
+    /// `#setNewlineGapSize(BoundSize)`.
     ///
     /// #### Returns
     ///
@@ -1397,8 +1397,8 @@ public final class CC {
     /// #### Parameters
     ///
     /// - `gapSize`: @param gapSize The gap size that will override the gap size in the row/colum constraints if `!= null`. E.g. "5px" or "unrel".
-    ///                If `null` or `""` the wrap size will be set to the default size and turned on. This is different compared to
-    ///                `#setWrapGapSize(BoundSize)`.
+    /// If `null` or `""` the wrap size will be set to the default size and turned on. This is different compared to
+    /// `#setWrapGapSize(BoundSize)`.
     ///
     /// #### Returns
     ///
@@ -1981,13 +1981,13 @@ public final class CC {
     ///
     /// - `mode`: @param mode The mode:
     ///
-    ///             0 == Normal. Bounds will be calculated as if the component was visible.
+    /// 0 == Normal. Bounds will be calculated as if the component was visible.
     ///
-    ///             1 == If hidden the size will be 0, 0 but the gaps remain.
+    /// 1 == If hidden the size will be 0, 0 but the gaps remain.
     ///
-    ///             2 == If hidden the size will be 0, 0 and gaps set to zero.
+    /// 2 == If hidden the size will be 0, 0 and gaps set to zero.
     ///
-    ///             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+    /// 3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
     public void setHideMode(int mode) {
         if (mode < -1 || mode > 3) {
             throw new IllegalArgumentException("Wrong hideMode: " + mode);
@@ -2015,7 +2015,7 @@ public final class CC {
     /// #### Parameters
     ///
     /// - `id`: @param id The id or `null`. May consist of a groupID and a componentID which are separated by a dot: ".". E.g. "grp1.id1".
-    ///           The dot should never be first or last if present.
+    /// The dot should never be first or last if present.
     public void setId(String id) {
         this.id = id;
     }
@@ -2303,7 +2303,7 @@ public final class CC {
     /// #### Parameters
     ///
     /// - `s`: @param s The custom gap size. NOTE! `null` will not turn on or off wrap, it will only set the wrap gap size to "default".
-    ///          A non-null value will turn on wrap though.
+    /// A non-null value will turn on wrap though.
     ///
     /// #### Since
     ///
@@ -2365,7 +2365,7 @@ public final class CC {
     /// #### Parameters
     ///
     /// - `s`: @param s The custom gap size. NOTE! `null` will not turn on or off newline, it will only set the newline gap size to "default".
-    ///          A non-null value will turn on newline though.
+    /// A non-null value will turn on newline though.
     ///
     /// #### Since
     ///

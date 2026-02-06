@@ -582,7 +582,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /// - `url`: the image URL
     ///
     /// - `l`: @param l       the Label that should be updated when the data arrives
-    ///                to just use storage and the url as the key
+    /// to just use storage and the url as the key
     ///
     /// - `cacheId`: a unique identifier to be used to store the image into storage
     ///
@@ -599,7 +599,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /// - `url`: the image URL
     ///
     /// - `l`: @param l        the Label that should be updated when the data arrives
-    ///                 to just use storage and the url as the key
+    /// to just use storage and the url as the key
     ///
     /// - `cacheId`: a unique identifier to be used to store the image into storage
     ///
@@ -619,7 +619,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /// - `url`: the image URL
     ///
     /// - `l`: @param l           the Label that should be updated when the data arrives
-    ///                    to just use storage and the url as the key
+    /// to just use storage and the url as the key
     ///
     /// - `cacheId`: a unique identifier to be used to store the image into storage
     ///
@@ -639,7 +639,7 @@ public class ImageDownloadService extends ConnectionRequest {
     /// - `url`: the image URL
     ///
     /// - `l`: @param l        the Label that should be updated when the data arrives
-    ///                 to just use storage and the url as the key
+    /// to just use storage and the url as the key
     ///
     /// - `cacheId`: a unique identifier to be used to store the image into storage
     ///

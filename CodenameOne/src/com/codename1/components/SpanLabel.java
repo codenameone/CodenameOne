@@ -352,7 +352,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     /// #### Parameters
     ///
     /// - `align`: @param align valid values are Component.LEFT, Component.RIGHT, Component.CENTER. Anything else will
-    ///              stretch the text block
+    /// stretch the text block
     public void setTextBlockAlign(int align) {
         switch (align) {
             case LEFT:

@@ -1,6 +1,6 @@
 /// Package for capturing photos, audio or video from the camera/microphone.
 ///
-///     The code below demonstrates capturing and playing back audio files using this API:
+/// The code below demonstrates capturing and playing back audio files using this API:
 ///
 /// ```java
 /// Form hi = new Form("Capture", BoxLayout.y());

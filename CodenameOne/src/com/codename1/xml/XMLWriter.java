@@ -58,9 +58,9 @@ public class XMLWriter {
     /// #### Parameters
     ///
     /// - `encodeText`: @param encodeText Determines whether or not text components (text
-    ///                   content, tag names, attribute names, and attribute values) should be
-    ///                   encoded with escapes when written. Use false if these values are already
-    ///                   encoded.
+    /// content, tag names, attribute names, and attribute values) should be
+    /// encoded with escapes when written. Use false if these values are already
+    /// encoded.
     public XMLWriter(boolean encodeText) {
         this.encodeText = encodeText;
     }
@@ -109,7 +109,7 @@ public class XMLWriter {
     /// - `indentation`: A starting indentation for the given Element.
     ///
     /// - `isInline`: @param isInline    Whether or not the given element Element should be
-    ///                    treated as part of in-line content.
+    /// treated as part of in-line content.
     private void toXML(StringBuilder writer, Element element, StringBuilder indentation, boolean isInline) {
         if (!isInline) {
             writer.append(indentation);
@@ -186,7 +186,7 @@ public class XMLWriter {
     /// - `indentation`: A starting indentation for the given Element.
     ///
     /// - `isInline`: @param isInline    Whether or not the given element Element should be
-    ///                    treated as part of in-line content.
+    /// treated as part of in-line content.
     ///
     /// #### Throws
     ///

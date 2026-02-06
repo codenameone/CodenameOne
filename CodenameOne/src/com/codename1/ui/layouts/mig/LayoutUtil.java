@@ -100,7 +100,7 @@ public final class LayoutUtil {
     /// #### Parameters
     ///
     /// - `millis`: @param millis The new debug milliseconds. 0 turns of global debug and leaves debug up to every
-    ///               individual panel.
+    /// individual panel.
     ///
     /// #### See also
     ///
@@ -114,13 +114,13 @@ public final class LayoutUtil {
     /// #### Parameters
     ///
     /// - `cw`: @param cw The container to set design time for. `null` is legal and can be used as
-    ///           a key to turn on/off design time "in general". Note though that design time "in general" is
-    ///           always on as long as there is at least one ContainerWrapper with design time.
+    /// a key to turn on/off design time "in general". Note though that design time "in general" is
+    /// always on as long as there is at least one ContainerWrapper with design time.
     ///
     ///
-    ///           **If this method has not ever been called it will default to what
-    ///           `Beans.isDesignTime()` returns.** This means that if you call
-    ///           this method you indicate that you will take responsibility for the design time value.
+    /// **If this method has not ever been called it will default to what
+    /// `Beans.isDesignTime()` returns.** This means that if you call
+    /// this method you indicate that you will take responsibility for the design time value.
     ///
     /// - `b`: `true` means design time on.
     @SuppressWarnings("PMD.NonThreadSafeSingleton")
@@ -137,8 +137,8 @@ public final class LayoutUtil {
     /// #### Parameters
     ///
     /// - `cw`: @param cw The container to set design time for. `null` is legal will return `true`
-    ///           if there is at least one `ContainerWrapper` (or `null`) that have design time
-    ///           turned on.
+    /// if there is at least one `ContainerWrapper` (or `null`) that have design time
+    /// turned on.
     ///
     /// #### Returns
     ///
@@ -170,8 +170,8 @@ public final class LayoutUtil {
     /// #### Parameters
     ///
     /// - `pixels`: @param pixels The number of pixels. Default is 0 (it was 15 prior to v3.7.2, but since that meant different behaviour
-    ///               under design time by default it was changed to be 0, same as non-design time). IDE vendors can still set it to 15 to
-    ///               get the old behaviour.
+    /// under design time by default it was changed to be 0, same as non-design time). IDE vendors can still set it to 15 to
+    /// get the old behaviour.
     public static void setDesignTimeEmptySize(int pixels) {
         eSz = pixels;
     }
@@ -222,13 +222,13 @@ public final class LayoutUtil {
     /// #### Parameters
     ///
     /// - `sizes`: @param sizes          [ix],[MIN][PREF][MAX]. Grid.CompWrap.NOT_SET will be treated as N/A or 0. A "[MIN][PREF][MAX]" array with null elements will be interpreted as very flexible (no bounds)
-    ///                       but if the array itself is null it will not get any size.
+    /// but if the array itself is null it will not get any size.
     ///
     /// - `resConstr`: @param resConstr      Elements can be `null` and the whole array can be `null`. `null` means that the size will not be flexible at all.
-    ///                       Can have length less than `sizes` in which case the last element should be used for the elements missing.
+    /// Can have length less than `sizes` in which case the last element should be used for the elements missing.
     ///
     /// - `defPushWeights`: @param defPushWeights If there is no grow weight for a resConstr the corresponding value of this array is used.
-    ///                       These forced resConstr will be grown last though and only if needed to fill to the bounds.
+    /// These forced resConstr will be grown last though and only if needed to fill to the bounds.
     ///
     /// - `startSizeType`: The initial size to use. E.g. `net.miginfocom.layout.LayoutUtil#MIN`.
     ///

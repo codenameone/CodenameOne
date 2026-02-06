@@ -324,7 +324,7 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-    ///          the paint and key handling events
+    /// the paint and key handling events
     public static void callSerially(Runnable r) {
         Display.INSTANCE.callSerially(r);
     }
@@ -337,7 +337,7 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-    ///          the paint and key handling events
+    /// the paint and key handling events
     public static void callSeriallyOnIdle(Runnable r) {
         Display.INSTANCE.callSeriallyOnIdle(r);
     }
@@ -358,12 +358,12 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-    ///          the paint and key handling events
+    /// the paint and key handling events
     ///
     /// #### Throws
     ///
     /// - `IllegalStateException`: @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
-    ///                               paint or event handling).
+    /// paint or event handling).
     public static void callSeriallyAndWait(Runnable r) {
         Display.INSTANCE.callSeriallyAndWait(r);
     }
@@ -373,14 +373,14 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r       runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-    ///                the paint and key handling events
+    /// the paint and key handling events
     ///
     /// - `timeout`: timeout duration, on timeout the method just returns
     ///
     /// #### Throws
     ///
     /// - `IllegalStateException`: @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
-    ///                               paint or event handling).
+    /// paint or event handling).
     public static void callSeriallyAndWait(Runnable r, int timeout) {
         Display.INSTANCE.callSeriallyAndWait(r, timeout);
     }
@@ -409,7 +409,7 @@ public class CN extends CN1Constants {
     /// #### Throws
     ///
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
-    ///                                     anywhere in the Runnable.
+    /// anywhere in the Runnable.
     ///
     /// #### Since
     ///
@@ -429,7 +429,7 @@ public class CN extends CN1Constants {
     /// #### Throws
     ///
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
-    ///                                     anywhere in the Runnable.
+    /// anywhere in the Runnable.
     ///
     /// #### Since
     ///
@@ -515,8 +515,8 @@ public class CN extends CN1Constants {
     /// - `value`: The value to convert, expressed in unitType.
     ///
     /// - `unitType`: @param unitType   The unit type.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`,
-    ///                   `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
-    ///                   `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
+    /// `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
+    /// `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
     ///
     /// - `horizontal`: Whether screen percentage units should be based on horitonzal or vertical percentage.
     ///
@@ -538,8 +538,8 @@ public class CN extends CN1Constants {
     /// - `value`: The value to convert, expressed in unitType.
     ///
     /// - `unitType`: @param unitType The unit type.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`,
-    ///                 `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
-    ///                 `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
+    /// `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
+    /// `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
     ///
     /// #### Returns
     ///
@@ -915,7 +915,7 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `hint`: @param hint a `Dimension` whose width/height represent percentages of the desktop to use for
-    ///             the initial window size, or `null` to clear a previously stored hint
+    /// the initial window size, or `null` to clear a previously stored hint
     public static void setInitialWindowSizeHintPercent(Dimension hint) {
         Display.getInstance().setInitialWindowSizeHintPercent(hint);
     }
@@ -1151,8 +1151,8 @@ public class CN extends CN1Constants {
     /// - `mimeType`: type of the image or null if no image to share
     ///
     /// - `sourceRect`: @param sourceRect The source rectangle of the button that originated the share request.  This is used on
-    ///                   some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
-    ///                   on the iPad with iOS 8 and higher.
+    /// some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
+    /// on the iPad with iOS 8 and higher.
     public static void share(String text, String image, String mimeType, Rectangle sourceRect) {
         Display.INSTANCE.share(text, image, mimeType, sourceRect);
     }
@@ -1216,7 +1216,7 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `e`: @param e when set to true the screen saver will work as usual and when set to false the screen
-    ///          will not turn off automatically
+    /// will not turn off automatically
     public static void setScreenSaverEnabled(boolean e) {
         Display.INSTANCE.setScreenSaverEnabled(e);
     }
@@ -1248,7 +1248,7 @@ public class CN extends CN1Constants {
     /// - `type`: the picker type constant
     ///
     /// - `source`: @param source       the source component (optional) the native dialog will be placed in relation to this
-    ///                     component if applicable
+    /// component if applicable
     ///
     /// - `currentValue`: the currently selected value
     ///
@@ -2021,7 +2021,7 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r Runnable that will be run when/if you are permitted to prompt the user to install
-    ///          the app on their homescreen.
+    /// the app on their homescreen.
     ///
     /// #### Since
     ///

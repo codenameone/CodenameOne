@@ -542,7 +542,7 @@ public class Calendar extends Container implements ActionSource {
     /// #### Parameters
     ///
     /// - `changesSelectedDateEnabled`: @param changesSelectedDateEnabled if true pressing on a date will cause
-    ///                                   the selected date to be changed to the pressed one
+    /// the selected date to be changed to the pressed one
     public void setChangesSelectedDateEnabled(boolean changesSelectedDateEnabled) {
         this.changesSelectedDateEnabled = changesSelectedDateEnabled;
     }

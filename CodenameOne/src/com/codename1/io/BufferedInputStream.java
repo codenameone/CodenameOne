@@ -307,8 +307,8 @@ public class BufferedInputStream extends InputStream {
     /// #### Throws
     ///
     /// - `IOException`: @throws IOException if this input stream has been closed by
-    ///                     invoking its `#close()` method,
-    ///                     or an I/O error occurs.
+    /// invoking its `#close()` method,
+    /// or an I/O error occurs.
     @Override
     public synchronized int read() throws IOException {
         if (stopped) {

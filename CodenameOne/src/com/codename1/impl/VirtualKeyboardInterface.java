@@ -35,10 +35,10 @@ public interface VirtualKeyboardInterface {
     /// #### Parameters
     ///
     /// - `inputType`: @param inputType one of TextArea.ANY, TextArea.EMAILADDR,
-    ///                  TextArea.NUMERIC, TextArea.PHONENUMBER, TextArea.URL, TextArea.DECIMAL
-    ///                  it can be bitwised or'd with one of TextArea.PASSWORD,
-    ///                  TextArea.UNEDITABLE, TextArea.SENSITIVE, TextArea.NON_PREDICTIVE,
-    ///                  INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    /// TextArea.NUMERIC, TextArea.PHONENUMBER, TextArea.URL, TextArea.DECIMAL
+    /// it can be bitwised or'd with one of TextArea.PASSWORD,
+    /// TextArea.UNEDITABLE, TextArea.SENSITIVE, TextArea.NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
     void setInputType(int inputType);
 
     /// Returns the Virtual Keyboard name.

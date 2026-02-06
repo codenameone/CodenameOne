@@ -400,10 +400,10 @@ public class Style {
     /// - `im`: background image
     ///
     /// - `backgroundType`: @param backgroundType one of:
-    ///                       BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
-    ///                       BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
-    ///                       BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
-    ///                       BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
+    /// BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
     public Style(int fgColor, int bgColor, Font f, byte transparency, Image im, byte backgroundType) {
         this();
         this.fgColor = fgColor;
@@ -718,9 +718,9 @@ public class Style {
     /// #### Parameters
     ///
     /// - `backgroundType`: @param backgroundType one of BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
-    ///                       BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
-    ///                       BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
-    ///                       BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
     public void setBackgroundType(byte backgroundType) {
         setBackgroundType(backgroundType, false);
     }
@@ -746,9 +746,9 @@ public class Style {
     /// #### Parameters
     ///
     /// - `backgroundAlignment`: @param backgroundAlignment one of:
-    ///                            BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
-    ///                            BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
-    ///                            BACKGROUND_IMAGE_ALIGN_CENTER
+    /// BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
+    /// BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
+    /// BACKGROUND_IMAGE_ALIGN_CENTER
     ///
     /// #### Deprecated
     ///
@@ -927,7 +927,7 @@ public class Style {
     /// - `elevation`: The elevation value.
     ///
     /// - `override`: @param override  If set to true allows the look and feel/theme to override
-    ///                  the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     ///
     /// #### Since
     ///
@@ -958,7 +958,7 @@ public class Style {
     /// - `units`: The units of the gap.
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     ///
     /// #### Since
     ///
@@ -992,7 +992,7 @@ public class Style {
     /// - `gap`: the icon gap.
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     ///
     /// #### Since
     ///
@@ -1027,7 +1027,7 @@ public class Style {
     /// - `unit`: The icon gap unit.  One of the standard style units of measurement.
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     ///
     /// #### Since
     ///
@@ -1057,7 +1057,7 @@ public class Style {
     /// - `surface`: True to enable surface rendering mode.
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     ///
     /// #### Since
     ///
@@ -1085,7 +1085,7 @@ public class Style {
     /// - `align`: alignment value
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     ///
     /// #### See also
     ///
@@ -1336,7 +1336,7 @@ public class Style {
     /// - `textDecoration`: the textDecoration to set (bitmask of the TEXT_DECORATION_* constants)
     ///
     /// - `override`: @param override       If set to true allows the look and feel/theme to override
-    ///                       the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setTextDecoration(int textDecoration, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1413,7 +1413,7 @@ public class Style {
     /// - `opacity`: int value between 0-255
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public final void setOpacity(int opacity, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1735,7 +1735,7 @@ public class Style {
     /// #### Parameters
     ///
     /// - `unit`: @param unit One of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
-    ///             `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
     /// #### Since
     ///
@@ -1756,7 +1756,7 @@ public class Style {
     /// #### Parameters
     ///
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
-    ///             `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
     /// #### Since
     ///
@@ -1777,7 +1777,7 @@ public class Style {
     /// #### Parameters
     ///
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
-    ///             `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
     /// #### Since
     ///
@@ -1798,7 +1798,7 @@ public class Style {
     /// #### Parameters
     ///
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
-    ///             `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
     /// #### Since
     ///
@@ -2416,7 +2416,7 @@ public class Style {
     /// - `bgColor`: RRGGBB color that ignores the alpha component
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBgColor(int bgColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2440,7 +2440,7 @@ public class Style {
     /// - `bgImage`: background image
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBgImage(Image bgImage, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2462,12 +2462,12 @@ public class Style {
     /// #### Parameters
     ///
     /// - `backgroundType`: @param backgroundType one of BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
-    ///                       BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
-    ///                       BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
-    ///                       BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
     ///
     /// - `override`: @param override       If set to true allows the look and feel/theme to override
-    ///                       the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundType(byte backgroundType, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2489,12 +2489,12 @@ public class Style {
     /// #### Parameters
     ///
     /// - `backgroundAlignment`: @param backgroundAlignment one of:
-    ///                            BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
-    ///                            BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
-    ///                            BACKGROUND_IMAGE_ALIGN_CENTER
+    /// BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
+    /// BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
+    /// BACKGROUND_IMAGE_ALIGN_CENTER
     ///
     /// - `override`: @param override            If set to true allows the look and feel/theme to override
-    ///                            the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     ///
     /// #### Deprecated
     ///
@@ -2542,7 +2542,7 @@ public class Style {
     /// - `backgroundGradientStartColor`: start color for the linear/radial gradient
     ///
     /// - `override`: @param override                     If set to true allows the look and feel/theme to override
-    ///                                     the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientStartColor(int backgroundGradientStartColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2566,7 +2566,7 @@ public class Style {
     /// - `backgroundGradientEndColor`: end color for the linear/radial gradient
     ///
     /// - `override`: @param override                   If set to true allows the look and feel/theme to override
-    ///                                   the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientEndColor(int backgroundGradientEndColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2590,7 +2590,7 @@ public class Style {
     /// - `backgroundGradientRelativeX`: x position of the radial gradient center
     ///
     /// - `override`: @param override                    If set to true allows the look and feel/theme to override
-    ///                                    the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientRelativeX(float backgroundGradientRelativeX, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2614,7 +2614,7 @@ public class Style {
     /// - `backgroundGradientRelativeY`: y position of the radial gradient center
     ///
     /// - `override`: @param override                    If set to true allows the look and feel/theme to override
-    ///                                    the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientRelativeY(float backgroundGradientRelativeY, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2636,10 +2636,10 @@ public class Style {
     /// #### Parameters
     ///
     /// - `backgroundGradientRelativeSize`: @param backgroundGradientRelativeSize the size of the radial gradient relative to the screens
-    ///                                       larger dimension
+    /// larger dimension
     ///
     /// - `override`: @param override                       If set to true allows the look and feel/theme to override
-    ///                                       the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientRelativeSize(float backgroundGradientRelativeSize, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2663,7 +2663,7 @@ public class Style {
     /// - `fgColor`: foreground color
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public final void setFgColor(int fgColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2687,7 +2687,7 @@ public class Style {
     /// - `fgAlpha`: foreground alpha
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setFgAlpha(int fgAlpha, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2711,7 +2711,7 @@ public class Style {
     /// - `font`: the font
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setFont(Font font, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2737,7 +2737,7 @@ public class Style {
     /// - `transparency`: int value between 0-255
     ///
     /// - `override`: @param override     If set to true allows the look and feel/theme to override
-    ///                     the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBgTransparency(int transparency, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2767,7 +2767,7 @@ public class Style {
     /// - `gap`: number of pixels to pad the orientation
     ///
     /// - `override`: @param override    If set to true allows the look and feel/theme to override
-    ///                    the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setPadding(int orientation, int gap, boolean override) {
         setPadding(orientation, (float) gap, override);
     }
@@ -2781,7 +2781,7 @@ public class Style {
     /// - `gap`: number of pixels to pad the orientation
     ///
     /// - `override`: @param override    If set to true allows the look and feel/theme to override
-    ///                    the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setPadding(int orientation, float gap, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2814,7 +2814,7 @@ public class Style {
     /// - `gap`: number of margin using the current unit
     ///
     /// - `override`: @param override    If set to true allows the look and feel/theme to override
-    ///                    the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setMargin(int orientation, int gap, boolean override) {
         setMargin(orientation, (float) gap, override);
     }
@@ -2828,7 +2828,7 @@ public class Style {
     /// - `gap`: number of margin using the current unit
     ///
     /// - `override`: @param override    If set to true allows the look and feel/theme to override
-    ///                    the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setMargin(int orientation, float gap, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2944,7 +2944,7 @@ public class Style {
     /// - `border`: new border object for the component
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
-    ///                 the value in this attribute when changing a theme/look and feel
+    /// the value in this attribute when changing a theme/look and feel
     public void setBorder(Border border, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -3102,7 +3102,7 @@ public class Style {
     /// #### Parameters
     ///
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
-    ///             `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
     /// #### Since
     ///
@@ -3123,7 +3123,7 @@ public class Style {
     /// #### Parameters
     ///
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
-    ///             `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
     /// #### Since
     ///
@@ -3144,7 +3144,7 @@ public class Style {
     /// #### Parameters
     ///
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
-    ///             `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
     /// #### Since
     ///
@@ -3165,7 +3165,7 @@ public class Style {
     /// #### Parameters
     ///
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
-    ///             `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
     /// #### Since
     ///

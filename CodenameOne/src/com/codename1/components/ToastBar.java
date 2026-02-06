@@ -810,7 +810,7 @@ public final class ToastBar {
         /// #### Parameters
         ///
         /// - `millis`: @param millis The maximum number of milliseconds that the status message should be displayed for.
-        ///               Helpful for error messages that only need to be displayed for a few seconds.
+        /// Helpful for error messages that only need to be displayed for a few seconds.
         public void setExpires(int millis) {
             if (millis < 0 && timer != null) {
                 timer.cancel();

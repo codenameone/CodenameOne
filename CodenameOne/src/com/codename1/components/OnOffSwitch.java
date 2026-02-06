@@ -735,7 +735,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     /// #### Parameters
     ///
     /// - `switchMaskImage`: @param switchMaskImage the switchMaskImage image to set as the mask for the on-off
-    ///                        switch.
+    /// switch.
     public void setSwitchMaskImage(Image switchMaskImage) {
         this.switchMaskImage = switchMaskImage;
         iosMode = true;  // If we are explicitly setting this, then we will enable

@@ -241,8 +241,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - `columns`: - the number of columns
     ///
     /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
-    ///                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
-    ///                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
     ///
     /// #### Throws
     ///
@@ -256,7 +256,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// #### Parameters
     ///
     /// - `text`: @param text    the text to be displayed; if text is null, the empty
-    ///                string "" will be displayed
+    /// string "" will be displayed
     ///
     /// - `rows`: the number of rows
     ///
@@ -274,15 +274,15 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// #### Parameters
     ///
     /// - `text`: @param text       the text to be displayed; if text is null, the empty
-    ///                   string "" will be displayed
+    /// string "" will be displayed
     ///
     /// - `rows`: the number of rows
     ///
     /// - `columns`: - the number of columns
     ///
     /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
-    ///                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
-    ///                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
     ///
     /// #### Throws
     ///
@@ -297,7 +297,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// #### Parameters
     ///
     /// - `text`: @param text    the text to be displayed; if text is null, the empty
-    ///                string "" will be displayed
+    /// string "" will be displayed
     ///
     /// - `maxSize`: text area maximum size
     public TextArea(String text, int maxSize) {
@@ -310,7 +310,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// #### Parameters
     ///
     /// - `text`: @param text the text to be displayed; if text is null, the empty
-    ///             string "" will be displayed
+    /// string "" will be displayed
     public TextArea(String text) {
         this(text, Math.max(defaultMaxSize, nl(text)), 1, numCols(text), ANY);
     }
@@ -326,7 +326,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// #### Parameters
     ///
     /// - `text`: @param text       the text to be displayed; if text is null, the empty
-    ///                   string "" will be displayed
+    /// string "" will be displayed
     ///
     /// - `maxSize`: text area maximum size
     ///
@@ -335,8 +335,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - `columns`: - the number of columns
     ///
     /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
-    ///                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
-    ///                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
     ///
     /// #### Throws
     ///
@@ -546,8 +546,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// #### Parameters
     ///
     /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
-    ///                   it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
-    ///                   INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
     public void setConstraint(int constraint) {
         this.constraint = constraint;
     }

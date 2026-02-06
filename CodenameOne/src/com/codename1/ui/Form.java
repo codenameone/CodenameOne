@@ -1150,7 +1150,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `glassPane`: @param glassPane a new glass pane to install. It is generally recommended to
-    ///                  use a painter chain if more than one painter is required.
+    /// use a painter chain if more than one painter is required.
     public void setGlassPane(Painter glassPane) {
         this.glassPane = glassPane;
         repaint();
@@ -1508,7 +1508,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `c`: @param c   the class with which this layered pane is associated, null for the global layered pane which
-    ///            is always on the bottom
+    /// is always on the bottom
     ///
     /// - `top`: if created this indicates whether the layered pane should be added on top or bottom
     ///
@@ -1572,7 +1572,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `c`: @param c      the class with which this layered pane is associated, null for the global layered pane which
-    ///               is always on the bottom
+    /// is always on the bottom
     ///
     /// - `zIndex`: if created this indicates the zIndex at which the pane is placed.  Higher z values in front of lower z values.
     ///
@@ -1638,7 +1638,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `c`: @param c   the class with which this layered pane is associated, null for the global layered pane which
-    ///            is always on the bottom
+    /// is always on the bottom
     ///
     /// - `top`: if created this indicates whether the layered pane should be added on top or bottom
     ///
@@ -2596,7 +2596,7 @@ public class Form extends Container {
     /// - `right`: space in pixels between the right of the screen and the form
     ///
     /// - `includeTitle`: @param includeTitle whether the title should hang in the top of the screen or
-    ///                     be glued onto the content pane
+    /// be glued onto the content pane
     ///
     /// - `modal`: indictes if this is a modal or modeless dialog true for modal dialogs
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
@@ -2819,7 +2819,7 @@ public class Form extends Container {
     /// - `cmp`: the Component to change the focus state
     ///
     /// - `gained`: @param gained if true this Component needs to gain focus if false
-    ///               it needs to lose focus
+    /// it needs to lose focus
     ///
     /// #### Returns
     ///
@@ -2994,8 +2994,8 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `start`: @param start The start position.  The iterator will automatically initialized such that `ListIterator#next()`
-    ///              will return the next component in the traversal order, and the `ListIterator#previous()` returns the previous
-    ///              component in traversal order.
+    /// will return the next component in the traversal order, and the `ListIterator#previous()` returns the previous
+    /// component in traversal order.
     ///
     /// #### Returns
     ///
@@ -4085,7 +4085,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `down`: @param down if true will the return the next focusable on the bottom else
-    ///             on the top
+    /// on the top
     ///
     /// #### Returns
     ///
@@ -4125,7 +4125,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `right`: @param right if true will the return the next focusable on the right else
-    ///              on the left
+    /// on the left
     ///
     /// #### Returns
     ///

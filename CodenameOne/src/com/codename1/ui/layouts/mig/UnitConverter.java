@@ -48,15 +48,15 @@ public abstract class UnitConverter {
     /// - `unit`: The unit of `value`. Never `null` and at least one character.
     ///
     /// - `refValue`: @param refValue Some reference value that may of may not be used. If the unit is percent for instance this value
-    ///                 is the value to take the percent from. Usually the size of the parent component in the appropriate dimension.
+    /// is the value to take the percent from. Usually the size of the parent component in the appropriate dimension.
     ///
     /// - `isHor`: If the value is horizontal (`true`) or vertical (`false`).
     ///
     /// - `parent`: @param parent   The parent of the target component that `value` is to be applied to.
-    ///                 Might for instance be needed to get the screen that the component is on in a multi screen environment.
+    /// Might for instance be needed to get the screen that the component is on in a multi screen environment.
     ///
     ///
-    ///                 May be `null` in which case a "best guess" value should be returned.
+    /// May be `null` in which case a "best guess" value should be returned.
     ///
     /// - `comp`: The component, if applicable, or `null` if none.
     ///

@@ -103,12 +103,12 @@ public class BrowserComponent extends Container {
     ///
     /// ```java
     /// `function postToCN1(msg) {
-    ///       if (window.cn1PostMessage) {
-    ///           // Case 1: Running inside native app in a WebView
-    ///           window.cn1PostMessage(msg);` else {
-    ///           // Case 2: Running inside a Javascript app in an iframe
-    ///           window.parent.postMessage(msg, '*');
-    ///       }
+    /// if (window.cn1PostMessage) {
+    /// // Case 1: Running inside native app in a WebView
+    /// window.cn1PostMessage(msg);` else {
+    /// // Case 2: Running inside a Javascript app in an iframe
+    /// window.parent.postMessage(msg, '*');
+    /// }
     ///   }
     /// }
     /// ```
@@ -117,9 +117,9 @@ public class BrowserComponent extends Container {
     ///
     /// ```java
     /// `myBrowserComponent.addWebEventListener(BrowserComponent.onMessage, e->{
-    ///       CN.callSerially(()->{
-    ///           Log.p("Message: "+e.getSource());
-    ///           Dialog.show("Here", (String)e.getSource(), "OK", null);`);
+    /// CN.callSerially(()->{
+    /// Log.p("Message: "+e.getSource());
+    /// Dialog.show("Here", (String)e.getSource(), "OK", null);`);
     ///   });
     /// }
     /// ```
@@ -1346,8 +1346,8 @@ public class BrowserComponent extends Container {
     ///
     /// ```java
     /// `bc.execute("callback.onSuccess(window)", value -> {
-    ///    System.out.println("value="+value+"; type="+value.getJSType());
-    ///       // value=[object Window]; type=OBJECT`);
+    /// System.out.println("value="+value+"; type="+value.getJSType());
+    /// // value=[object Window]; type=OBJECT`);
     /// }
     /// ```
     ///
@@ -1355,8 +1355,8 @@ public class BrowserComponent extends Container {
     ///
     /// ```java
     /// `bc.execute("callback.onSuccess(1+2)", value -> {
-    ///      System.out.println("value="+value.getInt()+"; type="+value.getJSType());
-    ///          // value=3; type=NUMBER`);
+    /// System.out.println("value="+value.getInt()+"; type="+value.getJSType());
+    /// // value=3; type=NUMBER`);
     /// }
     /// ```
     ///
@@ -1364,8 +1364,8 @@ public class BrowserComponent extends Container {
     ///
     /// ```java
     /// `bc.execute("callback.onSuccess('hello world')",value -> {
-    ///          System.out.println("value="+value+"; type="+value.getJSType());
-    ///          // value=hello world; type=STRING`
+    /// System.out.println("value="+value+"; type="+value.getJSType());
+    /// // value=hello world; type=STRING`
     /// );
     /// }
     /// ```
@@ -1379,10 +1379,10 @@ public class BrowserComponent extends Container {
     ///
     /// ```java
     /// `bc.execute("setTimeout(function(){callback.onSuccess('hello world')`, 1500)",
-    ///      value -> {
-    ///          System.out.println("value="+value+"; type="+value.getJSType());
-    ///          // value=hello world; type=STRING
-    ///      }
+    /// value -> {
+    /// System.out.println("value="+value+"; type="+value.getJSType());
+    /// // value=hello world; type=STRING
+    /// }
     /// );
     /// }
     /// ```
@@ -1519,9 +1519,9 @@ public class BrowserComponent extends Container {
     ///
     /// ```java
     /// `bc.addJSCallback("someButton.addEventListener('click', function(){callback.onSuccess('hello world')`)", new Callback() {
-    ///     public void onSucess(JSRef value) {
-    ///         System.out.println("Received click: "+value);
-    ///     }
+    /// public void onSucess(JSRef value) {
+    /// System.out.println("Received click: "+value);
+    /// }
     /// });
     /// }
     /// ```

@@ -662,7 +662,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// #### Parameters
     ///
     /// - `selector`: @param selector A selector string that defines which components to include in the
-    ///                 set.
+    /// set.
     ///
     /// #### Returns
     ///
@@ -810,7 +810,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// #### Parameters
     ///
     /// - `mapper`: @param mapper The mapper which will be called once for each element in the set.  The return value
-    ///               of the mapper function dictates which component should be included in the resulting set.
+    /// of the mapper function dictates which component should be included in the resulting set.
     ///
     /// #### Returns
     ///
@@ -831,7 +831,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// #### Parameters
     ///
     /// - `filter`: @param filter The filter function called for each element in the set.  If it returns true,
-    ///               then the element is included in the resulting set.  If false, it will not be included.
+    /// then the element is included in the resulting set.  If false, it will not be included.
     ///
     /// #### Returns
     ///
@@ -1650,9 +1650,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// #### Parameters
     ///
     /// - `mapper`: @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
-    ///               the input component, then no change is made for that component.  A null return value cause the component
-    ///               to be removed from its parent.  Returning a Component results in that component replacing the original component
-    ///               within its parent.
+    /// the input component, then no change is made for that component.  A null return value cause the component
+    /// to be removed from its parent.  Returning a Component results in that component replacing the original component
+    /// within its parent.
     ///
     /// #### Returns
     ///
@@ -1667,9 +1667,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// #### Parameters
     ///
     /// - `mapper`: @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
-    ///               the input component, then no change is made for that component.  A null return value cause the component
-    ///               to be removed from its parent.  Returning a Component results in that component replacing the original component
-    ///               within its parent.
+    /// the input component, then no change is made for that component.  A null return value cause the component
+    /// to be removed from its parent.  Returning a Component results in that component replacing the original component
+    /// within its parent.
     ///
     /// - `t`: Transition to use for replacements.
     ///
@@ -1710,9 +1710,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// #### Parameters
     ///
     /// - `mapper`: @param mapper Mapper that defines the replacements for each component in the set.  If the mapper returns
-    ///               the input component, then no change is made for that component.  A null return value cause the component
-    ///               to be removed from its parent.  Returning a Component results in that component replacing the original component
-    ///               within its parent.
+    /// the input component, then no change is made for that component.  A null return value cause the component
+    /// to be removed from its parent.  Returning a Component results in that component replacing the original component
+    /// within its parent.
     ///
     /// - `t`
     ///

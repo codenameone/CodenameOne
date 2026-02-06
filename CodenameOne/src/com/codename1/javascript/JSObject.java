@@ -392,9 +392,9 @@ public class JSObject {
     /// - `key`: The name of the property to set on the current object.
     ///
     /// - `js`: @param js    The value of the property.  This value should be provided as a
-    ///              Java value and it will be converted to the appropriate Javascript value.
-    ///              See @ref JavascriptContext.set() for a conversion table of the Java to
-    ///              Javascript type conversions.
+    /// Java value and it will be converted to the appropriate Javascript value.
+    /// See @ref JavascriptContext.set() for a conversion table of the Java to
+    /// Javascript type conversions.
     ///
     /// - `async`: If this flag is set, then the call will be asynchronous (will not wait for command to complete before continuing execution).
     public void set(String key, Object js, boolean async) {
@@ -627,10 +627,10 @@ public class JSObject {
     /// #### Parameters
     ///
     /// - `key`: @param key  The name of the property on the underlying Javascript object
-    ///             where the method proxy will be added in Javascript.
+    /// where the method proxy will be added in Javascript.
     ///
     /// - `func`: @param func A JSFunction callback that will be called when the generated
-    ///             Javascript proxy method is called.
+    /// Javascript proxy method is called.
     void addCallback(String key, JSFunction func, boolean async) {
         context.addCallback(this, key, func, async);
     }
@@ -640,7 +640,7 @@ public class JSObject {
     /// #### Parameters
     ///
     /// - `key`: @param key The name of the property on the underlying Javascript object
-    ///            that is to be deleted.
+    /// that is to be deleted.
     void removeCallback(String key, boolean async) {
         context.removeCallback(this, key, async);
     }
@@ -657,8 +657,8 @@ public class JSObject {
     /// - `key`: The name of the method to call.
     ///
     /// - `params`: @param params Array of parameters to pass to the method.  These will be
-    ///               converted to corresponding Javascript types according to the translation
-    ///               table specified in `Object)`
+    /// converted to corresponding Javascript types according to the translation
+    /// table specified in `Object)`
     ///
     /// #### Returns
     ///
@@ -676,8 +676,8 @@ public class JSObject {
     /// - `key`: The name of the method to call.
     ///
     /// - `params`: @param params   Array of parameters to pass to the method.  These will be
-    ///                 converted to corresponding Javascript types according to the translation
-    ///                 table specified in `Object)`
+    /// converted to corresponding Javascript types according to the translation
+    /// table specified in `Object)`
     ///
     /// - `callback`: Callback to be called when the method call is completed.
     public void callAsync(String key, Object[] params, Callback callback) {
@@ -691,8 +691,8 @@ public class JSObject {
     /// - `key`: The name of the method to call.
     ///
     /// - `params`: @param params   Array of parameters to pass to the method.  These will be
-    ///                 converted to corresponding Javascript types according to the translation
-    ///                 table specified in `Object)`
+    /// converted to corresponding Javascript types according to the translation
+    /// table specified in `Object)`
     ///
     /// - `callback`: Callback to be called when the method call is completed.
     public void callAsync(String key, Object[] params, final SuccessCallback callback) {
@@ -901,7 +901,7 @@ public class JSObject {
     /// #### Parameters
     ///
     /// - `params`: @param params The parameters to pass to the function.  These will be converted
-    ///               to the appropriate Javascript type.
+    /// to the appropriate Javascript type.
     ///
     /// #### Returns
     ///
@@ -929,10 +929,10 @@ public class JSObject {
     /// #### Parameters
     ///
     /// - `params`: @param params   The parameters to pass to the function.  These will be converted
-    ///                 to the appropriate Javascript type.
+    /// to the appropriate Javascript type.
     ///
     /// - `callback`: @param callback The result of the javascript function call converted to the appropriate
-    ///                 Java type and passed to the callback.
+    /// Java type and passed to the callback.
     public void callAsync(Object[] params, Callback callback) {
         context.callAsync(this, context.getWindow(), params, callback);
     }
@@ -954,10 +954,10 @@ public class JSObject {
     /// #### Parameters
     ///
     /// - `params`: @param params   The parameters to pass to the function.  These will be converted
-    ///                 to the appropriate Javascript type.
+    /// to the appropriate Javascript type.
     ///
     /// - `callback`: @param callback The result of the javascript function call converted to the appropriate
-    ///                 Java type and passed to the callback.
+    /// Java type and passed to the callback.
     public void callAsync(Object[] params, final SuccessCallback callback) {
         callAsync(params, new CallAsyncCallbackAdapter(callback));
     }

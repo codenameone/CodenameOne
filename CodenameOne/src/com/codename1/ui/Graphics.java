@@ -841,7 +841,7 @@ public final class Graphics {
     /// #### Parameters
     ///
     /// - `img`: @param img the specified image to be drawn. This method does
-    ///            nothing if img is null.
+    /// nothing if img is null.
     ///
     /// - `x`: the x coordinate.
     ///
@@ -855,7 +855,7 @@ public final class Graphics {
     /// #### Parameters
     ///
     /// - `img`: @param img the specified image to be drawn. This method does
-    ///            nothing if img is null.
+    /// nothing if img is null.
     ///
     /// - `x`: the x coordinate.
     ///
@@ -1144,8 +1144,8 @@ public final class Graphics {
     /// #### Parameters
     ///
     /// - `transform`: @param transform The transformation `com.codename1.ui.geom.Matrix` to use for drawing.  2D/Affine transformations
-    ///                  can be achieved using a 3x3 transformation `com.codename1.ui.geom.Matrix`.  3D/Perspective transformations
-    ///                  can be achieved using a 4x3 transformation `com.codename1.ui.geom.Matrix`.
+    /// can be achieved using a 3x3 transformation `com.codename1.ui.geom.Matrix`.  3D/Perspective transformations
+    /// can be achieved using a 4x3 transformation `com.codename1.ui.geom.Matrix`.
     ///
     /// #### See also
     ///
@@ -1218,7 +1218,7 @@ public final class Graphics {
     /// - `h`: the height of the region to be rendered
     ///
     /// - `processAlpha`: @param processAlpha true if rgbData has an alpha channel, false if
-    ///                     all pixels are fully opaque
+    /// all pixels are fully opaque
     void drawRGB(int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
         impl.drawRGB(nativeGraphics, rgbData, offset, x + xTranslate, y + yTranslate, w, h, processAlpha);
     }

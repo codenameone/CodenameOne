@@ -47,6 +47,6 @@ public interface Editable {
     /// #### Parameters
     ///
     /// - `onComplete`: @param onComplete Optional callback that will be called after the editing
-    ///                   is finished (as stopping may take some time for the native side to do cleanup).
+    /// is finished (as stopping may take some time for the native side to do cleanup).
     void stopEditing(Runnable onComplete);
 }

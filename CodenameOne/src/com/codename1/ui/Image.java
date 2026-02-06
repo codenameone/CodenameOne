@@ -139,7 +139,7 @@ public class Image implements ActionSource {
     /// #### Parameters
     ///
     /// - `path`: @param path If path begins with file: then the image will be loaded from FileSystemStorage.  Otherwise
-    ///             it will load from the jar resources.
+    /// it will load from the jar resources.
     ///
     /// #### Returns
     ///
@@ -452,7 +452,7 @@ public class Image implements ActionSource {
     /// #### Parameters
     ///
     /// - `capturedImage`: @param capturedImage is the FileSystemStorage path of a captured photo,
-    ///                      usually inside a temporary directory
+    /// usually inside a temporary directory
     ///
     /// #### Returns
     ///
@@ -518,12 +518,12 @@ public class Image implements ActionSource {
     /// #### Parameters
     ///
     /// - `capturedImage`: @param capturedImage is the FileSystemStorage path of a captured photo,
-    ///                      usually inside a temporary directory
+    /// usually inside a temporary directory
     ///
     /// - `rotatedImage`: @param rotatedImage  is the FileSystemStorage path in which the rotated
-    ///                      photo is stored, normally this should be inside the
-    ///                      FileSystemStorage.getAppHomePath(); it can be null if you don't want to
-    ///                      save the rotated image to the FileSystemStorage.
+    /// photo is stored, normally this should be inside the
+    /// FileSystemStorage.getAppHomePath(); it can be null if you don't want to
+    /// save the rotated image to the FileSystemStorage.
     ///
     /// #### Returns
     ///
@@ -593,15 +593,15 @@ public class Image implements ActionSource {
     /// #### Parameters
     ///
     /// - `capturedImage`: @param capturedImage is the FileSystemStorage path of a captured photo,
-    ///                      usually inside a temporary directory
+    /// usually inside a temporary directory
     ///
     /// - `rotatedImage`: @param rotatedImage  is the FileSystemStorage path in which the rotated
-    ///                      photo is stored, normally this should be inside the
-    ///                      FileSystemStorage.getAppHomePath(); it can be null if you don't want to
-    ///                      save the rotated image to the FileSystemStorage.
+    /// photo is stored, normally this should be inside the
+    /// FileSystemStorage.getAppHomePath(); it can be null if you don't want to
+    /// save the rotated image to the FileSystemStorage.
     ///
     /// - `maxSize`: @param maxSize       is the maximum value of the width and height of the
-    ///                      rotated images, that is scaled if necessary, keeping the ratio.
+    /// rotated images, that is scaled if necessary, keeping the ratio.
     ///
     /// #### Returns
     ///
@@ -1501,13 +1501,13 @@ public class Image implements ActionSource {
     /// #### Parameters
     ///
     /// - `rgbData`: @param rgbData    an array of integers in which the ARGB pixel data is
-    ///                   stored
+    /// stored
     ///
     /// - `offset`: @param offset     the index into the array where the first ARGB value is
-    ///                   stored
+    /// stored
     ///
     /// - `scanlength`: @param scanlength the relative offset in the array between
-    ///                   corresponding pixels in consecutive rows of the region
+    /// corresponding pixels in consecutive rows of the region
     ///
     /// - `x`: the x-coordinate of the upper left corner of the region
     ///
@@ -1532,10 +1532,10 @@ public class Image implements ActionSource {
     /// - `image`: RGBImage that would receive pixel data
     ///
     /// - `destX`: @param destX  x location within RGBImage into which the data will
-    ///               be written
+    /// be written
     ///
     /// - `destY`: @param destY  y location within RGBImage into which the data will
-    ///               be written
+    /// be written
     ///
     /// - `x`: location within the source image
     ///

@@ -380,7 +380,7 @@ public class Log {
     /// #### Parameters
     ///
     /// - `consumeError`: @param consumeError true will hide the error from the user, false will leave the builtin logic that defaults to
-    ///                     showing an error dialog to the user
+    /// showing an error dialog to the user
     public static void bindCrashProtection(final boolean consumeError) {
         if (Display.getInstance().isSimulator()) {
             return;

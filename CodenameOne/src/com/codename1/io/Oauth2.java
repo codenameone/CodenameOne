@@ -134,7 +134,7 @@ public class Oauth2 {
     /// - `clientSecret`: the client secret
     ///
     /// - `additionalParams`: @param additionalParams hashtable of additional parameters to the
-    ///                         authentication request
+    /// authentication request
     public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope, String tokenRequestURL, String clientSecret, Hashtable additionalParams) {
         this.oauth2URL = oauth2URL;
         this.redirectURI = redirectURI;
@@ -202,7 +202,7 @@ public class Oauth2 {
     /// #### Parameters
     ///
     /// - `callback`: @param callback a listener that will receive at its source either a token for
-    ///                 the service or an exception in case of a failure
+    /// the service or an exception in case of a failure
     ///
     /// #### Returns
     ///
@@ -256,7 +256,7 @@ public class Oauth2 {
     /// #### Throws
     ///
     /// - `IOException`: @throws IOException the method will throw an IOException if something
-    ///                     went wrong in the communication.
+    /// went wrong in the communication.
     ///
     /// #### Deprecated
     ///
@@ -367,7 +367,7 @@ public class Oauth2 {
     /// #### Parameters
     ///
     /// - `al`: @param al a listener that will receive at its source either a token for
-    ///           the service or an exception in case of a failure
+    /// the service or an exception in case of a failure
     ///
     /// #### Returns
     ///
@@ -382,7 +382,7 @@ public class Oauth2 {
     /// #### Parameters
     ///
     /// - `al`: @param al a listener that will receive at its source either a token for
-    ///           the service or an exception in case of a failure
+    /// the service or an exception in case of a failure
     public void showAuthentication(final ActionListener<ActionEvent> al) {
 
 

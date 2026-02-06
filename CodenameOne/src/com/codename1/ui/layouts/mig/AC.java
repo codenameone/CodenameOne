@@ -76,8 +76,8 @@ public final class AC {
     /// #### Parameters
     ///
     /// - `constr`: @param constr The different `net.miginfocom.layout.DimConstraint`s that this object consists of. The list
-    ///               will be copied for storage. `null` or and empty array will reset the constraints to one `DimConstraint`
-    ///               with default values.
+    /// will be copied for storage. `null` or and empty array will reset the constraints to one `DimConstraint`
+    /// with default values.
     public void setConstaints(DimConstraint[] constr) {
         if (constr == null || constr.length < 1) {
             constr = new DimConstraint[]{new DimConstraint()};
@@ -291,7 +291,7 @@ public final class AC {
     /// #### Parameters
     ///
     /// - `s`: @param s The minimum and/or preferred and/or maximum size of this row. The string will be interpreted
-    ///          as a **BoundSize**. For more info on how **BoundSize** is formatted see the documentation.
+    /// as a **BoundSize**. For more info on how **BoundSize** is formatted see the documentation.
     ///
     /// #### Returns
     ///
@@ -307,7 +307,7 @@ public final class AC {
     /// #### Parameters
     ///
     /// - `size`: @param size    The minimum and/or preferred and/or maximum size of this row. The string will be interpreted
-    ///                as a **BoundSize**. For more info on how **BoundSize** is formatted see the documentation.
+    /// as a **BoundSize**. For more info on how **BoundSize** is formatted see the documentation.
     ///
     /// - `indexes`: The index(es) (0-based) of the columns/rows that should be affected by this constraint.
     ///
@@ -344,7 +344,7 @@ public final class AC {
     /// #### Parameters
     ///
     /// - `size`: @param size minimum and/or preferred and/or maximum size of the gap between this and the next row/column.
-    ///             The string will be interpreted as a **BoundSize**. For more info on how **BoundSize** is formatted see the documentation.
+    /// The string will be interpreted as a **BoundSize**. For more info on how **BoundSize** is formatted see the documentation.
     ///
     /// #### Returns
     ///
@@ -360,7 +360,7 @@ public final class AC {
     /// #### Parameters
     ///
     /// - `size`: @param size    minimum and/or preferred and/or maximum size of the gap between this and the next row/column.
-    ///                The string will be interpreted as a **BoundSize**. For more info on how **BoundSize** is formatted see the documentation.
+    /// The string will be interpreted as a **BoundSize**. For more info on how **BoundSize** is formatted see the documentation.
     ///
     /// - `indexes`: The index(es) (0-based) of the columns/rows that should be affected by this constraint.
     ///

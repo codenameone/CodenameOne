@@ -2642,7 +2642,7 @@ public class ConnectionRequest implements IOProgressListener {
     /// #### Parameters
     ///
     /// - `chunklen`: @param chunklen The number of bytes to write in each chunk. If chunklen
-    ///                 is zero a default value will be used.
+    /// is zero a default value will be used.
     public void setChunkedStreamingMode(int chunklen) {
         this.chunkedStreamingLen = chunklen;
     }

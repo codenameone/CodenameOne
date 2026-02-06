@@ -72,7 +72,7 @@ public abstract class ImageIO {
     /// - `height`: the height of the resulting image, use -1 to not scale
     ///
     /// - `quality`: @param quality  the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
-    ///                 this isn't implemented in all platforms.
+    /// this isn't implemented in all platforms.
     public abstract void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException;
 
     /// Saves an image object to the given format
@@ -86,7 +86,7 @@ public abstract class ImageIO {
     /// - `format`: the format for the image either FORMAT_PNG or FORMAT_JPEG
     ///
     /// - `quality`: @param quality  the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
-    ///                 this isn't implemented in all platforms.
+    /// this isn't implemented in all platforms.
     public void save(Image img, OutputStream response, String format, float quality) throws IOException {
         if (img instanceof EncodedImage) {
             EncodedImage i = (EncodedImage) img;
@@ -118,7 +118,7 @@ public abstract class ImageIO {
     /// - `height`: the height of the resulting image, use -1 to not scale
     ///
     /// - `quality`: @param quality       the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
-    ///                      this isn't implemented in all platforms.
+    /// this isn't implemented in all platforms.
     public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException {
         InputStream in = null; //NOPMD CloseResource
         try {
@@ -161,12 +161,12 @@ public abstract class ImageIO {
     /// - `height`: the desired height, either width or height will be respected based on aspect dimensions
     ///
     /// - `quality`: @param quality             the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
-    ///                            this isn't implemented in all platforms.
+    /// this isn't implemented in all platforms.
     ///
     /// - `onlyDownscale`: will not scale if the resolution to scale will be higher in this case will return the imageFilePath
     ///
     /// - `scaleToFill`: @param scaleToFill         when set to true will pick the larger value so the resulting image will be at least as big as width x height, when set to false
-    ///                            will create an image that is no bigger than width x height
+    /// will create an image that is no bigger than width x height
     ///
     /// #### Returns
     ///
@@ -226,7 +226,7 @@ public abstract class ImageIO {
     /// - `format`: the format for the image either FORMAT_PNG or FORMAT_JPEG
     ///
     /// - `quality`: @param quality  the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
-    ///                 this isn't implemented in all platforms.
+    /// this isn't implemented in all platforms.
     protected abstract void saveImage(Image img, OutputStream response, String format, float quality) throws IOException;
 
     /// Indicates if the given format for output is supported by this implementation

@@ -52,7 +52,7 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s The String to parse. Should not be `null` and **must
-    ///          be lower case and trimmed**.
+    /// be lower case and trimmed**.
     ///
     /// #### Returns
     ///
@@ -384,17 +384,17 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s         The single constraint to parse. May look something like
-    ///                  `"min:pref,fill,grow"`. Should not be `null` and
-    ///                  **must be lower case and trimmed**.
+    /// `"min:pref,fill,grow"`. Should not be `null` and
+    /// **must be lower case and trimmed**.
     ///
     /// - `gapBefore`: @param gapBefore The default gap "before" the column/row constraint. Can
-    ///                  be overridden with a `"gap"` section within `s`.
+    /// be overridden with a `"gap"` section within `s`.
     ///
     /// - `gapAfter`: @param gapAfter  The default gap "after" the column/row constraint. Can be
-    ///                  overridden with a `"gap"` section within `s`.
+    /// overridden with a `"gap"` section within `s`.
     ///
     /// - `isCols`: @param isCols    If the constraints are column constraints rather than row
-    ///                  constraints.
+    /// constraints.
     ///
     /// #### Returns
     ///
@@ -497,7 +497,7 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `constrMap`: @param constrMap The constraints as `String`s. Strings **must
-    ///                  be lower case and trimmed**
+    /// be lower case and trimmed**
     ///
     /// #### Returns
     ///
@@ -517,7 +517,7 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s The string to parse. Should not be `null` and **must
-    ///          be lower case and trimmed**.
+    /// be lower case and trimmed**.
     ///
     /// #### Returns
     ///
@@ -987,10 +987,10 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s           The string to parse. E.g. "10 10 10 10" or "20". If less than 4
-    ///                    groups the last will be used for the missing.
+    /// groups the last will be used for the missing.
     ///
     /// - `acceptPanel`: @param acceptPanel If "panel" and "dialog" should be accepted. They are
-    ///                    used to access platform defaults.
+    /// used to access platform defaults.
     ///
     /// #### Returns
     ///
@@ -1028,7 +1028,7 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s The string that contains gap information. Should start with
-    ///          "gap".
+    /// "gap".
     ///
     /// #### Returns
     ///
@@ -1127,7 +1127,7 @@ public final class ConstraintParser {
     /// - `s`: The string to parse. Not `null`.
     ///
     /// - `isGap`: @param isGap If this bound size is a gap (different empty string
-    ///              handling).
+    /// handling).
     ///
     /// - `isHor`: If the size is for the horizontal dimension.
     ///
@@ -1177,12 +1177,12 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s                The string to parse. Not `null`. May look something
-    ///                         like `"10px"` or `"5dlu"`.
+    /// like `"10px"` or `"5dlu"`.
     ///
     /// - `isHor`: If the value is for the horizontal dimension.
     ///
     /// - `emptyReplacement`: @param emptyReplacement A replacement if `s` is empty. May be
-    ///                         `null`.
+    /// `null`.
     ///
     /// #### Returns
     ///
@@ -1205,7 +1205,7 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s     The string to parse. Not `null`. May look something
-    ///              like `"10px"` or `"5dlu"`.
+    /// like `"10px"` or `"5dlu"`.
     ///
     /// - `isHor`: If the value is for the horizontal dimension.
     ///
@@ -1221,10 +1221,10 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s                The string to parse. May be `null`. May look
-    ///                         something like `"10px"` or `"5dlu"`.
+    /// something like `"10px"` or `"5dlu"`.
     ///
     /// - `emptyReplacement`: @param emptyReplacement A replacement `s` is empty or
-    ///                         `null`. May be `null`.
+    /// `null`. May be `null`.
     ///
     /// - `isHor`: If the value is for the horizontal dimension.
     ///
@@ -1317,7 +1317,7 @@ public final class ConstraintParser {
     /// - `s`: The string to parse. Not `null`.
     ///
     /// - `isHor`: @param isHor If alignments for horizontal is checked. `false`
-    ///              means vertical.
+    /// means vertical.
     ///
     /// #### Returns
     ///
@@ -1373,8 +1373,8 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s The string to split. Not `null`. Needs be be
-    ///          reasonably formatted since the method only finds the first 0-9 or . and
-    ///          cuts the string in half there.
+    /// reasonably formatted since the method only finds the first 0-9 or . and
+    /// cuts the string in half there.
     ///
     /// #### Returns
     ///
@@ -1468,13 +1468,13 @@ public final class ConstraintParser {
     /// - `matches`: A number of possible starts for `s`.
     ///
     /// - `minChars`: @param minChars       The minimum number of characters to match for every
-    ///                       element in `matches`. Needs to be of same length as
-    ///                       `matches`. Can be `null`.
+    /// element in `matches`. Needs to be of same length as
+    /// `matches`. Can be `null`.
     ///
     /// - `acceptTrailing`: @param acceptTrailing If after the required number of characters are
-    ///                       matched on recognized characters that are not in one of the the
-    ///                       `matches` string should be accepted. For instance if "abczz"
-    ///                       should be matched with "abcdef" and min chars 3.
+    /// matched on recognized characters that are not in one of the the
+    /// `matches` string should be accepted. For instance if "abczz"
+    /// should be matched with "abcdef" and min chars 3.
     ///
     /// #### Returns
     ///
@@ -1500,16 +1500,16 @@ public final class ConstraintParser {
     /// - `s`: The string to check. Not `null` and must be trimmed.
     ///
     /// - `match`: @param match          The possible start for `s`. Not `null`
-    ///                       and must be trimmed.
+    /// and must be trimmed.
     ///
     /// - `minChars`: @param minChars       The mimimum number of characters to match to
-    ///                       `s` for it this to be considered a match. -1 means the full
-    ///                       length of `match`.
+    /// `s` for it this to be considered a match. -1 means the full
+    /// length of `match`.
     ///
     /// - `acceptTrailing`: @param acceptTrailing If after the required number of charecters are
-    ///                       matched unrecognized characters that are not in one of the the
-    ///                       `matches` string should be accepted. For instance if "abczz"
-    ///                       should be matched with "abcdef" and min chars 3.
+    /// matched unrecognized characters that are not in one of the the
+    /// `matches` string should be accepted. For instance if "abczz"
+    /// should be matched with "abcdef" and min chars 3.
     ///
     /// #### Returns
     ///
@@ -1558,10 +1558,10 @@ public final class ConstraintParser {
     /// #### Parameters
     ///
     /// - `s`: @param s   The string to parse. If it starts and/or ends with a
-    ///            `sep` the first and/or last element returned will be "". If
-    ///            two `sep` are next to each other and empty element will be
-    ///            "between" the periods. The `sep` themselves will never be
-    ///            returned.
+    /// `sep` the first and/or last element returned will be "". If
+    /// two `sep` are next to each other and empty element will be
+    /// "between" the periods. The `sep` themselves will never be
+    /// returned.
     ///
     /// - `sep`: The separator char.
     ///
@@ -1648,7 +1648,7 @@ public final class ConstraintParser {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException If a [] mismatch of some kind. (If not
-    ///                                  same [ as ] count or if the interleave.)
+    /// same [ as ] count or if the interleave.)
     private static ArrayList<String> getRowColAndGapsTrimmed(String s) {
         if (s.indexOf('|') != -1) {
             s = StringUtil.replaceAll(s, "\\|", "][");

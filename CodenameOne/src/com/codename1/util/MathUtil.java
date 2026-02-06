@@ -1327,7 +1327,7 @@ public abstract class MathUtil {
     /// - `start`: starting value
     ///
     /// - `direction`: @param direction value indicating which of the neighboring representable
-    ///                  floating point number to return
+    /// floating point number to return
     ///
     /// #### Returns
     ///

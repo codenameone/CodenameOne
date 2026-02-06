@@ -507,7 +507,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `defaultDragTransparency`: @param defaultDragTransparency a number between 0 and 255 where 255
-    ///                                indicates an opaque image.
+    /// indicates an opaque image.
     public static void setDefaultDragTransparency(byte defaultDragTransparency) {
         Component.defaultDragTransparency = defaultDragTransparency;
     }
@@ -567,8 +567,8 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `cursor`: @param cursor The cursor to set on this component.  One of `#DEFAULT_CURSOR`, `#CROSSHAIR_CURSOR`, `#TEXT_CURSOR`,
-    ///               `#WAIT_CURSOR`, `#SW_RESIZE_CURSOR`, `#SE_RESIZE_CURSOR`, `#S_RESIZE_CURSOR`, `#NE_RESIZE_CURSOR`,
-    ///               `#NW_RESIZE_CURSOR`, `#W_RESIZE_CURSOR`, `#HAND_CURSOR`, or `#MOVE_CURSOR`.
+    /// `#WAIT_CURSOR`, `#SW_RESIZE_CURSOR`, `#SE_RESIZE_CURSOR`, `#S_RESIZE_CURSOR`, `#NE_RESIZE_CURSOR`,
+    /// `#NW_RESIZE_CURSOR`, `#W_RESIZE_CURSOR`, `#HAND_CURSOR`, or `#MOVE_CURSOR`.
     ///
     /// #### See also
     ///
@@ -1512,7 +1512,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `value`: @param value The preferred size to set in format "width height", where width and height can be a scalar
-    ///              value with px or mm units. Or the special value "inherit" which will just inherit the default preferred size.
+    /// value with px or mm units. Or the special value "inherit" which will just inherit the default preferred size.
     ///
     /// #### Deprecated
     ///
@@ -4075,7 +4075,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `shouldCalcPreferredSize`: @param shouldCalcPreferredSize indicate whether this component need to
-    ///                                recalculate his preferred size
+    /// recalculate his preferred size
     public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
         if (!shouldCalcScrollSize) {
             this.shouldCalcScrollSize = shouldCalcPreferredSize;
@@ -4121,7 +4121,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `handlesInput`: @param handlesInput indicates whether key events can be grabbed for
-    ///                     focus traversal
+    /// focus traversal
     public void setHandlesInput(boolean handlesInput) {
         this.handlesInput = handlesInput;
     }
@@ -4146,7 +4146,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `focused`: @param focused sets the state that determines what colors from the
-    ///                Style should be used when painting a focused component
+    /// Style should be used when painting a focused component
     ///
     /// #### Deprecated
     ///
@@ -4944,9 +4944,9 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `scale`: @param scale the scaling of the pinch operation a number larger than 1 means scaling up and smaller than 1 means scaling down.
-    ///              It is recommended that code would threshold the number (so a change between 1.0 and 1.02 shouldn't necessarily trigger zoom).
-    ///              Notice that this number is relevant to current zoom levels and unaware of them so you should also enforce limits of maximum/minimum
-    ///              zoom levels.
+    /// It is recommended that code would threshold the number (so a change between 1.0 and 1.02 shouldn't necessarily trigger zoom).
+    /// Notice that this number is relevant to current zoom levels and unaware of them so you should also enforce limits of maximum/minimum
+    /// zoom levels.
     ///
     /// #### Returns
     ///
@@ -5085,7 +5085,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `dragTransparency`: @param dragTransparency a number between 0 and 255 where 255
-    ///                         indicates an opaque image.
+    /// indicates an opaque image.
     public void setDragTransparency(byte dragTransparency) {
         this.dragTransparency = dragTransparency;
     }
@@ -5385,8 +5385,8 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `y`: the pointer y coordinate
     ///
     /// - `currentPointerPress`: @param currentPointerPress Object useed to track the current pointer press.  Each time
-    ///                            the pointer is pressed, a new Object is generated, and is passed to pointerDragged.
-    ///                            This is to help prevent infinite loops of pointerDragged after a pointer press has been released.
+    /// the pointer is pressed, a new Object is generated, and is passed to pointerDragged.
+    /// This is to help prevent infinite loops of pointerDragged after a pointer press has been released.
     private void pointerDragged(final Component lead, final int x, final int y, final Object currentPointerPress) {
         Form p = getComponentForm();
         if (p == null) {
@@ -6010,7 +6010,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `y`: the y position of the touch
     ///
     /// - `position`: @param position a value between 0 and 1000 with 0 indicating the beginning of the ripple effect and 1000
-    ///                 indicating the completion of it
+    /// indicating the completion of it
     public void paintRippleOverlay(Graphics g, int x, int y, int position) {
         int a = g.getAlpha();
         int c = g.getColor();
@@ -6940,8 +6940,8 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `rect`: the rectangle that need to be visible
     ///
     /// - `coordinateSpace`: @param coordinateSpace the component according to whose coordinates
-    ///                        rect is defined. Rect's x/y are relative to that component
-    ///                        (they are not absolute).
+    /// rect is defined. Rect's x/y are relative to that component
+    /// (they are not absolute).
     protected void scrollRectToVisible(Rectangle rect, Component coordinateSpace) {
         scrollRectToVisible(rect.getX(), rect.getY(),
                 rect.getSize().getWidth(), rect.getSize().getHeight(), coordinateSpace);
@@ -6961,8 +6961,8 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `height`
     ///
     /// - `coordinateSpace`: @param coordinateSpace the component according to whose coordinates
-    ///                        rect is defined. Rect's x/y are relative to that component
-    ///                        (they are not absolute).
+    /// rect is defined. Rect's x/y are relative to that component
+    /// (they are not absolute).
     public void scrollRectToVisible(int x, int y, int width, int height, Component coordinateSpace) {
         if (isScrollable()) {
             int scrollPosition = getScrollY();
@@ -7113,7 +7113,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `cellRenderer`: @param cellRenderer indicate whether this component is currently being
-    ///                     used as a cell renderer
+    /// used as a cell renderer
     public void setCellRenderer(boolean cellRenderer) {
         this.cellRenderer = cellRenderer;
         if (cellRenderer) {

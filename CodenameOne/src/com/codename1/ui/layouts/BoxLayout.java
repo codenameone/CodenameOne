@@ -97,7 +97,7 @@ public class BoxLayout extends Layout {
     /// #### Parameters
     ///
     /// - `axis`: @param axis the axis to lay out components along.
-    ///             Can be: BoxLayout.X_AXIS or BoxLayout.Y_AXIS
+    /// Can be: BoxLayout.X_AXIS or BoxLayout.Y_AXIS
     public BoxLayout(int axis) {
         this.axis = axis;
     }

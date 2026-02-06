@@ -37,10 +37,10 @@ import java.util.Iterator;
 /// of the Group class.  GroupLayout supports two types of groups:
 ///
 ///   Sequential:A sequential group positions its child
-///           elements sequentially, one after another.
+/// elements sequentially, one after another.
 ///   Parallel:A parallel group positions its child
-///           elements in the same space on top of each other.  Parallel groups
-///           can also align the child elements along their baseline.
+/// elements in the same space on top of each other.  Parallel groups
+/// can also align the child elements along their baseline.
 ///
 /// Each Group can contain any number of child groups, Components or gaps.
 /// GroupLayout treats each axis independently.  That is, there is a group
@@ -71,28 +71,28 @@ import java.util.Iterator;
 /// This layout consists of the following:
 ///
 /// - The horizontal axis consists of a sequential group containing two
-///         parallel groups.  The first parallel group consists of the labels,
-///         with the second parallel group consisting of the text fields.
+/// parallel groups.  The first parallel group consists of the labels,
+/// with the second parallel group consisting of the text fields.
 ///
 /// - The vertical axis similarly consists of a sequential group
-///         containing two parallel groups.  The parallel groups align their
-///         contents along the baseline.  The first parallel group consists
-///         of the first label and text field, and the second group consists
-///         of the second label and text field.
+/// containing two parallel groups.  The parallel groups align their
+/// contents along the baseline.  The first parallel group consists
+/// of the first label and text field, and the second group consists
+/// of the second label and text field.
 ///
 /// There are a couple of things to notice in this code:
 ///
 ///
 /// - You need not explicitly add the components to the container, this
-///       is indirectly done by using one of the `add` methods.
+/// is indirectly done by using one of the `add` methods.
 ///
 /// - The various `add` methods of `Groups` return
-///       themselves.  This allows for easy chaining of invocations.  For
-///       example, `group.add(label1).add(label2);` is equivalent to
-///       `group.add(label1);group.add(label2);`.
+/// themselves.  This allows for easy chaining of invocations.  For
+/// example, `group.add(label1).add(label2);` is equivalent to
+/// `group.add(label1);group.add(label2);`.
 ///
 /// - There are no public constructors for the Groups, instead
-///       use the create methods of `GroupLayout`.
+/// use the create methods of `GroupLayout`.
 ///
 /// GroupLayout offer the ability to automatically insert the appropriate gap
 /// between components.  This can be turned on using the
@@ -312,7 +312,7 @@ public class GroupLayout extends Layout {
     /// #### Parameters
     ///
     /// - `honorsVisibility`: @param honorsVisibility whether component visibility is considered when
-    ///                         sizing and positioning components
+    /// sizing and positioning components
     ///
     /// #### See also
     ///
@@ -343,7 +343,7 @@ public class GroupLayout extends Layout {
     /// - `component`: the component
     ///
     /// - `honorsVisibility`: @param honorsVisibility whether `component`'s visibility should be
-    ///                         considered for sizing and positioning
+    /// considered for sizing and positioning
     ///
     /// #### Throws
     ///
@@ -433,7 +433,7 @@ public class GroupLayout extends Layout {
     /// #### Parameters
     ///
     /// - `autocreatePadding`: @param autocreatePadding whether or not to automatically created a gap
-    ///                          between components and the container
+    /// between components and the container
     public void setAutocreateGaps(boolean autocreatePadding) {
         if (this.autocreatePadding != autocreatePadding) {
             this.autocreatePadding = autocreatePadding;
@@ -460,7 +460,7 @@ public class GroupLayout extends Layout {
     /// #### Parameters
     ///
     /// - `autocreatePadding`: @param autocreatePadding whether or not to automatically create
-    ///                          gaps between the container and first/last components.
+    /// gaps between the container and first/last components.
     public void setAutocreateContainerGaps(boolean autocreatePadding) {
         if (autocreatePadding != autocreateContainerPadding) {
             autocreateContainerPadding = autocreatePadding;
@@ -491,7 +491,7 @@ public class GroupLayout extends Layout {
     /// #### Parameters
     ///
     /// - `group`: @param group `Group` responsible for layout along
-    ///              the horizontal axis
+    /// the horizontal axis
     ///
     /// #### Throws
     ///
@@ -525,7 +525,7 @@ public class GroupLayout extends Layout {
     /// #### Parameters
     ///
     /// - `group`: @param group `Group` responsible for layout along
-    ///              the vertical axis.
+    /// the vertical axis.
     ///
     /// #### Throws
     ///
@@ -587,8 +587,8 @@ public class GroupLayout extends Layout {
     /// #### Parameters
     ///
     /// - `alignment`: @param alignment alignment for the elements of the Group, one
-    ///                  of `LEADING`, `TRAILING`,
-    ///                  `CENTER` or `BASELINE`.
+    /// of `LEADING`, `TRAILING`,
+    /// `CENTER` or `BASELINE`.
     ///
     /// #### Returns
     ///
@@ -597,8 +597,8 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if alignment is not one of
-    ///                                  `LEADING`, `TRAILING`,
-    ///                                  `CENTER` or `BASELINE`
+    /// `LEADING`, `TRAILING`,
+    /// `CENTER` or `BASELINE`
     public ParallelGroup createParallelGroup(int alignment) {
         return createParallelGroup(alignment, true);
     }
@@ -613,12 +613,12 @@ public class GroupLayout extends Layout {
     /// #### Parameters
     ///
     /// - `alignment`: @param alignment alignment for the elements of the Group, one
-    ///                  of `LEADING`, `TRAILING`,
-    ///                  `CENTER` or `BASELINE`.
+    /// of `LEADING`, `TRAILING`,
+    /// `CENTER` or `BASELINE`.
     ///
     /// - `resizable`: @param resizable whether or not the group is resizable.  If the group
-    ///                  is not resizable the min/max size will be the same as the
-    ///                  preferred.
+    /// is not resizable the min/max size will be the same as the
+    /// preferred.
     ///
     /// #### Returns
     ///
@@ -627,8 +627,8 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if alignment is not one of
-    ///                                  `LEADING`, `TRAILING`,
-    ///                                  `CENTER` or `BASELINE`
+    /// `LEADING`, `TRAILING`,
+    /// `CENTER` or `BASELINE`
     public ParallelGroup createParallelGroup(int alignment, boolean resizable) {
         if (alignment == BASELINE) {
             return new BaselineGroup(resizable);
@@ -644,7 +644,7 @@ public class GroupLayout extends Layout {
     /// - `resizable`: whether the group is resizable
     ///
     /// - `anchorBaselineToTop`: @param anchorBaselineToTop whether the baseline is anchored to
-    ///                            the top or bottom of the group
+    /// the top or bottom of the group
     ///
     /// #### Returns
     ///
@@ -673,7 +673,7 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `components` is
-    ///                                  null, or contains null.
+    /// null, or contains null.
     public void linkSize(Component[] components) {
         linkSize(components, HORIZONTAL | VERTICAL);
     }
@@ -689,15 +689,15 @@ public class GroupLayout extends Layout {
     /// - `components`: Components to force to have same size.
     ///
     /// - `axis`: @param axis       Axis to bind size, one of HORIZONTAL, VERTICAL or
-    ///                   HORIZONTAL | VERTICAL
+    /// HORIZONTAL | VERTICAL
     ///
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `components` is
-    ///                                  null, or contains null.
+    /// null, or contains null.
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `axis` does not
-    ///                                  contain `HORIZONTAL` or `VERTICAL`
+    /// contain `HORIZONTAL` or `VERTICAL`
     public void linkSize(Component[] components, int axis) {
         if (components == null) {
             throw new IllegalArgumentException("Components must be non-null");
@@ -739,14 +739,14 @@ public class GroupLayout extends Layout {
     /// #### Parameters
     ///
     /// - `existingComponent`: @param existingComponent the Component that should be removed and
-    ///                          replaced with newComponent
+    /// replaced with newComponent
     ///
     /// - `newComponent`: the Component to put in existingComponents place
     ///
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException is either of the Components are null or
-    ///                                  if existingComponent is not being managed by this layout manager
+    /// if existingComponent is not being managed by this layout manager
     public void replace(Component existingComponent, Component newComponent) {
         if (existingComponent == null || newComponent == null) {
             throw new IllegalArgumentException("Components must be non-null");
@@ -814,10 +814,10 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
-    ///         the same `Container` that this was created with
+    /// the same `Container` that this was created with
     ///
     /// - `IllegalStateException`: @throws IllegalStateException if any of the components added to
-    ///         this layout are not in both a horizontal and vertical group
+    /// this layout are not in both a horizontal and vertical group
     ///
     /// #### See also
     ///
@@ -860,10 +860,10 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
-    ///         the same `Container` that this was created with
+    /// the same `Container` that this was created with
     ///
     /// - `IllegalStateException`: @throws IllegalStateException if any of the components added to
-    ///         this layout are not in both a horizontal and vertical group
+    /// this layout are not in both a horizontal and vertical group
     ///
     /// #### See also
     ///
@@ -892,7 +892,7 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
-    ///         the same `Container` that this was created with
+    /// the same `Container` that this was created with
     /*public float getLayoutAlignmentX(Container parent) {
         checkParent(parent);
         return .5f;
@@ -924,10 +924,10 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
-    ///                                  the same `Container` that this was created with
+    /// the same `Container` that this was created with
     ///
     /// - `IllegalStateException`: @throws IllegalStateException    if any of the components added to
-    ///                                  this layout are not in both a horizontal and vertical group
+    /// this layout are not in both a horizontal and vertical group
     ///
     /// #### See also
     ///
@@ -949,7 +949,7 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalStateException`: @throws IllegalStateException if any of the components added to
-    ///                               this layout are not in both a horizontal and vertical group
+    /// this layout are not in both a horizontal and vertical group
     @Override
     public void layoutContainer(Container parent) {
         // Step 1: Prepare for layout.
@@ -991,7 +991,7 @@ public class GroupLayout extends Layout {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `parent` is not
-    ///                                  the same `Container` that this was created with
+    /// the same `Container` that this was created with
     /*public void invalidateLayout(Container parent) {
         checkParent(parent);
         // invalidateLayout is called from Container.invalidate, which
@@ -1402,7 +1402,7 @@ public class GroupLayout extends Layout {
         /// - `origin`: of this Spring
         ///
         /// - `size`: @param size   of the Spring.  If size is UNSET, this invokes
-        ///               clear.
+        /// clear.
         void setSize(int axis, int origin, int size) {
             this.size = size;
             if (size == UNSET) {
@@ -1563,18 +1563,18 @@ public class GroupLayout extends Layout {
         /// - `axis`: the axis of the springs; HORIZONTAL or VERTICAL
         ///
         /// - `leadingPadding`: @param leadingPadding  List of AutopaddingSprings that occur before
-        ///                        this Group
+        /// this Group
         ///
         /// - `trailingPadding`: @param trailingPadding any trailing autopadding springs are added
-        ///                        to this on exit
+        /// to this on exit
         ///
         /// - `leading`: List of ComponentSprings that occur before this Group
         ///
         /// - `trailing`: @param trailing        any trailing ComponentSpring are added to this
-        ///                        List
+        /// List
         ///
         /// - `insert`: @param insert          Whether or not to insert AutopaddingSprings or just
-        ///                        adjust any existing AutopaddingSprings.
+        /// adjust any existing AutopaddingSprings.
         abstract void insertAutopadding(int axis, ArrayList leadingPadding,
                                         ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
                                         boolean insert);
@@ -1670,7 +1670,7 @@ public class GroupLayout extends Layout {
         /// - `group`: the `Group` to add
         ///
         /// - `useAsBaseline`: @param useAsBaseline whether the specified `Group` should
-        ///                      be used to calculate the baseline for this `Group`
+        /// be used to calculate the baseline for this `Group`
         ///
         /// #### Returns
         ///
@@ -1702,7 +1702,7 @@ public class GroupLayout extends Layout {
         /// #### Parameters
         ///
         /// - `useAsBaseline`: @param useAsBaseline whether the specified `Component` should
-        ///                      be used to calculate the baseline for this `Group`
+        /// be used to calculate the baseline for this `Group`
         ///
         /// - `component`: the `Component` to add
         ///
@@ -1746,7 +1746,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if min, pref or max are
-        ///                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE
+        /// not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE
         public SequentialGroup add(Component component, int min, int pref,
                                    int max) {
             return (SequentialGroup) addSpring(new ComponentSpring(
@@ -1759,18 +1759,18 @@ public class GroupLayout extends Layout {
         /// #### Parameters
         ///
         /// - `useAsBaseline`: @param useAsBaseline whether the specified `Component` should
-        ///                      be used to calculate the baseline for this `Group`
+        /// be used to calculate the baseline for this `Group`
         ///
         /// - `component`: the `Component` to add
         ///
         /// - `min`: @param min           the minimum size or one of `DEFAULT_SIZE` or
-        ///                      `PREFERRED_SIZE`
+        /// `PREFERRED_SIZE`
         ///
         /// - `pref`: @param pref          the preferred size or one of `DEFAULT_SIZE` or
-        ///                      `PREFERRED_SIZE`
+        /// `PREFERRED_SIZE`
         ///
         /// - `max`: @param max           the maximum size or one of `DEFAULT_SIZE` or
-        ///                      `PREFERRED_SIZE`
+        /// `PREFERRED_SIZE`
         ///
         /// #### Returns
         ///
@@ -1797,7 +1797,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
-        ///                                  or the following is not meant min <= pref <= max
+        /// or the following is not meant min <= pref <= max
         public SequentialGroup add(int pref) {
             return add(pref, pref, pref);
         }
@@ -1819,7 +1819,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
-        ///                                  or the following is not meant min <= pref <= max
+        /// or the following is not meant min <= pref <= max
         public SequentialGroup add(int min, int pref, int max) {
             return (SequentialGroup) addSpring(new GapSpring(min, pref, max));
         }
@@ -1834,7 +1834,7 @@ public class GroupLayout extends Layout {
         /// - `comp2`: the second component
         ///
         /// - `type`: @param type  the type of gap; one of the constants defined by
-        ///              LayoutStyle
+        /// LayoutStyle
         ///
         /// #### Returns
         ///
@@ -1843,7 +1843,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if `type` is not a
-        ///                                  valid LayoutStyle constant
+        /// valid LayoutStyle constant
         ///
         /// #### See also
         ///
@@ -1864,10 +1864,10 @@ public class GroupLayout extends Layout {
         /// - `comp2`: the second component
         ///
         /// - `type`: @param type    the type of gap; one of the constants defined by
-        ///                LayoutStyle
+        /// LayoutStyle
         ///
         /// - `canGrow`: @param canGrow true if the gap can grow if more
-        ///                space is available
+        /// space is available
         ///
         /// #### Returns
         ///
@@ -1876,7 +1876,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if `type` is not a
-        ///                                  valid LayoutStyle constant
+        /// valid LayoutStyle constant
         ///
         /// #### See also
         ///
@@ -1915,8 +1915,8 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if type is not one of
-        ///                                  `LayoutStyle.RELATED` or
-        ///                                  `LayoutStyle.UNRELATED`
+        /// `LayoutStyle.RELATED` or
+        /// `LayoutStyle.UNRELATED`
         ///
         /// #### See also
         ///
@@ -1940,12 +1940,12 @@ public class GroupLayout extends Layout {
         /// #### Parameters
         ///
         /// - `type`: @param type the type of gap; one of LayoutStyle.RELATED or
-        ///             LayoutStyle.UNRELATED
+        /// LayoutStyle.UNRELATED
         ///
         /// - `pref`: the preferred size; one of DEFAULT_SIZE or a value > 0
         ///
         /// - `max`: @param max  the maximum size; one of DEFAULT_SIZE, PREFERRED_SIZE
-        ///             or a value > 0
+        /// or a value > 0
         ///
         /// #### Returns
         ///
@@ -1954,9 +1954,9 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if type is not one of
-        ///                                  `LayoutStyle.RELATED` or
-        ///                                  `LayoutStyle.UNRELATED` or pref/max is
-        ///                                  != DEFAULT_SIZE and  max
+        /// `LayoutStyle.RELATED` or
+        /// `LayoutStyle.UNRELATED` or pref/max is
+        /// != DEFAULT_SIZE and  max
         ///
         /// #### See also
         ///
@@ -2001,7 +2001,7 @@ public class GroupLayout extends Layout {
         /// - `pref`: the preferred size; one of DEFAULT_SIZE or a value > 0
         ///
         /// - `max`: @param max  the maximum size; one of DEFAULT_SIZE, PREFERRED_SIZE
-        ///             or a value > 0.
+        /// or a value > 0.
         ///
         /// #### Returns
         ///
@@ -2010,7 +2010,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if pref/max is
-        ///                                  != DEFAULT_SIZE and  max
+        /// != DEFAULT_SIZE and  max
         public SequentialGroup addContainerGap(int pref, int max) {
             if ((pref < 0 && pref != DEFAULT_SIZE) ||
                     (max < 0 && max != DEFAULT_SIZE && max != PREFERRED_SIZE) ||
@@ -2430,7 +2430,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if min, pref or max are
-        ///                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
+        /// not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
         public ParallelGroup add(Component component, int min, int pref,
                                  int max) {
             return (ParallelGroup) addSpring(new ComponentSpring(
@@ -2450,7 +2450,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
-        ///                                  or the following is not meant min <= pref <= max.
+        /// or the following is not meant min <= pref <= max.
         public ParallelGroup add(int pref) {
             return add(pref, pref, pref);
         }
@@ -2472,7 +2472,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if min < 0 or pref < 0 or max < 0
-        ///                                  or the following is not meant min <= pref <= max.
+        /// or the following is not meant min <= pref <= max.
         public ParallelGroup add(int min, int pref, int max) {
             return (ParallelGroup) addSpring(new GapSpring(min, pref, max));
         }
@@ -2492,8 +2492,8 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if alignment is not one of
-        ///                                  `LEADING`, `TRAILING` or
-        ///                                  `CENTER`
+        /// `LEADING`, `TRAILING` or
+        /// `CENTER`
         public ParallelGroup add(int alignment, Group group) {
             checkChildAlignment(alignment);
             group.setAlignment(alignment);
@@ -2516,8 +2516,8 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if alignment is not one of
-        ///                                  `LEADING`, `TRAILING` or
-        ///                                  `CENTER`
+        /// `LEADING`, `TRAILING` or
+        /// `CENTER`
         public ParallelGroup add(int alignment, Component component) {
             return add(alignment, component, DEFAULT_SIZE, DEFAULT_SIZE,
                     DEFAULT_SIZE);
@@ -2554,7 +2554,7 @@ public class GroupLayout extends Layout {
         /// #### Throws
         ///
         /// - `IllegalArgumentException`: @throws IllegalArgumentException if min, pref or max are
-        ///                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
+        /// not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
         public ParallelGroup add(int alignment, Component component, int min,
                                  int pref, int max) {
             checkChildAlignment(alignment);
@@ -2943,7 +2943,7 @@ public class GroupLayout extends Layout {
     /// - Use the pref/min/max from the component
     ///
     /// - Use the pref from the component and fix the min to 0 or max
-    ///     to a big number.
+    /// to a big number.
     ///
     /// - Force the min/max/pref to be a certain value.
     /// If the Component's size is to be linked to another components than

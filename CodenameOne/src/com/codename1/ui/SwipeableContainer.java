@@ -107,7 +107,7 @@ public class SwipeableContainer extends Container {
     /// #### Parameters
     ///
     /// - `bottomLeft`: @param bottomLeft the Component below the top, this Component is exposed
-    ///                   when dragging the top to the right
+    /// when dragging the top to the right
     ///
     /// - `top`: the component on top.
     public SwipeableContainer(Component bottomLeft, Component top) {
@@ -119,10 +119,10 @@ public class SwipeableContainer extends Container {
     /// #### Parameters
     ///
     /// - `bottomLeft`: @param bottomLeft  the Component below the top, this Component is exposed
-    ///                    when dragging the top to the right
+    /// when dragging the top to the right
     ///
     /// - `bottomRight`: @param bottomRight the Component below the top, this Component is exposed
-    ///                    when dragging the top to the Left
+    /// when dragging the top to the Left
     ///
     /// - `top`: the component on top.
     public SwipeableContainer(Component bottomLeft, Component bottomRight, Component top) {
@@ -356,7 +356,7 @@ public class SwipeableContainer extends Container {
     /// #### Parameters
     ///
     /// - `previouslyOpened`: @param previouslyOpened an already open SwipeableContainer that will be
-    ///                         closed if this one is opened
+    /// closed if this one is opened
     public void setPreviouslyOpened(SwipeableContainer previouslyOpened) {
         this.previouslyOpened = previouslyOpened;
     }

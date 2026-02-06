@@ -80,7 +80,7 @@ import java.util.ArrayList;
 /// [ChartsDemo app](https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo). Y ou can start playing with this app by checking it out from our git
 /// repository.
 ///
-///       How to Create A Chart
+/// How to Create A Chart
 ///
 /// Adding a chart to your app involves four steps:
 ///
@@ -855,16 +855,16 @@ public class ChartComponent extends Component {
     /// #### Parameters
     ///
     /// - `minRangeX`: @param minRangeX The minimum distance from `XYMultipleSeriesRenderer#getXAxisMin()` to
-    ///                  `XYMultipleSeriesRenderer#getXAxisMax()` that can be achieved by zooming in.  0 means no limit.
+    /// `XYMultipleSeriesRenderer#getXAxisMax()` that can be achieved by zooming in.  0 means no limit.
     ///
     /// - `maxRangeX`: @param maxRangeX The maximum distance from `XYMultipleSeriesRenderer#getXAxisMin()` to
-    ///                  `XYMultipleSeriesRenderer#getXAxisMax()` that can be achieved by zooming out.  0 means no limit.
+    /// `XYMultipleSeriesRenderer#getXAxisMax()` that can be achieved by zooming out.  0 means no limit.
     ///
     /// - `minRangeY`: @param minRangeY The minimum distance from `XYMultipleSeriesRenderer#getYAxisMin()` to
-    ///                  `XYMultipleSeriesRenderer#getYAxisMax()` that can be achieved by zooming in. 0 means no limit.
+    /// `XYMultipleSeriesRenderer#getYAxisMax()` that can be achieved by zooming in. 0 means no limit.
     ///
     /// - `maxRangeY`: @param maxRangeY The maximum distance from `XYMultipleSeriesRenderer#getYAxisMin()` to
-    ///                  `XYMultipleSeriesRenderer#getYAxisMax()` that can be achieved by zooming out. 0 means no limit.
+    /// `XYMultipleSeriesRenderer#getYAxisMax()` that can be achieved by zooming out. 0 means no limit.
     public void setZoomLimits(double minRangeX, double maxRangeX, double minRangeY, double maxRangeY) {
         if (chart instanceof XYChart) {
             XYChart xyChart = (XYChart) chart;

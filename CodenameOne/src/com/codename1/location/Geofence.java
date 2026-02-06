@@ -99,8 +99,8 @@ public class Geofence {
     /// - `loc`: the center location of this Geofence
     ///
     /// - `radius`: @param radius     the radius in meters. Note that the actual radius will vary
-    ///                   on an actual device depending on the hardware and OS.  Typical android and iOS devices
-    ///                   have a minimum radius of 100m.
+    /// on an actual device depending on the hardware and OS.  Typical android and iOS devices
+    /// have a minimum radius of 100m.
     ///
     /// - `expiration`: the expiration time in milliseconds.  Note that this is a duration, not a timestamp.  Use -1 to never expire.
     public Geofence(String id, Location loc, int radius, long expiration) {

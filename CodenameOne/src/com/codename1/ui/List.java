@@ -510,7 +510,7 @@ public class List<T> extends Component implements ActionSource {
     /// - `index`: the current selected offset in the list
     ///
     /// - `scrollToSelection`: @param scrollToSelection indicates whether scrolling to selection should
-    ///                          occur if the selection is outside of view
+    /// occur if the selection is outside of view
     public void setSelectedIndex(int index, boolean scrollToSelection) {
         if (index < 0) {
             throw new IllegalArgumentException("Selection index is negative:" + index);
@@ -1596,7 +1596,7 @@ public class List<T> extends Component implements ActionSource {
     /// #### Parameters
     ///
     /// - `inputOnFocus`: @param inputOnFocus true is a list can start handling input
-    ///                     implicitly upon gaining focus
+    /// implicitly upon gaining focus
     public void setInputOnFocus(boolean inputOnFocus) {
         this.inputOnFocus = inputOnFocus;
     }
@@ -1680,7 +1680,7 @@ public class List<T> extends Component implements ActionSource {
     /// #### Parameters
     ///
     /// - `renderingPrototype`: @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
-    ///                           size of a list component.
+    /// size of a list component.
     public void setRenderingPrototype(T renderingPrototype) {
         this.renderingPrototype = renderingPrototype;
     }
@@ -2093,7 +2093,7 @@ public class List<T> extends Component implements ActionSource {
     /// #### Parameters
     ///
     /// - `fixedSelection`: @param fixedSelection one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD,
-    ///                       FIXED_CENTER, FIXED_NONE_CYCLIC
+    /// FIXED_CENTER, FIXED_NONE_CYCLIC
     public void setFixedSelection(int fixedSelection) {
         this.fixedSelection = fixedSelection;
     }
@@ -2220,7 +2220,7 @@ public class List<T> extends Component implements ActionSource {
     /// #### Parameters
     ///
     /// - `scrollToSelected`: @param scrollToSelected if true the List scrolls to the selected element
-    ///                         when It's been initialized.
+    /// when It's been initialized.
     public void setScrollToSelected(boolean scrollToSelected) {
         this.scrollToSelected = scrollToSelected;
     }

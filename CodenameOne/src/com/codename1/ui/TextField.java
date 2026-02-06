@@ -40,7 +40,7 @@ import java.util.Vector;
 /// - Blinking cursor is rendered on `TextField` only
 ///
 /// - `com.codename1.ui.events.DataChangeListener` is only available in `TextField`.
-///              This is crucial for character by character input event tracking
+/// This is crucial for character by character input event tracking
 ///
 /// - `com.codename1.ui.TextField#setDoneListener(com.codename1.ui.events.ActionListener)` is only available in `TextField`
 ///
@@ -405,10 +405,10 @@ public class TextField extends TextArea {
     /// - `name`: a unique display name for the input mode e.g. ABC, 123 etc...
     ///
     /// - `values`: @param values      The key for the hashtable is an Integer keyCode and the value
-    ///                    is a String containing the characters to toggle between for the given keycode
+    /// is a String containing the characters to toggle between for the given keycode
     ///
     /// - `firstUpcase`: @param firstUpcase indicates if this input mode in an input mode used for the special
-    ///                    case where the first letter is an upper case letter
+    /// case where the first letter is an upper case letter
     ///
     /// #### Deprecated
     ///
@@ -650,7 +650,7 @@ public class TextField extends TextArea {
     /// #### Parameters
     ///
     /// - `commitTimeout`: @param commitTimeout indicates the amount of time that should elapse for a commit
-    ///                      to automatically occur
+    /// to automatically occur
     public void setCommitTimeout(int commitTimeout) {
         this.commitTimeout = commitTimeout;
     }
@@ -671,7 +671,7 @@ public class TextField extends TextArea {
     /// #### Parameters
     ///
     /// - `inputMode`: @param inputMode the display name of the input mode by default the following modes
-    ///                  are supported: Abc, ABC, abc, 123
+    /// are supported: Abc, ABC, abc, 123
     ///
     /// #### Deprecated
     ///

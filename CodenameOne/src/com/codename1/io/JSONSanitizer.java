@@ -740,11 +740,11 @@ final class JSONSanitizer {
     /// - Escaping any Javascript newlines : CR, LF, U+2028, U+2029
     ///
     /// - Escaping HTML special characters to allow it to be safely embedded
-    ///       in HTML `` elements and XML ``
-    ///       sections.
+    /// in HTML `` elements and XML ``
+    /// sections.
     ///
     /// - Rewrite hex, octal, and other escapes that are valid in Javascript
-    ///       but not in JSON.
+    /// but not in JSON.
     ///
     /// #### Parameters
     ///

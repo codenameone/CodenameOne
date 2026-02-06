@@ -108,7 +108,7 @@ public class MediaRecorderBuilder {
     /// #### Parameters
     ///
     /// - `path`: @param path The output path where the recording should be saved as
-    ///             a `com.codename1.io.FileSystemStorage` path
+    /// a `com.codename1.io.FileSystemStorage` path
     ///
     /// #### Returns
     ///
@@ -124,7 +124,7 @@ public class MediaRecorderBuilder {
     /// #### Parameters
     ///
     /// - `redirect`: @param redirect True to redirect output to an audio buffer.  The `#path(java.lang.String)`
-    ///                 parameter would then be used as the path to the audio buffer instead of the output file.
+    /// parameter would then be used as the path to the audio buffer instead of the output file.
     ///
     /// #### Returns
     ///

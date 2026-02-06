@@ -399,9 +399,9 @@ public final class FileSystemStorage {
     ///
     /// String imageFile = FileSystemStorage.getInstance().getAppHomePath() + "screenshot.png";
     /// try(OutputStream os = FileSystemStorage.getInstance().openOutputStream(imageFile)) {
-    ///     ImageIO.getImageIO().save(screenshot, os, ImageIO.FORMAT_PNG, 1);
+    /// ImageIO.getImageIO().save(screenshot, os, ImageIO.FORMAT_PNG, 1);
     /// } catch(IOException err) {
-    ///     Log.e(err);
+    /// Log.e(err);
     /// }
     /// sb.setImageToShare(imageFile, "image/png");
     /// ```

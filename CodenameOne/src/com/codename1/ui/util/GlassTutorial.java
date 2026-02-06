@@ -72,8 +72,8 @@ public class GlassTutorial implements Painter {
     /// - `destinationComponent`: the "hinted" component over which the hint will show
     ///
     /// - `position`: @param position             the position relative to the destinationComponent in BorderLayout values e.g. to place the hint
-    ///                             above the component just place it in BorderLayout.NORTH. The center will stretch the component but the
-    ///                             other sides will give the component its exact preferred size.
+    /// above the component just place it in BorderLayout.NORTH. The center will stretch the component but the
+    /// other sides will give the component its exact preferred size.
     public void addHint(Component hintComponent, Component destinationComponent, String position) {
         hintComponent.putClientProperty(POS, position);
         hintComponent.putClientProperty(DEST, destinationComponent);

@@ -465,7 +465,7 @@ public class RequestBuilder {
     /// - `error`: callback for a networking error
     ///
     /// - `replace`: @param replace If true, replaces the existing errorCallback(s) with the handler
-    ///                provided.
+    /// provided.
     ///
     /// #### Returns
     ///

@@ -285,7 +285,7 @@ public class UIManager {
     /// #### Parameters
     ///
     /// - `useLargerTextScale`: @param useLargerTextScale true to apply `Display#getLargerTextScale()` when
-    ///                           `Display#isLargerTextEnabled()` is true.
+    /// `Display#isLargerTextEnabled()` is true.
     public void setUseLargerTextScale(boolean useLargerTextScale) {
         this.useLargerTextScale = useLargerTextScale;
     }
@@ -442,14 +442,14 @@ public class UIManager {
     /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
     ///
     /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
-    ///                    overridden by the styles provided in styleString.
+    /// overridden by the styles provided in styleString.
     ///
     /// - `id`: the component id into which the resulting style is to be cached.
     ///
     /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
-    ///                    is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
-    ///                    and values
-    ///                    correspond to properties of `Style` and their associated values.
+    /// is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    /// and values
+    /// correspond to properties of `Style` and their associated values.
     ///
     /// #### Returns
     ///
@@ -485,14 +485,14 @@ public class UIManager {
     /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
     ///
     /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
-    ///                    overridden by the styles provided in styleString.
+    /// overridden by the styles provided in styleString.
     ///
     /// - `id`: the component id into which the resulting style is to be cached.
     ///
     /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
-    ///                    is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
-    ///                    and values
-    ///                    correspond to properties of `Style` and their associated values.
+    /// is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    /// and values
+    /// correspond to properties of `Style` and their associated values.
     ///
     /// #### Returns
     ///
@@ -529,16 +529,16 @@ public class UIManager {
     /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
     ///
     /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
-    ///                    overridden by the styles provided in styleString.
+    /// overridden by the styles provided in styleString.
     ///
     /// - `id`: the component id into which the resulting style is to be cached.
     ///
     /// - `type`: the style type
     ///
     /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
-    ///                    is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
-    ///                    and values
-    ///                    correspond to properties of `Style` and their associated values.
+    /// is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    /// and values
+    /// correspond to properties of `Style` and their associated values.
     ///
     /// #### Returns
     ///
@@ -619,8 +619,8 @@ public class UIManager {
     /// #### Parameters
     ///
     /// - `installedTheme`: @param installedTheme the theme to be installed or null, this is used
-    ///                       to check if style inheritance is used in which case we must NOT init
-    ///                       style defaults for that particular component
+    /// to check if style inheritance is used in which case we must NOT init
+    /// style defaults for that particular component
     private void resetThemeProps(Hashtable installedTheme) {
         themeProps = new HashMap<String, Object>();
         wasThemeInstalled = false;

@@ -79,7 +79,7 @@ public class TimeChart extends LineChart {
     /// #### Parameters
     ///
     /// - `format`: @param format the date format pattern for the X axis labels. If null, an
-    ///               appropriate default format will be used.
+    /// appropriate default format will be used.
     public void setDateFormat(String format) {
         mDateFormat = format;
     }

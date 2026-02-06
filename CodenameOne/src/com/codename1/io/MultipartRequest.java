@@ -232,8 +232,8 @@ public class MultipartRequest extends ConnectionRequest {
     /// - `data`: the data stream
     ///
     /// - `dataSize`: @param dataSize the byte size of the data stream, if the data stream is a file
-    ///                 the file size can be obtained using the
-    ///                 FileSystemStorage.getInstance().getLength(file) method
+    /// the file size can be obtained using the
+    /// FileSystemStorage.getInstance().getLength(file) method
     ///
     /// - `mimeType`: the mime type for the content
     public void addData(String name, InputStream data, long dataSize, String mimeType) {

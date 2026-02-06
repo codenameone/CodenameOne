@@ -130,7 +130,7 @@ public final class DefaultCrashReporter implements CrashReport {
     /// - `promptUser`: indicates whether the user should be prompted on crash reporting
     ///
     /// - `frequency`: @param frequency  the frequency with which we send the log to the server in debug mode in minutes
-    ///                   frequency must be at least 1. Any lower level automatically disables this feature
+    /// frequency must be at least 1. Any lower level automatically disables this feature
     public static void init(boolean promptUser, int frequency) {
         if (Preferences.get("$CN1_crashBlocked", false) || Log.getReportingLevel() == Log.REPORTING_NONE) {
             return;

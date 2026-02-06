@@ -82,7 +82,7 @@ public class Command implements ActionListener<ActionEvent> {
     /// - `command`: the string that will be placed on the Soft buttons\Menu
     ///
     /// - `id`: @param id      user defined ID for a command simplifying switch statement code
-    ///                working with a command
+    /// working with a command
     public Command(String command, int id) {
         this.command = command;
         this.commandId = id;
@@ -97,7 +97,7 @@ public class Command implements ActionListener<ActionEvent> {
     /// - `icon`: the icon representing the command
     ///
     /// - `id`: @param id      user defined ID for a command simplifying switch statement code
-    ///                working with a command
+    /// working with a command
     public Command(String command, Image icon, int id) {
         this.command = command;
         this.commandId = id;

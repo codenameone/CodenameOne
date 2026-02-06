@@ -50,16 +50,16 @@ public class LocationRequest {
     /// #### Parameters
     ///
     /// - `priority`: @param priority The priority we are interested to listen for location updates.
-    ///                 PRIORITY_HIGH_ACCUARCY, PRIORITY_MEDIUM_ACCUARCY, PRIORITY_LOW_ACCUARCY
-    ///                 High priority means gps locations which is CPU intensive and consumes more battery.
-    ///                 Medium priority is less intensive in terms of battery and might return a
-    ///                 gps or a network location which is less accurate.
-    ///                 Low priority won't consume the battery and will return a gps location if
-    ///                 available otherwise the location would be a network location.
+    /// PRIORITY_HIGH_ACCUARCY, PRIORITY_MEDIUM_ACCUARCY, PRIORITY_LOW_ACCUARCY
+    /// High priority means gps locations which is CPU intensive and consumes more battery.
+    /// Medium priority is less intensive in terms of battery and might return a
+    /// gps or a network location which is less accurate.
+    /// Low priority won't consume the battery and will return a gps location if
+    /// available otherwise the location would be a network location.
     ///
     /// - `interval`: @param interval time in milliseconds which determines what are the time
-    ///                 intervals that we would like to get updates from the OS.
-    ///                 This is a request only and might not be respected by the underlying OS
+    /// intervals that we would like to get updates from the OS.
+    /// This is a request only and might not be respected by the underlying OS
     public LocationRequest(int priority, long interval) {
         this.priority = priority;
         this.interval = interval;

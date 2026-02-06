@@ -150,7 +150,7 @@ class TBigInteger {
     /// - `NullPointerException`: if `val == null`.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if `val` is not a valid representation of a
-    ///                               `BigInteger`.
+    /// `BigInteger`.
     public TBigInteger(String val) {
         this(val, 10);
     }
@@ -172,7 +172,7 @@ class TBigInteger {
     /// - `NullPointerException`: if `val == null`.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if `val` is not a valid representation of a
-    ///                               `BigInteger` or if `radix  Character.MAX_RADIX`.
+    /// `BigInteger` or if `radix  Character.MAX_RADIX`.
     public TBigInteger(String val, int radix) {
         if (val == null) {
             throw new NullPointerException();
@@ -194,17 +194,17 @@ class TBigInteger {
     /// #### Parameters
     ///
     /// - `signum`: @param signum    sign of the new `BigInteger` (-1 for negative, 0 for
-    ///                  zero, 1 for positive).
+    /// zero, 1 for positive).
     ///
     /// - `magnitude`: @param magnitude magnitude of the new `BigInteger` with the most
-    ///                  significant byte first.
+    /// significant byte first.
     ///
     /// #### Throws
     ///
     /// - `NullPointerException`: if `magnitude == null`.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if the sign is not one of -1, 0, 1 or if the sign is zero and
-    ///                               the magnitude contains non-zero entries.
+    /// the magnitude contains non-zero entries.
     public TBigInteger(int signum, byte[] magnitude) {
         if (magnitude == null) {
             throw new NullPointerException();
@@ -1344,7 +1344,7 @@ class TBigInteger {
     /// - `NullPointerException`: if `m == null`
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `m < 0 or` if `this` is not relatively prime
-    ///                              to `m`
+    /// to `m`
     public TBigInteger modInverse(TBigInteger m) {
         if (m.sign <= 0) {
             throw new ArithmeticException("BigInteger: modulus not positive");
@@ -1390,7 +1390,7 @@ class TBigInteger {
     /// - `NullPointerException`: if `m == null` or `exponent == null`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `m < 0` or if `exponent<0` and this is not
-    ///                              relatively prime to `m`.
+    /// relatively prime to `m`.
     public TBigInteger modPow(TBigInteger exponent, TBigInteger m) {
         if (m.sign <= 0) {
             throw new ArithmeticException("BigInteger: modulus not positive");

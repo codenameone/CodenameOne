@@ -123,12 +123,12 @@ final class TMathContext {
     /// #### Parameters
     ///
     /// - `val`: @param val a string describing the precision and rounding mode for the
-    ///            new `MathContext`.
+    /// new `MathContext`.
     ///
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if the string is not in the correct format or if the
-    ///                                  precision specified is < 0.
+    /// precision specified is < 0.
     public TMathContext(String val) {
         char[] charVal = val.toCharArray();
         int i; // Index of charVal

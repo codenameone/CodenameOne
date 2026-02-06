@@ -95,10 +95,10 @@ public class AffineTransform {
     /// #### Parameters
     ///
     /// - `m`: @param m the float array containing the values to be set
-    ///          in the new `AffineTransform` object. The length of the
-    ///          array is assumed to be at least 4. If the length of the array is
-    ///          less than 6, only the first 4 values are taken. If the length of
-    ///          the array is greater than 6, the first 6 values are taken.
+    /// in the new `AffineTransform` object. The length of the
+    /// array is assumed to be at least 4. If the length of the array is
+    /// less than 6, only the first 4 values are taken. If the length of
+    /// the array is greater than 6, the first 6 values are taken.
     public AffineTransform(float[] m) {
         int len = m.length;
         m00 = m[0];
@@ -148,10 +148,10 @@ public class AffineTransform {
     /// #### Parameters
     ///
     /// - `m`: @param m the double array containing the values to be set
-    ///          in the new `AffineTransform` object. The length of the
-    ///          array is assumed to be at least 4. If the length of the array is
-    ///          less than 6, only the first 4 values are taken. If the length of
-    ///          the array is greater than 6, the first 6 values are taken.
+    /// in the new `AffineTransform` object. The length of the
+    /// array is assumed to be at least 4. If the length of the array is
+    /// less than 6, only the first 4 values are taken. If the length of
+    /// the array is greater than 6, the first 6 values are taken.
     public AffineTransform(double[] m) {
         int len = m.length;
         m00 = m[0];

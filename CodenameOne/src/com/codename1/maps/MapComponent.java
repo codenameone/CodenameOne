@@ -764,7 +764,7 @@ public class MapComponent extends Container {
     /// #### Throws
     ///
     /// - `ArrayIndexOutOfBoundsException`: @throws ArrayIndexOutOfBoundsException - if the index is out of range
-    ///                                        (index < 0 || index >= size())
+    /// (index < 0 || index >= size())
     public Layer getLayerAt(int index) {
         return ((LayerWithZoomLevels) _layers.elementAt(index)).layer;
     }
@@ -866,7 +866,7 @@ public class MapComponent extends Container {
     /// #### Parameters
     ///
     /// - `coord`: @param coord     center map to this coordinate, coord should be in wg84
-    ///                  format
+    /// format
     ///
     /// - `zoomLevel`: zoom map to this level;
     ///

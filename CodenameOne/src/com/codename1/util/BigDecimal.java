@@ -45,10 +45,10 @@ public class BigDecimal {
     /// #### Parameters
     ///
     /// - `value`: @param value The value of the `BigDecimal` to be
-    ///              created.
+    /// created.
     ///
     /// - `scale`: @param scale The scale of the `BigDecimal` to be
-    ///              created.
+    /// created.
     ///
     /// #### Returns
     ///

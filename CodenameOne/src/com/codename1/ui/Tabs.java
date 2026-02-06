@@ -936,7 +936,7 @@ public class Tabs extends Container {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if index is out of range
-    ///                                   (index = tab count)
+    /// (index = tab count)
     ///
     /// #### See also
     ///
@@ -968,7 +968,7 @@ public class Tabs extends Container {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if index is out of range
-    ///                                   (index = tab count)
+    /// (index = tab count)
     ///
     /// #### See also
     ///
@@ -1033,7 +1033,7 @@ public class Tabs extends Container {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if index is out of range
-    ///                                   (index = tab count)
+    /// (index = tab count)
     public void setSelectedIndex(int index) {
         setSelectedIndex(index, false);
     }
@@ -1201,7 +1201,7 @@ public class Tabs extends Container {
     /// - `index`: the index for the tab starting with tab 0.
     ///
     /// - `slideToSelected`: @param slideToSelected true to animate the transition to the new selection
-    ///                        false to just move immediately
+    /// false to just move immediately
     public void setSelectedIndex(int index, boolean slideToSelected) {
         if (index < 0 || index >= tabsContainer.getComponentCount()) {
             throw new IndexOutOfBoundsException("Index: " + index + ", Tab count: " + tabsContainer.getComponentCount());
@@ -1367,7 +1367,7 @@ public class Tabs extends Container {
     /// #### Parameters
     ///
     /// - `tabsGap`: @param tabsGap the gap on the sides of the content in pixels, the value must
-    ///                be positive.
+    /// be positive.
     public void setTabsContentGap(int tabsGap) {
         if (tabsGap < 0) {
             throw new IllegalArgumentException("gap must be positive");

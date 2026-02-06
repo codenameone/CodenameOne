@@ -540,7 +540,7 @@ public class AutoCompleteTextField extends TextField {
     /// #### Parameters
     ///
     /// - `popupPosition`: @param popupPosition on of POPUP_POSITION_AUTO, POPUP_POSITION_OVER,
-    ///                      POPUP_POSITION_UNDER
+    /// POPUP_POSITION_UNDER
     public void setPopupPosition(int popupPosition) {
         this.popupPosition = popupPosition;
     }

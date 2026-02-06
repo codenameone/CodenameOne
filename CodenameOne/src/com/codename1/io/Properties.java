@@ -440,7 +440,7 @@ public class Properties extends HashMap<String, String> {
     /// #### Throws
     ///
     /// - `ClassCastException`: @throws ClassCastException if the key or value of a mapping is not a
-    ///                            String.
+    /// String.
     ///
     /// #### Deprecated
     ///

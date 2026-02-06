@@ -84,7 +84,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /// - `limit`: the limit on the number of RSS entries supported
     ///
     /// - `startOffset`: @param startOffset indicates the entry offset which we are interested
-    ///                    in, this is useful if previously the limit for RSS entries was reached.
+    /// in, this is useful if previously the limit for RSS entries was reached.
     public RSSService(String url, int limit, int startOffset) {
         this(url, limit);
         this.startOffset = startOffset;

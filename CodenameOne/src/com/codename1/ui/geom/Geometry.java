@@ -617,7 +617,7 @@ class Geometry {
         /// - `c`: The bezier curve to compare to
         ///
         /// - `epsilon`: @param epsilon Curves are equal if all x and y values are within epsilon of the corresponding x/y value
-        ///                in the other curve.  epsilon must be greater than 0
+        /// in the other curve.  epsilon must be greater than 0
         ///
         /// #### Returns
         ///

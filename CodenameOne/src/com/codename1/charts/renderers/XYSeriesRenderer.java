@@ -297,7 +297,7 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
     /// #### Parameters
     ///
     /// - `spacing`: @param spacing the chart values spacing (in pixels) from the chart data
-    ///                point
+    /// point
     public void setChartValuesSpacing(float spacing) {
         mChartValuesSpacing = spacing;
     }

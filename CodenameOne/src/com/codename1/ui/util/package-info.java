@@ -5,5 +5,5 @@
 */
 
 /// Utility features that are either too domain specific or don't "fit" into any
-///     other packages including the Resource file format loading API.
+/// other packages including the Resource file format loading API.
 package com.codename1.ui.util;

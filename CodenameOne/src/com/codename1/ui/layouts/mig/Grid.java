@@ -128,19 +128,19 @@ public final class Grid {
     /// - `lc`: The form flow constraints.
     ///
     /// - `rowConstr`: @param rowConstr    The rows specifications. If more cell rows are required,
-    ///                     the last element will be used for when there is no corresponding element
-    ///                     in this array.
+    /// the last element will be used for when there is no corresponding element
+    /// in this array.
     ///
     /// - `colConstr`: @param colConstr    The columns specifications. If more cell rows are
-    ///                     required, the last element will be used for when there is no
-    ///                     corresponding element in this array.
+    /// required, the last element will be used for when there is no
+    /// corresponding element in this array.
     ///
     /// - `ccMap`: @param ccMap        The map containing the parsed constraints for each child
-    ///                     component of `parent`. Will not be altered. Can have null CC
-    ///                     which will use a common cached one.
+    /// component of `parent`. Will not be altered. Can have null CC
+    /// which will use a common cached one.
     ///
     /// - `callbackList`: @param callbackList A list of callbacks or `null` if none.
-    ///                     Will not be altered.
+    /// Will not be altered.
     public Grid(ContainerWrapper container, LC lc, AC rowConstr, AC colConstr, Map<? extends ComponentWrapper, CC> ccMap, ArrayList<LayoutCallback> callbackList) {
 //        System.out.println("new grid!");
         this.lc = lc;
@@ -666,8 +666,8 @@ public final class Grid {
     /// #### Parameters
     ///
     /// - `span`: @param span    The span un the uncompressed grid.
-    ///                `LayoutUtil.INF` will be interpreted to span the rest of the
-    ///                column/row excluding the surrounding docking components.
+    /// `LayoutUtil.INF` will be interpreted to span the rest of the
+    /// column/row excluding the surrounding docking components.
     ///
     /// - `indexes`: The indexes in the correct dimension.
     ///
@@ -919,17 +919,17 @@ public final class Grid {
     /// #### Parameters
     ///
     /// - `resConstr`: @param resConstr       One resize constriant for every row/component. Can be
-    ///                        lesser in length and the last element should be used for missing
-    ///                        elements.
+    /// lesser in length and the last element should be used for missing
+    /// elements.
     ///
     /// - `gapPush`: @param gapPush         If the corresponding gap should be considered pushing and
-    ///                        thus want to take free space if left over. Should be one more than
-    ///                        resConstrs!
+    /// thus want to take free space if left over. Should be one more than
+    /// resConstrs!
     ///
     /// - `minPrefMaxSizes`: The sizes (min/pref/max) for every row/component.
     ///
     /// - `gapSizes`: @param gapSizes        The gaps before and after each row/component packed in
-    ///                        one double sized array.
+    /// one double sized array.
     ///
     /// #### Returns
     ///
@@ -1134,7 +1134,7 @@ public final class Grid {
     /// #### Parameters
     ///
     /// - `bounds`: @param bounds The bounds to layout against. Normally that of the parent.
-    ///               [x, y, width, height].
+    /// [x, y, width, height].
     ///
     /// - `alignX`: The alignment for the x-axis. Can be null.
     ///
@@ -1161,7 +1161,7 @@ public final class Grid {
     /// #### Parameters
     ///
     /// - `bounds`: @param bounds   The bounds to layout against. Normally that of the parent.
-    ///                 [x, y, width, height].
+    /// [x, y, width, height].
     ///
     /// - `alignX`: The alignment for the x-axis. Can be null.
     ///
@@ -1170,8 +1170,8 @@ public final class Grid {
     /// - `debug`: If debug information should be saved in `#debugRects`.
     ///
     /// - `trialRun`: @param trialRun If true the bounds calculated will not be transferred to
-    ///                 the components. Only the internal size of the components will be
-    ///                 calculated.
+    /// the components. Only the internal size of the components will be
+    /// calculated.
     ///
     /// #### Returns
     ///
@@ -1410,7 +1410,7 @@ public final class Grid {
     /// - `cc`: Never `null`.
     ///
     /// - `external`: @param external The bounds should be stored even if they are not in
-    ///                 `#linkTargetIDs`.
+    /// `#linkTargetIDs`.
     ///
     /// #### Returns
     ///
@@ -1467,10 +1467,10 @@ public final class Grid {
     /// #### Parameters
     ///
     /// - `cellXY`: @param cellXY  The point to wrap and thus set either x or y to 0 and
-    ///                increase the other one.
+    /// increase the other one.
     ///
     /// - `gapSize`: @param gapSize The gaps size specified in a "wrap XXX" or "newline XXX"
-    ///                or `null` if none.
+    /// or `null` if none.
     private void wrap(int[] cellXY, BoundSize gapSize) {
         boolean flowx = lc.isFlowX();
         cellXY[0] = flowx ? 0 : cellXY[0] + 1;
@@ -1739,8 +1739,8 @@ public final class Grid {
     /// - `isHor`: If it is the horizontal dimension to calculate.
     ///
     /// - `containerSize`: @param containerSize The reference container size in the dimension. If <=
-    ///                      0 it will be replaced by the actual container's size. @return The sizes
-    ///                      in a `.Grid.FlowSizeSpec`.
+    /// 0 it will be replaced by the actual container's size. @return The sizes
+    /// in a `.Grid.FlowSizeSpec`.
     private FlowSizeSpec calcRowsOrColsSizes(boolean isHor, int containerSize) {
         ArrayList<LinkedDimGroup>[] groupsLists = isHor ? colGroupLists : rowGroupLists;
         Float[] defPush = isHor ? pushXs : pushYs;
@@ -1895,7 +1895,7 @@ public final class Grid {
     /// - `isHor`
     ///
     /// - `fillInPushGaps`: @param fillInPushGaps If the gaps are pushing. **NOTE!** this argument
-    ///                       will be filled in and thus changed!
+    /// will be filled in and thus changed!
     ///
     /// #### Returns
     ///
@@ -1973,10 +1973,10 @@ public final class Grid {
     /// #### Parameters
     ///
     /// - `specs`: @param specs       The specs for the columns or rows. Last index will be used
-    ///                    if `count` is greater than this array's length.
+    /// if `count` is greater than this array's length.
     ///
     /// - `defPush`: @param defPush     The default grow weight if the specs does not have anyone
-    ///                    that will grow. Comes from "push" in the CC.
+    /// that will grow. Comes from "push" in the CC.
     ///
     /// - `fss`
     ///
@@ -2299,13 +2299,13 @@ public final class Grid {
         /// #### Parameters
         ///
         /// - `specs`: @param specs      The specs for the columns or rows. Last index will be
-        ///                   used of `fromIx + len` is greater than this array's
-        ///                   length.
+        /// used of `fromIx + len` is greater than this array's
+        /// length.
         ///
         /// - `targetSize`: The size to try to meet.
         ///
         /// - `defGrow`: @param defGrow    The default grow weight if the specs does not have
-        ///                   anyone that will grow. Comes from "push" in the CC.
+        /// anyone that will grow. Comes from "push" in the CC.
         ///
         /// - `fromIx`
         ///
@@ -2314,22 +2314,22 @@ public final class Grid {
         /// - `sizeType`
         ///
         /// - `eagerness`: @param eagerness  How eager the algorithm should be to try to expand
-        ///                   the sizes.
+        /// the sizes.
         ///
         ///
         ///
         /// - 0 - Grow only rows/columns which have the `sizeType`
-        ///                   set to be the containing components AND which has a grow weight >
-        ///                   0.
+        /// set to be the containing components AND which has a grow weight >
+        /// 0.
         ///
         /// - 1 - Grow only rows/columns which have the `sizeType`
-        ///                   set to be the containing components AND which has a grow weight >
-        ///                   0 OR unspecified.
+        /// set to be the containing components AND which has a grow weight >
+        /// 0 OR unspecified.
         ///
         /// - 2 - Grow all rows/columns that have a grow weight > 0.
         ///
         /// - 3 - Grow all rows/columns that have a grow weight > 0 OR
-        ///                   unspecified.
+        /// unspecified.
         ///
         /// #### Returns
         ///
@@ -2415,7 +2415,7 @@ public final class Grid {
         /// - `cc`
         ///
         /// - `eHideMode`: @param eHideMode Effective hide mode. <= 0 means visible. @param useVis
-        ///                  ualPadding
+        /// ualPadding
         private CompWrap(ComponentWrapper c, CC cc, int eHideMode, boolean useVisualPadding) {
             this.comp = c;
             this.cc = cc;

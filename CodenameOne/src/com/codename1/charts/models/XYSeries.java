@@ -347,7 +347,7 @@ public class XYSeries {
     /// - `stop`: stop x value
     ///
     /// - `beforeAfterPoints`: @param beforeAfterPoints if the points before and after the first and last
-    ///                          visible ones must be displayed
+    /// visible ones must be displayed
     ///
     /// #### Returns
     ///

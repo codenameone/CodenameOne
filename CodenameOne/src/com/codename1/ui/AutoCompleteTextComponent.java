@@ -218,7 +218,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /// #### Parameters
     ///
     /// - `focusAnimation`: @param focusAnimation true for the label to animate into place on focus,
-    ///                       false otherwise
+    /// false otherwise
     ///
     /// #### Returns
     ///
@@ -344,7 +344,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /// #### Parameters
     ///
     /// - `columns`: @param columns the number of columns which is used for preferred size
-    ///                calculations
+    /// calculations
     ///
     /// #### Returns
     ///
@@ -361,7 +361,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /// #### Parameters
     ///
     /// - `rows`: @param rows the number of rows which is used for preferred size
-    ///             calculations
+    /// calculations
     ///
     /// #### Returns
     ///
@@ -379,8 +379,8 @@ public class AutoCompleteTextComponent extends TextComponent {
     /// #### Parameters
     ///
     /// - `constraint`: @param constraint one of the constants from the
-    ///                   `com.codename1.ui.TextArea` class see
-    ///                   `com.codename1.ui.TextArea#setConstraint(int)`
+    /// `com.codename1.ui.TextArea` class see
+    /// `com.codename1.ui.TextArea#setConstraint(int)`
     ///
     /// #### Returns
     ///

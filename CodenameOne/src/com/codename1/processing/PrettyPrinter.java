@@ -112,7 +112,7 @@ final class PrettyPrinter {
     /// - `value`: The value to be serialized.
     ///
     /// - `indentFactor`: @param indentFactor The number of spaces to add to each level of
-    ///                     indentation.
+    /// indentation.
     ///
     /// - `indent`: The indentation of the top level.
     ///
@@ -274,7 +274,7 @@ final class PrettyPrinter {
     /// #### Parameters
     ///
     /// - `indentFactor`: @param indentFactor The number of spaces to add to each level of
-    ///                     indentation.
+    /// indentation.
     ///
     /// #### Returns
     ///
@@ -293,7 +293,7 @@ final class PrettyPrinter {
     /// #### Parameters
     ///
     /// - `indentFactor`: @param indentFactor The number of spaces to add to each level of
-    ///                     indentation.
+    /// indentation.
     ///
     /// - `indent`: The indentation of the top level.
     ///

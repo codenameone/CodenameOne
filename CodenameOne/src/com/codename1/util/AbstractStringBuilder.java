@@ -172,7 +172,7 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than or equal to the
-    ///                                   current `#length()`.
+    /// current `#length()`.
     public char charAt(int index) {
         if (index < 0 || index >= count) {
             throw new StringIndexOutOfBoundsException(index);
@@ -245,10 +245,10 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if the `start` is negative, the `destStart` is
-    ///                                   negative, the `start` is greater than `end`, the
-    ///                                   `end` is greater than the current `#length()` or
-    ///                                   `destStart + end - begin` is greater than
-    ///                                   `dest.length`.
+    /// negative, the `start` is greater than `end`, the
+    /// `end` is greater than the current `#length()` or
+    /// `destStart + end - begin` is greater than
+    /// `dest.length`.
     public void getChars(int start, int end, char[] dest, int destStart) {
         if (start > count || end > count || start > end) {
             throw new StringIndexOutOfBoundsException();
@@ -442,7 +442,7 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than or equal to the
-    ///                                   current `#length()`.
+    /// current `#length()`.
     public void setCharAt(int index, char ch) {
         if (0 > index || index >= count) {
             throw new StringIndexOutOfBoundsException(index);
@@ -495,7 +495,7 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `start` is negative or greater than the current
-    ///                                         `#length()`.
+    /// `#length()`.
     public String substring(int start) {
         if (0 <= start && start <= count) {
             if (start == count) {
@@ -524,7 +524,7 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `start` is negative, greater than `end` or if
-    ///                                         `end` is greater than the current `#length()`.
+    /// `end` is greater than the current `#length()`.
     public String substring(int start, int end) {
         if (0 <= start && start <= end && end <= count) {
             if (start == end) {
@@ -749,7 +749,7 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than or equal to
-    ///                                   `#length()`.
+    /// `#length()`.
     ///
     /// #### Since
     ///
@@ -780,7 +780,7 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is less than 1 or greater than
-    ///                                   `#length()`.
+    /// `#length()`.
     ///
     /// #### Since
     ///
@@ -814,8 +814,8 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `beginIndex` is negative or greater than
-    ///                                   `endIndex` or `endIndex` is greater than
-    ///                                   `#length()`.
+    /// `endIndex` or `endIndex` is greater than
+    /// `#length()`.
     ///
     /// #### Since
     ///
@@ -851,9 +851,9 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than
-    ///                                   `#length()` or if there aren't enough code points
-    ///                                   before or after `index` to match
-    ///                                   `codePointOffset`.
+    /// `#length()` or if there aren't enough code points
+    /// before or after `index` to match
+    /// `codePointOffset`.
     ///
     /// #### Since
     ///

@@ -6,7 +6,7 @@
 
 /// Send e-mail messages through underlying platforms e-mail clients or thru the Codename One cloud.
 ///
-///     You can send messages and include attachments by using the platform native email client like this:
+/// You can send messages and include attachments by using the platform native email client like this:
 ///
 /// ```java
 /// Message m = new Message("Body of message");
@@ -15,8 +15,8 @@
 /// Display.getInstance().sendMessage(new String[] {"someone@gmail.com"}, "Subject of message", m);
 /// ```
 ///
-///     The following code demonstrates sending an email via the Codename One cloud, notice that this is a pro
-///     specific feature:
+/// The following code demonstrates sending an email via the Codename One cloud, notice that this is a pro
+/// specific feature:
 ///
 /// ```java
 /// Message m = new Message("Check out Codename One");

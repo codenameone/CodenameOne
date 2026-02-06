@@ -59,7 +59,7 @@ public interface InCellGapProvider {
     /// - `adjacentComp`: The adjacent component if any. May be `null`.
     ///
     /// - `adjacentSide`: @param adjacentSide What side the `adjacentComp` is on. `javax.swing.SwingUtilities#TOP` or
-    ///                     `javax.swing.SwingUtilities#LEFT` or `javax.swing.SwingUtilities#BOTTOM` or `javax.swing.SwingUtilities#RIGHT`.
+    /// `javax.swing.SwingUtilities#LEFT` or `javax.swing.SwingUtilities#BOTTOM` or `javax.swing.SwingUtilities#RIGHT`.
     ///
     /// - `tag`: The tag string that the component might be tagged with in the component constraints. May be `null`.
     ///

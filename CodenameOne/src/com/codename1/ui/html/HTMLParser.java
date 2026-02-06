@@ -144,17 +144,17 @@ public class HTMLParser extends XMLParser {
     ///
     /// @return The char code of the symbol, or -1 if none found
     ///
-    ///     protected int getCharEntityCode(String symbol) {
-    ///     int val=super.getCharEntityCode(symbol);
-    ///     if (val==-1) {
-    ///     // Not one of the most popular char codes, proceed to check the ISO-8859-1 symbols array
-    ///     val=CSSElement.getStringVal(symbol, CHAR_ENTITY_STRINGS);
-    ///     if (val!=-1) {
-    ///     return val+160;
-    ///     }
-    ///     }
-    ///     return val;
-    ///     }
+    /// protected int getCharEntityCode(String symbol) {
+    /// int val=super.getCharEntityCode(symbol);
+    /// if (val==-1) {
+    /// // Not one of the most popular char codes, proceed to check the ISO-8859-1 symbols array
+    /// val=CSSElement.getStringVal(symbol, CHAR_ENTITY_STRINGS);
+    /// if (val!=-1) {
+    /// return val+160;
+    /// }
+    /// }
+    /// return val;
+    /// }
 
 
     /// Checks whether the specified tag is an empty tag as defined in EMPTY_TAGS

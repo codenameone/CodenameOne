@@ -326,7 +326,7 @@ public class MediaPlayer extends Container {
     /// #### Parameters
     ///
     /// - `uri`: @param uri the uri of the media can start with file://, http:// (can also
-    ///            use rtsp:// although may not be supported on all target platforms)
+    /// use rtsp:// although may not be supported on all target platforms)
     ///
     /// #### Throws
     ///

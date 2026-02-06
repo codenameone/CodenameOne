@@ -439,7 +439,7 @@ public class SplitPane extends Container {
     /// #### Parameters
     ///
     /// - `force`: @param force If this is true, then it will only expand "all the way".  It will skip the preferred position if it is
-    ///              currently in collapsed state.
+    /// currently in collapsed state.
     public void expand(boolean force) {
         if (isCollapsed && !force) {
             getFixedInset(preferredInset).copyTo(getDividerInset());

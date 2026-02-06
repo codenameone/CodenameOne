@@ -250,7 +250,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the manual payments API and will fail if
-    ///                          isManualPaymentSupported() returns false
+    /// isManualPaymentSupported() returns false
     public String pay(double amount, String currency) {
         throw new RuntimeException("Unsupported");
     }
@@ -275,7 +275,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the manual payments API and will fail if
-    ///                          isManualPaymentSupported() returns false
+    /// isManualPaymentSupported() returns false
     public String pay(double amount, String currency, String invoiceNumber) {
         return pay(amount, currency);
     }
@@ -305,7 +305,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
-    ///                          isManagedPaymentSupported() returns false
+    /// isManagedPaymentSupported() returns false
     ///
     /// - `RuntimeException`: This method works only if isItemListingSupported() returns true
     public Product[] getProducts(String[] skus) {
@@ -328,7 +328,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
-    ///                          isManagedPaymentSupported() returns false
+    /// isManagedPaymentSupported() returns false
     public boolean wasPurchased(String sku) {
         throw new RuntimeException("Unsupported");
     }
@@ -347,7 +347,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
-    ///                          isManagedPaymentSupported() returns false
+    /// isManagedPaymentSupported() returns false
     public void purchase(String sku) {
         throw new RuntimeException("Unsupported");
     }
@@ -365,7 +365,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
-    ///                          isManagedPaymentSupported() returns false
+    /// isManagedPaymentSupported() returns false
     ///
     /// #### See also
     ///
@@ -388,7 +388,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
-    ///                          isManagedPaymentSupported() returns false
+    /// isManagedPaymentSupported() returns false
     public void subscribe(String sku) {
         if (receiptStore != null) {
             purchase(sku);
@@ -410,7 +410,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
-    ///                          isManagedPaymentSupported() returns false
+    /// isManagedPaymentSupported() returns false
     ///
     /// #### See also
     ///
@@ -432,7 +432,7 @@ public abstract class Purchase {
     /// #### Throws
     ///
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
-    ///                          isManagedPaymentSupported() returns false
+    /// isManagedPaymentSupported() returns false
     public void unsubscribe(String sku) {
         throw new RuntimeException("Unsupported");
     }
@@ -531,7 +531,7 @@ public abstract class Purchase {
     /// - `ifOlderThanMs`: Only fetch receipts if they haven't been fetched in `ifOlderThanMs` milliseconds.
     ///
     /// - `callback`: @param callback      Callback called when sync is done.  Will be passed true if all pending purchases were successfully
-    ///                      submitted to the receipt store AND receipts were successfully loaded.
+    /// submitted to the receipt store AND receipts were successfully loaded.
     public final void synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
         synchronized (synchronizationLock) {
             if (callback != null) {
@@ -628,10 +628,10 @@ public abstract class Purchase {
     /// #### Parameters
     ///
     /// - `ifOlderThanMs`: @param ifOlderThanMs Update is only performed if more than `ifOlderThanMs` milliseconds has elapsed
-    ///                      since the last successful fetch.
+    /// since the last successful fetch.
     ///
     /// - `callback`: @param callback      Callback called when request is complete.  Passed `true` if
-    ///                      the data was successfully fetched.  `false` otherwise.
+    /// the data was successfully fetched.  `false` otherwise.
     private void loadReceipts(long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
         if (loadInProgress) {
             Log.p("Did not load receipts because another load is in progress");
@@ -862,9 +862,9 @@ public abstract class Purchase {
     /// #### Parameters
     ///
     /// - `sku`: @param sku Optional sku of product whose subscription you wish to manage.  If left null, then
-    ///            the general subscription management UI will be opened.  iOS doesn't support "deep-linking" directly to the
-    ///            management for a particular sku, so this parameter is ignored there.  If included on Android, howerver,
-    ///            it will open the UI for managing the specified sku.
+    /// the general subscription management UI will be opened.  iOS doesn't support "deep-linking" directly to the
+    /// management for a particular sku, so this parameter is ignored there.  If included on Android, howerver,
+    /// it will open the UI for managing the specified sku.
     ///
     /// #### Since
     ///

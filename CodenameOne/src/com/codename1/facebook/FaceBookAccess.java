@@ -260,7 +260,7 @@ public final class FaceBookAccess {
     /// #### Parameters
     ///
     /// - `al`: @param al a listener that will receive at its source either a token for
-    ///           the service or an exception in case of a failure
+    /// the service or an exception in case of a failure
     public void showAuthentication(final ActionListener<ActionEvent> al) {
         createOAuth().showAuthentication(new ShowAuthenticationActionListener(al));
     }
@@ -463,7 +463,7 @@ public final class FaceBookAccess {
     /// - `postId`: the post id
     ///
     /// - `needAuth`: @param needAuth if this object is public needAuth can be false and no
-    ///                 authentication will be performed
+    /// authentication will be performed
     ///
     /// #### Returns
     ///
@@ -500,7 +500,7 @@ public final class FaceBookAccess {
     /// - `photoId`: the photoId
     ///
     /// - `needAuth`: @param needAuth if this object is public needAuth can be false and no
-    ///                 authentication will be performed
+    /// authentication will be performed
     ///
     /// #### Returns
     ///
@@ -538,7 +538,7 @@ public final class FaceBookAccess {
     /// - `albumId`: the albumId
     ///
     /// - `needAuth`: @param needAuth if this object is public needAuth can be false and no
-    ///                 authentication will be performed
+    /// authentication will be performed
     ///
     /// #### Returns
     ///
@@ -852,7 +852,7 @@ public final class FaceBookAccess {
     /// - `userId`: the id
     ///
     /// - `friends`: @param friends  store friends results into the given model,
-    ///                 each entry is an Hashtable Object contaning the Object data
+    /// each entry is an Hashtable Object contaning the Object data
     ///
     /// - `callback`: the callback that should be updated when the data arrives
     public void getUserFriends(String userId, DefaultListModel friends, final ActionListener callback) throws IOException {
@@ -866,7 +866,7 @@ public final class FaceBookAccess {
     /// - `userId`: the id
     ///
     /// - `albums`: @param albums   store albums results into the given model,
-    ///                 each entry is an Hashtable Object contaning the Object data
+    /// each entry is an Hashtable Object contaning the Object data
     ///
     /// - `callback`: the callback that should be updated when the data arrives
     public void getUserAlbums(String userId, DefaultListModel albums, final ActionListener callback) throws IOException {
@@ -880,7 +880,7 @@ public final class FaceBookAccess {
     /// - `albumId`: the id
     ///
     /// - `photos`: @param photos   store photos results into the given model,
-    ///                 each entry is an Hashtable Object contaning the Object data
+    /// each entry is an Hashtable Object contaning the Object data
     ///
     /// - `offset`: the offset of the photo in the album
     ///
@@ -902,7 +902,7 @@ public final class FaceBookAccess {
     /// - `postId`: the id
     ///
     /// - `comments`: @param comments store comments results into the given model,
-    ///                 each entry is an Hashtable Object contaning the Object data
+    /// each entry is an Hashtable Object contaning the Object data
     ///
     /// - `callback`: the callback that should be updated when the data arrives
     // PMD Fix (UnusedPrivateMethod): Removed unused album photo ListModel helper.
@@ -917,7 +917,7 @@ public final class FaceBookAccess {
     /// - `userId`: the id
     ///
     /// - `threads`: @param threads  store threads results into the given model,
-    ///                 each entry is an Hashtable Object contaning the Object data
+    /// each entry is an Hashtable Object contaning the Object data
     ///
     /// - `limit`: the amount of thread to return
     ///
@@ -1118,13 +1118,13 @@ public final class FaceBookAccess {
     /// - `userId`: the user id
     ///
     /// - `startTime`: @param startTime     Indicates the earliest time to return a notification.
-    ///                      This equates to the updated_time field in the notification FQL table. If not specified, this call returns all available notifications.
+    /// This equates to the updated_time field in the notification FQL table. If not specified, this call returns all available notifications.
     ///
     /// - `includeRead`: @param includeRead   Indicates whether to include notifications that have already been read.
-    ///                      By default, notifications a user has read are not included.
+    /// By default, notifications a user has read are not included.
     ///
     /// - `notifications`: @param notifications store notifications results into the given model,
-    ///                      each entry is an Hashtable Object contaning the Object data
+    /// each entry is an Hashtable Object contaning the Object data
     ///
     /// - `callback`: the callback that should be updated when the data arrives
     public void getUserNotifications(String userId, String startTime, boolean includeRead,
@@ -1159,11 +1159,11 @@ public final class FaceBookAccess {
     /// - `fields`: which fields to query on the users see http://developers.facebook.com/docs/reference/rest/users.getInfo/
     ///
     /// - `callback`: @param callback the result will call the callback with the result
-    ///                 to extrct the data preform the following:
-    ///                 public void actionPerformed(ActionEvent evt) {
-    ///                 Vector data = (Vector) ((NetworkEvent) evt).getMetaData();
-    ///                 Vector users = (Vector) data.elementAt(0);
-    ///                 }
+    /// to extrct the data preform the following:
+    /// public void actionPerformed(ActionEvent evt) {
+    /// Vector data = (Vector) ((NetworkEvent) evt).getMetaData();
+    /// Vector users = (Vector) data.elementAt(0);
+    /// }
     public void getUsersDetails(String[] usersIds, String[] fields, final ActionListener<NetworkEvent> callback) throws IOException {
         checkAuthentication();
 
@@ -1203,7 +1203,7 @@ public final class FaceBookAccess {
     /// - `userId`: the user id
     ///
     /// - `events`: @param events   store events results into the given model,
-    ///                 each entry is an Hashtable Object contaning the Object data
+    /// each entry is an Hashtable Object contaning the Object data
     ///
     /// - `callback`: the callback that should be updated when the data arrives
     public void getUserEvents(String userId, DefaultListModel events, final ActionListener callback) throws IOException {
@@ -1219,7 +1219,7 @@ public final class FaceBookAccess {
     /// - `query`: the query string to search for
     ///
     /// - `results`: @param results    store results onto the given model,
-    ///                   each entry is an Hashtable Object contaning the Object data
+    /// each entry is an Hashtable Object contaning the Object data
     ///
     /// - `callback`: the callback that should be updated when the data arrives
     public void search(String objectType, String query, DefaultListModel results, ActionListener callback) throws IOException {

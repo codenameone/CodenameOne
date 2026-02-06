@@ -118,7 +118,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// #### Parameters
     ///
     /// - `cmd`: @param cmd command whose text would be used for the button and would recive action events
-    ///            from the button
+    /// from the button
     public Button(Command cmd) {
         this(cmd.getCommandName(), cmd.getIcon());
         addActionListener(cmd);

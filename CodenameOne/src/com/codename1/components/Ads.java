@@ -92,7 +92,7 @@ public class Ads extends Container implements HTMLCallback {
     /// #### Parameters
     ///
     /// - `appId`: @param appId unique identifier of the app, to gain an appId please refer to
-    ///              http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+    /// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
     public Ads(String appId) {
         this(appId, true);
     }
@@ -100,10 +100,10 @@ public class Ads extends Container implements HTMLCallback {
     /// #### Parameters
     ///
     /// - `appId`: @param appId     unique identifier of the app, to gain an appId please refer to
-    ///                  http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+    /// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
     ///
     /// - `refreshAd`: @param refreshAd if true this Component will refresh the Ad every 60 seconds,
-    ///                  if false no refresh will occur
+    /// if false no refresh will occur
     public Ads(String appId, boolean refreshAd) {
         this();
         this.appId = appId;
@@ -366,7 +366,7 @@ public class Ads extends Container implements HTMLCallback {
     /// #### Parameters
     ///
     /// - `appId`: @param appId unique identifier of the app, to gain an appId please refer to
-    ///              http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+    /// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
     public void setAppID(String appId) {
         this.appId = appId;
         if (service == null) {

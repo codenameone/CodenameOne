@@ -967,7 +967,7 @@ public class Table extends Container {
     /// #### Parameters
     ///
     /// - `row`: @param row the row as it visually appears in the table or in the
-    ///            `createCell` method
+    /// `createCell` method
     ///
     /// #### Returns
     ///

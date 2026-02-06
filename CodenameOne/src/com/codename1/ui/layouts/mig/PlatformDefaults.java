@@ -229,8 +229,8 @@ public final class PlatformDefaults {
     /// #### Parameters
     ///
     /// - `plaf`: @param plaf The platform. `PlatformDefaults.WINDOWS_XP`,
-    ///             `PlatformDefaults.MAC_OSX`, or
-    ///             `PlatformDefaults.GNOME`.
+    /// `PlatformDefaults.MAC_OSX`, or
+    /// `PlatformDefaults.GNOME`.
     public static void setPlatform(int plaf) {
         switch (plaf) {
             case WINDOWS_XP:
@@ -828,7 +828,7 @@ public final class PlatformDefaults {
     /// - `adjacentComp`: The adjacent component if any. May be `null`.
     ///
     /// - `adjacentSide`: @param adjacentSide What side the `adjacentComp` is on. `javax.swing.SwingUtilities#TOP` (1) or
-    ///                     `javax.swing.SwingUtilities#LEFT` (2) or `javax.swing.SwingUtilities#BOTTOM` (3) or `javax.swing.SwingUtilities#RIGHT` (4).
+    /// `javax.swing.SwingUtilities#LEFT` (2) or `javax.swing.SwingUtilities#BOTTOM` (3) or `javax.swing.SwingUtilities#RIGHT` (4).
     ///
     /// - `tag`: The tag string that the component might be tagged with in the component constraints. May be `null`.
     ///

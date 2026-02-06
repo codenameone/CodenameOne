@@ -1083,7 +1083,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /// #### Parameters
     ///
     /// - `range`: @param range an array having the values in this order: minX, maxX, minY,
-    ///              maxY
+    /// maxY
     public void setRange(double[] range) {
         setRange(range, 0);
     }
@@ -1093,7 +1093,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /// #### Parameters
     ///
     /// - `range`: @param range an array having the values in this order: minX, maxX, minY,
-    ///              maxY
+    /// maxY
     ///
     /// - `scale`: the renderer scale
     public void setRange(double[] range, int scale) {
@@ -1134,7 +1134,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /// #### Parameters
     ///
     /// - `range`: @param range an array having the values in this order: minX, maxX, minY,
-    ///              maxY
+    /// maxY
     public void setInitialRange(double[] range) {
         setInitialRange(range, 0);
     }
@@ -1157,7 +1157,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /// #### Parameters
     ///
     /// - `range`: @param range an array having the values in this order: minX, maxX, minY,
-    ///              maxY
+    /// maxY
     ///
     /// - `scale`: the renderer scale
     public void setInitialRange(double[] range, int scale) {
@@ -1399,7 +1399,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /// #### Parameters
     ///
     /// - `zoomInLimitX`: @param zoomInLimitX the maximum distance permitted between
-    ///                     `#getXAxisMin()` and `#getXAxisMax()`.
+    /// `#getXAxisMin()` and `#getXAxisMax()`.
     public void setZoomInLimitX(double zoomInLimitX) {
         this.mZoomInLimitX = zoomInLimitX;
         if (mZoomLimits == null) {
@@ -1432,7 +1432,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /// #### Parameters
     ///
     /// - `zoomInLimitY`: @param zoomInLimitY the maximum distance permitted between
-    ///                     `#getYAxisMin()` and `#getYAxisMax()`
+    /// `#getYAxisMin()` and `#getYAxisMax()`
     public void setZoomInLimitY(double zoomInLimitY) {
         this.mZoomInLimitY = zoomInLimitY;
         if (mZoomLimits == null) {

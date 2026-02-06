@@ -58,7 +58,7 @@ public abstract class PluginEvent<T> extends ActionEvent {
     /// - `source`: The source of the event.  May be null.
     ///
     /// - `type`: @param type   The type of the event.  All PluginEvent classes should have a corresponding enum type in the
-    ///               `Type` enum.
+    /// `Type` enum.
     public PluginEvent(Object source, Type type) {
         super(source, type);
     }

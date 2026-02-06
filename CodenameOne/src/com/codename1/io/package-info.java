@@ -1,23 +1,23 @@
 /// Networking, Storage, Filesystem & related API's
 ///
-///     The IO package includes all of the main features related to storage and networking with the exception
-///     of `SQL` & XML parsing.
+/// The IO package includes all of the main features related to storage and networking with the exception
+/// of `SQL` & XML parsing.
 ///
 /// Storage
 ///
-///     `com.codename1.io.Storage` is accessed via the `Storage`
-///     class. It is a flat filesystem like interface and contains the ability to list/delete and
-///     write to named storage entries.
+/// `com.codename1.io.Storage` is accessed via the `Storage`
+/// class. It is a flat filesystem like interface and contains the ability to list/delete and
+/// write to named storage entries.
 ///
-///     The `com.codename1.io.Storage` API also provides convenient methods to write objects to
-///     `com.codename1.io.Storage` and read them from `com.codename1.io.Storage` specifically
-///     `readObject` & `writeObject`.
+/// The `com.codename1.io.Storage` API also provides convenient methods to write objects to
+/// `com.codename1.io.Storage` and read them from `com.codename1.io.Storage` specifically
+/// `readObject` & `writeObject`.
 ///
-///     Notice that objects in `com.codename1.io.Storage` are deleted when an app is uninstalled but are
-///     retained between application updates.
+/// Notice that objects in `com.codename1.io.Storage` are deleted when an app is uninstalled but are
+/// retained between application updates.
 ///
-///     The sample code below demonstrates listing the content of the storage, adding/viewing and
-///     deleting entries within the storage:
+/// The sample code below demonstrates listing the content of the storage, adding/viewing and
+/// deleting entries within the storage:
 ///
 /// ```java
 /// public void pictureUpload(final Callback resultURL) {
@@ -50,11 +50,11 @@
 ///
 /// The Preferences API
 ///
-///     `com.codename1.io.Storage` also offers a very simple API in the form of the
-///     `com.codename1.io.Preferences`
-///     class. The `com.codename1.io.Preferences` class allows developers to store simple variables, strings,
-///     numbers, booleans etc. in storage without writing any storage code. This is a common use case
-///     within applications e.g. you have a server token that you need to store you can store & read it like this:
+/// `com.codename1.io.Storage` also offers a very simple API in the form of the
+/// `com.codename1.io.Preferences`
+/// class. The `com.codename1.io.Preferences` class allows developers to store simple variables, strings,
+/// numbers, booleans etc. in storage without writing any storage code. This is a common use case
+/// within applications e.g. you have a server token that you need to store you can store & read it like this:
 ///
 /// ```java
 /// // save a token to storage
@@ -64,55 +64,55 @@
 /// String token = Preferences.get("token", null);
 /// ```
 ///
-///     This gets somewhat confusing with primitive numbers e.g. if you use
-///     `Preferences.set("primitiveLongValue", myLongNumber)` then invoke
-///     `Preferences.get("primitiveLongValue", 0)` you might get an exception!
+/// This gets somewhat confusing with primitive numbers e.g. if you use
+/// `Preferences.set("primitiveLongValue", myLongNumber)` then invoke
+/// `Preferences.get("primitiveLongValue", 0)` you might get an exception!
 ///
-///     This would happen because the value is physically a `Long` object but you are
-///     trying to get an `Integer`. The workaround is to remain consistent and use code
-///     like this `Preferences.get("primitiveLongValue", (long)0)`.
+/// This would happen because the value is physically a `Long` object but you are
+/// trying to get an `Integer`. The workaround is to remain consistent and use code
+/// like this `Preferences.get("primitiveLongValue", (long)0)`.
 ///
 /// File System
 ///
-///     `com.codename1.io.FileSystemStorage` provides file system access. It maps to the underlying
-///     OS's file system API providing most of the common operations expected from a file API somewhat in
-///     the vain of `java.io.File` & `java.io.FileInputStream` e.g. opening,
-///     renaming, deleting etc.
+/// `com.codename1.io.FileSystemStorage` provides file system access. It maps to the underlying
+/// OS's file system API providing most of the common operations expected from a file API somewhat in
+/// the vain of `java.io.File` & `java.io.FileInputStream` e.g. opening,
+/// renaming, deleting etc.
 ///
-///     Notice that the file system API is somewhat platform specific in its behavior. All paths used the API
-///     should be absolute otherwise they are not guaranteed to work.
+/// Notice that the file system API is somewhat platform specific in its behavior. All paths used the API
+/// should be absolute otherwise they are not guaranteed to work.
 ///
-///     The main reason `java.io.File` & `java.io.FileInputStream`
-///     weren't supported directly has a lot to do with the richness of those two API's. They effectively
-///     allow saving a file anywhere, however mobile devices are far more restrictive and don't allow
-///     apps to see/modify files that are owned by other apps.
+/// The main reason `java.io.File` & `java.io.FileInputStream`
+/// weren't supported directly has a lot to do with the richness of those two API's. They effectively
+/// allow saving a file anywhere, however mobile devices are far more restrictive and don't allow
+/// apps to see/modify files that are owned by other apps.
 ///
 /// File Paths & App Home
 ///
-///     All paths in `com.codename1.io.FileSystemStorage` are absolute, this simplifies the issue of portability
-///     significantly since the concept of relativity and current working directory aren't very portable.
+/// All paths in `com.codename1.io.FileSystemStorage` are absolute, this simplifies the issue of portability
+/// significantly since the concept of relativity and current working directory aren't very portable.
 ///
-///     All URL's use the `/` as their path separator we try to enforce this behavior even in
-///     Windows.
+/// All URL's use the `/` as their path separator we try to enforce this behavior even in
+/// Windows.
 ///
-///     Directories end with the `/` character and thus can be easily distinguished by their name.
+/// Directories end with the `/` character and thus can be easily distinguished by their name.
 ///
-///     The `com.codename1.io.FileSystemStorage` API provides a `getRoots()` call to list the root
-///     directories of the file system (you can then "dig in" via the `listFiles` API). However,
-///     this is confusing and unintuitive for developers.
+/// The `com.codename1.io.FileSystemStorage` API provides a `getRoots()` call to list the root
+/// directories of the file system (you can then "dig in" via the `listFiles` API). However,
+/// this is confusing and unintuitive for developers.
 ///
-///     To simplify the process of creating/reading files we added the `getAppHomePath()` method.
-///     This method allows us to obtain the path to a directory where files can be stored/read.
+/// To simplify the process of creating/reading files we added the `getAppHomePath()` method.
+/// This method allows us to obtain the path to a directory where files can be stored/read.
 ///
-///     We can use this directory to place an image to share as we did in the
-///     [share sample](https://www.codenameone.com/manual/components.html#sharebutton-section).
+/// We can use this directory to place an image to share as we did in the
+/// [share sample](https://www.codenameone.com/manual/components.html#sharebutton-section).
 ///
-///     **Warning:** A common Android hack is to write files to the SDCard storage to share
-///     them among apps. Android 4.x disabled the ability to write to arbitrary directories on the SDCard
-///     even when the appropriate permission was requested.
+/// **Warning:** A common Android hack is to write files to the SDCard storage to share
+/// them among apps. Android 4.x disabled the ability to write to arbitrary directories on the SDCard
+/// even when the appropriate permission was requested.
 ///
-///     A more advanced usage of the `com.codename1.io.FileSystemStorage` API can be a
-///     `com.codename1.io.FileSystemStorage` `Tree`:
+/// A more advanced usage of the `com.codename1.io.FileSystemStorage` API can be a
+/// `com.codename1.io.FileSystemStorage` `Tree`:
 ///
 /// ```java
 /// Form hi = new Form("FileSystemTree", new BorderLayout());
@@ -211,7 +211,7 @@
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false);
 /// request.addResponseListener((e) -> {
-///     // process the response
+/// // process the response
 /// });
 ///
 /// // request will be handled asynchronously
@@ -224,19 +224,19 @@
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false) {
-///    protected void readResponse(InputStream input) {
-///         // just read from the response input stream
-///    }
+/// protected void readResponse(InputStream input) {
+/// // just read from the response input stream
+/// }
 ///
-///    protected void postResponse() {
-///         // invoked on the EDT after processing is complete to allow the networking code
-///         // to update the UI
-///    }
+/// protected void postResponse() {
+/// // invoked on the EDT after processing is complete to allow the networking code
+/// // to update the UI
+/// }
 ///
-///    protected void buildRequestBody(OutputStream os) {
-///         // writes post data, by default this "just works" but if you want to write this
-///        // manually then override this
-///    }
+/// protected void buildRequestBody(OutputStream os) {
+/// // writes post data, by default this "just works" but if you want to write this
+/// // manually then override this
+/// }
 /// };
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
@@ -320,7 +320,7 @@
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url +
-///     "MyArgName=" + Util.encodeUrl(value), false);
+/// "MyArgName=" + Util.encodeUrl(value), false);
 /// ```
 ///
 ///     This would be almost identical but doesn't provide the convenience for switching back and
@@ -383,16 +383,16 @@
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false) {
-///     protected void readHeaders(Object connection) throws IOException {
-///         String[] headerNames = getHeaderFieldNames(connection);
-///         for(String headerName : headerNames) {
-///             String headerValue = getHeader(headerName);
-///             //....
-///         }
-///     }
-///     protected void readResponse(InputStream input) {
-///         // just read from the response input stream
-///     }
+/// protected void readHeaders(Object connection) throws IOException {
+/// String[] headerNames = getHeaderFieldNames(connection);
+/// for(String headerName : headerNames) {
+/// String headerValue = getHeader(headerName);
+/// //....
+/// }
+/// }
+/// protected void readResponse(InputStream input) {
+/// // just read from the response input stream
+/// }
 /// };
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
@@ -444,14 +444,14 @@
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false) {
-///     protected void handleErrorResponseCode(int code, String message) {
-///         if(code == 444) {
-///             // do something
-///         }
-///     }
-///     protected void readResponse(InputStream input) {
-///         // just read from the response input stream
-///     }
+/// protected void handleErrorResponseCode(int code, String message) {
+/// if(code == 444) {
+/// // do something
+/// }
+/// }
+/// protected void readResponse(InputStream input) {
+/// // just read from the response input stream
+/// }
 /// };
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
@@ -470,7 +470,7 @@
 /// request.setFailSilently(true);
 /// NetworkManager.getInstance().addToQueueAndWait(request);
 /// if(request.getResponseCode() != 200) {
-///     // probably an error...
+/// // probably an error...
 /// }
 /// ```
 ///
@@ -540,18 +540,18 @@
 /// // File: UploadServlet.java
 /// @WebServlet(name = "UploadServlet", urlPatterns = {"/upload"})
 /// @MultipartConfig(fileSizeThreshold = 1024 * 1024 * 100, // 10 MB
-///         maxFileSize = 1024 * 1024 * 150, // 50 MB
-///         maxRequestSize = 1024 * 1024 * 200)      // 100 MB
+/// maxFileSize = 1024 * 1024 * 150, // 50 MB
+/// maxRequestSize = 1024 * 1024 * 200)      // 100 MB
 /// public class UploadServlet extends HttpServlet {
 /// @Override
-///     public void doPost(HttpServletRequest req, HttpServletResponse res)
-///             throws ServletException, IOException {
-///         Collection parts = req.getParts();
-///         Part data = parts.iterator().next();
-///         try(InputStream is = data.getInputStream()) {}
-///             // store or do something with the input stream
-///         }
-///     }
+/// public void doPost(HttpServletRequest req, HttpServletResponse res)
+/// throws ServletException, IOException {
+/// Collection parts = req.getParts();
+/// Part data = parts.iterator().next();
+/// try(InputStream is = data.getInputStream()) {}
+/// // store or do something with the input stream
+/// }
+/// }
 /// }
 /// ```
 ///
@@ -582,36 +582,36 @@
 /// Form hi = new Form("CSV Parsing", new BorderLayout());
 /// CSVParser parser = new CSVParser();
 /// try(Reader r = new com.codename1.io.CharArrayReader("1997,Ford,E350,\"Super, \"\"luxurious\"\" truck\"".toCharArray())) {
-///     String[][] data = parser.parse(r);
-///     String[] columnNames = new String[data[0].length];
-///     for(int iter=  0 ; iter
+/// String[][] data = parser.parse(r);
+/// String[] columnNames = new String[data[0].length];
+/// for(int iter=  0 ; iter
 ///
-///     The data contains a two dimensional array of the CSV content. You can change the delimiter character
-///     by using the `CSVParser` constructor that accepts a character.
+/// The data contains a two dimensional array of the CSV content. You can change the delimiter character
+/// by using the `CSVParser` constructor that accepts a character.
 ///
-///     **IMPORTANT:** Notice that we used `com.codename1.io.CharArrayReader` for
-///     this sample. Normally you would want to use `java.util.InputStreamReader` for real world data.
+/// **IMPORTANT:** Notice that we used `com.codename1.io.CharArrayReader` for
+/// this sample. Normally you would want to use `java.util.InputStreamReader` for real world data.
 ///
 /// JSON
 ///
-///     The JSON ("Java Script Object Notation") format is popular on the web for passing values to/from
-///     webservices since it works so well with JavaScript. Parsing JSON is just as easy but has two
-///     different variations. You can use the
-///     `com.codename1.io.JSONParser` class to build a tree of the JSON data as such:
+/// The JSON ("Java Script Object Notation") format is popular on the web for passing values to/from
+/// webservices since it works so well with JavaScript. Parsing JSON is just as easy but has two
+/// different variations. You can use the
+/// `com.codename1.io.JSONParser` class to build a tree of the JSON data as such:
 ///
 /// ```java
 /// JSONParser parser = new JSONParser();
 /// Hashtable response = parser.parse(reader);
 /// ```
 ///
-///     The response is a `Map` containing a nested hierarchy of `Collection` (`java.util.List`),
-///     Strings and numbers to represent the content of the submitted JSON. To extract the data from a specific
-///     path just iterate the `Map` keys and recurs into it.
+/// The response is a `Map` containing a nested hierarchy of `Collection` (`java.util.List`),
+/// Strings and numbers to represent the content of the submitted JSON. To extract the data from a specific
+/// path just iterate the `Map` keys and recurs into it.
 ///
-///     The sample below uses results from [an API of ice and fire](https://anapioficeandfire.com/)
-///     that queries structured data about the "Song Of Ice & Fire" book series. Here is a sample result
-///     returned from the API for the query
-///     [http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3](http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3):
+/// The sample below uses results from [an API of ice and fire](https://anapioficeandfire.com/)
+/// that queries structured data about the "Song Of Ice & Fire" book series. Here is a sample result
+/// returned from the API for the query
+/// [http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3](http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3):
 ///
 /// ```java
 /// [
@@ -693,8 +693,8 @@
 /// ]
 /// ```
 ///
-///     We will place that into a file named "anapioficeandfire.json" in the src directory to make the next
-///     sample simpler:
+/// We will place that into a file named "anapioficeandfire.json" in the src directory to make the next
+/// sample simpler:
 ///
 /// ```java
 /// Form hi = new Form("JSON Parsing", new BoxLayout(BoxLayout.Y_AXIS));
@@ -727,74 +727,74 @@
 ///
 ///
 /// - The `JSONParser` returns a `Map` which is great if the root object is a `Map`
-///         but in some cases its a list of elements (as is the case above). In this case a special case `"root"`
-///         element is created to contain the actual list of elements.
+/// but in some cases its a list of elements (as is the case above). In this case a special case `"root"`
+/// element is created to contain the actual list of elements.
 ///
 ///
 /// - We rely that the entries are all maps, this might not be the case for every API type.
 ///
 /// - Notice that the "titles" and "aliases" entries are both lists of elements. We use `java.util.List`
-///         to avoid a clash with `com.codename1.ui.List`.
+/// to avoid a clash with `com.codename1.ui.List`.
 ///
 ///
-///     **Tip:** The structure of the returned map is sometimes unintuitive when looking at the raw JSON. The easiest
-///     thing to do is set a breakpoint on the method and use the inspect variables capability of your IDE to
-///     inspect the returned element hierarchy while writing the code to extract that data
+/// **Tip:** The structure of the returned map is sometimes unintuitive when looking at the raw JSON. The easiest
+/// thing to do is set a breakpoint on the method and use the inspect variables capability of your IDE to
+/// inspect the returned element hierarchy while writing the code to extract that data
 ///
-///     An alternative approach is to use the static data parse() method of the `JSONParser` class and
-///     implement a callback parser e.g.: `JSONParser.parse(reader, callback);`
+/// An alternative approach is to use the static data parse() method of the `JSONParser` class and
+/// implement a callback parser e.g.: `JSONParser.parse(reader, callback);`
 ///
-///     Notice that a static version of the method is used! The callback object is an instance of the
-///     `JSONParseCallback` interface, which includes multiple methods. These methods are invoked
-///     by the parser to indicate internal parser states, this is similar to the way traditional XML SAX event
-///     parsers work.
+/// Notice that a static version of the method is used! The callback object is an instance of the
+/// `JSONParseCallback` interface, which includes multiple methods. These methods are invoked
+/// by the parser to indicate internal parser states, this is similar to the way traditional XML SAX event
+/// parsers work.
 ///
 /// XML Parsing
 ///
-///     The `com.codename1.xml.XMLParser` started its life as an HTML parser built for displaying
-///     mobile HTML. That usage has since been deprecated but the parser can still parse many HTML
-///     pages and is very "loose" in terms of verification. This is both good and bad as the parser will work
-///     with invalid data without complaining.
+/// The `com.codename1.xml.XMLParser` started its life as an HTML parser built for displaying
+/// mobile HTML. That usage has since been deprecated but the parser can still parse many HTML
+/// pages and is very "loose" in terms of verification. This is both good and bad as the parser will work
+/// with invalid data without complaining.
 ///
-///     The simplest usage of `com.codename1.xml.XMLParser` looks a bit like this:
+/// The simplest usage of `com.codename1.xml.XMLParser` looks a bit like this:
 ///
 /// ```java
 /// XMLParser parser = new XMLParser();
 /// Element elem = parser.parse(reader);
 /// ```
 ///
-///     The `com.codename1.xml.Element` contains children and attributes. It represents a tag within the
-///     XML document and even the root document itself. You can iterate over the XML tree to extract the
-///     data from within the XML file.
+/// The `com.codename1.xml.Element` contains children and attributes. It represents a tag within the
+/// XML document and even the root document itself. You can iterate over the XML tree to extract the
+/// data from within the XML file.
 ///
-///     We have a great sample of working with `XMLParser` in the
-///     `com.codename1.ui.tree.Tree` class.
+/// We have a great sample of working with `XMLParser` in the
+/// `com.codename1.ui.tree.Tree` class.
 ///
 /// XPath Processing
 ///
-///     Codename One ships with support to a subset of XPath processing, you can read more about it in
-///     the `processing package docs`.
+/// Codename One ships with support to a subset of XPath processing, you can read more about it in
+/// the `processing package docs`.
 ///
 /// Externalizable Objects
 ///
-///     Codename One provides the `com.codename1.io.Externalizable` interface, which is similar
-///     to the Java SE `com.codename1.io.Externalizable` interface.
-///     This interface allows an object to declare itself as `com.codename1.io.Externalizable` for
-///     serialization (so an object can be stored in a file/storage or sent over the network). However, due to the
-///     lack of reflection and use of obfuscation these objects must be registered with the
-///     `com.codename1.io.Util` class.
+/// Codename One provides the `com.codename1.io.Externalizable` interface, which is similar
+/// to the Java SE `com.codename1.io.Externalizable` interface.
+/// This interface allows an object to declare itself as `com.codename1.io.Externalizable` for
+/// serialization (so an object can be stored in a file/storage or sent over the network). However, due to the
+/// lack of reflection and use of obfuscation these objects must be registered with the
+/// `com.codename1.io.Util` class.
 ///
-///     Codename One doesn't support the Java SE Serialization API due to the size issues and
-///     complexities related to obfuscation.
+/// Codename One doesn't support the Java SE Serialization API due to the size issues and
+/// complexities related to obfuscation.
 ///
-///     The major objects that are supported by default in the Codename One
-///     `com.codename1.io.Externalizable` are:
-///     `String`, `Collection`, `Map`, `ArrayList`,
-///     `HashMap`, `Vector`, `Hashtable`,
-///     `Integer`, `Double`, `Float`, `Byte`,
-///     `Short`, `Long`, `Character`, `Boolean`,
-///     `Object[]`, `byte[]`, `int[]`, `float[]`,
-///     `long[]`, `double[]`.
+/// The major objects that are supported by default in the Codename One
+/// `com.codename1.io.Externalizable` are:
+/// `String`, `Collection`, `Map`, `ArrayList`,
+/// `HashMap`, `Vector`, `Hashtable`,
+/// `Integer`, `Double`, `Float`, `Byte`,
+/// `Short`, `Long`, `Character`, `Boolean`,
+/// `Object[]`, `byte[]`, `int[]`, `float[]`,
+/// `long[]`, `double[]`.
 ///
 /// Externalizing an object such as h below should work just fine:
 ///
@@ -805,27 +805,27 @@
 /// Storage.getInstance().writeObject("Test", h);
 /// ```
 ///
-///     However, notice that some things aren't polymorphic e.g. if we will externalize a
-///     `String[]` we will get back an `Object[]` since `String`
-///     arrays aren't detected by the implementation.
+/// However, notice that some things aren't polymorphic e.g. if we will externalize a
+/// `String[]` we will get back an `Object[]` since `String`
+/// arrays aren't detected by the implementation.
 ///
-///     **Important:** The externalization process caches objects so the app will seem to
-///     work and only fail on restart!
+/// **Important:** The externalization process caches objects so the app will seem to
+/// work and only fail on restart!
 ///
-///     Implementing the `com.codename1.io.Externalizable` interface is only important when we
-///     want to store a proprietary object. In this case we must register the object with the
-///     `com.codename1.io.Util` class so the externalization algorithm will be able to
-///     recognize it by name by invoking:
+/// Implementing the `com.codename1.io.Externalizable` interface is only important when we
+/// want to store a proprietary object. In this case we must register the object with the
+/// `com.codename1.io.Util` class so the externalization algorithm will be able to
+/// recognize it by name by invoking:
 ///
 /// ```java
 /// Util.register("MyClass", MyClass.class);
 /// ```
 ///
-///     You should do this early on in the app e.g. in the `init(Object)` but you shouldn't do
-///     it in a static initializer within the object as that might never be invoked!
+/// You should do this early on in the app e.g. in the `init(Object)` but you shouldn't do
+/// it in a static initializer within the object as that might never be invoked!
 ///
-///     An `com.codename1.io.Externalizable` object **must** have a
-///     **default public constructor** and must implement the following 4 methods:
+/// An `com.codename1.io.Externalizable` object **must** have a
+/// **default public constructor** and must implement the following 4 methods:
 ///
 /// ```java
 /// public int getVersion();
@@ -834,21 +834,21 @@
 /// public String getObjectId();
 /// ```
 ///
-///     The `getVersion()` method returns the current version of the object allowing the
-///     stored data to change its structure in the future (the version is then passed when internalizing
-///     the object). The object id is a `String` uniquely representing the object;
-///     it usually corresponds to the class name (in the example above the Unique Name should be
-///     `MyClass`).
+/// The `getVersion()` method returns the current version of the object allowing the
+/// stored data to change its structure in the future (the version is then passed when internalizing
+/// the object). The object id is a `String` uniquely representing the object;
+/// it usually corresponds to the class name (in the example above the Unique Name should be
+/// `MyClass`).
 ///
-///     **Warning:** It's a common mistake to use `getClass().getName()`
-///     to implement `getObjectId()` and it would **seem to work** in the
-///     simulator. This isn't the case though!
+/// **Warning:** It's a common mistake to use `getClass().getName()`
+/// to implement `getObjectId()` and it would **seem to work** in the
+/// simulator. This isn't the case though!
 ///
-///     Since devices obfuscate the class names this becomes a problem as data is stored in a random
-///     name that changes with every release.
+/// Since devices obfuscate the class names this becomes a problem as data is stored in a random
+/// name that changes with every release.
 ///
-///     Developers need to write the data of the object in the externalize method using the methods in the
-///     data output stream and read the data of the object in the internalize method e.g.:
+/// Developers need to write the data of the object in the externalize method using the methods in the
+/// data output stream and read the data of the object in the internalize method e.g.:
 ///
 /// ```java
 /// public void externalize(DataOutputStream out) throws IOException {
@@ -880,9 +880,9 @@
 /// }
 /// ```
 ///
-///     Since strings might be null sometimes we also included convenience methods to implement such
-///     externalization. This effectively writes a boolean before writing the UTF to indicate whether the string
-///     is null:
+/// Since strings might be null sometimes we also included convenience methods to implement such
+/// externalization. This effectively writes a boolean before writing the UTF to indicate whether the string
+/// is null:
 ///
 /// ```java
 /// public void externalize(DataOutputStream out) throws IOException {
@@ -900,9 +900,9 @@
 /// }
 /// ```
 ///
-///     Assuming we added a new date field to the object we can do the following. Notice that a
-///     `Date` is really a `long` value in Java that can be null.
-///     For completeness the full class is presented below:
+/// Assuming we added a new date field to the object we can do the following. Notice that a
+/// `Date` is really a `long` value in Java that can be null.
+/// For completeness the full class is presented below:
 ///
 /// ```java
 /// public class MyClass implements Externalizable {
@@ -952,5 +952,5 @@
 /// ```
 ///
 /// Notice that we only need to check for compatibility during the reading process as the writing
-///     process always writes the latest version of the data.
+/// process always writes the latest version of the data.
 package com.codename1.io;

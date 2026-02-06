@@ -5,7 +5,7 @@
 */
 
 /// The mapping API allows developers to use maps in their applications, add layers
-///     on top of the map and to enhance the API with additional Layers, Providers and functionality.
+/// on top of the map and to enhance the API with additional Layers, Providers and functionality.
 ///
-///     The mapping was contributed by Roman Kamyk
+/// The mapping was contributed by Roman Kamyk
 package com.codename1.maps;

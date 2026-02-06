@@ -66,7 +66,7 @@ public class Tile {
     /// #### Parameters
     ///
     /// - `if`: @param if true a Loading rect is displayed when map image is being
-    ///           downloaded
+    /// downloaded
     public static void setPaintLoading(boolean toPaint) {
         paintLoading = toPaint;
     }

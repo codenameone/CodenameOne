@@ -72,20 +72,20 @@ import java.util.Vector;
 ///
 /// ```java
 /// class XMLTreeModel implements TreeModel {
-///     private Element root;
-///     public XMLTreeModel(Element e) {
-///         root = e;
-///     }
+/// private Element root;
+/// public XMLTreeModel(Element e) {
+/// root = e;
+/// }
 ///
-///     public Vector getChildren(Object parent) {
-///         if(parent == null) {
-///             Vector c = new Vector();
-///             c.addElement(root);
-///             return c;
-///         }
-///         Vector result = new Vector();
-///         Element e = (Element)parent;
-///         for(int iter = 0 ; iter
+/// public Vector getChildren(Object parent) {
+/// if(parent == null) {
+/// Vector c = new Vector();
+/// c.addElement(root);
+/// return c;
+/// }
+/// Vector result = new Vector();
+/// Element e = (Element)parent;
+/// for(int iter = 0 ; iter
 ///
 /// Another real world example showing the `com.codename1.io.FileSystemStorage` as a tree:
 ///

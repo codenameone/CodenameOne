@@ -132,17 +132,17 @@ class ResourceThreadQueue {
     ///
     /// - `styles`: @param styles A mask of CSSEngine.STYLE_* values indicating in which styles this background image should be displayed
     ///
-    ///     synchronized void downloadImageImmediately(Component imgComp,String imageUrl,int styles) {
-    ///     try {
-    ///     InputStream is = htmlC.getRequestHandler().resourceRequested(new DocumentInfo(imageUrl,DocumentInfo.TYPE_IMAGE));
-    ///     Image img = Image.createImage(is);
-    ///     ResourceThread t = new ResourceThread(imageUrl, imgComp, htmlC, null);
-    ///     t.handleImage(img, imgComp,((styles & CSSEngine.STYLE_UNSELECTED)!=0),((styles & CSSEngine.STYLE_SELECTED)!=0),((styles & CSSEngine.STYLE_PRESSED)!=0));
-    ///     } catch (Exception ex) {
-    ///     ex.printStackTrace();
-    ///     }
+    /// synchronized void downloadImageImmediately(Component imgComp,String imageUrl,int styles) {
+    /// try {
+    /// InputStream is = htmlC.getRequestHandler().resourceRequested(new DocumentInfo(imageUrl,DocumentInfo.TYPE_IMAGE));
+    /// Image img = Image.createImage(is);
+    /// ResourceThread t = new ResourceThread(imageUrl, imgComp, htmlC, null);
+    /// t.handleImage(img, imgComp,((styles & CSSEngine.STYLE_UNSELECTED)!=0),((styles & CSSEngine.STYLE_SELECTED)!=0),((styles & CSSEngine.STYLE_PRESSED)!=0));
+    /// } catch (Exception ex) {
+    /// ex.printStackTrace();
+    /// }
     ///
-    ///     }
+    /// }
 
     /// Adds a stylesheet to the queue
     ///

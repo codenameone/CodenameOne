@@ -224,16 +224,16 @@ import java.util.ArrayList;
 ///
 ///
 /// - com.weusours.util.re is not currently compatible with all
-///      standard POSIX regcomp flags
+/// standard POSIX regcomp flags
 ///
 /// - com.weusours.util.re does not support POSIX equivalence classes
-///      ([=foo=] syntax) (I18N/locale issue)
+/// ([=foo=] syntax) (I18N/locale issue)
 ///
 /// - com.weusours.util.re does not support nested POSIX character
-///      classes (definitely should, but not completely trivial)
+/// classes (definitely should, but not completely trivial)
 ///
 /// - com.weusours.util.re Does not support POSIX character collation
-///      concepts ([.foo.] syntax) (I18N/locale issue)
+/// concepts ([.foo.] syntax) (I18N/locale issue)
 ///
 /// - Should there be different matching styles (simple, POSIX, Perl etc?)
 ///
@@ -242,12 +242,12 @@ import java.util.ArrayList;
 /// - Should RE support reluctant {m,n} closures (does anyone care)?
 ///
 /// - Not *all* possibilities are considered for greediness when backreferences
-///      are involved (as POSIX suggests should be the case).  The POSIX RE
-///      "(ac*)c*d[ac]*\1", when matched against "acdacaa" should yield a match
-///      of acdacaa where \1 is "a".  This is not the case in this RE package,
-///      and actually Perl doesn't go to this extent either!  Until someone
-///      actually complains about this, I'm not sure it's worth "fixing".
-///      If it ever is fixed, test #137 in RETest.txt should be updated.
+/// are involved (as POSIX suggests should be the case).  The POSIX RE
+/// "(ac*)c*d[ac]*\1", when matched against "acdacaa" should yield a match
+/// of acdacaa where \1 is "a".  This is not the case in this RE package,
+/// and actually Perl doesn't go to this extent either!  Until someone
+/// actually complains about this, I'm not sure it's worth "fixing".
+/// If it ever is fixed, test #137 in RETest.txt should be updated.
 ///
 /// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
 /// @author [Tobias Schafer](mailto:ts@sch-fer.de)
@@ -274,15 +274,15 @@ public class RE {
     /// Flag bit that indicates that subst should replace backreferences
     public static final int REPLACE_BACKREFERENCES = 0x0002;
     /// *********************************************
-    ///                                              *
+    /// *
     /// The format of a node in a program is:        *
-    ///                                              *
+    /// *
     /// [ OPCODE ] [ OPDATA ] [ OPNEXT ] [ OPERAND ] *
-    ///                                              *
+    /// *
     /// char OPCODE - instruction                    *
     /// char OPDATA - modifying data                 *
     /// char OPNEXT - next node (relative offset)    *
-    ///                                              *
+    /// *
     /// **********************************************
 
     //   Opcode              Char       Opdata/Operand  Meaning
@@ -757,7 +757,7 @@ public class RE {
     /// - `firstNode`: Node to start at in program
     ///
     /// - `lastNode`: @param lastNode  Last valid node (used for matching a subexpression without
-    ///                  matching the rest of the program as well).
+    /// matching the rest of the program as well).
     ///
     /// - `idxStart`: Starting position in character array
     ///
@@ -1512,10 +1512,10 @@ public class RE {
     /// - `substitution`: String to substitute for matches of this regular expression
     ///
     /// - `flags`: @param flags        One or more bitwise flags from REPLACE_*.  If the REPLACE_FIRSTONLY
-    ///                     flag bit is set, only the first occurrence of this regular expression is replaced.
-    ///                     If the bit is not set (REPLACE_ALL), all occurrences of this pattern will be
-    ///                     replaced. If the flag REPLACE_BACKREFERENCES is set, all backreferences will
-    ///                     be processed.
+    /// flag bit is set, only the first occurrence of this regular expression is replaced.
+    /// If the bit is not set (REPLACE_ALL), all occurrences of this pattern will be
+    /// replaced. If the flag REPLACE_BACKREFERENCES is set, all backreferences will
+    /// be processed.
     ///
     /// #### Returns
     ///

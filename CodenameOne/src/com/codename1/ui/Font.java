@@ -32,24 +32,24 @@ import java.util.Hashtable;
 ///
 ///
 /// - **System fonts** - these are very simplistic builtin fonts. They work on all platforms and come
-///                  in one of 3 sizes. However, they are ubiquitous and work in every platform in all languages.
-///                    A system font can be created using `int, int)`.
+/// in one of 3 sizes. However, they are ubiquitous and work in every platform in all languages.
+/// A system font can be created using `int, int)`.
 ///
 ///
 /// - **TTF files** - you can just place a TTF file in the src directory of the project and it will appear in
-///                  the Codename One Designer as an option. You can load such a font using `java.lang.String)`.
+/// the Codename One Designer as an option. You can load such a font using `java.lang.String)`.
 ///
 /// - **Native fonts** - these aren't supported on all platforms but generally they allow you to use a set
-///                  of platform native good looking fonts. E.g. on Android the devices Roboto font will be used and on
-///                  iOS Helvetica Neue will be used. You can load such a font using `java.lang.String)`.
+/// of platform native good looking fonts. E.g. on Android the devices Roboto font will be used and on
+/// iOS Helvetica Neue will be used. You can load such a font using `java.lang.String)`.
 ///
-///    **WARNING:** If you use a TTF file **MAKE SURE** not to delete the file when there **MIGHT**
-///          be a reference to it. This can cause hard to track down issues!
+/// **WARNING:** If you use a TTF file **MAKE SURE** not to delete the file when there **MIGHT**
+/// be a reference to it. This can cause hard to track down issues!
 ///
 ///   **IMPORTANT:** due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it.
-///          In the simulator you will see Roboto as the fallback in some cases and not the device font unless you
-///          are running on a Mac. Notice that the Roboto font from Google doesn't support all languages and thus
-///          special characters might not work on the simulator but would work on the device.
+/// In the simulator you will see Roboto as the fallback in some cases and not the device font unless you
+/// are running on a Mac. Notice that the Roboto font from Google doesn't support all languages and thus
+/// special characters might not work on the simulator but would work on the device.
 ///
 /// The sample code below demonstrates a catalog of available fonts, the scr
 ///
@@ -148,7 +148,7 @@ import java.util.Hashtable;
 ///
 /// The demo code on an Android 5.1 OPO device (OnePlus One)
 ///
-///    The Font class also supports bitmap fonts but this support is strictly aimed at legacy applications. We no longer
+/// The Font class also supports bitmap fonts but this support is strictly aimed at legacy applications. We no longer
 /// maintain that functionality.
 public class Font extends CN {
 
@@ -284,12 +284,12 @@ public class Font extends CN {
     /// - `size`: the size in the specified unit.
     ///
     /// - `sizeUnit`: @param sizeUnit The unit type of the size.  One of `com.codename1.ui.plaf.Style#UNIT_TYPE_DIPS`,
-    ///                 *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_PIXELS`,
-    ///                 *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_REM`,
-    ///                 *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VW`,
-    ///                 *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VH`,
-    ///                 *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VMIN`,
-    ///                 *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VMAX`.
+    /// *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_PIXELS`,
+    /// *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_REM`,
+    /// *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VW`,
+    /// *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VH`,
+    /// *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VMIN`,
+    /// *                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VMAX`.
     ///
     /// #### Returns
     ///
@@ -360,7 +360,7 @@ public class Font extends CN {
     /// #### Parameters
     ///
     /// - `lookup`: @param lookup a set of platform specific names delimited by commas, the first succefully
-    ///               loaded font will be used
+    /// loaded font will be used
     ///
     /// #### Returns
     ///
@@ -388,10 +388,10 @@ public class Font extends CN {
     /// - `cutOffsets`: character offsets matching the bitmap pixels and characters in the font
     ///
     /// - `charWidth`: @param charWidth  The width of the character when drawing... this should not be confused with
-    ///                   the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
-    ///                   since a character can be "wider" and "seep" into the next region. This is
-    ///                   especially true with italic characters all of which "lean" outside of their
-    ///                   bounds.
+    /// the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+    /// since a character can be "wider" and "seep" into the next region. This is
+    /// especially true with italic characters all of which "lean" outside of their
+    /// bounds.
     ///
     /// - `charsets`: the set of characters in the font
     ///
@@ -417,10 +417,10 @@ public class Font extends CN {
     /// - `cutOffsets`: character offsets matching the bitmap pixels and characters in the font
     ///
     /// - `charWidth`: @param charWidth  The width of the character when drawing... this should not be confused with
-    ///                   the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
-    ///                   since a character can be "wider" and "seep" into the next region. This is
-    ///                   especially true with italic characters all of which "lean" outside of their
-    ///                   bounds.
+    /// the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+    /// since a character can be "wider" and "seep" into the next region. This is
+    /// especially true with italic characters all of which "lean" outside of their
+    /// bounds.
     ///
     /// - `charsets`: the set of characters in the font
     ///
@@ -507,12 +507,12 @@ public class Font extends CN {
     /// - `weight`: PLAIN, BOLD or ITALIC weight based on the constants in this class
     ///
     /// - `unitType`: @param unitType The unit type of the size.  One of `com.codename1.ui.plaf.Style#UNIT_TYPE_DIPS`,
-    ///                 `com.codename1.ui.plaf.Style#UNIT_TYPE_PIXELS`,
-    ///                 `com.codename1.ui.plaf.Style#UNIT_TYPE_REM`,
-    ///                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VW`,
-    ///                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VH`,
-    ///                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VMIN`,
-    ///                 `com.codename1.ui.plaf.Style#UNIT_TYPE_VMAX`.
+    /// `com.codename1.ui.plaf.Style#UNIT_TYPE_PIXELS`,
+    /// `com.codename1.ui.plaf.Style#UNIT_TYPE_REM`,
+    /// `com.codename1.ui.plaf.Style#UNIT_TYPE_VW`,
+    /// `com.codename1.ui.plaf.Style#UNIT_TYPE_VH`,
+    /// `com.codename1.ui.plaf.Style#UNIT_TYPE_VMIN`,
+    /// `com.codename1.ui.plaf.Style#UNIT_TYPE_VMAX`.
     ///
     /// #### Returns
     ///

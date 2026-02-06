@@ -66,7 +66,7 @@ public class CharArrayReader extends Reader {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException if `offset < 0` or `length < 0`, or if
-    ///                                  `offset` is greater than the size of `buf` .
+    /// `offset` is greater than the size of `buf` .
     public CharArrayReader(char[] buf, int offset, int length) {
         /*
          * The spec of this constructor is broken. In defining the legal values
@@ -190,7 +190,7 @@ public class CharArrayReader extends Reader {
     /// - `buffer`: the character array to store the characters read.
     ///
     /// - `offset`: @param offset the initial position in `buffer` to store the characters
-    ///               read from this reader.
+    /// read from this reader.
     ///
     /// - `len`: the maximum number of characters to read.
     ///
@@ -202,8 +202,8 @@ public class CharArrayReader extends Reader {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `offset < 0` or `len < 0`, or if
-    ///                                   `offset + len` is bigger than the size of
-    ///                                   `buffer`.
+    /// `offset + len` is bigger than the size of
+    /// `buffer`.
     ///
     /// - `IOException`: if this reader is closed.
     @Override

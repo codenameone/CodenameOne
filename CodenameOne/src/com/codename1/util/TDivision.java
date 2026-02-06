@@ -386,7 +386,7 @@ final class TDivision {
     /// #### Parameters
     ///
     /// - `m`: @param m   a positive modulus Return the greatest common divisor of op1
-    ///            and op2,
+    /// and op2,
     ///
     /// - `op1`: must be greater than zero
     ///

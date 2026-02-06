@@ -384,16 +384,16 @@ public class JavascriptContext {
     /// is a Java object that will be converted into a Javascript object as follows:
     ///
     ///
-    ///      Java typeConverted to
+    /// Java typeConverted to
     ///
     ///
-    ///      DoubleNumber
-    ///      IntegerNumber
-    ///      FloatNumber
-    ///      LongNumber
-    ///      StringString
-    ///      JSObjectObject by ref
-    ///      nullnull
+    /// DoubleNumber
+    /// IntegerNumber
+    /// FloatNumber
+    /// LongNumber
+    /// StringString
+    /// JSObjectObject by ref
+    /// nullnull
     ///
     ///
     /// Hence if you want to set a Javascript string value, you can just
@@ -661,8 +661,8 @@ public class JavascriptContext {
     /// - `self`: Javascript Object that should act as "this" for the function call.
     ///
     /// - `params`: @param params The parameters that should be passed to the function.  These
-    ///               parameters should be passed as Java objects but will be converted into their
-    ///               associated Javascript version.
+    /// parameters should be passed as Java objects but will be converted into their
+    /// associated Javascript version.
     ///
     /// #### Returns
     ///
@@ -682,8 +682,8 @@ public class JavascriptContext {
     /// - `self`: Javascript Object that should act as "this" for the function call.
     ///
     /// - `params`: @param params   The parameters that should be passed to the function.  These
-    ///                 parameters should be passed as Java objects but will be converted into their
-    ///                 associated Javascript version.
+    /// parameters should be passed as Java objects but will be converted into their
+    /// associated Javascript version.
     ///
     /// - `callback`: The callback to pass the return value to.
     public void callAsync(JSObject func, JSObject self, Object[] params, Callback callback) {
@@ -700,8 +700,8 @@ public class JavascriptContext {
     /// - `self`: Javascript Object that should act as "this" for the function call.
     ///
     /// - `params`: @param params   The parameters that should be passed to the function.  These
-    ///                 parameters should be passed as Java objects but will be converted into their
-    ///                 associated Javascript version.
+    /// parameters should be passed as Java objects but will be converted into their
+    /// associated Javascript version.
     ///
     /// - `callback`: The callback to pass the return value to.
     public void callAsync(JSObject func, JSObject self, Object[] params, final SuccessCallback callback) {
@@ -722,12 +722,12 @@ public class JavascriptContext {
     /// #### Parameters
     ///
     /// - `jsFunc`: @param jsFunc A javascript expression that resolves to a function object that
-    ///               is to be called.
+    /// is to be called.
     ///
     /// - `self`: The Javascript object that is used as "this" for the method call.
     ///
     /// - `params`: @param params Array of the Javascript parameters, as Java objects.  These use
-    ///               the same conversions as are described in the docs for set().
+    /// the same conversions as are described in the docs for set().
     ///
     /// #### Returns
     ///
@@ -746,15 +746,15 @@ public class JavascriptContext {
     /// #### Parameters
     ///
     /// - `jsFunc`: @param jsFunc   A javascript expression that resolves to a function object that
-    ///                 is to be called.
+    /// is to be called.
     ///
     /// - `self`: The Javascript object that is used as "this" for the method call.
     ///
     /// - `params`: @param params   Array of the Javascript parameters, as Java objects.  These use
-    ///                 the same conversions as are described in the docs for set().
+    /// the same conversions as are described in the docs for set().
     ///
     /// - `callback`: @param callback Callback to pass the return value converted to the corresponding Java
-    ///                 object type.
+    /// object type.
     public void callAsync(String jsFunc, JSObject self, Object[] params, Callback callback) {
         call(jsFunc, self, params, true, callback);
     }
@@ -767,15 +767,15 @@ public class JavascriptContext {
     /// #### Parameters
     ///
     /// - `jsFunc`: @param jsFunc   A javascript expression that resolves to a function object that
-    ///                 is to be called.
+    /// is to be called.
     ///
     /// - `self`: The Javascript object that is used as "this" for the method call.
     ///
     /// - `params`: @param params   Array of the Javascript parameters, as Java objects.  These use
-    ///                 the same conversions as are described in the docs for set().
+    /// the same conversions as are described in the docs for set().
     ///
     /// - `callback`: @param callback Callback to pass the return value converted to the corresponding Java
-    ///                 object type.
+    /// object type.
     public void callAsync(String jsFunc, JSObject self, Object[] params, final SuccessCallback callback) {
         callAsync(jsFunc, self, params, new CallAsyncCallbackAdapter(callback));
     }
@@ -788,12 +788,12 @@ public class JavascriptContext {
     /// #### Parameters
     ///
     /// - `jsFunc`: @param jsFunc   A javascript expression that resolves to a function object that
-    ///                 is to be called.
+    /// is to be called.
     ///
     /// - `self`: The Javascript object that is used as "this" for the method call.
     ///
     /// - `params`: @param params   Array of the Javascript parameters, as Java objects.  These use
-    ///                 the same conversions as are described in the docs for set().
+    /// the same conversions as are described in the docs for set().
     ///
     /// - `async`: If true, the call will be made asynchronously.
     ///
@@ -877,12 +877,12 @@ public class JavascriptContext {
     /// #### Parameters
     ///
     /// - `jsFunc`: @param jsFunc   A javascript expression that resolves to a function object that
-    ///                 is to be called.
+    /// is to be called.
     ///
     /// - `self`: The Javascript object that is used as "this" for the method call.
     ///
     /// - `params`: @param params   Array of the Javascript parameters, as Java objects.  These use
-    ///                 the same conversions as are described in the docs for set().
+    /// the same conversions as are described in the docs for set().
     ///
     /// - `async`: If true, the call will be made asynchronously.
     ///

@@ -5,5 +5,5 @@
 */
 
 /// Spinners allows picking of simple sequential values similarly to combo boxes but of a much wider value set.
-///     They are mostly designed for picking dates, numbers or hours of the day.
+/// They are mostly designed for picking dates, numbers or hours of the day.
 package com.codename1.ui.spinner;

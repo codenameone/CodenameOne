@@ -155,7 +155,7 @@ public final class Socket {
     /// - `port`: the device port
     ///
     /// - `scClass`: @param scClass class of callback for when the connection is established or fails, this class
-    ///                will be instantiated for every incoming connection and must have a public no argument constructor.
+    /// will be instantiated for every incoming connection and must have a public no argument constructor.
     ///
     /// #### Returns
     ///

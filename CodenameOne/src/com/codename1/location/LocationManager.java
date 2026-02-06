@@ -186,10 +186,10 @@ public abstract class LocationManager {
     /// #### Parameters
     ///
     /// - `l`: @param l   a LocationListener or null to stop the current listener
-    ///            from getting updates
+    /// from getting updates
     ///
     /// - `req`: @param req provide the settings in which we are interested to get updates
-    ///            to the Listener.
+    /// to the Listener.
     public void setLocationListener(final LocationListener l, LocationRequest req) {
         setLocationListener(l);
         request = req;
@@ -207,7 +207,7 @@ public abstract class LocationManager {
     /// #### Parameters
     ///
     /// - `geofenceListenerClass`: @param geofenceListenerClass a Class that implements the GeofenceListener interface
-    ///                              this class must have an empty constructor
+    /// this class must have an empty constructor
     ///
     /// - `gf`: a Geofence to track
     public void addGeoFencing(Class geofenceListenerClass, Geofence gf) {
@@ -239,7 +239,7 @@ public abstract class LocationManager {
     /// #### Parameters
     ///
     /// - `l`: @param l a LocationListener or null to stop the current listener
-    ///          from getting updates
+    /// from getting updates
     public void setLocationListener(final LocationListener l) {
         synchronized (LISTENER_LOCK) {
             if (listener != null) {
@@ -279,8 +279,8 @@ public abstract class LocationManager {
     /// #### Parameters
     ///
     /// - `locationListener`: @param locationListener a class that implements the LocationListener interface
-    ///                         this class must have an empty constructor since the underlying implementation will
-    ///                         try to create an instance and invoke the locationUpdated method
+    /// this class must have an empty constructor since the underlying implementation will
+    /// try to create an instance and invoke the locationUpdated method
     public void setBackgroundLocationListener(Class locationListener) {
         synchronized (LISTENER_LOCK) {
             if (backgroundlistener != null) {

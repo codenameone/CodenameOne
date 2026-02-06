@@ -76,7 +76,7 @@ public class Promise<T> {
     /// #### Parameters
     ///
     /// - `executor`: @param executor The executor function.  This is executed immediately, and should call either the passed resolve
-    ///                 or reject functor to mark success or failure.
+    /// or reject functor to mark success or failure.
     ///
     /// #### See also
     ///
@@ -267,7 +267,7 @@ public class Promise<T> {
     /// - `o`: The value to pipe into the handler functors as an argument.
     ///
     /// - `resolved`: @param resolved Whether the promise was resolved.  If true, it will call the resolve
-    ///                 handler.  If false, it will call the reject handler.
+    /// handler.  If false, it will call the reject handler.
     @Async.Execute
     private void processThens(final Object o, final boolean resolved) {
         if (!CN.isEdt()) {

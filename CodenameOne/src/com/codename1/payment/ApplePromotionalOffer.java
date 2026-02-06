@@ -51,7 +51,7 @@ public class ApplePromotionalOffer implements PromotionalOffer {
     /// - `offerIdentifier`: @param offerIdentifier The offer identifier.
     ///
     ///
-    ///                        See [Apple docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc).
+    /// See [Apple docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc).
     public void setOfferIdentifier(String offerIdentifier) {
         this.offerIdentifier = offerIdentifier;
     }
@@ -74,7 +74,7 @@ public class ApplePromotionalOffer implements PromotionalOffer {
     /// - `keyIdentifier`: @param keyIdentifier The key identifier.
     ///
     ///
-    ///                      See [Apple's docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc).
+    /// See [Apple's docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc).
     public void setKeyIdentifier(String keyIdentifier) {
         this.keyIdentifier = keyIdentifier;
     }

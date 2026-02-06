@@ -265,7 +265,7 @@ public class UiBinding {
     /// - `cmp`: the component
     ///
     /// - `adapt`: @param adapt an implementation of `com.codename1.properties.UiBinding.ComponentAdapter`
-    ///              that allows us to define the way the component maps to/from the property
+    /// that allows us to define the way the component maps to/from the property
     ///
     /// #### Returns
     ///
@@ -537,10 +537,10 @@ public class UiBinding {
         /// #### Parameters
         ///
         /// - `toPropertyType`: @param toPropertyType  Used by the subclass to convert values from the component to the
-        ///                        property
+        /// property
         ///
         /// - `toComponentType`: @param toComponentType Used by the subclass to convert values from the property to the
-        ///                        component
+        /// component
         public ComponentAdapter(ObjectConverter toPropertyType, ObjectConverter toComponentType) {
             this.toPropertyType = toPropertyType;
             this.toComponentType = toComponentType;

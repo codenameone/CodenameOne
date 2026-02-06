@@ -1,16 +1,16 @@
 /// Provides access to the contacts list from the device address book
 ///
-///     The contacts API provides us with the means to query the phone's address book, delete elements from
-///     it and create new entries into it.
+/// The contacts API provides us with the means to query the phone's address book, delete elements from
+/// it and create new entries into it.
 ///
-///     Notice that on some platforms this will prompt the user for permissions and the user might choose not
-///     to grant that permission. To detect whether this is the case you can invoke
-///     `com.codename1.Display#isContactsPermissionGranted()` after invoking the contact listing API.
-///     This can help you adapt your error message to the user.
+/// Notice that on some platforms this will prompt the user for permissions and the user might choose not
+/// to grant that permission. To detect whether this is the case you can invoke
+/// `com.codename1.Display#isContactsPermissionGranted()` after invoking the contact listing API.
+/// This can help you adapt your error message to the user.
 ///
-///     The sample below demonstrates listing all the contacts within the device with their photos, notice that
-///     this API is very performance sensitive and should be invoked on a separate thread unlike most
-///     Codename One API's:
+/// The sample below demonstrates listing all the contacts within the device with their photos, notice that
+/// this API is very performance sensitive and should be invoked on a separate thread unlike most
+/// Codename One API's:
 ///
 /// ```java
 /// Form hi = new Form("Contacts", new BoxLayout(BoxLayout.Y_AXIS));

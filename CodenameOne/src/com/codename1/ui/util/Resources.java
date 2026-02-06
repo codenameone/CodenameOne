@@ -209,7 +209,7 @@ public class Resources {
     /// #### Parameters
     ///
     /// - `resource`: @param resource a local reference to a resource using the syntax of Class.getResourceAsStream(String)
-    ///                 however **the extension MUST not be included in the name!** E.g. to reference /x.res use /x
+    /// however **the extension MUST not be included in the name!** E.g. to reference /x.res use /x
     ///
     /// #### Returns
     ///
@@ -262,7 +262,7 @@ public class Resources {
     /// #### Parameters
     ///
     /// - `resource`: @param resource a local reference to a resource using the syntax of Class.getResourceAsStream(String)
-    ///                 however **the extension MUST not be included in the name!** E.g. to reference /x.res use /x
+    /// however **the extension MUST not be included in the name!** E.g. to reference /x.res use /x
     ///
     /// - `dpi`: the dpi used for the loaded images
     ///

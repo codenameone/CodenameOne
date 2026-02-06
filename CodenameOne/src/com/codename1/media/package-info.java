@@ -5,16 +5,16 @@
 */
 
 /// Video and Audio playback support are handled within this package using the
-///     `com.codename1.media.Media` & `com.codename1.media.MediaManager` APIs.
-///     Said API's allow for video playback both within a native full screen player and embedded within
-///     an application screen.
+/// `com.codename1.media.Media` & `com.codename1.media.MediaManager` APIs.
+/// Said API's allow for video playback both within a native full screen player and embedded within
+/// an application screen.
 ///
-///     Simplified video playback API is also available via the `com.codename1.components.MediaPlayer` class.
-///     Capture/recording is handled separately for the most part thru the
-///     `com.codename1.capture.Capture` API. However, there is some basic low level recording
-///     functionality within `com.codename1.media.MediaManager` as well.
+/// Simplified video playback API is also available via the `com.codename1.components.MediaPlayer` class.
+/// Capture/recording is handled separately for the most part thru the
+/// `com.codename1.capture.Capture` API. However, there is some basic low level recording
+/// functionality within `com.codename1.media.MediaManager` as well.
 ///
-///     The code below demonstrates capturing and playing back audio files using this API:
+/// The code below demonstrates capturing and playing back audio files using this API:
 ///
 /// ```java
 /// Form hi = new Form("Capture", BoxLayout.y());
@@ -69,7 +69,7 @@
 /// hi.show();
 /// ```
 ///
-///     The sample code below demonstrates simple video playback.
+/// The sample code below demonstrates simple video playback.
 ///
 /// ```java
 /// final Form hi = new Form("MediaPlayer", new BorderLayout());

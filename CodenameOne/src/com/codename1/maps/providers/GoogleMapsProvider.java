@@ -52,7 +52,7 @@ public class GoogleMapsProvider extends TiledProvider {
     /// #### Parameters
     ///
     /// - `apiKey`: @param apiKey google maps api key
-    ///               https://developers.google.com/maps/documentation/staticmaps/#api_key
+    /// https://developers.google.com/maps/documentation/staticmaps/#api_key
     public GoogleMapsProvider(String apiKey) {
         super("https://maps.googleapis.com/maps/api/staticmap?", new Mercator(), new Dimension(tileSize, tileSize));
         this.apiKey = apiKey;

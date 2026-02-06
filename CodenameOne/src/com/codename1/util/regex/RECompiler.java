@@ -1190,7 +1190,7 @@ public class RECompiler {
     /// #### Parameters
     ///
     /// - `pattern`: @param pattern Regular expression pattern to compile (see RECompiler class
-    ///                for details).
+    /// for details).
     ///
     /// #### Returns
     ///

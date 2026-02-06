@@ -833,7 +833,7 @@ public class BorderLayout extends Layout {
     /// #### Parameters
     ///
     /// - `portraitPosition`: @param portraitPosition  the position for the component when in portrait (this position
-    ///                          should always be used when adding a component to the layout). One of NORTH/SOUTH/EAST/WEST/CENTER.
+    /// should always be used when adding a component to the layout). One of NORTH/SOUTH/EAST/WEST/CENTER.
     ///
     /// - `landscapePosition`: the destination position to use in landscape
     public void defineLandscapeSwap(String portraitPosition, String landscapePosition) {

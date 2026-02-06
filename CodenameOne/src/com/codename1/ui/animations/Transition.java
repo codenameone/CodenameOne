@@ -165,7 +165,7 @@ public abstract class Transition implements Animation {
     /// #### Parameters
     ///
     /// - `reverse`: @param reverse creates a new transition instance with "reverse" behavior useful
-    ///                for signifying "back" operations
+    /// for signifying "back" operations
     ///
     /// #### Returns
     ///

@@ -39,8 +39,8 @@ public interface LocationListener {
     /// #### Parameters
     ///
     /// - `newState`: @param newState a new state one of the following:
-    ///                 LocationManager.AVAILABLE, LocationManager.OUT_OF_SERVICE or
-    ///                 LocationManager.TEMPORARILY_UNAVAILABLE
+    /// LocationManager.AVAILABLE, LocationManager.OUT_OF_SERVICE or
+    /// LocationManager.TEMPORARILY_UNAVAILABLE
     void providerStateChanged(int newState);
 
 }

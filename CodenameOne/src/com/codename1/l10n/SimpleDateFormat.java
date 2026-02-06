@@ -149,8 +149,8 @@ public class SimpleDateFormat extends DateFormat {
     /// #### Parameters
     ///
     /// - `restrict`: @param restrict `true` to truncate localized month names to the
-    ///                 length requested by the pattern, `false` to keep the platform
-    ///                 provided value as-is (default behaviour).
+    /// length requested by the pattern, `false` to keep the platform
+    /// provided value as-is (default behaviour).
     public static void setRestrictMonthNameLength(boolean restrict) {
         restrictMonthNameLength = restrict;
     }
@@ -595,7 +595,7 @@ public class SimpleDateFormat extends DateFormat {
     /// - `source`: as a string.
     ///
     /// - `offset`: @param offset the offset of original timestamp where marker started, for
-    ///               error reporting.
+    /// error reporting.
     ///
     /// #### Returns
     ///
@@ -604,7 +604,7 @@ public class SimpleDateFormat extends DateFormat {
     /// #### Throws
     ///
     /// - `ParseException`: @throws ParseException if the source could not be parsed. See http
-    ///                        ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+    /// ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
     int parseHour(String source, char patternChar, int offset) throws ParseException {
         int min = 0;
         boolean oneBased = (patternChar == HOUR_1_LETTER || patternChar == HOUR12_1_LETTER);
@@ -626,7 +626,7 @@ public class SimpleDateFormat extends DateFormat {
     /// - `name`: name of the element being parsed when error occurred.
     ///
     /// - `offset`: @param offset offset within the original timestamp where named element
-    ///               beings.
+    /// beings.
     int throwInvalid(String name, int offset) throws ParseException {
         throw new ParseException("Invalid " + name + " value", offset);
     }
@@ -638,7 +638,7 @@ public class SimpleDateFormat extends DateFormat {
     /// - `source`: as a string.
     ///
     /// - `ofs`: @param ofs    the offset of original timestamp where number starts, for
-    ///               error reporting.
+    /// error reporting.
     ///
     /// #### Returns
     ///
@@ -752,7 +752,7 @@ public class SimpleDateFormat extends DateFormat {
     /// - `token`: the token currently being parsed
     ///
     /// - `adjacent`: @param adjacent true if the number is adjacent to next field with no
-    ///                 literal separator.
+    /// literal separator.
     ///
     /// #### Returns
     ///
@@ -791,7 +791,7 @@ public class SimpleDateFormat extends DateFormat {
     /// - `source`: year as a string.
     ///
     /// - `ofs`: @param ofs    the offset of original timestamp where marker started, for
-    ///               error reporting.
+    /// error reporting.
     ///
     /// #### Returns
     ///
@@ -800,7 +800,7 @@ public class SimpleDateFormat extends DateFormat {
     /// #### Throws
     ///
     /// - `ParseException`: @throws ParseException if the source could not be parsed. See http
-    ///                        ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+    /// ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
     int parseYear(String source, String token, int ofs) throws ParseException {
         int year = parseNumber(source, ofs, "year", -1, -1);
         int len = source.length();
@@ -911,7 +911,7 @@ public class SimpleDateFormat extends DateFormat {
     /// - `source`: month as a string.
     ///
     /// - `ofs`: @param ofs    the offset of original timestamp where marker started, for
-    ///               error reporting.
+    /// error reporting.
     ///
     /// #### Returns
     ///
@@ -1010,7 +1010,7 @@ public class SimpleDateFormat extends DateFormat {
     /// - `month`: as a string.
     ///
     /// - `offset`: @param offset the offset of original timestamp where month started, for
-    ///               error reporting.
+    /// error reporting.
     ///
     /// #### Returns
     ///
@@ -1130,7 +1130,7 @@ public class SimpleDateFormat extends DateFormat {
     /// - `source`: source timezone.
     ///
     /// - `ofs`: @param ofs    the offset of original timestamp where month started, for
-    ///               error reporting.
+    /// error reporting.
     ///
     /// #### Returns
     ///

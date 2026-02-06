@@ -569,8 +569,8 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `showDuringEdit`: @param showDuringEdit one of the following: SHOW_DURING_EDIT_IGNORE,
-    ///                       SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
-    ///                       SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+    /// SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
+    /// SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
     ///
     /// #### Deprecated
     ///
@@ -727,7 +727,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-    ///          the paint and key handling events
+    /// the paint and key handling events
     public void callSerially(Runnable r) {
         // otherwise this will fail in an odd locaiton. Better it fails here...
         if (r == null) {
@@ -757,7 +757,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-    ///          the paint and key handling events
+    /// the paint and key handling events
     public void callSeriallyOnIdle(Runnable r) {
         if (codenameOneRunning) {
             synchronized (lock) {
@@ -825,12 +825,12 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-    ///          the paint and key handling events
+    /// the paint and key handling events
     ///
     /// #### Throws
     ///
     /// - `IllegalStateException`: @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
-    ///                               paint or event handling).
+    /// paint or event handling).
     public void callSeriallyAndWait(Runnable r) {
         if (isEdt()) {
             throw new RuntimeException("This method MUST NOT be invoked on the EDT");
@@ -863,14 +863,14 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r       runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-    ///                the paint and key handling events
+    /// the paint and key handling events
     ///
     /// - `timeout`: timeout duration, on timeout the method just returns
     ///
     /// #### Throws
     ///
     /// - `IllegalStateException`: @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
-    ///                               paint or event handling).
+    /// paint or event handling).
     public void callSeriallyAndWait(Runnable r, int timeout) {
         RunnableWrapper c = new RunnableWrapper(r, 0);
         callSerially(c);
@@ -1295,7 +1295,7 @@ public final class Display extends CN1Constants {
     /// #### Throws
     ///
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
-    ///                                     anywhere in the Runnable.
+    /// anywhere in the Runnable.
     ///
     /// #### Since
     ///
@@ -1324,7 +1324,7 @@ public final class Display extends CN1Constants {
     /// #### Throws
     ///
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
-    ///                                     anywhere in the Runnable.
+    /// anywhere in the Runnable.
     ///
     /// #### Since
     ///
@@ -1353,12 +1353,12 @@ public final class Display extends CN1Constants {
     /// - `r`: runnable (NOT A THREAD!) that will be invoked synchronously by this method
     ///
     /// - `dropEvents`: @param dropEvents indicates if the display should drop all events
-    ///                   while this runnable is running
+    /// while this runnable is running
     ///
     /// #### Throws
     ///
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException if this method is called while blocking is disabled (i.e. we are running
-    ///                                     inside a call to `#invokeWithoutBlocking(java.lang.Runnable)` on the EDT).
+    /// inside a call to `#invokeWithoutBlocking(java.lang.Runnable)` on the EDT).
     public void invokeAndBlock(Runnable r, boolean dropEvents) {
         this.dropEvents = dropEvents;
         try {
@@ -2593,7 +2593,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `hint`: @param hint a `Dimension` whose width/height represent percentages of the desktop to use for
-    ///             the initial window size, or `null` to clear a previously stored hint
+    /// the initial window size, or `null` to clear a previously stored hint
     public void setInitialWindowSizeHintPercent(Dimension hint) {
         impl.setInitialWindowSizeHintPercent(hint);
     }
@@ -2630,8 +2630,8 @@ public final class Display extends CN1Constants {
     /// - `value`: The value to convert, expressed in unitType.
     ///
     /// - `unitType`: @param unitType The unit type.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`,
-    ///                 `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
-    ///                 `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
+    /// `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
+    /// `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
     ///
     /// #### Returns
     ///
@@ -2651,8 +2651,8 @@ public final class Display extends CN1Constants {
     /// - `value`: The value to convert, expressed in unitType.
     ///
     /// - `unitType`: @param unitType   The unit type.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`,
-    ///                   `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
-    ///                   `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
+    /// `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
+    /// `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
     ///
     /// - `horizontal`: Whether screen percentage units should be based on horitonzal or vertical percentage.
     ///
@@ -2860,7 +2860,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `vkb`: @param vkb a VirtualKeyboard to be used or null to disable the
-    ///            VirtualKeyboard
+    /// VirtualKeyboard
     ///
     /// #### Deprecated
     ///
@@ -3069,7 +3069,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `activate`: @param activate set to true to activate the bidi algorithm, false to
-    ///                 disable it
+    /// disable it
     public void setBidiAlgorithm(boolean activate) {
         impl.setBidiAlgorithm(activate);
     }
@@ -3702,7 +3702,7 @@ public final class Display extends CN1Constants {
     /// - `url`: the url to execute
     ///
     /// - `response`: @param response a callback from the platform when this execution returned
-    ///                 to the application
+    /// to the application
     public void execute(String url, ActionListener response) {
         impl.execute(url, response);
     }
@@ -3781,7 +3781,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `soundIdentifier`: @param soundIdentifier the sound identifier which can match one of the
-    ///                        common constants in this class or be a user/implementation defined sound
+    /// common constants in this class or be a user/implementation defined sound
     ///
     /// #### Deprecated
     ///
@@ -3819,7 +3819,7 @@ public final class Display extends CN1Constants {
     /// - `soundIdentifier`: the sound string passed to playBuiltinSound
     ///
     /// - `data`: @param data            an input stream containing platform specific audio file, its usually safe
-    ///                        to assume that wav/mp3 would be supported.
+    /// to assume that wav/mp3 would be supported.
     ///
     /// #### Throws
     ///
@@ -4010,7 +4010,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `obj`: @param obj object to copy, while this can be any arbitrary object it is recommended that only Strings or Codename One
-    ///            image objects be used to copy
+    /// image objects be used to copy
     public void copyToClipboard(Object obj) {
         impl.copyToClipboard(obj);
     }
@@ -4376,7 +4376,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `response`: @param response a callback Object to retrieve the file path For multiselection types (`#GALLERY_IMAGE_MULTI`, `#GALLERY_VIDEO_MULTI`, and `#GALLERY_ALL_MULTI`), the source
-    ///                 of the ActionEvent sent this callback will be a String[].  For other types, it will be a String.  If the dialog was cancelled, it will be null.
+    /// of the ActionEvent sent this callback will be a String[].  For other types, it will be a String.  If the dialog was cancelled, it will be null.
     ///
     /// - `type`: one of the following `#GALLERY_IMAGE`, `#GALLERY_VIDEO`, `#GALLERY_ALL`, `#GALLERY_IMAGE_MULTI`, `#GALLERY_VIDEO_MULTI`, `#GALLERY_ALL_MULTI`.
     ///
@@ -4971,8 +4971,8 @@ public final class Display extends CN1Constants {
     /// - `mimeType`: type of the image or file.  null if just sharing text
     ///
     /// - `sourceRect`: @param sourceRect The source rectangle of the button that originated the share request.  This is used on
-    ///                   some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
-    ///                   on the iPad with iOS 8 and higher.
+    /// some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
+    /// on the iPad with iOS 8 and higher.
     public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect) {
         impl.share(textOrPath, image, mimeType, sourceRect);
     }
@@ -5019,8 +5019,8 @@ public final class Display extends CN1Constants {
     /// - `id`: the id for the user
     ///
     /// - `noFallback`: @param noFallback some devices don't support an efficient push API and will resort to polling
-    ///                   to provide push like functionality. If this flag is set to true no polling will occur and
-    ///                   the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+    /// to provide push like functionality. If this flag is set to true no polling will occur and
+    /// the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
     ///
     /// #### Deprecated
     ///
@@ -5037,11 +5037,11 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `metaData`: @param metaData   meta data for push, this is relevant on some platforms such as google where
-    ///                   a push id is necessary,
+    /// a push id is necessary,
     ///
     /// - `noFallback`: @param noFallback some devices don't support an efficient push API and will resort to polling
-    ///                   to provide push like functionality. If this flag is set to true no polling will occur and
-    ///                   the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+    /// to provide push like functionality. If this flag is set to true no polling will occur and
+    /// the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
     ///
     /// #### Deprecated
     ///
@@ -5070,7 +5070,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `path`: @param path a file path to where to store the recording, if the file does
-    ///             not exists it will be created.
+    /// not exists it will be created.
     public Media createMediaRecorder(String path) throws IOException {
         return createMediaRecorder(path, getAvailableRecordingMimeTypes()[0]);
     }
@@ -5108,10 +5108,10 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `path`: @param path     a file path to where to store the recording, if the file does
-    ///                 not exists it will be created.
+    /// not exists it will be created.
     ///
     /// - `mimeType`: @param mimeType the output mime type that is supported see
-    ///                 getAvailableRecordingMimeTypes()
+    /// getAvailableRecordingMimeTypes()
     public Media createMediaRecorder(String path, String mimeType) throws IOException {
         return impl.createMediaRecorder(path, mimeType);
     }
@@ -5193,7 +5193,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `databaseName`: @param databaseName the name of the database with out / or path
-    ///                     elements e.g. `mydatabase.db`
+    /// elements e.g. `mydatabase.db`
     ///
     /// #### Returns
     ///
@@ -5369,7 +5369,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `e`: @param e when set to true the screen saver will work as usual and when set to false the screen
-    ///          will not turn off automatically
+    /// will not turn off automatically
     public void setScreenSaverEnabled(boolean e) {
         if (e) {
             impl.unlockScreen();
@@ -5405,7 +5405,7 @@ public final class Display extends CN1Constants {
     /// - `type`: the picker type constant
     ///
     /// - `source`: @param source       the source component (optional) the native dialog will be placed in relation to this
-    ///                     component if applicable
+    /// component if applicable
     ///
     /// - `currentValue`: the currently selected value
     ///
@@ -5499,7 +5499,7 @@ public final class Display extends CN1Constants {
     /// - `firstTime`: time in milliseconds when to schedule the notification
     ///
     /// - `repeat`: @param repeat    repeat one of the following: REPEAT_NONE, REPEAT_FIFTEEN_MINUTES,
-    ///                  REPEAT_HALF_HOUR, REPEAT_HOUR, REPEAT_DAY, REPEAT_WEEK
+    /// REPEAT_HALF_HOUR, REPEAT_HOUR, REPEAT_DAY, REPEAT_WEEK
     public void scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) {
         if (n.getId() == null || n.getId().length() == 0) {
             throw new IllegalArgumentException("Notification ID must be set");
@@ -5599,7 +5599,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `uri`: @param uri the uri of the media can start with jar://, file://, http://
-    ///            (can also use rtsp:// if supported on the platform)
+    /// (can also use rtsp:// if supported on the platform)
     ///
     /// #### Returns
     ///
@@ -5619,7 +5619,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `uri`: @param uri the uri of the media can start with jar://, file://, http://
-    ///            (can also use rtsp:// if supported on the platform)
+    /// (can also use rtsp:// if supported on the platform)
     ///
     /// #### Returns
     ///
@@ -5749,7 +5749,7 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `r`: @param r Runnable that will be run when/if you are permitted to prompt the user to install
-    ///          the app on their homescreen.
+    /// the app on their homescreen.
     public void onCanInstallOnHomescreen(Runnable r) {
         impl.onCanInstallOnHomescreen(r);
     }

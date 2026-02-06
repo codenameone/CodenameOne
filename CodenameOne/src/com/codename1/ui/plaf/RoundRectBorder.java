@@ -243,8 +243,8 @@ public final class RoundRectBorder extends Border {
     /// #### Parameters
     ///
     /// - `side`: @param side The side to place the tracking arrow on.  Values `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`,
-    ///             or `Component#BOTTOM`.  Set negative value for default behaviour, which is to just calculate the arrow position
-    ///             based on the tracking component bounds.
+    /// or `Component#BOTTOM`.  Set negative value for default behaviour, which is to just calculate the arrow position
+    /// based on the tracking component bounds.
     ///
     /// #### Returns
     ///
@@ -277,7 +277,7 @@ public final class RoundRectBorder extends Border {
     /// #### Parameters
     ///
     /// - `pos`: @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
-    ///            default behaviour, which is to calculate the position based on the tracking component position.
+    /// default behaviour, which is to calculate the position based on the tracking component position.
     ///
     /// #### Returns
     ///
@@ -310,7 +310,7 @@ public final class RoundRectBorder extends Border {
     /// #### Parameters
     ///
     /// - `pos`: @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
-    ///            default behaviour, which is to calculate the position based on the tracking component position.
+    /// default behaviour, which is to calculate the position based on the tracking component position.
     ///
     /// #### Returns
     ///

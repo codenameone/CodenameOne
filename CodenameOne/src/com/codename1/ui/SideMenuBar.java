@@ -1084,7 +1084,7 @@ public class SideMenuBar extends MenuBar {
     /// #### Parameters
     ///
     /// - `menu`: @param menu the Menu Container that was created in the
-    ///             constructSideNavigationComponent() method
+    /// constructSideNavigationComponent() method
     ///
     /// - `cmp`: the Component to add to the side menu
     protected void addComponentToSideMenu(Container menu, Component cmp) {

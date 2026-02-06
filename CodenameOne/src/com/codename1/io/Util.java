@@ -1691,8 +1691,8 @@ public final class Util {
     /// #### Throws
     ///
     /// - `IOException`: @throws IOException the stream has been closed and the contained
-    ///                     input stream does not support reading after close, or
-    ///                     another I/O error occurs.
+    /// input stream does not support reading after close, or
+    /// another I/O error occurs.
     public static void readFully(InputStream i, byte b[]) throws IOException {
         readFully(i, b, 0, b.length);
     }
@@ -1711,8 +1711,8 @@ public final class Util {
     /// #### Throws
     ///
     /// - `IOException`: @throws IOException the stream has been closed and the contained
-    ///                     input stream does not support reading after close, or
-    ///                     another I/O error occurs.
+    /// input stream does not support reading after close, or
+    /// another I/O error occurs.
     public static void readFully(InputStream i, byte b[], int off, int len) throws IOException {
         if (len < 0) {
             throw new IndexOutOfBoundsException();
@@ -1740,8 +1740,8 @@ public final class Util {
     /// #### Throws
     ///
     /// - `IOException`: @throws IOException the stream has been closed and the contained
-    ///                     input stream does not support reading after close, or
-    ///                     another I/O error occurs.
+    /// input stream does not support reading after close, or
+    /// another I/O error occurs.
     public static int readAll(InputStream i, byte b[]) throws IOException {
         int len = b.length;
         int n = 0;
@@ -2053,7 +2053,7 @@ public final class Util {
     /// - `url`: The URL to download the image from.
     ///
     /// - `fileName`: @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
-    ///                  network request altogether.
+    /// network request altogether.
     ///
     /// - `onSuccess`: Callback called on success.
     ///
@@ -2078,7 +2078,7 @@ public final class Util {
     /// - `url`: The URL to download the image from.
     ///
     /// - `fileName`: @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
-    ///                 network request altogether.
+    /// network request altogether.
     ///
     /// #### Since
     ///
@@ -2114,7 +2114,7 @@ public final class Util {
     /// - `url`: The URL to download the image from.
     ///
     /// - `fileName`: @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
-    ///                  network request altogether.
+    /// network request altogether.
     ///
     /// - `onSuccess`: Callback called on success.
     ///
@@ -2137,7 +2137,7 @@ public final class Util {
     /// - `url`: The URL to download the image from.
     ///
     /// - `fileName`: @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
-    ///                  network request altogether.
+    /// network request altogether.
     ///
     /// - `onSuccess`: Callback called on success.
     ///
@@ -2162,7 +2162,7 @@ public final class Util {
     /// - `url`: The URL to download the image from.
     ///
     /// - `fileName`: @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
-    ///                 network request altogether.
+    /// network request altogether.
     ///
     /// #### Since
     ///
@@ -2244,7 +2244,7 @@ public final class Util {
     /// - `url`: The URL to download the image from.
     ///
     /// - `fileName`: @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
-    ///                  network request altogether.
+    /// network request altogether.
     ///
     /// - `onSuccess`: Callback called on success.
     ///
@@ -2659,7 +2659,7 @@ public final class Util {
     /// #### Parameters
     ///
     /// - `sourceFile,`: @param sourceFile, it automatically choose Storage API or
-    ///                    FileSystemStorage API
+    /// FileSystemStorage API
     ///
     /// #### Returns
     ///
@@ -2911,7 +2911,7 @@ public final class Util {
     /// - `url`
     ///
     /// - `checkPartialDownloadSupport`: @param checkPartialDownloadSupport if true returns -2 if the server
-    ///                                    doesn't accept partial downloads.
+    /// doesn't accept partial downloads.
     ///
     /// #### Returns
     ///
@@ -3116,14 +3116,14 @@ public final class Util {
     /// - `url`
     ///
     /// - `fileName`: @param fileName           must be a valid Storage file name or FileSystemStorage
-    ///                           file path
+    /// file path
     ///
     /// - `percentageCallback`: @param percentageCallback invoked (in EDT) during the download to notify
-    ///                           the progress (from 0 to 100); it can be null if you are not interested in
-    ///                           monitoring the progress
+    /// the progress (from 0 to 100); it can be null if you are not interested in
+    /// monitoring the progress
     ///
     /// - `filesavedCallback`: @param filesavedCallback  invoked (in EDT) only when the download is
-    ///                           finished; if null, no action is taken
+    /// finished; if null, no action is taken
     ///
     /// #### Throws
     ///

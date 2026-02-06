@@ -250,7 +250,7 @@ public final class URLImage extends EncodedImage {
     /// #### Parameters
     ///
     /// - `imageMask`: @param imageMask the mask image see the createMask() method of image for details of what a mask is, it
-    ///                  will be used as the reference size for the image and resulting images must be of the same size!
+    /// will be used as the reference size for the image and resulting images must be of the same size!
     ///
     /// #### Returns
     ///
@@ -280,7 +280,7 @@ public final class URLImage extends EncodedImage {
     /// #### Parameters
     ///
     /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
-    ///                    and serves as the guideline to the size of the downloaded image.
+    /// and serves as the guideline to the size of the downloaded image.
     ///
     /// - `storageFile`: the file in storage to which the image will be stored
     ///
@@ -298,14 +298,14 @@ public final class URLImage extends EncodedImage {
     /// #### Parameters
     ///
     /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
-    ///                    and serves as the guideline to the size of the downloaded image.
+    /// and serves as the guideline to the size of the downloaded image.
     ///
     /// - `storageFile`: the file in storage to which the image will be stored
     ///
     /// - `url`: the url from which the image is fetched
     ///
     /// - `adapter`: @param adapter     the adapter used to adapt the image into place, it should scale the image
-    ///                    if necessary
+    /// if necessary
     ///
     /// #### Returns
     ///
@@ -326,14 +326,14 @@ public final class URLImage extends EncodedImage {
     /// #### Parameters
     ///
     /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
-    ///                    and serves as the guideline to the size of the downloaded image.
+    /// and serves as the guideline to the size of the downloaded image.
     ///
     /// - `file`: the file in the file system to which the image will be stored
     ///
     /// - `url`: the url from which the image is fetched
     ///
     /// - `adapter`: @param adapter     the adapter used to adapt the image into place, it should scale the image
-    ///                    if necessary
+    /// if necessary
     ///
     /// #### Returns
     ///
@@ -362,7 +362,7 @@ public final class URLImage extends EncodedImage {
     /// - `url`: the URL from which the image is fetched
     ///
     /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
-    ///                    and serves as the guideline to the size of the downloaded image.
+    /// and serves as the guideline to the size of the downloaded image.
     ///
     /// - `resizeRule`: One of `#FLAG_RESIZE_FAIL`, `#FLAG_RESIZE_SCALE`, or `#FLAG_RESIZE_SCALE_TO_FILL`.
     ///

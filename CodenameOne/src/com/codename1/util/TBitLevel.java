@@ -207,15 +207,15 @@ final class TBitLevel {
     /// #### Parameters
     ///
     /// - `result`: @param result an array of digits that will hold the computed result when
-    ///               this method returns. The size of this array is
-    ///               `srcLen + 1`, and the format is the same as
-    ///               `TBigInteger#digits`.
+    /// this method returns. The size of this array is
+    /// `srcLen + 1`, and the format is the same as
+    /// `TBigInteger#digits`.
     ///
     /// - `source`: @param source the array of digits to shift left, in the same format as
-    ///               `TBigInteger#digits`.
+    /// `TBigInteger#digits`.
     ///
     /// - `srcLen`: @param srcLen the length of `source`; may be less than
-    ///               `source.length`
+    /// `source.length`
     static void shiftLeftOneBit(int[] result, int[] source, int srcLen) {
         int carry = 0;
         for (int i = 0; i < srcLen; i++) {
@@ -340,7 +340,7 @@ final class TBitLevel {
     /// #### Parameters
     ///
     /// - `intCount`: @param intCount  : the index of the element of the digits array where the
-    ///                  operation will be performed
+    /// operation will be performed
     ///
     /// - `bitNumber`: : the bit's position in the intCount element
     static TBigInteger flipBit(TBigInteger val, int n) {

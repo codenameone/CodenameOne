@@ -5,15 +5,15 @@
 */
 
 /// Abstraction of location services (GPS/Geofencing etc.) providing user global positioning and monitoring over
-///     such changes both in the foreground and background.
+/// such changes both in the foreground and background.
 ///
-///     Trivial one time usage of location data can look like this sample:
+/// Trivial one time usage of location data can look like this sample:
 ///
 /// ```java
 /// Location position = LocationManager.getLocationManager().getCurrentLocationSync();
 /// ```
 ///
-///     You can also track location in the foreground using API calls like this:
+/// You can also track location in the foreground using API calls like this:
 ///
 /// ```java
 /// public MyListener implements LocationListener {
@@ -28,8 +28,8 @@
 /// LocationManager.getLocationManager().setLocationListener(new MyListener());
 /// ```
 ///
-///     Geofencing allows tracking whether a user entered a specific region, this can work when the app is completely
-///     in the background and is very efficient in terms of battery life:
+/// Geofencing allows tracking whether a user entered a specific region, this can work when the app is completely
+/// in the background and is very efficient in terms of battery life:
 ///
 /// ```java
 /// // File: GeofenceListenerImpl.java

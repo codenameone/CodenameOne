@@ -374,7 +374,7 @@ public abstract class Login {
     /// #### Parameters
     ///
     /// - `lc`: @param lc the login callback or null to remove the existing login
-    ///           callback
+    /// callback
     public void setCallback(LoginCallback lc) {
         loginCallback = lc;
     }

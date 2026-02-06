@@ -30,7 +30,7 @@ public abstract class REUtil {
     /// #### Parameters
     ///
     /// - `expression`: @param expression The expression, beginning with a prefix if it's complex or
-    ///                   having no prefix if it's simple
+    /// having no prefix if it's simple
     ///
     /// - `matchFlags`: Matching style flags
     ///
@@ -53,7 +53,7 @@ public abstract class REUtil {
     /// #### Parameters
     ///
     /// - `expression`: @param expression The expression, beginning with a prefix if it's complex or
-    ///                   having no prefix if it's simple
+    /// having no prefix if it's simple
     ///
     /// #### Returns
     ///

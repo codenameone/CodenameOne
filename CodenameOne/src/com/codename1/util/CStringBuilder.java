@@ -282,7 +282,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `ArrayIndexOutOfBoundsException`: @throws ArrayIndexOutOfBoundsException if `offset` and `len` do not specify a valid
-    ///                                        subsequence.
+    /// subsequence.
     ///
     /// #### See also
     ///
@@ -327,7 +327,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `start` is less than zero, greater than the current
-    ///                                         length or greater than `end`.
+    /// length or greater than `end`.
     public CStringBuilder delete(int start, int end) {
         delete0(start, end);
         return this;
@@ -347,7 +347,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `index` is less than zero or is greater than or
-    ///                                         equal to the current length.
+    /// equal to the current length.
     public CStringBuilder deleteCharAt(int index) {
         deleteCharAt0(index);
         return this;
@@ -371,7 +371,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         `length`.
+    /// `length`.
     ///
     /// #### See also
     ///
@@ -398,7 +398,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                   `length()`.
+    /// `length()`.
     ///
     /// #### See also
     ///
@@ -425,7 +425,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         `length()`.
+    /// `length()`.
     ///
     /// #### See also
     ///
@@ -452,7 +452,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         {code length()}.
+    /// {code length()}.
     ///
     /// #### See also
     ///
@@ -479,7 +479,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         `length()`.
+    /// `length()`.
     ///
     /// #### See also
     ///
@@ -507,7 +507,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         `length()`.
+    /// `length()`.
     ///
     /// #### See also
     ///
@@ -534,7 +534,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         `length()`.
+    /// `length()`.
     ///
     /// #### See also
     ///
@@ -560,7 +560,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         `length()`.
+    /// `length()`.
     public CStringBuilder insert(int offset, String str) {
         insert0(offset, str);
         return this;
@@ -583,7 +583,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         `length()`.
+    /// `length()`.
     ///
     /// #### See also
     ///
@@ -615,8 +615,8 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
-    ///                                         `length()`, or `strOffset` and `strLen` do
-    ///                                         not specify a valid subsequence.
+    /// `length()`, or `strOffset` and `strLen` do
+    /// not specify a valid subsequence.
     ///
     /// #### See also
     ///
@@ -645,7 +645,7 @@ public final class CStringBuilder extends AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `start` is negative, greater than the current
-    ///                                         `length()` or greater than `end`.
+    /// `length()` or greater than `end`.
     ///
     /// - `NullPointerException`: if `str` is `null`.
     public CStringBuilder replace(int start, int end, String str) {

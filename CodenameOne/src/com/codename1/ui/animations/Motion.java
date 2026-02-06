@@ -240,7 +240,7 @@ public class Motion {
     /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
     ///
     /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
-    ///                         destinationValue)
+    /// destinationValue)
     ///
     /// #### Returns
     ///
@@ -262,7 +262,7 @@ public class Motion {
     /// - `destinationValue`: the destination color
     ///
     /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
-    ///                         destinationValue)
+    /// destinationValue)
     ///
     /// #### Returns
     ///
@@ -282,7 +282,7 @@ public class Motion {
     /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
     ///
     /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
-    ///                         destinationValue)
+    /// destinationValue)
     ///
     /// #### Returns
     ///
@@ -302,7 +302,7 @@ public class Motion {
     /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
     ///
     /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
-    ///                         destinationValue)
+    /// destinationValue)
     ///
     /// #### Returns
     ///

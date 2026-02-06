@@ -58,10 +58,10 @@ public class CubicLineChart extends LineChart {
     /// - `renderer`: the renderer
     ///
     /// - `smoothness`: @param smoothness smoothness determines how smooth the curve should be,
-    ///                   range [0->0.5] super smooth, 0.5, means that it might not get
-    ///                   close to control points if you have random data // less smooth,
-    ///                   (close to 0) means that it will most likely touch all control //
-    ///                   points
+    /// range [0->0.5] super smooth, 0.5, means that it might not get
+    /// close to control points if you have random data // less smooth,
+    /// (close to 0) means that it will most likely touch all control //
+    /// points
     public CubicLineChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer,
                           float smoothness) {
         super(dataset, renderer);

@@ -93,7 +93,7 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
-    ///                          `null` will be treated as "".
+    /// `null` will be treated as "".
     public MigLayout(String layoutConstraints) {
         this(layoutConstraints, "", "");
     }
@@ -103,10 +103,10 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
-    ///                          `null` will be treated as "".
+    /// `null` will be treated as "".
     ///
     /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
-    ///                          `null` will be treated as "".
+    /// `null` will be treated as "".
     public MigLayout(String layoutConstraints, String colConstraints) {
         this(layoutConstraints, colConstraints, "");
     }
@@ -116,13 +116,13 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
-    ///                          `null` will be treated as "".
+    /// `null` will be treated as "".
     ///
     /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
-    ///                          `null` will be treated as "".
+    /// `null` will be treated as "".
     ///
     /// - `rowConstraints`: @param rowConstraints    The constraints for the rows in the grid.
-    ///                          `null` will be treated as "".
+    /// `null` will be treated as "".
     public MigLayout(String layoutConstraints, String colConstraints, String rowConstraints) {
         setLayoutConstraints(layoutConstraints);
         setColumnConstraints(colConstraints);
@@ -134,7 +134,7 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
-    ///                          `null` will be treated as an empty constraint.
+    /// `null` will be treated as an empty constraint.
     public MigLayout(LC layoutConstraints) {
         this(layoutConstraints, null, null);
     }
@@ -144,10 +144,10 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
-    ///                          `null` will be treated as an empty constraint.
+    /// `null` will be treated as an empty constraint.
     ///
     /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
-    ///                          `null` will be treated as an empty constraint.
+    /// `null` will be treated as an empty constraint.
     public MigLayout(LC layoutConstraints, AC colConstraints) {
         this(layoutConstraints, colConstraints, null);
     }
@@ -157,13 +157,13 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
-    ///                          `null` will be treated as an empty constraint.
+    /// `null` will be treated as an empty constraint.
     ///
     /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
-    ///                          `null` will be treated as an empty constraint.
+    /// `null` will be treated as an empty constraint.
     ///
     /// - `rowConstraints`: @param rowConstraints    The constraints for the rows in the grid.
-    ///                          `null` will be treated as an empty constraint.
+    /// `null` will be treated as an empty constraint.
     public MigLayout(LC layoutConstraints, AC colConstraints, AC rowConstraints) {
         setLayoutConstraints(layoutConstraints);
         setColumnConstraints(colConstraints);
@@ -199,8 +199,8 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `constr`: @param constr The layout constraints as a String pr
-    ///               `net.miginfocom.layout.LC` representation. `null` is
-    ///               converted to `""` for storage.
+    /// `net.miginfocom.layout.LC` representation. `null` is
+    /// converted to `""` for storage.
     ///
     /// #### Throws
     ///
@@ -241,8 +241,8 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `constr`: @param constr The column layout constraints as a String or
-    ///               `net.miginfocom.layout.AC` representation. `null` is
-    ///               converted to `""` for storage.
+    /// `net.miginfocom.layout.AC` representation. `null` is
+    /// converted to `""` for storage.
     ///
     /// #### Throws
     ///
@@ -281,8 +281,8 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `constr`: @param constr The row layout constraints as a String or
-    ///               `net.miginfocom.layout.AC` representation. `null` is
-    ///               converted to `""` for storage.
+    /// `net.miginfocom.layout.AC` representation. `null` is
+    /// converted to `""` for storage.
     ///
     /// #### Throws
     ///
@@ -352,7 +352,7 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `constr`: @param constr The component constraints as a String or
-    ///               `net.miginfocom.layout.CC`. `null` is ok.
+    /// `net.miginfocom.layout.CC`. `null` is ok.
     ///
     /// - `comp`: The component to set the constraints for.
     ///
@@ -361,7 +361,7 @@ public final class MigLayout extends Layout {
     /// - `RuntimeException`: if the constraint was not valid.
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException If the component is not handling the
-    ///                                  component.
+    /// component.
     public void setComponentConstraints(Component comp, Object constr) {
         setComponentConstraintsImpl(comp, constr, false);
     }
@@ -374,7 +374,7 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `constr`: @param constr  The component constraints as a String or
-    ///                `net.miginfocom.layout.CC`. `null` is ok.
+    /// `net.miginfocom.layout.CC`. `null` is ok.
     ///
     /// - `comp`: The component to set the constraints for.
     ///
@@ -385,7 +385,7 @@ public final class MigLayout extends Layout {
     /// - `RuntimeException`: if the constraint was not valid.
     ///
     /// - `IllegalArgumentException`: @throws IllegalArgumentException If the component is not handling the
-    ///                                  component.
+    /// component.
     private void setComponentConstraintsImpl(Component comp, Object constr, boolean noCheck) {
         if (!noCheck && !scrConstrMap.containsKey(comp)) {
             throw new IllegalArgumentException("Component must already be added to parent!");
@@ -416,7 +416,7 @@ public final class MigLayout extends Layout {
     /// #### Parameters
     ///
     /// - `c`: @param c The component to check. If `null` then
-    ///          `false` will be returned.
+    /// `false` will be returned.
     ///
     /// #### Returns
     ///

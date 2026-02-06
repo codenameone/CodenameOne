@@ -466,7 +466,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `hint`: @param hint a `Dimension` whose width/height represent percentages of the desktop to use for
-    ///             the initial window size, or `null` to clear a previously stored hint
+    /// the initial window size, or `null` to clear a previously stored hint
     public void setInitialWindowSizeHintPercent(Dimension hint) {
         initialWindowSizeHintPercent = hint;
     }
@@ -837,7 +837,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `enter`: @param enter true before the edt sleeps and false when exits from the
-    ///              idle state
+    /// idle state
     public void edtIdle(boolean enter) {
     }
 
@@ -1023,7 +1023,7 @@ public abstract class CodenameOneImplementation {
     /// - `height`: the height of the mutable image
     ///
     /// - `fillColor`: @param fillColor the ARGB fill color, alpha may be ignored based on the value of
-    ///                  isAlphaMutableImageSupported
+    /// isAlphaMutableImageSupported
     ///
     /// #### Returns
     ///
@@ -2161,7 +2161,7 @@ public abstract class CodenameOneImplementation {
     /// - `graphics`: The graphics context.
     ///
     /// - `image`: @param image        The image whose raster should be used to generate the shadow.  The alpha channel of this image is used as the
-    ///                     bases for the shadow projection.
+    /// bases for the shadow projection.
     ///
     /// - `x`: x-coordinate of the graphics context where shadow should be painted.
     ///
@@ -2499,7 +2499,7 @@ public abstract class CodenameOneImplementation {
     /// - `h`: the height of the region to be rendered
     ///
     /// - `processAlpha`: @param processAlpha true if rgbData has an alpha channel, false if
-    ///                     all pixels are fully opaque
+    /// all pixels are fully opaque
     public abstract void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha);
 
     /// Returns the native graphics object on which all rendering operations occur
@@ -2655,14 +2655,14 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `face`: @param face  the face of the font, can be one of FACE_SYSTEM,
-    ///              FACE_PROPORTIONAL, FACE_MONOSPACE.
+    /// FACE_PROPORTIONAL, FACE_MONOSPACE.
     ///
     /// - `style`: @param style the style of the font.
-    ///              The value is an OR'ed  combination of STYLE_BOLD, STYLE_ITALIC, and
-    ///              STYLE_UNDERLINED; or the value is zero (STYLE_PLAIN).
+    /// The value is an OR'ed  combination of STYLE_BOLD, STYLE_ITALIC, and
+    /// STYLE_UNDERLINED; or the value is zero (STYLE_PLAIN).
     ///
     /// - `size`: @param size  the size of the font, can be one of SIZE_SMALL,
-    ///              SIZE_MEDIUM, SIZE_LARGE
+    /// SIZE_MEDIUM, SIZE_LARGE
     ///
     /// #### Returns
     ///
@@ -3960,7 +3960,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `activate`: @param activate set to true to activate the bidi algorithm, false to
-    ///                 disable it
+    /// disable it
     public void setBidiAlgorithm(boolean activate) {
         bidi = activate;
     }
@@ -4286,7 +4286,7 @@ public abstract class CodenameOneImplementation {
     /// - `url`: the url to execute
     ///
     /// - `response`: @param response a callback from the platform when this execution returned
-    ///                 to the application
+    /// to the application
     public void execute(String url, ActionListener response) {
         execute(url);
     }
@@ -4365,7 +4365,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `soundIdentifier`: @param soundIdentifier the sound identifier which can match one of the
-    ///                        common constants in this class or be a user/implementation defined sound
+    /// common constants in this class or be a user/implementation defined sound
     public void playBuiltinSound(String soundIdentifier) {
         playUserSound(soundIdentifier);
     }
@@ -4375,7 +4375,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `soundIdentifier`: @param soundIdentifier the sound identifier which can match one of the
-    ///                        common constants in this class or be a user/implementation defined sound
+    /// common constants in this class or be a user/implementation defined sound
     protected void playUserSound(String soundIdentifier) {
         // TODO: Reintroduce builitin sound support
         //Object sound = builtinSounds.get(soundIdentifier);
@@ -4428,7 +4428,7 @@ public abstract class CodenameOneImplementation {
     /// - `soundIdentifier`: the sound string passed to playBuiltinSound
     ///
     /// - `data`: @param data            an input stream containing platform specific audio file, its usually safe
-    ///                        to assume that wav/mp3 would be supported.
+    /// to assume that wav/mp3 would be supported.
     ///
     /// #### Throws
     ///
@@ -4617,7 +4617,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `uri`: @param uri the uri of the media can start with jar://, file://, http://
-    ///            (can also use rtsp:// if supported on the platform)
+    /// (can also use rtsp:// if supported on the platform)
     ///
     /// #### Returns
     ///
@@ -4660,7 +4660,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `uri`: @param uri the uri of the media can start with jar://, file://, http://
-    ///            (can also use rtsp:// if supported on the platform)
+    /// (can also use rtsp:// if supported on the platform)
     ///
     /// #### Returns
     ///
@@ -4754,7 +4754,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `obj`: @param obj object to copy, while this can be any arbitrary object it is recommended that only Strings or Codename One
-    ///            image objects be used to copy
+    /// image objects be used to copy
     public void copyToClipboard(Object obj) {
         lightweightClipboard = obj;
     }
@@ -5708,7 +5708,7 @@ public abstract class CodenameOneImplementation {
     /// - `connection`: the connection object
     ///
     /// - `bufferLen`: @param bufferLen  The number of bytes to write in each chunk. If chunklen
-    ///                   is less than or equal to zero, a default value will be used.
+    /// is less than or equal to zero, a default value will be used.
     public void setChunkedStreamingMode(Object connection, int bufferLen) {
     }
 
@@ -6980,8 +6980,8 @@ public abstract class CodenameOneImplementation {
     /// - `mimeType`: type of the image or null if no image to share
     ///
     /// - `sourceRect`: @param sourceRect The bounds of the button that was clicked to initiate
-    ///                   the share.  This is used by some platforms (e.g. iPad2 on iOS 8 or
-    ///                   higher) to dictate where the popover dialog should be placed.
+    /// the share.  This is used by some platforms (e.g. iPad2 on iOS 8 or
+    /// higher) to dictate where the popover dialog should be placed.
     public void share(String text, String image, String mimeType, Rectangle sourceRect) {
 
     }
@@ -7342,8 +7342,8 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `nativeTransform`: @param nativeTransform The transform to rotate. Each implementation can decide the format
-    ///                        to use internally for transforms.  This should return a transform in that internal format.
-    ///                        This is used by the `com.codename1.ui.Transform` class.
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
     ///
     ///
     /// This can only be used if `#isTransformSupported()` returns true.
@@ -7370,8 +7370,8 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `nativeTransform`: @param nativeTransform The native transform to translate. Each implementation can decide the format
-    ///                        to use internally for transforms.  This should return a transform in that internal format.
-    ///                        This is used by the `com.codename1.ui.Transform` class.
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
     ///
     ///
     /// This can only be used if `#isTransformSupported()` returns true.
@@ -7395,8 +7395,8 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `nativeTransform`: @param nativeTransform Each implementation can decide the format
-    ///                        to use internally for transforms.  This should return a transform in that internal format.
-    ///                        This is used by the `com.codename1.ui.Transform` class.
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
     ///
     ///
     /// This can only be used if `#isTransformSupported()` returns true.
@@ -7420,8 +7420,8 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `nativeTransform`: @param nativeTransform The native transform of which to make the inverse.  Each implementation can decide the format
-    ///                        to use internally for transforms.  This should return a transform in that internal format.
-    ///                        This is used by the `com.codename1.ui.Transform` class.
+    /// to use internally for transforms.  This should return a transform in that internal format.
+    /// This is used by the `com.codename1.ui.Transform` class.
     ///
     ///
     /// This can only be used if `#isTransformSupported()` returns true.
@@ -7512,12 +7512,12 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `nativeTransform`: @param nativeTransform The native transform to use for the transformation. Each implementation can decide the format
-    ///                        to use internally for transforms.  This should return a transform in that internal format.
+    /// to use internally for transforms.  This should return a transform in that internal format.
     ///
     ///
     /// This can only be used if `#isTransformSupported()` returns true.
     ///
-    ///                        This is used by the `com.codename1.ui.Transform` class.
+    /// This is used by the `com.codename1.ui.Transform` class.
     ///
     /// - `in`: A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple to be transformed.
     ///
@@ -8249,8 +8249,8 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `noFallback`: @param noFallback some devices don't support an efficient push API and will resort to polling
-    ///                   to provide push like functionality. If this flag is set to true no polling will occur and
-    ///                   the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+    /// to provide push like functionality. If this flag is set to true no polling will occur and
+    /// the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
     public void registerPush(Hashtable metaData, boolean noFallback) {
         if (!noFallback) {
             Preferences.set("PollingPush", true);
@@ -8274,10 +8274,10 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `path`: @param path     a file path to where to store the recording, if the file does
-    ///                 not exists it will be created.
+    /// not exists it will be created.
     ///
     /// - `mimeType`: @param mimeType the output mime type that is supported see
-    ///                 getAvailableRecordingMimeTypes()
+    /// getAvailableRecordingMimeTypes()
     public Media createMediaRecorder(String path, String mimeType) throws IOException {
         return null;
     }
@@ -8288,7 +8288,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `builder`: @param builder THe media builder with settings for the recorder.
-    ///                getAvailableRecordingMimeTypes()
+    /// getAvailableRecordingMimeTypes()
     ///
     /// #### Since
     ///
@@ -8745,7 +8745,7 @@ public abstract class CodenameOneImplementation {
     /// - `type`: the picker type constant
     ///
     /// - `source`: @param source       the source component (optional) the native dialog will be placed in relation to this
-    ///                     component if applicable
+    /// component if applicable
     ///
     /// - `currentValue`: the currently selected value
     ///
@@ -9531,7 +9531,7 @@ public abstract class CodenameOneImplementation {
     /// - `y`: position for the label
     ///
     /// - `txtW`: @param txtW           stringWidth(text) equivalent which is faster than just
-    ///                       invoking string width all the time
+    /// invoking string width all the time
     ///
     /// - `textSpaceW`: the width available for the component
     ///
@@ -9594,7 +9594,7 @@ public abstract class CodenameOneImplementation {
     /// - `y`: the y coordinate.
     ///
     /// - `textDecoration`: @param textDecoration Text decoration bitmask (See Style's
-    ///                       TEXT_DECORATION_* constants)
+    /// TEXT_DECORATION_* constants)
     public void drawString(Object nativeGraphics, Object nativeFont, String str, int x, int y, int textDecoration) {
         drawString(nativeGraphics, nativeFont, str, x, y, textDecoration, getHeight(nativeFont));
     }
@@ -9615,7 +9615,7 @@ public abstract class CodenameOneImplementation {
     /// - `y`: the y coordinate.
     ///
     /// - `textDecoration`: @param textDecoration Text decoration bitmask (See Style's
-    ///                       TEXT_DECORATION_* constants)
+    /// TEXT_DECORATION_* constants)
     private void drawString(Object nativeGraphics, Object nativeFont, String str, int x, int y, int textDecoration, int fontHeight) {
         if (str.length() == 0) {
             return;
@@ -9867,7 +9867,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `r`: @param r Runnable that will be run when/if you are permitted to prompt the user to install
-    ///          the app on their homescreen.
+    /// the app on their homescreen.
     public void onCanInstallOnHomescreen(Runnable r) {
 
     }

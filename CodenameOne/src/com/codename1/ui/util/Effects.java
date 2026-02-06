@@ -62,11 +62,11 @@ public final class Effects {
     /// - `source`: image to add the reflection effect to
     ///
     /// - `mirrorRatio`: @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
-    ///                    height of the image, 0.75f will create a 3 quarter height mirror etc.
+    /// height of the image, 0.75f will create a 3 quarter height mirror etc.
     ///
     /// - `alphaRatio`: @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
-    ///                    (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
-    ///                    opaque use 255. A recommended value would be between 128 to 90.
+    /// (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
+    /// opaque use 255. A recommended value would be between 128 to 90.
     ///
     /// #### Returns
     ///
@@ -84,11 +84,11 @@ public final class Effects {
     /// - `source`: image to add the reflection effect to
     ///
     /// - `mirrorRatio`: @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
-    ///                    height of the image, 0.75f will create a 3 quarter height mirror etc.
+    /// height of the image, 0.75f will create a 3 quarter height mirror etc.
     ///
     /// - `alphaRatio`: @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
-    ///                    (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
-    ///                    opaque use 255. A recommended value would be between 128 to 90.
+    /// (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
+    /// opaque use 255. A recommended value would be between 128 to 90.
     ///
     /// - `spacing`: the distance in pixels between the image and its reflection
     ///

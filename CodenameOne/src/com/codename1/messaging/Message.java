@@ -186,7 +186,7 @@ public class Message {
     /// - `subject`: e-mail subject
     ///
     /// - `plainTextBody`: @param plainTextBody when sending an HTML message you should also attach a plain text fallback message,
-    ///                      this is redundant if the email is a plain text message to begin with
+    /// this is redundant if the email is a plain text message to begin with
     ///
     /// #### Deprecated
     ///
@@ -217,7 +217,7 @@ public class Message {
     /// - `subject`: e-mail subject
     ///
     /// - `plainTextBody`: @param plainTextBody when sending an HTML message you should also attach a plain text fallback message,
-    ///                      this is redundant if the email is a plain text message to begin with
+    /// this is redundant if the email is a plain text message to begin with
     ///
     /// #### Returns
     ///

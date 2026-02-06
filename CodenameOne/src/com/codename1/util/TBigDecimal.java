@@ -241,7 +241,7 @@ class TBigDecimal {
     /// #### Parameters
     ///
     /// - `in`: @param in     array of characters containing the string representation of
-    ///               this `BigDecimal`.
+    /// this `BigDecimal`.
     ///
     /// - `offset`: first index to be copied.
     ///
@@ -254,7 +254,7 @@ class TBigDecimal {
     /// - `NumberFormatException`: if `offset = in.length`.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if in does not contain a valid string representation of a big
-    ///                               decimal.
+    /// decimal.
     public TBigDecimal(char[] in, int offset, int len) {
         int begin = offset; // first index to be copied
         int last = offset + (len - 1); // last index to be copied
@@ -351,7 +351,7 @@ class TBigDecimal {
     /// #### Parameters
     ///
     /// - `in`: @param in     array of characters containing the string representation of
-    ///               this `BigDecimal`.
+    /// this `BigDecimal`.
     ///
     /// - `offset`: first index to be copied.
     ///
@@ -366,11 +366,11 @@ class TBigDecimal {
     /// - `NumberFormatException`: if `offset = in.length`.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if `in` does not contain a valid string representation
-    ///                               of a big decimal.
+    /// of a big decimal.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException   if `mc.precision > 0` and `mc.roundingMode ==
-    ///                               UNNECESSARY` and the new big decimal cannot be represented
-    ///                               within the given precision without rounding.
+    /// UNNECESSARY` and the new big decimal cannot be represented
+    /// within the given precision without rounding.
     public TBigDecimal(char[] in, int offset, int len, TMathContext mc) {
         this(in, offset, len);
         inplaceRound(mc);
@@ -382,14 +382,14 @@ class TBigDecimal {
     /// #### Parameters
     ///
     /// - `in`: @param in array of characters containing the string representation of
-    ///           this `BigDecimal`.
+    /// this `BigDecimal`.
     ///
     /// #### Throws
     ///
     /// - `NullPointerException`: if `in == null`.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if `in` does not contain a valid string representation
-    ///                               of a big decimal.
+    /// of a big decimal.
     public TBigDecimal(char[] in) {
         this(in, 0, in.length);
     }
@@ -401,7 +401,7 @@ class TBigDecimal {
     /// #### Parameters
     ///
     /// - `in`: @param in array of characters containing the string representation of
-    ///           this `BigDecimal`.
+    /// this `BigDecimal`.
     ///
     /// - `mc`: rounding mode and precision for the result of this operation.
     ///
@@ -410,11 +410,11 @@ class TBigDecimal {
     /// - `NullPointerException`: if `in == null`.
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if `in` does not contain a valid string representation
-    ///                               of a big decimal.
+    /// of a big decimal.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException   if `mc.precision > 0` and `mc.roundingMode ==
-    ///                               UNNECESSARY` and the new big decimal cannot be represented
-    ///                               within the given precision without rounding.
+    /// UNNECESSARY` and the new big decimal cannot be represented
+    /// within the given precision without rounding.
     public TBigDecimal(char[] in, TMathContext mc) {
         this(in, 0, in.length);
         inplaceRound(mc);
@@ -430,7 +430,7 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if `val` does not contain a valid string representation
-    ///                               of a big decimal.
+    /// of a big decimal.
     public TBigDecimal(String val) {
         this(val.toCharArray(), 0, val.length());
     }
@@ -448,11 +448,11 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `NumberFormatException`: @throws NumberFormatException if `val` does not contain a valid string representation
-    ///                               of a big decimal.
+    /// of a big decimal.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException   if `mc.precision > 0` and `mc.roundingMode ==
-    ///                               UNNECESSARY` and the new big decimal cannot be represented
-    ///                               within the given precision without rounding.
+    /// UNNECESSARY` and the new big decimal cannot be represented
+    /// within the given precision without rounding.
     public TBigDecimal(String val, TMathContext mc) {
         this(val.toCharArray(), 0, val.length());
         inplaceRound(mc);
@@ -541,8 +541,8 @@ class TBigDecimal {
     /// - `NumberFormatException`: if `val` is infinity or not a number.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException   if `mc.precision > 0` and `mc.roundingMode ==
-    ///                               UNNECESSARY` and the new big decimal cannot be represented
-    ///                               within the given precision without rounding.
+    /// UNNECESSARY` and the new big decimal cannot be represented
+    /// within the given precision without rounding.
     public TBigDecimal(double val, TMathContext mc) {
         this(val);
         inplaceRound(mc);
@@ -571,8 +571,8 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `ArithmeticException`: @throws ArithmeticException if `mc.precision > 0` and `mc.roundingMode ==
-    ///                             UNNECESSARY` and the new big decimal cannot be represented
-    ///                             within the given precision without rounding.
+    /// UNNECESSARY` and the new big decimal cannot be represented
+    /// within the given precision without rounding.
     public TBigDecimal(TBigInteger val, TMathContext mc) {
         this(val);
         inplaceRound(mc);
@@ -585,7 +585,7 @@ class TBigDecimal {
     /// #### Parameters
     ///
     /// - `unscaledVal`: @param unscaledVal `BigInteger` representing the unscaled value of this
-    ///                    `BigDecimal` instance.
+    /// `BigDecimal` instance.
     ///
     /// - `scale`: scale of this `BigDecimal` instance.
     ///
@@ -608,7 +608,7 @@ class TBigDecimal {
     /// #### Parameters
     ///
     /// - `unscaledVal`: @param unscaledVal `BigInteger` representing the unscaled value of this
-    ///                    `BigDecimal` instance.
+    /// `BigDecimal` instance.
     ///
     /// - `scale`: scale of this `BigDecimal` instance.
     ///
@@ -617,8 +617,8 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `mc.precision > 0` and `mc.roundingMode ==
-    ///                              UNNECESSARY` and the new big decimal cannot be represented
-    ///                              within the given precision without rounding.
+    /// UNNECESSARY` and the new big decimal cannot be represented
+    /// within the given precision without rounding.
     ///
     /// - `NullPointerException`: if `unscaledVal == null`.
     public TBigDecimal(TBigInteger unscaledVal, int scale, TMathContext mc) {
@@ -648,8 +648,8 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `ArithmeticException`: @throws ArithmeticException if `mc.precision > 0` and `c.roundingMode ==
-    ///                             UNNECESSARY` and the new big decimal cannot be represented
-    ///                             within the given precision without rounding.
+    /// UNNECESSARY` and the new big decimal cannot be represented
+    /// within the given precision without rounding.
     public TBigDecimal(int val, TMathContext mc) {
         this(val, 0);
         inplaceRound(mc);
@@ -676,8 +676,8 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `ArithmeticException`: @throws ArithmeticException if `mc.precision > 0` and `mc.roundingMode ==
-    ///                             UNNECESSARY` and the new big decimal cannot be represented
-    ///                             within the given precision without rounding.
+    /// UNNECESSARY` and the new big decimal cannot be represented
+    /// within the given precision without rounding.
     public TBigDecimal(long val, TMathContext mc) {
         this(val);
         inplaceRound(mc);
@@ -937,7 +937,7 @@ class TBigDecimal {
     /// #### Parameters
     ///
     /// - `parityBit`: @param parityBit    can be 0 or 1, it's only used in the case
-    ///                     `HALF_EVEN`
+    /// `HALF_EVEN`
     ///
     /// - `fraction`: the mantisa to be analyzed
     ///
@@ -1000,7 +1000,7 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `ArithmeticException`: @throws ArithmeticException when `scale` doesn't
-    ///                             fit in `int` type
+    /// fit in `int` type
     ///
     /// #### See also
     ///
@@ -1342,7 +1342,7 @@ class TBigDecimal {
     /// - `ArithmeticException`: if `divisor == 0`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException      if `roundingMode == ROUND_UNNECESSARY` and rounding is
-    ///                                  necessary according to the given scale.
+    /// necessary according to the given scale.
     public TBigDecimal divide(TBigDecimal divisor, int scale, int roundingMode) {
         return divide(divisor, scale, TRoundingMode.valueOf(roundingMode));
     }
@@ -1372,8 +1372,8 @@ class TBigDecimal {
     /// - `ArithmeticException`: if `divisor == 0`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `roundingMode == RoundingMode.UNNECESSAR`Y and
-    ///                              rounding is necessary according to the given scale and given
-    ///                              precision.
+    /// rounding is necessary according to the given scale and given
+    /// precision.
     public TBigDecimal divide(TBigDecimal divisor, int scale, TRoundingMode roundingMode) {
         // Let be: this = [u1,s1]  and  divisor = [u2,s2]
         if (roundingMode == null) {
@@ -1441,7 +1441,7 @@ class TBigDecimal {
     /// - `ArithmeticException`: if `divisor == 0`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException      if `roundingMode == ROUND_UNNECESSARY` and rounding is
-    ///                                  necessary according to the scale of this.
+    /// necessary according to the scale of this.
     public TBigDecimal divide(TBigDecimal divisor, int roundingMode) {
         return divide(divisor, scale, TRoundingMode.valueOf(roundingMode));
     }
@@ -1469,7 +1469,7 @@ class TBigDecimal {
     /// - `ArithmeticException`: if `divisor == 0`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `roundingMode == RoundingMode.UNNECESSARY` and
-    ///                              rounding is necessary according to the scale of this.
+    /// rounding is necessary according to the scale of this.
     public TBigDecimal divide(TBigDecimal divisor, TRoundingMode roundingMode) {
         return divide(divisor, scale, roundingMode);
     }
@@ -1576,7 +1576,7 @@ class TBigDecimal {
     /// - `ArithmeticException`: if `divisor == 0`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `mc.getRoundingMode() == UNNECESSARY` and rounding
-    ///                              is necessary according `mc.getPrecision()`.
+    /// is necessary according `mc.getPrecision()`.
     public TBigDecimal divide(TBigDecimal divisor, TMathContext mc) {
         /* Calculating how many zeros must be append to 'dividend'
          * to obtain a  quotient with at least 'mc.precision()' digits */
@@ -1710,7 +1710,7 @@ class TBigDecimal {
     /// - `divisor`: value by which `this` is divided.
     ///
     /// - `mc`: @param mc      math context which determines the maximal precision of the
-    ///                result.
+    /// result.
     ///
     /// #### Returns
     ///
@@ -1723,7 +1723,7 @@ class TBigDecimal {
     /// - `ArithmeticException`: if `divisor == 0`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `mc.getPrecision() > 0` and the result requires more
-    ///                              digits to be represented.
+    /// digits to be represented.
     public TBigDecimal divideToIntegralValue(TBigDecimal divisor, TMathContext mc) {
         int mcPrecision = mc.getPrecision();
         int diffPrecision = this.precision() - divisor.precision();
@@ -1860,7 +1860,7 @@ class TBigDecimal {
     /// - `ArithmeticException`: if `divisor == 0`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `mc.getPrecision() > 0` and the result of `this.divideToIntegralValue(divisor, mc)` requires more digits
-    ///                              to be represented.
+    /// to be represented.
     public TBigDecimal remainder(TBigDecimal divisor, TMathContext mc) {
         return divideAndRemainder(divisor, mc)[1];
     }
@@ -1910,7 +1910,7 @@ class TBigDecimal {
     /// - `divisor`: value by which `this` is divided.
     ///
     /// - `mc`: @param mc      math context which determines the maximal precision of the
-    ///                result.
+    /// result.
     ///
     /// #### Returns
     ///
@@ -2203,8 +2203,8 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `ArithmeticException`: @throws ArithmeticException if `mc.precision > 0` and `mc.roundingMode ==
-    ///                             UNNECESSARY` and this cannot be represented within the given
-    ///                             precision.
+    /// UNNECESSARY` and this cannot be represented within the given
+    /// precision.
     public TBigDecimal round(TMathContext mc) {
         TBigDecimal thisBD = new TBigDecimal(getUnscaledValue(), scale);
 
@@ -2237,7 +2237,7 @@ class TBigDecimal {
     /// - `NullPointerException`: if `roundingMode == null`.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException  if `roundingMode == ROUND_UNNECESSARY` and rounding is
-    ///                              necessary according to the given scale.
+    /// necessary according to the given scale.
     public TBigDecimal setScale(int newScale, TRoundingMode roundingMode) {
         if (roundingMode == null) {
             throw new NullPointerException();
@@ -2288,7 +2288,7 @@ class TBigDecimal {
     /// - `IllegalArgumentException`: if `roundingMode` is not a valid rounding mode.
     ///
     /// - `ArithmeticException`: @throws ArithmeticException      if `roundingMode == ROUND_UNNECESSARY` and rounding is
-    ///                                  necessary according to the given scale.
+    /// necessary according to the given scale.
     public TBigDecimal setScale(int newScale, int roundingMode) {
         return setScale(newScale, TRoundingMode.valueOf(roundingMode));
     }
@@ -2859,7 +2859,7 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `ArithmeticException`: @throws ArithmeticException if rounding is necessary of the number doesn't fit in a
-    ///                             short.
+    /// short.
     public short shortValueExact() {
         return (short) valueExact(16);
     }
@@ -3166,7 +3166,7 @@ class TBigDecimal {
     /// #### Parameters
     ///
     /// - `bitLengthOfType`: @param bitLengthOfType number of bits of the type whose value will be calculated
-    ///                        exactly
+    /// exactly
     ///
     /// #### Returns
     ///
@@ -3176,7 +3176,7 @@ class TBigDecimal {
     /// #### Throws
     ///
     /// - `ArithmeticException`: @throws ArithmeticException when rounding is necessary or the
-    ///                             number don't fit in the primitive type
+    /// number don't fit in the primitive type
     private long valueExact(int bitLengthOfType) {
         TBigInteger bigInteger = toBigIntegerExact();
 

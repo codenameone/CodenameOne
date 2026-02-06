@@ -836,7 +836,7 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
     /// #### Parameters
     ///
     /// - `margins`: @param margins an array containing the margin size values, in this order:
-    ///                top, left, bottom, right
+    /// top, left, bottom, right
     public void setMargins(int[] margins) {
         mMargins = margins;
     }

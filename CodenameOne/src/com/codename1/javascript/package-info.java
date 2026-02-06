@@ -22,57 +22,57 @@
 */
 
 /// **NOTE:** The `com.codename1.javascript` package is now deprecated. The preferred method of
-///     Java/Javascript interop is to use `BrowserComponent#execute(java.lang.String)`, `com.codename1.util.SuccessCallback)`,
-///     `BrowserComponent#executeAndWait(java.lang.String)`, etc.. as these work asynchronously (except in the
-///     XXXAndWait() variants, which use invokeAndBlock() to make the calls synchronously.
+/// Java/Javascript interop is to use `BrowserComponent#execute(java.lang.String)`, `com.codename1.util.SuccessCallback)`,
+/// `BrowserComponent#executeAndWait(java.lang.String)`, etc.. as these work asynchronously (except in the
+/// XXXAndWait() variants, which use invokeAndBlock() to make the calls synchronously.
 ///
 /// The Codename One JS Bridge package includes classes that facilitate the
-///     interaction between Java and Javascript in a Codename One application.
-///     It allows both Java to Javascript communication and the reverse via a
-///     mechanism similar to the one employed by Phone Gap/Apache Cordova.
+/// interaction between Java and Javascript in a Codename One application.
+/// It allows both Java to Javascript communication and the reverse via a
+/// mechanism similar to the one employed by Phone Gap/Apache Cordova.
 ///
 /// Requirements
 ///
 /// The bridge will only run on platforms that include a native browser component. This includes iOS,
-///     Android, Windows, Desktop & JavaScript at this time.
+/// Android, Windows, Desktop & JavaScript at this time.
 ///
 /// Usage
 ///
 /// The `com.codename1.javascript.JavascriptContext` class lays the foundation by enabling you to call
-///     Javascript code directly from Java. It provides automatic type conversion
-///     between Java and Javascript types as follows:
+/// Javascript code directly from Java. It provides automatic type conversion
+/// between Java and Javascript types as follows:
 ///
 /// Java to Javascript
 ///
 ///
 ///
-///         Java Type
-///         Javascript Type
+/// Java Type
+/// Javascript Type
 ///
 ///
 ///
-///         String
-///         String
+/// String
+/// String
 ///
 ///
-///         Double/Integer/Float/Long
-///         Number
+/// Double/Integer/Float/Long
+/// Number
 ///
 ///
-///         Boolean
-///         Boolean
+/// Boolean
+/// Boolean
 ///
 ///
-///         JSObject
-///         Object
+/// JSObject
+/// Object
 ///
 ///
-///         null
-///         null
+/// null
+/// null
 ///
 ///
-///         Other
-///         Not Allowed
+/// Other
+/// Not Allowed
 ///
 ///
 ///
@@ -80,142 +80,142 @@
 ///
 ///
 ///
-///         Javascript Type
-///         Java Type
+/// Javascript Type
+/// Java Type
 ///
 ///
 ///
 ///
-///         Number
-///         Double
+/// Number
+/// Double
 ///
 ///
-///         String
-///         String
+/// String
+/// String
 ///
 ///
-///         Boolean
-///         Boolean
+/// Boolean
+/// Boolean
 ///
 ///
-///         Object
-///         JSObject
+/// Object
+/// JSObject
 ///
 ///
-///         Function
-///         JSObject
+/// Function
+/// JSObject
 ///
 ///
-///         Array
-///         JSObject
+/// Array
+/// JSObject
 ///
 ///
-///         null
-///         null
+/// null
+/// null
 ///
 ///
-///         undefined
-///         null
+/// undefined
+/// null
 ///
 ///
 ///
-///     Note that this conversion table is more verbose than necessary, since Javascript functions
-///     and arrays are, in fact Objects themselves, so those rows are redundant. All Javascript
-///     objects are converted to `com.codename1.javascript.JSObject`s.
+/// Note that this conversion table is more verbose than necessary, since Javascript functions
+/// and arrays are, in fact Objects themselves, so those rows are redundant. All Javascript
+/// objects are converted to `com.codename1.javascript.JSObject`s.
 ///
 /// Getting Started
 ///
 /// In order to start interacting with a Javascript environment, you need to create
-///     a WebBrowser and load a page. Then inside the WebBrowser's onLoad() handler, you
-///     can create a JavascriptContext on the internal BrowserComponent object:
+/// a WebBrowser and load a page. Then inside the WebBrowser's onLoad() handler, you
+/// can create a JavascriptContext on the internal BrowserComponent object:
 ///
 /// Getting Values
 ///
 /// The `com.codename1.javascript.JavascriptContext#get(String)` method is used to get values from Javascript.
-///     It takes an arbitrary Javascript expression, executes it, and returns the
-///     result, after converting it to the corresponding Java type. E.g. if the result
-///     is a String, it will return a String and if it is a Number it will return a
-///     java Double object. If the result is an Object, it will return a `com.codename1.javascript.JSObject`.
+/// It takes an arbitrary Javascript expression, executes it, and returns the
+/// result, after converting it to the corresponding Java type. E.g. if the result
+/// is a String, it will return a String and if it is a Number it will return a
+/// java Double object. If the result is an Object, it will return a `com.codename1.javascript.JSObject`.
 ///
 /// The following is a simple example that retrieves the document content, which
-///     is a string:
+/// is a string:
 ///
 /// If you run this example in the simulator, you'll see something like the following:
 ///
 ///
 ///
 /// Note: You don't see the WebBrowser in the background here due to a bug in the simulator.
-///     If you run this example on a device, you will see the WebBrowser component in the background.
+/// If you run this example on a device, you will see the WebBrowser component in the background.
 ///
 /// Returning Numeric Values
 ///
 /// As mentioned in the conversion table above, numeric values are automatically
-///     converted to java.lang.Double objects. The following example, returns the width and height
-///     properties of the window for use in Java.
+/// converted to java.lang.Double objects. The following example, returns the width and height
+/// properties of the window for use in Java.
 ///
 /// The result, when run in the simulator would be something like:
 ///
 /// Returning Objects
 ///
 /// The previous examples involved only primitive return values. The `com.codename1.javascript.JavascriptContext`
-///     abstraction,
-///     in these cases, doesn't offer a whole lot of added-value over just using the
-///     BrowserComponent.executeJavascriptAndReturnString()
-///     method. The real value is when we are dealing with objects.
+/// abstraction,
+/// in these cases, doesn't offer a whole lot of added-value over just using the
+/// BrowserComponent.executeJavascriptAndReturnString()
+/// method. The real value is when we are dealing with objects.
 ///
 /// The following example obtains a reference to the `window` object and wraps it in a
-///     proxy `com.codename1.javascript.JSObject` class so that we can work directly with the window object:
+/// proxy `com.codename1.javascript.JSObject` class so that we can work directly with the window object:
 ///
 /// This code produces the exact same result as the previous example. The difference
-///     is the intermediary step of wrapping the window object in a `com.codename1.javascript.JSObject`, and
-///     obtaining the outerHeight and outerWidth properties directly via that proxy object.
+/// is the intermediary step of wrapping the window object in a `com.codename1.javascript.JSObject`, and
+/// obtaining the outerHeight and outerWidth properties directly via that proxy object.
 ///
 /// You can obtain a `com.codename1.javascript.JSObject` proxy for any Javascript object, even ones that you create
-///     on the fly. The following example creates an anonymous object with some keys and values
-///     and uses a `com.codename1.javascript.JSObject` proxy to interact with this object from Java.
+/// on the fly. The following example creates an anonymous object with some keys and values
+/// and uses a `com.codename1.javascript.JSObject` proxy to interact with this object from Java.
 ///
 /// The result is as follows:
 ///
 /// See [Working With Objects](#working-with-objects) for more information
-///     about working with the `com.codename1.javascript.JSObject` class.
+/// about working with the `com.codename1.javascript.JSObject` class.
 ///
 /// Returning Functions and Arrays
 ///
 /// In Javascript, functions and arrays are just objects, so these are also encapsulated as `com.codename1.javascript.JSObject`
-///     proxies. See [Working with Arrays](#working-with-arrays) and
-///     [Workin with Functions](#working-with-functions) for more details on how to work
-///     with these values via the `com.codename1.javascript.JSObject` interface.
+/// proxies. See [Working with Arrays](#working-with-arrays) and
+/// [Workin with Functions](#working-with-functions) for more details on how to work
+/// with these values via the `com.codename1.javascript.JSObject` interface.
 ///
 /// Setting Values
 ///
 /// Just as you can get values from Javascript using `com.codename1.javascript.JavascriptContext`'s get() method,
-///     you can
-///     also set values via `com.codename1.javascript.JavascriptContext#set(String,Object)`.
+/// you can
+/// also set values via `com.codename1.javascript.JavascriptContext#set(String,Object)`.
 ///
 /// The following is a simple example that sets the location, and causes it to redirect to
-///     a different page:
+/// a different page:
 ///
 /// If you run this example, you should see your browser display the Codename One website after
-///     a redirect.
+/// a redirect.
 ///
 /// Setting Object Values
 ///
 /// The previous example showed us setting a primitive String value. You can do the same with other
-///     primitives like numbers and booleans, but you can also set Object values using the set() method.
+/// primitives like numbers and booleans, but you can also set Object values using the set() method.
 ///
 /// The following example creates an anonymous Javascript object, wraps it in a `com.codename1.javascript.JSObject`
-///     proxy,
-///     sets some values on it, then sets the object as a property of the top-level window object.
+/// proxy,
+/// sets some values on it, then sets the object as a property of the top-level window object.
 ///
 /// As a result, you should see the following content set as the body of the HTML page in the
-///     WebBrowser. Note that we can refer to the "steve" object that we just set directly/globally
-///     because the "window" object's properties are always available directly through the global
-///     namespace in Javascript.
+/// WebBrowser. Note that we can refer to the "steve" object that we just set directly/globally
+/// because the "window" object's properties are always available directly through the global
+/// namespace in Javascript.
 ///
 /// Working with Objects
 ///
 /// Previously examples showed how to obtain a `com.codename1.javascript.JSObject` proxy to a Javascript object.
-///     There are 4 ways to get a `com.codename1.javascript.JSObject`:
+/// There are 4 ways to get a `com.codename1.javascript.JSObject`:
 ///
 ///
 /// - Create an anonymous object:
@@ -236,19 +236,19 @@
 ///
 ///
 /// `com.codename1.javascript.JSObject`s are essentially just proxies around a Javascript object. Any calls to
-///     retrieve
-///     properties from a `com.codename1.javascript.JSObject` are just sent directly to the Javascript context, and
-///     the result
-///     returned. The `com.codename1.javascript.JSObject` object doesn't store copies the javascript object's
-///     properties. It just
-///     retrieves them as they are required via the `com.codename1.javascript.JSObject#get(String)` method.
+/// retrieve
+/// properties from a `com.codename1.javascript.JSObject` are just sent directly to the Javascript context, and
+/// the result
+/// returned. The `com.codename1.javascript.JSObject` object doesn't store copies the javascript object's
+/// properties. It just
+/// retrieves them as they are required via the `com.codename1.javascript.JSObject#get(String)` method.
 ///
 /// Getting Simple Values
 ///
 /// You can always retrieve the properties of an object using the `com.codename1.javascript.JSObject#get(String)`
-///     method. It takes the name of the property
-///     as a parameter, and returns its value, converted to the appropriate Java type. (e.g. if it is a String,
-///     it returns a String, if it is a number it returns a Double, and if it is an Object, it returns an object.
+/// method. It takes the name of the property
+/// as a parameter, and returns its value, converted to the appropriate Java type. (e.g. if it is a String,
+/// it returns a String, if it is a number it returns a Double, and if it is an Object, it returns an object.
 ///
 /// E.g.
 ///
@@ -271,8 +271,8 @@
 /// `````java var obj = { name : 'Steve', position : { x : 100, y : 105, z : -25 } } `````
 ///
 /// In this case you may want to obtain the x coordinate of the nested position object. `JSObject`
-///     allows
-///     you to use the dot '.' notation for referencing sub-properties like this. E.g.
+/// allows
+/// you to use the dot '.' notation for referencing sub-properties like this. E.g.
 ///
 ///     `````java Double x = (Double)obj.get("position.x") `````
 ///
@@ -281,9 +281,9 @@
 /// `````java var obj = { name : 'Steve', position : { x : 100, y : 105, z : -25 }, 'position.x' : 200 } `````
 ///
 /// In this example there is a top-level property named 'position.x' as well as a property at the component address position.x.
-///     This is a contrived example that is meant to be somewhat confusing in order to demonstrate how to differentiate
-///     between requests for properties in the child object heirarchy and top-level properties that happen to
-///     include a '.' in the property name.
+/// This is a contrived example that is meant to be somewhat confusing in order to demonstrate how to differentiate
+/// between requests for properties in the child object heirarchy and top-level properties that happen to
+/// include a '.' in the property name.
 ///
 /// We can force the retrieval of a top-level property by wrapping the key in single quotes:
 ///
@@ -296,27 +296,27 @@
 /// `````java Double x2 = (Double)obj.get("position.x") `````
 ///
 /// Would return
-///     100
+/// 100
 ///
 /// .
 ///
 /// Setting Object Values
 ///
 /// The `com.codename1.javascript.JSObject#set(String,Object)` method works the same as the `com.codename1.javascript.JavascriptContext#set(String,Object)` method except that it treats the local
-///     object as the root node. It allows you to easily set properties on the object. Values set here should
-///     be provided using Java values as they will automatically be converted to the appropriate associated Javascript
-///     type. If you are setting an Object as a value, then you'll need to set it as a `com.codename1.javascript.JSObject` and not a string
-///     representation of the object. This is because Strings will just be converted to Javascript strings.
+/// object as the root node. It allows you to easily set properties on the object. Values set here should
+/// be provided using Java values as they will automatically be converted to the appropriate associated Javascript
+/// type. If you are setting an Object as a value, then you'll need to set it as a `com.codename1.javascript.JSObject` and not a string
+/// representation of the object. This is because Strings will just be converted to Javascript strings.
 ///
 /// Properties set via the `com.codename1.javascript.JSObject#set(String,Object)` method modify the underlying
-///     Javascript object directly so that the change
-///     is immediately effective inside the javascript environment.
+/// Javascript object directly so that the change
+/// is immediately effective inside the javascript environment.
 ///
 /// Just as with the `com.codename1.javascript.JSObject#get(String)` method, you can set the values of direct
-///     properties or nested properties using
-///     the dot '.' notation. And just like `com.codename1.javascript.JSObject#get(String)`, you can force setting a
-///     direct property in cases where the property
-///     name includes a '.', by wrapping the key inside single quotes.
+/// properties or nested properties using
+/// the dot '.' notation. And just like `com.codename1.javascript.JSObject#get(String)`, you can force setting a
+/// direct property in cases where the property
+/// name includes a '.', by wrapping the key inside single quotes.
 ///
 /// E.g.:
 ///
@@ -337,8 +337,8 @@
 /// Working with Arrays
 ///
 /// In javascript, arrays are just objects that include a special ability to be iterated. You can use the alternate
-///     version of `com.codename1.javascript.JSObject#get(int)` which takes an int as a parameter to
-///     retrieve the elements of an array.
+/// version of `com.codename1.javascript.JSObject#get(int)` which takes an int as a parameter to
+/// retrieve the elements of an array.
 ///
 /// For example, consider the following javascript object:
 ///
@@ -351,8 +351,8 @@
 /// `````java JObject players = (JObject)obj.get("players"); int len = ((Double)players.get("length")).intValue(); for ( int i=0; iCalling Java Methods from Javascript
 ///
 /// So far, our examples have been limited to Java calling into Javascript. However, it may be
-///     useful to be able to also go the other way: call java methods from Javascript. Some applications
-///     of this might include:
+/// useful to be able to also go the other way: call java methods from Javascript. Some applications
+/// of this might include:
 ///
 ///
 /// - Capturing video, or using the camera on the phone
@@ -362,9 +362,9 @@
 /// - Accessing the file system or storage API
 ///
 /// The Codename One JS bridge supports javascript to java method calling by way of the `com.codename1.javascript.JSFunction` interface
-///     and the `com.codename1.javascript.JSObject#set(String,Object)` methods on the `com.codename1.javascript.JSObject` class. You can implement a `com.codename1.javascript.JSFunction`
-///     object and register it as a callback with a `com.codename1.javascript.JSObject`, then you will be able to
-///     execute this object's apply method via a Javascript proxy.
+/// and the `com.codename1.javascript.JSObject#set(String,Object)` methods on the `com.codename1.javascript.JSObject` class. You can implement a `com.codename1.javascript.JSFunction`
+/// object and register it as a callback with a `com.codename1.javascript.JSObject`, then you will be able to
+/// execute this object's apply method via a Javascript proxy.
 ///
 /// As an example, let's implement a simple logging function:
 ///
@@ -414,27 +414,27 @@
 /// `````java WebBrowser b = new WebBrowser(){ protected void onLoad(String url){ JSObject window = (JSObject)ctx.get("window"); window.set("addAsync", new JSFunction(){ public void apply(JSObject self, final Object[] args) { Double a = (Double)args[0]; Double b = (Double)args[1]; JSObject callback = (JSObject)args[2]; double result = a.doubleValue() + b.doubleValue(); callback.call(new Object[]{new Double(result)}); } }); } }; b.setURL("jar:///ca/weblite/codename1/tests/AddAsync.html"); `````
 ///
 /// In this snippet, we start by obtaining a reference to the "window" object. We then add a method to this object named
-///     "addAsync". This method is a `com.codename1.javascript.JSFunction`
-///     object that we implement inline. The apply() method of the `com.codename1.javascript.JSFunction` object is the
-///     Java method that will be executed when the addAsync method is called
-///     from Javascript. In this case the addAsync method expects three parameters:
+/// "addAsync". This method is a `com.codename1.javascript.JSFunction`
+/// object that we implement inline. The apply() method of the `com.codename1.javascript.JSFunction` object is the
+/// Java method that will be executed when the addAsync method is called
+/// from Javascript. In this case the addAsync method expects three parameters:
 ///
 ///
 /// - The two numbers that are being added together.
 ///
 /// - A Javascript callback method that will be executed when completed and passed the result of the addition
-///         as a parameter.
+/// as a parameter.
 ///
 ///
 /// Notice that all numerical arguments are converted to Java Double objects, and the callback function is converted to a
-///     `com.codename1.javascript.JSObject` object. Also notice the use
-///     of callback.call(), which just calls the callback as a function itself. With this variant of
-///     the call() method,
-///     the window object is used as this. Notice also that we pass the result inside an
-///     Object[] array. This array will be expanded to
-///     the direct javascript function parameters. (i.e. it will not pass an array as the parameter to the javascript
-///     method, the array elements are extracted
-///     and passed individually.
+/// `com.codename1.javascript.JSObject` object. Also notice the use
+/// of callback.call(), which just calls the callback as a function itself. With this variant of
+/// the call() method,
+/// the window object is used as this. Notice also that we pass the result inside an
+/// Object[] array. This array will be expanded to
+/// the direct javascript function parameters. (i.e. it will not pass an array as the parameter to the javascript
+/// method, the array elements are extracted
+/// and passed individually.
 ///
 /// Now, let's look at the HTML page contents for our example:
 ///
@@ -449,12 +449,12 @@
 ///     `````
 ///
 /// Our HTML simply includes two text fields (to input the values to be added together), a button to initiate the
-///     calculation,
-///     and a <span> tag where the result will be placed when the calculation is complete.
+/// calculation,
+/// and a <span> tag where the result will be placed when the calculation is complete.
 ///
 /// Finally it includes the AddAsync.js Javascript file (which is placed in the same directory as the AddAsync.html file.
-///     Its
-///     contents are as follows:
+/// Its
+/// contents are as follows:
 ///
 /// `````java document .getElementById('calculate') .addEventListener('click', function(){ var aField = document.getElementById('input1'); var bField = document.getElementById('input2'); var a = parseFloat(aField.value); var b = parseFloat(bField.value); window.addAsync(a, b, function(result){ document.getElementById('result').innerHTML = result; }); }, true); `````
 ///
@@ -487,14 +487,14 @@
 /// `````java document.getElementById('capture') .addEventListener('click', function(){ camera.capture(function(url){ if ( url == null ){ // No image was provided return; } var results = document.getElementById('results'); results.appendChild(document.createTextNode("testing")); var img = document.createElement('img'); img.setAttribute('src',url); img.setAttribute('width', '100'); img.setAttribute('height', '100'); results.appendChild(img); }) }, true); `````
 ///
 /// The CameraExample.js script attaches a listener to the 'click' event of the "Capture" button which simply calls the
-///     `camera.capture()` method,
-///     which is actually a JSFunction that has been registered with the Javascript runtime. This actually calls into Java.
+/// `camera.capture()` method,
+/// which is actually a JSFunction that has been registered with the Javascript runtime. This actually calls into Java.
 ///
 /// We pass a callback function into `camera.capture()` which will be executed upon successfully completion of
-///     the camera. This is a common
-///     programming pattern in Javascript. If a non-null URL is passed to this callback function, it is expected to be the
-///     URL of the image (it will be
-///     a local file URL.
+/// the camera. This is a common
+/// programming pattern in Javascript. If a non-null URL is passed to this callback function, it is expected to be the
+/// URL of the image (it will be
+/// a local file URL.
 ///
 /// The Java code that powers this example is as follows:
 ///
@@ -507,7 +507,7 @@
 ///
 ///
 /// - It shows the use of the `call()` method of `JSObject` to call the callback function that
-///         was
-///         provided by Javascript from inside
-///         the JSFunction's `apply()` method.
+/// was
+/// provided by Javascript from inside
+/// the JSFunction's `apply()` method.
 package com.codename1.javascript;

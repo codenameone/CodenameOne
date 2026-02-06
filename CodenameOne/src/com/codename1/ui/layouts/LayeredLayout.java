@@ -515,7 +515,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose inset we wish to retrieve.
     ///
     /// - `side`: @param side The side of the inset.  One of `Component#TOP`, `Component#LEFT`, `Component#BOTTOM`
-    ///             or `Component#RIGHT`.
+    /// or `Component#RIGHT`.
     ///
     /// #### Returns
     ///
@@ -533,7 +533,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose insets we wish to retrieve.
     ///
     /// - `withLabels`: @param withLabels If false, then this returns a string of the format `"top right bottom left"`
-    ///                   e.g `"2mm 2mm 2mm 2mm"`.  If true, then it will be formatted like CSS properties: `"top:2mm; right:2mm; bottom:2mm; left:2mm"`.
+    /// e.g `"2mm 2mm 2mm 2mm"`.  If true, then it will be formatted like CSS properties: `"top:2mm; right:2mm; bottom:2mm; left:2mm"`.
     ///
     /// #### Returns
     ///
@@ -642,7 +642,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose insets we wish to set.
     ///
     /// - `insets`: @param insets The insets expressed as a string.  See `LayeredLayoutConstraint#setInsets(java.lang.String)` for
-    ///               details on the format of this parameter.
+    /// details on the format of this parameter.
     ///
     /// #### Returns
     ///
@@ -664,7 +664,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose inset we wish to set.
     ///
     /// - `inset`: @param inset The inset value, including unit.  Units are Percent (%), Millimetres (mm), Pixels (px), and "auto".  E.g. the
-    ///              following insets values would all be acceptable:
+    /// following insets values would all be acceptable:
     ///
     ///
     ///
@@ -693,7 +693,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose inset we wish to set.
     ///
     /// - `inset`: @param inset The inset value, including unit.  Units are Percent (%), Millimetres (mm), Pixels (px), and "auto".  E.g. the
-    ///              following insets values would all be acceptable:
+    /// following insets values would all be acceptable:
     ///
     ///
     ///
@@ -722,7 +722,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose inset we wish to set.
     ///
     /// - `inset`: @param inset The inset value, including unit.  Units are Percent (%), Millimetres (mm), Pixels (px), and "auto".  E.g. the
-    ///              following insets values would all be acceptable:
+    /// following insets values would all be acceptable:
     ///
     ///
     ///
@@ -751,7 +751,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose inset we wish to set.
     ///
     /// - `inset`: @param inset The inset value, including unit.  Units are Percent (%), Millimetres (mm), Pixels (px), and "auto".  E.g. the
-    ///              following insets values would all be acceptable:
+    /// following insets values would all be acceptable:
     ///
     ///
     ///
@@ -781,7 +781,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose reference components we wish to check.
     ///
     /// - `referenceComponents`: @param referenceComponents The reference components.  This var arg may contain 1 to 4 values.  See `LayeredLayoutConstraint#setReferenceComponents(com.codename1.ui.Component...)`
-    ///                            for a full description.
+    /// for a full description.
     ///
     /// #### Returns
     ///
@@ -881,7 +881,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose insets we are manipulating.
     ///
     /// - `referencePositions`: @param referencePositions The reference positions for the reference components. See `LayeredLayoutConstraint#setReferencePositions(float...)`
-    ///                           for a full description of this parameter.
+    /// for a full description of this parameter.
     ///
     /// #### Returns
     ///
@@ -899,7 +899,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose insets we are manipulating.
     ///
     /// - `positions`: @param positions The reference positions for the reference components. See `LayeredLayoutConstraint#setReferencePositions(float...)`
-    ///                  for a full description of this parameter.
+    /// for a full description of this parameter.
     ///
     /// #### Returns
     ///
@@ -917,7 +917,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose insets were are manipulating.
     ///
     /// - `position`: @param position The position.  See `LayeredLayoutConstraint#setReferencePositions(float...)` for a full
-    ///                 description of the possible values here.
+    /// description of the possible values here.
     public LayeredLayout setReferencePositionTop(Component cmp, float position) {
         getOrCreateConstraint(cmp).top().referencePosition(position);
         return this;
@@ -932,7 +932,7 @@ public class LayeredLayout extends Layout {
     /// - `referenceComponent`: The component to which the inset should be anchored.
     ///
     /// - `position`: @param position           The position of the reference anchor.  See `LayeredLayoutConstraint#setReferencePositions(float...)`
-    ///                           for a full description of reference positions.
+    /// for a full description of reference positions.
     public LayeredLayout setReferenceComponentTop(Component cmp, Component referenceComponent, float position) {
         getOrCreateConstraint(cmp).top().referenceComponent(referenceComponent).referencePosition(position);
         return this;
@@ -946,7 +946,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose insets were are manipulating.
     ///
     /// - `position`: @param position The position.  See `LayeredLayoutConstraint#setReferencePositions(float...)` for a full
-    ///                 description of the possible values here.
+    /// description of the possible values here.
     public LayeredLayout setReferencePositionBottom(Component cmp, float position) {
         getOrCreateConstraint(cmp).bottom().referencePosition(position);
         return this;
@@ -961,7 +961,7 @@ public class LayeredLayout extends Layout {
     /// - `referenceComponent`: The component to which the inset should be anchored.
     ///
     /// - `position`: @param position           The position of the reference anchor.  See `LayeredLayoutConstraint#setReferencePositions(float...)`
-    ///                           for a full description of reference positions.
+    /// for a full description of reference positions.
     public LayeredLayout setReferenceComponentBottom(Component cmp, Component referenceComponent, float position) {
         getOrCreateConstraint(cmp).bottom().referenceComponent(referenceComponent).referencePosition(position);
         return this;
@@ -975,7 +975,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose insets were are manipulating.
     ///
     /// - `position`: @param position The position.  See `LayeredLayoutConstraint#setReferencePositions(float...)` for a full
-    ///                 description of the possible values here.
+    /// description of the possible values here.
     public LayeredLayout setReferencePositionLeft(Component cmp, float position) {
         getOrCreateConstraint(cmp).left().referencePosition(position);
         return this;
@@ -990,7 +990,7 @@ public class LayeredLayout extends Layout {
     /// - `referenceComponent`: The component to which the inset should be anchored.
     ///
     /// - `position`: @param position           The position of the reference anchor.  See `LayeredLayoutConstraint#setReferencePositions(float...)`
-    ///                           for a full description of reference positions.
+    /// for a full description of reference positions.
     public LayeredLayout setReferenceComponentLeft(Component cmp, Component referenceComponent, float position) {
         getOrCreateConstraint(cmp).left().referenceComponent(referenceComponent).referencePosition(position);
         return this;
@@ -1004,7 +1004,7 @@ public class LayeredLayout extends Layout {
     /// - `cmp`: The component whose insets were are manipulating.
     ///
     /// - `position`: @param position The position.  See `LayeredLayoutConstraint#setReferencePositions(float...)` for a full
-    ///                 description of the possible values here.
+    /// description of the possible values here.
     public LayeredLayout setReferencePositionRight(Component cmp, float position) {
         getOrCreateConstraint(cmp).right().referencePosition(position);
         return this;
@@ -1019,7 +1019,7 @@ public class LayeredLayout extends Layout {
     /// - `referenceComponent`: The component to which the inset should be anchored.
     ///
     /// - `position`: @param position           The position of the reference anchor.  See `LayeredLayoutConstraint#setReferencePositions(float...)`
-    ///                           for a full description of reference positions.
+    /// for a full description of reference positions.
     public LayeredLayout setReferenceComponentRight(Component cmp, Component referenceComponent, float position) {
         getOrCreateConstraint(cmp).right().referenceComponent(referenceComponent).referencePosition(position);
         return this;
@@ -1442,7 +1442,7 @@ public class LayeredLayout extends Layout {
         /// #### Parameters
         ///
         /// - `inset`: @param inset One of `Component#TOP`, `Component#BOTTOM`, `Component#LEFT` or
-        ///              `Component#RIGHT`.
+        /// `Component#RIGHT`.
         ///
         /// #### Returns
         ///
@@ -1594,7 +1594,7 @@ public class LayeredLayout extends Layout {
         /// - `y`: The number of pixels that the insets should be shifted on the y axis.
         ///
         /// - `preferMM`: @param preferMM If an inset needs to be switched from flexible to fixed, then this indicates where it will
-        ///                 be changed to millimetres or pixels.  true for millimetres.
+        /// be changed to millimetres or pixels.  true for millimetres.
         ///
         /// - `parent`: The parent container in which calculations should be performed.
         ///
@@ -1674,7 +1674,7 @@ public class LayeredLayout extends Layout {
         /// - `y`: The number of pixels that the insets should be shifted on the y axis.
         ///
         /// - `preferMM`: @param preferMM If an inset needs to be switched from flexible to fixed, then this indicates where it will
-        ///                 be changed to millimetres or pixels.  true for millimetres.
+        /// be changed to millimetres or pixels.  true for millimetres.
         ///
         /// - `parent`: The parent container in which calculations should be performed.
         ///
@@ -1719,7 +1719,7 @@ public class LayeredLayout extends Layout {
         /// #### Parameters
         ///
         /// - `withLabels`: @param withLabels True to return the string in CSS format:  e.g. `"top:1.0; right:0; bottom:1.0; left:1.0"`  false
-        ///                   to return as a space-delimited string of inset reference positions in the order "top right bottom left".  E.g. "1.0 0 1.0 1.0"
+        /// to return as a space-delimited string of inset reference positions in the order "top right bottom left".  E.g. "1.0 0 1.0 1.0"
         ///
         /// #### Returns
         ///
@@ -1944,9 +1944,9 @@ public class LayeredLayout extends Layout {
         ///
         ///
         /// The string format
-        ///                may be either using labels following the same output format of cnst.getReferenceComponentIndicesAsString(true)
-        ///                or as a space-delimited string (e.g. cnst.getReferenceComponentIndicesAsString(false).  When using the label
-        ///                format, you may provide one or more inset values in the string.  E.g. the following are all acceptable:
+        /// may be either using labels following the same output format of cnst.getReferenceComponentIndicesAsString(true)
+        /// or as a space-delimited string (e.g. cnst.getReferenceComponentIndicesAsString(false).  When using the label
+        /// format, you may provide one or more inset values in the string.  E.g. the following are all acceptable:
         ///
         ///
         ///
@@ -1963,26 +1963,26 @@ public class LayeredLayout extends Layout {
         ///
         ///
         ///
-        ///                If you provide the positions as a space-delimited string, then they are expected to follow the same format
-        ///                as is used in CSS for providing [margin](https://developer.mozilla.org/en/docs/Web/CSS/margin). To summarize:
+        /// If you provide the positions as a space-delimited string, then they are expected to follow the same format
+        /// as is used in CSS for providing [margin](https://developer.mozilla.org/en/docs/Web/CSS/margin). To summarize:
         ///
         ///
         ///
         ///
-        ///                `//Set component at index 0 as reference for all 4 insets.
-        ///                0
+        /// `//Set component at index 0 as reference for all 4 insets.
+        /// 0
         ///
         ///
-        ///                //vertical insets use component index 2 | horizontal insets use component index 1
-        ///                2 1
+        /// //vertical insets use component index 2 | horizontal insets use component index 1
+        /// 2 1
         ///
         ///
-        ///                // top | horizontal | bottom
-        ///                -1 3 10
+        /// // top | horizontal | bottom
+        /// -1 3 10
         ///
         ///
-        ///                // top | right | bottom | left
-        ///                -1 -1 -1 -1`
+        /// // top | right | bottom | left
+        /// -1 -1 -1 -1`
         ///
         ///
         ///
@@ -2149,10 +2149,10 @@ public class LayeredLayout extends Layout {
         /// #### Parameters
         ///
         /// - `refs`: @param refs May contain 1, 2, 3, or 4 values.  If only 1 value is passed, then it is
-        ///             set on all 4 insets.  If two values are passed, then the first is set on the top and bottom
-        ///             insets, and the 2nd is set on the left and right insets (i.e. vertical | horizontal).
-        ///             If 3 values are passed, then, they are used for top, horizontal, and bottom.
-        ///             If 4 values are passed, then they are used for top, right, bottom, left (in that order).
+        /// set on all 4 insets.  If two values are passed, then the first is set on the top and bottom
+        /// insets, and the 2nd is set on the left and right insets (i.e. vertical | horizontal).
+        /// If 3 values are passed, then, they are used for top, horizontal, and bottom.
+        /// If 4 values are passed, then they are used for top, right, bottom, left (in that order).
         ///
         /// #### Returns
         ///
@@ -2200,10 +2200,10 @@ public class LayeredLayout extends Layout {
         /// #### Parameters
         ///
         /// - `p`: @param p May contain 1, 2, 3, or 4 values.  If only 1 value is passed, then it is
-        ///          set on all 4 insets.  If two values are passed, then the first is set on the top and bottom
-        ///          insets, and the 2nd is set on the left and right insets (i.e. vertical | horizontal).
-        ///          If 3 values are passed, then, they are used for top, horizontal, and bottom.
-        ///          If 4 values are passed, then they are used for top, right, bottom, left (in that order).
+        /// set on all 4 insets.  If two values are passed, then the first is set on the top and bottom
+        /// insets, and the 2nd is set on the left and right insets (i.e. vertical | horizontal).
+        /// If 3 values are passed, then, they are used for top, horizontal, and bottom.
+        /// If 4 values are passed, then they are used for top, right, bottom, left (in that order).
         ///
         /// #### Returns
         ///

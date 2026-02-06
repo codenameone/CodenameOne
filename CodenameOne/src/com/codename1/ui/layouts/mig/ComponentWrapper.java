@@ -131,9 +131,9 @@ public interface ComponentWrapper {
     /// #### Parameters
     ///
     /// - `hHint`: @param hHint The Size hint for the other dimension. An implementation can use this value or the
-    ///              current size for the widget in this dimension, or a combination of both, to calculate the correct size.
+    /// current size for the widget in this dimension, or a combination of both, to calculate the correct size.
     ///
-    ///              Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
+    /// Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
     ///
     /// #### Returns
     ///
@@ -150,9 +150,9 @@ public interface ComponentWrapper {
     /// #### Parameters
     ///
     /// - `wHint`: @param wHint The Size hint for the other dimension. An implementation can use this value or the
-    ///              current size for the widget in this dimension, or a combination of both, to calculate the correct size.
+    /// current size for the widget in this dimension, or a combination of both, to calculate the correct size.
     ///
-    ///              Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
+    /// Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
     ///
     /// #### Returns
     ///
@@ -169,9 +169,9 @@ public interface ComponentWrapper {
     /// #### Parameters
     ///
     /// - `hHint`: @param hHint The Size hint for the other dimension. An implementation can use this value or the
-    ///              current size for the widget in this dimension, or a combination of both, to calculate the correct size.
+    /// current size for the widget in this dimension, or a combination of both, to calculate the correct size.
     ///
-    ///              Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
+    /// Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
     ///
     /// #### Returns
     ///
@@ -188,9 +188,9 @@ public interface ComponentWrapper {
     /// #### Parameters
     ///
     /// - `wHint`: @param wHint The Size hint for the other dimension. An implementation can use this value or the
-    ///              current size for the widget in this dimension, or a combination of both, to calculate the correct size.
+    /// current size for the widget in this dimension, or a combination of both, to calculate the correct size.
     ///
-    ///              Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
+    /// Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
     ///
     /// #### Returns
     ///
@@ -207,9 +207,9 @@ public interface ComponentWrapper {
     /// #### Parameters
     ///
     /// - `hHint`: @param hHint The Size hint for the other dimension. An implementation can use this value or the
-    ///              current size for the widget in this dimension, or a combination of both, to calculate the correct size.
+    /// current size for the widget in this dimension, or a combination of both, to calculate the correct size.
     ///
-    ///              Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
+    /// Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
     ///
     /// #### Returns
     ///
@@ -226,9 +226,9 @@ public interface ComponentWrapper {
     /// #### Parameters
     ///
     /// - `wHint`: @param wHint The Size hint for the other dimension. An implementation can use this value or the
-    ///              current size for the widget in this dimension, or a combination of both, to calculate the correct size.
+    /// current size for the widget in this dimension, or a combination of both, to calculate the correct size.
     ///
-    ///              Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
+    /// Use -1 to denote that there is no hint. This corresponds with SWT.DEFAULT.
     ///
     /// #### Returns
     ///
@@ -398,7 +398,7 @@ public interface ComponentWrapper {
     /// #### Parameters
     ///
     /// - `disregardScrollPane`: @param disregardScrollPane Is `true` any wrapping scroll pane should be disregarded and the type
-    ///                            of the scrolled component should be returned.
+    /// of the scrolled component should be returned.
     ///
     /// #### Returns
     ///

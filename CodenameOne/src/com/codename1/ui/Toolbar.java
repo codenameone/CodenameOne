@@ -732,7 +732,7 @@ public class Toolbar extends Container {
     /// - `callback`: gets the search string callbacks
     ///
     /// - `iconSize`: @param iconSize indicates the size of the icons used in the search/back
-    ///                 in millimeters
+    /// in millimeters
     public void addSearchCommand(final ActionListener callback, final float iconSize) {
         searchIconSize = iconSize;
         searchCommand = new Command("") {
@@ -950,7 +950,7 @@ public class Toolbar extends Container {
     /// #### Parameters
     ///
     /// - `menu`: @param menu the Menu Container that was created in the
-    ///             constructSideNavigationComponent() method
+    /// constructSideNavigationComponent() method
     ///
     /// - `cmp`: the Component to add to the side menu
     protected void addComponentToSideMenu(Container menu, Component cmp) {
@@ -2054,7 +2054,7 @@ public class Toolbar extends Container {
     /// #### Parameters
     ///
     /// - `sidemenuSouthComponent`: @param sidemenuSouthComponent the new component to place in the south or
-    ///                               null to remove the current component
+    /// null to remove the current component
     public void setComponentToSideMenuSouth(Component sidemenuSouthComponent) {
         if (this.sidemenuSouthComponent != null) {
             sidemenuSouthComponent.remove();
@@ -2084,7 +2084,7 @@ public class Toolbar extends Container {
     /// #### Parameters
     ///
     /// - `sidemenuSouthComponent`: @param sidemenuSouthComponent the new component to place in the south or
-    ///                               null to remove the current component
+    /// null to remove the current component
     public void setComponentToRightSideMenuSouth(Component sidemenuSouthComponent) {
         if (this.rightSidemenuSouthComponent != null) {
             rightSidemenuSouthComponent.remove();
@@ -2560,7 +2560,7 @@ public class Toolbar extends Container {
     /// #### Parameters
     ///
     /// - `scrollOff`: @param scrollOff if true the Toolbar needs to scroll off the screen when
-    ///                  the Form ContentPane is scrolled
+    /// the Form ContentPane is scrolled
     public void setScrollOffUponContentPane(boolean scrollOff) {
         if (initialized && !this.scrollOff && scrollOff) {
             bindScrollListener(true);
@@ -2740,7 +2740,7 @@ public class Toolbar extends Container {
     /// #### Parameters
     ///
     /// - `menu`: @param menu the Menu Container that was created in the
-    ///             constructSideNavigationComponent() method
+    /// constructSideNavigationComponent() method
     ///
     /// - `cmp`: the Component to add to the side menu
     protected void addComponentToLeftSideMenu(Container menu, Component cmp) {
@@ -2753,7 +2753,7 @@ public class Toolbar extends Container {
     /// #### Parameters
     ///
     /// - `menu`: @param menu the Menu Container that was created in the
-    ///             constructSideNavigationComponent() method
+    /// constructSideNavigationComponent() method
     ///
     /// - `cmp`: the Component to add to the side menu
     protected void addComponentToRightSideMenu(Container menu, Component cmp) {

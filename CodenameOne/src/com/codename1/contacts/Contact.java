@@ -111,8 +111,8 @@ public class Contact {
     /// #### Parameters
     ///
     /// - `addresses`: @param addresses the Hashtable contains key/value pairs where
-    ///                  the key is a String which represents the type of the Address, types can
-    ///                  be: "home", "work", "other" the value is an Address Object.
+    /// the key is a String which represents the type of the Address, types can
+    /// be: "home", "work", "other" the value is an Address Object.
     public void setAddresses(Hashtable addresses) {
         this.addresses = addresses;
     }
@@ -184,8 +184,8 @@ public class Contact {
     /// #### Parameters
     ///
     /// - `emails`: @param emails the Hashtable contains key/value pairs where
-    ///               the key is a String which represents the type of the Email, types can
-    ///               be: "home", "mobile", "work", "other" the value is String of the email.
+    /// the key is a String which represents the type of the Email, types can
+    /// be: "home", "mobile", "work", "other" the value is String of the email.
     public void setEmails(Hashtable emails) {
         this.emails = emails;
     }
@@ -275,9 +275,9 @@ public class Contact {
     /// #### Parameters
     ///
     /// - `phoneNumbers`: @param phoneNumbers the Hashtable contains key/value pairs where
-    ///                     the key is a String which represents the type of the phone number, types can
-    ///                     be: "home", "mobile", "work", "fax", "other" the value is String of the
-    ///                     phone number.
+    /// the key is a String which represents the type of the phone number, types can
+    /// be: "home", "mobile", "work", "fax", "other" the value is String of the
+    /// phone number.
     public void setPhoneNumbers(Hashtable phoneNumbers) {
         this.phoneNumbers = phoneNumbers;
     }

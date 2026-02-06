@@ -130,7 +130,7 @@ public class AnalyticsService {
     /// - `agent`: the google analytics tracking agent
     ///
     /// - `domain`: @param domain a domain to represent your application, commonly you should use your package name as a URL (e.g.
-    ///               com.mycompany.myapp should become: myapp.mycompany.com)
+    /// com.mycompany.myapp should become: myapp.mycompany.com)
     public static void init(String agent, String domain) {
         synchronized (INSTANCE_LOCK) {
             if (instance == null) {
