@@ -425,7 +425,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 String canonicalEl = element;
                 try {
                     canonicalEl = new File(canonicalEl).getCanonicalPath();
-                } catch (Exception ex){}
+                } catch (Exception ex){
+                    if (getLog().isDebugEnabled()) {
+                        getLog().warn("Failed to resolve canonical path for " + element, ex);
+                    }
+                }
 
                 if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
                     getLog().debug("NOT adding jar "+element+" because it is on the blacklist");
@@ -580,6 +584,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     closingHypLog[0] = true;
                     proc[0].destroyForcibly();
                 } catch (Exception ex) {
+                    if (getLog().isDebugEnabled()) {
+                        getLog().warn("Failed to shut down hyperlog process cleanly", ex);
+                    }
                 }
             }
         }
