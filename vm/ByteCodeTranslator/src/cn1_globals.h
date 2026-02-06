@@ -1029,6 +1029,7 @@ extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObje
 
 
 #if defined(__APPLE__) && defined(__OBJC__)
+@class NSString;
 extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
 extern NSString* toNSString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 #else

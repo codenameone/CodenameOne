@@ -70,8 +70,6 @@ public class FileClassIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
 
         Path srcRoot = distDir.resolve("FileTestApp-src");
-        CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
-
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
         Path buildDir = distDir.resolve("build");

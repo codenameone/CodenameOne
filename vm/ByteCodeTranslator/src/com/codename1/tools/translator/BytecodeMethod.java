@@ -1103,10 +1103,6 @@ public class BytecodeMethod implements SignatureSet {
             returnType.appendCMethodExt(bld);
         }
         
-        if(!forceVirtual && !virtualMethodsInvoked.contains(bld.toString())) {
-            return;
-        }
-                
         // generate the function pointer declaration
         appendCMethodPrefix("\ntypedef ", ")", b, "(*functionPtr_", cls);
         b.append(";\n");
@@ -1155,9 +1151,6 @@ public class BytecodeMethod implements SignatureSet {
         if(!returnType.isVoid()) {
             bld.append("_R");
             returnType.appendCMethodExt(bld);
-        }
-        if(!forceVirtual && !virtualMethodsInvoked.contains(bld.toString())) {
-            return;
         }
         appendCMethodPrefix(b, "virtual_", cls);
         b.append(";\n");

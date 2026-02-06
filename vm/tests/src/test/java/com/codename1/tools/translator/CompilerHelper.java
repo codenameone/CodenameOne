@@ -230,8 +230,6 @@ public class CompilerHelper {
             CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "ExecutorApp");
 
             java.nio.file.Path distDir = outputDir.resolve("dist");
-            java.nio.file.Path srcRoot = distDir.resolve("ExecutorApp-src");
-            CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
 
             CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(outputDir.resolve("dist").resolve("CMakeLists.txt"), "ExecutorApp-src");
 

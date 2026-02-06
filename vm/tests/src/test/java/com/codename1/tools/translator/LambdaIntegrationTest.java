@@ -118,7 +118,6 @@ class LambdaIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
 
         Path srcRoot = distDir.resolve("LambdaApp-src");
-        CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
 
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
