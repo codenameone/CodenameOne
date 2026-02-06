@@ -113,7 +113,10 @@ class StackOverflowIntegrationTest {
                 "    private static int counter;\n" +
                 "    private static native void report(String msg);\n" +
                 "    private static void triggerOverflow() {\n" +
-                "        String txt = \"Calling ...\" + counter;\n" +
+                "        String txt = new StringBuilder()\n" +
+                "                .append(\"Calling ...\")\n" +
+                "                .append(counter)\n" +
+                "                .toString();\n" +
                 "        counter++;\n" +
                 "        report(txt);\n" +
                 "        triggerOverflow();\n" +
