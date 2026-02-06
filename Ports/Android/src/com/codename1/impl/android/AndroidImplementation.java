@@ -26,7 +26,6 @@ import android.Manifest;
 import android.annotation.TargetApi;
 import com.codename1.impl.android.permissions.DevicePermission;
 import com.codename1.impl.android.permissions.PermissionsHelper;
-import com.codename1.io.Log;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -554,7 +553,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 v = java.net.URLDecoder.decode(v, "UTF-8");
             } catch (UnsupportedEncodingException ex) {
                 // won't happen
-                Log.e(ex);
+                com.codename1.io.Log.e(ex);
             }
             out.put(k, v);
         }
@@ -1087,7 +1086,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 try {
                     getActivity().requestWindowFeature(Window.FEATURE_NO_TITLE);
                 } catch (Exception e) {
-                    Log.p("requestWindowFeature FEATURE_NO_TITLE threw exception: " + e.toString());
+                    com.codename1.io.Log.p("requestWindowFeature FEATURE_NO_TITLE threw exception: " + e.toString());
                 }
             } else {
                 getActivity().invalidateOptionsMenu();
