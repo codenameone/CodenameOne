@@ -1,7 +1,10 @@
 package com.codename1.tools.translator;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,6 +19,7 @@ import java.util.TreeMap;
  * Helper class to manage external JDK compilers.
  */
 public class CompilerHelper {
+    private static String lastErrorLog;
 
     private static final Map<String, Path> availableJdks = new TreeMap<>();
 
@@ -157,9 +161,25 @@ public class CompilerHelper {
 
         ProcessBuilder pb = new ProcessBuilder(command);
         // Inherit IO so we see errors in the log
-        pb.inheritIO();
+        pb.redirectErrorStream(true);
         Process p = pb.start();
+        lastErrorLog = "";
+        try (InputStream is = p.getInputStream();
+             ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
+
+            byte[] data = new byte[8192]; // 8 KB buffer
+            int n;
+            while ((n = is.read(data)) != -1) {
+                buffer.write(data, 0, n);
+            }
+
+            lastErrorLog = buffer.toString("UTF-8");
+        }
         return p.waitFor();
+    }
+
+    public static String getLastErrorLog() {
+        return lastErrorLog;
     }
 
     public static class CompilerConfig {

@@ -119,6 +119,9 @@ public class VarOp extends Instruction implements AssignableExpression {
             case Opcodes.DSTORE:
                 return ex.assignTo("dlocals_"+var+"_", b);
             case Opcodes.ASTORE: {
+                if (!isObjectAssignable(ex)) {
+                    return false;
+                }
                 if(getMethod() != null && getMethod().isBarebone()) {
                     if (!getMethod().isStatic() && var == 0) {
                         return ex.assignTo("__cn1ThisObject", b);
@@ -138,6 +141,37 @@ public class VarOp extends Instruction implements AssignableExpression {
                 
         }
         b.append("\n");
+        return false;
+    }
+
+    private boolean isObjectAssignable(AssignableExpression ex) {
+        if (ex instanceof Field) {
+            return ((Field) ex).isObject();
+        }
+        if (ex instanceof VarOp) {
+            return ((VarOp) ex).getOpcode() == Opcodes.ALOAD;
+        }
+        if (ex instanceof Ldc) {
+            Object value = ((Ldc) ex).getValue();
+            if (value instanceof Number) {
+                return false;
+            }
+            return value instanceof String
+                    || value instanceof org.objectweb.asm.Type
+                    || value instanceof org.objectweb.asm.Handle;
+        }
+        if (ex instanceof BasicInstruction) {
+            return ((BasicInstruction) ex).getOpcode() == Opcodes.ACONST_NULL;
+        }
+        if (ex instanceof ArrayLoadExpression) {
+            return ((ArrayLoadExpression) ex).isObject();
+        }
+        if (ex instanceof DupExpression) {
+            return true;
+        }
+        if (ex instanceof ArithmeticExpression) {
+            return false;
+        }
         return false;
     }
     

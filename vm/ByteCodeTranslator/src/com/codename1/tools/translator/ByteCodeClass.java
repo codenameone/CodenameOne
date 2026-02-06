@@ -230,6 +230,10 @@ public class ByteCodeClass {
                 bc.markDependent(lst);
                 continue;
             }
+            if(bc.clsName.equals("java_lang_StackOverflowError")) {
+                bc.markDependent(lst);
+                continue;
+            }
             if(bc.clsName.equals("java_text_DateFormat")) {
                 bc.markDependent(lst);
                 continue;
