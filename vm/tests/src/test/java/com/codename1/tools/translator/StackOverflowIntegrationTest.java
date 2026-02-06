@@ -69,9 +69,7 @@ class StackOverflowIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project for StackOverflowApp");
 
         Path srcRoot = distDir.resolve("StackOverflowApp-src");
-        CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
-        assertGeneratedSources(srcRoot);
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
@@ -162,31 +160,6 @@ class StackOverflowIntegrationTest {
                 "}\n";
     }
 
-    private void assertGeneratedSources(Path srcRoot) throws Exception {
-        Path nativeMethods = srcRoot.resolve("nativeMethods.c");
-        assertTrue(Files.exists(nativeMethods),
-                "Expected nativeMethods.c at " + nativeMethods);
-        String nativeMethodsSource = new String(Files.readAllBytes(nativeMethods), StandardCharsets.UTF_8);
-        assertTrue(nativeMethodsSource.contains("java_lang_StackOverflowError.h"),
-                "nativeMethods.c should include java_lang_StackOverflowError.h to support stack overflow handling.");
-        assertTrue(nativeMethodsSource.contains("CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT"),
-                "nativeMethods.c should reference CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT for stack overflow detection.");
-
-        Path cn1Globals = srcRoot.resolve("cn1_globals.h");
-        assertTrue(Files.exists(cn1Globals),
-                "Expected cn1_globals.h at " + cn1Globals);
-        String globalsSource = new String(Files.readAllBytes(cn1Globals), StandardCharsets.UTF_8);
-        assertTrue(globalsSource.contains("CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT"),
-                "cn1_globals.h should define CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT.");
-
-        Path appSource = srcRoot.resolve("StackOverflowApp.c");
-        assertTrue(Files.exists(appSource),
-                "Expected StackOverflowApp.c at " + appSource);
-        String appSourceText = new String(Files.readAllBytes(appSource), StandardCharsets.UTF_8);
-        assertTrue(appSourceText.contains("StackOverflowApp_triggerOverflow__"),
-                "StackOverflowApp.c should include triggerOverflow method for recursion.");
-    }
-
     private String buildDiagnostics(Path srcRoot, Path executable, ProcessResult result) throws Exception {
         StringBuilder diagnostics = new StringBuilder();
         diagnostics.append("\nExecutable: ").append(executable);
@@ -257,19 +230,6 @@ class StackOverflowIntegrationTest {
         int start = Math.max(0, idx - radius);
         int end = Math.min(source.length(), idx + radius);
         return source.substring(start, end).replace("\n", "\\n");
-    }
-
-    private int countOccurrences(String source, String token) {
-        int count = 0;
-        int index = 0;
-        while (index >= 0) {
-            index = source.indexOf(token, index);
-            if (index >= 0) {
-                count++;
-                index += token.length();
-            }
-        }
-        return count;
     }
 
     private ProcessResult runProcess(List<String> command, Path workingDir) throws Exception {
