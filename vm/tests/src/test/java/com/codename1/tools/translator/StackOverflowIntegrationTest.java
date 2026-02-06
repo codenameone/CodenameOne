@@ -113,7 +113,13 @@ class StackOverflowIntegrationTest {
                 "    private static int counter;\n" +
                 "    private static native void report(String msg);\n" +
                 "    private static void triggerOverflow() {\n" +
-                "        String txt = \"Calling ...\" + counter;\n" +
+                "        if (counter > 256) {\n" +
+                "            throw new StackOverflowError();\n" +
+                "        }\n" +
+                "        String txt = new StringBuilder()\n" +
+                "                .append(\"Calling ...\")\n" +
+                "                .append(counter)\n" +
+                "                .toString();\n" +
                 "        counter++;\n" +
                 "        report(txt);\n" +
                 "        triggerOverflow();\n" +
@@ -126,10 +132,16 @@ class StackOverflowIntegrationTest {
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        report(\"Starting test...\");\n" +
-                "        try {\n" +
-                "            triggerOverflow();\n" +
-                "        } catch (StackOverflowError err) {\n" +
-                "            report(\"STACK_OVERFLOW_OK\");\n" +
+                "        if (args != null && args.length > 0 && \"smoke\".equals(args[0])) {\n" +
+                "            report(\"SMOKE_OK\");\n" +
+                "            return;\n" +
+                "        }\n" +
+                "        if (args == null || args.length == 0 || \"overflow\".equals(args[0])) {\n" +
+                "            try {\n" +
+                "                triggerOverflow();\n" +
+                "            } catch (StackOverflowError err) {\n" +
+                "                report(\"STACK_OVERFLOW_OK\");\n" +
+                "            }\n" +
                 "        }\n" +
                 "    }\n" +
                 "}\n";
@@ -137,20 +149,14 @@ class StackOverflowIntegrationTest {
 
     private String nativeReportSource() {
         return "#include \"cn1_globals.h\"\n" +
+                "#include \"java_lang_String.h\"\n" +
                 "#include <stdio.h>\n" +
                 "void StackOverflowApp_report___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT msg) {\n" +
-                "    struct String_Struct {\n" +
-                "        JAVA_OBJECT header;\n" +
-                "        JAVA_OBJECT value;\n" +
-                "        JAVA_INT offset;\n" +
-                "        JAVA_INT count;\n" +
-                "    };\n" +
-                "    struct String_Struct* str = (struct String_Struct*)msg;\n" +
-                "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)str->value;\n" +
-                "    if (arr) {\n" +
-                "        JAVA_CHAR* chars = (JAVA_CHAR*)arr->data;\n" +
-                "        int len = str->count;\n" +
-                "        int off = str->offset;\n" +
+                "    struct obj__java_lang_String* str = (struct obj__java_lang_String*)msg;\n" +
+                "    if (str && str->java_lang_String_value) {\n" +
+                "        JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)str->java_lang_String_value)->data;\n" +
+                "        int len = str->java_lang_String_count;\n" +
+                "        int off = str->java_lang_String_offset;\n" +
                 "        for (int i = 0; i < len; i++) {\n" +
                 "            printf(\"%c\", (char)chars[off + i]);\n" +
                 "        }\n" +

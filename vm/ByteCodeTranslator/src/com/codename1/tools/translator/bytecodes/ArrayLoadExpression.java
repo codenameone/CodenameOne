@@ -180,4 +180,8 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
         sb.append(b);
         return true;
     }
+
+    public boolean isObject() {
+        return loadInstruction != null && loadInstruction.getOpcode() == Opcodes.AALOAD;
+    }
 }
