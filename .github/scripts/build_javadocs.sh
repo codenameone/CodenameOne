@@ -36,7 +36,18 @@ public class ImplementationFactory {
 EOF
 
 find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" -not -path "$ROOT_DIR/Ports/CLDC11/src/java/*" \
-  | /usr/bin/xargs "$JAVADOC_CMD" --allow-script-in-comments --release 8 -exclude com.codename1.impl -Xdoclint:none -quiet -protected -d "$CN1_DIR/dist/javadoc" -windowtitle "Codename One API" || true
+  | /usr/bin/xargs "$JAVADOC_CMD" \
+    --allow-script-in-comments \
+    --add-stylesheet "$ROOT_DIR/maven/javadoc-resources/highlight.css" \
+    --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
+    --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
+    --release 8 \
+    -exclude com.codename1.impl \
+    -Xdoclint:none \
+    -quiet \
+    -protected \
+    -d "$CN1_DIR/dist/javadoc" \
+    -windowtitle "Codename One API" || true
 
 (
   cd "$CN1_DIR/dist/javadoc"
