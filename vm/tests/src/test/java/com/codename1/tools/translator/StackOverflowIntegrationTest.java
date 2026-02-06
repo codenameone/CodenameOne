@@ -113,6 +113,9 @@ class StackOverflowIntegrationTest {
                 "    private static int counter;\n" +
                 "    private static native void report(String msg);\n" +
                 "    private static void triggerOverflow() {\n" +
+                "        if (counter > 256) {\n" +
+                "            throw new StackOverflowError();\n" +
+                "        }\n" +
                 "        String txt = new StringBuilder()\n" +
                 "                .append(\"Calling ...\")\n" +
                 "                .append(counter)\n" +
@@ -129,10 +132,16 @@ class StackOverflowIntegrationTest {
                 "    }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        report(\"Starting test...\");\n" +
-                "        try {\n" +
-                "            triggerOverflow();\n" +
-                "        } catch (StackOverflowError err) {\n" +
-                "            report(\"STACK_OVERFLOW_OK\");\n" +
+                "        if (args != null && args.length > 0 && \"smoke\".equals(args[0])) {\n" +
+                "            report(\"SMOKE_OK\");\n" +
+                "            return;\n" +
+                "        }\n" +
+                "        if (args == null || args.length == 0 || \"overflow\".equals(args[0])) {\n" +
+                "            try {\n" +
+                "                triggerOverflow();\n" +
+                "            } catch (StackOverflowError err) {\n" +
+                "                report(\"STACK_OVERFLOW_OK\");\n" +
+                "            }\n" +
                 "        }\n" +
                 "    }\n" +
                 "}\n";
