@@ -340,10 +340,11 @@
                         <failOnError>false</failOnError>
                         <doclint>none</doclint>
                         <top><![CDATA[
-<script src="script-files/highlight.min.js"></script>
-<script src="script-files/javadoc-highlight-init.js"></script>
+<script src="{@docRoot}/script-files/highlight.min.js"></script>
+<script src="{@docRoot}/script-files/javadoc-highlight-init.js"></script>
                         ]]></top>
                         <additionalOptions>
+                            <additionalOption>--allow-script-in-comments</additionalOption>
                             <additionalOption>--add-stylesheet</additionalOption>
                             <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
                             <additionalOption>--add-script</additionalOption>
@@ -420,10 +421,11 @@
                     <doclint>none</doclint>
                     <failOnError>false</failOnError>
                     <top><![CDATA[
-<script src="script-files/highlight.min.js"></script>
-<script src="script-files/javadoc-highlight-init.js"></script>
+<script src="{@docRoot}/script-files/highlight.min.js"></script>
+<script src="{@docRoot}/script-files/javadoc-highlight-init.js"></script>
                     ]]></top>
                     <additionalOptions>
+                        <additionalOption>--allow-script-in-comments</additionalOption>
                         <additionalOption>--add-stylesheet</additionalOption>
                         <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
                         <additionalOption>--add-script</additionalOption>
