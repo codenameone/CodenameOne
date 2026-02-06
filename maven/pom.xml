@@ -409,11 +409,11 @@
                     <failOnError>false</failOnError>
                     <additionalOptions>
                         <additionalOption>--add-stylesheet</additionalOption>
-                        <additionalOption>${project.basedir}/javadoc-resources/highlight.css</additionalOption>
+                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
                         <additionalOption>--add-script</additionalOption>
-                        <additionalOption>${project.basedir}/javadoc-resources/highlight.min.js</additionalOption>
+                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.min.js</additionalOption>
                         <additionalOption>--add-script</additionalOption>
-                        <additionalOption>${project.basedir}/javadoc-resources/javadoc-highlight-init.js</additionalOption>
+                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/javadoc-highlight-init.js</additionalOption>
                     </additionalOptions>
                 </configuration>
             </plugin>
