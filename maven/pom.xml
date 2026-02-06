@@ -339,6 +339,19 @@
                         <show>protected</show>
                         <failOnError>false</failOnError>
                         <doclint>none</doclint>
+                        <top><![CDATA[
+<script src="{@docRoot}/script-files/highlight.min.js"></script>
+<script src="{@docRoot}/script-files/javadoc-highlight-init.js"></script>
+                        ]]></top>
+                        <additionalOptions>
+                            <additionalOption>--allow-script-in-comments</additionalOption>
+                            <additionalOption>--add-stylesheet</additionalOption>
+                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
+                            <additionalOption>--add-script</additionalOption>
+                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.min.js</additionalOption>
+                            <additionalOption>--add-script</additionalOption>
+                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/javadoc-highlight-init.js</additionalOption>
+                        </additionalOptions>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -407,8 +420,18 @@
                 <configuration>
                     <doclint>none</doclint>
                     <failOnError>false</failOnError>
+                    <top><![CDATA[
+<script src="{@docRoot}/script-files/highlight.min.js"></script>
+<script src="{@docRoot}/script-files/javadoc-highlight-init.js"></script>
+                    ]]></top>
                     <additionalOptions>
                         <additionalOption>--allow-script-in-comments</additionalOption>
+                        <additionalOption>--add-stylesheet</additionalOption>
+                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
+                        <additionalOption>--add-script</additionalOption>
+                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.min.js</additionalOption>
+                        <additionalOption>--add-script</additionalOption>
+                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/javadoc-highlight-init.js</additionalOption>
                     </additionalOptions>
                 </configuration>
             </plugin>
