@@ -584,6 +584,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     closingHypLog[0] = true;
                     proc[0].destroyForcibly();
                 } catch (Exception ex) {
+                    if (getLog().isDebugEnabled()) {
+                        getLog().warn("Failed to shut down hyperlog process cleanly", ex);
+                    }
                 }
             }
         }
