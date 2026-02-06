@@ -1,13 +1,26 @@
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('pre code').forEach((block) => {
-    const className = block.className || '';
-    const shouldHighlight =
-      className === '' ||
-      className.includes('language-') ||
-      className.includes('lang-');
+  const highlighter = window.Cn1JavaDocHighlight;
+  if (!highlighter) {
+    return;
+  }
 
-    if (shouldHighlight && window.Cn1JavaDocHighlight) {
-      window.Cn1JavaDocHighlight.highlightElement(block);
+  const shouldHighlight = (className) =>
+    className === '' || className.includes('language-') || className.includes('lang-');
+
+  document.querySelectorAll('pre').forEach((pre) => {
+    const code = pre.querySelector('code');
+    const target = code || pre;
+    if (shouldHighlight(target.className || '')) {
+      highlighter.highlightElement(target);
+    }
+  });
+
+  document.querySelectorAll('code').forEach((code) => {
+    if (code.closest('pre')) {
+      return;
+    }
+    if (shouldHighlight(code.className || '')) {
+      highlighter.highlightElement(code);
     }
   });
 });
