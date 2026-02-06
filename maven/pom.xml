@@ -407,6 +407,10 @@
                 <configuration>
                     <doclint>none</doclint>
                     <failOnError>false</failOnError>
+                    <top><![CDATA[
+<script src="script-files/highlight.min.js"></script>
+<script src="script-files/javadoc-highlight-init.js"></script>
+                    ]]></top>
                     <additionalOptions>
                         <additionalOption>--add-stylesheet</additionalOption>
                         <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
