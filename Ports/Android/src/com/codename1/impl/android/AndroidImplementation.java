@@ -26,6 +26,7 @@ import android.Manifest;
 import android.annotation.TargetApi;
 import com.codename1.impl.android.permissions.DevicePermission;
 import com.codename1.impl.android.permissions.PermissionsHelper;
+import com.codename1.io.Log;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -343,10 +344,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // working its way through the system.  Give it some time
             // before forcing the deinitialize
             System.out.println("Waiting for deinitializing to complete before starting a new initialization");
-            try {
-                Thread.sleep(30);
-
-            } catch (Exception ex){}
+            Util.sleep(30);
         }
         if (deinitializing && instance != null) {
             instance.deinitialize();
@@ -551,8 +549,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 k = part;
                 v = "";
             }
-            try { k = java.net.URLDecoder.decode(k, "UTF-8");} catch (Exception ex){}
-            try {v = java.net.URLDecoder.decode(v, "UTF-8");} catch (Exception ex){}
+            try {
+                k = java.net.URLDecoder.decode(k, "UTF-8");
+                v = java.net.URLDecoder.decode(v, "UTF-8");
+            } catch (UnsupportedEncodingException ex) {
+                // won't happen
+                Log.e(ex);
+            }
             out.put(k, v);
         }
         return out;
@@ -885,8 +888,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             newIntent.putExtra("pushActionId", action.getId());
             PendingIntent contentIntent = createMutablePendingIntent(context, requestCode++, newIntent);
             try {
-                int iconId = 0;
-                try { iconId = Integer.parseInt(action.getIcon());} catch (Exception ex){}
+                int iconId;
+                try {
+                    iconId = Integer.parseInt(action.getIcon());
+                } catch (NumberFormatException ex) {
+                    iconId = 0;
+                }
                 if (ActionWrapper.BuilderWrapper.isSupported()) {
                     // We need to take this abstracted "wrapper" approach because the Action.Builder class, and RemoteInput class
                     // aren't available until API 22.
@@ -1080,7 +1087,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 try {
                     getActivity().requestWindowFeature(Window.FEATURE_NO_TITLE);
                 } catch (Exception e) {
-                    //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+                    Log.p("requestWindowFeature FEATURE_NO_TITLE threw exception: " + e.toString());
                 }
             } else {
                 getActivity().invalidateOptionsMenu();
@@ -1220,10 +1227,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 Display.getInstance().invokeAndBlock(new Runnable(){ public void run(){
-                    try {
-                        Thread.sleep(50);
-
-                    } catch (Exception ex){}
+                    Util.sleep(50);
                 }});
                 if (!Display.isInitialized() || Display.getInstance().isMinimized()) {
                     return;
@@ -1539,14 +1543,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         //came back black from the background.
         if(myView instanceof AndroidAsyncView){
             new Thread(new Runnable() {
-
                 @Override
                 public void run() {
-                    try {
-                        Thread.sleep(1000);
-                        ((AndroidAsyncView)myView).setPaintViewOnBuffer(false);
-                    } catch (Exception e) {
-                    }
+                    Util.sleep(1000);
+                    ((AndroidAsyncView)myView).setPaintViewOnBuffer(false);
                 }
             }).start();
         }
@@ -2331,12 +2331,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object createImage(byte[] bytes, int offset, int len) {
         BitmapFactory.Options opts = new BitmapFactory.Options();
         opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
-        try {
-            BitmapFactory.Options.class.getField("inPurgeable").set(opts, true);
-        } catch (Exception e) {
-            // inPurgeable not supported
-            // http://www.droidnova.com/2d-sprite-animation-in-android-addendum,505.html
-        }
         return BitmapFactory.decodeByteArray(bytes, offset, len, opts);
     }
 
@@ -7148,8 +7142,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 serviceProperties = new HashMap<String,String>();
                 try {
                     i = a.openFileInput("CN1$AndroidServiceProperties");
-                } catch (FileNotFoundException notFoundEx){}
-                if(i == null) {
+                    if(i == null) {
+                        return serviceProperties;
+                    }
+                } catch (FileNotFoundException notFoundEx){
                     return serviceProperties;
                 }
                 DataInputStream is = new DataInputStream(i);
@@ -10700,11 +10696,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             while (blocking && !complete[0]) {
-                synchronized(lock) {
-                    try {
-                        lock.wait(1000);
-                    } catch (Exception ex){}
-                }
+                Util.wait(lock, 1000);
                 if (!complete[0]) {
                     System.out.println("Waiting for background fetch to complete.  Make sure your background fetch handler calls onSuccess() or onError() in the callback when complete");
 
