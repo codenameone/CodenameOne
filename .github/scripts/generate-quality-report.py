@@ -811,6 +811,26 @@ def main() -> None:
 
     # Enforce quality gates
     spotbugs_reports, _, _ = parse_spotbugs()
+    if spotbugs_reports:
+        cross_project_rules = {
+            "DE_MIGHT_IGNORE",
+            "BC_IMPOSSIBLE_CAST",
+        }
+        cross_project_violations: List[Tuple[str, Finding]] = []
+        for label, report in spotbugs_reports.items():
+            for finding in report.findings:
+                if finding.rule in cross_project_rules:
+                    cross_project_violations.append((label, finding))
+        if cross_project_violations:
+            print(
+                "\n❌ Build failed due to forbidden SpotBugs violations across projects:"
+            )
+            for label, finding in cross_project_violations:
+                location = finding.location
+                print(
+                    f"  - {finding.rule}: {label} {location} - {finding.message}"
+                )
+            exit(1)
     spotbugs = spotbugs_reports.get("core-unittests")
     if spotbugs:
         forbidden_rules = {
