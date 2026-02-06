@@ -6410,8 +6410,6 @@ public class IOSImplementation extends CodenameOneImplementation {
                         callbacks.remove(callbackId);
                         super.error(t);
                     }
-                    
-                    
                 };
                 callbacks.put(callbackId, out);
                 userAgent = nativeInstance.getUserAgentString(callbackId);
@@ -6419,10 +6417,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     try {
                         userAgent = out.get();
                     } catch (Exception ex) {
-                        
+                        Log.e(ex);
                     }
                 }
-                
             }
             return userAgent;
         }

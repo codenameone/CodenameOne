@@ -814,6 +814,7 @@ def main() -> None:
     spotbugs = spotbugs_reports.get("core-unittests")
     if spotbugs:
         forbidden_rules = {
+            "DE_MIGHT_IGNORE",
             "NP_ALWAYS_NULL",
             "NP_NULL_PARAM_DEREF",
             "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",

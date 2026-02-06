@@ -411,7 +411,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         try {
                             blackListJars.add(jar.getCanonicalPath());
                             getLog().debug("Added "+jar+" to blacklist");
-                        } catch (Exception ex){}
+                        } catch (Exception ex){
+                            getLog().debug("Failed to add " + jar + " to blacklist. This is not a fatal error: " + ex);
+                        }
                     }
                 }
 
