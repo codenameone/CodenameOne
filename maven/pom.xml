@@ -407,21 +407,13 @@
                 <configuration>
                     <doclint>none</doclint>
                     <failOnError>false</failOnError>
-                    <bottom><![CDATA[
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('pre code').forEach((block) => {
-    if (window.hljs) {
-      window.hljs.highlightElement(block);
-    }
-  });
-});
-</script>
-                    ]]></bottom>
                     <additionalOptions>
-                        <additionalOption>--allow-script-in-comments</additionalOption>
+                        <additionalOption>--add-stylesheet</additionalOption>
+                        <additionalOption>${project.basedir}/javadoc-resources/highlight.css</additionalOption>
+                        <additionalOption>--add-script</additionalOption>
+                        <additionalOption>${project.basedir}/javadoc-resources/highlight.min.js</additionalOption>
+                        <additionalOption>--add-script</additionalOption>
+                        <additionalOption>${project.basedir}/javadoc-resources/javadoc-highlight-init.js</additionalOption>
                     </additionalOptions>
                 </configuration>
             </plugin>

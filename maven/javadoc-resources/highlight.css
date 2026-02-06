@@ -1,0 +1,17 @@
+pre code {
+  color: #24292e;
+}
+
+.javadoc-keyword {
+  color: #d73a49;
+  font-weight: 600;
+}
+
+.javadoc-string {
+  color: #032f62;
+}
+
+.javadoc-comment {
+  color: #6a737d;
+  font-style: italic;
+}
