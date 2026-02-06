@@ -34,12 +34,10 @@ import com.codename1.ui.plaf.UIManager;
 
 import java.util.Map;
 
-/**
- * Default implementation of the renderer based on a label see the {@link ListCellRenderer}
- * for more information about the use and purpose of this class
- *
- * @author Chen Fishbein
- */
+/// Default implementation of the renderer based on a label see the `ListCellRenderer`
+/// for more information about the use and purpose of this class
+///
+/// @author Chen Fishbein
 public class DefaultListCellRenderer<T> extends Label implements ListCellRenderer<T>, CellRenderer<T> {
     private static boolean showNumbersDefault = true;
     private final Label focusComponent = new Label();
@@ -48,9 +46,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     private boolean rightAlignNumbers;
     private boolean alwaysRenderSelection;
 
-    /**
-     * Creates a new instance of DefaultCellRenderer
-     */
+    /// Creates a new instance of DefaultCellRenderer
     public DefaultListCellRenderer() {
         super("");
         setCellRenderer(true);
@@ -60,40 +56,38 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
         setUIIDFinal("ListRenderer");
     }
 
-    /**
-     * Creates a new instance of DefaultCellRenderer
-     *
-     * @param showNumbers indicates numbers should be shown
-     */
+    /// Creates a new instance of DefaultCellRenderer
+    ///
+    /// #### Parameters
+    ///
+    /// - `showNumbers`: indicates numbers should be shown
     public DefaultListCellRenderer(boolean showNumbers) {
         this();
         showNumbersForce = true;
         this.showNumbers = showNumbers;
     }
 
-    /**
-     * Indicates whether the default list cell renderer will show numbers by default
-     * when constructed
-     *
-     * @return true when showing numbers, false otherwise
-     */
+    /// Indicates whether the default list cell renderer will show numbers by default
+    /// when constructed
+    ///
+    /// #### Returns
+    ///
+    /// true when showing numbers, false otherwise
     public static boolean isShowNumbersDefault() {
         return showNumbersDefault;
     }
 
-    /**
-     * Indicates whether the default list cell renderer will show numbers by default
-     * when constructed
-     *
-     * @param def true to show numbers for all renderers created in the future
-     */
+    /// Indicates whether the default list cell renderer will show numbers by default
+    /// when constructed
+    ///
+    /// #### Parameters
+    ///
+    /// - `def`: true to show numbers for all renderers created in the future
     public static void setShowNumbersDefault(boolean def) {
         showNumbersDefault = def;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -102,18 +96,14 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         focusComponent.refreshTheme(merge);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
         if (!alwaysRenderSelection && !Display.getInstance().shouldRenderSelection(list)) {
@@ -171,9 +161,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Style getStyle() {
         if (alwaysRenderSelection && hasFocus()) {
@@ -183,103 +171,95 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
         return super.getStyle();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
         return getCellRendererComponent(list, list.getModel(), value, index, isSelected);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getListFocusComponent(List list) {
         return focusComponent;
     }
 
-    /**
-     * Overriden to do nothing and remove a performance issue where renderer changes
-     * perform needless repaint calls
-     */
+    /// Overriden to do nothing and remove a performance issue where renderer changes
+    /// perform needless repaint calls
     @Override
     public void repaint() {
     }
 
-    /**
-     * Indicate whether numbering should exist for the default cell renderer
-     *
-     * @return true if numers are shown by the numbers
-     */
+    /// Indicate whether numbering should exist for the default cell renderer
+    ///
+    /// #### Returns
+    ///
+    /// true if numers are shown by the numbers
     public boolean isShowNumbers() {
         return showNumbers;
     }
 
-    /**
-     * Indicate whether numbering should exist for the default cell renderer
-     *
-     * @param showNumbers indicate whether numbering should exist for the default cell renderer
-     */
+    /// Indicate whether numbering should exist for the default cell renderer
+    ///
+    /// #### Parameters
+    ///
+    /// - `showNumbers`: indicate whether numbering should exist for the default cell renderer
     public void setShowNumbers(boolean showNumbers) {
         this.showNumbers = showNumbers;
         showNumbersForce = true;
     }
 
-    /**
-     * The background transparency factor to apply to the selection focus
-     *
-     * @return selection transperancy value
-     */
+    /// The background transparency factor to apply to the selection focus
+    ///
+    /// #### Returns
+    ///
+    /// selection transperancy value
     public int getSelectionTransparency() {
         return focusComponent.getUnselectedStyle().getBgTransparency() & 0xff;
     }
 
-    /**
-     * The background transparency factor to apply to the selection focus
-     *
-     * @param selectionTransparency the selection transperancy value
-     */
+    /// The background transparency factor to apply to the selection focus
+    ///
+    /// #### Parameters
+    ///
+    /// - `selectionTransparency`: the selection transperancy value
     public void setSelectionTransparency(int selectionTransparency) {
         focusComponent.getUnselectedStyle().setBgTransparency(selectionTransparency);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Component getFocusComponent(Component list) {
         return focusComponent;
     }
 
-    /**
-     * @return the rightAlignNumbers
-     */
+    /// #### Returns
+    ///
+    /// the rightAlignNumbers
     public boolean isRightAlignNumbers() {
         return rightAlignNumbers;
     }
 
-    /**
-     * @param rightAlignNumbers the rightAlignNumbers to set
-     */
+    /// #### Parameters
+    ///
+    /// - `rightAlignNumbers`: the rightAlignNumbers to set
     public void setRightAlignNumbers(boolean rightAlignNumbers) {
         this.rightAlignNumbers = rightAlignNumbers;
     }
 
-    /**
-     * Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
-     *
-     * @return the alwaysRenderSelection
-     */
+    /// Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
+    ///
+    /// #### Returns
+    ///
+    /// the alwaysRenderSelection
     public boolean isAlwaysRenderSelection() {
         return alwaysRenderSelection;
     }
 
-    /**
-     * Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
-     *
-     * @param alwaysRenderSelection the alwaysRenderSelection to set
-     */
+    /// Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
+    ///
+    /// #### Parameters
+    ///
+    /// - `alwaysRenderSelection`: the alwaysRenderSelection to set
     public void setAlwaysRenderSelection(boolean alwaysRenderSelection) {
         this.alwaysRenderSelection = alwaysRenderSelection;
     }

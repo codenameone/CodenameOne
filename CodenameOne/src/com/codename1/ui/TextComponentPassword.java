@@ -26,13 +26,11 @@ package com.codename1.ui;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
-/**
- * TextComponent extended to automatically add mask/unmask password button near
- * the TextField; it acts like a normal TextComponent if the Constraint is not
- * TextArea.PASSWORD
- *
- * @author Francesco Galgani
- */
+/// TextComponent extended to automatically add mask/unmask password button near
+/// the TextField; it acts like a normal TextComponent if the Constraint is not
+/// TextArea.PASSWORD
+///
+/// @author Francesco Galgani
 public class TextComponentPassword extends TextComponent {
     private final TextField field = super.getField();
 
@@ -61,37 +59,29 @@ public class TextComponentPassword extends TextComponent {
     }
 
 
-    /**
-     * Overridden for covariant return type
-     * {@inheritDoc}
-     */
+    /// Overridden for covariant return type
+    /// {@inheritDoc}
     @Override
     public TextComponentPassword label(String text) {
         return (TextComponentPassword) super.label(text);
     }
 
-    /**
-     * Overridden for covariant return type
-     * {@inheritDoc}
-     */
+    /// Overridden for covariant return type
+    /// {@inheritDoc}
     @Override
     public TextComponentPassword labelAndHint(String text) {
         return (TextComponentPassword) super.labelAndHint(text);
     }
 
-    /**
-     * Overridden for covariant return type
-     * {@inheritDoc}
-     */
+    /// Overridden for covariant return type
+    /// {@inheritDoc}
     @Override
     public TextComponentPassword hint(String hint) {
         return (TextComponentPassword) super.hint(hint);
     }
 
-    /**
-     * Overridden for covariant return type
-     * {@inheritDoc}
-     */
+    /// Overridden for covariant return type
+    /// {@inheritDoc}
     @Override
     public TextComponentPassword hint(Image hint) {
         return (TextComponentPassword) super.hint(hint);

@@ -4,9 +4,5 @@
     Author     : Shai Almog
 */
 
-/**
- * <p>
- *     Tree component for displaying hierarchy based information and its related classes
- * </p>
- */
+/// Tree component for displaying hierarchy based information and its related classes
 package com.codename1.ui.tree;

@@ -22,68 +22,55 @@
  */
 package com.codename1.location;
 
-/**
- * This class is used when requesting to listen to location update.
- * See {@link com.codename1.location.LocationManager#setLocationListener(com.codename1.location.LocationListener l, com.codename1.location.LocationRequest req) setLocationListener}
- *
- * @author Chen
- */
+/// This class is used when requesting to listen to location update.
+/// See `l, com.codename1.location.LocationRequest req) setLocationListener`
+///
+/// @author Chen
 public class LocationRequest {
 
-    /**
-     * When you need gps location updates
-     */
+    /// When you need gps location updates
     public static final int PRIORITY_HIGH_ACCUARCY = 0;
 
-    /**
-     * When accuracy is not highly important and you want to save battery
-     */
+    /// When accuracy is not highly important and you want to save battery
     public static final int PRIORITY_MEDIUM_ACCUARCY = 1;
 
-    /**
-     * When accuracy is not important and you want to save battery
-     */
+    /// When accuracy is not important and you want to save battery
     public static final int PRIORITY_LOW_ACCUARCY = 2;
 
     private int priority = PRIORITY_MEDIUM_ACCUARCY;
 
     private long interval = 5000;
 
-    /**
-     * Empty Constructor
-     */
+    /// Empty Constructor
     public LocationRequest() {
     }
 
-    /**
-     * Simple Constructor
-     *
-     * @param priority The priority we are interested to listen for location updates.
-     *                 PRIORITY_HIGH_ACCUARCY, PRIORITY_MEDIUM_ACCUARCY, PRIORITY_LOW_ACCUARCY
-     *                 High priority means gps locations which is CPU intensive and consumes more battery.
-     *                 Medium priority is less intensive in terms of battery and might return a
-     *                 gps or a network location which is less accurate.
-     *                 Low priority won't consume the battery and will return a gps location if
-     *                 available otherwise the location would be a network location.
-     * @param interval time in milliseconds which determines what are the time
-     *                 intervals that we would like to get updates from the OS.
-     *                 This is a request only and might not be respected by the underlying OS
-     */
+    /// Simple Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `priority`: @param priority The priority we are interested to listen for location updates.
+    /// PRIORITY_HIGH_ACCUARCY, PRIORITY_MEDIUM_ACCUARCY, PRIORITY_LOW_ACCUARCY
+    /// High priority means gps locations which is CPU intensive and consumes more battery.
+    /// Medium priority is less intensive in terms of battery and might return a
+    /// gps or a network location which is less accurate.
+    /// Low priority won't consume the battery and will return a gps location if
+    /// available otherwise the location would be a network location.
+    ///
+    /// - `interval`: @param interval time in milliseconds which determines what are the time
+    /// intervals that we would like to get updates from the OS.
+    /// This is a request only and might not be respected by the underlying OS
     public LocationRequest(int priority, long interval) {
         this.priority = priority;
         this.interval = interval;
     }
 
-    /**
-     * Gets the request priority
-     */
+    /// Gets the request priority
     public int getPriority() {
         return priority;
     }
 
-    /**
-     * Gest the request time interval
-     */
+    /// Gest the request time interval
     public long getInterval() {
         return interval;
     }

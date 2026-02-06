@@ -28,22 +28,20 @@ import com.codename1.ui.Container;
 import com.codename1.ui.geom.Dimension;
 
 
-/**
- * Abstract class that can be used to arrange components in a container using
- * a predefined algorithm. This class may be implemented externally and is similar
- * in spirit to the AWT/Swing layout managers.
- *
- * @author Chen Fishbein
- */
+/// Abstract class that can be used to arrange components in a container using
+/// a predefined algorithm. This class may be implemented externally and is similar
+/// in spirit to the AWT/Swing layout managers.
+///
+/// @author Chen Fishbein
 public abstract class Layout {
 
-    /**
-     * Utility method
-     *
-     * @param components
-     * @param offset
-     * @return
-     */
+    /// Utility method
+    ///
+    /// #### Parameters
+    ///
+    /// - `components`
+    ///
+    /// - `offset`
     private static int updateTabIndicesImpl(Component[] components, int offset) {
         int len = components.length;
         int idx = offset;
@@ -64,50 +62,58 @@ public abstract class Layout {
         return idx;
     }
 
-    /**
-     * Layout the given parent container children
-     *
-     * @param parent the given parent container
-     */
+    /// Layout the given parent container children
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the given parent container
     public abstract void layoutContainer(Container parent);
 
-    /**
-     * Returns the container preferred size
-     *
-     * @param parent the parent container
-     * @return the container preferred size
-     */
+    /// Returns the container preferred size
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the parent container
+    ///
+    /// #### Returns
+    ///
+    /// the container preferred size
     public abstract Dimension getPreferredSize(Container parent);
 
-    /**
-     * Some layouts can optionally track the addition of elements with meta-data
-     * that allows the user to "hint" on object positioning.
-     *
-     * @param value optional meta data information, like alignment orientation
-     * @param comp  the added component to the layout
-     * @param c     the parent container
-     */
+    /// Some layouts can optionally track the addition of elements with meta-data
+    /// that allows the user to "hint" on object positioning.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: optional meta data information, like alignment orientation
+    ///
+    /// - `comp`: the added component to the layout
+    ///
+    /// - `c`: the parent container
     public void addLayoutComponent(Object value, Component comp, Container c) {
         if (value != null) {
             throw new IllegalStateException("Layout doesn't support adding with arguments: " + getClass().getName());
         }
     }
 
-    /**
-     * Removes the component from the layout this operation is only useful if the
-     * layout maintains references to components within it
-     *
-     * @param comp the removed component from layout
-     */
+    /// Removes the component from the layout this operation is only useful if the
+    /// layout maintains references to components within it
+    ///
+    /// #### Parameters
+    ///
+    /// - `comp`: the removed component from layout
     public void removeLayoutComponent(Component comp) {
     }
 
-    /**
-     * Returns the optional component constraint
-     *
-     * @param comp the component whose constraint should be returned
-     * @return the optional component constraint
-     */
+    /// Returns the optional component constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `comp`: the component whose constraint should be returned
+    ///
+    /// #### Returns
+    ///
+    /// the optional component constraint
     public Object getComponentConstraint(Component comp) {
         return null;
     }
@@ -116,75 +122,77 @@ public abstract class Layout {
         return constraint;
     }
 
-    /**
-     * This method returns true if the Layout allows Components to
-     * Overlap.
-     *
-     * @return true if Components may intersect in this layout
-     */
+    /// This method returns true if the Layout allows Components to
+    /// Overlap.
+    ///
+    /// #### Returns
+    ///
+    /// true if Components may intersect in this layout
     public boolean isOverlapSupported() {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         return o != null && o.getClass() == getClass();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         return getClass().getName().hashCode();
     }
 
-    /**
-     * If this method returns true, the addLayoutComponent method will be called when replacing a
-     * layout for every component within the container
-     *
-     * @return false by default
-     */
+    /// If this method returns true, the addLayoutComponent method will be called when replacing a
+    /// layout for every component within the container
+    ///
+    /// #### Returns
+    ///
+    /// false by default
     public boolean isConstraintTracking() {
         return false;
     }
 
-    /**
-     * Some layout managers can obscure their child components in some cases this
-     * returns true if the basic underpinnings are in place for that. This method
-     * doesn't take padding/margin etc. into account since that is checked by the
-     * caller
-     *
-     * @param parent parent container
-     * @return true if there is a chance that this layout manager can fully obscure the background, when in doubt return false...
-     */
+    /// Some layout managers can obscure their child components in some cases this
+    /// returns true if the basic underpinnings are in place for that. This method
+    /// doesn't take padding/margin etc. into account since that is checked by the
+    /// caller
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: parent container
+    ///
+    /// #### Returns
+    ///
+    /// true if there is a chance that this layout manager can fully obscure the background, when in doubt return false...
     public boolean obscuresPotential(Container parent) {
         return false;
     }
 
-    /**
-     * If a layout specifies a different traversal order of its components than the
-     * component index, then it should override this method to return {@literal true}, and
-     * it should also override {@link #getChildrenInTraversalOrder(com.codename1.ui.Container) }
-     * to set the tab indices of a container's children.
-     *
-     * @param parent The parent component.
-     * @return True if this layout overrides tab traversal order.
-     */
+    /// If a layout specifies a different traversal order of its components than the
+    /// component index, then it should override this method to return true, and
+    /// it should also override `#getChildrenInTraversalOrder(com.codename1.ui.Container)`
+    /// to set the tab indices of a container's children.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The parent component.
+    ///
+    /// #### Returns
+    ///
+    /// True if this layout overrides tab traversal order.
     public boolean overridesTabIndices(Container parent) {
         return false;
     }
 
-    /**
-     * Updates the tab traversal order
-     *
-     * @param parent
-     * @param offset
-     * @return
-     */
+    /// Updates the tab traversal order
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`
+    ///
+    /// - `offset`
     public final int updateTabIndices(Container parent, int offset) {
         if (overridesTabIndices(parent)) {
             Component[] cmps = getChildrenInTraversalOrder(parent);
@@ -193,19 +201,22 @@ public abstract class Layout {
         return offset;
     }
 
-    /**
-     * Gets the children of the parent container in the order that they should
-     * be traversed when tabbing through a form.
-     *
-     * <p>This should only be overridden if the Layout defines a different traversal order
-     * than the standard index order.  </p>
-     *
-     * <p>Layouts that implement this method, should override the {@link #overridesTabIndices(com.codename1.ui.Container) }
-     * method to return {@literal true}.</p>
-     *
-     * @param parent
-     * @return Array of Components in the order
-     */
+    /// Gets the children of the parent container in the order that they should
+    /// be traversed when tabbing through a form.
+    ///
+    /// This should only be overridden if the Layout defines a different traversal order
+    /// than the standard index order.
+    ///
+    /// Layouts that implement this method, should override the `#overridesTabIndices(com.codename1.ui.Container)`
+    /// method to return true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`
+    ///
+    /// #### Returns
+    ///
+    /// Array of Components in the order
     protected Component[] getChildrenInTraversalOrder(Container parent) {
         return null;
     }

@@ -26,7 +26,6 @@ package com.codename1.ui.plaf;
 import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
-import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
@@ -34,350 +33,222 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.util.EventDispatcher;
 
-/**
- * Represents the look of a given component: colors, fonts, transparency, margin and padding &amp; images.
- * <p>Each Component contains a Style Object and allows Style modification in Runtime
- * by Using {@code cmp.getStyle()}
- * The style is also used in Themeing, when a Theme is Changed the Styles Objects are been
- * updated automatically.
- * <p>When changing a theme the elements changed manually in a style will not be updated
- * by the theme change by default. There are two ways to change that behavior:
- * <ol><li>Use the set method that accepts a second boolean argument and set it to true.
- * <li>Create a new style object and pass all the options in the constructor (without invoking setters manually).
- * </ol>
- * <p>
- * The Margin and Padding is inspired by <a href="http://www.w3.org/TR/REC-CSS2/box.html">W3 Box Model</a>
- *
- * <pre>
- *
- *       **************************
- *       *         Margin         *
- *       *  ********************  *
- *       *  *      Padding     *  *
- *       *  *    ***********   *  *
- *       *  *    * Content *   *  *
- *       *  *    ***********   *  *
- *       *  *      Padding     *  *
- *       *  ********************  *
- *       *         Margin         *
- *       **************************
- * </pre>
- *
- * <h3>Change Events</h3>
- *
- * <p>Styles fire a change event for each style change that occurs.  {@link Component} listens to all changes events
- * of its styles, and adjusts some of its properties accordingly.  Currently (as of 6.0) each style change will trigger
- * a {@link Container#revalidate() } call on the Style's Component's parent container, which is expensive.  You can disable this
- * {@link Container#revalidate() } call by calling {@literal CN.setProperty("Component.revalidateOnStyleChange", "false")}.  This will
- * likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
- * to avoid regressions when the default is changed.</p>
- *
- * @author Chen Fishbein
- */
+/// Represents the look of a given component: colors, fonts, transparency, margin and padding & images.
+///
+/// Each Component contains a Style Object and allows Style modification in Runtime
+/// by Using `cmp.getStyle()`
+/// The style is also used in Themeing, when a Theme is Changed the Styles Objects are been
+/// updated automatically.
+///
+/// When changing a theme the elements changed manually in a style will not be updated
+/// by the theme change by default. There are two ways to change that behavior:
+///
+/// - Use the set method that accepts a second boolean argument and set it to true.
+///
+/// - Create a new style object and pass all the options in the constructor (without invoking setters manually).
+///
+/// The Margin and Padding is inspired by [W3 Box Model](http://www.w3.org/TR/REC-CSS2/box.html)
+///
+/// ```java
+///       **************************
+///       *         Margin         *
+///       *  ********************  *
+///       *  *      Padding     *  *
+///       *  *    ***********   *  *
+///       *  *    * Content *   *  *
+///       *  *    ***********   *  *
+///       *  *      Padding     *  *
+///       *  ********************  *
+///       *         Margin         *
+///       **************************
+/// ```
+///
+/// Change Events
+///
+/// Styles fire a change event for each style change that occurs.  `Component` listens to all changes events
+/// of its styles, and adjusts some of its properties accordingly.  Currently (as of 6.0) each style change will trigger
+/// a `Container#revalidate()` call on the Style's Component's parent container, which is expensive.  You can disable this
+/// `Container#revalidate()` call by calling CN.setProperty("Component.revalidateOnStyleChange", "false").  This will
+/// likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
+/// to avoid regressions when the default is changed.
+///
+/// @author Chen Fishbein
 public class Style {
 
-    /**
-     * Background color attribute name for the theme hashtable
-     */
+    /// Background color attribute name for the theme hashtable
     public static final String BG_COLOR = "bgColor";
-    /**
-     * Foreground color attribute name for the theme hashtable
-     */
+    /// Foreground color attribute name for the theme hashtable
     public static final String FG_COLOR = "fgColor";
-    /**
-     * Foreground alpha attribute name for the theme hashtable
-     */
+    /// Foreground alpha attribute name for the theme hashtable
     public static final String FG_ALPHA = "fgAlpha";
-    /**
-     * Background image attribute name for the theme hashtable
-     */
+    /// Background image attribute name for the theme hashtable
     public static final String BG_IMAGE = "bgImage";
-    /**
-     * Background attribute name for the theme hashtable
-     */
+    /// Background attribute name for the theme hashtable
     public static final String BACKGROUND_TYPE = "bgType";
-    /**
-     * Background attribute name for the theme hashtable
-     */
+    /// Background attribute name for the theme hashtable
     public static final String BACKGROUND_ALIGNMENT = "bgAlign";
-    /**
-     * Background attribute name for the theme hashtable
-     */
+    /// Background attribute name for the theme hashtable
     public static final String BACKGROUND_GRADIENT = "bgGradient";
-    /**
-     * Font attribute name for the theme hashtable
-     */
+    /// Font attribute name for the theme hashtable
     public static final String FONT = "font";
-    /**
-     * Transparency attribute name for the theme hashtable
-     */
+    /// Transparency attribute name for the theme hashtable
     public static final String TRANSPARENCY = "transparency";
-    /**
-     * Opacity attribute name for the theme hashtable
-     */
+    /// Opacity attribute name for the theme hashtable
     public static final String OPACITY = "opacity";
-    /**
-     * Elevation attribute name for the theme hashtable.
-     */
+    /// Elevation attribute name for the theme hashtable.
     public static final String ELEVATION = "elevation";
-    /**
-     * Icon gap attribute name for the theme hashtable.
-     *
-     * @since 8.0
-     */
+    /// Icon gap attribute name for the theme hashtable.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static final String ICON_GAP = "iconGap";
-    /**
-     * Icon gap unit attribute.
-     *
-     * @since 8.0
-     */
+    /// Icon gap unit attribute.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static final String ICON_GAP_UNIT = "iconGapUnit";
-    /**
-     * Surface attribute name for the theme hashtable.
-     */
+    /// Surface attribute name for the theme hashtable.
     public static final String SURFACE = "surface";
-    /**
-     * Margin attribute name for the theme hashtable
-     */
+    /// Margin attribute name for the theme hashtable
     public static final String MARGIN = "margin";
-    /**
-     * Border attribute name for the theme hashtable
-     */
+    /// Border attribute name for the theme hashtable
     public static final String BORDER = "border";
-    /**
-     * Padding attribute name for the theme hashtable
-     */
+    /// Padding attribute name for the theme hashtable
     public static final String PADDING = "padding";
-    /**
-     * Painter attribute name for the style event
-     */
+    /// Painter attribute name for the style event
     public static final String PAINTER = "painter";
-    /**
-     * Alignment attribute for the style event
-     */
+    /// Alignment attribute for the style event
     public static final String ALIGNMENT = "align";
-    /**
-     * Text decoration attribute for the style event
-     */
+    /// Text decoration attribute for the style event
     public static final String TEXT_DECORATION = "textDecoration";
-    /**
-     * The units of the padding
-     */
+    /// The units of the padding
     public static final String PADDING_UNIT = "padUnit";
-    /**
-     * The units of the margin
-     */
+    /// The units of the margin
     public static final String MARGIN_UNIT = "marUnit";
-    /**
-     * Indicates the background for the style would use a scaled image
-     */
+    /// Indicates the background for the style would use a scaled image
     public static final byte BACKGROUND_NONE = (byte) 0;
-    /**
-     * Indicates the background for the style would use a scaled image
-     */
+    /// Indicates the background for the style would use a scaled image
     public static final byte BACKGROUND_IMAGE_SCALED = (byte) 1;
-    /**
-     * Indicates the background for the style would use a tiled image on both axis
-     */
+    /// Indicates the background for the style would use a tiled image on both axis
     public static final byte BACKGROUND_IMAGE_TILE_BOTH = (byte) 2;
-    /**
-     * Indicates the background for the style would use a vertical tiled image
-     */
+    /// Indicates the background for the style would use a vertical tiled image
     public static final byte BACKGROUND_IMAGE_TILE_VERTICAL = (byte) 3;
-    /**
-     * Indicates the background for the style would use a horizontal tiled image
-     */
+    /// Indicates the background for the style would use a horizontal tiled image
     public static final byte BACKGROUND_IMAGE_TILE_HORIZONTAL = (byte) 4;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_TOP = (byte) 20;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_BOTTOM = (byte) 21;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_LEFT = (byte) 22;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_RIGHT = (byte) 23;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_CENTER = (byte) 24;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_TOP_LEFT = (byte) 25;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT = (byte) 26;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT = (byte) 27;
-    /**
-     * Indicates the background for the style would use an unscaled image with an alignment
-     */
+    /// Indicates the background for the style would use an unscaled image with an alignment
     public static final byte BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT = (byte) 28;
-    /**
-     * Indicates the background for the style would use a horizontal tiled image
-     */
+    /// Indicates the background for the style would use a horizontal tiled image
     public static final byte BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP = (byte) 4;
-    /**
-     * Indicates the background for the style would use a horizontal tiled image
-     */
+    /// Indicates the background for the style would use a horizontal tiled image
     public static final byte BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER = (byte) 29;
-    /**
-     * Indicates the background for the style would use a horizontal tiled image
-     */
+    /// Indicates the background for the style would use a horizontal tiled image
     public static final byte BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM = (byte) 30;
-    /**
-     * Indicates the background for the style would use a horizontal tiled image
-     */
+    /// Indicates the background for the style would use a horizontal tiled image
     public static final byte BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT = BACKGROUND_IMAGE_TILE_VERTICAL;
-    /**
-     * Indicates the background for the style would use a horizontal tiled image
-     */
+    /// Indicates the background for the style would use a horizontal tiled image
     public static final byte BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER = (byte) 31;
-    /**
-     * Indicates the background for the style would use a horizontal tiled image
-     */
+    /// Indicates the background for the style would use a horizontal tiled image
     public static final byte BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT = (byte) 32;
-    /**
-     * Indicates the background for the style would use a scaled image that fills all available space while
-     * maintaining aspect ratio
-     */
+    /// Indicates the background for the style would use a scaled image that fills all available space while
+    /// maintaining aspect ratio
     public static final byte BACKGROUND_IMAGE_SCALED_FILL = (byte) 33;
-    /**
-     * Indicates the background for the style would use a scaled image that fits to available space while
-     * maintaining aspect ratio
-     */
+    /// Indicates the background for the style would use a scaled image that fits to available space while
+    /// maintaining aspect ratio
     public static final byte BACKGROUND_IMAGE_SCALED_FIT = (byte) 34;
-    /**
-     * Indicates the background for the style would use a linear gradient
-     */
+    /// Indicates the background for the style would use a linear gradient
     public static final byte BACKGROUND_GRADIENT_LINEAR_VERTICAL = (byte) 6;
-    /**
-     * Indicates the background for the style would use a linear gradient
-     */
+    /// Indicates the background for the style would use a linear gradient
     public static final byte BACKGROUND_GRADIENT_LINEAR_HORIZONTAL = (byte) 7;
-    /**
-     * Indicates the background for the style would use a radial gradient
-     */
+    /// Indicates the background for the style would use a radial gradient
     public static final byte BACKGROUND_GRADIENT_RADIAL = (byte) 8;
-    /**
-     * Indicates no text decoration
-     */
+    /// Indicates no text decoration
     public static final byte TEXT_DECORATION_NONE = (byte) 0;
-    /**
-     * Indicates underline
-     */
+    /// Indicates underline
     public static final byte TEXT_DECORATION_UNDERLINE = (byte) 1;
-    /**
-     * Indicates a strike-through line (usually used to denote deleted text)
-     */
+    /// Indicates a strike-through line (usually used to denote deleted text)
     public static final byte TEXT_DECORATION_STRIKETHRU = (byte) 2;
-    /**
-     * Indicates overline
-     */
+    /// Indicates overline
     public static final byte TEXT_DECORATION_OVERLINE = (byte) 4;
-    /**
-     * 3D text effect using a font shadow
-     */
+    /// 3D text effect using a font shadow
     public static final byte TEXT_DECORATION_3D = (byte) 8;
-    /**
-     * 3D sunken text effect using a light font shadow
-     */
+    /// 3D sunken text effect using a light font shadow
     public static final byte TEXT_DECORATION_3D_LOWERED = (byte) 16;
-    /**
-     * 3D text effect using a font shadow
-     */
+    /// 3D text effect using a font shadow
     public static final byte TEXT_DECORATION_3D_SHADOW_NORTH = (byte) 32;
-    /**
-     * Indicates the unit type for padding/margin, the default is in device specific pixels
-     */
+    /// Indicates the unit type for padding/margin, the default is in device specific pixels
     public static final byte UNIT_TYPE_PIXELS = 0;
-    /**
-     * Indicates the unit type for padding/margin in percentage of the size of the screen
-     */
+    /// Indicates the unit type for padding/margin in percentage of the size of the screen
     public static final byte UNIT_TYPE_SCREEN_PERCENTAGE = 1;
-    /**
-     * Indicates the unit type for padding/margin in device independent pixels. Device independent pixels try to aim
-     * at roughly 1 millimeter of the screen per DIP but make no guarantee for accuracy.
-     */
+    /// Indicates the unit type for padding/margin in device independent pixels. Device independent pixels try to aim
+    /// at roughly 1 millimeter of the screen per DIP but make no guarantee for accuracy.
     public static final byte UNIT_TYPE_DIPS = 2;
-    /**
-     * Indicates the unit type for padding/margin as a percentage of the screen width.
-     *
-     * @since 8.0
-     */
+    /// Indicates the unit type for padding/margin as a percentage of the screen width.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static final byte UNIT_TYPE_VW = 3;
-    /**
-     * Indicates the unit type for padding/margin as a percentage of the screen height.
-     *
-     * @since 8.0
-     */
+    /// Indicates the unit type for padding/margin as a percentage of the screen height.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static final byte UNIT_TYPE_VH = 4;
-    /**
-     * Indicates the unit type for padding/margin as a percentage the minimum of screen width and height.
-     *
-     * @since 8.0
-     */
+    /// Indicates the unit type for padding/margin as a percentage the minimum of screen width and height.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static final byte UNIT_TYPE_VMIN = 5;
-    /**
-     * Indicates the unit type for padding/margin as a percentage the maximum of screen width and height.
-     *
-     * @since 8.0
-     */
+    /// Indicates the unit type for padding/margin as a percentage the maximum of screen width and height.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static final byte UNIT_TYPE_VMAX = 6;
-    /**
-     * Indicates the unit type for padding/margin relative to the font size of the default font.
-     * {@literal 1rem == Font.getDefaultFont().getHeight()}
-     *
-     * @since 8.0
-     */
+    /// Indicates the unit type for padding/margin relative to the font size of the default font.
+    /// 1rem == Font.getDefaultFont().getHeight()
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static final byte UNIT_TYPE_REM = 7;
-    /**
-     * Indicates the background alignment for use in tiling or aligned images.
-     */
+    /// Indicates the background alignment for use in tiling or aligned images.
     private static final byte BACKGROUND_IMAGE_ALIGN_TOP = (byte) 0xa1;
-    /**
-     * Used for modified flag
-     */
+    /// Used for modified flag
     private static final int FG_COLOR_MODIFIED = 1;
-    /**
-     * Used for modified flag
-     */
+    /// Used for modified flag
     private static final int BG_COLOR_MODIFIED = 2;
-    /**
-     * Used for modified flag
-     */
+    /// Used for modified flag
     private static final int FONT_MODIFIED = 16;
-    /**
-     * Used for modified flag
-     */
+    /// Used for modified flag
     private static final int BG_IMAGE_MODIFIED = 32;
     private static final int TEXT_DECORATION_MODIFIED = 64;
-    /**
-     * Used for modified flag
-     */
+    /// Used for modified flag
     private static final int TRANSPARENCY_MODIFIED = 128;
-    /**
-     * Used for modified flag
-     */
+    /// Used for modified flag
     private static final int PADDING_MODIFIED = 256;
-    /**
-     * Used for modified flag
-     */
+    /// Used for modified flag
     private static final int MARGIN_MODIFIED = 512;
-    /**
-     * Used for modified flag
-     */
+    /// Used for modified flag
     private static final int BORDER_MODIFIED = 1024;
     private static final int BACKGROUND_TYPE_MODIFIED = 2048;
     private static final int BACKGROUND_ALIGNMENT_MODIFIED = 4096;
@@ -390,25 +261,19 @@ public class Style {
     private static final int ICON_GAP_MODIFIED = 524288;
     float[] padding = new float[4];
     float[] margin = new float[4];
-    /**
-     * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
-     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     * * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     */
+    /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     byte[] paddingUnit;
-    /**
-     * Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
-     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     * * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     */
+    /// Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     byte[] marginUnit;
     Object roundRectCache;
     // used by the Android port, do not remove!
     Object nativeOSCache;
     boolean renderer;
-    /**
-     * Flag to suppress change events
-     */
+    /// Flag to suppress change events
     private boolean suppressChangeEvents;
     private Style[] proxyTo;
     private int fgColor = 0x000000;
@@ -430,32 +295,28 @@ public class Style {
     private Border border = null;
     private int align = Component.LEFT;
     private int textDecoration; // Used for underline, strikethru etc. (See TEXT_DECORATION_* constants)
-    /**
-     * The modified flag indicates which portions of the style have changed using
-     * bitmask values
-     */
+    /// The modified flag indicates which portions of the style have changed using
+    /// bitmask values
     private long modifiedFlag;
     private EventDispatcher listeners;
 
-    /**
-     * Each component when it draw itself uses this Object
-     * to determine in what colors it should use.
-     * When a Component is generated it construct a default Style Object.
-     * The Default values for each Component can be changed by using the UIManager class
-     */
+    /// Each component when it draw itself uses this Object
+    /// to determine in what colors it should use.
+    /// When a Component is generated it construct a default Style Object.
+    /// The Default values for each Component can be changed by using the UIManager class
     public Style() {
         setPadding(3, 3, 3, 3);
         setMargin(2, 2, 2, 2);
         modifiedFlag = 0;
     }
 
-    /**
-     * Creates a full copy of the given style. Notice that if the original style was modified
-     * manually (by invoking setters on it) it would not chnage when changing a theme/look and feel,
-     * however this newly created style would change in such a case.
-     *
-     * @param style the style to copy
-     */
+    /// Creates a full copy of the given style. Notice that if the original style was modified
+    /// manually (by invoking setters on it) it would not chnage when changing a theme/look and feel,
+    /// however this newly created style would change in such a case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: the style to copy
     public Style(Style style) {
         this(style.getFgColor(), style.getBgColor(), style.getFont(), style.getBgTransparency(),
                 style.getBgImage());
@@ -487,27 +348,34 @@ public class Style {
         }
     }
 
-    /**
-     * Creates a new style with the given attributes
-     *
-     * @param fgColor      foreground color
-     * @param bgColor      background color
-     * @param f            font
-     * @param transparency transparency value
-     */
+    /// Creates a new style with the given attributes
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    ///
+    /// - `bgColor`: background color
+    ///
+    /// - `f`: font
+    ///
+    /// - `transparency`: transparency value
     public Style(int fgColor, int bgColor, Font f, byte transparency) {
         this(fgColor, bgColor, f, transparency, null, BACKGROUND_IMAGE_SCALED);
     }
 
-    /**
-     * Creates a new style with the given attributes
-     *
-     * @param fgColor      foreground color
-     * @param bgColor      background color
-     * @param f            font
-     * @param transparency transparency value
-     * @param im           background image
-     */
+    /// Creates a new style with the given attributes
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    ///
+    /// - `bgColor`: background color
+    ///
+    /// - `f`: font
+    ///
+    /// - `transparency`: transparency value
+    ///
+    /// - `im`: background image
     private Style(int fgColor, int bgColor, Font f, byte transparency, Image im) {
         this();
         this.fgColor = fgColor;
@@ -517,20 +385,25 @@ public class Style {
         this.bgImage = im;
     }
 
-    /**
-     * Creates a new style with the given attributes
-     *
-     * @param fgColor        foreground color
-     * @param bgColor        background color
-     * @param f              font
-     * @param transparency   transparency value
-     * @param im             background image
-     * @param backgroundType one of:
-     *                       BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
-     *                       BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
-     *                       BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
-     *                       BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
-     */
+    /// Creates a new style with the given attributes
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    ///
+    /// - `bgColor`: background color
+    ///
+    /// - `f`: font
+    ///
+    /// - `transparency`: transparency value
+    ///
+    /// - `im`: background image
+    ///
+    /// - `backgroundType`: @param backgroundType one of:
+    /// BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
     public Style(int fgColor, int bgColor, Font f, byte transparency, Image im, byte backgroundType) {
         this();
         this.fgColor = fgColor;
@@ -541,13 +414,16 @@ public class Style {
         this.bgImage = im;
     }
 
-    /**
-     * Creates a "proxy" style whose setter methods map to the methods in the given styles passed and whose
-     * getter methods are meaningless
-     *
-     * @param styles the styles to which we will proxy
-     * @return a proxy style object
-     */
+    /// Creates a "proxy" style whose setter methods map to the methods in the given styles passed and whose
+    /// getter methods are meaningless
+    ///
+    /// #### Parameters
+    ///
+    /// - `styles`: the styles to which we will proxy
+    ///
+    /// #### Returns
+    ///
+    /// a proxy style object
     public static Style createProxyStyle(Style... styles) {
         Style s = new Style();
         s.proxyTo = styles;
@@ -562,29 +438,27 @@ public class Style {
         this.nativeOSCache = nativeOSCache;
     }
 
-    /**
-     * Disables native OS optimizations that might collide with cell renderers which do things like sharing style
-     * objects
-     */
+    /// Disables native OS optimizations that might collide with cell renderers which do things like sharing style
+    /// objects
     public void markAsRendererStyle() {
         renderer = true;
     }
 
-    /**
-     * Indicates whether this style has been marked for use with renderers.
-     *
-     * @return {@code true} if {@link #markAsRendererStyle()} was invoked.
-     */
+    /// Indicates whether this style has been marked for use with renderers.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if `#markAsRendererStyle()` was invoked.
     public boolean isRendererStyle() {
         return renderer;
     }
 
-    /**
-     * Merges the new style with the current style without changing the elements that
-     * were modified.
-     *
-     * @param style new values of styles from the current theme
-     */
+    /// Merges the new style with the current style without changing the elements that
+    /// were modified.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: new values of styles from the current theme
     public void merge(Style style) {
         long tmp = modifiedFlag;
 
@@ -667,32 +541,37 @@ public class Style {
         modifiedFlag = tmp;
     }
 
-    /**
-     * Gets the elevation value of this style.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
-     *
-     * @return The elevation value.  Default is 0.
-     * @since 8.0
-     */
+    /// Gets the elevation value of this style.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+    ///
+    /// #### Returns
+    ///
+    /// The elevation value.  Default is 0.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public int getElevation() {
         return elevation;
     }
 
-    /**
-     * Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
-     *
-     * @param elevation The elevation value.
-     * @since 8.0
-     */
+    /// Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+    ///
+    /// #### Parameters
+    ///
+    /// - `elevation`: The elevation value.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void setElevation(int elevation) {
         setElevation(elevation, false);
     }
 
-    /**
-     * Returns the icon gap in pixels.
-     *
-     * @return
-     * @since 8.0
-     */
+    /// Returns the icon gap in pixels.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public int getIconGap() {
         if (iconGap < 0) {
             return -1;
@@ -700,165 +579,189 @@ public class Style {
         return CN.convertToPixels(iconGap, iconGapUnit);
     }
 
-    /**
-     * Sets the icon gap in the current units.
-     *
-     * @param gap The icon gap.
-     * @see #getIconGapUnit()
-     * @since 8.0
-     */
+    /// Sets the icon gap in the current units.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: The icon gap.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #getIconGapUnit()
     public void setIconGap(float gap) {
         setIconGap(gap, false);
     }
 
-    /**
-     * Returns the icon gap unit.  One of {@link #UNIT_TYPE_REM}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_VMIN},
-     * {@link #UNIT_TYPE_VH}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_DIPS},
-     * {@link #UNIT_TYPE_PIXELS}
-     *
-     * @return The icon gap unit
-     * @since 8.0
-     */
+    /// Returns the icon gap unit.  One of `#UNIT_TYPE_REM`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_VMIN`,
+    /// `#UNIT_TYPE_VH`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_DIPS`,
+    /// `#UNIT_TYPE_PIXELS`
+    ///
+    /// #### Returns
+    ///
+    /// The icon gap unit
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public int getIconGapUnit() {
         return iconGapUnit;
     }
 
-    /**
-     * Sets the icon gap unit.
-     *
-     * @param unit The icon gap unit.  One of the standard style units of measurement.
-     * @since 8.0
-     */
+    /// Sets the icon gap unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: The icon gap unit.  One of the standard style units of measurement.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void setIconGapUnit(byte unit) {
         setIconGapUnit(unit, false);
     }
 
-    /**
-     * Checks whether the component is a surface.  Surface containers support a sort of z-index of descendants
-     * via the elevation attribute.  Surfaces will render the shadows of elevated descendants to convey depth.
-     *
-     * @return True if container should be rendered as a surface.
-     * @since 8.0
-     */
+    /// Checks whether the component is a surface.  Surface containers support a sort of z-index of descendants
+    /// via the elevation attribute.  Surfaces will render the shadows of elevated descendants to convey depth.
+    ///
+    /// #### Returns
+    ///
+    /// True if container should be rendered as a surface.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public boolean isSurface() {
         return surface;
     }
 
-    /**
-     * Enables or disables surface rendering mode for component.  Surfaces can support a sort of
-     * z-indexing of its descendants via their elevation properties.  The surface will render
-     * the shadows of elevated descendants to convey depth.
-     *
-     * @param surface True to enable surface rendering mode.
-     * @since 8.0
-     */
+    /// Enables or disables surface rendering mode for component.  Surfaces can support a sort of
+    /// z-indexing of its descendants via their elevation properties.  The surface will render
+    /// the shadows of elevated descendants to convey depth.
+    ///
+    /// #### Parameters
+    ///
+    /// - `surface`: True to enable surface rendering mode.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void setSurface(boolean surface) {
         setSurface(surface, false);
     }
 
-    /**
-     * Returns true if the style was modified manually after it was created by the
-     * look and feel. If the style was modified manually (by one of the set methods)
-     * then it should be merged rather than overwritten.
-     *
-     * @return true if the style was modified
-     */
+    /// Returns true if the style was modified manually after it was created by the
+    /// look and feel. If the style was modified manually (by one of the set methods)
+    /// then it should be merged rather than overwritten.
+    ///
+    /// #### Returns
+    ///
+    /// true if the style was modified
     public boolean isModified() {
         return modifiedFlag != 0;
     }
 
-    /**
-     * Background color for the component
-     *
-     * @return the background color for the component
-     */
+    /// Background color for the component
+    ///
+    /// #### Returns
+    ///
+    /// the background color for the component
     public int getBgColor() {
         return bgColor;
     }
 
-    /**
-     * Sets the background color for the component
-     *
-     * @param bgColor RRGGBB color that ignors the alpha component
-     */
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgColor`: RRGGBB color that ignors the alpha component
     public void setBgColor(int bgColor) {
         setBgColor(bgColor, false);
     }
 
-    /**
-     * Background image for the component
-     *
-     * @return the background image for the component
-     */
+    /// Background image for the component
+    ///
+    /// #### Returns
+    ///
+    /// the background image for the component
     public Image getBgImage() {
         return bgImage;
     }
 
-    /**
-     * Sets the background image for the component
-     *
-     * @param bgImage background image
-     */
+    /// Sets the background image for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgImage`: background image
     public void setBgImage(Image bgImage) {
         setBgImage(bgImage, false);
     }
 
-    /**
-     * The type of the background defaults to BACKGROUND_IMAGE_SCALED
-     *
-     * @return one of:
-     * BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
-     * BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
-     * BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
-     * BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
-     */
+    /// The type of the background defaults to BACKGROUND_IMAGE_SCALED
+    ///
+    /// #### Returns
+    ///
+    /// @return one of:
+    /// BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
     public byte getBackgroundType() {
         return backgroundType;
     }
 
-    /**
-     * Sets the background type for the component
-     *
-     * @param backgroundType one of BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
-     *                       BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
-     *                       BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
-     *                       BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
-     */
+    /// Sets the background type for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundType`: @param backgroundType one of BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
     public void setBackgroundType(byte backgroundType) {
         setBackgroundType(backgroundType, false);
     }
 
-    /**
-     * Return the alignment for the image or tiled image
-     *
-     * @return one of:
-     * BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
-     * BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
-     * BACKGROUND_IMAGE_ALIGN_CENTER
-     * @deprecated the functionality of this method is now covered by background type
-     */
+    /// Return the alignment for the image or tiled image
+    ///
+    /// #### Returns
+    ///
+    /// @return one of:
+    /// BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
+    /// BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
+    /// BACKGROUND_IMAGE_ALIGN_CENTER
+    ///
+    /// #### Deprecated
+    ///
+    /// the functionality of this method is now covered by background type
     private byte getBackgroundAlignment() {
         return backgroundAlignment;
     }
 
-    /**
-     * Sets the background alignment for the component
-     *
-     * @param backgroundAlignment one of:
-     *                            BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
-     *                            BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
-     *                            BACKGROUND_IMAGE_ALIGN_CENTER
-     * @deprecated the functionality of this method is now covered by background type
-     */
+    /// Sets the background alignment for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundAlignment`: @param backgroundAlignment one of:
+    /// BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
+    /// BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
+    /// BACKGROUND_IMAGE_ALIGN_CENTER
+    ///
+    /// #### Deprecated
+    ///
+    /// the functionality of this method is now covered by background type
     private void setBackgroundAlignment(byte backgroundAlignment) {
         setBackgroundAlignment(backgroundAlignment, false);
     }
 
-    /**
-     * Start color for the radial/linear gradient
-     *
-     * @return the start color for the radial/linear gradient
-     */
+    /// Start color for the radial/linear gradient
+    ///
+    /// #### Returns
+    ///
+    /// the start color for the radial/linear gradient
     public int getBackgroundGradientStartColor() {
         if (backgroundGradient != null && backgroundGradient.length > 1) {
             return ((Integer) backgroundGradient[0]).intValue();
@@ -866,20 +769,20 @@ public class Style {
         return 0xffffff;
     }
 
-    /**
-     * Sets the background color for the component
-     *
-     * @param backgroundGradientStartColor start color for the linear/radial gradient
-     */
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientStartColor`: start color for the linear/radial gradient
     public void setBackgroundGradientStartColor(int backgroundGradientStartColor) {
         setBackgroundGradientStartColor(backgroundGradientStartColor, false);
     }
 
-    /**
-     * End color for the radial/linear gradient
-     *
-     * @return the end color for the radial/linear gradient
-     */
+    /// End color for the radial/linear gradient
+    ///
+    /// #### Returns
+    ///
+    /// the end color for the radial/linear gradient
     public int getBackgroundGradientEndColor() {
         if (backgroundGradient != null && backgroundGradient.length > 1) {
             return ((Integer) backgroundGradient[1]).intValue();
@@ -887,20 +790,20 @@ public class Style {
         return 0;
     }
 
-    /**
-     * Sets the background color for the component
-     *
-     * @param backgroundGradientEndColor end color for the linear/radial gradient
-     */
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientEndColor`: end color for the linear/radial gradient
     public void setBackgroundGradientEndColor(int backgroundGradientEndColor) {
         setBackgroundGradientEndColor(backgroundGradientEndColor, false);
     }
 
-    /**
-     * Background radial gradient relative center position X
-     *
-     * @return value between 0 and 1 with 0.5 representing the center of the component
-     */
+    /// Background radial gradient relative center position X
+    ///
+    /// #### Returns
+    ///
+    /// value between 0 and 1 with 0.5 representing the center of the component
     public float getBackgroundGradientRelativeX() {
         if (backgroundGradient != null && backgroundGradient.length > 2) {
             return ((Float) backgroundGradient[2]).floatValue();
@@ -908,20 +811,20 @@ public class Style {
         return 0.5f;
     }
 
-    /**
-     * Background radial gradient relative center position X
-     *
-     * @param backgroundGradientRelativeX x position of the radial gradient center
-     */
+    /// Background radial gradient relative center position X
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeX`: x position of the radial gradient center
     public void setBackgroundGradientRelativeX(float backgroundGradientRelativeX) {
         setBackgroundGradientRelativeX(backgroundGradientRelativeX, false);
     }
 
-    /**
-     * Background radial gradient relative center position Y
-     *
-     * @return value between 0 and 1 with 0.5 representing the center of the component
-     */
+    /// Background radial gradient relative center position Y
+    ///
+    /// #### Returns
+    ///
+    /// value between 0 and 1 with 0.5 representing the center of the component
     public float getBackgroundGradientRelativeY() {
         if (backgroundGradient != null && backgroundGradient.length > 3) {
             return ((Float) backgroundGradient[3]).floatValue();
@@ -929,20 +832,20 @@ public class Style {
         return 0.5f;
     }
 
-    /**
-     * Background radial gradient relative center position Y
-     *
-     * @param backgroundGradientRelativeY y position of the radial gradient center
-     */
+    /// Background radial gradient relative center position Y
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeY`: y position of the radial gradient center
     public void setBackgroundGradientRelativeY(float backgroundGradientRelativeY) {
         setBackgroundGradientRelativeY(backgroundGradientRelativeY, false);
     }
 
-    /**
-     * Background radial gradient relative size
-     *
-     * @return value representing the relative size of the gradient
-     */
+    /// Background radial gradient relative size
+    ///
+    /// #### Returns
+    ///
+    /// value representing the relative size of the gradient
     public float getBackgroundGradientRelativeSize() {
         if (backgroundGradient != null && backgroundGradient.length > 4) {
             return ((Float) backgroundGradient[4]).floatValue();
@@ -950,78 +853,85 @@ public class Style {
         return 1f;
     }
 
-    /**
-     * Background radial gradient relative size
-     *
-     * @param backgroundGradientRelativeSize the size of the radial gradient
-     */
+    /// Background radial gradient relative size
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeSize`: the size of the radial gradient
     public void setBackgroundGradientRelativeSize(float backgroundGradientRelativeSize) {
         setBackgroundGradientRelativeSize(backgroundGradientRelativeSize, false);
     }
 
-    /**
-     * Foreground color for the component
-     *
-     * @return the foreground color for the component
-     */
+    /// Foreground color for the component
+    ///
+    /// #### Returns
+    ///
+    /// the foreground color for the component
     public int getFgColor() {
         return fgColor;
     }
 
-    /**
-     * Sets the foreground color for the component
-     *
-     * @param fgColor foreground color
-     */
+    /// Sets the foreground color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
     public final void setFgColor(int fgColor) {
         setFgColor(fgColor, false);
     }
 
-    /**
-     * Foreground alpha for the component
-     *
-     * @return the foreground alpha for the component
-     * @since 8.0
-     */
+    /// Foreground alpha for the component
+    ///
+    /// #### Returns
+    ///
+    /// the foreground alpha for the component
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public int getFgAlpha() {
         return fgAlpha;
     }
 
-    /**
-     * Sets the foreground alpha for the component
-     *
-     * @param fgAlpha foreground alpha
-     */
+    /// Sets the foreground alpha for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgAlpha`: foreground alpha
     public void setFgAlpha(int fgAlpha) {
         setFgAlpha(fgAlpha, false);
     }
 
-    /**
-     * Font for the component
-     *
-     * @return the font for the component
-     */
+    /// Font for the component
+    ///
+    /// #### Returns
+    ///
+    /// the font for the component
     public Font getFont() {
         return font;
     }
 
-    /**
-     * Sets the font for the component
-     *
-     * @param font the font
-     */
+    /// Sets the font for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: the font
     public void setFont(Font font) {
         setFont(font, false);
     }
 
-    /**
-     * Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
-     *
-     * @param elevation The elevation value.
-     * @param override  If set to true allows the look and feel/theme to override
-     *                  the value in this attribute when changing a theme/look and feel
-     * @since 8.0
-     */
+    /// Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+    ///
+    /// #### Parameters
+    ///
+    /// - `elevation`: The elevation value.
+    ///
+    /// - `override`: @param override  If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void setElevation(int elevation, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1039,16 +949,24 @@ public class Style {
 
     }
 
-    /**
-     * Sets the icon gap.
-     *
-     * @param gap      The gap.
-     * @param units    The units of the gap.
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     * @see #setIconGapUnit(byte, boolean)
-     * @since 8.0
-     */
+    /// Sets the icon gap.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: The gap.
+    ///
+    /// - `units`: The units of the gap.
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #setIconGapUnit(byte, boolean)
     public void setIconGap(float gap, byte units, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1067,38 +985,53 @@ public class Style {
 
     }
 
-    /**
-     * Sets the icon gap.
-     *
-     * @param gap      the icon gap.
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     * @see #setIconGapUnit(byte, boolean)
-     * @since 8.0
-     */
+    /// Sets the icon gap.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: the icon gap.
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #setIconGapUnit(byte, boolean)
     public void setIconGap(float gap, boolean override) {
         setIconGap(gap, iconGapUnit, override);
     }
 
-    /**
-     * Sets the icon gap.
-     *
-     * @param gap  The icon gap.
-     * @param unit The unit. One of the standard style units of measurement.
-     * @since 8.0
-     */
+    /// Sets the icon gap.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: The icon gap.
+    ///
+    /// - `unit`: The unit. One of the standard style units of measurement.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void setIconGap(float gap, byte unit) {
         setIconGap(gap, unit, false);
     }
 
-    /**
-     * Sets the icon gap unit.
-     *
-     * @param unit     The icon gap unit.  One of the standard style units of measurement.
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     * @since 8.0
-     */
+    /// Sets the icon gap unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: The icon gap unit.  One of the standard style units of measurement.
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void setIconGapUnit(byte unit, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1115,16 +1048,20 @@ public class Style {
         }
     }
 
-    /**
-     * Enables or disables surface rendering mode for component.  Surfaces can support a sort of
-     * z-indexing of its descendants via their elevation properties.  The surface will render
-     * the shadows of elevated descendants to convey depth.
-     *
-     * @param surface  True to enable surface rendering mode.
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     * @since 8.0
-     */
+    /// Enables or disables surface rendering mode for component.  Surfaces can support a sort of
+    /// z-indexing of its descendants via their elevation properties.  The surface will render
+    /// the shadows of elevated descendants to convey depth.
+    ///
+    /// #### Parameters
+    ///
+    /// - `surface`: True to enable surface rendering mode.
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public void setSurface(boolean surface, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1141,16 +1078,22 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
-     *
-     * @param align    alignment value
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     * @see com.codename1.ui.Component#CENTER
-     * @see com.codename1.ui.Component#LEFT
-     * @see com.codename1.ui.Component#RIGHT
-     */
+    /// Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: alignment value
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Component#CENTER
+    ///
+    /// - com.codename1.ui.Component#LEFT
+    ///
+    /// - com.codename1.ui.Component#RIGHT
     public void setAlignment(int align, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1167,44 +1110,54 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the alignment of the Label
-     *
-     * @return the alignment of the Label one of: CENTER, LEFT, RIGHT
-     * @see com.codename1.ui.Component#CENTER
-     * @see com.codename1.ui.Component#LEFT
-     * @see com.codename1.ui.Component#RIGHT
-     */
+    /// Returns the alignment of the Label
+    ///
+    /// #### Returns
+    ///
+    /// the alignment of the Label one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Component#CENTER
+    ///
+    /// - com.codename1.ui.Component#LEFT
+    ///
+    /// - com.codename1.ui.Component#RIGHT
     public int getAlignment() {
         return align;
     }
 
-    /**
-     * Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
-     *
-     * @param align alignment value
-     * @see com.codename1.ui.Component#CENTER
-     * @see com.codename1.ui.Component#LEFT
-     * @see com.codename1.ui.Component#RIGHT
-     */
+    /// Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: alignment value
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Component#CENTER
+    ///
+    /// - com.codename1.ui.Component#LEFT
+    ///
+    /// - com.codename1.ui.Component#RIGHT
     public void setAlignment(int align) {
         setAlignment(align, false);
     }
 
-    /**
-     * Returns true if the underline text decoration is on, false otherwise
-     *
-     * @return true if the underline text decoration is on, false otherwise
-     */
+    /// Returns true if the underline text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the underline text decoration is on, false otherwise
     public boolean isUnderline() {
         return ((textDecoration & TEXT_DECORATION_UNDERLINE) != 0);
     }
 
-    /**
-     * Sets the underline text decoration for this style
-     *
-     * @param underline true to turn underline on, false to turn it off
-     */
+    /// Sets the underline text decoration for this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `underline`: true to turn underline on, false to turn it off
     public void setUnderline(boolean underline) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1221,12 +1174,13 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the 3D text decoration for this style
-     *
-     * @param t      true to turn 3d shadow effect on, false to turn it off
-     * @param raised indicates a raised or lowered effect
-     */
+    /// Sets the 3D text decoration for this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: true to turn 3d shadow effect on, false to turn it off
+    ///
+    /// - `raised`: indicates a raised or lowered effect
     public void set3DText(boolean t, boolean raised) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1255,20 +1209,20 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the text decoration state for the north
-     *
-     * @return true if that is used
-     */
+    /// Returns the text decoration state for the north
+    ///
+    /// #### Returns
+    ///
+    /// true if that is used
     public boolean is3DTextNorth() {
         return (textDecoration & TEXT_DECORATION_3D_SHADOW_NORTH) == TEXT_DECORATION_3D_SHADOW_NORTH;
     }
 
-    /**
-     * Sets the text decoration to 3D text
-     *
-     * @param north true to enable 3d text with the shadow on top false otherwise
-     */
+    /// Sets the text decoration to 3D text
+    ///
+    /// #### Parameters
+    ///
+    /// - `north`: true to enable 3d text with the shadow on top false otherwise
     public void set3DTextNorth(boolean north) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1279,38 +1233,38 @@ public class Style {
         textDecoration = TEXT_DECORATION_3D_SHADOW_NORTH;
     }
 
-    /**
-     * Returns true if the 3D text decoration is on, false otherwise
-     *
-     * @return true if the 3D text decoration is on, false otherwise
-     */
+    /// Returns true if the 3D text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the 3D text decoration is on, false otherwise
     public boolean isRaised3DText() {
         return ((textDecoration & TEXT_DECORATION_3D) != 0);
     }
 
-    /**
-     * Returns true if the 3D text decoration is on, false otherwise
-     *
-     * @return true if the 3D text decoration is on, false otherwise
-     */
+    /// Returns true if the 3D text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the 3D text decoration is on, false otherwise
     public boolean isLowered3DText() {
         return ((textDecoration & TEXT_DECORATION_3D_LOWERED) != 0);
     }
 
-    /**
-     * Returns true if the overline text decoration is on, false otherwise
-     *
-     * @return true if the overline text decoration is on, false otherwise
-     */
+    /// Returns true if the overline text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the overline text decoration is on, false otherwise
     public boolean isOverline() {
         return ((textDecoration & TEXT_DECORATION_OVERLINE) != 0);
     }
 
-    /**
-     * Sets the overline text decoration for this style
-     *
-     * @param overline true to turn overline on, false to turn it off
-     */
+    /// Sets the overline text decoration for this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `overline`: true to turn overline on, false to turn it off
     public void setOverline(boolean overline) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1327,20 +1281,20 @@ public class Style {
         }
     }
 
-    /**
-     * Returns true if the strike through text decoration is on, false otherwise
-     *
-     * @return true if the strike through  text decoration is on, false otherwise
-     */
+    /// Returns true if the strike through text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the strike through  text decoration is on, false otherwise
     public boolean isStrikeThru() {
         return ((textDecoration & TEXT_DECORATION_STRIKETHRU) != 0);
     }
 
-    /**
-     * Sets the strike through text decoration for this style
-     *
-     * @param strikethru true to turn strike through on, false to turn it off
-     */
+    /// Sets the strike through text decoration for this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `strikethru`: true to turn strike through on, false to turn it off
     public void setStrikeThru(boolean strikethru) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1357,31 +1311,32 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the text decoration of this style
-     *
-     * @return the text decoration of this style (bitmask of the TEXT_DECORATION_* constants)
-     */
+    /// Returns the text decoration of this style
+    ///
+    /// #### Returns
+    ///
+    /// the text decoration of this style (bitmask of the TEXT_DECORATION_* constants)
     public int getTextDecoration() {
         return textDecoration;
     }
 
-    /**
-     * Sets the text decoration of this style
-     *
-     * @param textDecoration the textDecoration to set (bitmask of the TEXT_DECORATION_* constants)
-     */
+    /// Sets the text decoration of this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `textDecoration`: the textDecoration to set (bitmask of the TEXT_DECORATION_* constants)
     public void setTextDecoration(int textDecoration) {
         setTextDecoration(textDecoration, false);
     }
 
-    /**
-     * Sets the text decoration of this style
-     *
-     * @param textDecoration the textDecoration to set (bitmask of the TEXT_DECORATION_* constants)
-     * @param override       If set to true allows the look and feel/theme to override
-     *                       the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the text decoration of this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `textDecoration`: the textDecoration to set (bitmask of the TEXT_DECORATION_* constants)
+    ///
+    /// - `override`: @param override       If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setTextDecoration(int textDecoration, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1399,12 +1354,12 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the transparency (opacity) level of the Component, zero indicates fully
-     * transparent and FF indicates fully opaque.
-     *
-     * @return the transparency level of the Component
-     */
+    /// Returns the transparency (opacity) level of the Component, zero indicates fully
+    /// transparent and FF indicates fully opaque.
+    ///
+    /// #### Returns
+    ///
+    /// the transparency level of the Component
     public byte getBgTransparency() {
         if (bgImage != null && backgroundType <= BACKGROUND_IMAGE_TILE_BOTH && backgroundType != BACKGROUND_NONE && (bgImage.isAnimation() || bgImage.isOpaque())) {
             return (byte) 0xff;
@@ -1412,52 +1367,53 @@ public class Style {
         return transparency;
     }
 
-    /**
-     * Sets the Component transparency (opacity) level of the Component, zero indicates fully
-     * transparent and FF indicates fully opaque.
-     *
-     * @param transparency transparency level as byte
-     */
+    /// Sets the Component transparency (opacity) level of the Component, zero indicates fully
+    /// transparent and FF indicates fully opaque.
+    ///
+    /// #### Parameters
+    ///
+    /// - `transparency`: transparency level as byte
     public void setBgTransparency(byte transparency) {
         setBgTransparency(transparency & 0xFF, false);
     }
 
-    /**
-     * Sets the Component transparency level. Valid values should be a
-     * number between 0-255
-     *
-     * @param transparency int value between 0-255
-     */
+    /// Sets the Component transparency level. Valid values should be a
+    /// number between 0-255
+    ///
+    /// #### Parameters
+    ///
+    /// - `transparency`: int value between 0-255
     public void setBgTransparency(int transparency) {
         setBgTransparency(transparency, false);
     }
 
-    /**
-     * Returns the opacity value for the component
-     *
-     * @return the opacity value
-     */
+    /// Returns the opacity value for the component
+    ///
+    /// #### Returns
+    ///
+    /// the opacity value
     public int getOpacity() {
         return opacity & 0xff;
     }
 
-    /**
-     * Set the opacity value
-     *
-     * @param opacity the opacity value
-     */
+    /// Set the opacity value
+    ///
+    /// #### Parameters
+    ///
+    /// - `opacity`: the opacity value
     public final void setOpacity(int opacity) {
         setOpacity(opacity, false);
     }
 
-    /**
-     * Sets the Component transparency level. Valid values should be a
-     * number between 0-255
-     *
-     * @param opacity  int value between 0-255
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the Component transparency level. Valid values should be a
+    /// number between 0-255
+    ///
+    /// #### Parameters
+    ///
+    /// - `opacity`: int value between 0-255
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public final void setOpacity(int opacity, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1478,39 +1434,51 @@ public class Style {
         }
     }
 
-    /**
-     * Strips all margin and padding from this style.
-     *
-     * @since 7.0
-     */
+    /// Strips all margin and padding from this style.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void stripMarginAndPadding() {
         setPadding(0, 0, 0, 0);
         setMargin(0, 0, 0, 0);
         setBorder(Border.createEmpty());
     }
 
-    /**
-     * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
-     *
-     * @param top    number of units to pad the top
-     * @param bottom number of units to pad the bottom
-     * @param left   number of units to pad the left
-     * @param right  number of units to pad the right
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding. Units are specified by `#setPaddingUnit(byte...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: number of units to pad the top
+    ///
+    /// - `bottom`: number of units to pad the bottom
+    ///
+    /// - `left`: number of units to pad the left
+    ///
+    /// - `right`: number of units to pad the right
+    ///
+    /// #### See also
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPadding(int top, int bottom, int left, int right) {
         this.setPadding((float) top, (float) bottom, (float) left, (float) right);
     }
 
-    /**
-     * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
-     *
-     * @param top    number of units to pad the top
-     * @param bottom number of units to pad the bottom
-     * @param left   number of units to pad the left
-     * @param right  number of units to pad the right
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding. Units are specified by `#setPaddingUnit(byte...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: number of units to pad the top
+    ///
+    /// - `bottom`: number of units to pad the bottom
+    ///
+    /// - `left`: number of units to pad the left
+    ///
+    /// - `right`: number of units to pad the right
+    ///
+    /// #### See also
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPadding(float top, float bottom, float left, float right) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1535,46 +1503,54 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap         number of units to pad the orientation
-     */
+    /// Sets the Style Padding. Units are specified by `#setPaddingUnit(byte...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of units to pad the orientation
     public void setPadding(int orientation, int gap) {
         setPadding(orientation, gap, false);
     }
 
-    /**
-     * Sets the Style Padding. Units are specified by {@link #setPaddingUnit(byte...)}
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap         number of units to pad the orientation
-     */
+    /// Sets the Style Padding. Units are specified by `#setPaddingUnit(byte...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of units to pad the orientation
     public void setPadding(int orientation, float gap) {
         setPadding(orientation, gap, false);
     }
 
-    /**
-     * Sets the Style Margin
-     *
-     * @param top    number of margin using the current unit
-     * @param bottom number of margin using the current unit
-     * @param left   number of margin using the current unit
-     * @param right  number of margin using the current unit
-     */
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: number of margin using the current unit
+    ///
+    /// - `bottom`: number of margin using the current unit
+    ///
+    /// - `left`: number of margin using the current unit
+    ///
+    /// - `right`: number of margin using the current unit
     public void setMargin(int top, int bottom, int left, int right) {
         setMargin((float) top, (float) bottom, (float) left, (float) right);
     }
 
-    /**
-     * Sets the Style Margin
-     *
-     * @param top    number of margin using the current unit
-     * @param bottom number of margin using the current unit
-     * @param left   number of margin using the current unit
-     * @param right  number of margin using the current unit
-     */
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: number of margin using the current unit
+    ///
+    /// - `bottom`: number of margin using the current unit
+    ///
+    /// - `left`: number of margin using the current unit
+    ///
+    /// - `right`: number of margin using the current unit
     public void setMargin(float top, float bottom, float left, float right) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1599,14 +1575,12 @@ public class Style {
         }
     }
 
-    /**
-     * Store current margin values into a cache that could be restored with restoreCachedMargins()
-     *
-     * @parma override: if true, margins would be cached even if a a previous cache already exists. If false, margins would be cached only if no cache already exists
-     * Warning: This method is used internally when hidding a component with the Component.setHidden(true) method and expect a component with no previous margins cache.
-     * So do not use this method on a component that would be hidden or flush its margins cache by calling flushMarginsCache() before hidding the component.
-     * And do not use on an hidden component either or unhidding this component might result in unexpected results
-     */
+    /// Store current margin values into a cache that could be restored with restoreCachedMargins()
+    ///
+    /// @parma override: if true, margins would be cached even if a a previous cache already exists. If false, margins would be cached only if no cache already exists
+    /// Warning: This method is used internally when hidding a component with the Component.setHidden(true) method and expect a component with no previous margins cache.
+    /// So do not use this method on a component that would be hidden or flush its margins cache by calling flushMarginsCache() before hidding the component.
+    /// And do not use on an hidden component either or unhidding this component might result in unexpected results
     public void cacheMargins(boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1621,11 +1595,9 @@ public class Style {
         }
     }
 
-    /**
-     * Restore cached margins and flush the margins cache
-     * Warning: this method is used internally when unhidding a component with the Component.setHidden(false) method
-     * Do not use it on an hidden component or it would result into unexpected results when unhidding this component
-     */
+    /// Restore cached margins and flush the margins cache
+    /// Warning: this method is used internally when unhidding a component with the Component.setHidden(false) method
+    /// Do not use it on an hidden component or it would result into unexpected results when unhidding this component
     public void restoreCachedMargins() {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1640,9 +1612,7 @@ public class Style {
         }
     }
 
-    /**
-     * Flush the margins cache if one exists
-     */
+    /// Flush the margins cache if one exists
     public void flushMarginsCache() {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1653,48 +1623,70 @@ public class Style {
         cached_margin = null;
     }
 
-    /**
-     * Sets the Style Margin
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap         number of margin using the current unit
-     */
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of margin using the current unit
     public void setMargin(int orientation, int gap) {
         setMargin(orientation, gap, false);
     }
 
-    /**
-     * Sets the Style Margin
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap         number of margin using the current unit
-     */
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of margin using the current unit
     public void setMargin(int orientation, float gap) {
         setMargin(orientation, gap, false);
     }
 
-    /**
-     * Returns the Padding in the internal value regardless of the unit
-     *
-     * @param rtl         flag indicating whether the padding is for an RTL bidi component
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return amount of padding in the given orientation using current units.
-     * @see #getPaddingUnit()
-     * @deprecated Use {@link #getPaddingFloatValue(boolean, int)}
-     */
+    /// Returns the Padding in the internal value regardless of the unit
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// amount of padding in the given orientation using current units.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `int)`
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
     public int getPaddingValue(boolean rtl, int orientation) {
         return (int) getPaddingFloatValue(rtl, orientation);
     }
 
-    /**
-     * Returns the Padding in the internal value regardless of the unit
-     *
-     * @param rtl         flag indicating whether the padding is for an RTL bidi component
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return amount of padding in the given orientation using current units.
-     * @see #getPaddingUnit()
-     * @since 8.0
-     */
+    /// Returns the Padding in the internal value regardless of the unit
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// amount of padding in the given orientation using current units.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
     public float getPaddingFloatValue(boolean rtl, int orientation) {
         if (orientation < Component.TOP || orientation > Component.RIGHT) {
             throw new IllegalArgumentException("wrong orientation " + orientation);
@@ -1716,12 +1708,15 @@ public class Style {
         return padding[orientation];
     }
 
-    /**
-     * Returns the left padding in pixel or right padding in an RTL situation
-     *
-     * @param rtl indicates a right to left language
-     * @return the padding in pixels
-     */
+    /// Returns the left padding in pixel or right padding in an RTL situation
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: indicates a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
     public int getPaddingLeft(boolean rtl) {
         if (rtl) {
             return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
@@ -1735,13 +1730,16 @@ public class Style {
         }
     }
 
-    /**
-     * Sets left padding unit.
-     *
-     * @param unit One of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *             {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     * @since 7.0
-     */
+    /// Sets left padding unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setPaddingUnitLeft(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1753,13 +1751,16 @@ public class Style {
         paddingUnit[Component.LEFT] = unit;
     }
 
-    /**
-     * Sets right padding unit.
-     *
-     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *             {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     * @since 7.0
-     */
+    /// Sets right padding unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setPaddingUnitRight(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1771,13 +1772,16 @@ public class Style {
         paddingUnit[Component.RIGHT] = unit;
     }
 
-    /**
-     * Sets top padding unit.
-     *
-     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *             {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     * @since 7.0
-     */
+    /// Sets top padding unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setPaddingUnitTop(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1789,13 +1793,16 @@ public class Style {
         paddingUnit[Component.TOP] = unit;
     }
 
-    /**
-     * Sets bottom padding unit.
-     *
-     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *             {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     * @since 7.0
-     */
+    /// Sets bottom padding unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setPaddingUnitBottom(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1807,12 +1814,15 @@ public class Style {
         paddingUnit[Component.BOTTOM] = unit;
     }
 
-    /**
-     * Returns the right padding in pixel or left padding in an RTL situation
-     *
-     * @param rtl indicates a right to left language
-     * @return the padding in pixels
-     */
+    /// Returns the right padding in pixel or left padding in an RTL situation
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: indicates a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
     public int getPaddingRight(boolean rtl) {
         if (rtl) {
             return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
@@ -1820,32 +1830,39 @@ public class Style {
         return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
     }
 
-    /**
-     * Returns the top padding in pixel
-     *
-     * @return the padding in pixels
-     */
+    /// Returns the top padding in pixel
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
     public int getPaddingTop() {
         return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP);
     }
 
-    /**
-     * Sets the Style Padding on the top, this is equivalent to calling {@code setPadding(Component.TOP, gap, false);}
-     *
-     * @param gap amount to pad the top in current units.
-     * @see #getPaddingUnit()
-     */
+    /// Sets the Style Padding on the top, this is equivalent to calling `setPadding(Component.TOP, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: amount to pad the top in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
     public void setPaddingTop(int gap) {
         this.setPaddingTop((float) gap);
     }
 
-    /**
-     * Sets the Style Padding on the top, this is equivalent to calling {@code setPadding(Component.TOP, gap, false);}
-     *
-     * @param gap Amount to pad the top in current units.
-     * @see #getPaddingUnit()
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding on the top, this is equivalent to calling `setPadding(Component.TOP, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the top in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPaddingTop(float gap) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1863,24 +1880,32 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Style Padding on the left, this is equivalent to calling {@code setPadding(Component.LEFT, gap, false);}
-     *
-     * @param gap Amount to pad the left in current units.
-     * @see #getPaddingUnit()
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding on the left, this is equivalent to calling `setPadding(Component.LEFT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the left in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPaddingLeft(int gap) {
         this.setPaddingLeft((float) gap);
     }
 
-    /**
-     * Sets the Style Padding on the left, this is equivalent to calling {@code setPadding(Component.LEFT, gap, false);}
-     *
-     * @param gap Amount to pad the left in current units.
-     * @see #getPaddingUnit()
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding on the left, this is equivalent to calling `setPadding(Component.LEFT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the left in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPaddingLeft(float gap) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1898,24 +1923,32 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Style Padding on the right, this is equivalent to calling {@code setPadding(Component.RIGHT, gap, false);}
-     *
-     * @param gap Amount to pad the right in current units.
-     * @see #getPaddingUnit()
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding on the right, this is equivalent to calling `setPadding(Component.RIGHT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the right in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPaddingRight(int gap) {
         this.setPaddingRight((float) gap);
     }
 
-    /**
-     * Sets the Style Padding on the right, this is equivalent to calling {@code setPadding(Component.RIGHT, gap, false);}
-     *
-     * @param gap Amount to pad the right in current units.
-     * @see #getPaddingUnit()
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding on the right, this is equivalent to calling `setPadding(Component.RIGHT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the right in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPaddingRight(float gap) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1933,20 +1966,20 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Style Margin on the left, this is equivalent to calling {@code setMargin(Component.LEFT, gap, false);}
-     *
-     * @param gap number of left margin using the current unit
-     */
+    /// Sets the Style Margin on the left, this is equivalent to calling `setMargin(Component.LEFT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of left margin using the current unit
     public void setMarginLeft(int gap) {
         this.setMarginLeft((float) gap);
     }
 
-    /**
-     * Sets the Style Margin on the left, this is equivalent to calling {@code setMargin(Component.LEFT, gap, false);}
-     *
-     * @param gap number of left margin using the current unit
-     */
+    /// Sets the Style Margin on the left, this is equivalent to calling `setMargin(Component.LEFT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of left margin using the current unit
     public void setMarginLeft(float gap) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1964,20 +1997,20 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Style Margin on the right, this is equivalent to calling {@code setMargin(Component.RIGHT, gap, false);}
-     *
-     * @param gap number of right margin using the current unit
-     */
+    /// Sets the Style Margin on the right, this is equivalent to calling `setMargin(Component.RIGHT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of right margin using the current unit
     public void setMarginRight(int gap) {
         this.setMarginRight((float) gap);
     }
 
-    /**
-     * Sets the Style Margin on the right, this is equivalent to calling {@code setMargin(Component.RIGHT, gap, false);}
-     *
-     * @param gap number of right margin using the current unit
-     */
+    /// Sets the Style Margin on the right, this is equivalent to calling `setMargin(Component.RIGHT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of right margin using the current unit
     public void setMarginRight(float gap) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1995,33 +2028,41 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the bottom padding in pixel
-     *
-     * @return the padding in pixels
-     */
+    /// Returns the bottom padding in pixel
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
     public int getPaddingBottom() {
         return convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);
     }
 
-    /**
-     * Sets the Style Padding on the bottom, this is equivalent to calling {@code setPadding(Component.BOTTOM, gap, false);}
-     *
-     * @param gap Amount to pad the bottom in current units.
-     * @see #getPaddingUnit()
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding on the bottom, this is equivalent to calling `setPadding(Component.BOTTOM, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the bottom in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPaddingBottom(int gap) {
         this.setPaddingBottom((float) gap);
     }
 
-    /**
-     * Sets the Style Padding on the bottom, this is equivalent to calling {@code setPadding(Component.BOTTOM, gap, false);}
-     *
-     * @param gap Amount to pad the bottom in current units.
-     * @see #getPaddingUnit()
-     * @see #setPaddingUnit(byte...)
-     */
+    /// Sets the Style Padding on the bottom, this is equivalent to calling `setPadding(Component.BOTTOM, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the bottom in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
     public void setPaddingBottom(float gap) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2039,88 +2080,91 @@ public class Style {
         }
     }
 
-    /**
-     * The equivalent of getMarginLeft + getMarginRight
-     *
-     * @return the side margin
-     */
+    /// The equivalent of getMarginLeft + getMarginRight
+    ///
+    /// #### Returns
+    ///
+    /// the side margin
     public int getHorizontalMargins() {
         return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT) +
                 convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
     }
 
-    /**
-     * The equivalent of getMarginTop + getMarginBottom
-     *
-     * @return the vertical margin
-     */
+    /// The equivalent of getMarginTop + getMarginBottom
+    ///
+    /// #### Returns
+    ///
+    /// the vertical margin
     public int getVerticalMargins() {
         return convertUnit(marginUnit, margin[Component.TOP], Component.TOP) +
                 convertUnit(marginUnit, margin[Component.BOTTOM], Component.BOTTOM);
     }
 
-    /**
-     * The equivalent of getPaddingLeft + getPaddingRight
-     *
-     * @return the side padding
-     */
+    /// The equivalent of getPaddingLeft + getPaddingRight
+    ///
+    /// #### Returns
+    ///
+    /// the side padding
     public int getHorizontalPadding() {
         return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT) +
                 convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
     }
 
-    /**
-     * The equivalent of getPaddingTop + getPaddingBottom
-     *
-     * @return the vertical padding
-     */
+    /// The equivalent of getPaddingTop + getPaddingBottom
+    ///
+    /// #### Returns
+    ///
+    /// the vertical padding
     public int getVerticalPadding() {
         return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP) +
                 convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);
     }
 
-    /**
-     * Returns the right margin in pixels ignoring RTL
-     *
-     * @return the margin in pixels
-     */
+    /// Returns the right margin in pixels ignoring RTL
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
     public int getMarginRightNoRTL() {
         return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
     }
 
-    /**
-     * Returns the left margin in pixels ignoring RTL
-     *
-     * @return the margin in pixels
-     */
+    /// Returns the left margin in pixels ignoring RTL
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
     public int getMarginLeftNoRTL() {
         return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
     }
 
-    /**
-     * Returns the right padding in pixels ignoring RTL
-     *
-     * @return the padding in pixels
-     */
+    /// Returns the right padding in pixels ignoring RTL
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
     public int getPaddingRightNoRTL() {
         return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
     }
 
-    /**
-     * Returns the left padding in pixels ignoring RTL
-     *
-     * @return the padding in pixels
-     */
+    /// Returns the left padding in pixels ignoring RTL
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
     public int getPaddingLeftNoRTL() {
         return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
     }
 
-    /**
-     * Returns the right margin in pixel or left margin in an RTL situation
-     *
-     * @param rtl indicates a right to left language
-     * @return the margin in pixels
-     */
+    /// Returns the right margin in pixel or left margin in an RTL situation
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: indicates a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
     public int getMarginRight(boolean rtl) {
         if (rtl) {
             return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
@@ -2128,12 +2172,15 @@ public class Style {
         return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
     }
 
-    /**
-     * Returns the left margin in pixel or right margin in an RTL situation
-     *
-     * @param rtl indicates a right to left language
-     * @return the margin in pixels
-     */
+    /// Returns the left margin in pixel or right margin in an RTL situation
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: indicates a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
     public int getMarginLeft(boolean rtl) {
         if (rtl) {
             return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
@@ -2141,29 +2188,29 @@ public class Style {
         return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
     }
 
-    /**
-     * Returns the top margin in pixel
-     *
-     * @return the margin in pixels
-     */
+    /// Returns the top margin in pixel
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
     public int getMarginTop() {
         return convertUnit(marginUnit, margin[Component.TOP], Component.TOP);
     }
 
-    /**
-     * Sets the Style margin on the top, this is equivalent to calling {@code setMargin(Component.TOP, gap, false);}
-     *
-     * @param gap number of top margin using the current unit
-     */
+    /// Sets the Style margin on the top, this is equivalent to calling `setMargin(Component.TOP, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of top margin using the current unit
     public void setMarginTop(int gap) {
         this.setMarginTop((float) gap);
     }
 
-    /**
-     * Sets the Style margin on the top, this is equivalent to calling {@code setMargin(Component.TOP, gap, false);}
-     *
-     * @param gap number of top margin using the current unit
-     */
+    /// Sets the Style margin on the top, this is equivalent to calling `setMargin(Component.TOP, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of top margin using the current unit
     public void setMarginTop(float gap) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2181,29 +2228,29 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the bottom margin in pixel
-     *
-     * @return the margin in pixels
-     */
+    /// Returns the bottom margin in pixel
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
     public int getMarginBottom() {
         return convertUnit(marginUnit, margin[Component.BOTTOM], Component.BOTTOM);
     }
 
-    /**
-     * Sets the Style Margin on the bottom, this is equivalent to calling {@code setMargin(Component.BOTTOM, gap, false);}
-     *
-     * @param gap number of bottom margin using the current unit
-     */
+    /// Sets the Style Margin on the bottom, this is equivalent to calling `setMargin(Component.BOTTOM, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of bottom margin using the current unit
     public void setMarginBottom(int gap) {
         this.setMarginBottom((float) gap);
     }
 
-    /**
-     * Sets the Style Margin on the bottom, this is equivalent to calling {@code setMargin(Component.BOTTOM, gap, false);}
-     *
-     * @param gap number of bottom margin using the current unit
-     */
+    /// Sets the Style Margin on the bottom, this is equivalent to calling `setMargin(Component.BOTTOM, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of bottom margin using the current unit
     public void setMarginBottom(float gap) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2221,13 +2268,17 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the Padding in using the current unit
-     *
-     * @param rtl         flag indicating whether the padding is for an RTL bidi component
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of padding pixels in the given orientation
-     */
+    /// Returns the Padding in using the current unit
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of padding pixels in the given orientation
     public int getPadding(boolean rtl, int orientation) {
         return convertUnit(paddingUnit, getPaddingFloatValue(rtl, orientation), orientation);
     }
@@ -2264,57 +2315,81 @@ public class Style {
         return (int) v;
     }
 
-    /**
-     * Returns the Padding
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of padding pixels in the given orientation
-     */
+    /// Returns the Padding
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of padding pixels in the given orientation
     public int getPadding(int orientation) {
         return getPadding(UIManager.getInstance().getLookAndFeel().isRTL(), orientation);
     }
 
-    /**
-     * Returns the Margin
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of margin using the current unit in the given orientation
-     */
+    /// Returns the Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of margin using the current unit in the given orientation
     public int getMargin(int orientation) {
         return getMargin(UIManager.getInstance().getLookAndFeel().isRTL(), orientation);
     }
 
-    /**
-     * Returns the Margin
-     *
-     * @param rtl         flag indicating whether the padding is for an RTL bidi component
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of margin using the current unit in the given orientation
-     */
+    /// Returns the Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of margin using the current unit in the given orientation
     public int getMargin(boolean rtl, int orientation) {
         return convertUnit(marginUnit, getMarginFloatValue(rtl, orientation), orientation);
     }
 
-    /**
-     * Returns the Margin
-     *
-     * @param rtl         flag indicating whether the padding is for an RTL bidi component
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of margin using the current unit in the given orientation
-     * @deprecated Use {@link #getMarginFloatValue(boolean, int)}
-     */
+    /// Returns the Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of margin using the current unit in the given orientation
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `int)`
     public int getMarginValue(boolean rtl, int orientation) {
         return (int) getMarginFloatValue(rtl, orientation);
     }
 
-    /**
-     * Returns the Margin
-     *
-     * @param rtl         flag indicating whether the padding is for an RTL bidi component
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @return number of margin using the current unit in the given orientation
-     * @since 8.0
-     */
+    /// Returns the Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of margin using the current unit in the given orientation
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public float getMarginFloatValue(boolean rtl, int orientation) {
         if (orientation < Component.TOP || orientation > Component.RIGHT) {
             throw new IllegalArgumentException("wrong orientation " + orientation);
@@ -2334,13 +2409,14 @@ public class Style {
         return margin[orientation];
     }
 
-    /**
-     * Sets the background color for the component
-     *
-     * @param bgColor  RRGGBB color that ignores the alpha component
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgColor`: RRGGBB color that ignores the alpha component
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBgColor(int bgColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2357,13 +2433,14 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the background image for the component
-     *
-     * @param bgImage  background image
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the background image for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgImage`: background image
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBgImage(Image bgImage, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2380,16 +2457,17 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the background type for the component
-     *
-     * @param backgroundType one of BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
-     *                       BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
-     *                       BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
-     *                       BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
-     * @param override       If set to true allows the look and feel/theme to override
-     *                       the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the background type for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundType`: @param backgroundType one of BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
+    ///
+    /// - `override`: @param override       If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundType(byte backgroundType, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2406,17 +2484,21 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the background alignment for the component
-     *
-     * @param backgroundAlignment one of:
-     *                            BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
-     *                            BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
-     *                            BACKGROUND_IMAGE_ALIGN_CENTER
-     * @param override            If set to true allows the look and feel/theme to override
-     *                            the value in this attribute when changing a theme/look and feel
-     * @deprecated the functionality of this method is now covered by background type
-     */
+    /// Sets the background alignment for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundAlignment`: @param backgroundAlignment one of:
+    /// BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
+    /// BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
+    /// BACKGROUND_IMAGE_ALIGN_CENTER
+    ///
+    /// - `override`: @param override            If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### Deprecated
+    ///
+    /// the functionality of this method is now covered by background type
     private void setBackgroundAlignment(byte backgroundAlignment, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2433,13 +2515,13 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the background gradient array which includes the start/end color
-     * and optionally the x/y relative anchor for the radial gradient
-     *
-     * @return the background gradient array which includes the start/end color
-     * and optionally the x/y relative anchor for the radial gradient
-     */
+    /// Returns the background gradient array which includes the start/end color
+    /// and optionally the x/y relative anchor for the radial gradient
+    ///
+    /// #### Returns
+    ///
+    /// @return the background gradient array which includes the start/end color
+    /// and optionally the x/y relative anchor for the radial gradient
     Object[] getBackgroundGradient() {
         if (backgroundGradient == null) {
             Float c = Float.valueOf(0.5f);
@@ -2448,20 +2530,19 @@ public class Style {
         return backgroundGradient;
     }
 
-    /**
-     * Internal use background gradient setter
-     */
+    /// Internal use background gradient setter
     void setBackgroundGradient(Object[] backgroundGradient) {
         this.backgroundGradient = backgroundGradient;
     }
 
-    /**
-     * Sets the background color for the component
-     *
-     * @param backgroundGradientStartColor start color for the linear/radial gradient
-     * @param override                     If set to true allows the look and feel/theme to override
-     *                                     the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientStartColor`: start color for the linear/radial gradient
+    ///
+    /// - `override`: @param override                     If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientStartColor(int backgroundGradientStartColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2478,13 +2559,14 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the background color for the component
-     *
-     * @param backgroundGradientEndColor end color for the linear/radial gradient
-     * @param override                   If set to true allows the look and feel/theme to override
-     *                                   the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientEndColor`: end color for the linear/radial gradient
+    ///
+    /// - `override`: @param override                   If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientEndColor(int backgroundGradientEndColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2501,13 +2583,14 @@ public class Style {
         }
     }
 
-    /**
-     * Background radial gradient relative center position X
-     *
-     * @param backgroundGradientRelativeX x position of the radial gradient center
-     * @param override                    If set to true allows the look and feel/theme to override
-     *                                    the value in this attribute when changing a theme/look and feel
-     */
+    /// Background radial gradient relative center position X
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeX`: x position of the radial gradient center
+    ///
+    /// - `override`: @param override                    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientRelativeX(float backgroundGradientRelativeX, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2524,13 +2607,14 @@ public class Style {
         }
     }
 
-    /**
-     * Background radial gradient relative center position Y
-     *
-     * @param backgroundGradientRelativeY y position of the radial gradient center
-     * @param override                    If set to true allows the look and feel/theme to override
-     *                                    the value in this attribute when changing a theme/look and feel
-     */
+    /// Background radial gradient relative center position Y
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeY`: y position of the radial gradient center
+    ///
+    /// - `override`: @param override                    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientRelativeY(float backgroundGradientRelativeY, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2547,14 +2631,15 @@ public class Style {
         }
     }
 
-    /**
-     * Background radial gradient relative size
-     *
-     * @param backgroundGradientRelativeSize the size of the radial gradient relative to the screens
-     *                                       larger dimension
-     * @param override                       If set to true allows the look and feel/theme to override
-     *                                       the value in this attribute when changing a theme/look and feel
-     */
+    /// Background radial gradient relative size
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeSize`: @param backgroundGradientRelativeSize the size of the radial gradient relative to the screens
+    /// larger dimension
+    ///
+    /// - `override`: @param override                       If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBackgroundGradientRelativeSize(float backgroundGradientRelativeSize, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2571,13 +2656,14 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the foreground color for the component
-     *
-     * @param fgColor  foreground color
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the foreground color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public final void setFgColor(int fgColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2594,13 +2680,14 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the foreground alpha for the component
-     *
-     * @param fgAlpha  foreground alpha
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the foreground alpha for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgAlpha`: foreground alpha
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setFgAlpha(int fgAlpha, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2617,13 +2704,14 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the font for the component
-     *
-     * @param font     the font
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the font for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: the font
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setFont(Font font, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2641,14 +2729,15 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Component transparency level. Valid values should be a
-     * number between 0-255
-     *
-     * @param transparency int value between 0-255
-     * @param override     If set to true allows the look and feel/theme to override
-     *                     the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the Component transparency level. Valid values should be a
+    /// number between 0-255
+    ///
+    /// #### Parameters
+    ///
+    /// - `transparency`: int value between 0-255
+    ///
+    /// - `override`: @param override     If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBgTransparency(int transparency, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2669,26 +2758,30 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Style Padding
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap         number of pixels to pad the orientation
-     * @param override    If set to true allows the look and feel/theme to override
-     *                    the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the Style Padding
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of pixels to pad the orientation
+    ///
+    /// - `override`: @param override    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setPadding(int orientation, int gap, boolean override) {
         setPadding(orientation, (float) gap, override);
     }
 
-    /**
-     * Sets the Style Padding
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap         number of pixels to pad the orientation
-     * @param override    If set to true allows the look and feel/theme to override
-     *                    the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the Style Padding
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of pixels to pad the orientation
+    ///
+    /// - `override`: @param override    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setPadding(int orientation, float gap, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2712,26 +2805,30 @@ public class Style {
         }
     }
 
-    /**
-     * Sets the Style Margin
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap         number of margin using the current unit
-     * @param override    If set to true allows the look and feel/theme to override
-     *                    the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of margin using the current unit
+    ///
+    /// - `override`: @param override    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setMargin(int orientation, int gap, boolean override) {
         setMargin(orientation, (float) gap, override);
     }
 
-    /**
-     * Sets the Style Margin
-     *
-     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap         number of margin using the current unit
-     * @param override    If set to true allows the look and feel/theme to override
-     *                    the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of margin using the current unit
+    ///
+    /// - `override`: @param override    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setMargin(int orientation, float gap, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2754,22 +2851,28 @@ public class Style {
         }
     }
 
-    /**
-     * Checks to see if change events are currently suppressed.
-     *
-     * @return True if change events are suppressed.
-     * @since 7.0
-     */
+    /// Checks to see if change events are currently suppressed.
+    ///
+    /// #### Returns
+    ///
+    /// True if change events are suppressed.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public boolean isSuppressChangeEvents() {
         return suppressChangeEvents;
     }
 
-    /**
-     * Enables or disables events.  Use this to temporarily suppress change events.
-     *
-     * @param suppress True to suppress change events.
-     * @since 7.0
-     */
+    /// Enables or disables events.  Use this to temporarily suppress change events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `suppress`: True to suppress change events.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setSuppressChangeEvents(boolean suppress) {
         this.suppressChangeEvents = suppress;
     }
@@ -2782,11 +2885,11 @@ public class Style {
         listeners.fireStyleChangeEvent(propertName, this);
     }
 
-    /**
-     * Adds a Style Listener to the Style Object.
-     *
-     * @param l a style listener
-     */
+    /// Adds a Style Listener to the Style Object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: a style listener
     public void addStyleListener(StyleListener l) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2800,11 +2903,11 @@ public class Style {
         listeners.addListener(l);
     }
 
-    /**
-     * Removes a Style Listener from the Style Object.
-     *
-     * @param l a style listener
-     */
+    /// Removes a Style Listener from the Style Object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: a style listener
     public void removeStyleListener(StyleListener l) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2817,9 +2920,7 @@ public class Style {
         }
     }
 
-    /**
-     * This method removes all Listeners from the Style
-     */
+    /// This method removes all Listeners from the Style
     public void removeListeners() {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2836,13 +2937,14 @@ public class Style {
         modifiedFlag = 0;
     }
 
-    /**
-     * Sets the border for the style
-     *
-     * @param border   new border object for the component
-     * @param override If set to true allows the look and feel/theme to override
-     *                 the value in this attribute when changing a theme/look and feel
-     */
+    /// Sets the border for the style
+    ///
+    /// #### Parameters
+    ///
+    /// - `border`: new border object for the component
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
     public void setBorder(Border border, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2860,40 +2962,40 @@ public class Style {
         }
     }
 
-    /**
-     * Returns the border for the style
-     *
-     * @return the border
-     */
+    /// Returns the border for the style
+    ///
+    /// #### Returns
+    ///
+    /// the border
     public Border getBorder() {
         return border;
     }
 
-    /**
-     * Sets the border for the style
-     *
-     * @param border new border object for the component
-     */
+    /// Sets the border for the style
+    ///
+    /// #### Parameters
+    ///
+    /// - `border`: new border object for the component
     public void setBorder(Border border) {
         setBorder(border, false);
     }
 
-    /**
-     * Return the background painter for this style, normally this would be
-     * the internal image/color painter but can be user defined
-     *
-     * @return the background painter
-     */
+    /// Return the background painter for this style, normally this would be
+    /// the internal image/color painter but can be user defined
+    ///
+    /// #### Returns
+    ///
+    /// the background painter
     public Painter getBgPainter() {
         return bgPainter;
     }
 
-    /**
-     * Defines the background painter for this style, normally this would be
-     * the internal image/color painter but can be user defined
-     *
-     * @param bgPainter new painter to install into the style
-     */
+    /// Defines the background painter for this style, normally this would be
+    /// the internal image/color painter but can be user defined
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgPainter`: new painter to install into the style
     public void setBgPainter(Painter bgPainter) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2905,24 +3007,24 @@ public class Style {
         firePropertyChanged(PAINTER);
     }
 
-    /**
-     * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
-     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     * * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     *
-     * @return the paddingUnit
-     */
+    /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Returns
+    ///
+    /// the paddingUnit
     public byte[] getPaddingUnit() {
         return paddingUnit;
     }
 
-    /**
-     * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
-     * of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     *
-     * @param paddingUnit the paddingUnit to set
-     */
+    /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
+    /// of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paddingUnit`: the paddingUnit to set
     public void setPaddingUnit(byte... paddingUnit) {
         if (proxyTo != null) {
             if (paddingUnit != null && paddingUnit.length < 4) {
@@ -2947,24 +3049,24 @@ public class Style {
         }
     }
 
-    /**
-     * Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
-     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     * * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     *
-     * @return the marginUnit
-     */
+    /// Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Returns
+    ///
+    /// the marginUnit
     public byte[] getMarginUnit() {
         return marginUnit;
     }
 
-    /**
-     * Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
-     * of of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     * * {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     *
-     * @param marginUnit the marginUnit to set
-     */
+    /// Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `marginUnit`: the marginUnit to set
     public void setMarginUnit(byte... marginUnit) {
         if (proxyTo != null) {
             if (marginUnit != null && marginUnit.length < 4) {
@@ -2995,13 +3097,16 @@ public class Style {
         }
     }
 
-    /**
-     * Sets left margin unit.
-     *
-     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *             {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     * @since 7.0
-     */
+    /// Sets left margin unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setMarginUnitLeft(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -3013,13 +3118,16 @@ public class Style {
         marginUnit[Component.LEFT] = unit;
     }
 
-    /**
-     * Sets right margin unit.
-     *
-     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *             {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     * @since 7.0
-     */
+    /// Sets right margin unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setMarginUnitRight(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -3031,13 +3139,16 @@ public class Style {
         marginUnit[Component.RIGHT] = unit;
     }
 
-    /**
-     * Sets top margin unit.
-     *
-     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *             {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     * @since 7.0
-     */
+    /// Sets top margin unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setMarginUnitTop(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -3049,13 +3160,16 @@ public class Style {
         marginUnit[Component.TOP] = unit;
     }
 
-    /**
-     * Sets bottom margin unit.
-     *
-     * @param unit One of {@link #UNIT_TYPE_PIXELS}, {@link #UNIT_TYPE_DIPS}, {@link #UNIT_TYPE_SCREEN_PERCENTAGE}, {@link #UNIT_TYPE_VW}, {@link #UNIT_TYPE_VH},
-     *             {@link #UNIT_TYPE_VMIN}, {@link #UNIT_TYPE_VMAX}, {@link #UNIT_TYPE_REM}.
-     * @since 7.0
-     */
+    /// Sets bottom margin unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setMarginUnitBottom(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {

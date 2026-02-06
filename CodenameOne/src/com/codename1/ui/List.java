@@ -44,114 +44,141 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Collection;
 import java.util.Vector;
 
-/**
- * <p>A set of elements that is rendered using a {@link com.codename1.ui.list.ListCellRenderer}
- * and are extracted via the {@link com.codename1.ui.list.ListModel}, <b>notice</b> that
- * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
- * discourage usage of lists</a>.<br>
- * A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
- * is made possible thanks to extensive use of Swing's style of MVC. Specifically a list
- * component is relatively simple, it invokes the model in order to extract the displayed/selected
- * information and shows it to the user by invoking the cell renderer.</p>
- * <p>The list class itself is completely decoupled from everything, thus it allows us to extract its
- * content from any source (e.g. network, storage etc.) and display the information in any form
- * (e.g. checkboxed elemenents, icons etc.).</p>
- * <h3>Important</h3>
- * <p>
- * {@code List} is a pretty complex class to use so we generally recommend developers use
- * {@link com.codename1.ui.Container},
- * {@link com.codename1.components.InfiniteScrollAdapter} or {@link com.codename1.ui.InfiniteContainer}
- * coupled with widgets such as {@link com.codename1.components.MultiButton}. Arranging those in a
- * {@link com.codename1.ui.layouts.BoxLayout} on the {@link com.codename1.ui.layouts.BoxLayout#Y_AXIS}
- * can produce the functionality of the {@code List} with better performance and far simpler code!
- * </p>
- * <p>
- * Another simpler alternative although not as attractive is the {@link com.codename1.ui.list.MultiList} class
- * that removes a lot of the {@link com.codename1.ui.list.ListCellRenderer} related complexities inherent
- * in building a list.
- * </p>
- *
- * <h4>Sample Usage</h4>
- * <p>
- * The sample below uses the {@link com.codename1.ui.list.GenericListCellRenderer} class instead of the
- * {@link com.codename1.ui.list.DefaultListCellRenderer}. We generally recommend using the builtin classes
- * as the renderer is probably the greatest source of pitfalls in {@code Lists}.
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-generic-list-cell-renderer.png" alt="Sample of using the generic list cell renderer" />
- *
- * @author Chen Fishbein
- * @see com.codename1.ui.Container
- * @see com.codename1.ui.InfiniteContainer
- * @see com.codename1.components.InfiniteScrollAdapter
- * @see com.codename1.components.MultiButton
- * @see com.codename1.ui.list
- * @see com.codename1.ui.list.MultiList
- */
+/// A set of elements that is rendered using a `com.codename1.ui.list.ListCellRenderer`
+/// and are extracted via the `com.codename1.ui.list.ListModel`, **notice** that
+/// [we strongly discourage usage of lists](https://www.codenameone.com/blog/avoiding-lists.html).
+///
+/// A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
+/// is made possible thanks to extensive use of Swing's style of MVC. Specifically a list
+/// component is relatively simple, it invokes the model in order to extract the displayed/selected
+/// information and shows it to the user by invoking the cell renderer.
+///
+/// The list class itself is completely decoupled from everything, thus it allows us to extract its
+/// content from any source (e.g. network, storage etc.) and display the information in any form
+/// (e.g. checkboxed elemenents, icons etc.).
+///
+/// Important
+///
+/// `List` is a pretty complex class to use so we generally recommend developers use
+/// `com.codename1.ui.Container`,
+/// `com.codename1.components.InfiniteScrollAdapter` or `com.codename1.ui.InfiniteContainer`
+/// coupled with widgets such as `com.codename1.components.MultiButton`. Arranging those in a
+/// `com.codename1.ui.layouts.BoxLayout` on the `com.codename1.ui.layouts.BoxLayout#Y_AXIS`
+/// can produce the functionality of the `List` with better performance and far simpler code!
+///
+/// Another simpler alternative although not as attractive is the `com.codename1.ui.list.MultiList` class
+/// that removes a lot of the `com.codename1.ui.list.ListCellRenderer` related complexities inherent
+/// in building a list.
+///
+/// Sample Usage
+///
+/// The sample below uses the `com.codename1.ui.list.GenericListCellRenderer` class instead of the
+/// `com.codename1.ui.list.DefaultListCellRenderer`. We generally recommend using the builtin classes
+/// as the renderer is probably the greatest source of pitfalls in `Lists`.
+///
+/// ```java
+/// public void showForm() {
+///     com.codename1.ui.List list = new com.codename1.ui.List(createGenericListCellRendererModelData());
+///     list.setRenderer(new GenericListCellRenderer(createGenericRendererContainer(), createGenericRendererContainer()));
+///     Form hi = new Form("GenericListCellRenderer", new BorderLayout());
+///     hi.add(BorderLayout.CENTER, list);
+///     hi.show();
+/// }
+///
+/// private Container createGenericRendererContainer() {
+///     Label name = new Label();
+///     name.setFocusable(true);
+///     name.setName("Name");
+///     Label surname = new Label();
+///     surname.setFocusable(true);
+///     surname.setName("Surname");
+///     CheckBox selected = new CheckBox();
+///     selected.setName("Selected");
+///     selected.setFocusable(true);
+///     Container c = BorderLayout.center(name).
+///             add(BorderLayout.SOUTH, surname).
+///             add(BorderLayout.WEST, selected);
+///     c.setUIID("ListRenderer");
+///     return c;
+/// }
+///
+/// private Object[] createGenericListCellRendererModelData() {
+///     Map[] data = new HashMap[5];
+///     data[0] = new HashMap<>();
+///     data[0].put("Name", "Shai");
+///     data[0].put("Surname", "Almog");
+///     data[0].put("Selected", Boolean.TRUE);
+///     data[1] = new HashMap<>();
+///     data[1].put("Name", "Chen");
+///     data[1].put("Surname", "Fishbein");
+///     data[1].put("Selected", Boolean.TRUE);
+///     data[2] = new HashMap<>();
+///     data[2].put("Name", "Ofir");
+///     data[2].put("Surname", "Leitner");
+///     data[3] = new HashMap<>();
+///     data[3].put("Name", "Yaniv");
+///     data[3].put("Surname", "Vakarat");
+///     data[4] = new HashMap<>();
+///     data[4].put("Name", "Meirav");
+///     data[4].put("Surname", "Nachmanovitch");
+///     return data;
+/// }
+/// ```
+///
+/// @author Chen Fishbein
+///
+/// #### See also
+///
+/// - com.codename1.ui.Container
+///
+/// - com.codename1.ui.InfiniteContainer
+///
+/// - com.codename1.components.InfiniteScrollAdapter
+///
+/// - com.codename1.components.MultiButton
+///
+/// - com.codename1.ui.list
+///
+/// - com.codename1.ui.list.MultiList
 public class List<T> extends Component implements ActionSource {
-    /**
-     * Indicates the list isn't fixed and that selection is movable
-     */
+    /// Indicates the list isn't fixed and that selection is movable
     public static final int FIXED_NONE = 0;
-    /**
-     * Indicates that the list is not fixed in place but cycles its elements
-     */
+    /// Indicates that the list is not fixed in place but cycles its elements
     public static final int FIXED_NONE_CYCLIC = 1;
-    /**
-     * Indicates the list selection will only reach the edge when there are no more
-     * elements in the list.
-     */
+    /// Indicates the list selection will only reach the edge when there are no more
+    /// elements in the list.
     public static final int FIXED_NONE_ONE_ELEMENT_MARGIN_FROM_EDGE = 2;
-    /**
-     * Indicates the list selection is fixed into place at the top of the list
-     * or at the left of the list
-     */
+    /// Indicates the list selection is fixed into place at the top of the list
+    /// or at the left of the list
     public static final int FIXED_LEAD = 10;
-    /**
-     * Indicates the list selection is fixed into place at the bottom of the list
-     * or at the right of the list
-     */
+    /// Indicates the list selection is fixed into place at the bottom of the list
+    /// or at the right of the list
     public static final int FIXED_TRAIL = 11;
-    /**
-     * Indicates the list selection is fixed into place at the center of the list
-     */
+    /// Indicates the list selection is fixed into place at the center of the list
     public static final int FIXED_CENTER = 12;
-    /**
-     * Indicates the list orientation is VERTICAL
-     */
+    /// Indicates the list orientation is VERTICAL
     public static final int VERTICAL = 0;
-    /**
-     * Indicates the list orientation is HORIZONTAL
-     */
+    /// Indicates the list orientation is HORIZONTAL
     public static final int HORIZONTAL = 1;
     static final int COMBO = 2;
-    /**
-     * Allows to test for fixed none
-     */
+    /// Allows to test for fixed none
     private static final int FIXED_NONE_BOUNDRY = 9;
     private static boolean defaultFireOnClick = true;
-    /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     */
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
     private static boolean defaultIgnoreFocusComponentWhenUnfocused = true;
     Style spinnerOverlay;
     EventDispatcher dispatcher = new EventDispatcher();
     Object eventSource = this;
-    /**
-     * Used internally by the combo box
-     */
+    /// Used internally by the combo box
     boolean disposeDialogOnSelection;
-    /**
-     * @see #setRenderingPrototype
-     */
+    /// #### See also
+    ///
+    /// - #setRenderingPrototype
     private T renderingPrototype;
-    /**
-     * Indicates whether selection is fixable to place in which case all the
-     * elements in the list move and selection stays in place. Fixed selection
-     * can be one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD, FIXED_CENTER
-     */
+    /// Indicates whether selection is fixable to place in which case all the
+    /// elements in the list move and selection stays in place. Fixed selection
+    /// can be one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD, FIXED_CENTER
     private int fixedSelection;
     private ListModel<T> model;
     private ListCellRenderer<T> renderer = new DefaultListCellRenderer<T>();
@@ -161,32 +188,22 @@ public class List<T> extends Component implements ActionSource {
     private boolean inputOnFocus = true;
     private boolean numericKeyActions = true;
     private boolean paintFocusBehindList = true;
-    /**
-     * Indicates the number of elements the list should check to determine the element
-     * sizes. This is ignored when a rendering prototype is present.
-     */
+    /// Indicates the number of elements the list should check to determine the element
+    /// sizes. This is ignored when a rendering prototype is present.
     private int listSizeCalculationSampleCount = 5;
-    /**
-     * Minimum number of elements shown in a list, this member is used to calculate
-     * the list preferred size. If the number of elements in the model is smaller than
-     * this then this value is used in the calculations.
-     */
+    /// Minimum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is smaller than
+    /// this then this value is used in the calculations.
     private int minElementHeight = 0;
-    /**
-     * Maximum number of elements shown in a list, this member is used to calculate
-     * the list preferred size. If the number of elements in the model is larger than
-     * this then this value is used in the calculations.
-     */
+    /// Maximum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is larger than
+    /// this then this value is used in the calculations.
     private int maxElementHeight = Integer.MAX_VALUE;
-    /**
-     * Indicates the gap between each item in the list
-     */
+    /// Indicates the gap between each item in the list
     private int itemGap = 2;
     private Listeners listener;
-    /**
-     * Indicates the position within the current animation, 0 means no animation
-     * is in progress
-     */
+    /// Indicates the position within the current animation, 0 means no animation
+    /// is in progress
     private int animationPosition;
     private int fixedDraggedAnimationPosition;
     private int fixedDraggedPosition;
@@ -195,105 +212,93 @@ public class List<T> extends Component implements ActionSource {
     private Motion listMotion;
     private boolean fireOnClick = defaultFireOnClick;
     private boolean fireOnRelease;
-    /**
-     * Initial x/y positions for the fixed mode drag
-     */
+    /// Initial x/y positions for the fixed mode drag
     private int fixedDraggedSelection = 0;
     private boolean commandList;
-    /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     */
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
     private boolean ignoreFocusComponentWhenUnfocused = defaultIgnoreFocusComponentWhenUnfocused;
-    /**
-     * Indicates that the background of a cell renderer might mutate between one entry and the next,
-     * it is recommended that this flag remains false for performance reasons.
-     */
+    /// Indicates that the background of a cell renderer might mutate between one entry and the next,
+    /// it is recommended that this flag remains false for performance reasons.
     private boolean mutableRendererBackgrounds;
-    /**
-     * This flag indicates if the List should automatically scroll to the
-     * selected element when it's been initialized.
-     */
+    /// This flag indicates if the List should automatically scroll to the
+    /// selected element when it's been initialized.
     private boolean scrollToSelected = true;
     private Label hintLabel;
     private boolean longPointerPressAction;
 
-    /**
-     * Creates a new instance of List
-     *
-     * @param items set of items placed into the list model
-     */
+    /// Creates a new instance of List
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: set of items placed into the list model
     public List(Vector items) {
         this(new DefaultListModel(items));
     }
 
-    /**
-     * Creates a new instance of List
-     *
-     * @param items set of items placed into the list model
-     */
+    /// Creates a new instance of List
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: set of items placed into the list model
     public List(T... items) {
         this(new DefaultListModel(items));
     }
 
-    /**
-     * Creates a new instance of List with an empty default model
-     */
+    /// Creates a new instance of List with an empty default model
     public List() {
         this(new DefaultListModel());
     }
 
-    /**
-     * Creates a new instance of List with the given model
-     *
-     * @param model the model instance
-     */
+    /// Creates a new instance of List with the given model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model instance
     public List(ListModel model) {
         setUIIDFinal("List");
         setModel(model);
     }
 
-    /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     *
-     * @return the defaultIgnoreFocusComponentWhenUnfocused
-     */
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultIgnoreFocusComponentWhenUnfocused
     public static boolean isDefaultIgnoreFocusComponentWhenUnfocused() {
         return defaultIgnoreFocusComponentWhenUnfocused;
     }
 
-    /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     *
-     * @param aDefaultIgnoreFocusComponentWhenUnfocused the defaultIgnoreFocusComponentWhenUnfocused to set
-     */
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultIgnoreFocusComponentWhenUnfocused`: the defaultIgnoreFocusComponentWhenUnfocused to set
     public static void setDefaultIgnoreFocusComponentWhenUnfocused(boolean aDefaultIgnoreFocusComponentWhenUnfocused) {
         defaultIgnoreFocusComponentWhenUnfocused = aDefaultIgnoreFocusComponentWhenUnfocused;
     }
 
-    /**
-     * Default value for the fire on click behavior
-     *
-     * @return the defaultFireOnClick
-     */
+    /// Default value for the fire on click behavior
+    ///
+    /// #### Returns
+    ///
+    /// the defaultFireOnClick
     public static boolean isDefaultFireOnClick() {
         return defaultFireOnClick;
     }
 
-    /**
-     * Default value for the fire on click behavior
-     *
-     * @param aDefaultFireOnClick the defaultFireOnClick to set
-     */
+    /// Default value for the fire on click behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultFireOnClick`: the defaultFireOnClick to set
     public static void setDefaultFireOnClick(boolean aDefaultFireOnClick) {
         defaultFireOnClick = aDefaultFireOnClick;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -304,9 +309,7 @@ public class List<T> extends Component implements ActionSource {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void initComponentImpl() {
         dataChanged(0, 0);
@@ -320,9 +323,7 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void laidOut() {
         super.laidOut();
@@ -334,9 +335,7 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
@@ -350,27 +349,27 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * Callback to allow subclasses to react to a change in the model
-     *
-     * @param status the type data change; REMOVED, ADDED or CHANGED
-     * @param index  item index in a list model
-     */
+    /// Callback to allow subclasses to react to a change in the model
+    ///
+    /// #### Parameters
+    ///
+    /// - `status`: the type data change; REMOVED, ADDED or CHANGED
+    ///
+    /// - `index`: item index in a list model
     protected void modelChanged(int status, int index) {
     }
 
-    /**
-     * Callback to allow subclasses to react to a selection change in the model
-     *
-     * @param oldSelected the old selection value
-     * @param newSelected the new selection value
-     */
+    /// Callback to allow subclasses to react to a selection change in the model
+    ///
+    /// #### Parameters
+    ///
+    /// - `oldSelected`: the old selection value
+    ///
+    /// - `newSelected`: the new selection value
     protected void listSelectionChanged(int oldSelected, int newSelected) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getSideGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
@@ -380,83 +379,79 @@ public class List<T> extends Component implements ActionSource {
         return 0;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isScrollableY() {
         return (getScrollDimension().getHeight() > getHeight() || isAlwaysTensile()) && getHeight() > 0 && (fixedSelection < FIXED_NONE_BOUNDRY) &&
                 orientation != HORIZONTAL;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isScrollableX() {
         return (getScrollDimension().getWidth() > getWidth()) && (fixedSelection < FIXED_NONE_BOUNDRY) &&
                 orientation == HORIZONTAL;
     }
 
-    /**
-     * Maximum number of elements shown in a list, this member is used to calculate
-     * the list preferred size. If the number of elements in the model is larger than
-     * this then this value is used in the calculations.
-     *
-     * @return the maximum number of elements
-     */
+    /// Maximum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is larger than
+    /// this then this value is used in the calculations.
+    ///
+    /// #### Returns
+    ///
+    /// the maximum number of elements
     public int getMaxElementHeight() {
         return maxElementHeight;
     }
 
-    /**
-     * Maximum number of elements shown in a list, this member is used to calculate
-     * the list preferred size. If the number of elements in the model is larger than
-     * this then this value is used in the calculations.
-     *
-     * @param maxElementHeight the maximum number of elements
-     */
+    /// Maximum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is larger than
+    /// this then this value is used in the calculations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxElementHeight`: the maximum number of elements
     public void setMaxElementHeight(int maxElementHeight) {
         this.maxElementHeight = maxElementHeight;
     }
 
-    /**
-     * Minimum number of elements shown in a list, this member is used to calculate
-     * the list preferred size. If the number of elements in the model is smaller than
-     * this then this value is used in the calculations.
-     *
-     * @return the minimum number of elements
-     */
+    /// Minimum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is smaller than
+    /// this then this value is used in the calculations.
+    ///
+    /// #### Returns
+    ///
+    /// the minimum number of elements
     public int getMinElementHeight() {
         return minElementHeight;
     }
 
-    /**
-     * Minimum number of elements shown in a list, this member is used to calculate
-     * the list preferred size. If the number of elements in the model is smaller than
-     * this then this value is used in the calculations.
-     *
-     * @param minElementHeight the minimum number of elements
-     */
+    /// Minimum number of elements shown in a list, this member is used to calculate
+    /// the list preferred size. If the number of elements in the model is smaller than
+    /// this then this value is used in the calculations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minElementHeight`: the minimum number of elements
     public void setMinElementHeight(int minElementHeight) {
         this.minElementHeight = minElementHeight;
     }
 
-    /**
-     * Returns the number of elements in the list, shorthand for
-     * getModel().getSize()
-     *
-     * @return the number of elements in the list
-     */
+    /// Returns the number of elements in the list, shorthand for
+    /// getModel().getSize()
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements in the list
     public int size() {
         return model.getSize();
     }
 
-    /**
-     * Returns the visual selection during a drag operation, otherwise equivalent to model.getSelectedIndex
-     *
-     * @return visual selection
-     */
+    /// Returns the visual selection during a drag operation, otherwise equivalent to model.getSelectedIndex
+    ///
+    /// #### Returns
+    ///
+    /// visual selection
     public int getCurrentSelected() {
         if (fixedSelection > FIXED_NONE_BOUNDRY && isDragActivated()) {
             return fixedDraggedSelection;
@@ -464,28 +459,26 @@ public class List<T> extends Component implements ActionSource {
         return model.getSelectedIndex();
     }
 
-    /**
-     * Returns the current selected offset in the list
-     *
-     * @return the current selected offset in the list
-     */
+    /// Returns the current selected offset in the list
+    ///
+    /// #### Returns
+    ///
+    /// the current selected offset in the list
     public int getSelectedIndex() {
         return model.getSelectedIndex();
     }
 
-    /**
-     * Sets the current selected offset in the list, by default this implementation
-     * will scroll the list to the selection if the selection is outside of the screen
-     *
-     * @param index the current selected offset in the list
-     */
+    /// Sets the current selected offset in the list, by default this implementation
+    /// will scroll the list to the selection if the selection is outside of the screen
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the current selected offset in the list
     public void setSelectedIndex(int index) {
         setSelectedIndex(index, true);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Rectangle getVisibleBounds() {
         Rectangle pos = new Rectangle();
@@ -498,9 +491,7 @@ public class List<T> extends Component implements ActionSource {
         return pos;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected int getDragRegionStatus(int x, int y) {
         if (!isScrollable()) {
@@ -512,13 +503,14 @@ public class List<T> extends Component implements ActionSource {
         return DRAG_REGION_POSSIBLE_DRAG_Y;
     }
 
-    /**
-     * Sets the current selected offset in the list
-     *
-     * @param index             the current selected offset in the list
-     * @param scrollToSelection indicates whether scrolling to selection should
-     *                          occur if the selection is outside of view
-     */
+    /// Sets the current selected offset in the list
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the current selected offset in the list
+    ///
+    /// - `scrollToSelection`: @param scrollToSelection indicates whether scrolling to selection should
+    /// occur if the selection is outside of view
     public void setSelectedIndex(int index, boolean scrollToSelection) {
         if (index < 0) {
             throw new IllegalArgumentException("Selection index is negative:" + index);
@@ -536,11 +528,11 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * Returns the current selected item in the list or null for no selection
-     *
-     * @return the current selected item in the list
-     */
+    /// Returns the current selected item in the list or null for no selection
+    ///
+    /// #### Returns
+    ///
+    /// the current selected item in the list
     public T getSelectedItem() {
         int idx = model.getSelectedIndex();
         if (idx < model.getSize() && idx > -1) {
@@ -549,11 +541,11 @@ public class List<T> extends Component implements ActionSource {
         return null;
     }
 
-    /**
-     * Sets the current selected item in the list
-     *
-     * @param item the current selected item in the list
-     */
+    /// Sets the current selected item in the list
+    ///
+    /// #### Parameters
+    ///
+    /// - `item`: the current selected item in the list
     public void setSelectedItem(T item) {
         int size = model.getSize();
         for (int iter = 0; iter < size; iter++) {
@@ -565,20 +557,20 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * Returns the model underlying the list
-     *
-     * @return the model underlying the list
-     */
+    /// Returns the model underlying the list
+    ///
+    /// #### Returns
+    ///
+    /// the model underlying the list
     public ListModel<T> getModel() {
         return model;
     }
 
-    /**
-     * Replaces/sets the model underlying the list
-     *
-     * @param model the new model underlying the list
-     */
+    /// Replaces/sets the model underlying the list
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the new model underlying the list
     public void setModel(ListModel model) {
         if (this.model != null) {
             setShouldCalcPreferredSize(true);
@@ -602,9 +594,7 @@ public class List<T> extends Component implements ActionSource {
         repaint();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
         super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
@@ -649,129 +639,132 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * Indicate whether pressing the number keys should trigger an action
-     *
-     * @return true if pressing the number keys should trigger an action
-     */
+    /// Indicate whether pressing the number keys should trigger an action
+    ///
+    /// #### Returns
+    ///
+    /// true if pressing the number keys should trigger an action
     public boolean isNumericKeyActions() {
         return numericKeyActions;
     }
 
-    /**
-     * Indicate whether pressing the number keys should trigger an action
-     *
-     * @param numericKeyActions true to trigger an action on number keys
-     */
+    /// Indicate whether pressing the number keys should trigger an action
+    ///
+    /// #### Parameters
+    ///
+    /// - `numericKeyActions`: true to trigger an action on number keys
     public void setNumericKeyActions(boolean numericKeyActions) {
         this.numericKeyActions = numericKeyActions;
     }
 
-    /**
-     * Indicates that the list should be treated as a list of commands, if the
-     * user "clicks" a command from the list its action performed method is invoked.
-     *
-     * @return true if the list is treated as a command list
-     */
+    /// Indicates that the list should be treated as a list of commands, if the
+    /// user "clicks" a command from the list its action performed method is invoked.
+    ///
+    /// #### Returns
+    ///
+    /// true if the list is treated as a command list
     public boolean isCommandList() {
         return commandList;
     }
 
-    /**
-     * Indicates that the list should be treated as a list of commands, if the
-     * user "clicks" a command from the list its action performed method is invoked.
-     *
-     * @param commandList true for the list to be treated as a command list
-     */
+    /// Indicates that the list should be treated as a list of commands, if the
+    /// user "clicks" a command from the list its action performed method is invoked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commandList`: true for the list to be treated as a command list
     public void setCommandList(boolean commandList) {
         this.commandList = commandList;
     }
 
-    /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     *
-     * @return the ignoreFocusComponentWhenUnfocused
-     */
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+    ///
+    /// #### Returns
+    ///
+    /// the ignoreFocusComponentWhenUnfocused
     public boolean isIgnoreFocusComponentWhenUnfocused() {
         return ignoreFocusComponentWhenUnfocused;
     }
 
-    /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     *
-     * @param ignoreFocusComponentWhenUnfocused true to ignore the focus component false otherwise
-     */
+    /// Indicates whether the list should not paint the focus component if the list
+    /// itself has no focus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ignoreFocusComponentWhenUnfocused`: true to ignore the focus component false otherwise
     public void setIgnoreFocusComponentWhenUnfocused(boolean ignoreFocusComponentWhenUnfocused) {
         this.ignoreFocusComponentWhenUnfocused = ignoreFocusComponentWhenUnfocused;
     }
 
-    /**
-     * Indicates that the background of a cell renderer might mutate between one entry and the next,
-     * it is recommended that this flag remains false for performance reasons.
-     *
-     * @return the value of the flag
-     */
+    /// Indicates that the background of a cell renderer might mutate between one entry and the next,
+    /// it is recommended that this flag remains false for performance reasons.
+    ///
+    /// #### Returns
+    ///
+    /// the value of the flag
     public boolean isMutableRendererBackgrounds() {
         return mutableRendererBackgrounds;
     }
 
-    /**
-     * Indicates that the background of a cell renderer might mutate between one entry and the next,
-     * it is recommended that this flag remains false for performance reasons.
-     *
-     * @param mutableRendererBackgrounds the new value for the flag
-     */
+    /// Indicates that the background of a cell renderer might mutate between one entry and the next,
+    /// it is recommended that this flag remains false for performance reasons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mutableRendererBackgrounds`: the new value for the flag
     public void setMutableRendererBackgrounds(boolean mutableRendererBackgrounds) {
         this.mutableRendererBackgrounds = mutableRendererBackgrounds;
     }
 
-    /**
-     * Indicates the number of elements the list should check to determine the element
-     * sizes. This is ignored when a rendering prototype is present.
-     *
-     * @return the listSizeCalculationSampleCount
-     */
+    /// Indicates the number of elements the list should check to determine the element
+    /// sizes. This is ignored when a rendering prototype is present.
+    ///
+    /// #### Returns
+    ///
+    /// the listSizeCalculationSampleCount
     public int getListSizeCalculationSampleCount() {
         return listSizeCalculationSampleCount;
     }
 
-    /**
-     * Indicates the number of elements the list should check to determine the element
-     * sizes. This is ignored when a rendering prototype is present.
-     *
-     * @param listSizeCalculationSampleCount the listSizeCalculationSampleCount to set
-     */
+    /// Indicates the number of elements the list should check to determine the element
+    /// sizes. This is ignored when a rendering prototype is present.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listSizeCalculationSampleCount`: the listSizeCalculationSampleCount to set
     public void setListSizeCalculationSampleCount(int listSizeCalculationSampleCount) {
         this.listSizeCalculationSampleCount = listSizeCalculationSampleCount;
     }
 
-    /**
-     * Enable/disable list action on long pointer press event
-     *
-     * @return the longPointerPressAction
-     */
+    /// Enable/disable list action on long pointer press event
+    ///
+    /// #### Returns
+    ///
+    /// the longPointerPressAction
     public boolean isLongPointerPressActionEnabled() {
         return longPointerPressAction;
     }
 
-    /**
-     * Enable/disable list action on long pointer press event
-     *
-     * @param longPointerPressAction the longPointerPressAction to set
-     */
+    /// Enable/disable list action on long pointer press event
+    ///
+    /// #### Parameters
+    ///
+    /// - `longPointerPressAction`: the longPointerPressAction to set
     public void setLongPointerPressActionEnabled(boolean longPointerPressAction) {
         this.longPointerPressAction = longPointerPressAction;
     }
 
-    /**
-     * Sets the renderer which is used to draw list elements
-     *
-     * @param renderer cell renderer instance
-     * @deprecated use setRenderer instead, this method was deprecated to confirm
-     * better to JavaBean convention of having the getter/setter with the same name
-     */
+    /// Sets the renderer which is used to draw list elements
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: cell renderer instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated use setRenderer instead, this method was deprecated to confirm
+    /// better to JavaBean convention of having the getter/setter with the same name
     public void setListCellRenderer(ListCellRenderer renderer) {
         if (this.renderer != null) {
             //calculate the item list size and the list size.
@@ -782,49 +775,55 @@ public class List<T> extends Component implements ActionSource {
         this.renderer = renderer;
     }
 
-    /**
-     * Returns the renderer which is used to draw list elements
-     *
-     * @return the renderer which is used to draw list elements
-     */
+    /// Returns the renderer which is used to draw list elements
+    ///
+    /// #### Returns
+    ///
+    /// the renderer which is used to draw list elements
     public final ListCellRenderer getRenderer() {
         return renderer;
     }
 
-    /**
-     * Sets the renderer which is used to draw list elements
-     *
-     * @param renderer cell renderer instance
-     */
+    /// Sets the renderer which is used to draw list elements
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: cell renderer instance
     public final void setRenderer(ListCellRenderer renderer) {
         setListCellRenderer(renderer);
     }
 
-    /**
-     * Returns the list orientation
-     *
-     * @return the list orientation HORIZONTAL or VERTICAL
-     * @see #HORIZONTAL
-     * @see #VERTICAL
-     */
+    /// Returns the list orientation
+    ///
+    /// #### Returns
+    ///
+    /// the list orientation HORIZONTAL or VERTICAL
+    ///
+    /// #### See also
+    ///
+    /// - #HORIZONTAL
+    ///
+    /// - #VERTICAL
     public int getOrientation() {
         return orientation;
     }
 
-    /**
-     * Sets the list orientation HORIZONTAL or VERTICAL
-     *
-     * @param orientation the list orientation HORIZONTAL or VERTICAL
-     * @see #HORIZONTAL
-     * @see #VERTICAL
-     */
+    /// Sets the list orientation HORIZONTAL or VERTICAL
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: the list orientation HORIZONTAL or VERTICAL
+    ///
+    /// #### See also
+    ///
+    /// - #HORIZONTAL
+    ///
+    /// - #VERTICAL
     public void setOrientation(int orientation) {
         this.orientation = orientation;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         ListCellRenderer r = getRenderer();
@@ -844,12 +843,12 @@ public class List<T> extends Component implements ActionSource {
         super.refreshTheme(merge);
     }
 
-    /**
-     * Makes sure the selected index is visible if it is not in the current view
-     * rect the list will scroll so it fits within
-     *
-     * @param rect the rectangle area to scroll to
-     */
+    /// Makes sure the selected index is visible if it is not in the current view
+    /// rect the list will scroll so it fits within
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the rectangle area to scroll to
     public void scrollRectToVisible(Rectangle rect) {
         if (fixedSelection < FIXED_NONE_BOUNDRY) {
             //Dimension elemSize = getElementSize();
@@ -863,9 +862,7 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setHandlesInput(boolean b) {
         Form f = getComponentForm();
@@ -882,9 +879,7 @@ public class List<T> extends Component implements ActionSource {
         super.setHandlesInput(b);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireClicked() {
         boolean h = handlesInput();
@@ -895,17 +890,13 @@ public class List<T> extends Component implements ActionSource {
         repaint();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isSelectableInteraction() {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
@@ -933,9 +924,7 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int keyCode) {
         // scrolling events are in keyPressed to provide immediate feedback
@@ -1041,11 +1030,11 @@ public class List<T> extends Component implements ActionSource {
         return hasScrollableParent(c.getParent());
     }
 
-    /**
-     * Updates the animation constant to a new value based on a keypress
-     *
-     * @param direction direction of the animation 1 or -1
-     */
+    /// Updates the animation constant to a new value based on a keypress
+    ///
+    /// #### Parameters
+    ///
+    /// - `direction`: direction of the animation 1 or -1
     private void updateAnimationPosition(int direction) {
         if (animationPosition != 0) {
             animationPosition = 0;
@@ -1072,10 +1061,8 @@ public class List<T> extends Component implements ActionSource {
         listMotion.start();
     }
 
-    /**
-     * Calculates the desired bounds for the component and returns them within the
-     * given rectangle.
-     */
+    /// Calculates the desired bounds for the component and returns them within the
+    /// given rectangle.
     private void calculateComponentPosition(int index, int defaultWidth, Rectangle rect, Dimension rendererSize, Dimension selectedSize, boolean beforeSelected) {
         Style style = getStyle();
         int initialY = style.getPaddingTop();
@@ -1206,16 +1193,22 @@ public class List<T> extends Component implements ActionSource {
         return y;
     }
 
-    /**
-     * Allows us to recalculate the bounds of a coordinate to make it "loop" back
-     * into view
-     *
-     * @param offset        either x or y coordinate
-     * @param totalSize     the total width or height of the list with all the elements (including scroll)
-     * @param viewSize      the size visible to the user
-     * @param componentSize the size of the component
-     * @return offset after manipulation if such manipulation was performed
-     */
+    /// Allows us to recalculate the bounds of a coordinate to make it "loop" back
+    /// into view
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: either x or y coordinate
+    ///
+    /// - `totalSize`: the total width or height of the list with all the elements (including scroll)
+    ///
+    /// - `viewSize`: the size visible to the user
+    ///
+    /// - `componentSize`: the size of the component
+    ///
+    /// #### Returns
+    ///
+    /// offset after manipulation if such manipulation was performed
     private int recalcOffset(int offset, int totalSize, int viewSize, int componentSize) {
         if (offset + (animationPosition % componentSize) +
                 (fixedDraggedAnimationPosition % componentSize) >= viewSize) {
@@ -1229,9 +1222,7 @@ public class List<T> extends Component implements ActionSource {
         return offset;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         getUIManager().getLookAndFeel().drawList(g, this);
@@ -1412,12 +1403,12 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * Allows subclasses to override the selection rendering for the component, specifically the spinner
-     * in some themes
-     *
-     * @return true to render the selection, false otherwise.
-     */
+    /// Allows subclasses to override the selection rendering for the component, specifically the spinner
+    /// in some themes
+    ///
+    /// #### Returns
+    ///
+    /// true to render the selection, false otherwise.
     protected boolean shouldRenderSelection() {
         return Display.getInstance().shouldRenderSelection(this);
     }
@@ -1450,9 +1441,7 @@ public class List<T> extends Component implements ActionSource {
 
     }
 
-    /**
-     * Renders the current component on the screen
-     */
+    /// Renders the current component on the screen
     private void renderComponent(Graphics g, Component cmp, int x, int y, int width, int height) {
         Style s = cmp.getStyle();
         int left = s.getMarginLeft(isRTL());
@@ -1502,76 +1491,77 @@ public class List<T> extends Component implements ActionSource {
         //g.popClip();
     }
 
-    /**
-     * Invoked to indicate interest in future selection events
-     *
-     * @param l the selection listener to be added
-     */
+    /// Invoked to indicate interest in future selection events
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the selection listener to be added
     public void addSelectionListener(SelectionListener l) {
         model.addSelectionListener(l);
     }
 
-    /**
-     * Invoked to indicate no further interest in future selection events
-     *
-     * @param l the selection listener to be removed
-     */
+    /// Invoked to indicate no further interest in future selection events
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the selection listener to be removed
     public void removeSelectionListener(SelectionListener l) {
         model.removeSelectionListener(l);
     }
 
-    /**
-     * Allows binding a listener to user selection actions
-     *
-     * @param l the action listener to be added
-     */
+    /// Allows binding a listener to user selection actions
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the action listener to be added
     @Override
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
 
-    /**
-     * This method allows extracting the action listeners from the current list
-     *
-     * @return vector containing the action listeners on the list
-     * @deprecated use getListeners instead
-     */
+    /// This method allows extracting the action listeners from the current list
+    ///
+    /// #### Returns
+    ///
+    /// vector containing the action listeners on the list
+    ///
+    /// #### Deprecated
+    ///
+    /// use getListeners instead
     public Vector getActionListeners() {
         return dispatcher.getListenerVector();
     }
 
-    /**
-     * This method allows extracting the action listeners from the current list
-     *
-     * @return Collection containing the action listeners on the list
-     */
+    /// This method allows extracting the action listeners from the current list
+    ///
+    /// #### Returns
+    ///
+    /// Collection containing the action listeners on the list
     public Collection getListeners() {
         return dispatcher.getListenerCollection();
     }
 
-    /**
-     * Allows binding a listener to user selection actions
-     *
-     * @param l the action listener to be removed
-     */
+    /// Allows binding a listener to user selection actions
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the action listener to be removed
     @Override
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireActionEvent() {
         fireActionEvent(new ActionEvent(eventSource, ActionEvent.Type.Other));
     }
 
-    /**
-     * Triggers the event to the listeners
-     *
-     * @param a the event to fire
-     */
+    /// Triggers the event to the listeners
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the event to fire
     protected void fireActionEvent(ActionEvent a) {
         if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             if (disposeDialogOnSelection) {
@@ -1598,32 +1588,30 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * A list can start handling input implicitly upon gaining focus, this can
-     * make for a more intuitive UI when no other focus elements exist or when
-     * their use case is infrequent. However, it might be odd in some cases
-     * where the list "steals" focus.
-     *
-     * @param inputOnFocus true is a list can start handling input
-     *                     implicitly upon gaining focus
-     */
+    /// A list can start handling input implicitly upon gaining focus, this can
+    /// make for a more intuitive UI when no other focus elements exist or when
+    /// their use case is infrequent. However, it might be odd in some cases
+    /// where the list "steals" focus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inputOnFocus`: @param inputOnFocus true is a list can start handling input
+    /// implicitly upon gaining focus
     public void setInputOnFocus(boolean inputOnFocus) {
         this.inputOnFocus = inputOnFocus;
     }
 
-    /**
-     * This method determines if the animated focus is drawn on top of the List
-     * or behind the List when moving.
-     *
-     * @param paintFocusBehindList
-     */
+    /// This method determines if the animated focus is drawn on top of the List
+    /// or behind the List when moving.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paintFocusBehindList`
     public void setPaintFocusBehindList(boolean paintFocusBehindList) {
         this.paintFocusBehindList = paintFocusBehindList;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void focusGainedInternal() {
         super.focusGainedInternal();
@@ -1632,62 +1620,76 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * Returns the gap between items
-     *
-     * @return the gap between items
-     */
+    /// Returns the gap between items
+    ///
+    /// #### Returns
+    ///
+    /// the gap between items
     public int getItemGap() {
         return itemGap;
     }
 
-    /**
-     * Set the gap between items
-     *
-     * @param itemGap the gap between items
-     */
+    /// Set the gap between items
+    ///
+    /// #### Parameters
+    ///
+    /// - `itemGap`: the gap between items
     public void setItemGap(int itemGap) {
         this.itemGap = itemGap;
     }
 
-    /**
-     * See set rendering prototype
-     *
-     * @return the value of the rendering prototype
-     * @see #setRenderingPrototype(java.lang.Object)
-     */
+    /// See set rendering prototype
+    ///
+    /// #### Returns
+    ///
+    /// the value of the rendering prototype
+    ///
+    /// #### See also
+    ///
+    /// - #setRenderingPrototype(java.lang.Object)
     public T getRenderingPrototype() {
         return renderingPrototype;
     }
 
-    /**
-     * <p>The rendering prototype is optionally used in calculating the size of the
-     * List and is recommended for performance reasons. You should invoke it with an object
-     * representing a theoretical value in the list which will be used to calculate
-     * the size required for each element in the list.</p>
-     * <p>This allows list size calculations to work across look and feels and allows
-     * developers to predetermine size for list elements.</p>
-     * <p>e.g. For a list of Strings which you would like to always be 5 characters wide
-     * you can use a prototype "XXXXX" which would use the preferred size of the XXXXX
-     * String to determine the size of the list element. E.g. for a list of dates you can use
-     * new Date(30, 12, 00) etc..</p>
-     * <p>The example below was designed for {@link com.codename1.ui.list.MultiList} but
-     * should work for any list. Its goal is to render 2 lines of text with 20 characters and a
-     * 5mm square icon:</p>
-     * <script src="https://gist.github.com/codenameone/dc9c7f13f6b312d1edc8.js"></script>
-     *
-     * @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
-     *                           size of a list component.
-     */
+    /// The rendering prototype is optionally used in calculating the size of the
+    /// List and is recommended for performance reasons. You should invoke it with an object
+    /// representing a theoretical value in the list which will be used to calculate
+    /// the size required for each element in the list.
+    ///
+    /// This allows list size calculations to work across look and feels and allows
+    /// developers to predetermine size for list elements.
+    ///
+    /// e.g. For a list of Strings which you would like to always be 5 characters wide
+    /// you can use a prototype "XXXXX" which would use the preferred size of the XXXXX
+    /// String to determine the size of the list element. E.g. for a list of dates you can use
+    /// new Date(30, 12, 00) etc..
+    ///
+    /// The example below was designed for `com.codename1.ui.list.MultiList` but
+    /// should work for any list. Its goal is to render 2 lines of text with 20 characters and a
+    /// 5mm square icon:
+    ///
+    /// ```java
+    /// Map proto = new HashMap<>();
+    /// map.put("Line1", "WWWWWWWWWWWWWWWWWWWW");
+    /// map.put("Line2", "WWWWWWWWWWWWWWWWWWWW");
+    /// int mm5 = Display.getInstance().convertToPixels(5, true);
+    /// map.put("icon", Image.create(mm5, mm5));
+    /// myMultiList.setRenderingPrototype(map);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderingPrototype`: @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
+    /// size of a list component.
     public void setRenderingPrototype(T renderingPrototype) {
         this.renderingPrototype = renderingPrototype;
     }
 
-    /**
-     * Calculates the default size for elements on the list
-     *
-     * @return the default dimension for elements in a list
-     */
+    /// Calculates the default size for elements on the list
+    ///
+    /// #### Returns
+    ///
+    /// the default dimension for elements in a list
     Dimension getElementSize(boolean selected, boolean addMargin) {
         if (selected) {
             if (selectedElemSize == null) {
@@ -1724,9 +1726,7 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * Calculates the size of an element based on a forumla or on rendering prototype
-     */
+    /// Calculates the size of an element based on a forumla or on rendering prototype
     private Dimension calculateElementSize(boolean selected, boolean addMargin) {
         if (renderingPrototype != null) {
             Component unselected = renderer.getListCellRendererComponent(this, renderingPrototype, 0, selected);
@@ -1758,9 +1758,7 @@ public class List<T> extends Component implements ActionSource {
         return new Dimension(width + marginX, height + marginY);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void longPointerPress(int x, int y) {
         if (!isEnabled()) {
@@ -1775,9 +1773,7 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
         if (!isEnabled()) {
@@ -1814,16 +1810,12 @@ public class List<T> extends Component implements ActionSource {
         super.pointerPressed(x, y);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerHover(int[] x, int[] y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
         pointerDraggedImpl(x, y);
@@ -1874,9 +1866,7 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Rectangle getSelectedRect() {
         Style style = getStyle();
@@ -1965,21 +1955,19 @@ public class List<T> extends Component implements ActionSource {
         return selectedIndex;
     }
 
-    /**
-     * This method determines if the List fires the action event when the pointer
-     * was clicked on one of the items, or only if the item was the selected item
-     * By default the value is true, this setting is only relevant for none fixed
-     * Lists
-     *
-     * @param fireOnClick
-     */
+    /// This method determines if the List fires the action event when the pointer
+    /// was clicked on one of the items, or only if the item was the selected item
+    /// By default the value is true, this setting is only relevant for none fixed
+    /// Lists
+    ///
+    /// #### Parameters
+    ///
+    /// - `fireOnClick`
     public void setFireOnClick(boolean fireOnClick) {
         this.fireOnClick = fireOnClick;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerHoverReleased(int[] x, int[] y) {
     }
@@ -2050,17 +2038,13 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
         pointerReleasedImpl(x, y, false, false);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         if (shouldShowHint()) {
@@ -2082,34 +2066,34 @@ public class List<T> extends Component implements ActionSource {
         return d;
     }
 
-    /**
-     * Allows adding an element to a list if the underlying model supports this, notice that
-     * it is an optional operation and if the model does not support it (default list model does)
-     * then this operation may failed.
-     *
-     * @param item the item to be added to a list model
-     */
+    /// Allows adding an element to a list if the underlying model supports this, notice that
+    /// it is an optional operation and if the model does not support it (default list model does)
+    /// then this operation may failed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `item`: the item to be added to a list model
     public void addItem(T item) {
         model.addItem(item);
     }
 
-    /**
-     * Indicates whether selection is fixable to place in which case all the
-     * elements in the list move and selection stays in place.
-     *
-     * @return one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD, FIXED_CENTER, FIXED_NONE_CYCLIC
-     */
+    /// Indicates whether selection is fixable to place in which case all the
+    /// elements in the list move and selection stays in place.
+    ///
+    /// #### Returns
+    ///
+    /// one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD, FIXED_CENTER, FIXED_NONE_CYCLIC
     public int getFixedSelection() {
         return fixedSelection;
     }
 
-    /**
-     * Indicates whether selection is fixable to place in which case all the
-     * elements in the list move and selection stays in place.
-     *
-     * @param fixedSelection one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD,
-     *                       FIXED_CENTER, FIXED_NONE_CYCLIC
-     */
+    /// Indicates whether selection is fixable to place in which case all the
+    /// elements in the list move and selection stays in place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fixedSelection`: @param fixedSelection one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD,
+    /// FIXED_CENTER, FIXED_NONE_CYCLIC
     public void setFixedSelection(int fixedSelection) {
         this.fixedSelection = fixedSelection;
     }
@@ -2121,9 +2105,7 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         // parent is performing the animation we shouldn't do anything in this case
@@ -2221,9 +2203,7 @@ public class List<T> extends Component implements ActionSource {
         return parentFinished;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isTactileTouch(int x, int y) {
         // provide touch feedback only when pressing an entry in the list and not for the entire list
@@ -2234,20 +2214,18 @@ public class List<T> extends Component implements ActionSource {
         return false;
     }
 
-    /**
-     * This flag indicates to the List if the List should scroll to the selected
-     * element when it's been initialized.
-     *
-     * @param scrollToSelected if true the List scrolls to the selected element
-     *                         when It's been initialized.
-     */
+    /// This flag indicates to the List if the List should scroll to the selected
+    /// element when it's been initialized.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scrollToSelected`: @param scrollToSelected if true the List scrolls to the selected element
+    /// when It's been initialized.
     public void setScrollToSelected(boolean scrollToSelected) {
         this.scrollToSelected = scrollToSelected;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected int getGridPosY() {
         int gridSize = getElementSize(false, true).getHeight() + itemGap;
@@ -2267,9 +2245,7 @@ public class List<T> extends Component implements ActionSource {
         return scroll;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected int getGridPosX() {
         int gridSize = getElementSize(false, true).getWidth() + itemGap;
@@ -2277,9 +2253,7 @@ public class List<T> extends Component implements ActionSource {
         return calcGrid(scroll, gridSize);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected String paramString() {
         String elemSizeStr = "element size = ";
@@ -2293,53 +2267,54 @@ public class List<T> extends Component implements ActionSource {
                 ", size = " + size();
     }
 
-    /**
-     * Returns the hint text
-     *
-     * @return the hint text or null
-     */
+    /// Returns the hint text
+    ///
+    /// #### Returns
+    ///
+    /// the hint text or null
     @Override
     public String getHint() {
         return super.getHint();
     }
 
-    /**
-     * Sets the TextArea hint text, the hint text  is displayed on the TextArea
-     * When there is no text in the TextArea
-     *
-     * @param hint the hint text to display
-     */
+    /// Sets the TextArea hint text, the hint text  is displayed on the TextArea
+    /// When there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the hint text to display
     public void setHint(String hint) {
         super.setHint(hint, getHintIcon());
     }
 
-    /**
-     * Returns the hint icon
-     *
-     * @return the hint icon
-     */
+    /// Returns the hint icon
+    ///
+    /// #### Returns
+    ///
+    /// the hint icon
     @Override
     public Image getHintIcon() {
         return super.getHintIcon();
     }
 
-    /**
-     * Sets the TextArea hint icon, the hint is displayed on the TextArea
-     * When there is no text in the TextArea
-     *
-     * @param icon the icon
-     */
+    /// Sets the TextArea hint icon, the hint is displayed on the TextArea
+    /// When there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon
     public void setHintIcon(Image icon) {
         setHint(getHint(), icon);
     }
 
-    /**
-     * Sets the TextArea hint text and Icon, the hint text and icon are
-     * displayed on the TextArea when there is no text in the TextArea
-     *
-     * @param hint the hint text to display
-     * @param icon the hint icon to display
-     */
+    /// Sets the TextArea hint text and Icon, the hint text and icon are
+    /// displayed on the TextArea when there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the hint text to display
+    ///
+    /// - `icon`: the hint icon to display
     @Override
     public void setHint(String hint, Image icon) {
         super.setHint(hint, icon);

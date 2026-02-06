@@ -36,9 +36,9 @@ package com.codename1.io.gzip;
 
 import java.io.UnsupportedEncodingException;
 
-/**
- * @see "http://www.ietf.org/rfc/rfc1952.txt"
- */
+/// #### See also
+///
+/// - "http://www.ietf.org/rfc/rfc1952.txt"
 public class GZIPHeader {
 
     public static final byte OS_MSDOS = (byte) 0x00;

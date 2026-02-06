@@ -33,29 +33,70 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
-/**
- * <p>The slider component serves both as a slider widget to allow users to select
- * a value on a scale via touch/arrows and also to indicate progress. The slider
- * defaults to percentage display but can represent any positive set of values.</p>
- * <img src="https://www.codenameone.com/img/developer-guide/slider.png" alt="Sample Slider" />
- *
- * <p>
- * {@code Slider} is very versatile and can be used to represent things as diverse as the 5 star ranking UI
- * demonstrated below. Notice that for the UI to work correctly you need to enclose it in a layout that preserves
- * its preferred size like flow layout.
- * </p>
- * <script src="https://gist.github.com/codenameone/fbdde74e699174a16b31.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-slider.png" alt="Star Ranking Slider" />
- *
- * <p>
- * Slider can be used as a progress indicator for network operations when combined with the
- * {@link com.codename1.components.SliderBridge} component:
- * </p>
- * <script src="https://gist.github.com/codenameone/051bfa054fd3024c8292.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/network-sliderbridge.png" alt="SliderBridge progress for downloading the image in the slow network mode" />
- *
- * @author Shai Almog
- */
+/// The slider component serves both as a slider widget to allow users to select
+/// a value on a scale via touch/arrows and also to indicate progress. The slider
+/// defaults to percentage display but can represent any positive set of values.
+///
+/// `Slider` is very versatile and can be used to represent things as diverse as the 5 star ranking UI
+/// demonstrated below. Notice that for the UI to work correctly you need to enclose it in a layout that preserves
+/// its preferred size like flow layout.
+///
+/// ```java
+/// public void showForm() {
+///   Form hi = new Form("Star Slider", new BoxLayout(BoxLayout.Y_AXIS));
+///   hi.add(FlowLayout.encloseCenter(createStarRankSlider()));
+///   hi.show();
+/// }
+///
+/// private void initStarRankStyle(Style s, Image star) {
+///     s.setBackgroundType(Style.BACKGROUND_IMAGE_TILE_BOTH);
+///     s.setBorder(Border.createEmpty());
+///     s.setBgImage(star);
+///     s.setBgTransparency(0);
+/// }
+///
+/// private Slider createStarRankSlider() {
+///     Slider starRank = new Slider();
+///     starRank.setEditable(true);
+///     starRank.setMinValue(0);
+///     starRank.setMaxValue(10);
+///     Font fnt = Font.createTrueTypeFont("native:mainLight", "native:mainLight").
+///             derive(Display.getInstance().convertToPixels(5, true), Font.STYLE_PLAIN);
+///     Style s = new Style(0xffff33, 0, fnt, (byte)0);
+///     Image fullStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, s).toImage();
+///     s.setOpacity(100);
+///     s.setFgColor(0);
+///     Image emptyStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, s).toImage();
+///     initStarRankStyle(starRank.getSliderEmptySelectedStyle(), emptyStar);
+///     initStarRankStyle(starRank.getSliderEmptyUnselectedStyle(), emptyStar);
+///     initStarRankStyle(starRank.getSliderFullSelectedStyle(), fullStar);
+///     initStarRankStyle(starRank.getSliderFullUnselectedStyle(), fullStar);
+///     starRank.setPreferredSize(new Dimension(fullStar.getWidth() * 5, fullStar.getHeight()));
+///     return starRank;
+/// }
+/// ```
+///
+/// Slider can be used as a progress indicator for network operations when combined with the
+/// `com.codename1.components.SliderBridge` component:
+///
+/// ```java
+/// Form hi = new Form("Download Progress", new BorderLayout());
+/// Slider progress = new Slider();
+/// Button download = new Button("Download");
+/// download.addActionListener((e) -> {
+///     ConnectionRequest cr = new ConnectionRequest("https://www.codenameone.com/img/blog/new_icon.png", false);
+///     SliderBridge.bindProgress(cr, progress);
+///     NetworkManager.getInstance().addToQueueAndWait(cr);
+///     if(cr.getResponseCode() == 200) {
+///         hi.add(BorderLayout.CENTER, new ScaleImageLabel(EncodedImage.create(cr.getResponseData())));
+///         hi.revalidate();
+///     }
+/// });
+/// hi.add(BorderLayout.SOUTH, progress).add(BorderLayout.NORTH, download);
+/// hi.show();
+/// ```
+///
+/// @author Shai Almog
 public class Slider extends Label implements ActionSource {
     private final EventDispatcher listeners = new EventDispatcher();
     private final EventDispatcher actionListeners = new EventDispatcher();
@@ -80,9 +121,7 @@ public class Slider extends Label implements ActionSource {
     private String fullUIID = "Slider";
 
 
-    /**
-     * The default constructor uses internal rendering to draw its state
-     */
+    /// The default constructor uses internal rendering to draw its state
     public Slider() {
         this("Slider", "Slider");
     }
@@ -99,20 +138,18 @@ public class Slider extends Label implements ActionSource {
         putClientProperty("@centerAlignHBorderBool", true);
     }
 
-    /**
-     * Creates an infinite progress slider
-     *
-     * @return a slider instance that has no end value
-     */
+    /// Creates an infinite progress slider
+    ///
+    /// #### Returns
+    ///
+    /// a slider instance that has no end value
     public static Slider createInfinite() {
         Slider s = new Slider();
         s.infinite = true;
         return s;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public final void setUIID(String id) {
         super.setUIID(id);
@@ -126,17 +163,13 @@ public class Slider extends Label implements ActionSource {
         initCustomStyle(sliderFullSelected);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isStickyDrag() {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void initComponent() {
         if (infinite) {
@@ -147,9 +180,7 @@ public class Slider extends Label implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void deinitialize() {
         if (infinite) {
@@ -160,9 +191,7 @@ public class Slider extends Label implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         if (infinite) {
@@ -189,22 +218,22 @@ public class Slider extends Label implements ActionSource {
         return super.animate();
     }
 
-    /**
-     * The infinite slider functionality is used to animate
-     * progress for which there is no defined value.
-     *
-     * @return true for infinite progress
-     */
+    /// The infinite slider functionality is used to animate
+    /// progress for which there is no defined value.
+    ///
+    /// #### Returns
+    ///
+    /// true for infinite progress
     public boolean isInfinite() {
         return infinite;
     }
 
-    /**
-     * Activates/disables the infinite slider functionality used to animate
-     * progress for which there is no defined value.
-     *
-     * @param i true for infinite progress
-     */
+    /// Activates/disables the infinite slider functionality used to animate
+    /// progress for which there is no defined value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: true for infinite progress
     public void setInfinite(boolean i) {
         if (infinite != i) {
             infinite = i;
@@ -218,9 +247,7 @@ public class Slider extends Label implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -231,22 +258,22 @@ public class Slider extends Label implements ActionSource {
         }
     }
 
-    /**
-     * Indicates the value of progress made
-     *
-     * @return the progress on the slider
-     */
+    /// Indicates the value of progress made
+    ///
+    /// #### Returns
+    ///
+    /// the progress on the slider
     public int getProgress() {
         return value;
     }
 
-    /**
-     * Indicates the value of progress made, this method is thread safe and
-     * can be invoked from any thread although discretion should still be kept
-     * so one thread doesn't regress progress made by another thread...
-     *
-     * @param value new value for progress
-     */
+    /// Indicates the value of progress made, this method is thread safe and
+    /// can be invoked from any thread although discretion should still be kept
+    /// so one thread doesn't regress progress made by another thread...
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: new value for progress
     public void setProgress(int value) {
         if (this.value != value) {
             fireDataChanged(DataChangedListener.CHANGED, value);
@@ -254,14 +281,20 @@ public class Slider extends Label implements ActionSource {
         setProgressInternal(value);
     }
 
-    /**
-     * Gets the progress of the slider at the point where the provided ActionEvent
-     * was triggered.
-     *
-     * @param evt An ActionEvent that originated from this slider.
-     * @return The progress of the slider.
-     * @since 7.0
-     */
+    /// Gets the progress of the slider at the point where the provided ActionEvent
+    /// was triggered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `evt`: An ActionEvent that originated from this slider.
+    ///
+    /// #### Returns
+    ///
+    /// The progress of the slider.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public int getProgress(ActionEvent evt) {
         if (evt instanceof SliderActionEvent) {
             return ((SliderActionEvent) evt).value;
@@ -280,12 +313,15 @@ public class Slider extends Label implements ActionSource {
         }
     }
 
-    /**
-     * Allows formatting the appearance of the progress when text is drawn on top
-     *
-     * @param value the value of the slider
-     * @return a string formatted version
-     */
+    /// Allows formatting the appearance of the progress when text is drawn on top
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value of the slider
+    ///
+    /// #### Returns
+    ///
+    /// a string formatted version
     protected String formattedValue(int value) {
         if (renderValueOnTop) {
             return ("" + value);
@@ -296,45 +332,43 @@ public class Slider extends Label implements ActionSource {
         return ("");
     }
 
-    /**
-     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full
-     *
-     * @return the Style object that shows a completely full style.
-     */
+    /// Returns the `com.codename1.ui.plaf.Style` used to paint the slider when its full
+    ///
+    /// #### Returns
+    ///
+    /// the Style object that shows a completely full style.
     public Style getSliderFullUnselectedStyle() {
         return sliderFull;
     }
 
-    /**
-     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full and selected
-     *
-     * @return the Style object that shows a completely full style.
-     */
+    /// Returns the `com.codename1.ui.plaf.Style` used to paint the slider when its full and selected
+    ///
+    /// #### Returns
+    ///
+    /// the Style object that shows a completely full style.
     public Style getSliderFullSelectedStyle() {
         return sliderFullSelected;
     }
 
-    /**
-     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full
-     *
-     * @return the Style object that shows a completely full style.
-     */
+    /// Returns the `com.codename1.ui.plaf.Style` used to paint the slider when its full
+    ///
+    /// #### Returns
+    ///
+    /// the Style object that shows a completely full style.
     public Style getSliderEmptyUnselectedStyle() {
         return super.getUnselectedStyle();
     }
 
-    /**
-     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full and selected
-     *
-     * @return the Style object that shows a completely full style.
-     */
+    /// Returns the `com.codename1.ui.plaf.Style` used to paint the slider when its full and selected
+    ///
+    /// #### Returns
+    ///
+    /// the Style object that shows a completely full style.
     public Style getSliderEmptySelectedStyle() {
         return super.getSelectedStyle();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Style getStyle() {
         if (paintingFull) {
@@ -349,9 +383,7 @@ public class Slider extends Label implements ActionSource {
         return super.getStyle();
     }
 
-    /**
-     * Return the size we would generally like for the component
-     */
+    /// Return the size we would generally like for the component
     @Override
     protected Dimension calcPreferredSize() {
         Style style = getStyle();
@@ -393,9 +425,7 @@ public class Slider extends Label implements ActionSource {
         return new Dimension(prefW, prefH);
     }
 
-    /**
-     * Paint the progress indicator
-     */
+    /// Paint the progress indicator
     @Override
     public void paintComponentBackground(Graphics g) {
         super.paintComponentBackground(g);
@@ -449,39 +479,39 @@ public class Slider extends Label implements ActionSource {
         }
     }
 
-    /**
-     * Indicates the slider is vertical
-     *
-     * @return true if the slider is vertical
-     */
+    /// Indicates the slider is vertical
+    ///
+    /// #### Returns
+    ///
+    /// true if the slider is vertical
     public boolean isVertical() {
         return vertical;
     }
 
-    /**
-     * Indicates the slider is vertical
-     *
-     * @param vertical true if the slider is vertical
-     */
+    /// Indicates the slider is vertical
+    ///
+    /// #### Parameters
+    ///
+    /// - `vertical`: true if the slider is vertical
     public void setVertical(boolean vertical) {
         this.vertical = vertical;
     }
 
-    /**
-     * Indicates the slider is modifyable
-     *
-     * @return true if the slider is editable
-     */
+    /// Indicates the slider is modifyable
+    ///
+    /// #### Returns
+    ///
+    /// true if the slider is editable
     @Override
     public boolean isEditable() {
         return editable;
     }
 
-    /**
-     * Indicates the slider is modifyable
-     *
-     * @param editable true if the slider is editable
-     */
+    /// Indicates the slider is modifyable
+    ///
+    /// #### Parameters
+    ///
+    /// - `editable`: true if the slider is editable
     public void setEditable(boolean editable) {
         this.editable = editable;
         setFocusable(editable);
@@ -524,9 +554,7 @@ public class Slider extends Label implements ActionSource {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
         if (Display.getInstance().getImplementation().isScrollWheeling()) {
@@ -574,25 +602,19 @@ public class Slider extends Label implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireClicked() {
         setHandlesInput(!handlesInput());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isSelectableInteraction() {
         return editable;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
         if (Display.getInstance().getImplementation().isScrollWheeling()) {
@@ -606,18 +628,14 @@ public class Slider extends Label implements ActionSource {
         previousY = -1;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int code) {
         super.keyReleased(code);
         fireActionEventImpl();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int code) {
         if (editable && handlesInput()) {
@@ -672,20 +690,20 @@ public class Slider extends Label implements ActionSource {
         super.keyPressed(code);
     }
 
-    /**
-     * The increments when the user presses a key to the left/right/up/down etc.
-     *
-     * @return increment value
-     */
+    /// The increments when the user presses a key to the left/right/up/down etc.
+    ///
+    /// #### Returns
+    ///
+    /// increment value
     public int getIncrements() {
         return increments;
     }
 
-    /**
-     * The increments when the user presses a key to the left/right/up/down etc.
-     *
-     * @param increments increment value
-     */
+    /// The increments when the user presses a key to the left/right/up/down etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `increments`: increment value
     public void setIncrements(int increments) {
         this.increments = increments;
     }
@@ -698,129 +716,127 @@ public class Slider extends Label implements ActionSource {
         actionListeners.fireActionEvent(new SliderActionEvent(this));
     }
 
-    /**
-     * Adds a listener to data changed events, notice that the status argument to the data change listener
-     * shouldn't be relied upon.
-     *
-     * @param l new listener
-     */
+    /// Adds a listener to data changed events, notice that the status argument to the data change listener
+    /// shouldn't be relied upon.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: new listener
     public void addDataChangedListener(DataChangedListener l) {
         listeners.addListener(l);
     }
 
-    /**
-     * Removes a listener from data changed events, notice that the status argument to the data change listener
-     * shouldn't be relied upon.
-     *
-     * @param l listener to remove
-     */
+    /// Removes a listener from data changed events, notice that the status argument to the data change listener
+    /// shouldn't be relied upon.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: listener to remove
     public void removeDataChangedListener(DataChangedListener l) {
         listeners.removeListener(l);
     }
 
-    /**
-     * Action listeners give a more coarse event only when the user lifts the finger from the slider
-     *
-     * @param l the listener
-     */
+    /// Action listeners give a more coarse event only when the user lifts the finger from the slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
     @Override
     public void addActionListener(ActionListener l) {
         actionListeners.addListener(l);
     }
 
-    /**
-     * Action listeners give a more coarse event only when the user lifts the finger from the slider
-     *
-     * @param l the listener
-     */
+    /// Action listeners give a more coarse event only when the user lifts the finger from the slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
     @Override
     public void removeActionListener(ActionListener l) {
         actionListeners.removeListener(l);
     }
 
-    /**
-     * Indicates that the value of the slider should be rendered with a percentage sign
-     * on top of the slider.
-     *
-     * @return true if so
-     */
+    /// Indicates that the value of the slider should be rendered with a percentage sign
+    /// on top of the slider.
+    ///
+    /// #### Returns
+    ///
+    /// true if so
     public boolean isRenderPercentageOnTop() {
         return renderPercentageOnTop;
     }
 
-    /**
-     * Indicates that the value of the slider should be rendered with a percentage sign
-     * on top of the slider.
-     *
-     * @param renderPercentageOnTop true to render percentages
-     */
+    /// Indicates that the value of the slider should be rendered with a percentage sign
+    /// on top of the slider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderPercentageOnTop`: true to render percentages
     public void setRenderPercentageOnTop(boolean renderPercentageOnTop) {
         this.renderPercentageOnTop = renderPercentageOnTop;
     }
 
-    /**
-     * @return the renderValueOnTop
-     */
+    /// #### Returns
+    ///
+    /// the renderValueOnTop
     public boolean isRenderValueOnTop() {
         return renderValueOnTop;
     }
 
-    /**
-     * @param renderValueOnTop the renderValueOnTop to set
-     */
+    /// #### Parameters
+    ///
+    /// - `renderValueOnTop`: the renderValueOnTop to set
     public void setRenderValueOnTop(boolean renderValueOnTop) {
         this.renderValueOnTop = renderValueOnTop;
     }
 
-    /**
-     * @return the maxValue
-     */
+    /// #### Returns
+    ///
+    /// the maxValue
     public int getMaxValue() {
         return maxValue;
     }
 
-    /**
-     * @param maxValue the maxValue to set
-     */
+    /// #### Parameters
+    ///
+    /// - `maxValue`: the maxValue to set
     public void setMaxValue(int maxValue) {
         this.maxValue = maxValue;
     }
 
-    /**
-     * @return the minValue
-     */
+    /// #### Returns
+    ///
+    /// the minValue
     public int getMinValue() {
         return minValue;
     }
 
-    /**
-     * @param minValue the minValue to set
-     */
+    /// #### Parameters
+    ///
+    /// - `minValue`: the minValue to set
     public void setMinValue(int minValue) {
         this.minValue = minValue;
     }
 
-    /**
-     * The thumb image is drawn on top of the current progress
-     *
-     * @return the thumbImage
-     */
+    /// The thumb image is drawn on top of the current progress
+    ///
+    /// #### Returns
+    ///
+    /// the thumbImage
     public Image getThumbImage() {
         return thumbImage;
     }
 
-    /**
-     * The thumb image is drawn on top of the current progress
-     *
-     * @param thumbImage the thumbImage to set
-     */
+    /// The thumb image is drawn on top of the current progress
+    ///
+    /// #### Parameters
+    ///
+    /// - `thumbImage`: the thumbImage to set
     public void setThumbImage(Image thumbImage) {
         this.thumbImage = thumbImage;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean shouldBlockSideSwipe() {
         return editable && !vertical;

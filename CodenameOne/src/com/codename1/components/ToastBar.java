@@ -53,117 +53,142 @@ import java.util.TimerTask;
 
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * An API to present status messages to the user in an unobtrusive manner.  This is useful if
- * there are background tasks that need to display information to the user.  E.g. If a network request fails,
- * of let the user know that "Jobs are being synchronized".
- *
- * <h2>Example Usage</h2>
- *
- * <script src="https://gist.github.com/codenameone/4584f342783169899b34.js"></script>
- *
- * <h3>Advanced Usage</h3>
- * <p>See the <a href="https://github.com/codenameone/codenameone-demos/blob/master/ToastBarDemo/src/com/codename1/demos/status/ToastBarDemo.java">StatusBarDemo</a></p>
- *
- * <h2>Screenshots</h2>
- *
- * <h3>Status With Progress Bar</h3>
- * <img src="https://www.codenameone.com/img/developer-guide/components-statusbar.png" alt="Status With Progress Bar" />
- *
- * <h3>Status With Multi-Line Message</h3>
- * <img src="https://www.codenameone.com/img/developer-guide/components-statusbar-multiline.png" alt="Status With Multi-Line Message" />
- *
- * <h2>Video Demo</h2>
- * <iframe width="640" height="480" src="https://www.youtube.com/embed/SMhqQ1xvfz0?rel=0" frameborder="0" allowfullscreen></iframe>
- * <p>
- * Note: the video above refers to the {@code ToastBar} based on its development name of StatusBar. This
- * was changed to avoid confusion with the iOS StatusBar.
- * </p>
- *
- * @author shannah
- */
+/// An API to present status messages to the user in an unobtrusive manner.  This is useful if
+/// there are background tasks that need to display information to the user.  E.g. If a network request fails,
+/// of let the user know that "Jobs are being synchronized".
+///
+/// Example Usage
+///
+/// ```java
+/// Form hi = new Form("ToastBarDemo", BoxLayout.y());
+///
+/// Button basic = new Button("Basic");
+/// Button progress = new Button("Progress");
+/// Button expires = new Button("Expires");
+/// Button delayed = new Button("Delayed");
+/// hi.add(basic).add(progress).add(expires).add(delayed);
+///
+/// basic.addActionListener(e -> {
+///   ToastBar.Status status = ToastBar.getInstance().createStatus();
+///   status.setMessage("Hello world");
+///   status.show();
+///   //...  Some time later you must clear the status
+///   // status.clear();
+/// });
+///
+/// progress.addActionListener(e -> {
+///   ToastBar.Status status = ToastBar.getInstance().createStatus();
+///   status.setMessage("Hello world");
+///   status.setShowProgressIndicator(true);
+///   status.show();
+///   // ... Some time later you must clear it
+/// });
+///
+/// expires.addActionListener(e -> {
+///   ToastBar.Status status = ToastBar.getInstance().createStatus();
+///   status.setMessage("Hello world");
+///   status.setExpires(3000);  // only show the status for 3 seconds, then have it automatically clear
+///   status.show();
+/// });
+///
+/// delayed.addActionListener(e -> {
+///   ToastBar.Status status = ToastBar.getInstance().createStatus();
+///   status.setMessage("Hello world");
+///   status.showDelayed(300); // Wait 300 ms to show the status
+///   // ... Some time later, clear the status... this may be before it shows at all
+/// });
+///
+/// hi.show();
+/// ```
+///
+/// Advanced Usage
+///
+/// See the [StatusBarDemo](https://github.com/codenameone/codenameone-demos/blob/master/ToastBarDemo/src/com/codename1/demos/status/ToastBarDemo.java)
+///
+/// Screenshots
+///
+/// Status With Progress Bar
+///
+/// Status With Multi-Line Message
+///
+/// Video Demo
+///
+/// Note: the video above refers to the `ToastBar` based on its development name of StatusBar. This
+/// was changed to avoid confusion with the iOS StatusBar.
+///
+/// @author shannah
 public final class ToastBar {
 
-    /**
-     * The default timeout for info/error messages
-     */
+    /// The default timeout for info/error messages
     private static int defaultMessageTimeout = 4000;
-    /**
-     * Keeps track of the currently active status messages.
-     */
+    /// Keeps track of the currently active status messages.
     private final ArrayList<Status> statuses = new ArrayList<Status>();
     private int position = Component.BOTTOM;
-    /**
-     * The default UIID that to be used for the {@code ToastBar} component.  This is the
-     * style of the box that appears at the bottom of the screen.
-     */
+    /// The default UIID that to be used for the `ToastBar` component.  This is the
+    /// style of the box that appears at the bottom of the screen.
     private String defaultUIID = "ToastBar";
-    /**
-     * The default UIID that is to be used for the text in the {@code ToastBar}.
-     */
+    /// The default UIID that is to be used for the text in the `ToastBar`.
     private String defaultMessageUIID = "ToastBarMessage";
     //FIXME SH Need to style the {@code ToastBar} so that it looks nicer
     private boolean useFormLayeredPane;
-    /**
-     * Flag to indicate that the status is updating.  This is used to prevent
-     * two status updates from happening at the same time.
-     */
+    /// Flag to indicate that the status is updating.  This is used to prevent
+    /// two status updates from happening at the same time.
     private boolean updatingStatus;
-    /**
-     * Flag to indicate that a request to update the status was received while
-     * updateStatus() was running.
-     */
+    /// Flag to indicate that a request to update the status was received while
+    /// updateStatus() was running.
     private boolean pendingUpdateStatus;
 
     private ToastBar() {
 
     }
 
-    /**
-     * The default timeout for info/error messages
-     *
-     * @return the defaultMessageTimeout
-     */
+    /// The default timeout for info/error messages
+    ///
+    /// #### Returns
+    ///
+    /// the defaultMessageTimeout
     public static int getDefaultMessageTimeout() {
         return defaultMessageTimeout;
     }
 
-    /**
-     * The default timeout for info/error messages
-     *
-     * @param aDefaultMessageTimeout the defaultMessageTimeout to set
-     */
+    /// The default timeout for info/error messages
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultMessageTimeout`: the defaultMessageTimeout to set
     public static void setDefaultMessageTimeout(int aDefaultMessageTimeout) {
         defaultMessageTimeout = aDefaultMessageTimeout;
     }
 
-    /**
-     * Gets reference to the singleton StatusBar instance
-     *
-     * @return
-     */
+    /// Gets reference to the singleton StatusBar instance
     public static ToastBar getInstance() {
         return ToastBarHolder.INSTANCE;
     }
 
-    /**
-     * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
-     *
-     * @param msg the error message
-     */
+    /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the error message
     public static void showErrorMessage(String msg) {
         showErrorMessage(msg, defaultMessageTimeout);
     }
 
-    /**
-     * Simplifies a common use case of showing a message with an icon that fades out after a few seconds
-     *
-     * @param msg      the message
-     * @param icon     the material icon to show from {@link com.codename1.ui.FontImage}
-     * @param timeout  the timeout value in milliseconds
-     * @param listener the action to perform when the ToastBar is tapped
-     * @return the status if we want to clear it before timeout elapses
-     */
+    /// Simplifies a common use case of showing a message with an icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the message
+    ///
+    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    ///
+    /// - `timeout`: the timeout value in milliseconds
+    ///
+    /// - `listener`: the action to perform when the ToastBar is tapped
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
     public static Status showMessage(String msg, char icon, int timeout, ActionListener listener) {
         Status s = ToastBar.getInstance().createStatus();
         Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());
@@ -177,58 +202,79 @@ public final class ToastBar {
         return s;
     }
 
-    /**
-     * Simplifies a common use case of showing a message with an icon that fades out after a few seconds
-     *
-     * @param msg     the message
-     * @param icon    the material icon to show from {@link com.codename1.ui.FontImage}
-     * @param timeout the timeout value in milliseconds
-     * @return the status if we want to clear it before timeout elapses
-     */
+    /// Simplifies a common use case of showing a message with an icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the message
+    ///
+    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    ///
+    /// - `timeout`: the timeout value in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
     public static Status showMessage(String msg, char icon, int timeout) {
         return showMessage(msg, icon, timeout, null);
     }
 
-    /**
-     * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
-     *
-     * @param msg      the message
-     * @param icon     the material icon to show from {@link com.codename1.ui.FontImage}
-     * @param listener the action to perform when the ToastBar is tapped
-     * @return the status if we want to clear it before timeout elapses
-     */
+    /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the message
+    ///
+    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    ///
+    /// - `listener`: the action to perform when the ToastBar is tapped
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
     public static Status showMessage(String msg, char icon, ActionListener listener) {
         return showMessage(msg, icon, defaultMessageTimeout, listener);
     }
 
-    /**
-     * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
-     *
-     * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
-     * @param msg  the message
-     * @return the status if we want to clear it before timeout elapses
-     */
+    /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    ///
+    /// - `msg`: the message
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
     public static Status showMessage(String msg, char icon) {
         return showMessage(msg, icon, defaultMessageTimeout);
     }
 
-    /**
-     * Simplifies a common use case of showing an information message with an info icon that fades out after a few seconds
-     *
-     * @param msg the message
-     * @return the status if we want to clear it before timeout elapses
-     */
+    /// Simplifies a common use case of showing an information message with an info icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the message
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
     public static Status showInfoMessage(String msg) {
         return showMessage(msg, FontImage.MATERIAL_INFO, defaultMessageTimeout);
     }
 
-    /**
-     * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
-     *
-     * @param msg     the error message
-     * @param timeout the timeout value in milliseconds
-     * @return the status if we want to clear it before timeout elapses
-     */
+    /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the error message
+    ///
+    /// - `timeout`: the timeout value in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
     public static Status showErrorMessage(String msg, int timeout) {
         return showMessage(msg, FontImage.MATERIAL_ERROR, timeout);
     }
@@ -301,58 +347,64 @@ public final class ToastBar {
         NetworkManager.getInstance().addProgressListener(progListener[0]);
     }
 
-    /**
-     * Gets the default UIID to be used for the style of the {@code ToastBar} component.
-     * By default this is "ToastBarComponent".
-     *
-     * @return the defaultUIID
-     */
+    /// Gets the default UIID to be used for the style of the `ToastBar` component.
+    /// By default this is "ToastBarComponent".
+    ///
+    /// #### Returns
+    ///
+    /// the defaultUIID
     public String getDefaultUIID() {
         return defaultUIID;
     }
 
-    /**
-     * Sets the defaults UIID to be used for the style of the {@code ToastBar} component.  By default
-     * this is "ToastBarComponent"
-     *
-     * @param defaultUIID the defaultUIID to set
-     */
+    /// Sets the defaults UIID to be used for the style of the `ToastBar` component.  By default
+    /// this is "ToastBarComponent"
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultUIID`: the defaultUIID to set
     public void setDefaultUIID(String defaultUIID) {
         this.defaultUIID = defaultUIID;
     }
 
-    /**
-     * Gets the default UIID to be used for the style of the {@code ToastBar} text.  By default
-     * this is "ToastBarMessage"
-     *
-     * @return the defaultMessageUIID
-     */
+    /// Gets the default UIID to be used for the style of the `ToastBar` text.  By default
+    /// this is "ToastBarMessage"
+    ///
+    /// #### Returns
+    ///
+    /// the defaultMessageUIID
     public String getDefaultMessageUIID() {
         return defaultMessageUIID;
     }
 
-    /**
-     * Sets the default UIID to be used for the style of the {@code ToastBar} text.  By default this is
-     * "ToastBarMessage"
-     *
-     * @param defaultMessageUIID the defaultMessageUIID to set
-     */
+    /// Sets the default UIID to be used for the style of the `ToastBar` text.  By default this is
+    /// "ToastBarMessage"
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultMessageUIID`: the defaultMessageUIID to set
     public void setDefaultMessageUIID(String defaultMessageUIID) {
         this.defaultMessageUIID = defaultMessageUIID;
     }
 
-    /**
-     * By default the ToastBar uses the LayeredPane.  However, it may be better in many
-     * cases to use the FormLayerd pane.  This allows you to toggle whether to use
-     * the FormLayeredPane.
-     *
-     * <p>Key use-case is for displaying the ToastBar over a Sheet, which is on the FormLayeredPane.
-     * If you don't set this to true, then the ToastBar will be displayed behind the Sheet.</p>
-     *
-     * @param useFormLayeredPane True to use the form layered pane to display the toastbar.
-     * @return Self for chaining.
-     * @since 8.0
-     */
+    /// By default the ToastBar uses the LayeredPane.  However, it may be better in many
+    /// cases to use the FormLayerd pane.  This allows you to toggle whether to use
+    /// the FormLayeredPane.
+    ///
+    /// Key use-case is for displaying the ToastBar over a Sheet, which is on the FormLayeredPane.
+    /// If you don't set this to true, then the ToastBar will be displayed behind the Sheet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `useFormLayeredPane`: True to use the form layered pane to display the toastbar.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public ToastBar useFormLayeredPane(boolean useFormLayeredPane) {
         if (useFormLayeredPane != this.useFormLayeredPane) {
             ToastBarComponent c = getToastBarComponent(false);
@@ -367,27 +419,25 @@ public final class ToastBar {
         return this;
     }
 
-    /**
-     * Gets the position of the toast bar on the screen.  Either {@link Component#TOP} or {@link Component#BOTTOM}.
-     *
-     * @return the position
-     */
+    /// Gets the position of the toast bar on the screen.  Either `Component#TOP` or `Component#BOTTOM`.
+    ///
+    /// #### Returns
+    ///
+    /// the position
     public int getPosition() {
         return position;
     }
 
-    /**
-     * Sets the position of the toast bar on the screen.
-     *
-     * @param position the position to set Should be one of {@link Component#TOP} and {@link Component#BOTTOM}
-     */
+    /// Sets the position of the toast bar on the screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: the position to set Should be one of `Component#TOP` and `Component#BOTTOM`
     public void setPosition(int position) {
         this.position = position;
     }
 
-    /**
-     * Updates the ToastBar UI component with the settings of the current status.
-     */
+    /// Updates the ToastBar UI component with the settings of the current status.
     private void updateStatus() {
         final ToastBarComponent c = getToastBarComponent();
         moveLayerToFront();
@@ -559,11 +609,7 @@ public final class ToastBar {
         }
     }
 
-    /**
-     * Creates a new Status.
-     *
-     * @return
-     */
+    /// Creates a new Status.
     public Status createStatus() {
         Status s = new Status();
         statuses.add(s);
@@ -651,11 +697,11 @@ public final class ToastBar {
         return null;
     }
 
-    /**
-     * Shows or hides the {@code ToastBar}.
-     *
-     * @param visible
-     */
+    /// Shows or hides the `ToastBar`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`
     public void setVisible(boolean visible) {
         final ToastBarComponent c = getToastBarComponent();
         if (c == null || c.isVisible() == visible) {
@@ -717,72 +763,54 @@ public final class ToastBar {
         }
     }
 
-    /**
-     * Represents a single status message.
-     */
+    /// Represents a single status message.
     public class Status {
 
-        /**
-         * The start time of the process this status is tracking.
-         */
-        /**
-         * This UIID that should be used to style the ToastBar text while this
-         * message is being displayed.
-         */
+        /// The start time of the process this status is tracking.
+        /// This UIID that should be used to style the ToastBar text while this
+        /// message is being displayed.
         private String messageUIID = defaultMessageUIID;
-        /**
-         * The UIID that should be used to style the ToastBar component while
-         * this message is being displayed.
-         */
+        /// The UIID that should be used to style the ToastBar component while
+        /// this message is being displayed.
         private String uiid = defaultUIID;
-        /**
-         * Timer used to "expire" the message after a certain time.
-         *
-         * @see #setExpires(int)
-         */
+        /// Timer used to "expire" the message after a certain time.
+        ///
+        /// #### See also
+        ///
+        /// - #setExpires(int)
         private Timer timer;
-        /**
-         * Timer used to delay the showing of the message.  Useful if you only want
-         * to show the message if the task ends up taking a long time.
-         *
-         * @see #showDelayed(int)
-         */
+        /// Timer used to delay the showing of the message.  Useful if you only want
+        /// to show the message if the task ends up taking a long time.
+        ///
+        /// #### See also
+        ///
+        /// - #showDelayed(int)
         private Timer showTimer;
 
-        /**
-         * The message to be displayed in the {@code ToastBar}.
-         */
+        /// The message to be displayed in the `ToastBar`.
         private String message;
 
-        /**
-         * An action to perform when the ToastBar is tapped {@code ToastBar}.
-         */
+        /// An action to perform when the ToastBar is tapped `ToastBar`.
         private ActionListener listener;
 
-        /**
-         * Optional progress for the task.  (Not tested or implemented yet).
-         */
+        /// Optional progress for the task.  (Not tested or implemented yet).
         private int progress = -2;
 
-        /**
-         * Optional icon to show in the {@code ToastBar}.  (Not tested or implemented yet).
-         */
+        /// Optional icon to show in the `ToastBar`.  (Not tested or implemented yet).
         private Image icon;
 
-        /**
-         * Whether this status message should show an infinite progress indicator. (e.g. spinning beachball).
-         */
+        /// Whether this status message should show an infinite progress indicator. (e.g. spinning beachball).
         private boolean showProgressIndicator;
 
         private Status() {
         }
 
-        /**
-         * Directs the status to be cleared (if it isn't already cleared() after a given number of milliseconds.
-         *
-         * @param millis The maximum number of milliseconds that the status message should be displayed for.
-         *               Helpful for error messages that only need to be displayed for a few seconds.
-         */
+        /// Directs the status to be cleared (if it isn't already cleared() after a given number of milliseconds.
+        ///
+        /// #### Parameters
+        ///
+        /// - `millis`: @param millis The maximum number of milliseconds that the status message should be displayed for.
+        /// Helpful for error messages that only need to be displayed for a few seconds.
         public void setExpires(int millis) {
             if (millis < 0 && timer != null) {
                 timer.cancel();
@@ -810,15 +838,16 @@ public final class ToastBar {
             }
         }
 
-        /**
-         * Shows this status message.  Call this method after making any changes
-         * to the status that you want to have displayed.  This will always cause
-         * any currently-displayed status to be replaced by this status.
-         * <p>If you don't want to show the status immediately, but rather to wait some delay, you can use
-         * the {@link #showDelayed(int) } method instead.</p>
-         *
-         * @see #showDelayed(int)
-         */
+        /// Shows this status message.  Call this method after making any changes
+        /// to the status that you want to have displayed.  This will always cause
+        /// any currently-displayed status to be replaced by this status.
+        ///
+        /// If you don't want to show the status immediately, but rather to wait some delay, you can use
+        /// the `#showDelayed(int)` method instead.
+        ///
+        /// #### See also
+        ///
+        /// - #showDelayed(int)
         public void show() {
             if (showTimer != null) {
                 showTimer.cancel();
@@ -833,17 +862,18 @@ public final class ToastBar {
             }
         }
 
-        /**
-         * Schedules this status message to be shown after a specified number of milliseconds,
-         * if it hasn't been cleared or shown first.
-         * <p>This is handy if you want to show a status for an operation that usually completes very quickly, but could
-         * potentially hang.  In such a case you might decide not to display a status message at all unless the operation
-         * takes more than 500ms to complete.</p>
-         *
-         * <p>If you want to show the status immediately, use the {@link #show() } method instead.</p>
-         *
-         * @param millis Number of milliseconds to wait before showing the status.
-         */
+        /// Schedules this status message to be shown after a specified number of milliseconds,
+        /// if it hasn't been cleared or shown first.
+        ///
+        /// This is handy if you want to show a status for an operation that usually completes very quickly, but could
+        /// potentially hang.  In such a case you might decide not to display a status message at all unless the operation
+        /// takes more than 500ms to complete.
+        ///
+        /// If you want to show the status immediately, use the `#show()` method instead.
+        ///
+        /// #### Parameters
+        ///
+        /// - `millis`: Number of milliseconds to wait before showing the status.
         public void showDelayed(int millis) {
             showTimer = new Timer();
             showTimer.schedule(new TimerTask() {
@@ -863,9 +893,7 @@ public final class ToastBar {
             }, millis);
         }
 
-        /**
-         * Clears this status message. This any pending "showDelayed" requests for this status.
-         */
+        /// Clears this status message. This any pending "showDelayed" requests for this status.
         public void clear() {
             if (showTimer != null) {
                 showTimer.cancel();
@@ -878,143 +906,141 @@ public final class ToastBar {
             removeStatus(this);
         }
 
-        /**
-         * Returns the text that will be displayed for this status.
-         *
-         * @return the message
-         */
+        /// Returns the text that will be displayed for this status.
+        ///
+        /// #### Returns
+        ///
+        /// the message
         public String getMessage() {
             return message;
         }
 
-        /**
-         * Sets the message that should be displayed in the {@code ToastBar}.
-         *
-         * @param message
-         */
+        /// Sets the message that should be displayed in the `ToastBar`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `message`
         public void setMessage(String message) {
             this.message = message;
 
         }
 
-        /**
-         * Returns the listener added to perform a particular action.
-         *
-         * @return the listener
-         */
+        /// Returns the listener added to perform a particular action.
+        ///
+        /// #### Returns
+        ///
+        /// the listener
         public ActionListener getListener() {
             return listener;
         }
 
-        /**
-         * Sets the action listener needed to perform an action when the bar is tapped {@code ToastBar}.
-         *
-         * @param listener
-         */
+        /// Sets the action listener needed to perform an action when the bar is tapped `ToastBar`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `listener`
         public void setListener(ActionListener listener) {
             this.listener = listener;
         }
 
-        /**
-         * Returns the progress of this status.  A value of -1 indicates that the progress
-         * bar should not be shown.  Values between 0 and 100 inclusive will be rendered
-         * on a progress bar (slider) in the status component.
-         *
-         * @return the progress
-         */
+        /// Returns the progress of this status.  A value of -1 indicates that the progress
+        /// bar should not be shown.  Values between 0 and 100 inclusive will be rendered
+        /// on a progress bar (slider) in the status component.
+        ///
+        /// #### Returns
+        ///
+        /// the progress
         public int getProgress() {
             return progress;
         }
 
-        /**
-         * Sets the progress (-1..100) that should be displayed in the progress bar
-         * for this status.  When set to -1 it will act as an infinite progress
-         *
-         * @param progress
-         */
+        /// Sets the progress (-1..100) that should be displayed in the progress bar
+        /// for this status.  When set to -1 it will act as an infinite progress
+        ///
+        /// #### Parameters
+        ///
+        /// - `progress`
         public void setProgress(int progress) {
             this.progress = progress;
             updateStatus();
         }
 
-        /**
-         * Gets the icon (may be null) that is displayed with this status.
-         *
-         * @return the icon
-         */
+        /// Gets the icon (may be null) that is displayed with this status.
+        ///
+        /// #### Returns
+        ///
+        /// the icon
         public Image getIcon() {
             return icon;
         }
 
-        /**
-         * Sets the icon that is to be displayed with this status.  Set this to null to not show an icon.
-         *
-         * @param icon the icon to set
-         */
+        /// Sets the icon that is to be displayed with this status.  Set this to null to not show an icon.
+        ///
+        /// #### Parameters
+        ///
+        /// - `icon`: the icon to set
         public void setIcon(Image icon) {
             this.icon = icon;
         }
 
-        /**
-         * @return the showProgressIndicator
-         */
+        /// #### Returns
+        ///
+        /// the showProgressIndicator
         public boolean isShowProgressIndicator() {
             return showProgressIndicator;
         }
 
-        /**
-         * Sets whether this status message should include an infinite progress indicator (e.g. spinning beach ball).
-         *
-         * @param showProgressIndicator the showProgressIndicator to set
-         */
+        /// Sets whether this status message should include an infinite progress indicator (e.g. spinning beach ball).
+        ///
+        /// #### Parameters
+        ///
+        /// - `showProgressIndicator`: the showProgressIndicator to set
         public void setShowProgressIndicator(boolean showProgressIndicator) {
             this.showProgressIndicator = showProgressIndicator;
         }
 
-        /**
-         * Gets the UIID to use for styling the text of this status message.
-         *
-         * @return the messageUIID
-         */
+        /// Gets the UIID to use for styling the text of this status message.
+        ///
+        /// #### Returns
+        ///
+        /// the messageUIID
         public String getMessageUIID() {
             return messageUIID;
         }
 
-        /**
-         * Sets the UIID to use for styling the text of this status message.
-         *
-         * @param messageUIID the messageUIID to set
-         */
+        /// Sets the UIID to use for styling the text of this status message.
+        ///
+        /// #### Parameters
+        ///
+        /// - `messageUIID`: the messageUIID to set
         public void setMessageUIID(String messageUIID) {
             this.messageUIID = messageUIID;
         }
 
-        /**
-         * Gets the UIID that should be used for styling the status component while
-         * this status is displayed.
-         *
-         * @return the uiid
-         */
+        /// Gets the UIID that should be used for styling the status component while
+        /// this status is displayed.
+        ///
+        /// #### Returns
+        ///
+        /// the uiid
         public String getUiid() {
             return uiid;
         }
 
-        /**
-         * Sets the UIID that should be used for styling the status component while
-         * this status is displayed.
-         *
-         * @param uiid the uiid to set
-         */
+        /// Sets the UIID that should be used for styling the status component while
+        /// this status is displayed.
+        ///
+        /// #### Parameters
+        ///
+        /// - `uiid`: the uiid to set
         public void setUiid(String uiid) {
             this.uiid = uiid;
         }
 
     }
 
-    /**
-     * The actual component for the {@code ToastBar}.  This is added to the layered pane of
-     * the top-level form.
-     */
+    /// The actual component for the `ToastBar`.  This is added to the layered pane of
+    /// the top-level form.
     private class ToastBarComponent extends Container {
         private final InfiniteProgress progressLabel;
         private final Slider progressBar;

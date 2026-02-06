@@ -26,19 +26,17 @@ package com.codename1.javascript;
 import com.codename1.ui.events.ActionEvent;
 
 
-/**
- * An event that encapsulates a Javascript method call.  When commands are
- * received in a JavascriptContext via the BrowserNavigationCallback mechanism,
- * the requests are parsed and wrapped in a JavascriptEvent, which is then fired
- * and ultimately handled by another event handler to actually call the method.
- *
- * <p><strong>NOTE:</strong> The {@link com.codename1.javascript } package is now deprecated.  The preferred method of
- * Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) },
- * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these work asynchronously (except in the XXXAndWait() variants, which
- * use invokeAndBlock() to make the calls synchronously.</p>
- *
- * @author shannah
- */
+/// An event that encapsulates a Javascript method call.  When commands are
+/// received in a JavascriptContext via the BrowserNavigationCallback mechanism,
+/// the requests are parsed and wrapped in a JavascriptEvent, which is then fired
+/// and ultimately handled by another event handler to actually call the method.
+///
+/// **NOTE:** The `com.codename1.javascript` package is now deprecated.  The preferred method of
+/// Java/Javascript interop is to use `BrowserComponent#execute(java.lang.String)`, `com.codename1.util.SuccessCallback)`,
+/// `BrowserComponent#executeAndWait(java.lang.String)`, etc.. as these work asynchronously (except in the XXXAndWait() variants, which
+/// use invokeAndBlock() to make the calls synchronously.
+///
+/// @author shannah
 class JavascriptEvent extends ActionEvent {
 
     Object[] args;

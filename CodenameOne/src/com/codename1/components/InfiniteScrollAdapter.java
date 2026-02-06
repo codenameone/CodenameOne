@@ -30,25 +30,68 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.FlowLayout;
 
-/**
- * <p>Allows adapting a scroll container to scroll indefinitely (or at least until
- * running out of data), this effectively works by showing an infinite progress
- * indicator when reaching scroll end then allowing code to fetch additional components.</p>
- *
- * <p>
- * <strong>Warning:</strong> If you call {@link com.codename1.ui.Container#removeAll()}  on the container to which an InfiniteScrollAdapter is
- * installed, it will disable the infinite scrolling behavior.  You can re-enable infinite scrolling by calling {@link #addMoreComponents(com.codename1.ui.Container, com.codename1.ui.Component[], boolean) }
- * again.</p>
- *
- * <p>
- * The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
- * </p>
- * <script src="https://gist.github.com/codenameone/af27af111ba766627363.js"></script>
- *
- * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" /><br><br>
- *
- * @author Shai Almog
- */
+/// Allows adapting a scroll container to scroll indefinitely (or at least until
+/// running out of data), this effectively works by showing an infinite progress
+/// indicator when reaching scroll end then allowing code to fetch additional components.
+///
+/// **Warning:** If you call `com.codename1.ui.Container#removeAll()`  on the container to which an InfiniteScrollAdapter is
+/// installed, it will disable the infinite scrolling behavior.  You can re-enable infinite scrolling by calling `com.codename1.ui.Component[], boolean)`
+/// again.
+///
+/// The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
+///
+/// ```java
+/// public void showForm() {
+///     Form hi = new Form("InfiniteScrollAdapter", new BoxLayout(BoxLayout.Y_AXIS));
+///
+///     Style s = UIManager.getInstance().getComponentStyle("MultiLine1");
+///     FontImage p = FontImage.createMaterial(FontImage.MATERIAL_PORTRAIT, s);
+///     EncodedImage placeholder = EncodedImage.createFromImage(p.scaled(p.getWidth() * 3, p.getHeight() * 3), false);
+///
+///     InfiniteScrollAdapter.createInfiniteScroll(hi.getContentPane(), () -> {
+///         java.util.List> data = fetchPropertyData("Leeds");
+///         MultiButton[] cmps = new MultiButton[data.size()];
+///         for(int iter = 0 ; iter  currentListing = data.get(iter);
+///             if(currentListing == null) {
+///                 InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), new Component[0], false);
+///                 return;
+///             }
+///             String thumb_url = (String)currentListing.get("thumb_url");
+///             String guid = (String)currentListing.get("guid");
+///             String summary = (String)currentListing.get("summary");
+///             cmps[iter] = new MultiButton(summary);
+///             cmps[iter].setIcon(URLImage.createToStorage(placeholder, guid, thumb_url));
+///         }
+///         InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), cmps, true);
+///     }, true);
+///     hi.show();
+/// }
+/// int pageNumber = 1;
+/// java.util.List> fetchPropertyData(String text) {
+///     try {
+///         ConnectionRequest r = new ConnectionRequest();
+///         r.setPost(false);
+///         r.setUrl("http://api.nestoria.co.uk/api");
+///         r.addArgument("pretty", "0");
+///         r.addArgument("action", "search_listings");
+///         r.addArgument("encoding", "json");
+///         r.addArgument("listing_type", "buy");
+///         r.addArgument("page", "" + pageNumber);
+///         pageNumber++;
+///         r.addArgument("country", "uk");
+///         r.addArgument("place_name", text);
+///         NetworkManager.getInstance().addToQueueAndWait(r);
+///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), "UTF-8"));
+///         Map response = (Map)result.get("response");
+///         return (java.util.List>)response.get("listings");
+///     } catch(Exception err) {
+///         Log.e(err);
+///         return null;
+///     }
+/// }
+/// ```
+///
+/// @author Shai Almog
 public final class InfiniteScrollAdapter {
     private final Component ip;
     private final InfiniteProgress progress;
@@ -64,33 +107,42 @@ public final class InfiniteScrollAdapter {
         ip = p;
     }
 
-    /**
-     * Creates an instance of the InfiniteScrollAdapter that will invoke the fetch more
-     * callback to fetch additional components, once that method completes its task it
-     * should add the components via the addMoreComponents() invocation.
-     * Notice that the container MUST be empty when invoking this method, fetchMore
-     * will be invoked immediately and you can add your data when ready.
-     *
-     * @param cont      the container to bind, it MUST be empty and must be scrollable on the Y axis
-     * @param fetchMore a callback that will be invoked on the EDT to fetch more data (do not block this method)
-     * @return an instance of this class that can be used to add components
-     */
+    /// Creates an instance of the InfiniteScrollAdapter that will invoke the fetch more
+    /// callback to fetch additional components, once that method completes its task it
+    /// should add the components via the addMoreComponents() invocation.
+    /// Notice that the container MUST be empty when invoking this method, fetchMore
+    /// will be invoked immediately and you can add your data when ready.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cont`: the container to bind, it MUST be empty and must be scrollable on the Y axis
+    ///
+    /// - `fetchMore`: a callback that will be invoked on the EDT to fetch more data (do not block this method)
+    ///
+    /// #### Returns
+    ///
+    /// an instance of this class that can be used to add components
     public static InfiniteScrollAdapter createInfiniteScroll(Container cont, Runnable fetchMore) {
         return createInfiniteScroll(cont, fetchMore, true);
     }
 
-    /**
-     * Creates an instance of the InfiniteScrollAdapter that will invoke the fetch more
-     * callback to fetch additional components, once that method completes its task it
-     * should add the components via the addMoreComponents() invocation.
-     * Notice that the container MUST be empty when invoking this method, fetchMore
-     * will be invoked immediately and you can add your data when ready.
-     *
-     * @param cont          the container to bind, it MUST be empty and must be scrollable on the Y axis
-     * @param fetchMore     a callback that will be invoked on the EDT to fetch more data (do not block this method)
-     * @param fetchOnCreate if true the fetchMore callback is called upon calling this method
-     * @return an instance of this class that can be used to add components
-     */
+    /// Creates an instance of the InfiniteScrollAdapter that will invoke the fetch more
+    /// callback to fetch additional components, once that method completes its task it
+    /// should add the components via the addMoreComponents() invocation.
+    /// Notice that the container MUST be empty when invoking this method, fetchMore
+    /// will be invoked immediately and you can add your data when ready.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cont`: the container to bind, it MUST be empty and must be scrollable on the Y axis
+    ///
+    /// - `fetchMore`: a callback that will be invoked on the EDT to fetch more data (do not block this method)
+    ///
+    /// - `fetchOnCreate`: if true the fetchMore callback is called upon calling this method
+    ///
+    /// #### Returns
+    ///
+    /// an instance of this class that can be used to add components
     public static InfiniteScrollAdapter createInfiniteScroll(Container cont, Runnable fetchMore, boolean fetchOnCreate) {
         InfiniteScrollAdapter a = new InfiniteScrollAdapter();
         cont.putClientProperty("cn1$infinite", a);
@@ -105,28 +157,30 @@ public final class InfiniteScrollAdapter {
         return a;
     }
 
-    /**
-     * Invoke this method to add additional components to the container, if you use
-     * addComponent/removeComponent you will get undefined behavior.
-     * This is a convenience method saving the need to keep the InfiniteScrollAdapter as a variable
-     *
-     * @param cnt          container to add the components to
-     * @param components   the components to add
-     * @param areThereMore whether additional components exist
-     */
+    /// Invoke this method to add additional components to the container, if you use
+    /// addComponent/removeComponent you will get undefined behavior.
+    /// This is a convenience method saving the need to keep the InfiniteScrollAdapter as a variable
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: container to add the components to
+    ///
+    /// - `components`: the components to add
+    ///
+    /// - `areThereMore`: whether additional components exist
     public static void addMoreComponents(Container cnt, Component[] components, boolean areThereMore) {
         InfiniteScrollAdapter ia = (InfiniteScrollAdapter) cnt.getClientProperty("cn1$infinite");
         ia.addMoreComponents(components, areThereMore);
     }
 
-    /**
-     * If we previously added components with false for are there more this
-     * method can continue the process of fetching. This is useful in case of
-     * a networking error. You can end fetching and then restart it based on
-     * user interaction see https://github.com/codenameone/CodenameOne/issues/2721
-     *
-     * @param cnt the container associated with the infinite scroll adapter
-     */
+    /// If we previously added components with false for are there more this
+    /// method can continue the process of fetching. This is useful in case of
+    /// a networking error. You can end fetching and then restart it based on
+    /// user interaction see https://github.com/codenameone/CodenameOne/issues/2721
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container associated with the infinite scroll adapter
     public static void continueFetching(Container cnt) {
         InfiniteScrollAdapter ia = (InfiniteScrollAdapter) cnt.getClientProperty("cn1$infinite");
         ia.continueFetching();
@@ -143,13 +197,14 @@ public final class InfiniteScrollAdapter {
         }
     }
 
-    /**
-     * Invoke this method to add additional components to the container, if you use
-     * addComponent/removeComponent you will get undefined behavior.
-     *
-     * @param components   the components to add
-     * @param areThereMore whether additional components exist
-     */
+    /// Invoke this method to add additional components to the container, if you use
+    /// addComponent/removeComponent you will get undefined behavior.
+    ///
+    /// #### Parameters
+    ///
+    /// - `components`: the components to add
+    ///
+    /// - `areThereMore`: whether additional components exist
     public void addMoreComponents(Component[] components, boolean areThereMore) {
         if (infiniteContainer == null) {
             return;
@@ -177,49 +232,53 @@ public final class InfiniteScrollAdapter {
         }
     }
 
-    /**
-     * If we previously added components with false for are there more this
-     * method can continue the process of fetching. This is useful in case of
-     * a networking error. You can end fetching and then restart it based on
-     * user interaction see https://github.com/codenameone/CodenameOne/issues/2721
-     */
+    /// If we previously added components with false for are there more this
+    /// method can continue the process of fetching. This is useful in case of
+    /// a networking error. You can end fetching and then restart it based on
+    /// user interaction see https://github.com/codenameone/CodenameOne/issues/2721
     public void continueFetching() {
         if (endMarker.getParent() == null && fetchMore != null) {
             fetchMore.run();
         }
     }
 
-    /**
-     * The component limit defines the number of components that should be within the infinite scroll adapter,
-     * if more than component limit is added then the appropriate number of components is removed from the top.
-     * This prevents running out of memory or performance overhead with too many components...
-     * Notice that -1 is a special case value for no component limit.
-     *
-     * @return the componentLimit
-     * @deprecated this feature has some inherent problems and doesn't work as expected
-     */
+    /// The component limit defines the number of components that should be within the infinite scroll adapter,
+    /// if more than component limit is added then the appropriate number of components is removed from the top.
+    /// This prevents running out of memory or performance overhead with too many components...
+    /// Notice that -1 is a special case value for no component limit.
+    ///
+    /// #### Returns
+    ///
+    /// the componentLimit
+    ///
+    /// #### Deprecated
+    ///
+    /// this feature has some inherent problems and doesn't work as expected
     public int getComponentLimit() {
         return componentLimit;
     }
 
-    /**
-     * The component limit defines the number of components that should be within the infinite scroll adapter,
-     * if more than component limit is added then the appropriate number of components is removed from the top.
-     * This prevents running out of memory or performance overhead with too many components...
-     * Notice that -1 is a special case value for no component limit.
-     *
-     * @param componentLimit the componentLimit to set
-     * @deprecated this feature has some inherent problems and doesn't work as expected
-     */
+    /// The component limit defines the number of components that should be within the infinite scroll adapter,
+    /// if more than component limit is added then the appropriate number of components is removed from the top.
+    /// This prevents running out of memory or performance overhead with too many components...
+    /// Notice that -1 is a special case value for no component limit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `componentLimit`: the componentLimit to set
+    ///
+    /// #### Deprecated
+    ///
+    /// this feature has some inherent problems and doesn't work as expected
     public void setComponentLimit(int componentLimit) {
         this.componentLimit = componentLimit;
     }
 
-    /**
-     * Lets us manipulate the infinite progress object e.g. set the animation image etc.
-     *
-     * @return the infinite progress component underlying this adapter
-     */
+    /// Lets us manipulate the infinite progress object e.g. set the animation image etc.
+    ///
+    /// #### Returns
+    ///
+    /// the infinite progress component underlying this adapter
     public InfiniteProgress getInfiniteProgress() {
         return progress;
     }

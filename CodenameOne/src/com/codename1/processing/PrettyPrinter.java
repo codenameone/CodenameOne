@@ -44,14 +44,12 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Private class, do not use.
- * <p>
- * An internal utility method used by toString() methods to produce a JSON document
- * from a given Map or List.
- *
- * @author Eric Coolman (2012-03 - derivative work from original Sun source).
- */
+/// Private class, do not use.
+///
+/// An internal utility method used by toString() methods to produce a JSON document
+/// from a given Map or List.
+///
+/// @author Eric Coolman (2012-03 - derivative work from original Sun source).
 final class PrettyPrinter {
     Map<?, ?> myHashMap;
 
@@ -105,20 +103,25 @@ final class PrettyPrinter {
 
     }
 
-    /**
-     * Make a prettyprinted JSON text of an object value.
-     * <p>
-     * Warning: This method assumes that the data structure is acyclical.
-     *
-     * @param value        The value to be serialized.
-     * @param indentFactor The number of spaces to add to each level of
-     *                     indentation.
-     * @param indent       The indentation of the top level.
-     * @return a printable, displayable, transmittable
-     * representation of the object, beginning
-     * with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     * with <code>}</code>&nbsp;<small>(right brace)</small>.
-     */
+    /// Make a prettyprinted JSON text of an object value.
+    ///
+    /// Warning: This method assumes that the data structure is acyclical.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The value to be serialized.
+    ///
+    /// - `indentFactor`: @param indentFactor The number of spaces to add to each level of
+    /// indentation.
+    ///
+    /// - `indent`: The indentation of the top level.
+    ///
+    /// #### Returns
+    ///
+    /// @return a printable, displayable, transmittable
+    /// representation of the object, beginning
+    /// with `{` (left brace) and ending
+    /// with `}` (right brace).
     static String valueToString(Object value, int indentFactor, int indent) {
         if (value == null) {
             return "null";
@@ -150,15 +153,18 @@ final class PrettyPrinter {
         return quote(value.toString());
     }
 
-    /**
-     * Produce a string in double quotes with backslash sequences in all the
-     * right places. A backslash will be inserted within </, allowing JSON
-     * text to be delivered in HTML. In JSON text, a string cannot contain a
-     * control character or an unescaped quote or backslash.
-     *
-     * @param string A String
-     * @return A String correctly formatted for insertion in a JSON text.
-     */
+    /// Produce a string in double quotes with backslash sequences in all the
+    /// right places. A backslash will be inserted within </, allowing JSON
+    /// text to be delivered in HTML. In JSON text, a string cannot contain a
+    /// control character or an unescaped quote or backslash.
+    ///
+    /// #### Parameters
+    ///
+    /// - `string`: A String
+    ///
+    /// #### Returns
+    ///
+    /// A String correctly formatted for insertion in a JSON text.
     public static String quote(String string) {
         if (string == null || string.length() == 0) {
             return "\"\"";
@@ -227,12 +233,15 @@ final class PrettyPrinter {
         return s;
     }
 
-    /**
-     * Produce a string from a Number.
-     *
-     * @param n A Number
-     * @return A String.
-     */
+    /// Produce a string from a Number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: A Number
+    ///
+    /// #### Returns
+    ///
+    /// A String.
     static public String numberToString(Object n) {
         if (n == null) {
             return null;
@@ -240,53 +249,60 @@ final class PrettyPrinter {
         return trimNumber(n.toString());
     }
 
-    /**
-     * Get the number of keys stored in the Map.
-     *
-     * @return The number of keys in the Map.
-     */
+    /// Get the number of keys stored in the Map.
+    ///
+    /// #### Returns
+    ///
+    /// The number of keys in the Map.
     public int length() {
         return this.myHashMap.size();
     }
 
-    /**
-     * Get an enumeration of the keys of the Map.
-     *
-     * @return An iterator of the keys.
-     */
+    /// Get an enumeration of the keys of the Map.
+    ///
+    /// #### Returns
+    ///
+    /// An iterator of the keys.
     public Enumeration<?> keys() {
         return Collections.enumeration(this.myHashMap.keySet());
     }
 
-    /**
-     * Make a prettyprinted JSON text of this Map.
-     * <p>
-     * Warning: This method assumes that the data structure is acyclical.
-     *
-     * @param indentFactor The number of spaces to add to each level of
-     *                     indentation.
-     * @return a printable, displayable, portable, transmittable
-     * representation of the object, beginning
-     * with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     * with <code>}</code>&nbsp;<small>(right brace)</small>.
-     */
+    /// Make a prettyprinted JSON text of this Map.
+    ///
+    /// Warning: This method assumes that the data structure is acyclical.
+    ///
+    /// #### Parameters
+    ///
+    /// - `indentFactor`: @param indentFactor The number of spaces to add to each level of
+    /// indentation.
+    ///
+    /// #### Returns
+    ///
+    /// @return a printable, displayable, portable, transmittable
+    /// representation of the object, beginning
+    /// with `{` (left brace) and ending
+    /// with `}` (right brace).
     public String toString(int indentFactor) {
         return toString(indentFactor, 0);
     }
 
-    /**
-     * Make a prettyprinted JSON text of this Map.
-     * <p>
-     * Warning: This method assumes that the data structure is acyclical.
-     *
-     * @param indentFactor The number of spaces to add to each level of
-     *                     indentation.
-     * @param indent       The indentation of the top level.
-     * @return a printable, displayable, transmittable
-     * representation of the object, beginning
-     * with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     * with <code>}</code>&nbsp;<small>(right brace)</small>.
-     */
+    /// Make a prettyprinted JSON text of this Map.
+    ///
+    /// Warning: This method assumes that the data structure is acyclical.
+    ///
+    /// #### Parameters
+    ///
+    /// - `indentFactor`: @param indentFactor The number of spaces to add to each level of
+    /// indentation.
+    ///
+    /// - `indent`: The indentation of the top level.
+    ///
+    /// #### Returns
+    ///
+    /// @return a printable, displayable, transmittable
+    /// representation of the object, beginning
+    /// with `{` (left brace) and ending
+    /// with `}` (right brace).
     String toString(int indentFactor, int indent) {
         int i;
         int n = length();

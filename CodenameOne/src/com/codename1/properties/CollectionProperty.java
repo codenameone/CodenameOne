@@ -28,9 +28,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * Base class for a property as a collection which can contain multiple elements within
- */
+/// Base class for a property as a collection which can contain multiple elements within
 public abstract class CollectionProperty<T, K> extends PropertyBase<T, K> implements Iterable<T> {
 
 
@@ -45,102 +43,106 @@ public abstract class CollectionProperty<T, K> extends PropertyBase<T, K> implem
     }
 
 
-    /**
-     * The size of the property collection
-     *
-     * @return the number of elements
-     */
+    /// The size of the property collection
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements
     public abstract int size();
 
 
-    /**
-     * Sets the entire content of the property
-     *
-     * @param t the collection of elements to set
-     * @return the parent object for chaining
-     */
+    /// Sets the entire content of the property
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the collection of elements to set
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
     public abstract K set(Collection<T> t);
 
 
-    /**
-     * Adds a property value to the collection and fires a change event if collection has changed
-     *
-     * @param v the new value
-     */
+    /// Adds a property value to the collection and fires a change event if collection has changed
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the new value
     public abstract K add(T v);
 
 
-    /**
-     * Adds a collection of values to the collection and fires a change event if the collection has changed
-     *
-     * @param v the collection of values to add
-     */
+    /// Adds a collection of values to the collection and fires a change event if the collection has changed
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the collection of values to add
     public abstract K addAll(Collection<? extends T> v);
 
-    /**
-     * Removes the given item
-     *
-     * @param v the item to remove
-     */
+    /// Removes the given item
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the item to remove
     public abstract K remove(T v);
 
-    /**
-     * Removes the given item
-     *
-     * @param offset the index
-     */
+    /// Removes the given item
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index
     public abstract K remove(int offset);
 
-    /**
-     * Removes from this collection all of its elements that are contained in the specified collection
-     * and fires a change event if the collection has changed
-     *
-     * @param v the collection of values to remove
-     */
+    /// Removes from this collection all of its elements that are contained in the specified collection
+    /// and fires a change event if the collection has changed
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the collection of values to remove
     public abstract K removeAll(Collection<? extends T> v);
 
-    /**
-     * Iterate over the elements of the property
-     *
-     * @return an iterator
-     */
+    /// Iterate over the elements of the property
+    ///
+    /// #### Returns
+    ///
+    /// an iterator
     @Override
     public abstract Iterator<T> iterator();
 
-    /**
-     * Returns a copy of the content as a new list
-     *
-     * @return a list
-     */
+    /// Returns a copy of the content as a new list
+    ///
+    /// #### Returns
+    ///
+    /// a list
     public abstract List<T> asList();
 
-    /**
-     * Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
-     * be converted to a Map
-     *
-     * @return a list
-     */
+    /// Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
+    /// be converted to a Map
+    ///
+    /// #### Returns
+    ///
+    /// a list
     public abstract List<Object> asExplodedList();
 
-    /**
-     * Remove all the elements from the collection and fires a change event
-     */
+    /// Remove all the elements from the collection and fires a change event
     public abstract void clear();
 
-    /**
-     * Returns true if the given element is contained in the collection property
-     *
-     * @param element the element
-     * @return true if the given element is contained in the collection property
-     */
+    /// Returns true if the given element is contained in the collection property
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true if the given element is contained in the collection property
     public abstract boolean contains(T element);
 
-    /**
-     * Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
-     * be converted to a Map
-     *
-     * @return a list
-     */
+    /// Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
+    /// be converted to a Map
+    ///
+    /// #### Returns
+    ///
+    /// a list
     List<Object> asExplodedList(Collection<T> value) {
         ArrayList<Object> aa = new ArrayList<Object>();
         for (T t : value) {

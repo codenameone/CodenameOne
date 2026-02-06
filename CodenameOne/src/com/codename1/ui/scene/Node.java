@@ -42,135 +42,90 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Encapsulates a Node in the scene-graph.  This wraps a component (the "renderer" of the Node) and an associated transform
- * that describes where, in the 3D space of the scene graph the component should be rendered.
- *
- * @author shannah
- * @deprecated For internal use only.
- */
+/// Encapsulates a Node in the scene-graph.  This wraps a component (the "renderer" of the Node) and an associated transform
+/// that describes where, in the 3D space of the scene graph the component should be rendered.
+///
+/// @author shannah
+///
+/// #### Deprecated
+///
+/// For internal use only.
 public class Node {
-    /**
-     * The scale to apply to the node, along the x-axis.
-     */
+    /// The scale to apply to the node, along the x-axis.
     public final Property<Double, Node> scaleX;
 
-    /**
-     * The scale to apply to the node along the y-axis.
-     */
+    /// The scale to apply to the node along the y-axis.
     public final Property<Double, Node> scaleY;
 
-    /**
-     * The scale to apply to the node along the z-axis.
-     */
+    /// The scale to apply to the node along the z-axis.
     public final Property<Double, Node> scaleZ;
 
-    /**
-     * X-coordinate in the Scene-graph where node should be rendered.
-     */
+    /// X-coordinate in the Scene-graph where node should be rendered.
     public final Property<Double, Node> layoutX;
 
-    /**
-     * Y-coordinate in the scene graph where node should be rendered.
-     */
+    /// Y-coordinate in the scene graph where node should be rendered.
     public final Property<Double, Node> layoutY;
 
-    /**
-     * Z-coordinate in the scene graph where node should be rendered.
-     */
+    /// Z-coordinate in the scene graph where node should be rendered.
     public final Property<Double, Node> layoutZ;
 
-    /**
-     * X-translation to apply to the node.
-     */
+    /// X-translation to apply to the node.
     public final Property<Double, Node> translateX;
 
 
-    /**
-     * Y-translation to apply to the node.
-     */
+    /// Y-translation to apply to the node.
     public final Property<Double, Node> translateY;
 
-    /**
-     * Z-translation to apply to the node.
-     */
+    /// Z-translation to apply to the node.
     public final Property<Double, Node> translateZ;
 
-    /**
-     * Rotation to apply to the node.  In degrees.  Node is always rotated around its center.
-     */
+    /// Rotation to apply to the node.  In degrees.  Node is always rotated around its center.
     public final Property<Double, Node> rotate;
 
-    /**
-     * The depth of the coordinate at which the renderer should paint itself.
-     * By default nodes will have no depth, and renderer will be painted onto
-     * a rectangle on the Z=0 plane.  If you need to perform 3D rotations, you may want to
-     * give the node depth by setting the depth of {@link #boundsInLocal} and changing the
-     * {@link #localCanvasZ} to something other than 0 since the node will be rotated at its
-     * center point.
-     */
+    /// The depth of the coordinate at which the renderer should paint itself.
+    /// By default nodes will have no depth, and renderer will be painted onto
+    /// a rectangle on the Z=0 plane.  If you need to perform 3D rotations, you may want to
+    /// give the node depth by setting the depth of `#boundsInLocal` and changing the
+    /// `#localCanvasZ` to something other than 0 since the node will be rotated at its
+    /// center point.
     public final Property<Double, Node> localCanvasZ;
 
     public final Property<Double, Node> opacity;
-    /**
-     * The rotation axis around which rotations should be performed. (0, 0, 1) results in a rotation
-     * around the z-axis, (1, 0, 0) results in a rotation around the x-axis, and (0, 1, 0) a rotation
-     * around the y-axis.
-     */
+    /// The rotation axis around which rotations should be performed. (0, 0, 1) results in a rotation
+    /// around the z-axis, (1, 0, 0) results in a rotation around the x-axis, and (0, 1, 0) a rotation
+    /// around the y-axis.
     public final Property<Point3D, Node> rotationAxis;
-    /**
-     * The local bounds of the node (without any of the transforms applied to it).
-     */
+    /// The local bounds of the node (without any of the transforms applied to it).
     public final Property<Bounds, Node> boundsInLocal;
-    /**
-     * Flag to indicate whether the node should be visible or not.
-     */
+    /// Flag to indicate whether the node should be visible or not.
     public final Property<Boolean, Node> visible;
-    /**
-     * The painting rectangle, into which the renderer should be painted inside the
-     * node's local bounds.
-     */
+    /// The painting rectangle, into which the renderer should be painted inside the
+    /// node's local bounds.
     public final Property<Rectangle, Node> paintingRect;
-    /**
-     * The component that should be rendered inside this node.
-     */
+    /// The component that should be rendered inside this node.
     //private Component renderer;
     NodePainter renderer;
 
-    /**
-     * Private wrapper around the renderer component.  This gives us
-     * access to some package-private methods in Component that we need to use
-     * for rendering.
-     */
+    /// Private wrapper around the renderer component.  This gives us
+    /// access to some package-private methods in Component that we need to use
+    /// for rendering.
     //private RenderableContainer rendererCnt;
-    /**
-     * The scene that the node is currently attached to.
-     */
+    /// The scene that the node is currently attached to.
     private Scene scene;
-    /**
-     * The parent node.
-     */
+    /// The parent node.
     private Node parent;
-    /**
-     * Child nodes.
-     */
+    /// Child nodes.
     private List<Node> children;
-    /**
-     * Tags that are attached to this node. These are like CSS classes.
-     */
+    /// Tags that are attached to this node. These are like CSS classes.
     private HashSet<String> tags;
     private Style style;
-    /**
-     * Flag of whether to render the component onto an image buffer before rendering.
-     * Components that use 9-piece image borders may show lines between the border
-     * segments if renderered directly onto the scene graph. Setting this flag will
-     * resolve that (because it will first render to an image with the identity transform
-     * and then transform that image on the Graphics context).
-     */
+    /// Flag of whether to render the component onto an image buffer before rendering.
+    /// Components that use 9-piece image borders may show lines between the border
+    /// segments if renderered directly onto the scene graph. Setting this flag will
+    /// resolve that (because it will first render to an image with the identity transform
+    /// and then transform that image on the Graphics context).
     private boolean renderAsImage = false;
-    /**
-     * Flag to specify whether the node should have its children re-laid out
-     */
+    /// Flag to specify whether the node should have its children re-laid out
     private boolean needsLayout = true;
 
 
@@ -206,20 +161,20 @@ public class Node {
         t.scale((float) x, (float) y, (float) z);
     }
 
-    /**
-     * Sets the render as image flag.  True to render this Node as an image.
-     *
-     * @param t
-     */
+    /// Sets the render as image flag.  True to render this Node as an image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`
     public void setRenderAsImage(boolean t) {
         renderAsImage = t;
     }
 
-    /**
-     * Adds tags to this node.
-     *
-     * @param tags
-     */
+    /// Adds tags to this node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tags`
     public void addTags(String... tags) {
         if (this.tags == null) {
             this.tags = new HashSet<String>();
@@ -247,11 +202,11 @@ public class Node {
     //    this.localToParentTransform = t.copy();
     //}
 
-    /**
-     * Removes tags from this node.
-     *
-     * @param tags
-     */
+    /// Removes tags from this node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tags`
     public void removeTags(String... tags) {
         if (this.tags != null) {
             for (String tag : tags) {
@@ -260,21 +215,16 @@ public class Node {
         }
     }
 
-    /**
-     * Check if this node has a tag.
-     *
-     * @param tag
-     * @return
-     */
+    /// Check if this node has a tag.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tag`
     public boolean hasTag(String tag) {
         return (tags != null && tags.contains(tag));
     }
 
-    /**
-     * Gets the transform to use to transform the Node into its parent node's space.
-     *
-     * @return
-     */
+    /// Gets the transform to use to transform the Node into its parent node's space.
     public Transform getLocalToParentTransform() {
         Transform t = Transform.makeIdentity();
         Point3D rotationAxis = this.rotationAxis.get();
@@ -300,11 +250,7 @@ public class Node {
 
     }
 
-    /**
-     * Gets the transform to use to go from the local coordinates to scene coordinates.
-     *
-     * @return
-     */
+    /// Gets the transform to use to go from the local coordinates to scene coordinates.
     public Transform getLocalToSceneTransform() {
         if (parent == null) {
             return getLocalToParentTransform();
@@ -315,20 +261,20 @@ public class Node {
         }
     }
 
-    /**
-     * Gets the scene that this node is attached to.
-     *
-     * @return the scene
-     */
+    /// Gets the scene that this node is attached to.
+    ///
+    /// #### Returns
+    ///
+    /// the scene
     public Scene getScene() {
         return scene;
     }
 
-    /**
-     * Sets the scene that this node is attached to.
-     *
-     * @param scene
-     */
+    /// Sets the scene that this node is attached to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scene`
     void setScene(Scene scene) {
         this.scene = scene;
         if (children != null) {
@@ -338,32 +284,32 @@ public class Node {
         }
     }
 
-    /**
-     * Returns true if this node needs to have its children re-laid out before rendering
-     *
-     * @return the needsLayout
-     */
+    /// Returns true if this node needs to have its children re-laid out before rendering
+    ///
+    /// #### Returns
+    ///
+    /// the needsLayout
     public boolean isNeedsLayout() {
         return needsLayout;
     }
 
-    /**
-     * @param needsLayout the needsLayout to set
-     */
+    /// #### Parameters
+    ///
+    /// - `needsLayout`: the needsLayout to set
     public void setNeedsLayout(boolean needsLayout) {
         this.needsLayout = needsLayout;
     }
 
-    /**
-     * @return the style
-     */
+    /// #### Returns
+    ///
+    /// the style
     public Style getStyle() {
         return style;
     }
 
-    /**
-     * @param style the style to set
-     */
+    /// #### Parameters
+    ///
+    /// - `style`: the style to set
     public void setStyle(Style style) {
         this.style = style;
     }
@@ -376,14 +322,14 @@ public class Node {
         }
     }
 
-    /**
-     * This can be used to hit test pointer events against this node.  It checks whether
-     * a given absolute (x, y) coordinate hits the node.
-     *
-     * @param x
-     * @param y
-     * @return
-     */
+    /// This can be used to hit test pointer events against this node.  It checks whether
+    /// a given absolute (x, y) coordinate hits the node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
+    ///
+    /// - `y`
     public boolean contains(int x, int y) {
         GeneralPath p = GeneralPath.createFromPool();
         try {
@@ -419,11 +365,11 @@ public class Node {
         return newT;
     }
 
-    /**
-     * Renders the node onto a graphics context.
-     *
-     * @param g
-     */
+    /// Renders the node onto a graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
     public void render(Graphics g) {
         if (!visible.get()) {
             return;
@@ -480,11 +426,11 @@ public class Node {
 
     }
 
-    /**
-     * Renders the node's children.
-     *
-     * @param g
-     */
+    /// Renders the node's children.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
     public void renderChildren(Graphics g) {
         if (children != null) {
             for (Node child : children) {
@@ -493,29 +439,25 @@ public class Node {
         }
     }
 
-    /**
-     * Gets the renderer component for this node.
-     *
-     * @return
-     */
+    /// Gets the renderer component for this node.
     public NodePainter getRenderer() {
         return renderer;
     }
 
-    /**
-     * Sets the component that should be used to render the node's contents.
-     *
-     * @param comp
-     */
+    /// Sets the component that should be used to render the node's contents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `comp`
     public void setRenderer(NodePainter comp) {
         renderer = comp;
     }
 
-    /**
-     * Adds a child node.
-     *
-     * @param child
-     */
+    /// Adds a child node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `child`
     public void add(Node child) {
         if (children == null) {
             children = new ArrayList<Node>();
@@ -525,11 +467,11 @@ public class Node {
         child.setScene(getScene());
     }
 
-    /**
-     * Removes a child node.
-     *
-     * @param child
-     */
+    /// Removes a child node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `child`
     public void remove(Node child) {
         if (child.parent != this) { //NOPMD CompareObjectsWithEquals
             return;
@@ -548,27 +490,17 @@ public class Node {
         }
     }
 
-    /**
-     * Can be overridden by subclasses to layout children.  Called before node is rendered.
-     */
+    /// Can be overridden by subclasses to layout children.  Called before node is rendered.
     protected void layoutChildren() {
 
     }
 
-    /**
-     * Gets the child nodes of this node.
-     *
-     * @return
-     */
+    /// Gets the child nodes of this node.
     public Iterable<Node> getChildNodes() {
         return children;
     }
 
-    /**
-     * Gets number of children in this node.
-     *
-     * @return
-     */
+    /// Gets number of children in this node.
     public int getChildCount() {
         if (children == null) {
             return 0;
@@ -576,12 +508,11 @@ public class Node {
         return children.size();
     }
 
-    /**
-     * Gets child node at index.
-     *
-     * @param index
-     * @return
-     */
+    /// Gets child node at index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`
     public Node getChildAt(int index) {
         if (children == null) {
             return null;
@@ -589,19 +520,13 @@ public class Node {
         return children.get(index);
     }
 
-    /**
-     * Checks if node has children.
-     *
-     * @return
-     */
+    /// Checks if node has children.
     public boolean hasChildren() {
         return children != null && !children.isEmpty();
 
     }
 
-    /**
-     * Removes all child nodes.
-     */
+    /// Removes all child nodes.
     public void removeAll() {
         if (children != null) {
             children.clear();

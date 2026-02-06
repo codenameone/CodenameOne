@@ -25,11 +25,9 @@ package com.codename1.io.gzip;
 import java.io.IOException;
 import java.io.OutputStream;
 
-/**
- * Dummy implementation of filter output stream
- *
- * @author Shai Almog
- */
+/// Dummy implementation of filter output stream
+///
+/// @author Shai Almog
 public class FilterOutputStream extends OutputStream {
     protected OutputStream out;
 

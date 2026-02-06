@@ -22,27 +22,23 @@
  */
 package com.codename1.ui.validation;
 
-/**
- * Groups several constraints as if they are one constraint
- *
- * @author Shai Almog
- */
+/// Groups several constraints as if they are one constraint
+///
+/// @author Shai Almog
 public class GroupConstraint implements Constraint {
     private final Constraint[] group;
     private String failMessage = null;
 
-    /**
-     * Create a new constraint group
-     *
-     * @param group the group
-     */
+    /// Create a new constraint group
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: the group
     public GroupConstraint(Constraint... group) {
         this.group = group;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isValid(Object value) {
         for (Constraint c : group) {
@@ -54,9 +50,7 @@ public class GroupConstraint implements Constraint {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getDefaultFailMessage() {
         return failMessage;

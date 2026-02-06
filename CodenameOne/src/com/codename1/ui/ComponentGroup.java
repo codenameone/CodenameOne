@@ -26,25 +26,33 @@ package com.codename1.ui;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.Layout;
 
-/**
- * <p>A component group is a container that applies the given UIID to a set of components within it
- * and gives the same UIID with "First"/"Last" prepended to the first and last components. E.g.
- * by default the  GroupElement UIID is applied so the first and last elements would have the
- * GroupElementFirst/GroupElementLast UIID's applied to them. If a group has only one element
- * the word "Only" is appended to the element UIID as in GroupElementOnly.</p>
- * <p><b>Important!!!</b> A component group does nothing by default unless explicitly activated by
- * the theme by enabling the ComponentGroupBool constant (by default, this can be customized via the groupFlag property).
- * This allows logical grouping without changing the UI for themes that don't need grouping.</p>
- * <p>This container uses box X/Y layout (defaults to Y), other layout managers shouldn't be used
- * since this container relies on the specific behavior of the box layout.</p>
- * <p>
- * Check out this sample code:
- * </p>
- * <script src="https://gist.github.com/codenameone/5daba198d0009e503a1a.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-componentgroup.png" alt="Sample ComponentGroup Grouping" />
- *
- * @author Shai Almog
- */
+/// A component group is a container that applies the given UIID to a set of components within it
+/// and gives the same UIID with "First"/"Last" prepended to the first and last components. E.g.
+/// by default the  GroupElement UIID is applied so the first and last elements would have the
+/// GroupElementFirst/GroupElementLast UIID's applied to them. If a group has only one element
+/// the word "Only" is appended to the element UIID as in GroupElementOnly.
+///
+/// **Important!!!** A component group does nothing by default unless explicitly activated by
+/// the theme by enabling the ComponentGroupBool constant (by default, this can be customized via the groupFlag property).
+/// This allows logical grouping without changing the UI for themes that don't need grouping.
+///
+/// This container uses box X/Y layout (defaults to Y), other layout managers shouldn't be used
+/// since this container relies on the specific behavior of the box layout.
+///
+/// Check out this sample code:
+///
+/// ```java
+/// hi.add("Three Labels").
+///         add(ComponentGroup.enclose(new Label("GroupElementFirst UIID"), new Label("GroupElement UIID"), new Label("GroupElementLast UIID"))).
+///         add("One Label").
+///         add(ComponentGroup.enclose(new Label("GroupElementOnly UIID"))).
+///         add("Three Buttons").
+///         add(ComponentGroup.enclose(new Button("ButtonGroupFirst UIID"), new Button("ButtonGroup UIID"), new Button("ButtonGroupLast UIID"))).
+///         add("One Button").
+///         add(ComponentGroup.enclose(new Button("ButtonGroupOnly UIID")));
+/// ```
+///
+/// @author Shai Almog
 public class ComponentGroup extends Container {
     private String elementUIID = "GroupElement";
     private String buttonUIID = "ButtonGroup";
@@ -52,20 +60,21 @@ public class ComponentGroup extends Container {
     private boolean uiidsDirty;
     private boolean forceGroup;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public ComponentGroup() {
         super(new BoxLayout(BoxLayout.Y_AXIS));
         setUIIDFinal("ComponentGroup");
     }
 
-    /**
-     * Shorthand method for wrapping the given components in a vertical component group
-     *
-     * @param cmp the components to add into a newly created group
-     * @return the newly created group
-     */
+    /// Shorthand method for wrapping the given components in a vertical component group
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the components to add into a newly created group
+    ///
+    /// #### Returns
+    ///
+    /// the newly created group
     public static ComponentGroup enclose(Component... cmp) {
         ComponentGroup c = new ComponentGroup();
         for (Component cc : cmp) {
@@ -74,12 +83,15 @@ public class ComponentGroup extends Container {
         return c;
     }
 
-    /**
-     * Shorthand method for wrapping the given components in a horizontal component group
-     *
-     * @param cmp the components to add into a newly created group
-     * @return the newly created group
-     */
+    /// Shorthand method for wrapping the given components in a horizontal component group
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the components to add into a newly created group
+    ///
+    /// #### Returns
+    ///
+    /// the newly created group
     public static ComponentGroup encloseHorizontal(Component... cmp) {
         ComponentGroup c = new ComponentGroup();
         c.setHorizontal(true);
@@ -101,9 +113,7 @@ public class ComponentGroup extends Container {
         updateUIIDs();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -181,11 +191,11 @@ public class ComponentGroup extends Container {
         reverseRadio(c);
     }
 
-    /**
-     * Indicates that the component group should be horizontal by using the BoxLayout Y
-     *
-     * @return the horizontal
-     */
+    /// Indicates that the component group should be horizontal by using the BoxLayout Y
+    ///
+    /// #### Returns
+    ///
+    /// the horizontal
     public boolean isHorizontal() {
         Layout l = getLayout();
         if (l instanceof BoxLayout) {
@@ -194,11 +204,11 @@ public class ComponentGroup extends Container {
         return false;
     }
 
-    /**
-     * Indicates that the component group should be horizontal by using the BoxLayout Y
-     *
-     * @param horizontal the horizontal to set
-     */
+    /// Indicates that the component group should be horizontal by using the BoxLayout Y
+    ///
+    /// #### Parameters
+    ///
+    /// - `horizontal`: the horizontal to set
     public void setHorizontal(boolean horizontal) {
         if (horizontal != isHorizontal()) {
             if (horizontal) {
@@ -219,45 +229,39 @@ public class ComponentGroup extends Container {
         }
     }
 
-    /**
-     * The UIID to apply to the elements within this container
-     *
-     * @return the elementUIID
-     */
+    /// The UIID to apply to the elements within this container
+    ///
+    /// #### Returns
+    ///
+    /// the elementUIID
     public String getElementUIID() {
         return elementUIID;
     }
 
-    /**
-     * The UIID to apply to the elements within this container
-     *
-     * @param elementUIID the elementUIID to set
-     */
+    /// The UIID to apply to the elements within this container
+    ///
+    /// #### Parameters
+    ///
+    /// - `elementUIID`: the elementUIID to set
     public void setElementUIID(String elementUIID) {
         this.elementUIID = elementUIID;
         buttonUIID = elementUIID;
         updateUIIDs();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"elementUIID", "displayName", "horizontal", "groupFlag", "forceGroup"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, Boolean.class, String.class, Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("elementUIID".equals(name)) {
@@ -278,9 +282,7 @@ public class ComponentGroup extends Container {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("elementUIID".equals(name)) {
@@ -302,44 +304,44 @@ public class ComponentGroup extends Container {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * The group flag allows changing the flag that activates this group, from ComponentGroupBool to any
-     * arbitrary flag. This allows a developer/designer to enable grouping for a specific type of components
-     * (e.g. for horizontal Toggle Buttons) yet disable it for vertical lists of components.
-     *
-     * @return the groupFlag
-     */
+    /// The group flag allows changing the flag that activates this group, from ComponentGroupBool to any
+    /// arbitrary flag. This allows a developer/designer to enable grouping for a specific type of components
+    /// (e.g. for horizontal Toggle Buttons) yet disable it for vertical lists of components.
+    ///
+    /// #### Returns
+    ///
+    /// the groupFlag
     public String getGroupFlag() {
         return groupFlag;
     }
 
-    /**
-     * The group flag allows changing the flag that activates this group, from ComponentGroupBool to any
-     * arbitrary flag. This allows a developer/designer to enable grouping for a specific type of components
-     * (e.g. for horizontal Toggle Buttons) yet disable it for vertical lists of components.
-     *
-     * @param groupFlag the groupFlag to set
-     */
+    /// The group flag allows changing the flag that activates this group, from ComponentGroupBool to any
+    /// arbitrary flag. This allows a developer/designer to enable grouping for a specific type of components
+    /// (e.g. for horizontal Toggle Buttons) yet disable it for vertical lists of components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupFlag`: the groupFlag to set
     public void setGroupFlag(String groupFlag) {
         this.groupFlag = groupFlag;
     }
 
-    /**
-     * Component grouping can be an element from the theme but can be forced manually
-     * for a specific group
-     *
-     * @return the forceGroup
-     */
+    /// Component grouping can be an element from the theme but can be forced manually
+    /// for a specific group
+    ///
+    /// #### Returns
+    ///
+    /// the forceGroup
     public boolean isForceGroup() {
         return forceGroup;
     }
 
-    /**
-     * Component grouping can be an element from the theme but can be forced manually
-     * for a specific group
-     *
-     * @param forceGroup the forceGroup to set
-     */
+    /// Component grouping can be an element from the theme but can be forced manually
+    /// for a specific group
+    ///
+    /// #### Parameters
+    ///
+    /// - `forceGroup`: the forceGroup to set
     public void setForceGroup(boolean forceGroup) {
         this.forceGroup = forceGroup;
     }

@@ -30,13 +30,11 @@ import com.codename1.ui.events.ScrollListener;
 
 import java.util.ArrayList;
 
-/**
- * Animation manager concentrates all of the animations for a given form into a single place that allows us
- * to manage all mutations to a Form in a way the prevents collisions between mutations. The one type of
- * animation that isn't handled by this class is the form level transition, replace transitions are handled by this class.
- *
- * @author Shai Almog
- */
+/// Animation manager concentrates all of the animations for a given form into a single place that allows us
+/// to manage all mutations to a Form in a way the prevents collisions between mutations. The one type of
+/// animation that isn't handled by this class is the form level transition, replace transitions are handled by this class.
+///
+/// @author Shai Almog
 public final class AnimationManager {
     private final Form parentForm;
     private final ArrayList<ComponentAnimation> anims = new ArrayList<ComponentAnimation>();
@@ -47,11 +45,11 @@ public final class AnimationManager {
         this.parentForm = parentForm;
     }
 
-    /**
-     * Returns true if an animation is currently in progress
-     *
-     * @return true if an animation is currently in progress
-     */
+    /// Returns true if an animation is currently in progress
+    ///
+    /// #### Returns
+    ///
+    /// true if an animation is currently in progress
     public boolean isAnimating() {
         int size = anims.size();
         if (size == 0) {
@@ -89,16 +87,23 @@ public final class AnimationManager {
         }
     }
 
-    /**
-     * Adds a UIMutation to the animation manager.  If there are any current compatible
-     * UIMutations in the animation queue, then this mutation will be added to that mutation.
-     * Otherwise it will appended to the end of the queue to be run sequentially.
-     *
-     * @param container The container that is being mutated.
-     * @param an        The animation
-     * @see UIMutation
-     * @since 7.0
-     */
+    /// Adds a UIMutation to the animation manager.  If there are any current compatible
+    /// UIMutations in the animation queue, then this mutation will be added to that mutation.
+    /// Otherwise it will appended to the end of the queue to be run sequentially.
+    ///
+    /// #### Parameters
+    ///
+    /// - `container`: The container that is being mutated.
+    ///
+    /// - `an`: The animation
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - UIMutation
     public void addUIMutation(Container container, ComponentAnimation an) {
         for (UIMutation existing : uiMutations) {
             if (existing.add(container, an)) {
@@ -111,22 +116,22 @@ public final class AnimationManager {
 
     }
 
-    /**
-     * Adds the animation to the end to the animation queue
-     *
-     * @param an the animation object
-     */
+    /// Adds the animation to the end to the animation queue
+    ///
+    /// #### Parameters
+    ///
+    /// - `an`: the animation object
     public void addAnimation(ComponentAnimation an) {
         anims.add(an);
         Display.getInstance().notifyDisplay();
     }
 
-    /**
-     * Adds the animation to the end of the animation queue and blocks the current thread until the animation
-     * completes
-     *
-     * @param an the animation to perform
-     */
+    /// Adds the animation to the end of the animation queue and blocks the current thread until the animation
+    /// completes
+    ///
+    /// #### Parameters
+    ///
+    /// - `an`: the animation to perform
     public void addAnimationAndBlock(final ComponentAnimation an) {
         final Object lock = new Object();
         an.setNotifyLock(lock);
@@ -142,51 +147,61 @@ public final class AnimationManager {
     }
 
 
-    /**
-     * Adds the animation to the end to the animation queue
-     *
-     * @param an       the animation object
-     * @param callback invoked when the animation completes
-     */
+    /// Adds the animation to the end to the animation queue
+    ///
+    /// #### Parameters
+    ///
+    /// - `an`: the animation object
+    ///
+    /// - `callback`: invoked when the animation completes
     public void addAnimation(ComponentAnimation an, Runnable callback) {
         an.setOnCompletion(callback);
         addAnimation(an);
         Display.getInstance().notifyDisplay();
     }
 
-    /**
-     * Adds a UIMutation to the animation manager.  If there are any current compatible
-     * UIMutations in the animation queue, then this mutation will be added to that mutation.
-     * Otherwise it will appended to the end of the queue to be run sequentially.
-     *
-     * @param container The container that is being mutated.
-     * @param an        The animation
-     * @param callback  A callback to be run on completion.
-     * @see UIMutation
-     * @since 7.0
-     */
+    /// Adds a UIMutation to the animation manager.  If there are any current compatible
+    /// UIMutations in the animation queue, then this mutation will be added to that mutation.
+    /// Otherwise it will appended to the end of the queue to be run sequentially.
+    ///
+    /// #### Parameters
+    ///
+    /// - `container`: The container that is being mutated.
+    ///
+    /// - `an`: The animation
+    ///
+    /// - `callback`: A callback to be run on completion.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - UIMutation
     public void addUIMutation(Container container, ComponentAnimation an, Runnable callback) {
         an.setOnCompletion(callback);
         addUIMutation(container, an);
     }
 
-    /**
-     * Performs a step animation as the user scrolls down/up the page e.g. slowly converting a title UIID from
-     * a big visual representation to a smaller title for easier navigation then back again when scrolling up
-     *
-     * @param cna the animation to bind to the scroll event
-     */
+    /// Performs a step animation as the user scrolls down/up the page e.g. slowly converting a title UIID from
+    /// a big visual representation to a smaller title for easier navigation then back again when scrolling up
+    ///
+    /// #### Parameters
+    ///
+    /// - `cna`: the animation to bind to the scroll event
     public void onTitleScrollAnimation(final ComponentAnimation... cna) {
         onTitleScrollAnimation(parentForm.getContentPane(), cna);
     }
 
-    /**
-     * Performs a step animation as the user scrolls down/up the page e.g. slowly converting a title UIID from
-     * a big visual representation to a smaller title for easier navigation then back again when scrolling up
-     *
-     * @param content the scrollable container representing the body
-     * @param cna     the animation to bind to the scroll event
-     */
+    /// Performs a step animation as the user scrolls down/up the page e.g. slowly converting a title UIID from
+    /// a big visual representation to a smaller title for easier navigation then back again when scrolling up
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the scrollable container representing the body
+    ///
+    /// - `cna`: the animation to bind to the scroll event
     public void onTitleScrollAnimation(Container content, final ComponentAnimation... cna) {
         content.addScrollListener(new ScrollListener() {
             boolean recursion = false;
@@ -221,11 +236,11 @@ public final class AnimationManager {
         });
     }
 
-    /**
-     * Invokes the runnable when all animations have completed
-     *
-     * @param r the runnable that will be invoked after the animations
-     */
+    /// Invokes the runnable when all animations have completed
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the runnable that will be invoked after the animations
     public void flushAnimation(Runnable r) {
         if (isAnimating()) {
             postAnimations.add(r);

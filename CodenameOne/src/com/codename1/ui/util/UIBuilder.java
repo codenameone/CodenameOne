@@ -73,34 +73,24 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * The UI builder can create a user interface based on the UI designed in the
- * resource editor and allows us to bind to said UI. Notice that if a Component
- * was used in the GUI that is not a part of the com.codename1.ui package (even a
- * Component from sub packages such as table or tree) it MUST be registered
- * before loading a GUI!
- *
- * @author Shai Almog
- */
+/// The UI builder can create a user interface based on the UI designed in the
+/// resource editor and allows us to bind to said UI. Notice that if a Component
+/// was used in the GUI that is not a part of the com.codename1.ui package (even a
+/// Component from sub packages such as table or tree) it MUST be registered
+/// before loading a GUI!
+///
+/// @author Shai Almog
 public class UIBuilder { //implements Externalizable {
-    /**
-     * A key in the form state hashtable used in the back command navigation
-     */
+    /// A key in the form state hashtable used in the back command navigation
     public static final String FORM_STATE_KEY_NAME = "$name";
 
-    /**
-     * A key in the form state hashtable used in the back command navigation
-     */
+    /// A key in the form state hashtable used in the back command navigation
     public static final String FORM_STATE_KEY_TITLE = "$title";
 
-    /**
-     * A key in the form state hashtable used in the back command navigation
-     */
+    /// A key in the form state hashtable used in the back command navigation
     public static final String FORM_STATE_KEY_FOCUS = "$focus";
 
-    /**
-     * A key in the form state hashtable used in the back command navigation
-     */
+    /// A key in the form state hashtable used in the back command navigation
     public static final String FORM_STATE_KEY_SELECTION = "$sel";
     public static final int BACK_COMMAND_ID = 99999999;
     static final String COMMAND_ACTION = "$COMMAND_ACTION$";
@@ -192,9 +182,7 @@ public class UIBuilder { //implements Externalizable {
     static final int LAYOUT_FLOW_LEGACY = 5004;
     static final int LAYOUT_FLOW = 5009;
     static final int LAYOUT_LAYERED = 5011;
-    /**
-     * A key in the form state hashtable used in the back command navigation
-     */
+    /// A key in the form state hashtable used in the back command navigation
     private static final String FORM_STATE_KEY_CONTAINER = "$cnt";
     // used by the resource editor
     static boolean ignorBaseForm = false;
@@ -208,25 +196,23 @@ public class UIBuilder { //implements Externalizable {
     private Hashtable localComponentListeners;
     private boolean keepResourcesInRam = "true".equals(Display.getInstance().getProperty("cacheResFile", "false"));
     private Vector backCommands;
-    /**
-     * When reaching the home form the navigation stack is cleared
-     */
+    /// When reaching the home form the navigation stack is cleared
     private String homeForm;
 
-    /**
-     * Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
-     *
-     * @return the blockAnalytics
-     */
+    /// Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
+    ///
+    /// #### Returns
+    ///
+    /// the blockAnalytics
     public static boolean isBlockAnalytics() {
         return blockAnalytics;
     }
 
-    /**
-     * Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
-     *
-     * @param aBlockAnalytics the blockAnalytics to set
-     */
+    /// Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aBlockAnalytics`: the blockAnalytics to set
     public static void setBlockAnalytics(boolean aBlockAnalytics) {
         blockAnalytics = aBlockAnalytics;
     }
@@ -253,36 +239,35 @@ public class UIBuilder { //implements Externalizable {
         return componentRegistry;
     }
 
-    /**
-     * This method  allows the UIBuilder to package a smaller portion of Codename One into the JAR
-     * and add support for additional 3rd party components to the GUI builder. Components
-     * must be registered using their UIID name, by default all the content of com.codename1.ui is
-     * registered however subpackages and 3rd party components are not.
-     * Registration is essential for obfuscation to work properly!
-     *
-     * @param name the name of the component (UIID)
-     * @param cmp  the class for the given component
-     */
+    /// This method  allows the UIBuilder to package a smaller portion of Codename One into the JAR
+    /// and add support for additional 3rd party components to the GUI builder. Components
+    /// must be registered using their UIID name, by default all the content of com.codename1.ui is
+    /// registered however subpackages and 3rd party components are not.
+    /// Registration is essential for obfuscation to work properly!
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the component (UIID)
+    ///
+    /// - `cmp`: the class for the given component
     public static void registerCustomComponent(String name, Class cmp) {
         getComponentRegistry().put(name, cmp);
     }
 
-    /**
-     * Removes a navigation frame from the stack, this is useful in case you
-     * want to go back to a form in the middle of the navigation stack.
-     */
+    /// Removes a navigation frame from the stack, this is useful in case you
+    /// want to go back to a form in the middle of the navigation stack.
     protected void popNavigationStack() {
         if (baseFormNavigationStack != null && !baseFormNavigationStack.isEmpty()) {
             baseFormNavigationStack.removeElementAt(baseFormNavigationStack.size() - 1);
         }
     }
 
-    /**
-     * Pops the navigation stack until it finds form name and the back button will match form name
-     * if form name isn't in the stack this method will fail
-     *
-     * @param formName the name of the form to navigate back to.
-     */
+    /// Pops the navigation stack until it finds form name and the back button will match form name
+    /// if form name isn't in the stack this method will fail
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form to navigate back to.
     protected void setBackDestination(String formName) {
         if (baseFormNavigationStack != null) {
             while (!baseFormNavigationStack.isEmpty()) {
@@ -295,12 +280,12 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Useful method for logging form navigation, it returns a string representing the navigation state which
-     * can be used to analyze crash reports
-     *
-     * @return A string representing form states
-     */
+    /// Useful method for logging form navigation, it returns a string representing the navigation state which
+    /// can be used to analyze crash reports
+    ///
+    /// #### Returns
+    ///
+    /// A string representing form states
     protected String formNavigationStackDebug() {
         if (baseFormNavigationStack != null) {
             return baseFormNavigationStack.toString();
@@ -327,20 +312,20 @@ public class UIBuilder { //implements Externalizable {
         return baseFormNavigationStack;
     }
 
-    /**
-     * Seamlessly inserts a back command to all the forms
-     *
-     * @return true if a back command is automatically added
-     */
+    /// Seamlessly inserts a back command to all the forms
+    ///
+    /// #### Returns
+    ///
+    /// true if a back command is automatically added
     public boolean isBackCommandEnabled() {
         return baseFormNavigationStack != null;
     }
 
-    /**
-     * Seamlessly inserts a back command to all the forms
-     *
-     * @param back true to automatically add a back command
-     */
+    /// Seamlessly inserts a back command to all the forms
+    ///
+    /// #### Parameters
+    ///
+    /// - `back`: true to automatically add a back command
     public void setBackCommandEnabled(boolean back) {
         if (back) {
             if (baseFormNavigationStack == null) {
@@ -351,25 +336,30 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Invokes the analytics service if it is enabled and if
-     *
-     * @param page     the page visited
-     * @param referrer the source page
-     */
+    /// Invokes the analytics service if it is enabled and if
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: the page visited
+    ///
+    /// - `referrer`: the source page
     protected void analyticsCallback(String page, String referrer) {
         if (!isBlockAnalytics() && AnalyticsService.isEnabled()) {
             AnalyticsService.visit(page, referrer);
         }
     }
 
-    /**
-     * Creates the container defined under the given name in the res file
-     *
-     * @param resPath      the path to the res file containing the UI widget
-     * @param resourceName the name of the widget in the res file
-     * @return a Codename One container instance
-     */
+    /// Creates the container defined under the given name in the res file
+    ///
+    /// #### Parameters
+    ///
+    /// - `resPath`: the path to the res file containing the UI widget
+    ///
+    /// - `resourceName`: the name of the widget in the res file
+    ///
+    /// #### Returns
+    ///
+    /// a Codename One container instance
     public Container createContainer(String resPath, String resourceName) {
         if (this.resourceFilePath == null || (!this.resourceFilePath.equals(resPath))) {
             resourceFile = null;
@@ -378,13 +368,17 @@ public class UIBuilder { //implements Externalizable {
         return createContainer(fetchResourceFile(), resourceName);
     }
 
-    /**
-     * Creates the container defined under the given name in the res file
-     *
-     * @param res          the res file containing the UI widget
-     * @param resourceName the name of the widget in the res file
-     * @return a Codename One container instance
-     */
+    /// Creates the container defined under the given name in the res file
+    ///
+    /// #### Parameters
+    ///
+    /// - `res`: the res file containing the UI widget
+    ///
+    /// - `resourceName`: the name of the widget in the res file
+    ///
+    /// #### Returns
+    ///
+    /// a Codename One container instance
     public Container createContainer(Resources res, String resourceName) {
         return createContainer(res, resourceName, null);
     }
@@ -493,11 +487,9 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Invoked after the components were created to allow properties that require the entire
-     * tree to exist to update the component. This is useful for properties that point
-     * at other components.
-     */
+    /// Invoked after the components were created to allow properties that require the entire
+    /// tree to exist to update the component. This is useful for properties that point
+    /// at other components.
     private void postCreateComponents(DataInputStream in, Container parent, Resources res) throws Exception {
         // finds the component whose properties need to update
         String name = in.readUTF();
@@ -545,13 +537,17 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Finds the given component by its name
-     *
-     * @param name          the name of the component as defined in the resource editor
-     * @param rootComponent the root container
-     * @return the component matching the given name or null if its not found
-     */
+    /// Finds the given component by its name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the component as defined in the resource editor
+    ///
+    /// - `rootComponent`: the root container
+    ///
+    /// #### Returns
+    ///
+    /// the component matching the given name or null if its not found
     public Component findByName(String name, Component rootComponent) {
         Component c = (Component) rootComponent.getClientProperty("%" + name + "%");
         if (c == null) {
@@ -563,13 +559,17 @@ public class UIBuilder { //implements Externalizable {
         return c;
     }
 
-    /**
-     * Finds the given component by its name
-     *
-     * @param name          the name of the component as defined in the resource editor
-     * @param rootComponent the root container
-     * @return the component matching the given name or null if its not found
-     */
+    /// Finds the given component by its name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the component as defined in the resource editor
+    ///
+    /// - `rootComponent`: the root container
+    ///
+    /// #### Returns
+    ///
+    /// the component matching the given name or null if its not found
     public Component findByName(String name, Container rootComponent) {
         Component c = (Component) rootComponent.getClientProperty("%" + name + "%");
         if (c == null) {
@@ -581,38 +581,43 @@ public class UIBuilder { //implements Externalizable {
         return c;
     }
 
-    /**
-     * This method can be overriden to create custom components in a custom way, the component
-     * type is a shorthand for the component name and not the full name of the class.
-     * By default this method returns null which indicates Codename One should try to reolve the component
-     * on its own.
-     *
-     * @param componentType the type of the component from the UI builder
-     * @param cls           assumed component class based on the component registry
-     * @return a new component instance or null
-     */
+    /// This method can be overriden to create custom components in a custom way, the component
+    /// type is a shorthand for the component name and not the full name of the class.
+    /// By default this method returns null which indicates Codename One should try to reolve the component
+    /// on its own.
+    ///
+    /// #### Parameters
+    ///
+    /// - `componentType`: the type of the component from the UI builder
+    ///
+    /// - `cls`: assumed component class based on the component registry
+    ///
+    /// #### Returns
+    ///
+    /// a new component instance or null
     protected Component createComponentInstance(String componentType, Class cls) {
         return null;
     }
 
-    /**
-     * Callback to allow binding custom logic/listeners to a component after its major properties were set
-     * (notice that not all properties or the full hierarchy will be available at this stage). This
-     * is the perfect place to bind models/renderers etc. to components.
-     *
-     * @param cmp the component
-     */
+    /// Callback to allow binding custom logic/listeners to a component after its major properties were set
+    /// (notice that not all properties or the full hierarchy will be available at this stage). This
+    /// is the perfect place to bind models/renderers etc. to components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component
     protected void postCreateComponent(Component cmp) {
     }
 
-    /**
-     * Binds the given listener object to the component, this works seamlessly for
-     * common Codename One events but might be an issue with custom components and custom
-     * listener types so this method can be overloaded to add support for such cases.
-     *
-     * @param cmp      the component to bind the listener to
-     * @param listener the listener object
-     */
+    /// Binds the given listener object to the component, this works seamlessly for
+    /// common Codename One events but might be an issue with custom components and custom
+    /// listener types so this method can be overloaded to add support for such cases.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to bind the listener to
+    ///
+    /// - `listener`: the listener object
     protected void bindListenerToComponent(Component cmp, Object listener) {
         if (cmp instanceof Container) {
             cmp = ((Container) cmp).getLeadComponent();
@@ -678,22 +683,28 @@ public class UIBuilder { //implements Externalizable {
         return null;
     }
 
-    /**
-     * Allows a subclass to set the list model for the given component
-     *
-     * @param cmp the list whose model may be set
-     * @return true if a model was set by this method
-     */
+    /// Allows a subclass to set the list model for the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the list whose model may be set
+    ///
+    /// #### Returns
+    ///
+    /// true if a model was set by this method
     protected boolean setListModel(List cmp) {
         return false;
     }
 
-    /**
-     * Allows a subclass to set the list model for the given component
-     *
-     * @param cmp the list whose model may be set
-     * @return true if a model was set by this method
-     */
+    /// Allows a subclass to set the list model for the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the list whose model may be set
+    ///
+    /// #### Returns
+    ///
+    /// true if a model was set by this method
     protected boolean setListModel(ContainerList cmp) {
         return false;
     }
@@ -1544,16 +1555,22 @@ public class UIBuilder { //implements Externalizable {
     void modifyingCustomProperty(Component c, String name) {
     }
 
-    /**
-     * Creates a command instance. This method is invoked by the loading code and
-     * can be overriden to create a subclass of the Command class.
-     *
-     * @param commandName the label on the command
-     * @param icon        the icon for the command
-     * @param commandId   the id of the command
-     * @param action      the action assigned to the command if such an action is defined
-     * @return a new command instance
-     */
+    /// Creates a command instance. This method is invoked by the loading code and
+    /// can be overriden to create a subclass of the Command class.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commandName`: the label on the command
+    ///
+    /// - `icon`: the icon for the command
+    ///
+    /// - `commandId`: the id of the command
+    ///
+    /// - `action`: the action assigned to the command if such an action is defined
+    ///
+    /// #### Returns
+    ///
+    /// a new command instance
     protected Command createCommand(String commandName, Image icon, int commandId, String action) {
         return new Command(commandName, icon, commandId);
     }
@@ -1562,15 +1579,15 @@ public class UIBuilder { //implements Externalizable {
         return createCommand(commandName, icon, commandId, action);
     }
 
-    /**
-     * This method may be overriden by subclasses to provide a way to dynamically load
-     * a resource file. Normally the navigation feature of the UIBuilder requires the resource
-     * file present in RAM. However, that might be expensive to maintain.
-     * By implementing this method and replacing the storeResourceFile() with an empty
-     * implementation the resource file storage can be done strictly in RAM.
-     *
-     * @return the instance of the resource file
-     */
+    /// This method may be overriden by subclasses to provide a way to dynamically load
+    /// a resource file. Normally the navigation feature of the UIBuilder requires the resource
+    /// file present in RAM. However, that might be expensive to maintain.
+    /// By implementing this method and replacing the storeResourceFile() with an empty
+    /// implementation the resource file storage can be done strictly in RAM.
+    ///
+    /// #### Returns
+    ///
+    /// the instance of the resource file
     protected Resources fetchResourceFile() {
         try {
             if (resourceFile != null) {
@@ -1591,22 +1608,22 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Allows the navigation code to avoid storing the resource file and lets the GC
-     * remove it from memory when its not in use
-     *
-     * @return the resourceFilePath
-     */
+    /// Allows the navigation code to avoid storing the resource file and lets the GC
+    /// remove it from memory when its not in use
+    ///
+    /// #### Returns
+    ///
+    /// the resourceFilePath
     public String getResourceFilePath() {
         return resourceFilePath;
     }
 
-    /**
-     * Allows the navigation code to avoid storing the resource file and lets the GC
-     * remove it from memory when its not in use
-     *
-     * @param resourceFilePath the resourceFilePath to set
-     */
+    /// Allows the navigation code to avoid storing the resource file and lets the GC
+    /// remove it from memory when its not in use
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceFilePath`: the resourceFilePath to set
     public void setResourceFilePath(String resourceFilePath) {
         this.resourceFilePath = resourceFilePath;
         if (resourceFilePath != null) {
@@ -1614,24 +1631,25 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Sets the resource file if keep in rum or no path is defined
-     *
-     * @param res the resource file
-     */
+    /// Sets the resource file if keep in rum or no path is defined
+    ///
+    /// #### Parameters
+    ///
+    /// - `res`: the resource file
     protected void setResourceFile(Resources res) {
         if (keepResourcesInRam || resourceFilePath == null) {
             this.resourceFile = res;
         }
     }
 
-    /**
-     * Invoked to process a given command before naviation or any other internal
-     * processing occurs. The event can be consumed to prevent further processing.
-     *
-     * @param ev  the action event source of the command
-     * @param cmd the command to process
-     */
+    /// Invoked to process a given command before naviation or any other internal
+    /// processing occurs. The event can be consumed to prevent further processing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the action event source of the command
+    ///
+    /// - `cmd`: the command to process
     protected void processCommand(ActionEvent ev, Command cmd) {
     }
 
@@ -1656,11 +1674,11 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Adds a command listener that would be bound to all forms in the GUI seamlessly
-     *
-     * @param l the listener to bind
-     */
+    /// Adds a command listener that would be bound to all forms in the GUI seamlessly
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to bind
     public void addCommandListener(ActionListener l) {
         if (globalCommandListeners == null) {
             globalCommandListeners = new EventDispatcher();
@@ -1668,11 +1686,11 @@ public class UIBuilder { //implements Externalizable {
         globalCommandListeners.addListener(l);
     }
 
-    /**
-     * Removes a command listener
-     *
-     * @param l the listener to remove
-     */
+    /// Removes a command listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
     public void removeCommandListener(ActionListener l) {
         if (globalCommandListeners == null) {
             return;
@@ -1680,15 +1698,17 @@ public class UIBuilder { //implements Externalizable {
         globalCommandListeners.removeListener(l);
     }
 
-    /**
-     * Adds a component listener that would be bound when a UI for this form is created.
-     * Notice that this method is only effective before the form was created and would do
-     * nothing for an existing form
-     *
-     * @param formName      the name of the form to which the listener should be bound
-     * @param componentName the name of the component to bind to
-     * @param listener      the listener to bind, common listener types are supported
-     */
+    /// Adds a component listener that would be bound when a UI for this form is created.
+    /// Notice that this method is only effective before the form was created and would do
+    /// nothing for an existing form
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form to which the listener should be bound
+    ///
+    /// - `componentName`: the name of the component to bind to
+    ///
+    /// - `listener`: the listener to bind, common listener types are supported
     public void addComponentListener(String formName, String componentName, Object listener) {
         if (localComponentListeners == null) {
             localComponentListeners = new Hashtable();
@@ -1719,13 +1739,15 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Removes a component listener bound to a specific component
-     *
-     * @param formName      the name of the form
-     * @param componentName the name of the component
-     * @param listener      the listener instance
-     */
+    /// Removes a component listener bound to a specific component
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form
+    ///
+    /// - `componentName`: the name of the component
+    ///
+    /// - `listener`: the listener instance
     public void removeComponentListener(String formName, String componentName, Object listener) {
         if (localComponentListeners == null) {
             return;
@@ -1748,12 +1770,13 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Adds a command listener to be invoked for commands on a specific form
-     *
-     * @param formName the name of the form to which the listener should be bound
-     * @param l        the listener to bind
-     */
+    /// Adds a command listener to be invoked for commands on a specific form
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form to which the listener should be bound
+    ///
+    /// - `l`: the listener to bind
     public void addCommandListener(String formName, ActionListener l) {
         if (localCommandListeners == null) {
             localCommandListeners = new Hashtable();
@@ -1766,12 +1789,13 @@ public class UIBuilder { //implements Externalizable {
         d.addListener(l);
     }
 
-    /**
-     * Removes a command listener on a specific form
-     *
-     * @param formName the name of the form
-     * @param l        the listener to remove
-     */
+    /// Removes a command listener on a specific form
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form
+    ///
+    /// - `l`: the listener to remove
     public void removeCommandListener(String formName, ActionListener l) {
         if (localCommandListeners == null) {
             return;
@@ -1783,13 +1807,14 @@ public class UIBuilder { //implements Externalizable {
         d.removeListener(l);
     }
 
-    /**
-     * This method is invoked for every component to which an action event listener can be bound
-     * and delivers the event data for the given component seamlessly.
-     *
-     * @param c     the component broadcasting the event
-     * @param event the event meta data
-     */
+    /// This method is invoked for every component to which an action event listener can be bound
+    /// and delivers the event data for the given component seamlessly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component broadcasting the event
+    ///
+    /// - `event`: the event meta data
     protected void handleComponentAction(Component c, ActionEvent event) {
     }
 
@@ -1817,42 +1842,47 @@ public class UIBuilder { //implements Externalizable {
         return fc;
     }
 
-    /**
-     * Warning: This method is invoked OFF the EDT and is intended for usage with asynchronous
-     * command processing. This method is invoked when the UI indicates that an operation
-     * should occur in the background. To finish the processing of the operation within the
-     * EDT one should override the postAsyncCommand() method.
-     *
-     * @param cmd         the command requiring background processing
-     * @param sourceEvent the triggering event
-     */
+    /// Warning: This method is invoked OFF the EDT and is intended for usage with asynchronous
+    /// command processing. This method is invoked when the UI indicates that an operation
+    /// should occur in the background. To finish the processing of the operation within the
+    /// EDT one should override the postAsyncCommand() method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command requiring background processing
+    ///
+    /// - `sourceEvent`: the triggering event
     protected void asyncCommandProcess(Command cmd, ActionEvent sourceEvent) {
     }
 
-    /**
-     * This method is invoked in conjunction with asyncCommandProcess after the
-     * command was handled asynchronously on the separate thread. Here Codename One
-     * code can be execute to update the UI with the results from the separate thread.
-     *
-     * @param cmd         the command
-     * @param sourceEvent the source event
-     */
+    /// This method is invoked in conjunction with asyncCommandProcess after the
+    /// command was handled asynchronously on the separate thread. Here Codename One
+    /// code can be execute to update the UI with the results from the separate thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command
+    ///
+    /// - `sourceEvent`: the source event
     protected void postAsyncCommand(Command cmd, ActionEvent sourceEvent) {
     }
 
-    /**
-     * <b>Warning:</b> this method is invoked on a separate thread.
-     * This method is invoked when a next form property is defined, this property
-     * indicates a background process for a form of a transitional nature should
-     * take place (e.g. splash screen, IO etc.) after which the next form should be shown.
-     * After this method completes the next form is shown.
-     *
-     * @param f the form for which the background thread was constructed, notice
-     *          that most methods are not threadsafe and one should use callSerially* in this
-     *          method when mutating the form.
-     * @return if false is returned from this method navigation should not proceed
-     * to that given form
-     */
+    /// **Warning:** this method is invoked on a separate thread.
+    /// This method is invoked when a next form property is defined, this property
+    /// indicates a background process for a form of a transitional nature should
+    /// take place (e.g. splash screen, IO etc.) after which the next form should be shown.
+    /// After this method completes the next form is shown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: @param f the form for which the background thread was constructed, notice
+    /// that most methods are not threadsafe and one should use callSerially* in this
+    /// method when mutating the form.
+    ///
+    /// #### Returns
+    ///
+    /// @return if false is returned from this method navigation should not proceed
+    /// to that given form
     protected boolean processBackground(Form f) {
         try {
             Thread.sleep(3000);
@@ -1862,17 +1892,20 @@ public class UIBuilder { //implements Externalizable {
         return true;
     }
 
-    /**
-     * Returns the state of the current form which we are about to leave as part
-     * of the navigation logic. When a back command will return to this form the
-     * state would be restored using setFormState.
-     * The default implementation of this method restores focus and list selection.
-     * You can add arbitrary keys to the form state, keys starting with a $ sign
-     * are reserved for the UIBuilder base class use.
-     *
-     * @param f the form whose state should be preserved
-     * @return arbitrary state object
-     */
+    /// Returns the state of the current form which we are about to leave as part
+    /// of the navigation logic. When a back command will return to this form the
+    /// state would be restored using setFormState.
+    /// The default implementation of this method restores focus and list selection.
+    /// You can add arbitrary keys to the form state, keys starting with a $ sign
+    /// are reserved for the UIBuilder base class use.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form whose state should be preserved
+    ///
+    /// #### Returns
+    ///
+    /// arbitrary state object
     protected Hashtable getFormState(Form f) {
         Component c = f.getFocused();
         Hashtable h = new Hashtable();
@@ -1895,15 +1928,16 @@ public class UIBuilder { //implements Externalizable {
         return h;
     }
 
-    /**
-     * By default Codename One stores the states of components in the navigation graph
-     * as it moves between forms. However, some components aren't recognized by Codename One
-     * by default to enable smaller executable size. This method can be overriden to enable
-     * storing the state of custom components
-     *
-     * @param c           the component whose state should be restored
-     * @param destination the hashtable containing the state
-     */
+    /// By default Codename One stores the states of components in the navigation graph
+    /// as it moves between forms. However, some components aren't recognized by Codename One
+    /// by default to enable smaller executable size. This method can be overriden to enable
+    /// storing the state of custom components
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose state should be restored
+    ///
+    /// - `destination`: the hashtable containing the state
     protected void restoreComponentState(Component c, Hashtable destination) {
         if (shouldAutoStoreState()) {
             Enumeration e = destination.keys();
@@ -1932,15 +1966,16 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * By default Codename One stores the states of components in the navigation graph
-     * as it moves between forms. However, some components aren't recognized by Codename One
-     * by default to enable smaller executable size. This method can be overriden to enable
-     * storing the state of custom components
-     *
-     * @param c           the component whose state should be stored
-     * @param destination the destination hashtable
-     */
+    /// By default Codename One stores the states of components in the navigation graph
+    /// as it moves between forms. However, some components aren't recognized by Codename One
+    /// by default to enable smaller executable size. This method can be overriden to enable
+    /// storing the state of custom components
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose state should be stored
+    ///
+    /// - `destination`: the destination hashtable
     protected void storeComponentState(Component c, Hashtable destination) {
         if (shouldAutoStoreState()) {
             storeComponentStateImpl(c, destination);
@@ -1972,25 +2007,26 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Indicates whether the UIBuilder should try storing states for forms on its own
-     * by seeking lists, tabs and other statefull elements and keeping their selection
-     *
-     * @return true to handle state automatically, false otherwise
-     */
+    /// Indicates whether the UIBuilder should try storing states for forms on its own
+    /// by seeking lists, tabs and other statefull elements and keeping their selection
+    ///
+    /// #### Returns
+    ///
+    /// true to handle state automatically, false otherwise
     protected boolean shouldAutoStoreState() {
         return true;
     }
 
-    /**
-     * Sets the state of the current form to which we are returing as part
-     * of the navigation logic. When a back command is pressed this form
-     * state should be restored, it was obtained via getFormState.
-     * The default implementation of this method restores focus and list selection.
-     *
-     * @param f     the form whose state should be preserved
-     * @param state arbitrary state object
-     */
+    /// Sets the state of the current form to which we are returing as part
+    /// of the navigation logic. When a back command is pressed this form
+    /// state should be restored, it was obtained via getFormState.
+    /// The default implementation of this method restores focus and list selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form whose state should be preserved
+    ///
+    /// - `state`: arbitrary state object
     protected void setFormState(Form f, Hashtable state) {
         setContainerStateImpl(f, state);
     }
@@ -2005,13 +2041,16 @@ public class UIBuilder { //implements Externalizable {
         return false;
     }
 
-    /**
-     * This method is the container navigation equivalent of getFormState() see
-     * that method for details.
-     *
-     * @param cnt the container
-     * @return the state
-     */
+    /// This method is the container navigation equivalent of getFormState() see
+    /// that method for details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container
+    ///
+    /// #### Returns
+    ///
+    /// the state
     protected Hashtable getContainerState(Container cnt) {
         Component c = null;
         Form parentForm = cnt.getComponentForm();
@@ -2054,53 +2093,52 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * This method is the container navigation equivalent of setFormState() see
-     * that method for details.
-     *
-     * @param cnt   the container
-     * @param state the state
-     */
+    /// This method is the container navigation equivalent of setFormState() see
+    /// that method for details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container
+    ///
+    /// - `state`: the state
     protected void setContainerState(Container cnt, Hashtable state) {
         setContainerStateImpl(cnt, state);
     }
 
-    /**
-     * When reaching the home form the navigation stack is cleared
-     *
-     * @return the homeForm
-     */
+    /// When reaching the home form the navigation stack is cleared
+    ///
+    /// #### Returns
+    ///
+    /// the homeForm
     public String getHomeForm() {
         return homeForm;
     }
 
-    /**
-     * When reaching the home form the navigation stack is cleared
-     *
-     * @param homeForm the homeForm to set
-     */
+    /// When reaching the home form the navigation stack is cleared
+    ///
+    /// #### Parameters
+    ///
+    /// - `homeForm`: the homeForm to set
     public void setHomeForm(String homeForm) {
         this.homeForm = homeForm;
     }
 
-    /**
-     * This method effectively pops the form navigation stack and goes back
-     * to the previous form if back navigation is enabled and there is
-     * a previous form.
-     */
+    /// This method effectively pops the form navigation stack and goes back
+    /// to the previous form if back navigation is enabled and there is
+    /// a previous form.
     public void back() {
         back(null);
     }
 
-    /**
-     * This method effectively pops the form navigation stack and goes back
-     * to the previous form if back navigation is enabled and there is
-     * a previous form.
-     *
-     * @param sourceComponent the component that triggered the back command which effectively
-     *                        allows us to find the EmbeddedContainer for a case of container navigation. Null
-     *                        can be used if not applicable.
-     */
+    /// This method effectively pops the form navigation stack and goes back
+    /// to the previous form if back navigation is enabled and there is
+    /// a previous form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceComponent`: @param sourceComponent the component that triggered the back command which effectively
+    /// allows us to find the EmbeddedContainer for a case of container navigation. Null
+    /// can be used if not applicable.
     public void back(Component sourceComponent) {
         Vector formNavigationStack = getFormNavigationStackForComponent(sourceComponent);
         if (formNavigationStack != null && !formNavigationStack.isEmpty()) {
@@ -2125,12 +2163,15 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Returns the name of the previous form
-     *
-     * @param f the current form
-     * @return the name of the previous form
-     */
+    /// Returns the name of the previous form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the current form
+    ///
+    /// #### Returns
+    ///
+    /// the name of the previous form
     String getPreviousFormName(Form f) {
         Vector formNavigationStack = getFormNavigationStackForComponent(f);
         if (formNavigationStack != null && !formNavigationStack.isEmpty()) {
@@ -2140,12 +2181,15 @@ public class UIBuilder { //implements Externalizable {
         return null;
     }
 
-    /**
-     * Returns the text for the back command string. This can be controlled in the theme by the "backUsesTitleBool" constant
-     *
-     * @param previousFormTitle the title of the previous form
-     * @return the string for the back command inserted implicitly
-     */
+    /// Returns the text for the back command string. This can be controlled in the theme by the "backUsesTitleBool" constant
+    ///
+    /// #### Parameters
+    ///
+    /// - `previousFormTitle`: the title of the previous form
+    ///
+    /// #### Returns
+    ///
+    /// the string for the back command inserted implicitly
     protected String getBackCommandText(String previousFormTitle) {
         if (UIManager.getInstance().isThemeConstant("backUsesTitleBool", false)) {
             if (previousFormTitle == null || "".equals(previousFormTitle) || " ".equals(previousFormTitle)) {
@@ -2156,13 +2200,14 @@ public class UIBuilder { //implements Externalizable {
         return "Back";
     }
 
-    /**
-     * Invoked internally to set the back command on the form, this method allows subclasses
-     * to change the behavior of back command adding or disable it
-     *
-     * @param f           the form
-     * @param backCommand the back command
-     */
+    /// Invoked internally to set the back command on the form, this method allows subclasses
+    /// to change the behavior of back command adding or disable it
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form
+    ///
+    /// - `backCommand`: the back command
     protected void setBackCommand(Form f, Command backCommand) {
         if (f.getToolbar() != null) {
             f.getToolbar().setBackCommand(backCommand);
@@ -2209,31 +2254,36 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * This method is equivalent to the internal navigation behavior, it adds
-     * functionality such as the back command into the given form resource and
-     * shows it. If the source command is the back command the showBack() method
-     * will run.
-     * Notice that container navigation (none-form) doesn't support the back() method
-     * or the form stack. However a command marked as back command will be respected.
-     *
-     * @param resourceName    the name of the resource for the form to show
-     * @param sourceCommand   the command of the resource (may be null)
-     * @param sourceComponent the component that activated the show (may be null)
-     * @return the container thats being shown, notice that you can still manipulate
-     * some states of the container before it actually appears
-     */
+    /// This method is equivalent to the internal navigation behavior, it adds
+    /// functionality such as the back command into the given form resource and
+    /// shows it. If the source command is the back command the showBack() method
+    /// will run.
+    /// Notice that container navigation (none-form) doesn't support the back() method
+    /// or the form stack. However a command marked as back command will be respected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceName`: the name of the resource for the form to show
+    ///
+    /// - `sourceCommand`: the command of the resource (may be null)
+    ///
+    /// - `sourceComponent`: the component that activated the show (may be null)
+    ///
+    /// #### Returns
+    ///
+    /// @return the container thats being shown, notice that you can still manipulate
+    /// some states of the container before it actually appears
     public Container showContainer(String resourceName, Command sourceCommand, Component sourceComponent) {
         return showContainerImpl(resourceName, sourceCommand, sourceComponent, false);
     }
 
 
-    /**
-     * Useful tool to refresh the current state of a container shown using show container
-     * without pushing another instance to the back stack
-     *
-     * @param cnt the container thats embedded into the application
-     */
+    /// Useful tool to refresh the current state of a container shown using show container
+    /// without pushing another instance to the back stack
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container thats embedded into the application
     public void reloadContainer(Component cnt) {
         Container newCnt = createContainer(fetchResourceFile(), cnt.getName(), (EmbeddedContainer) cnt.getParent());
         beforeShowContainer(newCnt);
@@ -2242,10 +2292,8 @@ public class UIBuilder { //implements Externalizable {
     }
 
 
-    /**
-     * Useful tool to refresh the current state of a form shown using show form
-     * without pushing another instance to the back stack
-     */
+    /// Useful tool to refresh the current state of a form shown using show form
+    /// without pushing another instance to the back stack
     public void reloadForm() {
         Form currentForm = Display.getInstance().getCurrent();
         Command backCommand = currentForm.getBackCommand();
@@ -2376,12 +2424,15 @@ public class UIBuilder { //implements Externalizable {
     }
 
 
-    /**
-     * This is useful for swipe back navigation behavior
-     *
-     * @param f the form from which we should go back
-     * @return a lazy value that will return the back form
-     */
+    /// This is useful for swipe back navigation behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form from which we should go back
+    ///
+    /// #### Returns
+    ///
+    /// a lazy value that will return the back form
     public LazyValue<Form> createBackLazyValue(final Form f) {
         Vector formNavigationStack = baseFormNavigationStack;
         Hashtable p = null;
@@ -2528,65 +2579,76 @@ public class UIBuilder { //implements Externalizable {
         }
     }
 
-    /**
-     * Indicates whether a back command to this form should be generated automatically when
-     * leaving said form.
-     *
-     * @param formName the name of the form
-     * @return true to autogenerate and add a back command to the destination form
-     */
+    /// Indicates whether a back command to this form should be generated automatically when
+    /// leaving said form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form
+    ///
+    /// #### Returns
+    ///
+    /// true to autogenerate and add a back command to the destination form
     protected boolean allowBackTo(String formName) {
         return true;
     }
 
-    /**
-     * When navigating from one form/container to another we sometimes might not want the
-     * back command to return to the previous container/form but rather to the one before
-     * source. A good example would be a "refresh" command or a toggle button that changes
-     * the form state.
-     *
-     * @param source      the form or container we are leaving
-     * @param destination the container or form we are navigating to
-     * @return false if we want a standard back button to source, true if we want to use
-     * the same back button as the one in source
-     */
+    /// When navigating from one form/container to another we sometimes might not want the
+    /// back command to return to the previous container/form but rather to the one before
+    /// source. A good example would be a "refresh" command or a toggle button that changes
+    /// the form state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the form or container we are leaving
+    ///
+    /// - `destination`: the container or form we are navigating to
+    ///
+    /// #### Returns
+    ///
+    /// @return false if we want a standard back button to source, true if we want to use
+    /// the same back button as the one in source
     protected boolean isSameBackDestination(Container source, Container destination) {
         return source.getName() == null || destination.getName() == null ||
                 source.getName().equals(destination.getName());
     }
 
-    /**
-     * This method is equivalent to the internal navigation behavior, it adds
-     * functionality such as the back command into the given form resource and
-     * shows it. If the source command is the back command the showBack() method
-     * will run.
-     *
-     * @param resourceName  the name of the resource for the form to show
-     * @param sourceCommand the command of the resource (may be null)
-     * @return the form thats being shown, notice that you can still manipulate
-     * some states of the form before it actually appears
-     */
+    /// This method is equivalent to the internal navigation behavior, it adds
+    /// functionality such as the back command into the given form resource and
+    /// shows it. If the source command is the back command the showBack() method
+    /// will run.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceName`: the name of the resource for the form to show
+    ///
+    /// - `sourceCommand`: the command of the resource (may be null)
+    ///
+    /// #### Returns
+    ///
+    /// @return the form thats being shown, notice that you can still manipulate
+    /// some states of the form before it actually appears
     public Form showForm(String resourceName, Command sourceCommand) {
         Form f = (Form) createContainer(fetchResourceFile(), resourceName);
         showForm(f, sourceCommand, null);
         return f;
     }
 
-    /**
-     * This method allows binding an action that should occur before leaving the given
-     * form, e.g. memory cleanup
-     *
-     * @param f the form being left
-     */
+    /// This method allows binding an action that should occur before leaving the given
+    /// form, e.g. memory cleanup
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form being left
     protected void exitForm(Form f) {
     }
 
-    /**
-     * This method allows binding an action that should occur before showing the given
-     * form
-     *
-     * @param f the form about to be shown
-     */
+    /// This method allows binding an action that should occur before showing the given
+    /// form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form about to be shown
     protected void beforeShow(Form f) {
     }
 
@@ -2598,104 +2660,101 @@ public class UIBuilder { //implements Externalizable {
         beforeShow(f);
     }
 
-    /**
-     * This callback is invoked to indicate that the upcoming form is shown as part of a "back" navigation.
-     * This is useful for the case of a breadcrumb UI where the navigation stack is shown at the top of the
-     * UI, in that case this method can be used to pop out the breadcrumb stack.
-     */
+    /// This callback is invoked to indicate that the upcoming form is shown as part of a "back" navigation.
+    /// This is useful for the case of a breadcrumb UI where the navigation stack is shown at the top of the
+    /// UI, in that case this method can be used to pop out the breadcrumb stack.
     protected void onBackNavigation() {
     }
 
-    /**
-     * This method allows binding an action that should occur immediately after showing the given
-     * form
-     *
-     * @param f the form that was just shown
-     */
+    /// This method allows binding an action that should occur immediately after showing the given
+    /// form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form that was just shown
     private void postShowImpl(Form f) {
         postShow(f);
         analyticsCallback(f.getName(), getPreviousFormName(f));
     }
 
-    /**
-     * Back commands are set implicitly (see allowBackTo to disable that), this method allows subclasses
-     * to disable the behavior where the back command is also added to the menu (not just set to the back button).
-     *
-     * @return
-     */
+    /// Back commands are set implicitly (see allowBackTo to disable that), this method allows subclasses
+    /// to disable the behavior where the back command is also added to the menu (not just set to the back button).
     protected boolean shouldAddBackCommandToMenu() {
         return true;
     }
 
-    /**
-     * This method allows binding an action that should occur immediately after showing the given
-     * form
-     *
-     * @param f the form that was just shown
-     */
+    /// This method allows binding an action that should occur immediately after showing the given
+    /// form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form that was just shown
     protected void postShow(Form f) {
     }
 
-    /**
-     * This method allows binding an action that should occur before showing the given
-     * container
-     *
-     * @param c the container about to be shown
-     */
+    /// This method allows binding an action that should occur before showing the given
+    /// container
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the container about to be shown
     protected void beforeShowContainer(Container c) {
     }
 
-    /**
-     * This method allows binding an action that should occur immediately after showing the given
-     * container
-     *
-     * @param c the container that was just shown
-     */
+    /// This method allows binding an action that should occur immediately after showing the given
+    /// container
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the container that was just shown
     protected void postShowContainer(Container c) {
     }
 
-    /**
-     * This method allows binding logic that should occur before creating the root object
-     * e.g. a case where a created form needs data fetched for it.
-     *
-     * @param rootName the name of the root to be created from the resource file
-     */
+    /// This method allows binding logic that should occur before creating the root object
+    /// e.g. a case where a created form needs data fetched for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rootName`: the name of the root to be created from the resource file
     protected void onCreateRoot(String rootName) {
     }
 
-    /**
-     * Indicates that the UIBuilder should cache resources in memory and never release them.
-     * This is useful with small resource files or high RAM devices since it saves the cost
-     * of constantly fetching the res file from the jar whenever moving between forms.
-     * This can be toggled in the properties (e.g. jad) using the flag: cacheResFile (true/false)
-     * which defaults to false.
-     *
-     * @return the keepResourcesInRam
-     */
+    /// Indicates that the UIBuilder should cache resources in memory and never release them.
+    /// This is useful with small resource files or high RAM devices since it saves the cost
+    /// of constantly fetching the res file from the jar whenever moving between forms.
+    /// This can be toggled in the properties (e.g. jad) using the flag: cacheResFile (true/false)
+    /// which defaults to false.
+    ///
+    /// #### Returns
+    ///
+    /// the keepResourcesInRam
     public boolean isKeepResourcesInRam() {
         return keepResourcesInRam;
     }
 
-    /**
-     * Indicates that the UIBuilder should cache resources in memory and never release them.
-     * This is useful with small resource files or high RAM devices since it saves the cost
-     * of constantly fetching the res file from the jar whenever moving between forms.
-     * This can be toggled in the properties (e.g. jad) using the flag: cacheResFile (true/false)
-     * which defaults to false.
-     *
-     * @param keepResourcesInRam the keepResourcesInRam to set
-     */
+    /// Indicates that the UIBuilder should cache resources in memory and never release them.
+    /// This is useful with small resource files or high RAM devices since it saves the cost
+    /// of constantly fetching the res file from the jar whenever moving between forms.
+    /// This can be toggled in the properties (e.g. jad) using the flag: cacheResFile (true/false)
+    /// which defaults to false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keepResourcesInRam`: the keepResourcesInRam to set
     public void setKeepResourcesInRam(boolean keepResourcesInRam) {
         this.keepResourcesInRam = keepResourcesInRam;
     }
 
-    /**
-     * Returns either the parent form or the component below the embedded container
-     * above c.
-     *
-     * @param c the component whose root ancestor we should find
-     * @return the root
-     */
+    /// Returns either the parent form or the component below the embedded container
+    /// above c.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose root ancestor we should find
+    ///
+    /// #### Returns
+    ///
+    /// the root
     protected Container getRootAncestor(Component c) {
         while (c.getParent() != null && !(c.getParent() instanceof EmbeddedContainer)) {
             c = c.getParent();
@@ -2706,17 +2765,16 @@ public class UIBuilder { //implements Externalizable {
         return (Container) c;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     /*public final int getVersion() {
         return 1;
     }*/
 
-    /**
-     * Restores state of the previously running application
-     * @return true if there is a state to restore
-     */
+    /// Restores state of the previously running application
+    ///
+    /// #### Returns
+    ///
+    /// true if there is a state to restore
     /*protected boolean restoreRunningApp() {
         if(baseFormNavigationStack != null && !baseFormNavigationStack.isEmpty()) {
             Hashtable h = (Hashtable)baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);
@@ -2733,46 +2791,47 @@ public class UIBuilder { //implements Externalizable {
         return false;
     }*/
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     /*public final void externalize(DataOutputStream out) throws IOException {
         Util.writeObject(baseFormNavigationStack, out);
         Util.writeObject(backCommands, out);
         externalizeUserState(out);
     }*/
 
-    /**
-     * This method is called on externalization of the state machine and allows developers to persist their own data
-     *
-     * @param out output stream
-     * @throws IOException if an error occurred
-     */
+    /// This method is called on externalization of the state machine and allows developers to persist their own data
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: output stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an error occurred
     //protected void externalizeUserState(DataOutputStream out) throws IOException {
     //}
 
-    /**
-     * This method is called on loading of a state machine and allows the developers to load custom state machine data,
-     * notice that the version isn't passed into this method since the version of the UIBuilder persistence logic
-     * might differ from the version used by user code hence you should use a personal versioning system.
-     * @param in the input stream
-     * @throws IOException if an error occurred
-     */
+    /// This method is called on loading of a state machine and allows the developers to load custom state machine data,
+    /// notice that the version isn't passed into this method since the version of the UIBuilder persistence logic
+    /// might differ from the version used by user code hence you should use a personal versioning system.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the input stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an error occurred
     //protected void internalizeUserState(DataInputStream in) throws IOException {
     //}
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     /*public final void internalize(int version, DataInputStream in) throws IOException {
         baseFormNavigationStack = (Vector)Util.readObject(in);
         backCommands = (Vector)Util.readObject(in);
         internalizeUserState(in);
     }*/
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     /*public String getObjectId() {
         return "StateMachine";
     }*/

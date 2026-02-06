@@ -24,71 +24,79 @@ package com.codename1.processing;
 
 import java.util.List;
 
-/**
- * Private interface, do not use.
- * <p>
- * Predicate Evaluator interface, for handling predicate expressions (those within square backets
- * of the path).  Example:
- * <p>
- * Example predicates:
- *
- * <code>
- * Test price attribute:
- * <p>
- * [@price > 45]
- * <p>
- * Test Child node:
- * <p>
- * [town='Exeter']
- * <p>
- * Test attribute exists
- * <p>
- * [@price]
- * <p>
- * Test attribute doesn't exist:
- * <p>
- * [@price = null]
- * <p>
- * Select by index:
- * <p>
- * [3]
- * <p>
- * Select by position:
- * <p>
- * [position() < 5]
- * <p>
- * Select by position:
- * <p>
- * [last() - 5]
- * </code>
- *
- * @author Eric Coolman
- */
+/// Private interface, do not use.
+///
+/// Predicate Evaluator interface, for handling predicate expressions (those within square backets
+/// of the path).  Example:
+///
+/// Example predicates:
+///
+/// `Test price attribute:
+///
+///  [@price > 45]
+///
+///  Test Child node:
+///
+///  [town='Exeter']
+///
+///  Test attribute exists
+///
+///  [@price]
+///
+///  Test attribute doesn't exist:
+///
+///  [@price = null]
+///
+///  Select by index:
+///
+///  [3]
+///
+///  Select by position:
+///
+///  [position() < 5]
+///
+///  Select by position:
+///
+///  [last() - 5]`
+///
+/// @author Eric Coolman
 interface Evaluator {
 
-    /**
-     * Evaluate a predicate expression against an array of StructuredContent elements.  This method
-     * should return an array of elements that matched the given predicate expression.  If only a
-     * single match is found, a single StructuredContent element may be returned (not required).
-     *
-     * @param elements an array of StructuredContent elements.
-     * @return Either a single StructuredContent element, or an array of StructuredContent elements.
-     * @throws IllegalArgumentException thrown if there is an error processing the predicate expression.
-     */
+    /// Evaluate a predicate expression against an array of StructuredContent elements.  This method
+    /// should return an array of elements that matched the given predicate expression.  If only a
+    /// single match is found, a single StructuredContent element may be returned (not required).
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: an array of StructuredContent elements.
+    ///
+    /// #### Returns
+    ///
+    /// Either a single StructuredContent element, or an array of StructuredContent elements.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: thrown if there is an error processing the predicate expression.
     Object evaluate(List elements)
             throws IllegalArgumentException;
 
-    /**
-     * Evaluate a predicate expression against a single StructuredContent elements.  This method
-     * should return an array of elements that matched the given predicate expression.  If only a
-     * single match is found, a single StructuredContent element may be returned (not required).
-     * NOTE: Normally this method would return a single element, but an array could be produced
-     * if the predicate uses globbing.
-     *
-     * @param elements a single StructuredContent element.
-     * @return Either a single StructuredContent element, or an array of StructuredContent elements.
-     * @throws IllegalArgumentException thrown if there is an error processing the predicate expression.
-     */
+    /// Evaluate a predicate expression against a single StructuredContent elements.  This method
+    /// should return an array of elements that matched the given predicate expression.  If only a
+    /// single match is found, a single StructuredContent element may be returned (not required).
+    /// NOTE: Normally this method would return a single element, but an array could be produced
+    /// if the predicate uses globbing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: a single StructuredContent element.
+    ///
+    /// #### Returns
+    ///
+    /// Either a single StructuredContent element, or an array of StructuredContent elements.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: thrown if there is an error processing the predicate expression.
     Object evaluate(StructuredContent element)
             throws IllegalArgumentException;
 }

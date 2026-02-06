@@ -40,50 +40,50 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Collection;
 import java.util.Vector;
 
-/**
- * This is a "list component" implemented as a container with a layout manager
- * which provides <b>some</b> of the ui advantages of a Container and some of a
- * list while pulling out some of the drawbacks of both.
- * This container uses the model/renderer approach for populating itself, adding/removing
- * entries will probably break it. It still provides most of the large size advantages
- * a list offers since the components within it are very simple and don't contain any
- * actual state other than layout information. The big advantage with this class is
- * the ability to leverage elaborate CodenameOne layouts such as Grid, Table &amp; flow layout
- * to provide other ways of rendering the content of a list model.
- *
- * @author Shai Almog
- * @deprecated the performance of ContainerList is worse than the performance of List or Container. The API/behaviors
- * are problematic and we don't think its the right choice for any project. It is our recommendation that you use
- * Container, InfiniteContainer etc.
- */
+/// This is a "list component" implemented as a container with a layout manager
+/// which provides **some** of the ui advantages of a Container and some of a
+/// list while pulling out some of the drawbacks of both.
+/// This container uses the model/renderer approach for populating itself, adding/removing
+/// entries will probably break it. It still provides most of the large size advantages
+/// a list offers since the components within it are very simple and don't contain any
+/// actual state other than layout information. The big advantage with this class is
+/// the ability to leverage elaborate CodenameOne layouts such as Grid, Table & flow layout
+/// to provide other ways of rendering the content of a list model.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// @deprecated the performance of ContainerList is worse than the performance of List or Container. The API/behaviors
+/// are problematic and we don't think its the right choice for any project. It is our recommendation that you use
+/// Container, InfiniteContainer etc.
 public class ContainerList extends Container {
     private final EventDispatcher dispatcher = new EventDispatcher();
     private CellRenderer renderer = new DefaultListCellRenderer();
     private ListModel model;
     private Listeners listener;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public ContainerList() {
         this(new DefaultListModel());
     }
 
-    /**
-     * Constructs a container list with the given model
-     *
-     * @param m the model
-     */
+    /// Constructs a container list with the given model
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the model
     public ContainerList(ListModel m) {
         init(m);
     }
 
-    /**
-     * Constructs a container list with the given model and layout
-     *
-     * @param l layout manager
-     * @param m the model
-     */
+    /// Constructs a container list with the given model and layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: layout manager
+    ///
+    /// - `m`: the model
     public ContainerList(Layout l, ListModel m) {
         super(l);
         init(m);
@@ -95,18 +95,16 @@ public class ContainerList extends Container {
         setScrollableY(true);
     }
 
-    /**
-     * The renderer used to draw the container list elements
-     */
+    /// The renderer used to draw the container list elements
     public CellRenderer getRenderer() {
         return renderer;
     }
 
-    /**
-     * The renderer used to draw the container list elements
-     *
-     * @param r renderer instance
-     */
+    /// The renderer used to draw the container list elements
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: renderer instance
     public void setRenderer(CellRenderer r) {
         renderer = r;
         for (int iter = 0; iter < getComponentCount(); iter++) {
@@ -138,20 +136,20 @@ public class ContainerList extends Container {
         }
     }
 
-    /**
-     * Returns the list model
-     *
-     * @return the list model
-     */
+    /// Returns the list model
+    ///
+    /// #### Returns
+    ///
+    /// the list model
     public ListModel getModel() {
         return model;
     }
 
-    /**
-     * Set the model for the container list
-     *
-     * @param model a model class that is mapped into the internal components
-     */
+    /// Set the model for the container list
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: a model class that is mapped into the internal components
     public void setModel(ListModel model) {
         if (this.model != null && listener != null) {
             this.model.removeDataChangedListener(listener);
@@ -169,46 +167,47 @@ public class ContainerList extends Container {
         repaint();
     }
 
-    /**
-     * Allows binding a listener to user selection actions
-     *
-     * @param l the action listener to be added
-     */
+    /// Allows binding a listener to user selection actions
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the action listener to be added
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
 
-    /**
-     * This method allows extracting the action listeners from the current list
-     *
-     * @return vector containing the action listeners on the list
-     * @deprecated use getListeners instead
-     */
+    /// This method allows extracting the action listeners from the current list
+    ///
+    /// #### Returns
+    ///
+    /// vector containing the action listeners on the list
+    ///
+    /// #### Deprecated
+    ///
+    /// use getListeners instead
     public Vector getActionListeners() {
         return dispatcher.getListenerVector();
     }
 
-    /**
-     * This method allows extracting the action listeners from the current list
-     *
-     * @return Collection containing the action listeners on the list
-     */
+    /// This method allows extracting the action listeners from the current list
+    ///
+    /// #### Returns
+    ///
+    /// Collection containing the action listeners on the list
     public Collection getListeners() {
         return dispatcher.getListenerCollection();
     }
 
-    /**
-     * Allows binding a listener to user selection actions
-     *
-     * @param l the action listener to be removed
-     */
+    /// Allows binding a listener to user selection actions
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the action listener to be removed
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         if (model != null) {
@@ -220,9 +219,7 @@ public class ContainerList extends Container {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         if (this.model != null && listener != null) {
@@ -240,11 +237,11 @@ public class ContainerList extends Container {
         }
     }
 
-    /**
-     * Returns the current/last selected item
-     *
-     * @return selected item or null
-     */
+    /// Returns the current/last selected item
+    ///
+    /// #### Returns
+    ///
+    /// selected item or null
     public Object getSelectedItem() {
         int i = model.getSelectedIndex();
         if (i > -1) {
@@ -254,21 +251,21 @@ public class ContainerList extends Container {
     }
 
 
-    /**
-     * Returns the current selected offset in the list
-     *
-     * @return the current selected offset in the list
-     */
+    /// Returns the current selected offset in the list
+    ///
+    /// #### Returns
+    ///
+    /// the current selected offset in the list
     public int getSelectedIndex() {
         return model.getSelectedIndex();
     }
 
-    /**
-     * Sets the current selected offset in the list, by default this implementation
-     * will scroll the list to the selection if the selection is outside of the screen
-     *
-     * @param index the current selected offset in the list
-     */
+    /// Sets the current selected offset in the list, by default this implementation
+    /// will scroll the list to the selection if the selection is outside of the screen
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the current selected offset in the list
     public void setSelectedIndex(int index) {
         if (index < 0) {
             throw new IllegalArgumentException("Selection index is negative:" + index);
@@ -277,44 +274,36 @@ public class ContainerList extends Container {
         model.setSelectedIndex(index);
     }
 
-    /**
-     * Triggers the event to the listeners
-     *
-     * @param evt the event to fire
-     */
+    /// Triggers the event to the listeners
+    ///
+    /// #### Parameters
+    ///
+    /// - `evt`: the event to fire
     protected void fireActionEvent(ActionEvent evt) {
         if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             dispatcher.fireActionEvent(evt);
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"ListItems", "Renderer"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{com.codename1.impl.CodenameOneImplementation.getObjectArrayClass(), CellRenderer.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"Object[]", "CellRenderer"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("ListItems".equals(name)) {
@@ -331,9 +320,7 @@ public class ContainerList extends Container {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("ListItems".equals(name)) {
@@ -353,9 +340,7 @@ public class ContainerList extends Container {
         return cmp.getSelectedRect();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected int getDragRegionStatus(int x, int y) {
         if (!isScrollable()) {
@@ -371,9 +356,7 @@ public class ContainerList extends Container {
     }
 
 
-    /**
-     * This class is an internal implementation detail
-     */
+    /// This class is an internal implementation detail
     class Entry extends Component {
         private int offset;
 
@@ -428,9 +411,7 @@ public class ContainerList extends Container {
         }
 
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         public void pointerReleasedImpl(int x, int y, boolean longPress) {
             if (!isDragActivated()) {
                 // fire the action event into the selected component
@@ -458,9 +439,7 @@ public class ContainerList extends Container {
             }
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public void keyReleased(int keyCode) {
             super.keyReleased(keyCode);

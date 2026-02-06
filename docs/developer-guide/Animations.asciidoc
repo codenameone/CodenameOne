@@ -190,7 +190,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/animations
 
 === Low Level Animations
 
-The Codename One event dispatch thread has a special animation “pulse” allowing an animation to update its state and draw itself. Code can make use of this pulse to implement repetitive polling tasks that have very little to do with drawing.
+The Codename One event dispatch thread has a special animation "pulse" allowing an animation to update its state and draw itself. Code can make use of this pulse to implement repetitive polling tasks that have very little to do with drawing.
 
 This is helpful since the callback will always occur on the event dispatch thread.
 

@@ -31,103 +31,92 @@ import com.codename1.ui.plaf.Style;
 
 import java.util.HashMap;
 
-/**
- * <p>A border layout lays out a container, arranging and resizing its
- * components to fit in five regions: north, south, east, west, and center.
- * Each region may contain no more than one component, and is identified by a
- * corresponding constant: NORTH, SOUTH, EAST, WEST, and CENTER.
- * When adding a component to a container with a border layout, use one of
- * these five constants.</p>
- * <p>
- * The border layout scales all of the components within it to match the available
- * constraints. The NORTH &amp; SOUTH components use their preferred height but
- * are stretched to take up the full width available. The EAST &amp; WEST do the same
- * for the reverse axis however they leave room for the NORTH/SOUTH entries if they
- * are defined.<br>
- * The CENTER constraint will take up the rest of the available space regardless of its preferred
- * size. This is normally very useful, however in some cases we would prefer that the center
- * component will actually position itself in the middle of the available space. For this we have
- * the <code>setCenterBehavior</code> method.
- * </p>
- * <p>
- * Because of its scaling behavior scrolling a border layout makes no sense. However it is a
- * common mistake to apply a border layout to a scrollable container or trying to make a border
- * layout scrollable. That is why the {@link com.codename1.ui.Container} class explicitly blocks
- * scrolling on a BorderLayout.<br>
- * Typical usage of this class:
- * </p>
- * <script src="https://gist.github.com/codenameone/23e642b1a749e2f37e68.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/border-layout.png" alt="Border Layout" />
- *
- * <p>
- * When defining the center behavior we can get very different results:
- * </p>
- * <script src="https://gist.github.com/codenameone/108aa105386ed7c340ad.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/border-layout-center.png" alt="Border Layout Center" />
- *
- * <p>Notice that in the case of RTL (right to left language also known as bidi) the
- * EAST and WEST values are implicitly reversed as shown in this image:
- * </p>
- * <img src="https://www.codenameone.com/img/developer-guide/border-layout-RTL.png" alt="Border Layout bidi/RTL" />
- *
- * <p>
- * You can read further in the <a href="https://www.codenameone.com/manual/basics.html#_border_layout">BorderLayout section in the developer guide</a>.
- * </p>
- *
- * @author Nir Shabi, Shai Almog
- */
+/// A border layout lays out a container, arranging and resizing its
+/// components to fit in five regions: north, south, east, west, and center.
+/// Each region may contain no more than one component, and is identified by a
+/// corresponding constant: NORTH, SOUTH, EAST, WEST, and CENTER.
+/// When adding a component to a container with a border layout, use one of
+/// these five constants.
+///
+/// The border layout scales all of the components within it to match the available
+/// constraints. The NORTH & SOUTH components use their preferred height but
+/// are stretched to take up the full width available. The EAST & WEST do the same
+/// for the reverse axis however they leave room for the NORTH/SOUTH entries if they
+/// are defined.
+///
+/// The CENTER constraint will take up the rest of the available space regardless of its preferred
+/// size. This is normally very useful, however in some cases we would prefer that the center
+/// component will actually position itself in the middle of the available space. For this we have
+/// the `setCenterBehavior` method.
+///
+/// Because of its scaling behavior scrolling a border layout makes no sense. However it is a
+/// common mistake to apply a border layout to a scrollable container or trying to make a border
+/// layout scrollable. That is why the `com.codename1.ui.Container` class explicitly blocks
+/// scrolling on a BorderLayout.
+///
+/// Typical usage of this class:
+///
+/// ```java
+/// Form hi = new Form("Border Layout", new BorderLayout());
+/// hi.add(BorderLayout.CENTER, new Label("Center")).
+///     add(BorderLayout.SOUTH, new Label("South")).
+///     add(BorderLayout.NORTH, new Label("North")).
+///     add(BorderLayout.EAST, new Label("East")).
+///     add(BorderLayout.WEST, new Label("West"));
+/// hi.show();
+/// ```
+///
+/// When defining the center behavior we can get very different results:
+///
+/// ```java
+/// Form hi = new Form("Border Layout", new BorderLayout());
+/// ((BorderLayout)hi.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER);
+/// hi.add(BorderLayout.CENTER, new Label("Center")).
+///     add(BorderLayout.SOUTH, new Label("South")).
+///     add(BorderLayout.NORTH, new Label("North")).
+///     add(BorderLayout.EAST, new Label("East")).
+///     add(BorderLayout.WEST, new Label("West"));
+/// hi.show();
+/// ```
+///
+/// Notice that in the case of RTL (right to left language also known as bidi) the
+/// EAST and WEST values are implicitly reversed as shown in this image:
+///
+/// You can read further in the [BorderLayout section in the developer guide](https://www.codenameone.com/manual/basics.html#_border_layout).
+///
+/// @author Nir Shabi, Shai Almog
 public class BorderLayout extends Layout {
-    /**
-     * Defines the behavior of the component placed in the center position of the layout, by default it is scaled to the available space
-     */
+    /// Defines the behavior of the component placed in the center position of the layout, by default it is scaled to the available space
     public static final int CENTER_BEHAVIOR_SCALE = 0;
-    /**
-     * Defines the behavior of the component placed in the center position of the layout, places the component in the center of
-     * the space available to the center component.
-     */
+    /// Defines the behavior of the component placed in the center position of the layout, places the component in the center of
+    /// the space available to the center component.
     public static final int CENTER_BEHAVIOR_CENTER = 1;
-    /**
-     * Defines the behavior of the component placed in the center position of the layout, places the component in the center of
-     * the surrounding container
-     */
+    /// Defines the behavior of the component placed in the center position of the layout, places the component in the center of
+    /// the surrounding container
     public static final int CENTER_BEHAVIOR_CENTER_ABSOLUTE = 2;
-    /**
-     * Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
-     * The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
-     * a layered effect
-     *
-     * @deprecated Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
-     */
+    /// Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
+    /// The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
+    /// a layered effect
+    ///
+    /// #### Deprecated
+    ///
+    /// Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
     public static final int CENTER_BEHAVIOR_TOTAL_BELLOW = 3;
-    /**
-     * The center component takes up the entire screens and the sides are
-     * automatically placed on top (or below based on z-order) thus creating
-     * a layered effect
-     */
+    /// The center component takes up the entire screens and the sides are
+    /// automatically placed on top (or below based on z-order) thus creating
+    /// a layered effect
     public static final int CENTER_BEHAVIOR_TOTAL_BELOW = 3;
-    /**
-     * The north layout constraint (top of container).
-     */
+    /// The north layout constraint (top of container).
     public static final String NORTH = "North";
-    /**
-     * The south layout constraint (bottom of container).
-     */
+    /// The south layout constraint (bottom of container).
     public static final String SOUTH = "South";
-    /**
-     * The center layout constraint (middle of container)
-     */
+    /// The center layout constraint (middle of container)
     public static final String CENTER = "Center";
-    /**
-     * The west layout constraint (left of container).
-     */
+    /// The west layout constraint (left of container).
     public static final String WEST = "West";
-    /**
-     * The east layout constraint (right of container).
-     */
+    /// The east layout constraint (right of container).
     public static final String EAST = "East";
-    /**
-     * Overlay on top of the other layout components
-     */
+    /// Overlay on top of the other layout components
     public static final String OVERLAY = "Overlay";
     private final Dimension dim = new Dimension(0, 0);
     private boolean scaleEdges = true;
@@ -138,72 +127,76 @@ public class BorderLayout extends Layout {
     private Component portraitEast;
     private Component overlay;
     private HashMap<String, String> landscapeSwap;
-    /**
-     * Defines the behavior of the center component to one of the constants defined in this class
-     */
+    /// Defines the behavior of the center component to one of the constants defined in this class
     private int centerBehavior;
 
-    /**
-     * Creates a new instance of BorderLayout
-     */
+    /// Creates a new instance of BorderLayout
     public BorderLayout() {
     }
 
-    /**
-     * Creates a new instance of BorderLayout  with absolute behavior
-     *
-     * @param behavior identical value as the setCenterBehavior method
-     */
+    /// Creates a new instance of BorderLayout  with absolute behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `behavior`: identical value as the setCenterBehavior method
     public BorderLayout(int behavior) {
         setCenterBehavior(behavior);
     }
 
-    /**
-     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER)}
-     *
-     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
-     */
+    /// Shorthand for `new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER)`
+    ///
+    /// #### Returns
+    ///
+    /// a new `BorderLayout` with `#CENTER_BEHAVIOR_CENTER` constraint applied
     public static BorderLayout center() {
         return new BorderLayout(CENTER_BEHAVIOR_CENTER);
     }
 
-    /**
-     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE)}
-     *
-     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_CENTER_ABSOLUTE} constraint applied
-     */
+    /// Shorthand for `new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE)`
+    ///
+    /// #### Returns
+    ///
+    /// a new `BorderLayout` with `#CENTER_BEHAVIOR_CENTER_ABSOLUTE` constraint applied
     public static BorderLayout absolute() {
         return new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE);
     }
 
-    /**
-     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW)}
-     *
-     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
-     */
+    /// Shorthand for `new BorderLayout(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW)`
+    ///
+    /// #### Returns
+    ///
+    /// a new `BorderLayout` with `#CENTER_BEHAVIOR_TOTAL_BELOW` constraint applied
     public static BorderLayout totalBelow() {
         return new BorderLayout(CENTER_BEHAVIOR_TOTAL_BELOW);
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the center
-     *
-     * @param center the center component
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the center
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: the center component
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container center(Component center) {
         return Container.encloseIn(new BorderLayout(), center, BorderLayout.CENTER);
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the center
-     * east and west respectively
-     *
-     * @param center the center component
-     * @param east   component or null to ignore
-     * @param west   component or null to ignore
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the center
+    /// east and west respectively
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: the center component
+    ///
+    /// - `east`: component or null to ignore
+    ///
+    /// - `west`: component or null to ignore
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container centerEastWest(Component center, Component east, Component west) {
         Container c;
         if (center != null) {
@@ -220,15 +213,20 @@ public class BorderLayout extends Layout {
         return c;
     }
 
-    /**
-     * Convenience method that creates a border layout absolute center container and places the given component in the center
-     * east and west respectively
-     *
-     * @param center the center component
-     * @param east   component or null to ignore
-     * @param west   component or null to ignore
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout absolute center container and places the given component in the center
+    /// east and west respectively
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: the center component
+    ///
+    /// - `east`: component or null to ignore
+    ///
+    /// - `west`: component or null to ignore
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container centerAbsoluteEastWest(Component center, Component east, Component west) {
         Container c;
         if (center != null) {
@@ -245,15 +243,20 @@ public class BorderLayout extends Layout {
         return c;
     }
 
-    /**
-     * Convenience method that creates a border layout center container and places the given component in the center
-     * east and west respectively with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
-     *
-     * @param center the center component
-     * @param east   component or null to ignore
-     * @param west   component or null to ignore
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout center container and places the given component in the center
+    /// east and west respectively with the `#CENTER_BEHAVIOR_CENTER` constraint applied
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: the center component
+    ///
+    /// - `east`: component or null to ignore
+    ///
+    /// - `west`: component or null to ignore
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container centerCenterEastWest(Component center, Component east, Component west) {
         Container c;
         if (center != null) {
@@ -270,15 +273,20 @@ public class BorderLayout extends Layout {
         return c;
     }
 
-    /**
-     * Convenience method that creates a border layout center container and places the given component in the center
-     * east and west respectively with the {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
-     *
-     * @param center the center component
-     * @param east   component or null to ignore
-     * @param west   component or null to ignore
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout center container and places the given component in the center
+    /// east and west respectively with the `#CENTER_BEHAVIOR_TOTAL_BELOW` constraint applied
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: the center component
+    ///
+    /// - `east`: component or null to ignore
+    ///
+    /// - `west`: component or null to ignore
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container centerTotalBelowEastWest(Component center, Component east, Component west) {
         Container c;
         if (center != null) {
@@ -295,82 +303,101 @@ public class BorderLayout extends Layout {
         return c;
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the center
-     * with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
-     *
-     * @param center the center component
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the center
+    /// with the `#CENTER_BEHAVIOR_CENTER` constraint applied
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: the center component
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container centerCenter(Component center) {
         return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER), center, BorderLayout.CENTER);
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the center
-     * with the {@link  #CENTER_BEHAVIOR_CENTER_ABSOLUTE} constraint applied
-     *
-     * @param center the center component
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the center
+    /// with the `#CENTER_BEHAVIOR_CENTER_ABSOLUTE` constraint applied
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: the center component
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container centerAbsolute(Component center) {
         return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE), center, BorderLayout.CENTER);
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the center
-     * with the {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
-     *
-     * @param center the center component
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the center
+    /// with the `#CENTER_BEHAVIOR_TOTAL_BELOW` constraint applied
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: the center component
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container centerTotalBelow(Component center) {
         return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_TOTAL_BELOW), center, BorderLayout.CENTER);
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the north
-     *
-     * @param north the north component
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the north
+    ///
+    /// #### Parameters
+    ///
+    /// - `north`: the north component
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container north(Component north) {
         return Container.encloseIn(new BorderLayout(), north, BorderLayout.NORTH);
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the south
-     *
-     * @param south the south component
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the south
+    ///
+    /// #### Parameters
+    ///
+    /// - `south`: the south component
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container south(Component south) {
         return Container.encloseIn(new BorderLayout(), south, BorderLayout.SOUTH);
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the east
-     *
-     * @param east the east component
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the east
+    ///
+    /// #### Parameters
+    ///
+    /// - `east`: the east component
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container east(Component east) {
         return Container.encloseIn(new BorderLayout(), east, BorderLayout.EAST);
     }
 
-    /**
-     * Convenience method that creates a border layout container and places the given component in the west
-     *
-     * @param west the west component
-     * @return the created component
-     */
+    /// Convenience method that creates a border layout container and places the given component in the west
+    ///
+    /// #### Parameters
+    ///
+    /// - `west`: the west component
+    ///
+    /// #### Returns
+    ///
+    /// the created component
     public static Container west(Component west) {
         return Container.encloseIn(new BorderLayout(), west, BorderLayout.WEST);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addLayoutComponent(Object name, Component comp, Container c) {
         // helper check for a common mistake...
@@ -431,9 +458,7 @@ public class BorderLayout extends Layout {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeLayoutComponent(Component comp) {
         if (comp == portraitCenter) { //NOPMD CompareObjectsWithEquals
@@ -451,12 +476,15 @@ public class BorderLayout extends Layout {
         }
     }
 
-    /**
-     * Returns the component constraint
-     *
-     * @param comp the component whose constraint is queried
-     * @return one of the constraints defined in this class
-     */
+    /// Returns the component constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `comp`: the component whose constraint is queried
+    ///
+    /// #### Returns
+    ///
+    /// one of the constraints defined in this class
     @Override
     public Object getComponentConstraint(Component comp) {
         if (comp == portraitCenter) { //NOPMD CompareObjectsWithEquals
@@ -477,9 +505,7 @@ public class BorderLayout extends Layout {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void layoutContainer(Container target) {
         Style s = target.getStyle();
@@ -627,9 +653,7 @@ public class BorderLayout extends Layout {
         }
     }
 
-    /**
-     * Position the east/west component variables
-     */
+    /// Position the east/west component variables
     private void positionLeftRight(Component c, int targetWidth, int bottom, int top) {
         int y = top + c.getStyle().getMarginTop();
         int h = bottom - top - c.getStyle().getMarginTop() - c.getStyle().getMarginBottom();
@@ -668,9 +692,7 @@ public class BorderLayout extends Layout {
         c.setHeight(Math.min(targetHeight, c.getPreferredH())); //verify I want to use tge prefered size
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getPreferredSize(Container parent) {
         dim.setWidth(0);
@@ -713,9 +735,7 @@ public class BorderLayout extends Layout {
         return !d.isPortrait();
     }
 
-    /**
-     * Returns the component at the given constraint
-     */
+    /// Returns the component at the given constraint
     private Component getComponentAtIgnoreLandscape(String constraint) {
         if (constraint != null) {
             if (NORTH.equals(constraint)) {
@@ -747,76 +767,75 @@ public class BorderLayout extends Layout {
         return noLandscape;
     }
 
-    /**
-     * Returns the component in the south location
-     *
-     * @return the component in the constraint
-     */
+    /// Returns the component in the south location
+    ///
+    /// #### Returns
+    ///
+    /// the component in the constraint
     public Component getSouth() {
         return getComponentImpl(portraitSouth, SOUTH);
     }
 
-    /**
-     * Returns the component in the center location
-     *
-     * @return the component in the constraint
-     */
+    /// Returns the component in the center location
+    ///
+    /// #### Returns
+    ///
+    /// the component in the constraint
     public Component getCenter() {
         return getComponentImpl(portraitCenter, CENTER);
     }
 
-    /**
-     * Returns the component in the north location
-     *
-     * @return the component in the constraint
-     */
+    /// Returns the component in the north location
+    ///
+    /// #### Returns
+    ///
+    /// the component in the constraint
     public Component getNorth() {
         return getComponentImpl(portraitNorth, NORTH);
     }
 
-    /**
-     * Returns the component in the east location
-     *
-     * @return the component in the constraint
-     */
+    /// Returns the component in the east location
+    ///
+    /// #### Returns
+    ///
+    /// the component in the constraint
     public Component getEast() {
         return getComponentImpl(portraitEast, EAST);
     }
 
-    /**
-     * Returns the component in the west location
-     *
-     * @return the component in the constraint
-     */
+    /// Returns the component in the west location
+    ///
+    /// #### Returns
+    ///
+    /// the component in the constraint
     public Component getWest() {
         return getComponentImpl(portraitWest, WEST);
     }
 
-    /**
-     * Returns overlay component.
-     *
-     * @return The overlay component.
-     */
+    /// Returns overlay component.
+    ///
+    /// #### Returns
+    ///
+    /// The overlay component.
     public Component getOverlay() {
         return overlay;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "BorderLayout";
     }
 
-    /**
-     * This method allows swapping positions within the border layout when the layout
-     * orientation changes to landscape or if the layout starts off as landscape.
-     *
-     * @param portraitPosition  the position for the component when in portrait (this position
-     *                          should always be used when adding a component to the layout). One of NORTH/SOUTH/EAST/WEST/CENTER.
-     * @param landscapePosition the destination position to use in landscape
-     */
+    /// This method allows swapping positions within the border layout when the layout
+    /// orientation changes to landscape or if the layout starts off as landscape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `portraitPosition`: @param portraitPosition  the position for the component when in portrait (this position
+    /// should always be used when adding a component to the layout). One of NORTH/SOUTH/EAST/WEST/CENTER.
+    ///
+    /// - `landscapePosition`: the destination position to use in landscape
     public void defineLandscapeSwap(String portraitPosition, String landscapePosition) {
         if (landscapeSwap == null) {
             landscapeSwap = new HashMap<String, String>();
@@ -825,13 +844,16 @@ public class BorderLayout extends Layout {
         landscapeSwap.put(landscapePosition, portraitPosition);
     }
 
-    /**
-     * Returns the landscape swap destination for the given border layout element if such
-     * a destination is defined.
-     *
-     * @param portraitPosition the constraint used when placing the component
-     * @return the constraint to use when in landscape or null if undefined
-     */
+    /// Returns the landscape swap destination for the given border layout element if such
+    /// a destination is defined.
+    ///
+    /// #### Parameters
+    ///
+    /// - `portraitPosition`: the constraint used when placing the component
+    ///
+    /// #### Returns
+    ///
+    /// the constraint to use when in landscape or null if undefined
     public String getLandscapeSwap(String portraitPosition) {
         if (landscapeSwap == null) {
             return null;
@@ -839,9 +861,7 @@ public class BorderLayout extends Layout {
         return landscapeSwap.get(portraitPosition);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         if (super.equals(o) && centerBehavior == ((BorderLayout) o).centerBehavior) {
@@ -860,22 +880,28 @@ public class BorderLayout extends Layout {
         return centerBehavior + (landscapeSwap == null ? 0 : landscapeSwap.hashCode());
     }
 
-    /**
-     * Indicates that the center shouldn't grow and should be placed exactly in the center of the layout
-     *
-     * @return the absoluteCenter
-     * @deprecated use center behavior instead
-     */
+    /// Indicates that the center shouldn't grow and should be placed exactly in the center of the layout
+    ///
+    /// #### Returns
+    ///
+    /// the absoluteCenter
+    ///
+    /// #### Deprecated
+    ///
+    /// use center behavior instead
     public boolean isAbsoluteCenter() {
         return centerBehavior == CENTER_BEHAVIOR_CENTER;
     }
 
-    /**
-     * Indicates that the center shouldn't grow and should be placed exactly in the center of the layout
-     *
-     * @param absoluteCenter the absoluteCenter to set
-     * @deprecated use center behavior instead
-     */
+    /// Indicates that the center shouldn't grow and should be placed exactly in the center of the layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `absoluteCenter`: the absoluteCenter to set
+    ///
+    /// #### Deprecated
+    ///
+    /// use center behavior instead
     public void setAbsoluteCenter(boolean absoluteCenter) {
         if (absoluteCenter) {
             setCenterBehavior(CENTER_BEHAVIOR_CENTER);
@@ -884,61 +910,55 @@ public class BorderLayout extends Layout {
         }
     }
 
-    /**
-     * Defines the behavior of the center component to one of the constants defined in this class
-     *
-     * @return the centerBehavior
-     */
+    /// Defines the behavior of the center component to one of the constants defined in this class
+    ///
+    /// #### Returns
+    ///
+    /// the centerBehavior
     public int getCenterBehavior() {
         return centerBehavior;
     }
 
-    /**
-     * Defines the behavior of the center component to one of the constants defined in this class
-     *
-     * @param centerBehavior the centerBehavior to set
-     */
+    /// Defines the behavior of the center component to one of the constants defined in this class
+    ///
+    /// #### Parameters
+    ///
+    /// - `centerBehavior`: the centerBehavior to set
     public void setCenterBehavior(int centerBehavior) {
         this.centerBehavior = centerBehavior;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isOverlapSupported() {
         return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELOW || overlay != null;
     }
 
-    /**
-     * Stretches the edge components (NORTH/EAST/WEST/SOUTH)
-     *
-     * @return the scaleEdges
-     */
+    /// Stretches the edge components (NORTH/EAST/WEST/SOUTH)
+    ///
+    /// #### Returns
+    ///
+    /// the scaleEdges
     public boolean isScaleEdges() {
         return scaleEdges;
     }
 
-    /**
-     * Stretches the edge components (NORTH/EAST/WEST/SOUTH)
-     *
-     * @param scaleEdges the scaleEdges to set
-     */
+    /// Stretches the edge components (NORTH/EAST/WEST/SOUTH)
+    ///
+    /// #### Parameters
+    ///
+    /// - `scaleEdges`: the scaleEdges to set
     public void setScaleEdges(boolean scaleEdges) {
         this.scaleEdges = scaleEdges;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isConstraintTracking() {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean obscuresPotential(Container parent) {
         return getCenter() != null;

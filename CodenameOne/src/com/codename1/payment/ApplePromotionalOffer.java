@@ -23,11 +23,9 @@
 
 package com.codename1.payment;
 
-/**
- * Encapsulates a promotional offer for use with in-app-purchase in Apple's App store.  This mirrors the information required to construct a <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount">SKPaymentDiscount</a> object.
- *
- * <p>See <a href="https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc">Apple's documentation for implementing promotional offers.</a></p>
- */
+/// Encapsulates a promotional offer for use with in-app-purchase in Apple's App store.  This mirrors the information required to construct a [SKPaymentDiscount](https://developer.apple.com/documentation/storekit/skpaymentdiscount) object.
+///
+/// See [Apple's documentation for implementing promotional offers.](https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc)
 public class ApplePromotionalOffer implements PromotionalOffer {
     private String offerIdentifier;
     private String keyIdentifier;
@@ -35,108 +33,110 @@ public class ApplePromotionalOffer implements PromotionalOffer {
     private String signature;
     private long timestamp;
 
-    /**
-     * A string used to uniquely identify a discount offer for a product.
-     * <p>
-     * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc">Apple docs</a>.
-     *
-     * @return The offer identifier.
-     */
+    /// A string used to uniquely identify a discount offer for a product.
+    ///
+    /// See [Apple docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc).
+    ///
+    /// #### Returns
+    ///
+    /// The offer identifier.
     public String getOfferIdentifier() {
         return offerIdentifier;
     }
 
-    /**
-     * A string used to uniquely identify a discount offer for a product.
-     *
-     * @param offerIdentifier The offer identifier.
-     *                        <p>
-     *                        See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc">Apple docs</a>.
-     */
+    /// A string used to uniquely identify a discount offer for a product.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offerIdentifier`: @param offerIdentifier The offer identifier.
+    ///
+    ///
+    /// See [Apple docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc).
     public void setOfferIdentifier(String offerIdentifier) {
         this.offerIdentifier = offerIdentifier;
     }
 
-    /**
-     * A string that identifies the key used to generate the signature.
-     * <p>
-     * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc">Apple's docs</a>.
-     *
-     * @return The key identifier.
-     */
+    /// A string that identifies the key used to generate the signature.
+    ///
+    /// See [Apple's docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc).
+    ///
+    /// #### Returns
+    ///
+    /// The key identifier.
     public String getKeyIdentifier() {
         return keyIdentifier;
     }
 
-    /**
-     * A string that identifies the key used to generate the signature.
-     *
-     * @param keyIdentifier The key identifier.
-     *                      <p>
-     *                      See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc">Apple's docs</a>.
-     */
+    /// A string that identifies the key used to generate the signature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyIdentifier`: @param keyIdentifier The key identifier.
+    ///
+    ///
+    /// See [Apple's docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc).
     public void setKeyIdentifier(String keyIdentifier) {
         this.keyIdentifier = keyIdentifier;
     }
 
-    /**
-     * A universally unique ID (UUID) value that you define. (As a string).
-     * <p>
-     * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043531-nonce?language=objc">Apple's docs</a>.
-     *
-     * @return The nonce
-     */
+    /// A universally unique ID (UUID) value that you define. (As a string).
+    ///
+    /// See [Apple's docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043531-nonce?language=objc).
+    ///
+    /// #### Returns
+    ///
+    /// The nonce
     public String getNonce() {
         return nonce;
     }
 
-    /**
-     * A universally unique ID (UUID) value that you define. (As a string).
-     * <p>
-     * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043531-nonce?language=objc">Apple's docs</a>.
-     *
-     * @param nonce The nonce
-     */
+    /// A universally unique ID (UUID) value that you define. (As a string).
+    ///
+    /// See [Apple's docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043531-nonce?language=objc).
+    ///
+    /// #### Parameters
+    ///
+    /// - `nonce`: The nonce
     public void setNonce(String nonce) {
         this.nonce = nonce;
     }
 
-    /**
-     * A string representing the properties of a specific promotional offer, cryptographically signed.
-     * <p>
-     * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043532-signature?language=objc">Apple's docs</a>
-     *
-     * @return The signature.
-     */
+    /// A string representing the properties of a specific promotional offer, cryptographically signed.
+    ///
+    /// See [Apple's docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043532-signature?language=objc)
+    ///
+    /// #### Returns
+    ///
+    /// The signature.
     public String getSignature() {
         return signature;
     }
 
-    /**
-     * A string representing the properties of a specific promotional offer, cryptographically signed.
-     * <p>
-     * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043532-signature?language=objc">Apple's docs</a>
-     *
-     * @param signature The signature.
-     */
+    /// A string representing the properties of a specific promotional offer, cryptographically signed.
+    ///
+    /// See [Apple's docs](https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043532-signature?language=objc)
+    ///
+    /// #### Parameters
+    ///
+    /// - `signature`: The signature.
     public void setSignature(String signature) {
         this.signature = signature;
     }
 
-    /**
-     * The date and time of the signature's creation in milliseconds, formatted in Unix epoch time.
-     *
-     * @return The timestamp
-     */
+    /// The date and time of the signature's creation in milliseconds, formatted in Unix epoch time.
+    ///
+    /// #### Returns
+    ///
+    /// The timestamp
     public long getTimestamp() {
         return timestamp;
     }
 
-    /**
-     * The date and time of the signature's creation in milliseconds, formatted in Unix epoch time.
-     *
-     * @param timestamp The timestamp.
-     */
+    /// The date and time of the signature's creation in milliseconds, formatted in Unix epoch time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timestamp`: The timestamp.
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }

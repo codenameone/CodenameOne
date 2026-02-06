@@ -24,43 +24,38 @@ package com.codename1.ui;
 
 import com.codename1.ui.plaf.Style;
 
-/**
- * A base class for images that dynamically painted, just like a normal component. Subclasses
- * just need to implement the {@link #drawImageImpl(com.codename1.ui.Graphics, java.lang.Object, int, int, int, int) }
- * method.
- *
- * @author shannah
- */
+/// A base class for images that dynamically painted, just like a normal component. Subclasses
+/// just need to implement the `java.lang.Object, int, int, int, int)`
+/// method.
+///
+/// @author shannah
 public abstract class DynamicImage extends Image {
 
     private int w = 250;
     private int h = 250;
     private Style style;
 
-    /**
-     * Constructor.  Creates image of default size: 250x250 pixels.
-     */
+    /// Constructor.  Creates image of default size: 250x250 pixels.
     public DynamicImage() {
         super(null);
     }
 
-    /**
-     * Constructor with width and height.
-     *
-     * @param w The width of the image.
-     * @param h The height of the image.
-     */
+    /// Constructor with width and height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: The width of the image.
+    ///
+    /// - `h`: The height of the image.
     public DynamicImage(int w, int h) {
         super(null);
         this.w = w;
         this.h = h;
     }
 
-    /**
-     * Sets the given image as the icon for the specified label.  This will link the
-     * label's style with the image just before each call the {@link #drawImageImpl(com.codename1.ui.Graphics, java.lang.Object, int, int, int, int) }
-     * so that the image can correctly adapt to the label's style.
-     */
+    /// Sets the given image as the icon for the specified label.  This will link the
+    /// label's style with the image just before each call the `java.lang.Object, int, int, int, int)`
+    /// so that the image can correctly adapt to the label's style.
     public static void setIcon(final Label lbl, final DynamicImage img) {
 
         DynamicImage wrapper = new DynamicImage() {
@@ -77,53 +72,41 @@ public abstract class DynamicImage extends Image {
         lbl.setIcon(wrapper);
     }
 
-    /**
-     * Gets the style for this image.
-     *
-     * @return
-     */
+    /// Gets the style for this image.
     public Style getStyle() {
         return style;
     }
 
-    /**
-     * Sets the style to be used for drawing the image.  The {@link #drawImageImpl(com.codename1.ui.Graphics, java.lang.Object, int, int, int, int) }
-     * can use any aspect of this style to customize the drawing.
-     *
-     * @param s The style.
-     */
+    /// Sets the style to be used for drawing the image.  The `java.lang.Object, int, int, int, int)`
+    /// can use any aspect of this style to customize the drawing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The style.
     public void setStyle(Style s) {
         style = s == null ? null : new Style(s);
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public int getWidth() {
         return w;
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public int getHeight() {
         return h;
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public void scale(int width, int height) {
         w = width;
         h = height;
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public Image fill(int width, int height) {
         try {
@@ -137,9 +120,7 @@ public abstract class DynamicImage extends Image {
         }
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public Image applyMask(Object mask) {
         return fill(w, h);
@@ -150,30 +131,31 @@ public abstract class DynamicImage extends Image {
         return true;
     }
 
-    /**
-     * This method should be overridden by subclasses to perform the actual drawing of
-     * the image on a graphics context.
-     *
-     * @param g              The graphics context
-     * @param nativeGraphics THe native graphics context.
-     * @param x              x-coordinate of the bounds to draw.
-     * @param y              y-coordinate of the bounds to draw.
-     * @param w              width of the bounds
-     * @param h              height of the bounds
-     */
+    /// This method should be overridden by subclasses to perform the actual drawing of
+    /// the image on a graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics context
+    ///
+    /// - `nativeGraphics`: THe native graphics context.
+    ///
+    /// - `x`: x-coordinate of the bounds to draw.
+    ///
+    /// - `y`: y-coordinate of the bounds to draw.
+    ///
+    /// - `w`: width of the bounds
+    ///
+    /// - `h`: height of the bounds
     protected abstract void drawImageImpl(Graphics g, Object nativeGraphics, int x, int y, int w, int h);
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         drawImageImpl(g, nativeGraphics, x, y, w, h);
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         drawImageImpl(g, nativeGraphics, x, y, w, h);

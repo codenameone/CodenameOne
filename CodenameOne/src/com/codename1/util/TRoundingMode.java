@@ -17,90 +17,71 @@
 
 package com.codename1.util;
 
-/**
- * Specifies the rounding behavior for operations whose results cannot be
- * represented exactly.
- */
+/// Specifies the rounding behavior for operations whose results cannot be
+/// represented exactly.
 enum TRoundingMode {
 
-    /**
-     * Rounding mode where positive values are rounded towards positive infinity
-     * and negative values towards negative infinity.
-     * <br>
-     * Rule: {@code x.round().abs() >= x.abs()}
-     */
+    /// Rounding mode where positive values are rounded towards positive infinity
+    /// and negative values towards negative infinity.
+    ///
+    /// Rule: `x.round().abs() >= x.abs()`
     UP(TBigDecimal.ROUND_UP),
 
-    /**
-     * Rounding mode where the values are rounded towards zero.
-     * <br>
-     * Rule: {@code x.round().abs() <= x.abs()}
-     */
+    /// Rounding mode where the values are rounded towards zero.
+    ///
+    /// Rule: `x.round().abs() <= x.abs()`
     DOWN(TBigDecimal.ROUND_DOWN),
 
-    /**
-     * Rounding mode to round towards positive infinity. For positive values
-     * this rounding mode behaves as {@link #UP}, for negative values as
-     * {@link #DOWN}.
-     * <br>
-     * Rule: {@code x.round() >= x}
-     */
+    /// Rounding mode to round towards positive infinity. For positive values
+    /// this rounding mode behaves as `#UP`, for negative values as
+    /// `#DOWN`.
+    ///
+    /// Rule: `x.round() >= x`
     CEILING(TBigDecimal.ROUND_CEILING),
 
-    /**
-     * Rounding mode to round towards negative infinity. For positive values
-     * this rounding mode behaves as {@link #DOWN}, for negative values as
-     * {@link #UP}.
-     * <br>
-     * Rule: {@code x.round() <= x}
-     */
+    /// Rounding mode to round towards negative infinity. For positive values
+    /// this rounding mode behaves as `#DOWN`, for negative values as
+    /// `#UP`.
+    ///
+    /// Rule: `x.round() <= x`
     FLOOR(TBigDecimal.ROUND_FLOOR),
 
-    /**
-     * Rounding mode where values are rounded towards the nearest neighbor. Ties
-     * are broken by rounding up.
-     */
+    /// Rounding mode where values are rounded towards the nearest neighbor. Ties
+    /// are broken by rounding up.
     HALF_UP(TBigDecimal.ROUND_HALF_UP),
 
-    /**
-     * Rounding mode where values are rounded towards the nearest neighbor. Ties
-     * are broken by rounding down.
-     */
+    /// Rounding mode where values are rounded towards the nearest neighbor. Ties
+    /// are broken by rounding down.
     HALF_DOWN(TBigDecimal.ROUND_HALF_DOWN),
 
-    /**
-     * Rounding mode where values are rounded towards the nearest neighbor. Ties
-     * are broken by rounding to the even neighbor.
-     */
+    /// Rounding mode where values are rounded towards the nearest neighbor. Ties
+    /// are broken by rounding to the even neighbor.
     HALF_EVEN(TBigDecimal.ROUND_HALF_EVEN),
 
-    /**
-     * Rounding mode where the rounding operations throws an ArithmeticException
-     * for the case that rounding is necessary, i.e. for the case that the value
-     * cannot be represented exactly.
-     */
+    /// Rounding mode where the rounding operations throws an ArithmeticException
+    /// for the case that rounding is necessary, i.e. for the case that the value
+    /// cannot be represented exactly.
     UNNECESSARY(TBigDecimal.ROUND_UNNECESSARY);
 
-    /**
-     * The old constant of <code>BigDecimal</code>.
-     */
+    /// The old constant of `BigDecimal`.
     @SuppressWarnings({"unused", "PMD.SingularField"})
     private final int bigDecimalRM;
 
-    /**
-     * It sets the old constant.
-     */
+    /// It sets the old constant.
     TRoundingMode(int rm) {
         bigDecimalRM = rm;
     }
 
-    /**
-     * Converts rounding mode constants from class {@code BigDecimal} into
-     * {@code RoundingMode} values.
-     *
-     * @param mode rounding mode constant as defined in class {@code BigDecimal}
-     * @return corresponding rounding mode object
-     */
+    /// Converts rounding mode constants from class `BigDecimal` into
+    /// `RoundingMode` values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mode`: rounding mode constant as defined in class `BigDecimal`
+    ///
+    /// #### Returns
+    ///
+    /// corresponding rounding mode object
     public static TRoundingMode valueOf(int mode) {
         switch (mode) {
             case TBigDecimal.ROUND_CEILING:

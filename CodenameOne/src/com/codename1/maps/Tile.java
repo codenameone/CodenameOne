@@ -27,13 +27,11 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Point;
 import com.codename1.ui.plaf.UIManager;
 
-/**
- * This class represents a single tile on a map.
- * a map is been constructed from a few tiles that are been tiled on next to the
- * other.
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This class represents a single tile on a map.
+/// a map is been constructed from a few tiles that are been tiled on next to the
+/// other.
+///
+/// @author Roman Kamyk
 public class Tile {
 
     private static final Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
@@ -45,13 +43,15 @@ public class Tile {
     private final Image tileImage;
     private ActionListener listener;
 
-    /**
-     * Creates a new Tile.
-     *
-     * @param dimension      the tile Dimensions (usually 256x256)
-     * @param getBoundingBox the bounding box this tile is showing
-     * @param image          the map image or null.
-     */
+    /// Creates a new Tile.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dimension`: the tile Dimensions (usually 256x256)
+    ///
+    /// - `getBoundingBox`: the bounding box this tile is showing
+    ///
+    /// - `image`: the map image or null.
     public Tile(Dimension dimension, BoundingBox boundingBox, Image image) {
         this.dimension = dimension;
         bbox = boundingBox;
@@ -60,44 +60,47 @@ public class Tile {
         tileLoadingText = UIManager.getInstance().getThemeConstant("mapTileLoadingText", "Loading...");
     }
 
-    /**
-     * This flag indicates if the Tile should paint a Loading image or Text or
-     * simply not do any painting if a map image is not ready for painting
-     *
-     * @param if true a Loading rect is displayed when map image is being
-     *           downloaded
-     */
+    /// This flag indicates if the Tile should paint a Loading image or Text or
+    /// simply not do any painting if a map image is not ready for painting
+    ///
+    /// #### Parameters
+    ///
+    /// - `if`: @param if true a Loading rect is displayed when map image is being
+    /// downloaded
     public static void setPaintLoading(boolean toPaint) {
         paintLoading = toPaint;
     }
 
-    /**
-     * Sets a static image that will be drawn on the map if the tile image is
-     * not available yet.
-     *
-     * @param tileLoadingImage
-     */
+    /// Sets a static image that will be drawn on the map if the tile image is
+    /// not available yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tileLoadingImage`
     public static void setTileLoadingImage(Image tileLoadingImage) {
         Tile.tileLoadingImage = tileLoadingImage;
     }
 
-    /**
-     * Sets a static text to paint.
-     * This will be used if the map if the tile image is not available yet and
-     * the tileLoadingImage is null
-     *
-     * @param tileLoadingText
-     */
+    /// Sets a static text to paint.
+    /// This will be used if the map if the tile image is not available yet and
+    /// the tileLoadingImage is null
+    ///
+    /// #### Parameters
+    ///
+    /// - `tileLoadingText`
     public static void setTileLoadingText(String tileLoadingText) {
         Tile.tileLoadingText = tileLoadingText;
     }
 
-    /**
-     * Returns the x, y point of the given coordinate relative to this tile
-     *
-     * @param point a coordinate to translate to x, y
-     * @return a Point object relative to this tile
-     */
+    /// Returns the x, y point of the given coordinate relative to this tile
+    ///
+    /// #### Parameters
+    ///
+    /// - `point`: a coordinate to translate to x, y
+    ///
+    /// #### Returns
+    ///
+    /// a Point object relative to this tile
     public Point pointPosition(Coord point) {
         int x = position(dimension.getWidth(), point.getLongitude(),
                 bbox.getSouthWest().getLongitude(), bbox.getNorthEast().getLongitude());
@@ -115,43 +118,50 @@ public class Tile {
         return x1 + percent * (x2 - x1);
     }
 
-    /**
-     * Returns the Coordinate of the given x, y position on the tile
-     *
-     * @param posX
-     * @param posY
-     * @return a Coordinate that was created from the given x, y position
-     */
+    /// Returns the Coordinate of the given x, y position on the tile
+    ///
+    /// #### Parameters
+    ///
+    /// - `posX`
+    ///
+    /// - `posY`
+    ///
+    /// #### Returns
+    ///
+    /// a Coordinate that was created from the given x, y position
     public Coord position(int posX, int posY) {
         double longitude = coord(1.0 * posX / dimension.getWidth(), bbox.getSouthWest().getLongitude(), bbox.getNorthEast().getLongitude());
         double latitude = coord(1.0 * posY / dimension.getHeight(), bbox.getSouthWest().getLatitude(), bbox.getNorthEast().getLatitude());
         return new Coord(latitude, longitude, bbox.getSouthWest().isProjected());
     }
 
-    /**
-     * Gets the tile dimension
-     *
-     * @return the tile dimension
-     */
+    /// Gets the tile dimension
+    ///
+    /// #### Returns
+    ///
+    /// the tile dimension
     public Dimension dimension() {
         return dimension;
     }
 
-    /**
-     * Gets the tile bounding box.
-     *
-     * @return the tile bounding box.
-     */
+    /// Gets the tile bounding box.
+    ///
+    /// #### Returns
+    ///
+    /// the tile bounding box.
     public BoundingBox getBoundingBox() {
         return bbox;
     }
 
-    /**
-     * Paints the tile on the Graphics Object
-     *
-     * @param g Graphics object to paint on.
-     * @return true if painting succeeded.
-     */
+    /// Paints the tile on the Graphics Object
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: Graphics object to paint on.
+    ///
+    /// #### Returns
+    ///
+    /// true if painting succeeded.
     public boolean paint(Graphics g) {
         if (tileImage != null) {
             g.drawImage(tileImage, 0, 0);
@@ -160,15 +170,17 @@ public class Tile {
         return false;
     }
 
-    /**
-     * Paints the tile on the Graphics Object translated to the given x, y,
-     * This method paints the tile image if available or will call
-     * paintTileLoading
-     *
-     * @param g Graphics object to paint on.
-     * @param x translate to x before painting
-     * @param y translate to y before painting
-     */
+    /// Paints the tile on the Graphics Object translated to the given x, y,
+    /// This method paints the tile image if available or will call
+    /// paintTileLoading
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: Graphics object to paint on.
+    ///
+    /// - `x`: translate to x before painting
+    ///
+    /// - `y`: translate to y before painting
     public void paint(Graphics g, int x, int y) {
         g.translate(x, y);
         if (!paint(g) && paintLoading) {
@@ -177,12 +189,12 @@ public class Tile {
         g.translate(-x, -y);
     }
 
-    /**
-     * This method paints a "tile loading" on the Graphics if
-     * boolean paint(Graphics g) returned false.
-     *
-     * @param g Graphics object to paint on.
-     */
+    /// This method paints a "tile loading" on the Graphics if
+    /// boolean paint(Graphics g) returned false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: Graphics object to paint on.
     public void paintTileLoading(Graphics g) {
         if (tileLoadingImage == null) {
             paintLoadingText(g);
@@ -209,27 +221,23 @@ public class Tile {
         }
     }
 
-    /**
-     * Sets a Listener to be notified when the tile is fireReady to be painted
-     *
-     * @param listener
-     */
+    /// Sets a Listener to be notified when the tile is fireReady to be painted
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`
     public void setsTileReadyListener(ActionListener listener) {
         this.listener = listener;
     }
 
-    /**
-     * inform the TileReadyListener that this tile is ready to be painted
-     */
+    /// inform the TileReadyListener that this tile is ready to be painted
     protected void fireReady() {
         if (listener != null) {
             listener.actionPerformed(null);
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return getClass().getName() + " dimension: " + dimension + " bbox: " + bbox;

@@ -25,19 +25,18 @@ package com.codename1.ui.events;
 
 import com.codename1.ui.plaf.Style;
 
-/**
- * Invoked to indicate a change in a {@link Style} property
- *
- * @author Chen Fishbein
- */
+/// Invoked to indicate a change in a `Style` property
+///
+/// @author Chen Fishbein
 public interface StyleListener {
 
-    /**
-     * Invoked to indicate a change in a propertyName of a Style
-     *
-     * @param propertyName the property name that was changed
-     * @param source       The changed Style object
-     */
+    /// Invoked to indicate a change in a propertyName of a Style
+    ///
+    /// #### Parameters
+    ///
+    /// - `propertyName`: the property name that was changed
+    ///
+    /// - `source`: The changed Style object
     void styleChanged(String propertyName, Style source);
 
 }

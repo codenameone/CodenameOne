@@ -17,52 +17,48 @@
 
 package com.codename1.util.regex;
 
-/**
- * Encapsulates String as CharacterIterator.
- *
- * @author <a href="mailto:ales.novak@netbeans.com">Ales Novak</a>
- * @version CVS $Id: StringCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
- */
+/// Encapsulates String as CharacterIterator.
+///
+/// @author [Ales Novak](mailto:ales.novak@netbeans.com)
+/// @version CVS $Id: StringCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public final class StringCharacterIterator implements CharacterIterator {
-    /**
-     * encapsulated
-     */
+    /// encapsulated
     private final String src;
 
-    /**
-     * @param src - encapsulated String
-     */
+    /// #### Parameters
+    ///
+    /// - `src`: - encapsulated String
     public StringCharacterIterator(String src) {
         this.src = src;
     }
 
-    /**
-     * @return a substring
-     */
+    /// #### Returns
+    ///
+    /// a substring
     @Override
     public String substring(int beginIndex, int endIndex) {
         return src.substring(beginIndex, endIndex);
     }
 
-    /**
-     * @return a substring
-     */
+    /// #### Returns
+    ///
+    /// a substring
     @Override
     public String substring(int beginIndex) {
         return src.substring(beginIndex);
     }
 
-    /**
-     * @return a character at the specified position.
-     */
+    /// #### Returns
+    ///
+    /// a character at the specified position.
     @Override
     public char charAt(int pos) {
         return src.charAt(pos);
     }
 
-    /**
-     * @return <tt>true</tt> iff if the specified index is after the end of the character stream
-     */
+    /// #### Returns
+    ///
+    /// true iff if the specified index is after the end of the character stream
     @Override
     public boolean isEnd(int pos) {
         return (pos >= src.length());

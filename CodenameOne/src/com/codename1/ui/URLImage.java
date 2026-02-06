@@ -41,44 +41,115 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * <p>{@code URLImage} allows us to create an image from a URL. If the image was downloaded
- * already it is fetched from cache; if not it is downloaded optionally scaled/adapted
- * and placed in cache.</p>
- * <p>By default an image is fetched lazily as it is asked for by the GUI unless
- * the fetch() method is invoked in which case the IO code is executed immediately.</p>
- *
- * <p>
- * This sample code show a {@code URLImage} that is fetched to the title area background and scaled/cropped
- * to fit device specific dimensions.
- * </p>
- * <script src="https://gist.github.com/codenameone/085e3a8fa1c36829d812.js"></script>
- *
- * <p>
- * This sample code shows the usage of the nestoria API to fill out an infinitely scrolling list in it
- * we use {@code URLImage} to fetch the icon.
- * </p>
- * <script src="https://gist.github.com/codenameone/af27af111ba766627363.js"></script>
- *
- * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" /><br><br>
- *
- * <p>
- * You can use adapters with masks using syntax similar to this to create a round image mask for a {@code URLImage}:
- * </p>
- * <script src="https://gist.github.com/codenameone/2515be7528ef3e402ec0.js"></script>
- *
- * @author Shai Almog
- */
+/// `URLImage` allows us to create an image from a URL. If the image was downloaded
+/// already it is fetched from cache; if not it is downloaded optionally scaled/adapted
+/// and placed in cache.
+///
+/// By default an image is fetched lazily as it is asked for by the GUI unless
+/// the fetch() method is invoked in which case the IO code is executed immediately.
+///
+/// This sample code show a `URLImage` that is fetched to the title area background and scaled/cropped
+/// to fit device specific dimensions.
+///
+/// ```java
+/// Toolbar.setGlobalToolbar(true);
+///
+/// Form hi = new Form("Toolbar", new BoxLayout(BoxLayout.Y_AXIS));
+/// EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(hi.getWidth(), hi.getWidth() / 5, 0xffff0000), true);
+/// URLImage background = URLImage.createToStorage(placeholder, "400px-AGameOfThrones.jpg",
+///         "http://awoiaf.westeros.org/images/thumb/9/93/AGameOfThrones.jpg/400px-AGameOfThrones.jpg");
+/// background.fetch();
+/// Style stitle = hi.getToolbar().getTitleComponent().getUnselectedStyle();
+/// stitle.setBgImage(background);
+/// stitle.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
+/// stitle.setPaddingUnit(Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS);
+/// stitle.setPaddingTop(15);
+/// SpanButton credit = new SpanButton("This excerpt is from A Wiki Of Ice And Fire. Please check it out by clicking here!");
+/// credit.addActionListener((e) -> Display.getInstance().execute("http://awoiaf.westeros.org/index.php/A_Game_of_Thrones"));
+/// hi.add(new SpanLabel("A Game of Thrones is the first of seven planned novels in A Song of Ice and Fire, an epic fantasy series by American author George R. R. Martin. It was first published on 6 August 1996. The novel was nominated for the 1998 Nebula Award and the 1997 World Fantasy Award,[1] and won the 1997 Locus Award.[2] The novella Blood of the Dragon, comprising the Daenerys Targaryen chapters from the novel, won the 1997 Hugo Award for Best Novella. ")).
+///         add(new Label("Plot introduction", "Heading")).
+///         add(new SpanLabel("A Game of Thrones is set in the Seven Kingdoms of Westeros, a land reminiscent of Medieval Europe. In Westeros the seasons last for years, sometimes decades, at a time.\n\n" +
+///             "Fifteen years prior to the novel, the Seven Kingdoms were torn apart by a civil war, known alternately as \"Robert's Rebellion\" and the \"War of the Usurper.\" Prince Rhaegar Targaryen kidnapped Lyanna Stark, arousing the ire of her family and of her betrothed, Lord Robert Baratheon (the war's titular rebel). The Mad King, Aerys II Targaryen, had Lyanna's father and eldest brother executed when they demanded her safe return. Her second brother, Eddard, joined his boyhood friend Robert Baratheon and Jon Arryn, with whom they had been fostered as children, in declaring war against the ruling Targaryen dynasty, securing the allegiances of House Tully and House Arryn through a network of dynastic marriages (Lord Eddard to Catelyn Tully and Lord Arryn to Lysa Tully). The powerful House Tyrell continued to support the King, but House Lannister and House Martell both stalled due to insults against their houses by the Targaryens. The civil war climaxed with the Battle of the Trident, when Prince Rhaegar was killed in battle by Robert Baratheon. The Lannisters finally agreed to support King Aerys, but then brutally... ")).
+///         add(credit);
+///
+/// ComponentAnimation title = hi.getToolbar().getTitleComponent().createStyleAnimation("Title", 200);
+/// hi.getAnimationManager().onTitleScrollAnimation(title);
+/// hi.show();
+/// ```
+///
+/// This sample code shows the usage of the nestoria API to fill out an infinitely scrolling list in it
+/// we use `URLImage` to fetch the icon.
+///
+/// ```java
+/// public void showForm() {
+///     Form hi = new Form("InfiniteScrollAdapter", new BoxLayout(BoxLayout.Y_AXIS));
+///
+///     Style s = UIManager.getInstance().getComponentStyle("MultiLine1");
+///     FontImage p = FontImage.createMaterial(FontImage.MATERIAL_PORTRAIT, s);
+///     EncodedImage placeholder = EncodedImage.createFromImage(p.scaled(p.getWidth() * 3, p.getHeight() * 3), false);
+///
+///     InfiniteScrollAdapter.createInfiniteScroll(hi.getContentPane(), () -> {
+///         java.util.List> data = fetchPropertyData("Leeds");
+///         MultiButton[] cmps = new MultiButton[data.size()];
+///         for(int iter = 0 ; iter  currentListing = data.get(iter);
+///             if(currentListing == null) {
+///                 InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), new Component[0], false);
+///                 return;
+///             }
+///             String thumb_url = (String)currentListing.get("thumb_url");
+///             String guid = (String)currentListing.get("guid");
+///             String summary = (String)currentListing.get("summary");
+///             cmps[iter] = new MultiButton(summary);
+///             cmps[iter].setIcon(URLImage.createToStorage(placeholder, guid, thumb_url));
+///         }
+///         InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), cmps, true);
+///     }, true);
+///     hi.show();
+/// }
+/// int pageNumber = 1;
+/// java.util.List> fetchPropertyData(String text) {
+///     try {
+///         ConnectionRequest r = new ConnectionRequest();
+///         r.setPost(false);
+///         r.setUrl("http://api.nestoria.co.uk/api");
+///         r.addArgument("pretty", "0");
+///         r.addArgument("action", "search_listings");
+///         r.addArgument("encoding", "json");
+///         r.addArgument("listing_type", "buy");
+///         r.addArgument("page", "" + pageNumber);
+///         pageNumber++;
+///         r.addArgument("country", "uk");
+///         r.addArgument("place_name", text);
+///         NetworkManager.getInstance().addToQueueAndWait(r);
+///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), "UTF-8"));
+///         Map response = (Map)result.get("response");
+///         return (java.util.List>)response.get("listings");
+///     } catch(Exception err) {
+///         Log.e(err);
+///         return null;
+///     }
+/// }
+/// ```
+///
+/// You can use adapters with masks using syntax similar to this to create a round image mask for a `URLImage`:
+///
+/// ```java
+/// Image roundMask = Image.createImage(placeholder.getWidth(), placeholder.getHeight(), 0xff000000);
+/// Graphics gr = roundMask.getGraphics();
+/// gr.setColor(0xffffff);
+/// gr.fillArc(0, 0, placeholder.getWidth(), placeholder.getHeight(), 0, 360);
+///
+/// URLImage.ImageAdapter ada = URLImage.createMaskAdapter(roundMask);
+/// Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "http://xxx/myurl.jpg", ada);
+/// ```
+///
+/// @author Shai Almog
 public final class URLImage extends EncodedImage {
 
-    /**
-     * Flag used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }.
-     * Equivalent to {@link #RESIZE_FAIL}
-     */
+    /// Flag used by `java.lang.String, com.codename1.ui.Image, int)`.
+    /// Equivalent to `#RESIZE_FAIL`
     public static final int FLAG_RESIZE_FAIL = 3;
-    /**
-     * Will fail if the downloaded image has a different size from the placeholder image
-     */
+    /// Will fail if the downloaded image has a different size from the placeholder image
     public static final ImageAdapter RESIZE_FAIL = new ImageAdapter() {
         @Override
         public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
@@ -93,14 +164,10 @@ public final class URLImage extends EncodedImage {
             return false;
         }
     };
-    /**
-     * Flag used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }
-     * Equivalent to {@link #RESIZE_SCALE}.
-     */
+    /// Flag used by `java.lang.String, com.codename1.ui.Image, int)`
+    /// Equivalent to `#RESIZE_SCALE`.
     public static final int FLAG_RESIZE_SCALE = 1;
-    /**
-     * Scales the image to match the size of the new image exactly
-     */
+    /// Scales the image to match the size of the new image exactly
     public static final ImageAdapter RESIZE_SCALE = new ImageAdapter() {
         @Override
         public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
@@ -115,22 +182,16 @@ public final class URLImage extends EncodedImage {
             return false;
         }
     };
-    /**
-     * Flag used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }.
-     * Equivalent to {@link #RESIZE_SCALE_TO_FILL}.
-     */
+    /// Flag used by `java.lang.String, com.codename1.ui.Image, int)`.
+    /// Equivalent to `#RESIZE_SCALE_TO_FILL`.
     public static final int FLAG_RESIZE_SCALE_TO_FILL = 2;
-    /**
-     * Scales the image to match to fill the area while preserving aspect ratio
-     */
+    /// Scales the image to match to fill the area while preserving aspect ratio
     public static final ImageAdapter RESIZE_SCALE_TO_FILL = new ScaleToFill();
     private static final Map<String, URLImage> pendingToStorage = new HashMap<String, URLImage>();
     private static final Map<String, URLImage> pendingToFile = new HashMap<String, URLImage>();
     private static final String IMAGE_SUFFIX = "ImageURLTMP";
     private static final EasyThread imageLoader = EasyThread.start("ImageLoader");
-    /**
-     * The exception handler is used for callbacks in case of an error
-     */
+    /// The exception handler is used for callbacks in case of an error
     private static ErrorCallback exceptionHandler;
     private final EncodedImage placeholder;
     private final String url;
@@ -151,36 +212,49 @@ public final class URLImage extends EncodedImage {
         this.fileSystemFile = fileSystemFile;
     }
 
-    /**
-     * The exception handler is used for callbacks in case of an error
-     *
-     * @return the exceptionHandler
-     */
+    /// The exception handler is used for callbacks in case of an error
+    ///
+    /// #### Returns
+    ///
+    /// the exceptionHandler
     public static ErrorCallback getExceptionHandler() {
         return exceptionHandler;
     }
 
-    /**
-     * The exception handler is used for callbacks in case of an error
-     *
-     * @param aExceptionHandler the exceptionHandler to set
-     */
+    /// The exception handler is used for callbacks in case of an error
+    ///
+    /// #### Parameters
+    ///
+    /// - `aExceptionHandler`: the exceptionHandler to set
     public static void setExceptionHandler(
             ErrorCallback aExceptionHandler) {
         exceptionHandler = aExceptionHandler;
     }
 
-    /**
-     * <p>Creates an adapter that uses an image as a Mask, this is roughly the same as SCALE_TO_FILL with the
-     * exception that a mask will be applied later on. This adapter requires that the resulting image be in the size
-     * of the imageMask!<br>
-     * See the sample usage code below that implements a circular image masked downloader:</p>
-     * <script src="https://gist.github.com/codenameone/2515be7528ef3e402ec0.js"></script>
-     *
-     * @param imageMask the mask image see the createMask() method of image for details of what a mask is, it
-     *                  will be used as the reference size for the image and resulting images must be of the same size!
-     * @return the adapter
-     */
+    /// Creates an adapter that uses an image as a Mask, this is roughly the same as SCALE_TO_FILL with the
+    /// exception that a mask will be applied later on. This adapter requires that the resulting image be in the size
+    /// of the imageMask!
+    ///
+    /// See the sample usage code below that implements a circular image masked downloader:
+    ///
+    /// ```java
+    /// Image roundMask = Image.createImage(placeholder.getWidth(), placeholder.getHeight(), 0xff000000);
+    /// Graphics gr = roundMask.getGraphics();
+    /// gr.setColor(0xffffff);
+    /// gr.fillArc(0, 0, placeholder.getWidth(), placeholder.getHeight(), 0, 360);
+    ///
+    /// URLImage.ImageAdapter ada = URLImage.createMaskAdapter(roundMask);
+    /// Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "http://xxx/myurl.jpg", ada);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageMask`: @param imageMask the mask image see the createMask() method of image for details of what a mask is, it
+    /// will be used as the reference size for the image and resulting images must be of the same size!
+    ///
+    /// #### Returns
+    ///
+    /// the adapter
     public static ImageAdapter createMaskAdapter(Image imageMask) {
         final Object mask = imageMask.createMask();
         return new ScaleToFill() {
@@ -200,31 +274,42 @@ public final class URLImage extends EncodedImage {
         };
     }
 
-    /**
-     * Creates an image the will be downloaded on the fly as necessary with RESIZE_SCALE_TO_FILL as
-     * the default behavior
-     *
-     * @param placeholder the image placeholder is shown as the image is loading/downloading
-     *                    and serves as the guideline to the size of the downloaded image.
-     * @param storageFile the file in storage to which the image will be stored
-     * @param url         the url from which the image is fetched
-     * @return a URLImage that will initialy just delegate to the placeholder
-     */
+    /// Creates an image the will be downloaded on the fly as necessary with RESIZE_SCALE_TO_FILL as
+    /// the default behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
+    /// and serves as the guideline to the size of the downloaded image.
+    ///
+    /// - `storageFile`: the file in storage to which the image will be stored
+    ///
+    /// - `url`: the url from which the image is fetched
+    ///
+    /// #### Returns
+    ///
+    /// a URLImage that will initialy just delegate to the placeholder
     public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url) {
         return createToStorage(placeholder, storageFile, url, RESIZE_SCALE_TO_FILL);
     }
 
-    /**
-     * Creates an image the will be downloaded on the fly as necessary
-     *
-     * @param placeholder the image placeholder is shown as the image is loading/downloading
-     *                    and serves as the guideline to the size of the downloaded image.
-     * @param storageFile the file in storage to which the image will be stored
-     * @param url         the url from which the image is fetched
-     * @param adapter     the adapter used to adapt the image into place, it should scale the image
-     *                    if necessary
-     * @return a URLImage that will initialy just delegate to the placeholder
-     */
+    /// Creates an image the will be downloaded on the fly as necessary
+    ///
+    /// #### Parameters
+    ///
+    /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
+    /// and serves as the guideline to the size of the downloaded image.
+    ///
+    /// - `storageFile`: the file in storage to which the image will be stored
+    ///
+    /// - `url`: the url from which the image is fetched
+    ///
+    /// - `adapter`: @param adapter     the adapter used to adapt the image into place, it should scale the image
+    /// if necessary
+    ///
+    /// #### Returns
+    ///
+    /// a URLImage that will initialy just delegate to the placeholder
     public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url, ImageAdapter adapter) {
         // intern is used to trigger an NPE in case of a null URL or storage file
         URLImage out = pendingToStorage.get(storageFile);
@@ -236,17 +321,23 @@ public final class URLImage extends EncodedImage {
         return out;
     }
 
-    /**
-     * Creates an image the will be downloaded on the fly as necessary
-     *
-     * @param placeholder the image placeholder is shown as the image is loading/downloading
-     *                    and serves as the guideline to the size of the downloaded image.
-     * @param file        the file in the file system to which the image will be stored
-     * @param url         the url from which the image is fetched
-     * @param adapter     the adapter used to adapt the image into place, it should scale the image
-     *                    if necessary
-     * @return a URLImage that will initialy just delegate to the placeholder
-     */
+    /// Creates an image the will be downloaded on the fly as necessary
+    ///
+    /// #### Parameters
+    ///
+    /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
+    /// and serves as the guideline to the size of the downloaded image.
+    ///
+    /// - `file`: the file in the file system to which the image will be stored
+    ///
+    /// - `url`: the url from which the image is fetched
+    ///
+    /// - `adapter`: @param adapter     the adapter used to adapt the image into place, it should scale the image
+    /// if necessary
+    ///
+    /// #### Returns
+    ///
+    /// a URLImage that will initialy just delegate to the placeholder
     public static URLImage createToFileSystem(EncodedImage placeholder, String file, String url, ImageAdapter adapter) {
         // intern is used to trigger an NPE in case of a null URL or storage file
         URLImage out = pendingToFile.get(file);
@@ -258,20 +349,26 @@ public final class URLImage extends EncodedImage {
         return out;
     }
 
-    /**
-     * Creates an image that will be downloaded on the fly as necessary.  On platforms that support a native
-     * image cache (e.g. Javascript), the image will be loaded directly from the native cache (i.e. it defers to the
-     * platform to handle all caching considerations.  On platforms that don't have a native image cache but
-     * do have a caches directory {@link FileSystemStorage#hasCachesDir()}, this will call {@link #createToFileSystem(com.codename1.ui.EncodedImage, java.lang.String, java.lang.String, com.codename1.ui.URLImage.ImageAdapter) }
-     * with a file location in the caches directory.  In all other cases, this will call {@link #createToStorage(com.codename1.ui.EncodedImage, java.lang.String, java.lang.String) }.
-     *
-     * @param imageName   The name of the image.
-     * @param url         the URL from which the image is fetched
-     * @param placeholder the image placeholder is shown as the image is loading/downloading
-     *                    and serves as the guideline to the size of the downloaded image.
-     * @param resizeRule  One of {@link #FLAG_RESIZE_FAIL}, {@link #FLAG_RESIZE_SCALE}, or {@link #FLAG_RESIZE_SCALE_TO_FILL}.
-     * @return a Image that will initially just delegate to the placeholder
-     */
+    /// Creates an image that will be downloaded on the fly as necessary.  On platforms that support a native
+    /// image cache (e.g. Javascript), the image will be loaded directly from the native cache (i.e. it defers to the
+    /// platform to handle all caching considerations.  On platforms that don't have a native image cache but
+    /// do have a caches directory `FileSystemStorage#hasCachesDir()`, this will call `java.lang.String, java.lang.String, com.codename1.ui.URLImage.ImageAdapter)`
+    /// with a file location in the caches directory.  In all other cases, this will call `java.lang.String, java.lang.String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageName`: The name of the image.
+    ///
+    /// - `url`: the URL from which the image is fetched
+    ///
+    /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
+    /// and serves as the guideline to the size of the downloaded image.
+    ///
+    /// - `resizeRule`: One of `#FLAG_RESIZE_FAIL`, `#FLAG_RESIZE_SCALE`, or `#FLAG_RESIZE_SCALE_TO_FILL`.
+    ///
+    /// #### Returns
+    ///
+    /// a Image that will initially just delegate to the placeholder
     public static Image createCachedImage(String imageName, String url, Image placeholder, int resizeRule) {
         if (Display.getInstance().supportsNativeImageCache()) {
             CachedImage im = new CachedImage(placeholder, url, resizeRule);
@@ -402,13 +499,11 @@ public final class URLImage extends EncodedImage {
         });
     }
 
-    /**
-     * Images are normally fetched from storage or network only as needed,
-     * however if the download must start before the image is drawn this method
-     * can be invoked. Notice that "immediately" doesn't mean synchronously, it just
-     * means that the image will be added to the queue right away but probably won't be
-     * available by the time the method completes.
-     */
+    /// Images are normally fetched from storage or network only as needed,
+    /// however if the download must start before the image is drawn this method
+    /// can be invoked. Notice that "immediately" doesn't mean synchronously, it just
+    /// means that the image will be added to the queue right away but probably won't be
+    /// available by the time the method completes.
     public void fetch() {
         if (fetching || imageData != null) {
             return;
@@ -576,9 +671,7 @@ public final class URLImage extends EncodedImage {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Image getInternal() {
         if (imageData == null) {
@@ -597,9 +690,7 @@ public final class URLImage extends EncodedImage {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public byte[] getImageData() {
         if (imageData != null) {
@@ -608,9 +699,7 @@ public final class URLImage extends EncodedImage {
         return placeholder.getImageData();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         if (repaintImage) {
@@ -624,59 +713,54 @@ public final class URLImage extends EncodedImage {
         return false;
     }
 
-    /**
-     * Block this method from external callers as it might break the functionality
-     */
+    /// Block this method from external callers as it might break the functionality
     @Override
     public void lock() {
     }
 
-    /**
-     * Block this method from external callers as it might break the functionality
-     */
+    /// Block this method from external callers as it might break the functionality
     @Override
     public void unlock() {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isAnimation() {
         return repaintImage || imageData == null;
     }
 
-    /**
-     * Invoked in a case of an error
-     */
+    /// Invoked in a case of an error
     public interface ErrorCallback {
         void onError(URLImage source, Exception err);
     }
 
-    /**
-     * Allows applying resize logic to downloaded images you can use constant
-     * resize behaviors defined in this class. This class allows masking and various
-     * other effects to be applied to downloaded images.
-     * <p>Notice: adapters happen before the image is saved so they will only happen once
-     * and the image will be saved as "adapted" which can be great for performance but
-     * is also permanent. E.g. If you mask an image it will remain masked.
-     */
+    /// Allows applying resize logic to downloaded images you can use constant
+    /// resize behaviors defined in this class. This class allows masking and various
+    /// other effects to be applied to downloaded images.
+    ///
+    /// Notice: adapters happen before the image is saved so they will only happen once
+    /// and the image will be saved as "adapted" which can be great for performance but
+    /// is also permanent. E.g. If you mask an image it will remain masked.
     public interface ImageAdapter {
-        /**
-         * Allows the downloaded image to be adapted e.g if it isn't the same size of the placeholder image.
-         *
-         * @param downloadedImage  the downloaded image
-         * @param placeholderImage the placeholder image
-         * @return the adapted image or the same image
-         */
+        /// Allows the downloaded image to be adapted e.g if it isn't the same size of the placeholder image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `downloadedImage`: the downloaded image
+        ///
+        /// - `placeholderImage`: the placeholder image
+        ///
+        /// #### Returns
+        ///
+        /// the adapted image or the same image
         EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage);
 
-        /**
-         * Return true if the adapter should work on a separate thread to avoid blocking the EDT
-         * this is especially important for image masks and heavy image manipulation
-         *
-         * @return true to run off the EDT
-         */
+        /// Return true if the adapter should work on a separate thread to avoid blocking the EDT
+        /// this is especially important for image masks and heavy image manipulation
+        ///
+        /// #### Returns
+        ///
+        /// true to run off the EDT
         boolean isAsyncAdapter();
     }
 
@@ -717,9 +801,7 @@ public final class URLImage extends EncodedImage {
         }
     }
 
-    /**
-     * CachedImage used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }
-     */
+    /// CachedImage used by `java.lang.String, com.codename1.ui.Image, int)`
     private static class CachedImage extends Image {
         int resizeRule;
         Object image;
@@ -899,11 +981,11 @@ public final class URLImage extends EncodedImage {
             fetch();
         }
 
-        /**
-         * Used in cases where the source image is already downloaded ( so we don't need to try to load it from storage/file system.
-         *
-         * @param sourceImage
-         */
+        /// Used in cases where the source image is already downloaded ( so we don't need to try to load it from storage/file system.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sourceImage`
         void setSourceImage(Image sourceImage) {
             this.sourceImage = sourceImage;
         }

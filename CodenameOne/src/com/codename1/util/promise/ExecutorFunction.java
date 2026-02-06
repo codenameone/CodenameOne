@@ -23,18 +23,20 @@
 package com.codename1.util.promise;
 
 
-/**
- * Promise API function {@link com.codename1.util.promise.Promise}
- *
- * @author shannah
- * @since 8.0
- */
+/// Promise API function `com.codename1.util.promise.Promise`
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 8.0
 public interface ExecutorFunction {
-    /**
-     * Calls the function.
-     *
-     * @param resolutionFunc Callback function to be called on resolution.
-     * @param rejectionFunc  Callback function to be called on rejection.
-     */
+    /// Calls the function.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resolutionFunc`: Callback function to be called on resolution.
+    ///
+    /// - `rejectionFunc`: Callback function to be called on rejection.
     void call(Functor resolutionFunc, Functor rejectionFunc);
 }

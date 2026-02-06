@@ -28,22 +28,22 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.util.StringUtil;
 
-/**
- * This Tile brings the tile image from a given http url.
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This Tile brings the tile image from a given http url.
+///
+/// @author Roman Kamyk
 public class ProxyHttpTile extends Tile {
 
     private Tile _tile;
 
-    /**
-     * Creates an Http Tile
-     *
-     * @param tileSize the tile size
-     * @param bbox     the tile bounding box
-     * @param url      the url to bring the image from
-     */
+    /// Creates an Http Tile
+    ///
+    /// #### Parameters
+    ///
+    /// - `tileSize`: the tile size
+    ///
+    /// - `bbox`: the tile bounding box
+    ///
+    /// - `url`: the url to bring the image from
     public ProxyHttpTile(Dimension tileSize, BoundingBox bbox, final String url) {
         super(tileSize, bbox, null);
         String cacheId = url.substring(url.indexOf(":") + 1);
@@ -71,9 +71,7 @@ public class ProxyHttpTile extends Tile {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean paint(Graphics g) {
         if (_tile == null) {

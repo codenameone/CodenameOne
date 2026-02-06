@@ -24,149 +24,175 @@ package com.codename1.l10n;
 
 import java.util.Date;
 
-/**
- * A class for parsing and formatting localisation sensitive dates, compatible
- * with Jave 6 SDK. This implementation uses the <a href=
- * "https://codenameone.googlecode.com/svn/trunk/CodenameOne/javadoc/index.html"
- * >Codename One localization manager</a> for handling formatting dates. Parsing
- * dates is not implemented in this class since the localization pattern is not
- * exposed.
- *
- * @author Eric Coolman
- * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html">http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html</a>
- */
+/// A class for parsing and formatting localisation sensitive dates, compatible
+/// with Jave 6 SDK. This implementation uses the Codename One localization manager for handling formatting dates. Parsing
+/// dates is not implemented in this class since the localization pattern is not
+/// exposed.
+///
+/// @author Eric Coolman
+///
+/// #### See also
+///
+/// - [http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html](http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html)
 public class DateFormat extends Format {
-    /**
-     * Constant for full style parsing/formatting pattern.
-     */
+    /// Constant for full style parsing/formatting pattern.
     public static final int FULL = 0;
-    /**
-     * Constant for long style parsing/formatting pattern.
-     */
+    /// Constant for long style parsing/formatting pattern.
     public static final int LONG = 1;
-    /**
-     * Constant for medium style parsing/formatting pattern.
-     */
+    /// Constant for medium style parsing/formatting pattern.
     public static final int MEDIUM = 2;
-    /**
-     * Constant for short style parsing/formatting pattern.
-     */
+    /// Constant for short style parsing/formatting pattern.
     public static final int SHORT = 3;
-    /**
-     * Constant for default style (MEDIUM) parsing/formatting pattern.
-     */
+    /// Constant for default style (MEDIUM) parsing/formatting pattern.
     public static final int DEFAULT = MEDIUM;
 
     private final int dateStyle;
     private final int timeStyle;
 
-    /**
-     * Construct a date formatter using default patterns for date and time (SHORT/SHORT).
-     */
+    /// Construct a date formatter using default patterns for date and time (SHORT/SHORT).
     DateFormat() {
         this(SHORT, SHORT);
     }
 
-    /**
-     *
-     */
+    ///
     DateFormat(int dateStyle, int timeStyle) {
         this.dateStyle = dateStyle;
         this.timeStyle = timeStyle;
     }
 
-    /**
-     * Get a DateFormat instance with default style for date/time (SHORT/SHORT).
-     *
-     * @return a DateFormat instance.
-     */
+    /// Get a DateFormat instance with default style for date/time (SHORT/SHORT).
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
     public static final DateFormat getInstance() {
         return getDateTimeInstance(SHORT, SHORT);
     }
 
-    /**
-     * Get a DateFormat instance with default style for date (SHORT).
-     *
-     * @return a DateFormat instance.
-     */
+    /// Get a DateFormat instance with default style for date (SHORT).
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
     public static final DateFormat getDateInstance() {
         return getDateInstance(SHORT);
     }
 
-    /**
-     * Get a DateFormat instance with default style for time (SHORT).
-     *
-     * @return a DateFormat instance.
-     */
+    /// Get a DateFormat instance with default style for time (SHORT).
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
     public static final DateFormat getTimeInstance() {
         return getTimeInstance(SHORT);
     }
 
-    /**
-     * Get a DateFormat instance that uses a given style for dates.
-     *
-     * @param style style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
-     * @return a DateFormat instance.
-     * @see #SHORT
-     * @see #MEDIUM
-     * @see #LONG
-     * @see #FULL
-     * @see #DEFAULT
-     */
+    /// Get a DateFormat instance that uses a given style for dates.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    ///
+    /// #### See also
+    ///
+    /// - #SHORT
+    ///
+    /// - #MEDIUM
+    ///
+    /// - #LONG
+    ///
+    /// - #FULL
+    ///
+    /// - #DEFAULT
     public static final DateFormat getDateInstance(int style) {
         return getDateTimeInstance(style, DEFAULT);
     }
 
-    /**
-     * Get a DateFormat instance that uses a given style for times.
-     *
-     * @param style style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
-     * @return a DateFormat instance.
-     * @see #SHORT
-     * @see #MEDIUM
-     * @see #LONG
-     * @see #FULL
-     * @see #DEFAULT
-     */
+    /// Get a DateFormat instance that uses a given style for times.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    ///
+    /// #### See also
+    ///
+    /// - #SHORT
+    ///
+    /// - #MEDIUM
+    ///
+    /// - #LONG
+    ///
+    /// - #FULL
+    ///
+    /// - #DEFAULT
     public static final DateFormat getTimeInstance(int style) {
         return getDateTimeInstance(DEFAULT, style);
     }
 
-    /**
-     * Get a DateFormat instance that uses a given style for dates and times.
-     *
-     * @param style style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
-     * @return a DateFormat instance.
-     * @see #SHORT
-     * @see #MEDIUM
-     * @see #LONG
-     * @see #FULL
-     * @see #DEFAULT
-     */
+    /// Get a DateFormat instance that uses a given style for dates and times.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: style to use for parsing and formatting (SHORT, MEDIUM, LONG, FULL, DEFAULT);
+    ///
+    /// #### Returns
+    ///
+    /// a DateFormat instance.
+    ///
+    /// #### See also
+    ///
+    /// - #SHORT
+    ///
+    /// - #MEDIUM
+    ///
+    /// - #LONG
+    ///
+    /// - #FULL
+    ///
+    /// - #DEFAULT
     public static final DateFormat getDateTimeInstance(int dateStyle, int timeStyle) {
         return new DateFormat(dateStyle, timeStyle);
     }
 
-    /**
-     * Format a given object.
-     *
-     * @return formatted object.
-     * @throws IllegalArgumentException of the source can not be formatted.
-     * @obj object to be formatted.
-     */
+    /// Format a given object.
+    ///
+    /// @obj object to be formatted.
+    ///
+    /// #### Returns
+    ///
+    /// formatted object.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: of the source can not be formatted.
     @Override
     public String format(Object obj) throws IllegalArgumentException {
         return format(obj, new StringBuilder());
     }
 
-    /**
-     * Format a given object.
-     *
-     * @param source     object to be formatted.
-     * @param toAppendTo buffer to which to append output.
-     * @return formatted date.
-     * @throws IllegalArgumentException of the source can not be formatted.
-     */
+    /// Format a given object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: object to be formatted.
+    ///
+    /// - `toAppendTo`: buffer to which to append output.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: of the source can not be formatted.
     String format(Object obj, StringBuilder toAppendTo) throws IllegalArgumentException {
         if (obj instanceof Long) {
             obj = new Date(((Long) obj).longValue());
@@ -187,14 +213,21 @@ public class DateFormat extends Format {
         return format(source, toAppendTo);
     }
 
-    /**
-     * Format a given object.
-     *
-     * @param source     object to be formatted.
-     * @param toAppendTo buffer to which to append output.
-     * @return formatted date.
-     * @throws IllegalArgumentException of the source can not be formatted.
-     */
+    /// Format a given object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: object to be formatted.
+    ///
+    /// - `toAppendTo`: buffer to which to append output.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: of the source can not be formatted.
     String format(Object obj, StringBuffer toAppendTo) throws IllegalArgumentException {
         StringBuilder sb = new StringBuilder();
         format(obj, sb);
@@ -202,50 +235,57 @@ public class DateFormat extends Format {
         return toAppendTo.toString();
     }
 
-    /**
-     * Format a given date.
-     *
-     * @param source date to be formatted.
-     * @return formatted date.
-     */
+    /// Format a given date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: date to be formatted.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
     public String format(Date source) {
         return format(source, new StringBuilder());
     }
 
-    /**
-     * Format a given date.
-     *
-     * @param source     date to be formatted.
-     * @param toAppendTo buffer to which to append output.
-     * @return formatted date.
-     */
+    /// Format a given date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: date to be formatted.
+    ///
+    /// - `toAppendTo`: buffer to which to append output.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
     String format(Date source, StringBuffer toAppendTo) {
         return source.toString();
     }
 
-    /**
-     * Format a given date.
-     *
-     * @param source     date to be formatted.
-     * @param toAppendTo buffer to which to append output.
-     * @return formatted date.
-     */
+    /// Format a given date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: date to be formatted.
+    ///
+    /// - `toAppendTo`: buffer to which to append output.
+    ///
+    /// #### Returns
+    ///
+    /// formatted date.
     String format(Date source, StringBuilder toAppendTo) {
         return source.toString();
     }
 
-    /**
-     * NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
-     */
+    /// NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
     @Override
     public Object parseObject(String source) throws ParseException {
         // can't parse because we don't know the L10NManagers templates
         throw new ParseException("Not implemented", 0);
     }
 
-    /**
-     * NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
-     */
+    /// NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
     public Date parse(String source) throws ParseException {
         return (Date) parseObject(source);
     }

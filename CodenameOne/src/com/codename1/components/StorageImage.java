@@ -31,11 +31,9 @@ import com.codename1.ui.EncodedImage;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * An encoded image that stores the actual data of the encoded image in storage.
- *
- * @author Shai Almog
- */
+/// An encoded image that stores the actual data of the encoded image in storage.
+///
+/// @author Shai Almog
 public final class StorageImage extends EncodedImage {
     private final String fileName;
     private final boolean keep;
@@ -49,17 +47,23 @@ public final class StorageImage extends EncodedImage {
         this.keep = keep;
     }
 
-    /**
-     * Creates an encoded image that maps to a storage file thus allowing to
-     * seamlessly cache images as needed. This only works reasonably well for very small
-     * files.
-     *
-     * @param fileName the name of the storage file
-     * @param data     the data
-     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
-     * @return image that will load the file seamlessly or null if the storage failed
-     */
+    /// Creates an encoded image that maps to a storage file thus allowing to
+    /// seamlessly cache images as needed. This only works reasonably well for very small
+    /// files.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the name of the storage file
+    ///
+    /// - `data`: the data
+    ///
+    /// - `width`: the width of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// - `height`: the height of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// #### Returns
+    ///
+    /// image that will load the file seamlessly or null if the storage failed
     public static StorageImage create(String fileName, byte[] data, int width, int height) {
         if (Storage.getInstance().writeObject(fileName, data)) {
             return new StorageImage(fileName, width, height, true);
@@ -67,18 +71,25 @@ public final class StorageImage extends EncodedImage {
         return null;
     }
 
-    /**
-     * Creates an encoded image that maps to a storage file thus allowing to
-     * seamlessly cache images as needed. This only works reasonably well for very small
-     * files.
-     *
-     * @param fileName the name of the storage file
-     * @param data     the data
-     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
-     * @param keep     if set to true keeps the file in RAM once loaded
-     * @return image that will load the file seamlessly or null if the storage failed
-     */
+    /// Creates an encoded image that maps to a storage file thus allowing to
+    /// seamlessly cache images as needed. This only works reasonably well for very small
+    /// files.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the name of the storage file
+    ///
+    /// - `data`: the data
+    ///
+    /// - `width`: the width of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// - `height`: the height of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// - `keep`: if set to true keeps the file in RAM once loaded
+    ///
+    /// #### Returns
+    ///
+    /// image that will load the file seamlessly or null if the storage failed
     public static StorageImage create(String fileName, byte[] data, int width, int height, boolean keep) {
         if (Storage.getInstance().writeObject(fileName, data)) {
             return new StorageImage(fileName, width, height, keep);
@@ -86,54 +97,69 @@ public final class StorageImage extends EncodedImage {
         return null;
     }
 
-    /**
-     * Creates an encoded image that maps to a storage file thus allowing to
-     * seamlessly cache images as needed. This only works reasonably well for very small
-     * files.
-     *
-     * @param fileName the name of the storage file
-     * @param data     the stream to cache
-     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
-     * @return image that will load the file seamlessly
-     */
+    /// Creates an encoded image that maps to a storage file thus allowing to
+    /// seamlessly cache images as needed. This only works reasonably well for very small
+    /// files.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the name of the storage file
+    ///
+    /// - `data`: the stream to cache
+    ///
+    /// - `width`: the width of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// - `height`: the height of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// #### Returns
+    ///
+    /// image that will load the file seamlessly
     public static StorageImage create(String fileName, InputStream data, int width, int height) throws IOException {
         EncodedImage e = EncodedImage.create(data);
         return create(fileName, e.getImageData(), width, height);
     }
 
-    /**
-     * Creates an encoded image that maps to a storage file thus allowing to
-     * seamlessly cache images as needed. This only works reasonably well for very small
-     * files.
-     *
-     * @param fileName the name of the storage file
-     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
-     * @return image that will load the file seamlessly
-     */
+    /// Creates an encoded image that maps to a storage file thus allowing to
+    /// seamlessly cache images as needed. This only works reasonably well for very small
+    /// files.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the name of the storage file
+    ///
+    /// - `width`: the width of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// - `height`: the height of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// #### Returns
+    ///
+    /// image that will load the file seamlessly
     public static StorageImage create(String fileName, int width, int height) {
         return new StorageImage(fileName, width, height, true);
     }
 
-    /**
-     * Creates an encoded image that maps to a storage file thus allowing to
-     * seamlessly cache images as needed. This only works reasonably well for very small
-     * files.
-     *
-     * @param fileName the name of the storage file
-     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
-     * @param keep     if set to true keeps the file in RAM once loaded
-     * @return image that will load the file seamlessly
-     */
+    /// Creates an encoded image that maps to a storage file thus allowing to
+    /// seamlessly cache images as needed. This only works reasonably well for very small
+    /// files.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the name of the storage file
+    ///
+    /// - `width`: the width of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// - `height`: the height of the file or -1 if unknown (notice that this will improve performance)
+    ///
+    /// - `keep`: if set to true keeps the file in RAM once loaded
+    ///
+    /// #### Returns
+    ///
+    /// image that will load the file seamlessly
     public static StorageImage create(String fileName, int width, int height, boolean keep) {
         return new StorageImage(fileName, width, height, keep);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public byte[] getImageData() {
         if (data != null) {

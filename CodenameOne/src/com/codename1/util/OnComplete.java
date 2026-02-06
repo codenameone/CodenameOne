@@ -23,17 +23,15 @@
 
 package com.codename1.util;
 
-/**
- * Invoked when a process is completed, this is a generic interface designed to
- * replace the {@link SuccessCallback} interface.
- *
- * @author Shai Almog
- */
+/// Invoked when a process is completed, this is a generic interface designed to
+/// replace the `SuccessCallback` interface.
+///
+/// @author Shai Almog
 public interface OnComplete<T> {
-    /**
-     * Invoked to indicate the process was completed
-     *
-     * @param v the value of the process
-     */
+    /// Invoked to indicate the process was completed
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the value of the process
     void completed(T v);
 }

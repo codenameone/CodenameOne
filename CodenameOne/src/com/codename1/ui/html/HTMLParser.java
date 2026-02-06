@@ -30,26 +30,20 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
-/**
- * The HTMLParser class is used to parse an XHTML-MP 1.0 document into a DOM object (Element).
- * Unsupported tags and attributes as well as comments are dropped in the parsing process.
- * The parser is also makes use of CSSParser for external CSS files, embedded CSS segments and CSS within the 'style' attribute.
- *
- * @author Ofir Leitner
- */
+/// The HTMLParser class is used to parse an XHTML-MP 1.0 document into a DOM object (Element).
+/// Unsupported tags and attributes as well as comments are dropped in the parsing process.
+/// The parser is also makes use of CSSParser for external CSS files, embedded CSS segments and CSS within the 'style' attribute.
+///
+/// @author Ofir Leitner
 public class HTMLParser extends XMLParser {
 
-    /**
-     * The list of empty tags (tags that naturally don't have any children).
-     * This is used to enable empty tags to be closed also in a non-strict way (i.e. &lt;br&gt; instead of &lt;br/&gt;)
-     * some of these tags are not a part of the XHTML-MP 1.0 standard, but including them here allows a more smooth parsing if the document is not strictly XHTML-MP 1.0
-     */
+    /// The list of empty tags (tags that naturally don't have any children).
+    /// This is used to enable empty tags to be closed also in a non-strict way (i.e. <br> instead of <br/>)
+    /// some of these tags are not a part of the XHTML-MP 1.0 standard, but including them here allows a more smooth parsing if the document is not strictly XHTML-MP 1.0
     private static final String[] EMPTY_TAGS = {"br", "link", "meta", "base", "area", "basefont", "col", "frame", "hr", "img", "input", "isindex", "param"};
     HTMLComponent htmlC; // The HTMLComponent that uses this Parser
 
-    /**
-     * Constructs a new instance of HTMLParser
-     */
+    /// Constructs a new instance of HTMLParser
     public HTMLParser() {
         // Add common char entities that are above the HTML 2.0 char entities range
         addCharEntity("bull", 8226);
@@ -57,12 +51,12 @@ public class HTMLParser extends XMLParser {
         setIncludeWhitespacesBetweenTags(true);
     }
 
-    /**
-     * Pair this HTMLParser with the HTMLComponent that uses it.
-     * This pairing is necessary to allow access to the htmlC in parseTagContent upon finding a CSS embedded segment
-     *
-     * @param htmlC The HTMLComponent that uses this parser
-     */
+    /// Pair this HTMLParser with the HTMLComponent that uses it.
+    /// This pairing is necessary to allow access to the htmlC in parseTagContent upon finding a CSS embedded segment
+    ///
+    /// #### Parameters
+    ///
+    /// - `htmlC`: The HTMLComponent that uses this parser
     void setHTMLComponent(HTMLComponent htmlC) {
         if ((htmlC != null) && (this.htmlC != null)) {
             throw new IllegalStateException("This HTMLParser is already paired with an HTMLComponent");
@@ -70,13 +64,17 @@ public class HTMLParser extends XMLParser {
         this.htmlC = htmlC;
     }
 
-    /**
-     * Overrides XMLParser.parseTagContent to enable embedded CSS segments (Style tags)
-     *
-     * @param element The current parent element
-     * @param is      The reader containing the XML
-     * @throws IOException if an I/O error in the stream is encountered
-     */
+    /// Overrides XMLParser.parseTagContent to enable embedded CSS segments (Style tags)
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The current parent element
+    ///
+    /// - `is`: The reader containing the XML
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error in the stream is encountered
     @Override
     protected void parseTagContent(Element element, Reader is) throws IOException {
         if ((HTMLComponent.SUPPORT_CSS) && (htmlC.loadCSS) && (((HTMLElement) element).getTagId() == HTMLElement.TAG_STYLE)) { // We aren't strict and don't require text/css in a style tag // && "text/css".equals(element.getAttributeById(Element.ATTR_TYPE)))) {
@@ -88,34 +86,43 @@ public class HTMLParser extends XMLParser {
         super.parseTagContent(element, is);
     }
 
-    /**
-     * Overrides XMLParser.createNewElement to return an HTMLElement instance
-     *
-     * @param name The HTMLElement's name
-     * @return a new instance of the names HTMLElement
-     */
+    /// Overrides XMLParser.createNewElement to return an HTMLElement instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The HTMLElement's name
+    ///
+    /// #### Returns
+    ///
+    /// a new instance of the names HTMLElement
     @Override
     protected Element createNewElement(String name) {
         return new HTMLElement(name);
     }
 
-    /**
-     * Overrides XMLParser.createNewTextElement to return an HTMLElement instance
-     *
-     * @param text The HTMLElement's text
-     * @return a new instance of the HTMLElement
-     */
+    /// Overrides XMLParser.createNewTextElement to return an HTMLElement instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The HTMLElement's text
+    ///
+    /// #### Returns
+    ///
+    /// a new instance of the HTMLElement
     @Override
     protected Element createNewTextElement(String text) {
         return new HTMLElement(text, true);
     }
 
-    /**
-     * Overrides XMLParser.convertCharEntity to add in HTML char entities
-     *
-     * @param charEntity The char entity to convert
-     * @return A string containing a single char, or the original char entity string (with &amp; and ;) if the char entity couldn't be resolved
-     */
+    /// Overrides XMLParser.convertCharEntity to add in HTML char entities
+    ///
+    /// #### Parameters
+    ///
+    /// - `charEntity`: The char entity to convert
+    ///
+    /// #### Returns
+    ///
+    /// A string containing a single char, or the original char entity string (with & and ;) if the char entity couldn't be resolved
     @Override
     protected String convertCharEntity(String charEntity) {
         try {
@@ -125,33 +132,40 @@ public class HTMLParser extends XMLParser {
         }
     }
 
-    /**
-     * This method translates between an HTML char entity string to the according char code.
-     * It first tries to find it using its super method.
-     * If not found, the search continues to a wider string array of char codes 160-255 which are supported in ISO-8859-1 / HTML 2.0
-     *
-     * @param symbol The symbol to lookup
-     * @return The char code of the symbol, or -1 if none found
-     *
-    protected int getCharEntityCode(String symbol) {
-    int val=super.getCharEntityCode(symbol);
-    if (val==-1) {
-    // Not one of the most popular char codes, proceed to check the ISO-8859-1 symbols array
-    val=CSSElement.getStringVal(symbol, CHAR_ENTITY_STRINGS);
-    if (val!=-1) {
-    return val+160;
-    }
-    }
-    return val;
-    }*/
+    /// This method translates between an HTML char entity string to the according char code.
+    /// It first tries to find it using its super method.
+    /// If not found, the search continues to a wider string array of char codes 160-255 which are supported in ISO-8859-1 / HTML 2.0
+    ///
+    /// #### Parameters
+    ///
+    /// - `symbol`: The symbol to lookup
+    ///
+    /// #### Returns
+    ///
+    /// @return The char code of the symbol, or -1 if none found
+    ///
+    /// protected int getCharEntityCode(String symbol) {
+    /// int val=super.getCharEntityCode(symbol);
+    /// if (val==-1) {
+    /// // Not one of the most popular char codes, proceed to check the ISO-8859-1 symbols array
+    /// val=CSSElement.getStringVal(symbol, CHAR_ENTITY_STRINGS);
+    /// if (val!=-1) {
+    /// return val+160;
+    /// }
+    /// }
+    /// return val;
+    /// }
 
 
-    /**
-     * Checks whether the specified tag is an empty tag as defined in EMPTY_TAGS
-     *
-     * @param tagName The tag name to check
-     * @return true if that tag is defined as an empty tag, false otherwise
-     */
+    /// Checks whether the specified tag is an empty tag as defined in EMPTY_TAGS
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagName`: The tag name to check
+    ///
+    /// #### Returns
+    ///
+    /// true if that tag is defined as an empty tag, false otherwise
     @Override
     protected boolean isEmptyTag(String tagName) {
         int i = 0;
@@ -165,42 +179,43 @@ public class HTMLParser extends XMLParser {
         return found;
     }
 
-    /**
-     * A convenience method that casts the returned type of the parse method to HTMLElement.
-     * Basically calling this method is simlar to calling parse and casting to HTMLElement.
-     *
-     * @param isr The input stream containing the HTML
-     * @return The HTML document
-     */
+    /// A convenience method that casts the returned type of the parse method to HTMLElement.
+    /// Basically calling this method is simlar to calling parse and casting to HTMLElement.
+    ///
+    /// #### Parameters
+    ///
+    /// - `isr`: The input stream containing the HTML
+    ///
+    /// #### Returns
+    ///
+    /// The HTML document
     public HTMLElement parseHTML(InputStreamReader isr) {
         return (HTMLElement) super.parse(isr);
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     protected String getSupportedStandardName() {
         return "XHTML-MP 1.0";
     }
 
-    /**
-     * Overrides the Element.isSupported to let the parser know which tags are supported in XHTML-MP 1.0
-     *
-     * @return true if the tag is a supported XHTML Mobile Profile 1.0 tag, false otherwise
-     */
+    /// Overrides the Element.isSupported to let the parser know which tags are supported in XHTML-MP 1.0
+    ///
+    /// #### Returns
+    ///
+    /// true if the tag is a supported XHTML Mobile Profile 1.0 tag, false otherwise
     @Override
     protected boolean isSupported(Element element) {
         return (((HTMLElement) element).getTagId() != HTMLElement.TAG_UNSUPPORTED);
     }
 
-    /**
-     * Overrides the Element.shouldEvaluate method to return false on the script tag.
-     * The script tag should be skipped entirely, since it may contain characters like greater-than and lesser-than which may break the HTML
-     * All other tags are evaluated (i.e. added including all their children to the tree), even if not supported (But of course their functionality is ignored by HTMLComponent)
-     *
-     * @return false if this is the SCRIPT tag, true otherwise
-     */
+    /// Overrides the Element.shouldEvaluate method to return false on the script tag.
+    /// The script tag should be skipped entirely, since it may contain characters like greater-than and lesser-than which may break the HTML
+    /// All other tags are evaluated (i.e. added including all their children to the tree), even if not supported (But of course their functionality is ignored by HTMLComponent)
+    ///
+    /// #### Returns
+    ///
+    /// false if this is the SCRIPT tag, true otherwise
     @Override
     protected boolean shouldEvaluate(Element element) {
         return ((((HTMLElement) element).getTagId() != HTMLElement.TAG_UNSUPPORTED) || (!"script".equalsIgnoreCase(element.getTagName())));

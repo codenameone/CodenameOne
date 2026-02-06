@@ -30,11 +30,9 @@ import com.codename1.ui.validation.Validator;
 import java.util.Arrays;
 import java.util.Comparator;
 
-/**
- * A proxy that wraps the table model providing sorting API that can be leveraged by the table
- *
- * @author Shai Almog
- */
+/// A proxy that wraps the table model providing sorting API that can be leveraged by the table
+///
+/// @author Shai Almog
 public class SortableTableModel extends AbstractTableModel {
     private final TableModel model;
     private final boolean asc;
@@ -42,14 +40,17 @@ public class SortableTableModel extends AbstractTableModel {
     private final Comparator cmp;
     private int[] sorted;
 
-    /**
-     * Sorts a table based on the given column
-     *
-     * @param column the column to sort
-     * @param asc    the direction ascending/descending
-     * @param model  the underlying model that will be sorted
-     * @param cmp    a comparator used for comparing the cells in the column
-     */
+    /// Sorts a table based on the given column
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column to sort
+    ///
+    /// - `asc`: the direction ascending/descending
+    ///
+    /// - `model`: the underlying model that will be sorted
+    ///
+    /// - `cmp`: a comparator used for comparing the cells in the column
     public SortableTableModel(int column, boolean asc, TableModel model, Comparator cmp) {
         this.model = model;
         this.asc = asc;
@@ -58,21 +59,24 @@ public class SortableTableModel extends AbstractTableModel {
         initTable(model, asc, cmp, column);
     }
 
-    /**
-     * Returns the underlying table model
-     *
-     * @return the model
-     */
+    /// Returns the underlying table model
+    ///
+    /// #### Returns
+    ///
+    /// the model
     public TableModel getUnderlying() {
         return model;
     }
 
-    /**
-     * Returns the position of the row when sorted
-     *
-     * @param row the row in the visual table
-     * @return the position in the underlying model
-     */
+    /// Returns the position of the row when sorted
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row in the visual table
+    ///
+    /// #### Returns
+    ///
+    /// the position in the underlying model
     public int getSortedPosition(int row) {
         return sorted[row];
     }
@@ -92,41 +96,31 @@ public class SortableTableModel extends AbstractTableModel {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getRowCount() {
         return model.getRowCount();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getColumnCount() {
         return model.getColumnCount();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getColumnName(int i) {
         return model.getColumnName(i);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isCellEditable(int row, int column) {
         return model.isCellEditable(sorted[row], column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getValueAt(int row, int column) {
         if (model.getRowCount() != sorted.length) {
@@ -135,33 +129,25 @@ public class SortableTableModel extends AbstractTableModel {
         return model.getValueAt(sorted[row], column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setValueAt(int row, int column, Object o) {
         model.setValueAt(sorted[row], column, o);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addDataChangeListener(DataChangedListener d) {
         model.addDataChangeListener(d);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeDataChangeListener(DataChangedListener d) {
         model.removeDataChangeListener(d);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Constraint getValidationConstraint(int row, int column) {
         if (model instanceof AbstractTableModel) {
@@ -170,9 +156,7 @@ public class SortableTableModel extends AbstractTableModel {
         return super.getValidationConstraint(row, column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class getCellType(int row, int column) {
         if (model instanceof AbstractTableModel) {
@@ -181,9 +165,7 @@ public class SortableTableModel extends AbstractTableModel {
         return super.getCellType(row, column);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getMultipleChoiceOptions(int row, int column) {
         if (model instanceof AbstractTableModel) {

@@ -22,35 +22,37 @@
  */
 package com.codename1.codescan;
 
-/**
- * Deprecated!!:  Please use the <a href="https://github.com/codenameone/cn1-codescan">cn1-codescan library</a> instead.
- *
- * <p>Callback for the code scanner indicating the result of a scan operation,
- * the methods of this call will always be invoked on the EDT!</p>
- *
- * @author Shai Almog
- * @deprecated Use the cn1-codescanner cn1lib.
- */
+/// Deprecated!!:  Please use the [cn1-codescan library](https://github.com/codenameone/cn1-codescan) instead.
+///
+/// Callback for the code scanner indicating the result of a scan operation,
+/// the methods of this call will always be invoked on the EDT!
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// Use the cn1-codescanner cn1lib.
 public interface ScanResult {
-    /**
-     * Called upon a successful scan operation
-     *
-     * @param contents   the contents of the data
-     * @param formatName the format of the scan
-     * @param rawBytes   the bytes of data
-     */
+    /// Called upon a successful scan operation
+    ///
+    /// #### Parameters
+    ///
+    /// - `contents`: the contents of the data
+    ///
+    /// - `formatName`: the format of the scan
+    ///
+    /// - `rawBytes`: the bytes of data
     void scanCompleted(String contents, String formatName, byte[] rawBytes); // PMD Fix: UnnecessaryModifier removed
 
-    /**
-     * Invoked if the user canceled the scan
-     */
+    /// Invoked if the user canceled the scan
     void scanCanceled(); // PMD Fix: UnnecessaryModifier removed
 
-    /**
-     * Invoked if an error occurred during the scanning process
-     *
-     * @param errorCode code
-     * @param message   descriptive message
-     */
+    /// Invoked if an error occurred during the scanning process
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorCode`: code
+    ///
+    /// - `message`: descriptive message
     void scanError(int errorCode, String message); // PMD Fix: UnnecessaryModifier removed
 }

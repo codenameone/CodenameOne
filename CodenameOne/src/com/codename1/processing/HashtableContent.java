@@ -35,74 +35,82 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
-/**
- * Internal class do not use.
- * <p>
- * A DOM accessor implementation for working with Map data.
- *
- * @author Eric Coolman
- */
+/// Internal class do not use.
+///
+/// A DOM accessor implementation for working with Map data.
+///
+/// @author Eric Coolman
 class MapContent implements StructuredContent {
 
     private final Object root;
     private StructuredContent parent;
 
-    /**
-     * Construct from parsed Map content.
-     *
-     * @param content parsed Map content
-     */
+    /// Construct from parsed Map content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: parsed Map content
     public MapContent(Map<?, ?> content) {
         this.root = content;
     }
 
-    /**
-     * Construct from a JSON string.
-     *
-     * @param content a JSON string.
-     * @throws IOException on error reading/parsing the string
-     */
+    /// Construct from a JSON string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON string.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing the string
     public MapContent(String content) throws IOException {
         this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(content))));
     }
 
-    /**
-     * Construct from a JSON input stream.
-     *
-     * @param content a JSON input stream.
-     * @throws IOException on error reading/parsing the stream
-     */
+    /// Construct from a JSON input stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON input stream.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing the stream
     public MapContent(InputStream content) throws IOException {
         this(new JSONParser().parse(com.codename1.io.Util.getReader(content)));
     }
 
-    /**
-     * Construct from a JSON input stream.
-     *
-     * @param content a JSON reader.
-     * @throws IOException on error reading/parsing the stream
-     */
+    /// Construct from a JSON input stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON reader.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing the stream
     public MapContent(Reader content) throws IOException {
         this(new JSONParser().parse(content));
     }
 
-    /**
-     * INTERNAL - link a node to it's parent so we can traverse backwards when
-     * required.
-     *
-     * @param content a Map, List, or String node.
-     * @param parent  the parent element of content.
-     */
+    /// INTERNAL - link a node to it's parent so we can traverse backwards when
+    /// required.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a Map, List, or String node.
+    ///
+    /// - `parent`: the parent element of content.
     MapContent(Object content, StructuredContent parent) {
         this.root = content;
         this.parent = parent;
     }
 
-    /**
-     * Convert the object back to a JSON string.
-     *
-     * @return the object as a string
-     */
+    /// Convert the object back to a JSON string.
+    ///
+    /// #### Returns
+    ///
+    /// the object as a string
     @Override
     public String toString() {
         if (root instanceof Map) {
@@ -118,17 +126,17 @@ class MapContent implements StructuredContent {
         }
     }
 
-    /**
-     * @see java.lang.Object#hashCode()
-     */
+    /// #### See also
+    ///
+    /// - java.lang.Object#hashCode()
     @Override
     public int hashCode() {
         return root.hashCode();
     }
 
-    /**
-     * @see java.lang.Object#equals(Object)
-     */
+    /// #### See also
+    ///
+    /// - java.lang.Object#equals(Object)
     @Override
     public boolean equals(Object o) {
         return o instanceof MapContent &&
@@ -136,13 +144,12 @@ class MapContent implements StructuredContent {
                         (root != null && root.equals(((MapContent) o).root)));
     }
 
-    /**
-     * Copy an array of Map elements to an array of StructuredContent nodes,
-     * also linking the parent.
-     *
-     * @param array
-     * @return
-     */
+    /// Copy an array of Map elements to an array of StructuredContent nodes,
+    /// also linking the parent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`
     private List asStructuredContentArray(List array) {
         if (array == null) {
             return null;
@@ -279,13 +286,15 @@ class MapContent implements StructuredContent {
         return decendants;
     }
 
-    /**
-     * Internal method for finding decendant nodes
-     *
-     * @param target List for collecting results
-     * @param source source array to search
-     * @param name   node name we are searching for
-     */
+    /// Internal method for finding decendant nodes
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: List for collecting results
+    ///
+    /// - `source`: source array to search
+    ///
+    /// - `name`: node name we are searching for
     private void findByName(List target, List source, String name) {
         for (Object o : source) {
             if (o instanceof Map) {
@@ -296,13 +305,15 @@ class MapContent implements StructuredContent {
         }
     }
 
-    /**
-     * Internal method for finding decendant nodes
-     *
-     * @param target List for collecting results
-     * @param source source element to search
-     * @param name   node name we are searching for
-     */
+    /// Internal method for finding decendant nodes
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: List for collecting results
+    ///
+    /// - `source`: source element to search
+    ///
+    /// - `name`: node name we are searching for
     private void findByName(List target, Map source, String name) {
         if (source.containsKey(name)) {
             Object o = source.get(name);

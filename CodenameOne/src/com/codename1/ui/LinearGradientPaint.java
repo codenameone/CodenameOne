@@ -23,18 +23,21 @@
 package com.codename1.ui;
 
 import com.codename1.ui.geom.Rectangle2D;
-import com.codename1.ui.geom.Shape;
 import com.codename1.util.MathUtil;
 
 import static com.codename1.ui.MultipleGradientPaint.CycleMethod.REFLECT;
 
-/**
- * LinearGradientPaint provides a way to fill a {@link Shape} with a linear gradient.
- *
- * @author shannah
- * @see Graphics#setColor(com.codename1.ui.Paint)
- * @since 7.0
- */
+/// LinearGradientPaint provides a way to fill a `Shape` with a linear gradient.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
+///
+/// #### See also
+///
+/// - Graphics#setColor(com.codename1.ui.Paint)
 public class LinearGradientPaint extends MultipleGradientPaint {
     private final double startX;
     private final double startY;
@@ -43,19 +46,27 @@ public class LinearGradientPaint extends MultipleGradientPaint {
     private final Transform t = Transform.makeIdentity();
     private final Transform t2 = Transform.makeIdentity();
 
-    /**
-     * Creates a LinearGradientPaint with the specified settings.
-     *
-     * @param startX            The startX coordinate of the gradient in user space.
-     * @param startY            The startY coordinate of the gradient in user space.
-     * @param endX              The endX coordinate of the gradient in user space.
-     * @param endY              THe endY coordinate of the gradient in user space.
-     * @param fractions         Fractional positions of where gradient colors begin.  Each value should be between 0 and 1.
-     * @param colors            The colors to use in the gradient.  There should be the same number of colors as there are fractions.
-     * @param cycleMethod       The cycle method to use.
-     * @param colorSpace        The color space to use.
-     * @param gradientTransform Transform to use for the gradient.  Not used right now.
-     */
+    /// Creates a LinearGradientPaint with the specified settings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startX`: The startX coordinate of the gradient in user space.
+    ///
+    /// - `startY`: The startY coordinate of the gradient in user space.
+    ///
+    /// - `endX`: The endX coordinate of the gradient in user space.
+    ///
+    /// - `endY`: THe endY coordinate of the gradient in user space.
+    ///
+    /// - `fractions`: Fractional positions of where gradient colors begin.  Each value should be between 0 and 1.
+    ///
+    /// - `colors`: The colors to use in the gradient.  There should be the same number of colors as there are fractions.
+    ///
+    /// - `cycleMethod`: The cycle method to use.
+    ///
+    /// - `colorSpace`: The color space to use.
+    ///
+    /// - `gradientTransform`: Transform to use for the gradient.  Not used right now.
     public LinearGradientPaint(float startX, float startY, float endX, float endY, float[] fractions, int[] colors, MultipleGradientPaint.CycleMethod cycleMethod, MultipleGradientPaint.ColorSpaceType colorSpace, Transform gradientTransform) {
         super(fractions, colors, cycleMethod, colorSpace, gradientTransform);
         this.startX = startX;
@@ -64,19 +75,27 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         this.endY = endY;
     }
 
-    /**
-     * Creates a LinearGradientPaint with the specified settings.
-     *
-     * @param startX            The startX coordinate of the gradient in user space.
-     * @param startY            The startY coordinate of the gradient in user space.
-     * @param endX              The endX coordinate of the gradient in user space.
-     * @param endY              THe endY coordinate of the gradient in user space.
-     * @param fractions         Fractional positions of where gradient colors begin.  Each value should be between 0 and 1.
-     * @param colors            The colors to use in the gradient.  There should be the same number of colors as there are fractions.
-     * @param cycleMethod       The cycle method to use.
-     * @param colorSpace        The color space to use.
-     * @param gradientTransform Transform to use for the gradient.  Not used right now.
-     */
+    /// Creates a LinearGradientPaint with the specified settings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startX`: The startX coordinate of the gradient in user space.
+    ///
+    /// - `startY`: The startY coordinate of the gradient in user space.
+    ///
+    /// - `endX`: The endX coordinate of the gradient in user space.
+    ///
+    /// - `endY`: THe endY coordinate of the gradient in user space.
+    ///
+    /// - `fractions`: Fractional positions of where gradient colors begin.  Each value should be between 0 and 1.
+    ///
+    /// - `colors`: The colors to use in the gradient.  There should be the same number of colors as there are fractions.
+    ///
+    /// - `cycleMethod`: The cycle method to use.
+    ///
+    /// - `colorSpace`: The color space to use.
+    ///
+    /// - `gradientTransform`: Transform to use for the gradient.  Not used right now.
     public LinearGradientPaint(double startX, double startY, double endX, double endY, float[] fractions, int[] colors, MultipleGradientPaint.CycleMethod cycleMethod, MultipleGradientPaint.ColorSpaceType colorSpace, Transform gradientTransform) {
         super(fractions, colors, cycleMethod, colorSpace, gradientTransform);
         this.startX = startX;
@@ -85,12 +104,13 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         this.endY = endY;
     }
 
-    /**
-     * Paints linear gradient in the given bounds.
-     *
-     * @param g
-     * @param bounds
-     */
+    /// Paints linear gradient in the given bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
+    ///
+    /// - `bounds`
     @Override
     public final void paint(Graphics g, Rectangle2D bounds) {
         paint(g, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
@@ -145,15 +165,19 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         return out;
     }
 
-    /**
-     * Painds the linear gradient in the given bounds.
-     *
-     * @param g
-     * @param x
-     * @param y
-     * @param w
-     * @param h
-     */
+    /// Painds the linear gradient in the given bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
+    ///
+    /// - `x`
+    ///
+    /// - `y`
+    ///
+    /// - `w`
+    ///
+    /// - `h`
     @Override
     @SuppressWarnings("UnusedFormalParameter")
     public void paint(Graphics g, double x, double y, double w, double h) {

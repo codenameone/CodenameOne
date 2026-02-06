@@ -28,12 +28,10 @@ import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 
-/**
- * Asynchronous storage image that loads in the background and not during the paint
- * cycle effectively not blocking the EDT drawing speed.
- *
- * @author Shai Almog
- */
+/// Asynchronous storage image that loads in the background and not during the paint
+/// cycle effectively not blocking the EDT drawing speed.
+///
+/// @author Shai Almog
 public final class StorageImageAsync extends EncodedImage {
     private static final Object LOCK = new Object();
     private final String fileName;
@@ -51,30 +49,30 @@ public final class StorageImageAsync extends EncodedImage {
         this.placeholderImage = placeholderImage;
     }
 
-    /**
-     * Creates an encoded image that maps to a storage file thus allowing to
-     * seamlessly cache images as needed. This only works reasonably well for very small
-     * files.
-     *
-     * @param fileName    the name of the storage file
-     * @param placeholder an image that must be of the same size as the EncodedImage
-     * @return image that will load the file seamlessly
-     */
+    /// Creates an encoded image that maps to a storage file thus allowing to
+    /// seamlessly cache images as needed. This only works reasonably well for very small
+    /// files.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the name of the storage file
+    ///
+    /// - `placeholder`: an image that must be of the same size as the EncodedImage
+    ///
+    /// #### Returns
+    ///
+    /// image that will load the file seamlessly
     public static StorageImageAsync create(String fileName, Image placeholder) {
         return new StorageImageAsync(fileName, placeholder);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void resetCache() {
         super.resetCache();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Image getInternal() {
         if (imageData == null) {
@@ -87,9 +85,7 @@ public final class StorageImageAsync extends EncodedImage {
         return super.getInternal();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public byte[] getImageData() {
         if (imageData != null) {
@@ -126,9 +122,7 @@ public final class StorageImageAsync extends EncodedImage {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         if (changePending) {
@@ -140,9 +134,7 @@ public final class StorageImageAsync extends EncodedImage {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isAnimation() {
         return true;

@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -27,27 +25,21 @@ import com.codename1.ui.geom.GeneralPath;
 import java.util.List;
 
 
-/**
- * Draws smooth curves through XY series values using cubic interpolation.
- * <p>
- * Use this chart when you want to emphasise the trend between points rather
- * than the raw straight-line segments of {@link LineChart}. Supply the
- * {@link XYMultipleSeriesDataset} and {@link XYMultipleSeriesRenderer} as usual
- * and pass an optional smoothness factor to control how tightly the curve
- * follows the provided data points.
- */
+/// Draws smooth curves through XY series values using cubic interpolation.
+///
+/// Use this chart when you want to emphasise the trend between points rather
+/// than the raw straight-line segments of `LineChart`. Supply the
+/// `XYMultipleSeriesDataset` and `XYMultipleSeriesRenderer` as usual
+/// and pass an optional smoothness factor to control how tightly the curve
+/// follows the provided data points.
 public class CubicLineChart extends LineChart {
-    /**
-     * The chart type.
-     */
+    /// The chart type.
     public static final String TYPE = "Cubic";
 
     private final float mFirstMultiplier;
 
     private final float mSecondMultiplier;
-    /**
-     * A path measure for retrieving the points on the path.
-     */
+    /// A path measure for retrieving the points on the path.
     private PathMeasure mPathMeasure;
 
     public CubicLineChart() {
@@ -57,17 +49,19 @@ public class CubicLineChart extends LineChart {
         mSecondMultiplier = 1 - mFirstMultiplier;
     }
 
-    /**
-     * Builds a cubic line chart.
-     *
-     * @param dataset    the dataset
-     * @param renderer   the renderer
-     * @param smoothness smoothness determines how smooth the curve should be,
-     *                   range [0->0.5] super smooth, 0.5, means that it might not get
-     *                   close to control points if you have random data // less smooth,
-     *                   (close to 0) means that it will most likely touch all control //
-     *                   points
-     */
+    /// Builds a cubic line chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the dataset
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// - `smoothness`: @param smoothness smoothness determines how smooth the curve should be,
+    /// range [0->0.5] super smooth, 0.5, means that it might not get
+    /// close to control points if you have random data // less smooth,
+    /// (close to 0) means that it will most likely touch all control //
+    /// points
     public CubicLineChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer,
                           float smoothness) {
         super(dataset, renderer);
@@ -122,17 +116,23 @@ public class CubicLineChart extends LineChart {
         result.setY(p1y + (diffY * multiplier));
     }
 
-    /**
-     * Draws the series points.
-     *
-     * @param canvas         the canvas
-     * @param paint          the paint object
-     * @param pointsList     the points to be rendered
-     * @param seriesRenderer the series renderer
-     * @param yAxisValue     the y axis value in pixels
-     * @param seriesIndex    the series index
-     * @param startIndex     the start index of the rendering points
-     */
+    /// Draws the series points.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `paint`: the paint object
+    ///
+    /// - `pointsList`: the points to be rendered
+    ///
+    /// - `seriesRenderer`: the series renderer
+    ///
+    /// - `yAxisValue`: the y axis value in pixels
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `startIndex`: the start index of the rendering points
     @Override
     protected void drawPoints(Canvas canvas, Paint paint, List<Float> pointsList,
                               XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
@@ -161,11 +161,11 @@ public class CubicLineChart extends LineChart {
         }
     }
 
-    /**
-     * Returns the chart type identifier.
-     *
-     * @return the chart type
-     */
+    /// Returns the chart type identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the chart type
     @Override
     public String getChartType() {
         return TYPE;

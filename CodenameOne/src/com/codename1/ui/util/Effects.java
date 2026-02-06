@@ -30,59 +30,71 @@ import com.codename1.ui.Image;
 import com.codename1.ui.RGBImage;
 import com.codename1.ui.animations.Motion;
 
-/**
- * Static utility class useful for simple visual effects that don't quite fit
- * anywhere else in the core API.
- *
- * @author Shai Almog
- */
+/// Static utility class useful for simple visual effects that don't quite fit
+/// anywhere else in the core API.
+///
+/// @author Shai Almog
 public final class Effects {
     private Effects() {
     }
 
-    /**
-     * Takes the given image and appends an effect of reflection below it that
-     * is similar to the way elements appear in water beneath them. This method
-     * shouldn't be used when numAlpha is very low.
-     *
-     * @param source image to add the reflection effect to
-     * @return new image with a reflection effect for the source image
-     */
+    /// Takes the given image and appends an effect of reflection below it that
+    /// is similar to the way elements appear in water beneath them. This method
+    /// shouldn't be used when numAlpha is very low.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: image to add the reflection effect to
+    ///
+    /// #### Returns
+    ///
+    /// new image with a reflection effect for the source image
     public static Image reflectionImage(Image source) {
         return reflectionImage(source, 0.5f, 120);
     }
 
-    /**
-     * Takes the given image and appends an effect of reflection below it that
-     * is similar to the way elements appear in water beneath them. This method
-     * shouldn't be used when numAlpha is very low.
-     *
-     * @param source      image to add the reflection effect to
-     * @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
-     *                    height of the image, 0.75f will create a 3 quarter height mirror etc.
-     * @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
-     *                    (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
-     *                    opaque use 255. A recommended value would be between 128 to 90.
-     * @return new image with a reflection effect for the source image
-     */
+    /// Takes the given image and appends an effect of reflection below it that
+    /// is similar to the way elements appear in water beneath them. This method
+    /// shouldn't be used when numAlpha is very low.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: image to add the reflection effect to
+    ///
+    /// - `mirrorRatio`: @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
+    /// height of the image, 0.75f will create a 3 quarter height mirror etc.
+    ///
+    /// - `alphaRatio`: @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
+    /// (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
+    /// opaque use 255. A recommended value would be between 128 to 90.
+    ///
+    /// #### Returns
+    ///
+    /// new image with a reflection effect for the source image
     public static Image reflectionImage(Image source, float mirrorRatio, int alphaRatio) {
         return reflectionImage(source, mirrorRatio, alphaRatio, 0);
     }
 
-    /**
-     * Takes the given image and appends an effect of reflection below it that
-     * is similar to the way elements appear in water beneath them. This method
-     * shouldn't be used when numAlpha is very low.
-     *
-     * @param source      image to add the reflection effect to
-     * @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
-     *                    height of the image, 0.75f will create a 3 quarter height mirror etc.
-     * @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
-     *                    (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
-     *                    opaque use 255. A recommended value would be between 128 to 90.
-     * @param spacing     the distance in pixels between the image and its reflection
-     * @return new image with a reflection effect for the source image
-     */
+    /// Takes the given image and appends an effect of reflection below it that
+    /// is similar to the way elements appear in water beneath them. This method
+    /// shouldn't be used when numAlpha is very low.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: image to add the reflection effect to
+    ///
+    /// - `mirrorRatio`: @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
+    /// height of the image, 0.75f will create a 3 quarter height mirror etc.
+    ///
+    /// - `alphaRatio`: @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
+    /// (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
+    /// opaque use 255. A recommended value would be between 128 to 90.
+    ///
+    /// - `spacing`: the distance in pixels between the image and its reflection
+    ///
+    /// #### Returns
+    ///
+    /// new image with a reflection effect for the source image
     public static Image reflectionImage(Image source, float mirrorRatio, int alphaRatio, int spacing) {
         int w = source.getWidth();
         int h = source.getHeight();
@@ -109,32 +121,41 @@ public final class Effects {
         return rgbImg;
     }
 
-    /**
-     * Grows or shrinks the given component to its new preferred size, this method
-     * essentially takes a component whose preferred size has changed and creates a "growing"
-     * effect that lasts for the duration. Notice that some components (such as text areas)
-     * don't report proper preferred size untill they are laid out once. Hence the first time
-     * around a text area (or container containing a text area) will not produce the expected
-     * effect. This can be solved by invoking revalidate before the call to this method only the
-     * first time around!
-     *
-     * @param c        the component to grow/shrink, its size must be different from its preferred size
-     * @param duration the duration in milliseconds for the grow/shrink animation
-     * @deprecated use Component.growShrink instead
-     */
+    /// Grows or shrinks the given component to its new preferred size, this method
+    /// essentially takes a component whose preferred size has changed and creates a "growing"
+    /// effect that lasts for the duration. Notice that some components (such as text areas)
+    /// don't report proper preferred size untill they are laid out once. Hence the first time
+    /// around a text area (or container containing a text area) will not produce the expected
+    /// effect. This can be solved by invoking revalidate before the call to this method only the
+    /// first time around!
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component to grow/shrink, its size must be different from its preferred size
+    ///
+    /// - `duration`: the duration in milliseconds for the grow/shrink animation
+    ///
+    /// #### Deprecated
+    ///
+    /// use Component.growShrink instead
     public static void growShrink(final Component c, int duration) {
         c.growShrink(duration);
     }
 
-    /**
-     * Skews an image in a faux perspective transform on the vertical axis, this is effectively a fast scale
-     * algorithm that both shrinks the image vertically and reduces the width
-     *
-     * @param topScaleRatio    the amount by which the top portion should be scaled where 1.0 means none
-     * @param bottomScaleRatio the amount by which the bottom portion should be scaled where 1.0 means none
-     * @param verticalShrink   the scale ratio for the image height where 1.0 means none
-     * @return the perspective translated image
-     */
+    /// Skews an image in a faux perspective transform on the vertical axis, this is effectively a fast scale
+    /// algorithm that both shrinks the image vertically and reduces the width
+    ///
+    /// #### Parameters
+    ///
+    /// - `topScaleRatio`: the amount by which the top portion should be scaled where 1.0 means none
+    ///
+    /// - `bottomScaleRatio`: the amount by which the bottom portion should be scaled where 1.0 means none
+    ///
+    /// - `verticalShrink`: the scale ratio for the image height where 1.0 means none
+    ///
+    /// #### Returns
+    ///
+    /// the perspective translated image
     public static Image verticalPerspective(Image i, float topScaleRatio, float bottomScaleRatio, float verticalShrink) {
         int[] imageData = i.getRGB();
         int sourceWidth = i.getWidth();
@@ -179,36 +200,44 @@ public final class Effects {
     }
 
 
-    /**
-     * Create a blur image from the given image.
-     * The algorithm is gaussian blur - https://en.wikipedia.org/wiki/Gaussian_blur
-     *
-     * @param image  the image to blur
-     * @param radius the radius to be used in the algorithm
-     */
+    /// Create a blur image from the given image.
+    /// The algorithm is gaussian blur - https://en.wikipedia.org/wiki/Gaussian_blur
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image to blur
+    ///
+    /// - `radius`: the radius to be used in the algorithm
     public static Image gaussianBlurImage(Image image, float radius) {
         return Display.getInstance().gaussianBlurImage(image, radius);
     }
 
-    /**
-     * Returns true if gaussian blur is supported on this platform
-     *
-     * @return true if gaussian blur is supported.
-     */
+    /// Returns true if gaussian blur is supported on this platform
+    ///
+    /// #### Returns
+    ///
+    /// true if gaussian blur is supported.
     public static boolean isGaussianBlurSupported() {
         return Display.getInstance().isGaussianBlurSupported();
     }
 
-    /**
-     * Generates a shadow for the source image and returns a new larger image containing the shadow
-     *
-     * @param source     the source image for whom the shadow should be generated
-     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
-     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
-     * @param xDistance  the distance on the x axis from the main image body in pixels e.g. a negative value will represent a lightsource from the right (shadow on the left)
-     * @param yDistance  the distance on the y axis from the main image body in pixels e.g. a negative value will represent a lightsource from the bottom (shadow on top)
-     * @return a new image whose size incorporates x/yDistance
-     */
+    /// Generates a shadow for the source image and returns a new larger image containing the shadow
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the source image for whom the shadow should be generated
+    ///
+    /// - `blurRadius`: a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+    ///
+    /// - `opacity`: the opacity of the shadow between 0 - 1 where 1 is completely opaque
+    ///
+    /// - `xDistance`: the distance on the x axis from the main image body in pixels e.g. a negative value will represent a lightsource from the right (shadow on the left)
+    ///
+    /// - `yDistance`: the distance on the y axis from the main image body in pixels e.g. a negative value will represent a lightsource from the bottom (shadow on top)
+    ///
+    /// #### Returns
+    ///
+    /// a new image whose size incorporates x/yDistance
     public static Image dropshadow(Image source, int blurRadius, float opacity, int xDistance, int yDistance) {
         Image s = dropshadow(source, blurRadius, opacity);
         Image n = Image.createImage(source.getWidth() + Math.abs(xDistance), source.getHeight() + Math.abs(yDistance), 0);
@@ -232,15 +261,20 @@ public final class Effects {
         return n;
     }
 
-    /**
-     * Generates a shadow for the source image and returns either the shadow itself or the image merged with the
-     * shadow.
-     *
-     * @param source     the source image for whom the shadow should be generated
-     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
-     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
-     * @return an image containing the shadow for source
-     */
+    /// Generates a shadow for the source image and returns either the shadow itself or the image merged with the
+    /// shadow.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the source image for whom the shadow should be generated
+    ///
+    /// - `blurRadius`: a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+    ///
+    /// - `opacity`: the opacity of the shadow between 0 - 1 where 1 is completely opaque
+    ///
+    /// #### Returns
+    ///
+    /// an image containing the shadow for source
     public static Image dropshadow(Image source, int blurRadius, float opacity) {
         int[] rgb = source.getRGB();
         for (int iter = 0; iter < rgb.length; iter++) {
@@ -256,15 +290,21 @@ public final class Effects {
 
     }
 
-    /**
-     * Generates a square shadow and returns it
-     *
-     * @param width      the width of the shadow image
-     * @param height     the height of the shadow image
-     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
-     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
-     * @return an image containing the shadow for source
-     */
+    /// Generates a square shadow and returns it
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the width of the shadow image
+    ///
+    /// - `height`: the height of the shadow image
+    ///
+    /// - `blurRadius`: a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+    ///
+    /// - `opacity`: the opacity of the shadow between 0 - 1 where 1 is completely opaque
+    ///
+    /// #### Returns
+    ///
+    /// an image containing the shadow for source
     public static Image squareShadow(int width, int height, int blurRadius, float opacity) {
 
         Image img = Image.createImage(width + blurRadius * 2, height + blurRadius * 2, 0);

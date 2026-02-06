@@ -26,64 +26,64 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Point;
 
-/**
- * Do not use this layer directly, you need to add this layer into a PointsLayer class
- * instance in order for it to work as expected!
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// Do not use this layer directly, you need to add this layer into a PointsLayer class
+/// instance in order for it to work as expected!
+///
+/// @author Roman Kamyk
 public class PointLayer extends Coord implements Layer {
 
     private final String name;
     private Image icon;
     private boolean displayName;
 
-    /**
-     * Creates a Point Layer.
-     *
-     * @param position the position of the Point
-     * @param getName  the getName of the Point
-     * @param icon     icon of the Point
-     */
+    /// Creates a Point Layer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: the position of the Point
+    ///
+    /// - `getName`: the getName of the Point
+    ///
+    /// - `icon`: icon of the Point
     public PointLayer(Coord position, String name, Image icon) {
         super(position);
         this.name = name;
         this.icon = icon;
     }
 
-    /**
-     * Gets the Point name
-     *
-     * @return the Point name
-     */
+    /// Gets the Point name
+    ///
+    /// #### Returns
+    ///
+    /// the Point name
     @Override
     public String getName() {
         return name;
     }
 
-    /**
-     * Gets the point Icon
-     *
-     * @return the point Icon
-     */
+    /// Gets the point Icon
+    ///
+    /// #### Returns
+    ///
+    /// the point Icon
     public Image getIcon() {
         return icon;
     }
 
-    /**
-     * Sets the display icon
-     *
-     * @param icon
-     */
+    /// Sets the display icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`
     public void setIcon(Image icon) {
         this.icon = icon;
     }
 
-    /**
-     * This method declares if the point name should be displayed
-     *
-     * @param displayName
-     */
+    /// This method declares if the point name should be displayed
+    ///
+    /// #### Parameters
+    ///
+    /// - `displayName`
     public void setDisplayName(boolean displayName) {
         this.displayName = displayName;
     }
@@ -101,9 +101,7 @@ public class PointLayer extends Coord implements Layer {
                 (icon == null ? that.icon == null : icon.equals(that.icon));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         int result = super.hashCode();
@@ -112,9 +110,7 @@ public class PointLayer extends Coord implements Layer {
         return result;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g, Tile tile) {
         Point pos = tile.pointPosition(this);
@@ -137,17 +133,13 @@ public class PointLayer extends Coord implements Layer {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return super.toString() + " " + name;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public BoundingBox boundingBox() {
         return null;

@@ -36,12 +36,10 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.util.LazyValue;
 
-/**
- * Allows binding a swipe listener to the form that enables the user to swipe back to the previous
- * form.
- *
- * @author Shai Almog
- */
+/// Allows binding a swipe listener to the form that enables the user to swipe back to the previous
+/// form.
+///
+/// @author Shai Almog
 public class SwipeBackSupport {
     boolean sideSwipePotential;
     int initialDragY;
@@ -54,32 +52,34 @@ public class SwipeBackSupport {
     ActionListener pointerReleased;
     Form destinationForm;
 
-    /**
-     * Binds support for swiping to the given forms
-     *
-     * @param currentForm the current form
-     * @param destination the destination form which can be created lazily
-     */
+    /// Binds support for swiping to the given forms
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentForm`: the current form
+    ///
+    /// - `destination`: the destination form which can be created lazily
     public static void bindBack(Form currentForm, LazyValue<Form> destination) {
         new SwipeBackSupport().bind(currentForm, destination);
     }
 
-    /**
-     * Binds support for swiping to the current form
-     *
-     * @param destination the destination form which can be created lazily
-     */
+    /// Binds support for swiping to the current form
+    ///
+    /// #### Parameters
+    ///
+    /// - `destination`: the destination form which can be created lazily
     public static void bindBack(LazyValue<Form> destination) {
         new SwipeBackSupport().bind(Display.getInstance().getCurrent(), destination);
     }
 
 
-    /**
-     * Binds support for swiping to the given forms
-     *
-     * @param currentForm the current form
-     * @param destination the destination form which can be created lazily
-     */
+    /// Binds support for swiping to the given forms
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentForm`: the current form
+    ///
+    /// - `destination`: the destination form which can be created lazily
     protected void bind(final Form currentForm, final LazyValue<Form> destination) {
         pointerDragged = new ActionListener() {
             @Override

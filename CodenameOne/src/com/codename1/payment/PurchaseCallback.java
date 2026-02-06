@@ -22,67 +22,74 @@
  */
 package com.codename1.payment;
 
-/**
- * Callback interface that the main class must implement in order for in-app-purchasing
- * to work. Once the main class implements this interface the methods within it
- * are invoked to indicate the various purchase states.
- *
- * @author Shai Almog
- */
+/// Callback interface that the main class must implement in order for in-app-purchasing
+/// to work. Once the main class implements this interface the methods within it
+/// are invoked to indicate the various purchase states.
+///
+/// @author Shai Almog
 public interface PurchaseCallback {
-    /**
-     * Indicates a the given SKU was purchased by a user. When purchasing multiple
-     * SKU's at once multiple calls to this method will be performed.
-     *
-     * @param sku the sku purchased
-     */
+    /// Indicates a the given SKU was purchased by a user. When purchasing multiple
+    /// SKU's at once multiple calls to this method will be performed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the sku purchased
     void itemPurchased(String sku);
 
-    /**
-     * Callback indicating a the given SKU purchase failed
-     *
-     * @param sku the id
-     */
+    /// Callback indicating a the given SKU purchase failed
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the id
     void itemPurchaseError(String sku, String errorMessage);
 
-    /**
-     * Invoked if a refund was granted for a purchase
-     *
-     * @param sku the sku purchased
-     * @deprecated This callback is no longer used.  Use the Receipts API to check if the user currently "owns" a product.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
-     * into how to set up in-app purchase for all scenarios including subscriptions.
-     */
+    /// Invoked if a refund was granted for a purchase
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the sku purchased
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated This callback is no longer used.  Use the Receipts API to check if the user currently "owns" a product.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
+    /// into how to set up in-app purchase for all scenarios including subscriptions.
     void itemRefunded(String sku);
 
-    /**
-     * Invoked when a subscription SKU is started
-     *
-     * @param sku the sku purchased
-     * @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
-     * into how to set up in-app purchase for all scenarios including subscriptions.
-     */
+    /// Invoked when a subscription SKU is started
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the sku purchased
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
+    /// into how to set up in-app purchase for all scenarios including subscriptions.
     void subscriptionStarted(String sku);
 
-    /**
-     * Invoked when a subscription SKU is canceled
-     *
-     * @param sku the sku purchased
-     * @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
-     * into how to set up in-app purchase for all scenarios including subscriptions.
-     */
+    /// Invoked when a subscription SKU is canceled
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the sku purchased
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
+    /// into how to set up in-app purchase for all scenarios including subscriptions.
     void subscriptionCanceled(String sku);
 
-    /**
-     * Indicates that a manual payment has failed
-     *
-     * @param paymentCode the transaction id of the payment
-     */
+    /// Indicates that a manual payment has failed
+    ///
+    /// #### Parameters
+    ///
+    /// - `paymentCode`: the transaction id of the payment
     void paymentFailed(String paymentCode, String failureReason);
 
-    /**
-     * Indicates that a manual payment has passed
-     *
-     * @param paymentCode the transaction id of the payment
-     */
+    /// Indicates that a manual payment has passed
+    ///
+    /// #### Parameters
+    ///
+    /// - `paymentCode`: the transaction id of the payment
     void paymentSucceeded(String paymentCode, double amount, String currency);
 }

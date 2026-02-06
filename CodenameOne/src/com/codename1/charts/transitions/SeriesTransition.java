@@ -29,16 +29,14 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 
-/**
- * A base class for series transitions of ChartComponent.  This should be
- * overridden by concrete classes that implement the update(int) method
- * to update the chart's model and renderer appropriately.  This class can serve
- * as a buffer for changes to the model so that they don't affect the ChartComponent
- * immediately.  Changes can either be eased in using animateChart() or updated
- * in one shot using updateChart().
- *
- * @author shannah
- */
+/// A base class for series transitions of ChartComponent.  This should be
+/// overridden by concrete classes that implement the update(int) method
+/// to update the chart's model and renderer appropriately.  This class can serve
+/// as a buffer for changes to the model so that they don't affect the ChartComponent
+/// immediately.  Changes can either be eased in using animateChart() or updated
+/// in one shot using updateChart().
+///
+/// @author shannah
 public abstract class SeriesTransition implements Animation {
 
 
@@ -47,29 +45,19 @@ public abstract class SeriesTransition implements Animation {
     public static final int EASING_OUT = 3;
     public static final int EASING_IN_OUT = 4;
 
-    /**
-     * The chart to be animated.
-     */
+    /// The chart to be animated.
     private ChartComponent chart;
 
-    /**
-     * The duration of the transition (in ms).
-     */
+    /// The duration of the transition (in ms).
     private int duration;
 
-    /**
-     * Motion that will be used to perform the transition.
-     */
+    /// Motion that will be used to perform the transition.
     private Motion motion;
 
-    /**
-     * The type of easing that should be used for the transition.
-     */
+    /// The type of easing that should be used for the transition.
     private int easing = EASING_LINEAR;
 
-    /**
-     * Flag to indicate that the animation is finished.
-     */
+    /// Flag to indicate that the animation is finished.
     private boolean finished;
 
 
@@ -89,13 +77,11 @@ public abstract class SeriesTransition implements Animation {
     }
 
 
-    /**
-     * Initializes the transition for another iteration.  This can be overridden
-     * by subclasses to provide their own initialization.  This method
-     * will be called just prior to the transition taking place.
-     * IMPORTANT: Subclasses must make sure to call super.initTransition()
-     * so that the animation will be initialized properly.
-     */
+    /// Initializes the transition for another iteration.  This can be overridden
+    /// by subclasses to provide their own initialization.  This method
+    /// will be called just prior to the transition taking place.
+    /// IMPORTANT: Subclasses must make sure to call super.initTransition()
+    /// so that the animation will be initialized properly.
     protected void initTransition() {
         finished = false;
         switch (getEasing()) {
@@ -115,20 +101,18 @@ public abstract class SeriesTransition implements Animation {
         motion.start();
     }
 
-    /**
-     * Cleans up any settings in the transition.  Called after a transition
-     * is complete.  This is meant to be overridden by subclasses.
-     */
+    /// Cleans up any settings in the transition.  Called after a transition
+    /// is complete.  This is meant to be overridden by subclasses.
     protected void cleanup() {
 
     }
 
-    /**
-     * Updates the renderer and model at the specified progress position of
-     * the animation.  Meant to be overridden by subclasses.
-     *
-     * @param progress The progress of the animation (between 0 and 100).
-     */
+    /// Updates the renderer and model at the specified progress position of
+    /// the animation.  Meant to be overridden by subclasses.
+    ///
+    /// #### Parameters
+    ///
+    /// - `progress`: The progress of the animation (between 0 and 100).
     protected abstract void update(int progress);
 
     @Override
@@ -149,78 +133,74 @@ public abstract class SeriesTransition implements Animation {
         getChart().repaint();
     }
 
-    /**
-     * Gets the ChartComponent that is the subject of the transition.
-     *
-     * @return the chart
-     */
+    /// Gets the ChartComponent that is the subject of the transition.
+    ///
+    /// #### Returns
+    ///
+    /// the chart
     public ChartComponent getChart() {
         return chart;
     }
 
-    /**
-     * Sets the ChartComponent that is the subject of the transition.
-     *
-     * @param chart the chart to set
-     */
+    /// Sets the ChartComponent that is the subject of the transition.
+    ///
+    /// #### Parameters
+    ///
+    /// - `chart`: the chart to set
     public void setChart(ChartComponent chart) {
         this.chart = chart;
     }
 
-    /**
-     * Gets the duration of the transition. (in milliseconds)
-     *
-     * @return the duration
-     */
+    /// Gets the duration of the transition. (in milliseconds)
+    ///
+    /// #### Returns
+    ///
+    /// the duration
     public int getDuration() {
         return duration;
     }
 
-    /**
-     * Sets the duration of the transition in milliseconds.
-     *
-     * @param duration the duration to set
-     */
+    /// Sets the duration of the transition in milliseconds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration to set
     public void setDuration(int duration) {
         this.duration = duration;
     }
 
-    /**
-     * Gets the type of easing used in the transition.  Should be one of
-     * EASING_LINEAR, EASING_IN, EASING_OUT, or EASING_IN_OUT.
-     *
-     * @return the easing
-     */
+    /// Gets the type of easing used in the transition.  Should be one of
+    /// EASING_LINEAR, EASING_IN, EASING_OUT, or EASING_IN_OUT.
+    ///
+    /// #### Returns
+    ///
+    /// the easing
     public int getEasing() {
         return easing;
     }
 
-    /**
-     * Sets the type of easing used in the transition.  Should be one of
-     * EASING_LINEAR, EASING_IN, EASING_OUT, or EASING_IN_OUT.
-     *
-     * @param easing the easing to set
-     */
+    /// Sets the type of easing used in the transition.  Should be one of
+    /// EASING_LINEAR, EASING_IN, EASING_OUT, or EASING_IN_OUT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `easing`: the easing to set
     public void setEasing(int easing) {
         this.easing = easing;
     }
 
 
-    /**
-     * Applies all pending changes to the chart model and renderer using the
-     * current animation settings.
-     */
+    /// Applies all pending changes to the chart model and renderer using the
+    /// current animation settings.
     public void animateChart() {
         initTransition();
         chart.getComponentForm().registerAnimated(this);
 
     }
 
-    /**
-     * Applies all pending changes to the chart model and renderer and repaints
-     * the chart.  This is basically like calling animateChart() with a duration
-     * of 0.
-     */
+    /// Applies all pending changes to the chart model and renderer and repaints
+    /// the chart.  This is basically like calling animateChart() with a duration
+    /// of 0.
     public void updateChart() {
         chart.repaint();
     }

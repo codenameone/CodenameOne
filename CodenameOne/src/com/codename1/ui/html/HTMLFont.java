@@ -27,16 +27,16 @@ import com.codename1.ui.Font;
 
 import java.util.Vector;
 
-/**
- * This class is a wrapper class for a Codename One font object, that keeps additional info on the font as required for HTML rendering by HTMLComponent.<br>
- * The info kept on the font is its family, size and style. These attributes are available in Codename One only for system fonts,
- * but here they are made available for bitmap fonts using a key to describe the font (See HTMLComponent.addFont)<br>
- * <br>
- * In addition this class keeps track of "counterpart" fonts for this font in a space of 4 attributes: BOLD, ITALIC, BIG and SMALL.<br>
- * For example a bold font is the BOLD counterpart of a plain one. A font with size 16 is the BIG counterpart of a font the size of 12 - provided that all other attributes are the same (i.e. an arial.16 font is not the BIG counterpart of a courier.12 etc.)<br>
- *
- * @author Ofir Leitner
- */
+/// This class is a wrapper class for a Codename One font object, that keeps additional info on the font as required for HTML rendering by HTMLComponent.
+///
+/// The info kept on the font is its family, size and style. These attributes are available in Codename One only for system fonts,
+/// but here they are made available for bitmap fonts using a key to describe the font (See HTMLComponent.addFont)
+///
+/// In addition this class keeps track of "counterpart" fonts for this font in a space of 4 attributes: BOLD, ITALIC, BIG and SMALL.
+///
+/// For example a bold font is the BOLD counterpart of a plain one. A font with size 16 is the BIG counterpart of a font the size of 12 - provided that all other attributes are the same (i.e. an arial.16 font is not the BIG counterpart of a courier.12 etc.)
+///
+/// @author Ofir Leitner
 class HTMLFont {
 
     static final int BOLD = 0;
@@ -44,9 +44,7 @@ class HTMLFont {
     static final int BIG = 2;
     static final int SMALL = 3;
     private static final char TOKEN = '.';
-    /**
-     * The following tags are tags that mainly define the style of their content, and one of the things they can change is the font
-     */
+    /// The following tags are tags that mainly define the style of their content, and one of the things they can change is the font
     static private final int[] SPECIAL_FONT_TAGS_ID = {
             HTMLElement.TAG_EM, HTMLElement.TAG_STRONG,
             HTMLElement.TAG_DFN, HTMLElement.TAG_CODE,
@@ -59,10 +57,8 @@ class HTMLFont {
     };
     static Vector SPECIAL_FONT_TAGS = new Vector();
 
-    /**
-     * The static segment sets up the SPECIAL_FONT_TAGS vector with values from the SPECIAL_FONT_TAGS_ID array.
-     * This vector is used for lookup later on.
-     */
+    /// The static segment sets up the SPECIAL_FONT_TAGS vector with values from the SPECIAL_FONT_TAGS_ID array.
+    /// This vector is used for lookup later on.
     static {
         for (int tagId : SPECIAL_FONT_TAGS_ID) {
             SPECIAL_FONT_TAGS.addElement(HTMLElement.TAG_NAMES[tagId]);
@@ -78,12 +74,13 @@ class HTMLFont {
     boolean bold;
     boolean italic;
 
-    /**
-     * Constructs the HTMLFont
-     *
-     * @param fontKey The key for this font (See class definition)
-     * @param font    The actual Codename One font object (Can be either system or bitmap font)
-     */
+    /// Constructs the HTMLFont
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontKey`: The key for this font (See class definition)
+    ///
+    /// - `font`: The actual Codename One font object (Can be either system or bitmap font)
     HTMLFont(String fontKey, Font font) {
         this.font = font;
         systemFont = (font.getCharset() == null); // A systemfont has no "supported" charset
@@ -156,40 +153,44 @@ class HTMLFont {
 
     }
 
-    /**
-     * Checks if this is a system font
-     *
-     * @return true if the font is a system font, false otherwise
-     */
+    /// Checks if this is a system font
+    ///
+    /// #### Returns
+    ///
+    /// true if the font is a system font, false otherwise
     boolean isSystemFont() {
         return systemFont;
     }
 
-    /**
-     * Checks if this is a bold font
-     *
-     * @return true if the font is bold, false otherwise
-     */
+    /// Checks if this is a bold font
+    ///
+    /// #### Returns
+    ///
+    /// true if the font is bold, false otherwise
     boolean isBold() {
         return bold;
     }
 
-    /**
-     * Checks if this is an Italic font
-     *
-     * @return true if the font is italic, false otherwise
-     */
+    /// Checks if this is an Italic font
+    ///
+    /// #### Returns
+    ///
+    /// true if the font is italic, false otherwise
     boolean isItalic() {
         return italic;
     }
 
-    /**
-     * Checks if the given font is the counterpart of the current form in the sense of the given attribute
-     *
-     * @param attribute The attribute, can be one of BOLD, ITALIC, BIG or SMALL
-     * @param font      The font to check
-     * @return true if the font is a counterpart, false otherwise
-     */
+    /// Checks if the given font is the counterpart of the current form in the sense of the given attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `attribute`: The attribute, can be one of BOLD, ITALIC, BIG or SMALL
+    ///
+    /// - `font`: The font to check
+    ///
+    /// #### Returns
+    ///
+    /// true if the font is a counterpart, false otherwise
     boolean isCounterpart(int attribute, HTMLFont font) {
         switch (attribute) {
             case BOLD:
@@ -205,23 +206,29 @@ class HTMLFont {
         }
     }
 
-    /**
-     * Utility method that first checks that neither font family is null and then compares them
-     *
-     * @param font The other font to check
-     * @return true if the family of the compared font and this font are identical (and both are not null), false otherwise
-     */
+    /// Utility method that first checks that neither font family is null and then compares them
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: The other font to check
+    ///
+    /// #### Returns
+    ///
+    /// true if the family of the compared font and this font are identical (and both are not null), false otherwise
     boolean isSameFamily(HTMLFont font) {
         return ((family != null) && (font.getFamily() != null) && (family.equals(font.getFamily())));
     }
 
 
-    /**
-     * Checks if the specified font is a big counterpart of this font.
-     *
-     * @param font The font to check
-     * @return true if this is a big couterpart, false otherwise
-     */
+    /// Checks if the specified font is a big counterpart of this font.
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: The font to check
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a big couterpart, false otherwise
     private boolean isBigCounterpart(HTMLFont font) {
         if (size <= font.getSize()) {
             return false;
@@ -229,12 +236,15 @@ class HTMLFont {
         return (isSameFamily(font) && (style == font.getStyle()));
     }
 
-    /**
-     * Checks if the specified font is a small counterpart of this font.
-     *
-     * @param font The font to check
-     * @return true if this is a small couterpart, false otherwise
-     */
+    /// Checks if the specified font is a small counterpart of this font.
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: The font to check
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a small couterpart, false otherwise
     private boolean isSmallCounterpart(HTMLFont font) {
         if (size >= font.getSize()) {
             return false;
@@ -242,12 +252,15 @@ class HTMLFont {
         return (isSameFamily(font) && (style == font.getStyle()));
     }
 
-    /**
-     * Checks if the specified font is a bold counterpart of this font.
-     *
-     * @param font The font to check
-     * @return true if this is a bold couterpart, false otherwise
-     */
+    /// Checks if the specified font is a bold counterpart of this font.
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: The font to check
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a bold couterpart, false otherwise
 
     private boolean isBoldCounterpart(HTMLFont font) {
         if (!bold) {
@@ -256,12 +269,15 @@ class HTMLFont {
         return ((size == font.getSize()) && (isSameFamily(font)) && (italic == font.isItalic()));
     }
 
-    /**
-     * Checks if the specified font is an italic counterpart of this font.
-     *
-     * @param font The font to check
-     * @return true if this is an italic couterpart, false otherwise
-     */
+    /// Checks if the specified font is an italic counterpart of this font.
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: The font to check
+    ///
+    /// #### Returns
+    ///
+    /// true if this is an italic couterpart, false otherwise
     private boolean isItalicCounterpart(HTMLFont font) {
         if (!italic) {
             return false;
@@ -270,32 +286,35 @@ class HTMLFont {
     }
 
 
-    /**
-     * Returns the font family (i.e. Arial, Times New Roman)
-     *
-     * @return the string describing this font family
-     */
+    /// Returns the font family (i.e. Arial, Times New Roman)
+    ///
+    /// #### Returns
+    ///
+    /// the string describing this font family
     String getFamily() {
         return family;
     }
 
-    /**
-     * Returns the Codename One font wrapped in this HTMLFont
-     *
-     * @return the Codename One font wrapped in this HTMLFont
-     */
+    /// Returns the Codename One font wrapped in this HTMLFont
+    ///
+    /// #### Returns
+    ///
+    /// the Codename One font wrapped in this HTMLFont
     Font getFont() {
         return font;
     }
 
-    /**
-     * Returns the counterpart font for this font in the given attribute.
-     * This method either creates it or fetches it if it was already set. It handles both system and bitmap fonts.
-     * Note that a counterpart font can be the font itself if no other suitable font was found.
-     *
-     * @param attribute The requested counterpart attribute
-     * @return the counterpart font for this font in the given attribute
-     */
+    /// Returns the counterpart font for this font in the given attribute.
+    /// This method either creates it or fetches it if it was already set. It handles both system and bitmap fonts.
+    /// Note that a counterpart font can be the font itself if no other suitable font was found.
+    ///
+    /// #### Parameters
+    ///
+    /// - `attribute`: The requested counterpart attribute
+    ///
+    /// #### Returns
+    ///
+    /// the counterpart font for this font in the given attribute
     HTMLFont getCounterpartFont(int attribute) {
         if ((systemFont) && (counterpartFonts[attribute] == null)) { //Note that bold counterpart for a bold font is already set as the font itself in the constructor and so on for all attributes
             switch (attribute) {
@@ -322,12 +341,13 @@ class HTMLFont {
         return counterpartFonts[attribute];
     }
 
-    /**
-     * Sets the specified font as the counterpart of this font in the given attribute
-     *
-     * @param attribute       The attribute in which the specified font is the counterpart of this font.
-     * @param counterpartFont The counter part font
-     */
+    /// Sets the specified font as the counterpart of this font in the given attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `attribute`: The attribute in which the specified font is the counterpart of this font.
+    ///
+    /// - `counterpartFont`: The counter part font
     void setCounterpartFont(int attribute, HTMLFont counterpartFont) {
         counterpartFonts[attribute] = counterpartFont;
     }
@@ -335,58 +355,61 @@ class HTMLFont {
 
     // font "interface" methods
 
-    /**
-     * Return the total height of the font
-     *
-     * @return the total height of the font
-     */
+    /// Return the total height of the font
+    ///
+    /// #### Returns
+    ///
+    /// the total height of the font
     int getHeight() {
         return font.getHeight();
     }
 
-    /**
-     * Return the width of the given string in this font instance
-     *
-     * @param str the given string     *
-     * @return the width of the given string in this font instance
-     */
+    /// Return the width of the given string in this font instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: the given string     *
+    ///
+    /// #### Returns
+    ///
+    /// the width of the given string in this font instance
     int stringWidth(String str) {
         return font.stringWidth(str);
     }
 
-    /**
-     * Return Optional operation returning the font face for system fonts
-     *
-     * @return Optional operation returning the font face for system fonts
-     */
+    /// Return Optional operation returning the font face for system fonts
+    ///
+    /// #### Returns
+    ///
+    /// Optional operation returning the font face for system fonts
     int getFace() {
         return font.getFace();
     }
 
-    /**
-     * Returns the style of the font
-     *
-     * @return STYLE_PLAIN, STYLE_BOLD or STYLE_ITALIC or STYLE_BOLD | STYLE_ITALIC
-     */
+    /// Returns the style of the font
+    ///
+    /// #### Returns
+    ///
+    /// STYLE_PLAIN, STYLE_BOLD or STYLE_ITALIC or STYLE_BOLD | STYLE_ITALIC
     int getStyle() {
         return style;
     }
 
-    /**
-     * Returns the font size. For system fonts this would be either SIZE_SMALL, SIZE_MEDIUM or SIZE_LARGE.
-     * For bitmap font this would be the exact size as defined in the font key.
-     *
-     * @return the font size
-     */
+    /// Returns the font size. For system fonts this would be either SIZE_SMALL, SIZE_MEDIUM or SIZE_LARGE.
+    /// For bitmap font this would be the exact size as defined in the font key.
+    ///
+    /// #### Returns
+    ///
+    /// the font size
     int getSize() {
         return size;
     }
 
-    /**
-     * Returns the font size in pixels. For system fonts an estimation is made.
-     *
-     * @return the font size in pixels
-     */
+    /// Returns the font size in pixels. For system fonts an estimation is made.
+    ///
+    /// #### Returns
+    ///
+    /// the font size in pixels
     int getSizeInPixels() {
         if (systemFont) {
             return font.getHeight() - 2; //estimation - usually a font's hright is bigger in a few pixels than the size

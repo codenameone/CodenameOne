@@ -44,16 +44,17 @@ import static com.codename1.ui.CN.EAST;
 import static com.codename1.ui.CN.WEST;
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * <p>
- * A complex button similar to MultiButton that breaks lines automatically and
- * looks like a regular button (more or less). Unlike the multi button the span
- * button has the UIID style of a button.</p>
- * <script src="https://gist.github.com/codenameone/7bc6baa3a0229ec9d6f6.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-spanbutton.png" alt="SpanButton Sample" />
- *
- * @author Shai Almog
- */
+/// A complex button similar to MultiButton that breaks lines automatically and
+/// looks like a regular button (more or less). Unlike the multi button the span
+/// button has the UIID style of a button.
+///
+/// ```java
+/// SpanButton sb = new SpanButton("SpanButton is a composite component (lead component) that looks/acts like a Button but can break lines rather than crop them when the text is very long.");
+/// sb.setIcon(icon);
+/// hi.add(sb);
+/// ```
+///
+/// @author Shai Almog
 public class SpanButton extends Container implements ActionSource<ActionEvent>, SelectableIconHolder, TextHolder {
 
     private final Button actualButton;
@@ -61,27 +62,24 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     private int gap = Label.getDefaultGap();
     private boolean shouldLocalize = true;
 
-    /**
-     * Default constructor will be useful when adding this to the GUI builder
-     */
+    /// Default constructor will be useful when adding this to the GUI builder
     public SpanButton() {
         this("");
     }
 
-    /**
-     * Constructor accepting default text and uiid for the text
-     *
-     * @param txt      the text
-     * @param textUiid the new text UIID
-     */
+    /// Constructor accepting default text and uiid for the text
+    ///
+    /// #### Parameters
+    ///
+    /// - `txt`: the text
+    ///
+    /// - `textUiid`: the new text UIID
     public SpanButton(String txt, String textUiid) {
         this(txt);
         text.setUIID(textUiid);
     }
 
-    /**
-     * Constructor accepting default text
-     */
+    /// Constructor accepting default text
     public SpanButton(String txt) {
         setUIIDFinal("Button");
         setLayout(new BorderLayout());
@@ -146,29 +144,29 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         }
     }
 
-    /**
-     * Returns the TextArea holding the actual text
-     *
-     * @return the component
-     */
+    /// Returns the TextArea holding the actual text
+    ///
+    /// #### Returns
+    ///
+    /// the component
     public TextArea getTextComponent() {
         return text;
     }
 
-    /**
-     * Returns the uiid of the actual text
-     *
-     * @return the uiid
-     */
+    /// Returns the uiid of the actual text
+    ///
+    /// #### Returns
+    ///
+    /// the uiid
     public String getTextUIID() {
         return text.getUIID();
     }
 
-    /**
-     * Sets the UIID for the actual text
-     *
-     * @param uiid the uiid
-     */
+    /// Sets the UIID for the actual text
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the uiid
     public void setTextUIID(String uiid) {
         text.setUIID(uiid);
     }
@@ -199,50 +197,53 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         }
     }
 
-    /**
-     * Gets the component used for styling font icons on this SpanLabel.
-     *
-     * @return The component used for styling font icons on this SpanLabel.
-     * @since 7.0
-     */
+    /// Gets the component used for styling font icons on this SpanLabel.
+    ///
+    /// #### Returns
+    ///
+    /// The component used for styling font icons on this SpanLabel.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Component getIconStyleComponent() {
         return actualButton.getIconStyleComponent();
     }
 
-    /**
-     * Returns the Style proxy object for the text of this span button.
-     *
-     * @return The Style object for the text of this span button.
-     */
+    /// Returns the Style proxy object for the text of this span button.
+    ///
+    /// #### Returns
+    ///
+    /// The Style object for the text of this span button.
     public Style getTextAllStyles() {
         return text.getAllStyles();
     }
 
-    /**
-     * Returns the Style object for the text of this span button.
-     *
-     * @return The Style object for the text of this span button.
-     */
+    /// Returns the Style object for the text of this span button.
+    ///
+    /// #### Returns
+    ///
+    /// The Style object for the text of this span button.
     public Style getTextStyle() {
         return text.getStyle();
     }
 
-    /**
-     * Returns the UIID for the icon
-     *
-     * @return the uiid
-     */
+    /// Returns the UIID for the icon
+    ///
+    /// #### Returns
+    ///
+    /// the uiid
     @Override
     public String getIconUIID() {
         return actualButton.getUIID();
     }
 
-    /**
-     * Sets the uiid for the icon if present
-     *
-     * @param uiid the uiid for the icon
-     */
+    /// Sets the uiid for the icon if present
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the uiid for the icon
     @Override
     public void setIconUIID(String uiid) {
         actualButton.setUIID(uiid);
@@ -256,21 +257,21 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         s.setBgTransparency(0);
     }
 
-    /**
-     * Returns the text of the button
-     *
-     * @return the text
-     */
+    /// Returns the text of the button
+    ///
+    /// #### Returns
+    ///
+    /// the text
     @Override
     public String getText() {
         return text.getText();
     }
 
-    /**
-     * Set the text of the button
-     *
-     * @param t text of the button
-     */
+    /// Set the text of the button
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: text of the button
     @Override
     public void setText(String t) {
         if (shouldLocalize) {
@@ -280,83 +281,89 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         }
     }
 
-    /**
-     * Returns the image of the icon
-     *
-     * @return the icon
-     */
+    /// Returns the image of the icon
+    ///
+    /// #### Returns
+    ///
+    /// the icon
     @Override
     public Image getIcon() {
         return actualButton.getIcon();
     }
 
-    /**
-     * Sets the icon for the button
-     *
-     * @param i the icon
-     */
+    /// Sets the icon for the button
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
     @Override
     public void setIcon(Image i) {
         actualButton.setIcon(i);
         updateGap();
     }
 
-    /**
-     * Binds long press listener to button events.
-     *
-     * @param l
-     * @since 7.0
-     */
+    /// Binds long press listener to button events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void addLongPressListener(ActionListener l) {
         actualButton.addLongPressListener(l);
     }
 
-    /**
-     * Unbinds long press listener to button events.
-     *
-     * @param l
-     * @since 7.0
-     */
+    /// Unbinds long press listener to button events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void removeLongPressListener(ActionListener l) {
         actualButton.removeLongPressListener(l);
     }
 
-    /**
-     * Binds an action listener to button events
-     *
-     * @param l the listener
-     */
+    /// Binds an action listener to button events
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
     @Override
     public void addActionListener(ActionListener<ActionEvent> l) {
         actualButton.addActionListener(l);
     }
 
-    /**
-     * Removes the listener from tracking button events
-     *
-     * @param l the listener
-     */
+    /// Removes the listener from tracking button events
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
     @Override
     public void removeActionListener(ActionListener<ActionEvent> l) {
         actualButton.removeActionListener(l);
     }
 
-    /**
-     * Returns the icon position based on border layout constraints
-     *
-     * @return position either North/South/East/West
-     */
+    /// Returns the icon position based on border layout constraints
+    ///
+    /// #### Returns
+    ///
+    /// position either North/South/East/West
     public String getIconPosition() {
         return (String) getLayout().getComponentConstraint(actualButton);
     }
 
-    /**
-     * Sets the icon position based on border layout constraints
-     *
-     * @param s position either North/South/East/West
-     */
+    /// Sets the icon position based on border layout constraints
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: position either North/South/East/West
     public void setIconPosition(String t) {
         removeComponent(actualButton);
         addComponent(t, actualButton);
@@ -364,27 +371,25 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         revalidateLater();
     }
 
-    /**
-     * Returns the command instance of the button
-     *
-     * @return the command instance of the button
-     */
+    /// Returns the command instance of the button
+    ///
+    /// #### Returns
+    ///
+    /// the command instance of the button
     public Command getCommand() {
         return actualButton.getCommand();
     }
 
-    /**
-     * Sets the command for the component
-     *
-     * @param cmd the command
-     */
+    /// Sets the command for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command
     public void setCommand(Command cmd) {
         actualButton.setCommand(cmd);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{
@@ -392,9 +397,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
@@ -406,17 +409,13 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "Image", "String", "String", "String"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("text".equals(name)) {
@@ -437,9 +436,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("text".equals(name)) {
@@ -465,102 +462,100 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * Indicates if text should be localized when set to the component, by
-     * default all text is localized so this allows disabling automatic
-     * localization for a specific component.
-     *
-     * @return the shouldLocalize value
-     */
+    /// Indicates if text should be localized when set to the component, by
+    /// default all text is localized so this allows disabling automatic
+    /// localization for a specific component.
+    ///
+    /// #### Returns
+    ///
+    /// the shouldLocalize value
     public boolean isShouldLocalize() {
         return shouldLocalize;
     }
 
-    /**
-     * Indicates if text should be localized when set to the component, by
-     * default all text is localized so this allows disabling automatic
-     * localization for a specific component.
-     *
-     * @param shouldLocalize the shouldLocalize to set
-     */
+    /// Indicates if text should be localized when set to the component, by
+    /// default all text is localized so this allows disabling automatic
+    /// localization for a specific component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shouldLocalize`: the shouldLocalize to set
     public void setShouldLocalize(boolean shouldLocalize) {
         this.shouldLocalize = shouldLocalize;
     }
 
-    /**
-     * Returns the pressed icon of the button
-     *
-     * @return the pressed icon
-     */
+    /// Returns the pressed icon of the button
+    ///
+    /// #### Returns
+    ///
+    /// the pressed icon
     @Override
     public Image getPressedIcon() {
         return actualButton.getPressedIcon();
     }
 
-    /**
-     * Sets the pressed icon for the button
-     *
-     * @param i the icon
-     */
+    /// Sets the pressed icon for the button
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
     @Override
     public void setPressedIcon(Image i) {
         actualButton.setPressedIcon(i);
     }
 
-    /**
-     * Returns the rollover icon of the button
-     *
-     * @return the pressed icon
-     */
+    /// Returns the rollover icon of the button
+    ///
+    /// #### Returns
+    ///
+    /// the pressed icon
     @Override
     public Image getRolloverIcon() {
         return actualButton.getRolloverIcon();
     }
 
-    /**
-     * Sets the rollover icon for the button
-     *
-     * @param i the icon
-     */
+    /// Sets the rollover icon for the button
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
     @Override
     public void setRolloverIcon(Image i) {
         actualButton.setRolloverIcon(i);
     }
 
-    /**
-     * Returns the disabled icon of the button
-     *
-     * @return the pressed icon
-     */
+    /// Returns the disabled icon of the button
+    ///
+    /// #### Returns
+    ///
+    /// the pressed icon
     @Override
     public Image getDisabledIcon() {
         return actualButton.getDisabledIcon();
     }
 
-    /**
-     * Sets the disabled icon for the button
-     *
-     * @param i the icon
-     */
+    /// Sets the disabled icon for the button
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the icon
     @Override
     public void setDisabledIcon(Image i) {
         actualButton.setDisabledIcon(i);
     }
 
-    /**
-     * Returns if this is an auto released Button. Auto released Buttons will
-     * are been disarmed when a drag is happening within the Button.
-     *
-     * @return true if it's an auto released Button.
-     */
+    /// Returns if this is an auto released Button. Auto released Buttons will
+    /// are been disarmed when a drag is happening within the Button.
+    ///
+    /// #### Returns
+    ///
+    /// true if it's an auto released Button.
     public boolean isAutoRelease() {
         return actualButton.isAutoRelease();
     }
 
-    /**
-     * Sets the auto released mode of this button, by default it's not an auto
-     * released Button
-     */
+    /// Sets the auto released mode of this button, by default it's not an auto
+    /// released Button
     public void setAutoRelease(boolean autoRelease) {
         this.actualButton.setAutoRelease(autoRelease);
     }
@@ -599,9 +594,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
         }
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public int getTextPosition() {
         String iconPosition = getIconPosition();
@@ -621,9 +614,7 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
 
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public void setTextPosition(int textPosition) {
         switch (textPosition) {
@@ -645,119 +636,121 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
 
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Image getRolloverPressedIcon() {
         return actualButton.getRolloverIcon();
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public void setRolloverPressedIcon(Image arg0) {
         actualButton.setRolloverPressedIcon(arg0);
     }
 
-    /**
-     * {@inheritDoc }
-     *
-     * @since 7.0
-     */
+    /// {@inheritDoc }
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     @Override
     public Image getIconFromState() {
         return actualButton.getIconFromState();
     }
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
-     *
-     * @param c one of the constants from the font
-     */
+    /// This method is shorthand for `com.codename1.ui.Font, char)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from the font
     public void setFontIcon(Font font, char c) {
         actualButton.setFontIcon(font, c);
     }
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
-     *
-     * @param c    one of the constants from {@link com.codename1.ui.FontImage}
-     * @param size the size of the icon in millimeters
-     */
+    /// This method is shorthand for `char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from `com.codename1.ui.FontImage`
+    ///
+    /// - `size`: the size of the icon in millimeters
     @Override
     public void setMaterialIcon(char c, float size) {
         actualButton.setMaterialIcon(c, size);
     }
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
-     *
-     * @param c    one of the constants from the font
-     * @param size the size of the icon in millimeters
-     */
+    /// This method is shorthand for `com.codename1.ui.Font, char, float)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from the font
+    ///
+    /// - `size`: the size of the icon in millimeters
     @Override
     public void setFontIcon(Font font, char c, float size) {
         actualButton.setFontIcon(font, c, size);
     }
 
-    /**
-     * Returns the material icon assigned to this component or 0 if not applicable
-     *
-     * @return the material icon
-     */
+    /// Returns the material icon assigned to this component or 0 if not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon
     public char getMaterialIcon() {
         return actualButton.getMaterialIcon();
     }
 
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char)}
-     *
-     * @param c one of the constants from {@link com.codename1.ui.FontImage}
-     */
+    /// This method is shorthand for `char)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: one of the constants from `com.codename1.ui.FontImage`
     public void setMaterialIcon(char c) {
         actualButton.setMaterialIcon(c);
     }
 
-    /**
-     * Returns the font icon assigned to this component or 0 if not applicable
-     *
-     * @return the material icon
-     */
+    /// Returns the font icon assigned to this component or 0 if not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon
     public char getFontIcon() {
         return actualButton.getFontIcon();
     }
 
-    /**
-     * Returns the material icon size assigned to this component or 0/-1 if
-     * not applicable
-     *
-     * @return the material icon size
-     */
+    /// Returns the material icon size assigned to this component or 0/-1 if
+    /// not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the material icon size
     public float getMaterialIconSize() {
         return actualButton.getMaterialIconSize();
     }
 
-    /**
-     * Returns the icon size assigned to this component or 0/-1 if
-     * not applicable
-     *
-     * @return the icon size
-     */
+    /// Returns the icon size assigned to this component or 0/-1 if
+    /// not applicable
+    ///
+    /// #### Returns
+    ///
+    /// the icon size
     public float getFontIconSize() {
         return actualButton.getFontIconSize();
     }
 
-    /**
-     * Returns the font for the icon font or null if not font set
-     *
-     * @return the material icon size
-     */
+    /// Returns the font for the icon font or null if not font set
+    ///
+    /// #### Returns
+    ///
+    /// the material icon size
     public Font getIconFont() {
         return actualButton.getIconFont();
     }

@@ -16,9 +16,7 @@
  */
 package com.codename1.util.regex;
 
-/**
- * @author Nikolay Neizvesny
- */
+/// @author Nikolay Neizvesny
 public abstract class RECharacter {
 
     public static final byte UNASSIGNED = 0;

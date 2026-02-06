@@ -38,128 +38,151 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Parses Style strings into StyleInfo objects, which can be converted to Style objects at runtime.
- * <p>This class
- * is the basis for the inline style functionality: </p>
- * <ul>
- * <li>{@link Component#setInlineAllStyles(java.lang.String) }</li>
- * <li>{@link Component#getInlineAllStyles() }</li>
- * <li>{@link Component#setInlineSelectedStyles(java.lang.String) }</li>
- * <li>{@link Component#getInlineSelectedStyles() }</li>
- * <li>etc..</li>
- * </ul>
- *
- * <p>Style strings are strings which describe a style, and are in a particular format that {@link StyleParser} knows how to
- * parse.  The general format of a style string is {@literal key1:value1; key2:value2; ... keyn:valuen;}.  I.e. a set of key-value pairs
- * with pairs separated by semi-colons, and keys and values separated by a colon.  This is very similar to CSS, but it is <strong>NOT</strong> CSS.
- * Style string keys and values are closely related to the properties of the {@link Style} class and their associated values.
- * </p>
- * <h3>Supported Keys</h3>
- *
- * <p>The following keys are supported:</p>
- * <ul>
- *   <li>{@literal fgColor} - The foreground color as a hex string.  E.g. {@literal ff0000}.</li>
- *   <li>{@literal bgColor} - The background color as a hex string. E.g. {@literal ff0000}.</li>
- *   <li>{@literal transparency} - The background transparency as an integer. 0-255.</li>
- *   <li>{@literal textDecoration} - The text decoration.  One of {@literal underline}, {@literal overline},
- *      {@literal 3d}, {@literal 3d_lowered}, {@literal 3d_shadow_north}, {@literal strikethru}, or {@literal none}.</li>
- *   <li>{@literal opacity} - The opacity as an integer.  0-255</li>
- *   <li>{@literal padding} - The padding as a sequence of 1, 2, 3, or 4 values.  See "Padding and Margin Strings" below for details on the format.</li>
- *   <li>{@literal margin} - The margin as a sequence of 1, 2, 3, or 4, values. See "Padding and Margin Strings" below for details on the format.</li>
- *   <li>{@literal font} - The font.  See "Font Strings" below for details on the format.</li>
- *   <li>{@literal border} - The border.  See "Border Strings" below for details on the format.</li>
- *   <li>{@literal bgType} - The background type. See "Background Type Values" below for details on the available options.</li>
- * </ul>
- *
- * <h3>Padding and Margin Strings</h3>
- * <p>The {@literal padding} and {@literal margin} keys can take values the same format as is used for CSS {@literal margin} and {@literal padding} directives. That is the value
- *   can be expressed as a space-separated sequence of scalar values (i.e. float values with a unit suffix).  Some examples:</p>
- * <ul>
- * <li>{@literal padding:0px} - Sets all padding to zero pixels.</li>
- * <li>{@literal padding:2mm 1px} - Sets vertical padding to 2 millimetres, and horizontal padding to 1 pixel.</li>
- * <li>{@literal padding:2mm 1px inherit} - Sets top padding to 1 millimetres,  horizontal padding to 1 pixel, and bottom padding to inherit the parent style's bottom padding.</li>
- * <li>{@literal padding:1mm 2px inherit 4mm} - Top padding=1 millimetre.  Right padding=2 pixels.  Bottom padding inherits parent style's bottom padding. Left padding=4 millimetres.</li>
- * </ul>
- *
- * <p>All of the examples above use {@literal padding}, but the same format is used for {@literal margin}.  They demonstrate the use of 1, 2, 3, and 4 value sequences, and their meaning. In general terms
- * these formats can be described as:</p>
- * <ul>
- * <li>{@literal <value> } - Sets padding on all sites to {@literal <value>}</li>
- * <li>{@literal <vertical> <horizontal> } - Top and bottom padding set to {@literal <vertical>}.  Left and right padding set to {@literal <horizontal>}</li>
- * <li>{@literal <top> <horizontal> <bottom> } - Top={@literal <top>}.  Left and right = {@literal <horizontal>}.  Bottom = {@literal bottom}.</li>
- * <li>{@literal <top> <right> <bottom> <left>} - Top={@literal <top>}. Right={@literal right}. Bottom={@literal bottom}. Left={@literal left}.  In other words, values applied clock-wise, starting on top side.</li>
- * </ul>
- *
- * <h3>Font Strings</h3>
- * <p>Fonts strings can take any of the following formats:</p>
- * <ul>
- * <li>{@literal <size> <fontName> <fontFile>} - E.g. {@literal 3mm Arial.ttf /Arial.ttf} or {@literal 12px native:MainRegular native:MainRegular}</li>
- * <li>{@literal <size> <fontName>} - E.g. {@literal 3mm Arial.ttf} or {@literal 3mm native:ItalicBlack}.</li>
- * <li>{@literal <size>} - E.g. {@literal 3mm} or {@literal 12px}.  When only specifying the size, the font family will be dictated by the parent style.</li>
- * <li>{@literal <fontName> <fontFile>} - E.g. {@literal Arial.ttf /Arial.ttf} or {@literal native:MainBold native:MainBold}.  When omitting font size (as this format does), the size
- * is dictated by the parent style.</li>
- * <li>{@literal <fontName>|<fontFile>} - E.g. {@literal Arial.ttf} or {@literal /Arial.ttf}, or {@literal native:MainRegular}  Strings starting with a {@literal /} are assumed to be files.  The corresponding font name
- * is then derived by removing the slash and the trailing {@literal .ttf}.  When omitting font size (as this format does), the size is dictated by the parent style.</li>
- * </ul>
- *
- * <h3>Border Strings</h3>
- * <p>The {@literal border} property accepts several different formats for its value.  This is due to the many different kinds of
- * borders that can be created.  The following are some of the formats.</p>
- *
- * <p><strong>Line Border</strong></p>
- *
- * <p>{@literal <thickness> solid <color>} - E.g. {@literal 1mm solid ff0000}.  {@literal <thickness>} should be expressed as a scalar value with unit.  E.g. {@literal 1mm}, or {@literal 2px}.
- * {@literal <color>} should be an RGB hex string.  E.g {@literal ff0000} for red.</p>
- *
- * <p><strong>Dashed Border</strong></p>
- *
- * <p>{@literal <thickness> dashed <color>} - E.g. {@literal 1mm dashed ff0000}.  {@literal <thickness>} should be expressed as a scalar value with unit.  E.g. {@literal 1mm}, or {@literal 2px}.
- * {@literal <color>} should be an RGB hex string.  E.g {@literal ff0000} for red.</p>
- *
- * <p><strong>Dotted Border</strong></p>
- *
- * <p>{@literal <thickness> dotted <color>} - E.g. {@literal 1mm dotted ff0000}.  {@literal <thickness>} should be expressed as a scalar value with unit.  E.g. {@literal 1mm}, or {@literal 2px}.
- * {@literal <color>} should be an RGB hex string.  E.g {@literal ff0000} for red.</p>
- *
- * <p><strong>Underline Border</strong></p>
- *
- * <p>{@literal <thickness> underline <color>} - E.g. {@literal 1mm underline ff0000}.  {@literal <thickness>} should be expressed as a scalar value with unit.  E.g. {@literal 1mm}, or {@literal 2px}.
- * {@literal <color>} should be an RGB hex string.  E.g {@literal ff0000} for red.</p>
- *
- * <p><strong>Image Border</strong></p>
- *
- * <p>{@literal image <image1> <image2> ... <image9>} - A 9-piece image border.  The {@literal <image1>} .. {@literal <image9>} values are strings which refer to images either on the classpath, or in the theme resource file.
- * If the image string starts with {@literal /}, then it is assumed to be on the classpath.  The order of the images corresponds to the parameters of {@link Border#createImageBorder(com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image) }.</p>
- *
- * <p>{@literal image <image1> <image2> <image3>} - A 9-piece image border, but with the images corresponding to the parameters of {@link Border#createImageBorder(com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image) }.</p>
- * <p>{@literal horizontalImage <leftImage> <rightImage> <centerImage>} - A 3-piece horizontal image border.  Image parameters correspond with {@link Border#createHorizonalImageBorder(com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image) } parameters.</p>
- * <p>{@literal verticalImage <topImage> <bottomImage> <centerImage>} - A 3-piece horizontal image border.  Image parameters correspond with {@link Border#createVerticalImageBorder(com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image) } parameters.</p>
- * <p>{@literal splicedImage <image> <topInset> <rightInset> <bottomInset> <leftInset>} - A 9-piece image border that is generated from a single image, but with inset values specifying where the image should be sliced to create the 9 sub-images.
- * <br>
- * <strong>Parameters:</strong>
- * </p>
- * <ul>
- * <li>{@literal <image>} The image to use.  If this begins with {@literal /}, then the image will be found on the classpath.  Otherwise it will be found in the theme resource file.</li>
- * <li>{@literal <topInset>}, {@literal <rightInset>}, {@literal <bottomInset>}, {@literal <leftInset>} - The insets along which {@literal <image>} is sliced to generate the 9-subimages.  These values are
- * expressed as a floating point number between 0.0 and 1.0, where 1.0 is the full width or height of the image depending on the orientation (horizontal or vertical) or the inset.  If {@literal image}
- * is 100 pixels by 100 pixels, then a top inset of 0.4 would cause a slice to occur at 40 pixels from the top of the image (i.e. the top-left, top, and top-right slices would each be 40 pixels high.</li>
- * </ul>
- *
- * @author shannah
- */
+/// Parses Style strings into StyleInfo objects, which can be converted to Style objects at runtime.
+///
+/// This class
+/// is the basis for the inline style functionality:
+///
+/// - `Component#setInlineAllStyles(java.lang.String)`
+///
+/// - `Component#getInlineAllStyles()`
+///
+/// - `Component#setInlineSelectedStyles(java.lang.String)`
+///
+/// - `Component#getInlineSelectedStyles()`
+///
+/// - etc..
+///
+/// Style strings are strings which describe a style, and are in a particular format that `StyleParser` knows how to
+/// parse.  The general format of a style string is key1:value1; key2:value2; ... keyn:valuen;.  I.e. a set of key-value pairs
+/// with pairs separated by semi-colons, and keys and values separated by a colon.  This is very similar to CSS, but it is **NOT** CSS.
+/// Style string keys and values are closely related to the properties of the `Style` class and their associated values.
+///
+/// Supported Keys
+///
+/// The following keys are supported:
+///
+///
+/// - fgColor - The foreground color as a hex string.  E.g. ff0000.
+///
+/// - bgColor - The background color as a hex string. E.g. ff0000.
+///
+/// - transparency - The background transparency as an integer. 0-255.
+///
+/// - textDecoration - The text decoration.  One of underline, overline,
+/// 3d, 3d_lowered, 3d_shadow_north, strikethru, or none.
+///
+/// - opacity - The opacity as an integer.  0-255
+///
+/// - padding - The padding as a sequence of 1, 2, 3, or 4 values.  See "Padding and Margin Strings" below for details on the format.
+///
+/// - margin - The margin as a sequence of 1, 2, 3, or 4, values. See "Padding and Margin Strings" below for details on the format.
+///
+/// - font - The font.  See "Font Strings" below for details on the format.
+///
+/// - border - The border.  See "Border Strings" below for details on the format.
+///
+/// - bgType - The background type. See "Background Type Values" below for details on the available options.
+///
+/// Padding and Margin Strings
+///
+/// The padding and margin keys can take values the same format as is used for CSS margin and padding directives. That is the value
+///   can be expressed as a space-separated sequence of scalar values (i.e. float values with a unit suffix).  Some examples:
+///
+/// - padding:0px - Sets all padding to zero pixels.
+///
+/// - padding:2mm 1px - Sets vertical padding to 2 millimetres, and horizontal padding to 1 pixel.
+///
+/// - padding:2mm 1px inherit - Sets top padding to 1 millimetres,  horizontal padding to 1 pixel, and bottom padding to inherit the parent style's bottom padding.
+///
+/// - padding:1mm 2px inherit 4mm - Top padding=1 millimetre.  Right padding=2 pixels.  Bottom padding inherits parent style's bottom padding. Left padding=4 millimetres.
+///
+/// All of the examples above use padding, but the same format is used for margin.  They demonstrate the use of 1, 2, 3, and 4 value sequences, and their meaning. In general terms
+/// these formats can be described as:
+///
+/// -  - Sets padding on all sites to
+///
+/// -   - Top and bottom padding set to .  Left and right padding set to
+///
+/// -    - Top=.  Left and right = .  Bottom = bottom.
+///
+/// -     - Top=. Right=right. Bottom=bottom. Left=left.  In other words, values applied clock-wise, starting on top side.
+///
+/// Font Strings
+///
+/// Fonts strings can take any of the following formats:
+///
+/// -    - E.g. 3mm Arial.ttf /Arial.ttf or 12px native:MainRegular native:MainRegular
+///
+/// -   - E.g. 3mm Arial.ttf or 3mm native:ItalicBlack.
+///
+/// -  - E.g. 3mm or 12px.  When only specifying the size, the font family will be dictated by the parent style.
+///
+/// -   - E.g. Arial.ttf /Arial.ttf or native:MainBold native:MainBold.  When omitting font size (as this format does), the size
+/// is dictated by the parent style.
+///
+/// - | - E.g. Arial.ttf or /Arial.ttf, or native:MainRegular  Strings starting with a / are assumed to be files.  The corresponding font name
+/// is then derived by removing the slash and the trailing .ttf.  When omitting font size (as this format does), the size is dictated by the parent style.
+///
+/// Border Strings
+///
+/// The border property accepts several different formats for its value.  This is due to the many different kinds of
+/// borders that can be created.  The following are some of the formats.
+///
+/// **Line Border**
+///
+///  solid  - E.g. 1mm solid ff0000.   should be expressed as a scalar value with unit.  E.g. 1mm, or 2px.
+///  should be an RGB hex string.  E.g ff0000 for red.
+///
+/// **Dashed Border**
+///
+///  dashed  - E.g. 1mm dashed ff0000.   should be expressed as a scalar value with unit.  E.g. 1mm, or 2px.
+///  should be an RGB hex string.  E.g ff0000 for red.
+///
+/// **Dotted Border**
+///
+///  dotted  - E.g. 1mm dotted ff0000.   should be expressed as a scalar value with unit.  E.g. 1mm, or 2px.
+///  should be an RGB hex string.  E.g ff0000 for red.
+///
+/// **Underline Border**
+///
+///  underline  - E.g. 1mm underline ff0000.   should be expressed as a scalar value with unit.  E.g. 1mm, or 2px.
+///  should be an RGB hex string.  E.g ff0000 for red.
+///
+/// **Image Border**
+///
+/// image   ...  - A 9-piece image border.  The  ..  values are strings which refer to images either on the classpath, or in the theme resource file.
+/// If the image string starts with /, then it is assumed to be on the classpath.  The order of the images corresponds to the parameters of `com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image)`.
+///
+/// image    - A 9-piece image border, but with the images corresponding to the parameters of `com.codename1.ui.Image, com.codename1.ui.Image)`.
+///
+/// horizontalImage    - A 3-piece horizontal image border.  Image parameters correspond with `com.codename1.ui.Image, com.codename1.ui.Image)` parameters.
+///
+/// verticalImage    - A 3-piece horizontal image border.  Image parameters correspond with `com.codename1.ui.Image, com.codename1.ui.Image)` parameters.
+///
+/// splicedImage      - A 9-piece image border that is generated from a single image, but with inset values specifying where the image should be sliced to create the 9 sub-images.
+///
+/// **Parameters:**
+///
+/// -  The image to use.  If this begins with /, then the image will be found on the classpath.  Otherwise it will be found in the theme resource file.
+///
+/// - , , ,  - The insets along which  is sliced to generate the 9-subimages.  These values are
+/// expressed as a floating point number between 0.0 and 1.0, where 1.0 is the full width or height of the image depending on the orientation (horizontal or vertical) or the inset.  If image
+/// is 100 pixels by 100 pixels, then a top inset of 0.4 would cause a slice to occur at 40 pixels from the top of the image (i.e. the top-left, top, and top-right slices would each be 40 pixels high.
+///
+/// @author shannah
 public abstract class StyleParser {
 
     public static final byte UNIT_INHERIT = 99;
     private static final Map<String, Integer> BG_TYPES = createBgTypes();
 
-    /**
-     * Parses a style string into a Map
-     *
-     * @param out
-     * @param str
-     * @return
-     */
+    /// Parses a style string into a Map
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`
+    ///
+    /// - `str`
     static StyleInfo parseString(StyleInfo out, String str) {
         Map<String, String> map = parseString(new HashMap<String, String>(), str);
         for (Map.Entry<String, String> e : map.entrySet()) {
@@ -846,11 +869,7 @@ public abstract class StyleParser {
         return map;
     }
 
-    /**
-     * Gets the available background type strings (which can be passed to {@link StyleInfo#setBgType(java.lang.String) }
-     *
-     * @return
-     */
+    /// Gets the available background type strings (which can be passed to `StyleInfo#setBgType(java.lang.String)`
     public static List<String> getBackgroundTypes() {
         ArrayList<String> out = new ArrayList<String>();
         out.addAll(bgTypes().keySet());
@@ -883,17 +902,20 @@ public abstract class StyleParser {
         return null;
     }
 
-    /**
-     * Checks if a string is a valid scalar value.  A scalar value should be in the
-     * format {@literal <magnitude><unit>} where {@literal <magnitude>} is an integer
-     * or decimal number, and {@literal <unit>} is a unit - one of {@literal mm}, {@literal px}, or {@literal %}.
-     *
-     * <p>There is one special value: "inherit" which indicates that the scalar value just inherits from its
-     * parent.</p>
-     *
-     * @param val String value to validate.
-     * @return True if the value is a valid scalar value.
-     */
+    /// Checks if a string is a valid scalar value.  A scalar value should be in the
+    /// format  where  is an integer
+    /// or decimal number, and  is a unit - one of mm, px, or %.
+    ///
+    /// There is one special value: "inherit" which indicates that the scalar value just inherits from its
+    /// parent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: String value to validate.
+    ///
+    /// #### Returns
+    ///
+    /// True if the value is a valid scalar value.
     public static boolean validateScalarValue(String val) {
         try {
             parseSingleTRBLValue(val);
@@ -903,26 +925,21 @@ public abstract class StyleParser {
         }
     }
 
-    /**
-     * Parses a string into a scalar value.  A scalar value should be in the
-     * format {@literal <magnitude><unit>} where {@literal <magnitude>} is an integer
-     * or decimal number, and {@literal <unit>} is a unit - one of {@literal mm}, {@literal px}, or {@literal %}.
-     *
-     * <p>There is one special value: "inherit" which indicates that the scalar value just inherits from its
-     * parent.</p>
-     *
-     * @param val String that should be a valid scalar value.
-     * @return
-     */
+    /// Parses a string into a scalar value.  A scalar value should be in the
+    /// format  where  is an integer
+    /// or decimal number, and  is a unit - one of mm, px, or %.
+    ///
+    /// There is one special value: "inherit" which indicates that the scalar value just inherits from its
+    /// parent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: String that should be a valid scalar value.
     public static ScalarValue parseScalarValue(String val) {
         return parseSingleTRBLValue(val);
     }
 
-    /**
-     * Gets a list of the background types that are supported.
-     *
-     * @return
-     */
+    /// Gets a list of the background types that are supported.
     public static List<String> getSupportedBackgroundTypes() {
         ArrayList<String> out = new ArrayList<String>();
         out.addAll(BG_TYPES.keySet());
@@ -950,20 +967,19 @@ public abstract class StyleParser {
         return dStr;
     }
 
-    /**
-     * Encapsulates a scalar value with a unit.
-     */
+    /// Encapsulates a scalar value with a unit.
     public static class ScalarValue {
         private byte unit;
         private double value;
 
 
-        /**
-         * Creates a new scalar value given magnitude and unit.
-         *
-         * @param value The value to set.
-         * @param unit  The unit of the value. One of {@link #UNIT_INHERIT}, {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, or {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
-         */
+        /// Creates a new scalar value given magnitude and unit.
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: The value to set.
+        ///
+        /// - `unit`: The unit of the value. One of `#UNIT_INHERIT`, `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `Style#UNIT_TYPE_SCREEN_PERCENTAGE`.
         public ScalarValue(double value, byte unit) {
             this.value = value;
             this.unit = unit;
@@ -972,39 +988,35 @@ public abstract class StyleParser {
         public ScalarValue() {
         }
 
-        /**
-         * @return the unit of the value.  One of {@link #UNIT_INHERIT}, {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, or {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
-         */
+        /// #### Returns
+        ///
+        /// the unit of the value.  One of `#UNIT_INHERIT`, `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `Style#UNIT_TYPE_SCREEN_PERCENTAGE`.
         public byte getUnit() {
             return unit;
         }
 
-        /**
-         * @param unit the unit of the value.  One of {@link #UNIT_INHERIT}, {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, or {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}.
-         */
+        /// #### Parameters
+        ///
+        /// - `unit`: the unit of the value.  One of `#UNIT_INHERIT`, `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `Style#UNIT_TYPE_SCREEN_PERCENTAGE`.
         public void setUnit(byte unit) {
             this.unit = unit;
         }
 
-        /**
-         * @return the value of the scalar.
-         */
+        /// #### Returns
+        ///
+        /// the value of the scalar.
         public double getValue() {
             return value;
         }
 
-        /**
-         * @param value the value of the scalar.
-         */
+        /// #### Parameters
+        ///
+        /// - `value`: the value of the scalar.
         public void setValue(double value) {
             this.value = value;
         }
 
-        /**
-         * Returns the scalar value in CN1 style string format.  E.g.  12mm, 3px, 5%, or inherit
-         *
-         * @return
-         */
+        /// Returns the scalar value in CN1 style string format.  E.g.  12mm, 3px, 5%, or inherit
         @Override
         public String toString() {
             switch (unit) {
@@ -1019,13 +1031,12 @@ public abstract class StyleParser {
             }
         }
 
-        /**
-         * Formats this scalar value (including units) but rounding to the given number
-         * of decimal places.
-         *
-         * @param decimalPlaces
-         * @return
-         */
+        /// Formats this scalar value (including units) but rounding to the given number
+        /// of decimal places.
+        ///
+        /// #### Parameters
+        ///
+        /// - `decimalPlaces`
         public String toString(int decimalPlaces) {
             switch (unit) {
                 case UNIT_INHERIT:
@@ -1039,11 +1050,7 @@ public abstract class StyleParser {
             }
         }
 
-        /**
-         * Gets the magnitude of this scalar value in pixels.
-         *
-         * @return
-         */
+        /// Gets the magnitude of this scalar value in pixels.
         public int getPixelValue() {
             switch (unit) {
                 case UNIT_INHERIT:
@@ -1059,18 +1066,16 @@ public abstract class StyleParser {
 
     }
 
-    /**
-     * Encapculates a style string in structured format.
-     */
+    /// Encapculates a style string in structured format.
     public static class StyleInfo {
         Map<String, String> values;
 
-        /**
-         * Parses the given style strings and encapsulates their details in
-         * a StyleInfo object.
-         *
-         * @param styleString One or more style strings.
-         */
+        /// Parses the given style strings and encapsulates their details in
+        /// a StyleInfo object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `styleString`: One or more style strings.
         public StyleInfo(String... styleString) {
             if (styleString == null) {
                 this.values = new HashMap<String, String>();
@@ -1085,34 +1090,32 @@ public abstract class StyleParser {
             }
         }
 
-        /**
-         * Creates a new StyleInfo given the parsed Map of keys and values.
-         *
-         * @param values
-         */
+        /// Creates a new StyleInfo given the parsed Map of keys and values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`
         public StyleInfo(Map<String, String> values) {
             this.values = values;
         }
 
-        /**
-         * Creates a new StyleInfo.
-         */
+        /// Creates a new StyleInfo.
         public StyleInfo() {
             this(new HashMap<String, String>());
         }
 
-        /**
-         * Creates a new style info by copying styles from existing style info.
-         *
-         * @param info Style to copy.
-         */
+        /// Creates a new style info by copying styles from existing style info.
+        ///
+        /// #### Parameters
+        ///
+        /// - `info`: Style to copy.
         public StyleInfo(StyleInfo info) {
             this(info.toStyleString());
         }
 
-        /**
-         * @return The padding of the style.  Will return {@literal null} if padding wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The padding of the style.  Will return null if padding wasn't specified.
         public PaddingInfo getPadding() {
             if (values.containsKey("padding")) {
                 return parsePadding(values.get("padding"));
@@ -1120,12 +1123,15 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the padding.
-         *
-         * @param padding A valid padding string.  E.g. "1mm", or "2mm 3px 0 5mm"
-         * @return Self for chaining.
-         */
+        /// Sets the padding.
+        ///
+        /// #### Parameters
+        ///
+        /// - `padding`: A valid padding string.  E.g. "1mm", or "2mm 3px 0 5mm"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setPadding(String padding) {
             if (padding == null || padding.trim().length() == 0) {
                 values.remove("padding");
@@ -1135,9 +1141,9 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * @return The margin of the style.  Will return {@literal null} if margin wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The margin of the style.  Will return null if margin wasn't specified.
         public MarginInfo getMargin() {
             if (values.containsKey("margin")) {
                 return parseMargin(values.get("margin"));
@@ -1145,12 +1151,15 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the margin.
-         *
-         * @param margin A valid margin string.  E.g. "1mm", or "2mm 3px 0 0"
-         * @return Self for chaining.
-         */
+        /// Sets the margin.
+        ///
+        /// #### Parameters
+        ///
+        /// - `margin`: A valid margin string.  E.g. "1mm", or "2mm 3px 0 0"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setMargin(String margin) {
             if (margin == null || margin.trim().length() == 0) {
                 values.remove("margin");
@@ -1160,9 +1169,9 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * @return The border of the style.  Will return {@literal null} if border wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The border of the style.  Will return null if border wasn't specified.
         public BorderInfo getBorder() {
             if (values.containsKey("border")) {
                 return parseBorder(new BorderInfo(), values.get("border"));
@@ -1170,12 +1179,15 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the border
-         *
-         * @param border A valid border string. E.g. "1px solid ff0000", or "splicedImage notes.png 0.25 0.25 0.25 0.25"
-         * @return Self for chaining.
-         */
+        /// Sets the border
+        ///
+        /// #### Parameters
+        ///
+        /// - `border`: A valid border string. E.g. "1px solid ff0000", or "splicedImage notes.png 0.25 0.25 0.25 0.25"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setBorder(String border) {
             if (border == null || border.trim().length() == 0) {
                 values.remove("border");
@@ -1185,9 +1197,9 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * @return The font of the style.  Will return {@literal null} if font wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The font of the style.  Will return null if font wasn't specified.
         public FontInfo getFont() {
             if (values.containsKey("font")) {
                 return parseFont(new FontInfo(), values.get("font"));
@@ -1195,23 +1207,29 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the font in the style info.
-         *
-         * @param font A valid font style string.  E.g. "2mm native:MainRegular"
-         * @return Self for chaining.
-         */
+        /// Sets the font in the style info.
+        ///
+        /// #### Parameters
+        ///
+        /// - `font`: A valid font style string.  E.g. "2mm native:MainRegular"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setFont(String font) {
             values.put("font", font);
             return this;
         }
 
-        /**
-         * Sets the font size in the style.
-         *
-         * @param fontSize A valid font size.  E.g. "2mm"
-         * @return Self for chaining.
-         */
+        /// Sets the font size in the style.
+        ///
+        /// #### Parameters
+        ///
+        /// - `fontSize`: A valid font size.  E.g. "2mm"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setFontSize(String fontSize) {
             FontInfo finfo = getFont();
             if (finfo == null) {
@@ -1234,12 +1252,15 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * Sets the font name.
-         *
-         * @param fontName A valid font name.  E.g. "native:MainRegular"
-         * @return Self for chaining.
-         */
+        /// Sets the font name.
+        ///
+        /// #### Parameters
+        ///
+        /// - `fontName`: A valid font name.  E.g. "native:MainRegular"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setFontName(String fontName) {
             FontInfo finfo = getFont();
             if (finfo == null) {
@@ -1262,9 +1283,9 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * @return The background color of the style.  Will return {@literal null} if bgColor wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The background color of the style.  Will return null if bgColor wasn't specified.
         public Integer getBgColor() {
             if (values.containsKey("bgColor")) {
                 return Integer.parseInt(values.get("bgColor"), 16);
@@ -1272,12 +1293,11 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the background color.
-         *
-         * @param bgColor A valid color string.  E.g. "ff0000"
-         * @return
-         */
+        /// Sets the background color.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bgColor`: A valid color string.  E.g. "ff0000"
         public StyleInfo setBgColor(String bgColor) {
             if (bgColor == null || bgColor.trim().length() == 0) {
                 values.remove("bgColor");
@@ -1287,9 +1307,9 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * @return The foreground color of the style.  Will return {@literal null} if fgColor wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The foreground color of the style.  Will return null if fgColor wasn't specified.
         public Integer getFgColor() {
             if (values.containsKey("fgColor")) {
                 return Integer.parseInt(values.get("fgColor"), 16);
@@ -1297,12 +1317,15 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the foreground color.
-         *
-         * @param fgColor A valid color string.  E.g. "ff0000"
-         * @return Self for chaining.
-         */
+        /// Sets the foreground color.
+        ///
+        /// #### Parameters
+        ///
+        /// - `fgColor`: A valid color string.  E.g. "ff0000"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setFgColor(String fgColor) {
             if (fgColor == null || fgColor.trim().length() == 0) {
                 values.remove("fgColor");
@@ -1312,9 +1335,9 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * @return The background transparency of the style.  Will return {@literal null} if transparency wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The background transparency of the style.  Will return null if transparency wasn't specified.
         public Integer getTransparency() {
             if (values.containsKey("transparency")) {
                 return Integer.parseInt(values.get("transparency"));
@@ -1322,12 +1345,15 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the transparency.
-         *
-         * @param transparency A valid transparency string (0-255).  E.g. "255"
-         * @return Self for chaining.
-         */
+        /// Sets the transparency.
+        ///
+        /// #### Parameters
+        ///
+        /// - `transparency`: A valid transparency string (0-255).  E.g. "255"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setTransparency(String transparency) {
             if (transparency == null || transparency.trim().length() == 0) {
                 values.remove("transparency");
@@ -1337,9 +1363,9 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * @return The opacity of the style.  Will return {@literal null} if the opacity wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The opacity of the style.  Will return null if the opacity wasn't specified.
         public Integer getOpacity() {
             if (values.containsKey("opacity")) {
                 return Integer.parseInt(values.get("opacity"));
@@ -1347,12 +1373,15 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the opacity.
-         *
-         * @param opacity A valid opacity string (0-255).  E.g. "255"
-         * @return Self for chaining.
-         */
+        /// Sets the opacity.
+        ///
+        /// #### Parameters
+        ///
+        /// - `opacity`: A valid opacity string (0-255).  E.g. "255"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setOpacity(String opacity) {
             if (opacity == null || opacity.trim().length() == 0) {
                 values.remove("opacity");
@@ -1362,10 +1391,10 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * @return The alignment of the style.  One of {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}.  Or {@literal null} if
-         * alignment wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// @return The alignment of the style.  One of `Component#LEFT`, `Component#RIGHT`, `Component#CENTER`.  Or null if
+        /// alignment wasn't specified.
         public Integer getAlignment() {
             if (values.containsKey("alignment")) {
                 return parseAlignment(values.get("alignment"));
@@ -1373,24 +1402,26 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the alignment for this style.  One of {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}
-         *
-         * @param alignment One of {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}
-         * @return Self for chaining.
-         */
+        /// Sets the alignment for this style.  One of `Component#LEFT`, `Component#RIGHT`, `Component#CENTER`
+        ///
+        /// #### Parameters
+        ///
+        /// - `alignment`: One of `Component#LEFT`, `Component#RIGHT`, `Component#CENTER`
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setAlignment(int alignment) {
             values.put("alignment", String.valueOf(alignment));
             return this;
         }
 
-        /**
-         * Sets the alignment for this style as a String.  Accepts either a string representation of the integer values for {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}.  Or the
-         * literal strings "center", "left", or "right".  Or null to unset this property.
-         *
-         * @param alignment
-         * @return
-         */
+        /// Sets the alignment for this style as a String.  Accepts either a string representation of the integer values for `Component#LEFT`, `Component#RIGHT`, `Component#CENTER`.  Or the
+        /// literal strings "center", "left", or "right".  Or null to unset this property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `alignment`
         public StyleInfo setAlignment(String alignment) {
             if (alignment == null || alignment.length() == 0) {
                 values.remove("alignment");
@@ -1400,20 +1431,12 @@ public abstract class StyleParser {
             return this;
         }
 
-        /**
-         * Returns the alignment as a string.  "center", "left", "right", or null.
-         *
-         * @return
-         */
+        /// Returns the alignment as a string.  "center", "left", "right", or null.
         public String getAlignmentAsString() {
             return getAlignmentString(getAlignment());
         }
 
-        /**
-         * Gets the background type.  Will return {@literal null} if bgType wasn't specified.  Returns one of {@literal Style.BACKGROUND_XXX} constants.
-         *
-         * @return
-         */
+        /// Gets the background type.  Will return null if bgType wasn't specified.  Returns one of Style.BACKGROUND_XXX constants.
         public Integer getBgType() {
             if (values.containsKey("bgType")) {
                 return parseBgType(values.get("bgType"));
@@ -1421,33 +1444,35 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Sets the background type as a string.
-         *
-         * @param type A valid background type string.  E.g. "image_scaled_fit"
-         * @return Self for chaining.
-         */
+        /// Sets the background type as a string.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: A valid background type string.  E.g. "image_scaled_fit"
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setBgType(String type) {
             values.put("bgType", type);
             return this;
         }
 
-        /**
-         * Sets the background type as one of the Style.BACKGROUND_XXX constants.
-         *
-         * @param i A background type.  One of Style.BACKGROUND_XXX constants.
-         * @return Self for chaining.
-         */
+        /// Sets the background type as one of the Style.BACKGROUND_XXX constants.
+        ///
+        /// #### Parameters
+        ///
+        /// - `i`: A background type.  One of Style.BACKGROUND_XXX constants.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setBgType(Integer i) {
             setBgType(flip(bgTypes()).get(i));
             return this;
         }
 
-        /**
-         * Gets the bgType as a string.
-         *
-         * @return
-         */
+        /// Gets the bgType as a string.
         public String getBgTypeAsString() {
             Integer bgType = getBgType();
             if (bgType == null) {
@@ -1460,9 +1485,9 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * @return The background image for the style.  Will return {@literal null} if bgImage wasn't specified.
-         */
+        /// #### Returns
+        ///
+        /// The background image for the style.  Will return null if bgImage wasn't specified.
         public ImageInfo getBgImage() {
             if (values.containsKey("bgImage")) {
                 return new ImageInfo(values.get("bgImage"));
@@ -1471,20 +1496,23 @@ public abstract class StyleParser {
 
         }
 
-        /**
-         * Sets the background image.
-         *
-         * @param bgImage A valid image string.  E.g. "notes.png" (to refer to the notes.png image in the theme), or "/notes.png" to refer to notes.png in the src directory.
-         * @return Self for chaining.
-         */
+        /// Sets the background image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bgImage`: A valid image string.  E.g. "notes.png" (to refer to the notes.png image in the theme), or "/notes.png" to refer to notes.png in the src directory.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
         public StyleInfo setBgImage(String bgImage) {
             values.put("bgImage", bgImage);
             return this;
         }
 
-        /**
-         * @return The text decoration of the style.  Will return {@literal null} if textDecoration wasn't specified.  Returns one of {@literal Style.TEXT_DECORATION_XXX} constants.
-         */
+        /// #### Returns
+        ///
+        /// The text decoration of the style.  Will return null if textDecoration wasn't specified.  Returns one of Style.TEXT_DECORATION_XXX constants.
         public Integer getTextDecoration() {
             if (values.containsKey("textDecoration")) {
                 String val = values.get("textDecoration");
@@ -1520,11 +1548,11 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Gets the text decoration as a string.
-         *
-         * @return A valid text decoration string or null.  Text decoration strings include "3d", "3d_lowered", "3d_shadow_north", "none", "strikethru", "overline", and "underline"
-         */
+        /// Gets the text decoration as a string.
+        ///
+        /// #### Returns
+        ///
+        /// A valid text decoration string or null.  Text decoration strings include "3d", "3d_lowered", "3d_shadow_north", "none", "strikethru", "overline", and "underline"
         public String getTextDecorationAsString() {
             if (values.containsKey("textDecoration")) {
                 return values.get("textDecoration");
@@ -1532,11 +1560,11 @@ public abstract class StyleParser {
             return null;
         }
 
-        /**
-         * Builds a style string that is encapsulated by this style object.  The output of this can be passed to methods like {@link Component#setInlineAllStyles(java.lang.String) }
-         *
-         * @return A style string.
-         */
+        /// Builds a style string that is encapsulated by this style object.  The output of this can be passed to methods like `Component#setInlineAllStyles(java.lang.String)`
+        ///
+        /// #### Returns
+        ///
+        /// A style string.
         public String toStyleString() {
             StringBuilder sb = new StringBuilder();
             FontInfo finfo = getFont();
@@ -1602,18 +1630,16 @@ public abstract class StyleParser {
         }
     }
 
-    /**
-     * Encapsulates an image that is referenced by a style string.
-     */
+    /// Encapsulates an image that is referenced by a style string.
     public static class ImageInfo {
         private final String image;
 
-        /**
-         * Creates an ImageInfo to wrap the specified image.
-         *
-         * @param image Either the path to an image on the classpath (signified by a leading {@literal '/'}, or
-         *              the name of an image that can be found in the theme resource file.
-         */
+        /// Creates an ImageInfo to wrap the specified image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `image`: @param image Either the path to an image on the classpath (signified by a leading '/', or
+        /// the name of an image that can be found in the theme resource file.
         public ImageInfo(String image) {
             this.image = image;
         }
@@ -1623,29 +1649,26 @@ public abstract class StyleParser {
             return image;
         }
 
-        /**
-         * Gets the image object that this image info references.
-         *
-         * @param theme The theme resource file to use to get the image.  Note: If the image name has a leading {@literal '/'}, then
-         *              the image will be loaded from the classpath.  Otherwise the theme resource file will be used.
-         * @return
-         */
+        /// Gets the image object that this image info references.
+        ///
+        /// #### Parameters
+        ///
+        /// - `theme`: @param theme The theme resource file to use to get the image.  Note: If the image name has a leading '/', then
+        /// the image will be loaded from the classpath.  Otherwise the theme resource file will be used.
         public Image getImage(Resources theme) {
             return StyleParser.getImage(theme, image);
         }
     }
 
-    /**
-     * Base class for style values that consist of 4 scalar values, such as padding and margin.
-     */
+    /// Base class for style values that consist of 4 scalar values, such as padding and margin.
     public static class BoxInfo {
         protected ScalarValue[] values;
 
-        /**
-         * Creates a new box with the specified scalar values.
-         *
-         * @param values A 4-element array of scalar values.
-         */
+        /// Creates a new box with the specified scalar values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`: A 4-element array of scalar values.
         public BoxInfo(ScalarValue[] values) {
             if (values.length != 4) {
                 throw new IllegalArgumentException("BoxInfo expected 4-element array");
@@ -1653,40 +1676,31 @@ public abstract class StyleParser {
             this.values = values;
         }
 
-        /**
-         * Returns string of values in {@literal <top> <right> <bottom> <left>} format.
-         *
-         * @return
-         */
+        /// Returns string of values in     format.
         @Override
         public String toString() {
             return toString(Component.TOP) + " " + toString(Component.RIGHT) + " " + toString(Component.BOTTOM) + " " + toString(Component.LEFT);
         }
 
-        /**
-         * Returns the string representation of one of the sides of the box.
-         *
-         * @param side One of {@link Component#TOP}, {@link Component#RIGHT}, {@link Component#BOTTOM}, {@link Component#LEFT}.
-         * @return
-         */
+        /// Returns the string representation of one of the sides of the box.
+        ///
+        /// #### Parameters
+        ///
+        /// - `side`: One of `Component#TOP`, `Component#RIGHT`, `Component#BOTTOM`, `Component#LEFT`.
         public String toString(int side) {
             return values[side].toString();
         }
 
-        /**
-         * Gets the scalar values of this box as a 4-element array.
-         *
-         * @return
-         */
+        /// Gets the scalar values of this box as a 4-element array.
         public ScalarValue[] getValues() {
             return values;
         }
 
-        /**
-         * Sets the scalar values of this box as a 4-element array.
-         *
-         * @param values
-         */
+        /// Sets the scalar values of this box as a 4-element array.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`
         public void setValues(ScalarValue[] values) {
             if (values.length != 4) {
                 throw new IllegalArgumentException("BoxInfo requires array with 4 values.");
@@ -1694,39 +1708,43 @@ public abstract class StyleParser {
             this.values = values;
         }
 
-        /**
-         * Gets a value for a side.
-         *
-         * @param side One of {@link Component#TOP}, {@link Component#RIGHT}, {@link Component#BOTTOM}, {@link Component#LEFT}.
-         * @return The value portion of the scalar value.
-         */
+        /// Gets a value for a side.
+        ///
+        /// #### Parameters
+        ///
+        /// - `side`: One of `Component#TOP`, `Component#RIGHT`, `Component#BOTTOM`, `Component#LEFT`.
+        ///
+        /// #### Returns
+        ///
+        /// The value portion of the scalar value.
         public ScalarValue getValue(int side) {
             return values[side];
         }
 
     }
 
-    /**
-     * Encapsulates information about the padding in a style string.
-     */
+    /// Encapsulates information about the padding in a style string.
     public static class PaddingInfo extends BoxInfo {
 
-        /**
-         * Creates a new PaddingInfo.
-         *
-         * @param values 4-element array of scalar values.  Indices are {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT} and {@link Component#RIGHT}.
-         */
+        /// Creates a new PaddingInfo.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`: 4-element array of scalar values.  Indices are `Component#TOP`, `Component#BOTTOM`, `Component#LEFT` and `Component#RIGHT`.
         public PaddingInfo(ScalarValue[] values) {
             super(values);
         }
 
-        /**
-         * Generates a 4-element float array with the padding values - in the same format as used in the theme resource files.  This will use the provided base style
-         * to calculate the padding for sides that were specified as {@literal inherit}.
-         *
-         * @param baseStyle The base style used to get the padding on sides where the style string specified {@literal inherit}.
-         * @return 4-element float array.
-         */
+        /// Generates a 4-element float array with the padding values - in the same format as used in the theme resource files.  This will use the provided base style
+        /// to calculate the padding for sides that were specified as inherit.
+        ///
+        /// #### Parameters
+        ///
+        /// - `baseStyle`: The base style used to get the padding on sides where the style string specified inherit.
+        ///
+        /// #### Returns
+        ///
+        /// 4-element float array.
         float[] createPadding(Style baseStyle) {
             float[] out = new float[4];
             for (int i = 0; i < 4; i++) {
@@ -1785,15 +1803,13 @@ public abstract class StyleParser {
         }
     }
 
-    /**
-     * Encapsulates information about the padding in a style string.
-     */
+    /// Encapsulates information about the padding in a style string.
     public static class MarginInfo extends BoxInfo {
-        /**
-         * Creates a new MarginInfo.
-         *
-         * @param values 4-element array of scalar values.  Indices are {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT} and {@link Component#RIGHT}.
-         */
+        /// Creates a new MarginInfo.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`: 4-element array of scalar values.  Indices are `Component#TOP`, `Component#BOTTOM`, `Component#LEFT` and `Component#RIGHT`.
         public MarginInfo(ScalarValue[] values) {
             super(values);
         }
@@ -1857,9 +1873,7 @@ public abstract class StyleParser {
         }
     }
 
-    /**
-     * Encapsulates information about the {@literal border} property of a style string.
-     */
+    /// Encapsulates information about the border property of a style string.
     public static class BorderInfo {
 
         // Used for round and roundrect border
@@ -1884,39 +1898,25 @@ public abstract class StyleParser {
         private Boolean bottomRightMode;
         private Float cornerRadius;
 
-        /**
-         * The type of the border.  E.g. {@literal line}, {@literal dashed}, {@literal image}, etc..
-         */
+        /// The type of the border.  E.g. line, dashed, image, etc..
         private String type;
 
-        /**
-         * Used only by splicedImage border.  The name/path of the image to use for the image border.
-         */
+        /// Used only by splicedImage border.  The name/path of the image to use for the image border.
         private String spliceImage;
 
-        /**
-         * Used by image, horizontalImage, and verticalImage borders.  The names of images to use for these types of borders.
-         */
+        /// Used by image, horizontalImage, and verticalImage borders.  The names of images to use for these types of borders.
         private String[] images;
 
-        /**
-         * The inset string for a splicedImage border.
-         */
+        /// The inset string for a splicedImage border.
         private String spliceInsets;
 
-        /**
-         * The thickness for line/dashed/dotted/underline border
-         */
+        /// The thickness for line/dashed/dotted/underline border
         private Float width;
 
-        /**
-         * The unit for line/dashed/dotted/underline border
-         */
+        /// The unit for line/dashed/dotted/underline border
         private byte widthUnit;
 
-        /**
-         * The color for a line/dashed/dotted/underline border.
-         */
+        /// The color for a line/dashed/dotted/underline border.
         private Integer color;
 
         private static double round(double d, int decimalPlaces) {
@@ -1941,20 +1941,12 @@ public abstract class StyleParser {
             return d;
         }
 
-        /**
-         * Form "splicedImage" type
-         *
-         * @return
-         */
+        /// Form "splicedImage" type
         private String splicedImageToString() {
             return getType() + " " + getSpliceImage() + " " + getSpliceInsets();
         }
 
-        /**
-         * For "image", "horizontalImage", and "verticalImage" types
-         *
-         * @return
-         */
+        /// For "image", "horizontalImage", and "verticalImage" types
         private String imageToString() {
             StringBuilder sb = new StringBuilder();
             sb.append(getType()).append(" ");
@@ -1964,11 +1956,7 @@ public abstract class StyleParser {
             return sb.toString().trim();
         }
 
-        /**
-         * Used for "line", "dashed", "dotted", and "underline" types.
-         *
-         * @return
-         */
+        /// Used for "line", "dashed", "dotted", and "underline" types.
         private String lineToString() {
             int color = getColor() == null ? 0 : getColor();
             return widthString() + " " + lineTypeString() + " " + Integer.toHexString(color);
@@ -2029,11 +2017,7 @@ public abstract class StyleParser {
             sb.append(hex).append(" ");
         }
 
-        /**
-         * Used for "round" type
-         *
-         * @return
-         */
+        /// Used for "round" type
         private String roundToString() {
             StringBuilder sb = new StringBuilder();
 
@@ -2099,11 +2083,7 @@ public abstract class StyleParser {
             return sb.toString().trim();
         }
 
-        /**
-         * Returns the border as a style string value.  This value is formatted in a way that can be parsed by the StyleParser.
-         *
-         * @return
-         */
+        /// Returns the border as a style string value.  This value is formatted in a way that can be parsed by the StyleParser.
         @Override
         public String toString() {
             if ("splicedImage".equals(getType())) {
@@ -2121,11 +2101,7 @@ public abstract class StyleParser {
             }
         }
 
-        /**
-         * Returns width as a string, including units.  If the width isn't set, this outputs "1px".
-         *
-         * @return
-         */
+        /// Returns width as a string, including units.  If the width isn't set, this outputs "1px".
         public String widthString() {
             if (width == null) {
                 return "1px";
@@ -2133,11 +2109,7 @@ public abstract class StyleParser {
             return getWidth() + widthUnitString();
         }
 
-        /**
-         * Returns the border color as a hex string.  If no color is set, this returns the empty string.
-         *
-         * @return
-         */
+        /// Returns the border color as a hex string.  If no color is set, this returns the empty string.
         public String colorString() {
             if (color == null) {
                 return "";
@@ -2335,12 +2307,15 @@ public abstract class StyleParser {
             return b;
         }
 
-        /**
-         * Creates the border that is described by this border info.
-         *
-         * @param theme Theme resource file used to load images that are referenced.
-         * @return A Border.
-         */
+        /// Creates the border that is described by this border info.
+        ///
+        /// #### Parameters
+        ///
+        /// - `theme`: Theme resource file used to load images that are referenced.
+        ///
+        /// #### Returns
+        ///
+        /// A Border.
         public Border createBorder(Resources theme) {
             if (getType() == null || "empty".equals(getType()) || "none".equals(getType())) {
                 return Border.createEmpty();
@@ -2379,12 +2354,15 @@ public abstract class StyleParser {
 
         }
 
-        /**
-         * For a splicedImage border, this gets the spliced insets as a 4-element array of double values.
-         *
-         * @param out An out parameter.  4-element array of insets.  Indices {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, and {@link Component#RIGHT}.
-         * @return 4-element array of insets.  Indices {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, and {@link Component#RIGHT}.
-         */
+        /// For a splicedImage border, this gets the spliced insets as a 4-element array of double values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `out`: An out parameter.  4-element array of insets.  Indices `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`, and `Component#RIGHT`.
+        ///
+        /// #### Returns
+        ///
+        /// 4-element array of insets.  Indices `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`, and `Component#RIGHT`.
         public double[] getSpliceInsets(double[] out) {
             String[] parts = Util.split(getSpliceInsets(), " ");
 
@@ -2395,93 +2373,94 @@ public abstract class StyleParser {
             return out;
         }
 
-        /**
-         * The border type.  E.g. line, dashed, dotted, underline, image, horizontalImage, verticalImage, splicedImage.
-         *
-         * @return the type
-         */
+        /// The border type.  E.g. line, dashed, dotted, underline, image, horizontalImage, verticalImage, splicedImage.
+        ///
+        /// #### Returns
+        ///
+        /// the type
         public String getType() {
             return type;
         }
 
-        /**
-         * Sets the border type.
-         *
-         * @param type the type to set. E.g. line, dashed, dotted, underline, image, horizontalImage, verticalImage, splicedImage.
-         */
+        /// Sets the border type.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: the type to set. E.g. line, dashed, dotted, underline, image, horizontalImage, verticalImage, splicedImage.
         public void setType(String type) {
             this.type = type;
         }
 
-        /**
-         * The image to use for a splicedImage border.
-         *
-         * @return the spliceImage
-         */
+        /// The image to use for a splicedImage border.
+        ///
+        /// #### Returns
+        ///
+        /// the spliceImage
         public String getSpliceImage() {
             return spliceImage;
         }
 
-        /**
-         * Sets the image to use for a splicedImage border.
-         *
-         * @param spliceImage the spliceImage to set
-         */
+        /// Sets the image to use for a splicedImage border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `spliceImage`: the spliceImage to set
         public void setSpliceImage(String spliceImage) {
             this.spliceImage = spliceImage;
         }
 
-        /**
-         * Gets the images to use for image, horizontalImage, and verticalImage borders.
-         *
-         * @return the images
-         */
+        /// Gets the images to use for image, horizontalImage, and verticalImage borders.
+        ///
+        /// #### Returns
+        ///
+        /// the images
         public String[] getImages() {
             return images;
         }
 
-        /**
-         * Sets the images used by image, horizontalImage, and verticalImage borders.
-         *
-         * @param images the images to set
-         */
+        /// Sets the images used by image, horizontalImage, and verticalImage borders.
+        ///
+        /// #### Parameters
+        ///
+        /// - `images`: the images to set
         public void setImages(String[] images) {
             this.images = images;
         }
 
-        /**
-         * For splicedImage border, this gets the splice insets as a single string.
-         *
-         * @return the spliceInsets
-         */
+        /// For splicedImage border, this gets the splice insets as a single string.
+        ///
+        /// #### Returns
+        ///
+        /// the spliceInsets
         public String getSpliceInsets() {
             return spliceInsets;
         }
 
-        /**
-         * Sest the splice insets for a splicedImage border.
-         *
-         * @param spliceInsets the spliceInsets to set
-         */
+        /// Sest the splice insets for a splicedImage border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `spliceInsets`: the spliceInsets to set
         public void setSpliceInsets(String spliceInsets) {
             this.spliceInsets = spliceInsets;
         }
 
-        /**
-         * For a splicedImage border, sets the splice insets as a 4-element array.
-         *
-         * @param insets 4-element array.  Indices {@literal Component#TOP} , {@literal Component#BOTTOM}, {@literal Component#LEFT}, and {@literal Component#RIGHT}.
-         */
+        /// For a splicedImage border, sets the splice insets as a 4-element array.
+        ///
+        /// #### Parameters
+        ///
+        /// - `insets`: 4-element array.  Indices Component#TOP , Component#BOTTOM, Component#LEFT, and Component#RIGHT.
         public void setSpliceInsets(double[] insets) {
             this.spliceInsets = insets[Component.TOP] + " " + insets[Component.RIGHT] + " " + insets[Component.BOTTOM] + " " + insets[Component.LEFT];
         }
 
-        /**
-         * Sets the splicedImage border insets as a 4-element array and rounds each entry to the specified number of decimal places
-         *
-         * @param insets        4-element array of insets.Indices {@literal Component#TOP} , {@literal Component#BOTTOM}, {@literal Component#LEFT}, and {@literal Component#RIGHT}.
-         * @param decimalPlaces Number of decimal places to round to.
-         */
+        /// Sets the splicedImage border insets as a 4-element array and rounds each entry to the specified number of decimal places
+        ///
+        /// #### Parameters
+        ///
+        /// - `insets`: 4-element array of insets.Indices Component#TOP , Component#BOTTOM, Component#LEFT, and Component#RIGHT.
+        ///
+        /// - `decimalPlaces`: Number of decimal places to round to.
         public void setSpliceInsets(double[] insets, int decimalPlaces) {
             this.spliceInsets =
                     round(insets[Component.TOP], decimalPlaces) + " " +
@@ -2490,42 +2469,49 @@ public abstract class StyleParser {
                             round(insets[Component.LEFT], decimalPlaces);
         }
 
-        /**
-         * For a line/dashed/dotted/underline/round border, the thickness value.
-         *
-         * @return the width
-         * @see #getWidthUnit()
-         */
+        /// For a line/dashed/dotted/underline/round border, the thickness value.
+        ///
+        /// #### Returns
+        ///
+        /// the width
+        ///
+        /// #### See also
+        ///
+        /// - #getWidthUnit()
         public Float getWidth() {
             return width;
         }
 
-        /**
-         * For a line/dashed/dotted/underline/round border, gets the thickness value.
-         *
-         * @param width the width to set
-         * @see #setWidthUnit(byte)
-         */
+        /// For a line/dashed/dotted/underline/round border, gets the thickness value.
+        ///
+        /// #### Parameters
+        ///
+        /// - `width`: the width to set
+        ///
+        /// #### See also
+        ///
+        /// - #setWidthUnit(byte)
         public void setWidth(Float width) {
             this.width = width;
         }
 
-        /**
-         * Gets the border thickness as a scalar value.  This is effectively the same
-         * value as returned by {@link #getWidth() } and {@link #getWidthUnit() }
-         *
-         * @return The thickness of the border.  Used with line, dashed, dotted, underline, and round borders.
-         */
+        /// Gets the border thickness as a scalar value.  This is effectively the same
+        /// value as returned by `#getWidth()` and `#getWidthUnit()`
+        ///
+        /// #### Returns
+        ///
+        /// The thickness of the border.  Used with line, dashed, dotted, underline, and round borders.
         public ScalarValue getThickness() {
             return new ScalarValue(width == null ? 0 : width, widthUnit);
         }
 
-        /**
-         * For line/dashed/dotted/underline border.  The thickness in pixels.
-         *
-         * @return The thickness in pixels of the border line.
-         * @asee #getWidth()
-         */
+        /// For line/dashed/dotted/underline border.  The thickness in pixels.
+        ///
+        /// @asee #getWidth()
+        ///
+        /// #### Returns
+        ///
+        /// The thickness in pixels of the border line.
         public Integer getWidthInPixels() {
             if (width == null) {
                 return null;
@@ -2537,381 +2523,404 @@ public abstract class StyleParser {
             }
         }
 
-        /**
-         * For a line/dashed/dotted/underline/round border, gets the unit of the thickness value.
-         *
-         * @return the widthUnit
-         * @see #getWidth()
-         */
+        /// For a line/dashed/dotted/underline/round border, gets the unit of the thickness value.
+        ///
+        /// #### Returns
+        ///
+        /// the widthUnit
+        ///
+        /// #### See also
+        ///
+        /// - #getWidth()
         public byte getWidthUnit() {
             return widthUnit;
         }
 
-        /**
-         * For a line/dashed/dotted/underline/round border, sets the unit of the thickness value.
-         *
-         * @param widthUnit the widthUnit to set
-         * @see #setWidth(java.lang.Float)
-         */
+        /// For a line/dashed/dotted/underline/round border, sets the unit of the thickness value.
+        ///
+        /// #### Parameters
+        ///
+        /// - `widthUnit`: the widthUnit to set
+        ///
+        /// #### See also
+        ///
+        /// - #setWidth(java.lang.Float)
         public void setWidthUnit(byte widthUnit) {
             this.widthUnit = widthUnit;
         }
 
-        /**
-         * For a line/dashed/dotted/underline/round border, sets the color.  For round border
-         * this gets the fill color.  For line border variants, it gets the stroke color.
-         *
-         * @return the color
-         */
+        /// For a line/dashed/dotted/underline/round border, sets the color.  For round border
+        /// this gets the fill color.  For line border variants, it gets the stroke color.
+        ///
+        /// #### Returns
+        ///
+        /// the color
         public Integer getColor() {
             return color;
         }
 
-        /**
-         * For a line/dashed/dotted/underline/round border, gets the color.  For
-         * round border, this sets the fill color.  For line border variants, it sets the stroke color.
-         *
-         * @param color the color to set
-         */
+        /// For a line/dashed/dotted/underline/round border, gets the color.  For
+        /// round border, this sets the fill color.  For line border variants, it sets the stroke color.
+        ///
+        /// #### Parameters
+        ///
+        /// - `color`: the color to set
         public void setColor(Integer color) {
             this.color = color;
         }
 
-        /**
-         * Gets the fill opacity of round border.  Only used for round border
-         *
-         * @return the opacity The opacity of the round border.
-         */
+        /// Gets the fill opacity of round border.  Only used for round border
+        ///
+        /// #### Returns
+        ///
+        /// the opacity The opacity of the round border.
         public Integer getOpacity() {
             return opacity;
         }
 
-        /**
-         * Sets teh fill opacity of round border.  Only used for round border.
-         *
-         * @param opacity the opacity to set
-         */
+        /// Sets teh fill opacity of round border.  Only used for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `opacity`: the opacity to set
         public void setOpacity(Integer opacity) {
             this.opacity = opacity;
         }
 
-        /**
-         * Gets the stroke color for round border.  This is only used for round border.
-         * Line border variants should use {@link #getColor() }
-         *
-         * @return the strokeColor
-         */
+        /// Gets the stroke color for round border.  This is only used for round border.
+        /// Line border variants should use `#getColor()`
+        ///
+        /// #### Returns
+        ///
+        /// the strokeColor
         public Integer getStrokeColor() {
             return strokeColor;
         }
 
-        /**
-         * Sets the stroke color for round border.  This is only used for round border.
-         * Line border variants should use {@link #setColor(java.lang.Integer) }
-         *
-         * @param strokeColor the strokeColor to set
-         */
+        /// Sets the stroke color for round border.  This is only used for round border.
+        /// Line border variants should use `#setColor(java.lang.Integer)`
+        ///
+        /// #### Parameters
+        ///
+        /// - `strokeColor`: the strokeColor to set
         public void setStrokeColor(Integer strokeColor) {
             this.strokeColor = strokeColor;
         }
 
-        /**
-         * Gets the stroke opacity for round border.  This is only used for round border.
-         *
-         * @return the strokeOpacity
-         */
+        /// Gets the stroke opacity for round border.  This is only used for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the strokeOpacity
         public Integer getStrokeOpacity() {
             return strokeOpacity;
         }
 
-        /**
-         * Sets the stroke opacity for round border.  This is only used for round border.
-         *
-         * @param strokeOpacity the strokeOpacity to set
-         */
+        /// Sets the stroke opacity for round border.  This is only used for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `strokeOpacity`: the strokeOpacity to set
         public void setStrokeOpacity(Integer strokeOpacity) {
             this.strokeOpacity = strokeOpacity;
         }
 
-        /**
-         * Sets the shadow opacity for round border.  This is only used for round border.
-         *
-         * @return the shadowOpacity
-         */
+        /// Sets the shadow opacity for round border.  This is only used for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowOpacity
         public Integer getShadowOpacity() {
             return shadowOpacity;
         }
 
-        /**
-         * Sets the shadow opacity for round border.  This is only used for round border.
-         *
-         * @param shadowOpacity the shadowOpacity to set
-         */
+        /// Sets the shadow opacity for round border.  This is only used for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowOpacity`: the shadowOpacity to set
         public void setShadowOpacity(Integer shadowOpacity) {
             this.shadowOpacity = shadowOpacity;
         }
 
-        /**
-         * Gets the shadowX property of round border.
-         *
-         * @return the shadowX
-         */
+        /// Gets the shadowX property of round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowX
         public Float getShadowX() {
             return shadowX;
         }
 
-        /**
-         * Sets the shadowX property of round border.
-         *
-         * @param shadowX the shadowX to set
-         */
+        /// Sets the shadowX property of round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowX`: the shadowX to set
         public void setShadowX(Float shadowX) {
             this.shadowX = shadowX;
         }
 
-        /**
-         * Gets the shadowY property of round border.
-         *
-         * @return the shadowY
-         */
+        /// Gets the shadowY property of round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowY
         public Float getShadowY() {
             return shadowY;
         }
 
-        /**
-         * Sets the shadowY property of round border.
-         *
-         * @param shadowY the shadowY to set
-         */
+        /// Sets the shadowY property of round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowY`: the shadowY to set
         public void setShadowY(Float shadowY) {
             this.shadowY = shadowY;
         }
 
-        /**
-         * Gets the blur for round border.
-         *
-         * @return the shadowBlur
-         */
+        /// Gets the blur for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowBlur
         public Float getShadowBlur() {
             return shadowBlur;
         }
 
-        /**
-         * Sets the blur for round border.
-         *
-         * @param shadowBlur the shadowBlur to set
-         */
+        /// Sets the blur for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowBlur`: the shadowBlur to set
         public void setShadowBlur(Float shadowBlur) {
             this.shadowBlur = shadowBlur;
         }
 
-        /**
-         * Gets the shadow spread for round border.
-         *
-         * @return the shadowSpread
-         */
+        /// Gets the shadow spread for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowSpread
         public ScalarValue getShadowSpread() {
             return shadowSpread;
         }
 
-        /**
-         * Sets the shadow spread for round border.
-         *
-         * @param shadowSpread the shadowSpread to set
-         */
+        /// Sets the shadow spread for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowSpread`: the shadowSpread to set
         public void setShadowSpread(ScalarValue shadowSpread) {
             this.shadowSpread = shadowSpread;
         }
 
-        /**
-         * Sets the shadow spread for round border as a string.  String must be valid scalar
-         * value.  E.g. 2mm, or 3px.
-         *
-         * @param val
-         */
+        /// Sets the shadow spread for round border as a string.  String must be valid scalar
+        /// value.  E.g. 2mm, or 3px.
+        ///
+        /// #### Parameters
+        ///
+        /// - `val`
         public void setShadowSpread(String val) {
             this.shadowSpread = parseScalarValue(val);
         }
 
-        /**
-         * Checks whether round border should grow to a rectangle.  Only used for round border.
-         *
-         * @return the rectangle
-         */
+        /// Checks whether round border should grow to a rectangle.  Only used for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the rectangle
         public Boolean getRectangle() {
             return rectangle;
         }
 
-        /**
-         * Sets whether round border should grow to a rectangle.  Only used for round border.
-         *
-         * @param rectangle the rectangle to set
-         */
+        /// Sets whether round border should grow to a rectangle.  Only used for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `rectangle`: the rectangle to set
         public void setRectangle(Boolean rectangle) {
             this.rectangle = rectangle;
         }
 
-        /**
-         * Used only for roundRect border.  The value to set for {@link RoundRectBorder#topOnlyMode(boolean) }.  Returns {@literal null}
-         * if this flag isn't set at all.
-         *
-         * @return the topOnlyMode
-         */
+        /// Used only for roundRect border.  The value to set for `RoundRectBorder#topOnlyMode(boolean)`.  Returns null
+        /// if this flag isn't set at all.
+        ///
+        /// #### Returns
+        ///
+        /// the topOnlyMode
         public Boolean getTopOnlyMode() {
             return topOnlyMode;
         }
 
-        /**
-         * Used only for roundRect border.  The value to set for {@link RoundRectBorder#topOnlyMode(boolean) }.  Set to {@literal null} to
-         * not set this flag at all.
-         *
-         * @param topOnlyMode the topOnlyMode to set
-         */
+        /// Used only for roundRect border.  The value to set for `RoundRectBorder#topOnlyMode(boolean)`.  Set to null to
+        /// not set this flag at all.
+        ///
+        /// #### Parameters
+        ///
+        /// - `topOnlyMode`: the topOnlyMode to set
         public void setTopOnlyMode(Boolean topOnlyMode) {
             this.topOnlyMode = topOnlyMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomOnlyMode(boolean) }.  Returns {@literal null} if
-         * this property is ignored.
-         *
-         * @return the bottomOnlyMode
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomOnlyMode(boolean)`.  Returns null if
+        /// this property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the bottomOnlyMode
         public Boolean getBottomOnlyMode() {
             return bottomOnlyMode;
         }
 
-        /**
-         * Used for roundRect border. The value to set for {@link RoundRectBorder#bottomOnlyMode(boolean) }.  Set to {@literal null} to
-         * ignore this property.
-         *
-         * @param bottomOnlyMode the bottomOnlyMode to set
-         */
+        /// Used for roundRect border. The value to set for `RoundRectBorder#bottomOnlyMode(boolean)`.  Set to null to
+        /// ignore this property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bottomOnlyMode`: the bottomOnlyMode to set
         public void setBottomOnlyMode(Boolean bottomOnlyMode) {
             this.bottomOnlyMode = bottomOnlyMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#topLeftMode(boolean) }.  Returns {@literal null} if
-         * this property is ignored.
-         *
-         * @return the topLeftMode
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#topLeftMode(boolean)`.  Returns null if
+        /// this property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the topLeftMode
         public Boolean getTopLeftMode() {
             return topLeftMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#topLeftMode(boolean) }.  Set {@literal null} to ignore
-         * property.
-         *
-         * @param topLeftMode the topLeftMode to set
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#topLeftMode(boolean)`.  Set null to ignore
+        /// property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `topLeftMode`: the topLeftMode to set
         public void setTopLeftMode(Boolean topLeftMode) {
             this.topLeftMode = topLeftMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#topRightMode(boolean)}.  Returns {@literal null} if
-         * property is ignored.
-         *
-         * @return the topRightMode
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#topRightMode(boolean)`.  Returns null if
+        /// property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the topRightMode
         public Boolean getTopRightMode() {
             return topRightMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#topRightMode(boolean) }.  Sets {@literal null} to ignore
-         * property.
-         *
-         * @param topRightMode the topRightMode to set
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#topRightMode(boolean)`.  Sets null to ignore
+        /// property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `topRightMode`: the topRightMode to set
         public void setTopRightMode(Boolean topRightMode) {
             this.topRightMode = topRightMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomLeftMode(boolean) }.  Returns {@literal null} if
-         * property is ignored.
-         *
-         * @return the bottomLeftMode
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomLeftMode(boolean)`.  Returns null if
+        /// property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the bottomLeftMode
         public Boolean getBottomLeftMode() {
             return bottomLeftMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomLeftMode(boolean) }.  Set {@literal null} to ignore
-         * property.
-         *
-         * @param bottomLeftMode the bottomLeftMode to set
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomLeftMode(boolean)`.  Set null to ignore
+        /// property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bottomLeftMode`: the bottomLeftMode to set
         public void setBottomLeftMode(Boolean bottomLeftMode) {
             this.bottomLeftMode = bottomLeftMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomRightMode(boolean) }.  Returns {@literal null}
-         * if property is ignored.
-         *
-         * @return the bottomRightMode
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomRightMode(boolean)`.  Returns null
+        /// if property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the bottomRightMode
         public Boolean getBottomRightMode() {
             return bottomRightMode;
         }
 
-        /**
-         * Used for roundRect border.  The value to set for {@link RoundRectBorder#bottomRightMode(boolean) }.  Set {@literal null} to ignore
-         * property.
-         *
-         * @param bottomRightMode the bottomRightMode to set
-         */
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomRightMode(boolean)`.  Set null to ignore
+        /// property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bottomRightMode`: the bottomRightMode to set
         public void setBottomRightMode(Boolean bottomRightMode) {
             this.bottomRightMode = bottomRightMode;
         }
 
-        /**
-         * Used for roundRect border.  The corner radius.
-         *
-         * @return the cornerRadius
-         * @see RoundRectBorder#cornerRadius(float)
-         */
+        /// Used for roundRect border.  The corner radius.
+        ///
+        /// #### Returns
+        ///
+        /// the cornerRadius
+        ///
+        /// #### See also
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
         public Float getCornerRadius() {
             return cornerRadius;
         }
 
-        /**
-         * Used for roundRect border.  Sets the corner radius.
-         *
-         * @param cornerRadius the cornerRadius to set
-         * @see RoundRectBorder#cornerRadius(float)
-         */
+        /// Used for roundRect border.  Sets the corner radius.
+        ///
+        /// #### Parameters
+        ///
+        /// - `cornerRadius`: the cornerRadius to set
+        ///
+        /// #### See also
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
         public void setCornerRadius(Float cornerRadius) {
             this.cornerRadius = cornerRadius;
         }
 
-        /**
-         * Used for roundRect border.  Sets the corner radius as a scalar value.  E.g. "2mm" or "2px'
-         *
-         * @param cornerRadius the cornerRadius to set
-         * @see RoundRectBorder#cornerRadius(float)
-         * @see #setCornerRadius(java.lang.Float)
-         * @see #setCornerRadius(com.codename1.ui.plaf.StyleParser.ScalarValue)
-         * @see RoundRectBorder#cornerRadius(float)
-         */
+        /// Used for roundRect border.  Sets the corner radius as a scalar value.  E.g. "2mm" or "2px'
+        ///
+        /// #### Parameters
+        ///
+        /// - `cornerRadius`: the cornerRadius to set
+        ///
+        /// #### See also
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
+        ///
+        /// - #setCornerRadius(java.lang.Float)
+        ///
+        /// - #setCornerRadius(com.codename1.ui.plaf.StyleParser.ScalarValue)
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
         public void setCornerRadius(String cornerRadius) {
             setCornerRadius(getMMValue(cornerRadius));
         }
 
-        /**
-         * Used for roundRect border.  Sets the corner radius
-         *
-         * @param sv The corner radius to set.
-         * @see #setCornerRadius(java.lang.Float)
-         * @see #setCornerRadius(java.lang.String)
-         * @see RoundRectBorder#cornerRadius(float)
-         */
+        /// Used for roundRect border.  Sets the corner radius
+        ///
+        /// #### Parameters
+        ///
+        /// - `sv`: The corner radius to set.
+        ///
+        /// #### See also
+        ///
+        /// - #setCornerRadius(java.lang.Float)
+        ///
+        /// - #setCornerRadius(java.lang.String)
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
         public void setCornerRadius(ScalarValue sv) {
             switch (sv.getUnit()) {
                 case Style.UNIT_TYPE_DIPS:
@@ -2923,31 +2932,24 @@ public abstract class StyleParser {
         }
     }
 
-    /**
-     * Encapsulates the value of the {@literal font} property in a style string.
-     */
+    /// Encapsulates the value of the font property in a style string.
     public static class FontInfo {
         private Float size;
         private byte sizeUnit;
         private String name;
         private String file;
 
-        /**
-         * Returns the font in a format that can be used as the value of the {@literal font} property of a style string.
-         *
-         * @return
-         */
+        /// Returns the font in a format that can be used as the value of the font property of a style string.
         @Override
         public String toString() {
             return (sizeString("") + nameString(" ") + fileString(" ")).trim();
         }
 
-        /**
-         * Gets the font size as a style string.  E.g. 18mm, or 12px.  If unit is inherit, this will just return an empty string.
-         *
-         * @param prefix String to prefix to the size.
-         * @return
-         */
+        /// Gets the font size as a style string.  E.g. 18mm, or 12px.  If unit is inherit, this will just return an empty string.
+        ///
+        /// #### Parameters
+        ///
+        /// - `prefix`: String to prefix to the size.
         public String sizeString(String prefix) {
             if (getSize() == null) {
                 return prefix;
@@ -2961,12 +2963,11 @@ public abstract class StyleParser {
             }
         }
 
-        /**
-         * Gets the size of the font in pixels.
-         *
-         * @param baseStyle The base style to use in case the font size isn't specified in the style string.
-         * @return
-         */
+        /// Gets the size of the font in pixels.
+        ///
+        /// #### Parameters
+        ///
+        /// - `baseStyle`: The base style to use in case the font size isn't specified in the style string.
         public float getSizeInPixels(Style baseStyle) {
             if (getSize() == null || getSizeUnit() == UNIT_INHERIT) {
                 Font f = baseStyle.getFont();
@@ -3015,86 +3016,95 @@ public abstract class StyleParser {
             return prefix + getFile();
         }
 
-        /**
-         * Gets the font size.
-         *
-         * @return the size
-         * @see #getSizeUnit()
-         */
+        /// Gets the font size.
+        ///
+        /// #### Returns
+        ///
+        /// the size
+        ///
+        /// #### See also
+        ///
+        /// - #getSizeUnit()
         public Float getSize() {
             return size;
         }
 
-        /**
-         * Sets the font size.
-         *
-         * @param size the size to set
-         * @see #setSizeUnit(byte)
-         */
+        /// Sets the font size.
+        ///
+        /// #### Parameters
+        ///
+        /// - `size`: the size to set
+        ///
+        /// #### See also
+        ///
+        /// - #setSizeUnit(byte)
         public void setSize(Float size) {
             this.size = size;
         }
 
-        /**
-         * Gets the font size unit.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, or {@link #UNIT_INHERIT}.
-         *
-         * @return the sizeUnit
-         */
+        /// Gets the font size unit.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `#UNIT_INHERIT`.
+        ///
+        /// #### Returns
+        ///
+        /// the sizeUnit
         public byte getSizeUnit() {
             return sizeUnit;
         }
 
-        /**
-         * Sets the font size unit.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS}, or {@link #UNIT_INHERIT}.
-         *
-         * @param sizeUnit the sizeUnit to set
-         */
+        /// Sets the font size unit.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `#UNIT_INHERIT`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sizeUnit`: the sizeUnit to set
         public void setSizeUnit(byte sizeUnit) {
             this.sizeUnit = sizeUnit;
         }
 
-        /**
-         * Gets the name of the font.
-         *
-         * @return the name
-         */
+        /// Gets the name of the font.
+        ///
+        /// #### Returns
+        ///
+        /// the name
         public String getName() {
             return name;
         }
 
-        /**
-         * Sets the name of the font.
-         *
-         * @param name the name to set
-         */
+        /// Sets the name of the font.
+        ///
+        /// #### Parameters
+        ///
+        /// - `name`: the name to set
         public void setName(String name) {
             this.name = name;
         }
 
-        /**
-         * Gets the font file name.  Should start with "/".
-         *
-         * @return the file
-         */
+        /// Gets the font file name.  Should start with "/".
+        ///
+        /// #### Returns
+        ///
+        /// the file
         public String getFile() {
             return file;
         }
 
-        /**
-         * Sets the font file name.  Should start with "/".
-         *
-         * @param file the file to set
-         */
+        /// Sets the font file name.  Should start with "/".
+        ///
+        /// #### Parameters
+        ///
+        /// - `file`: the file to set
         public void setFile(String file) {
             this.file = file;
         }
 
-        /**
-         * Creates a font based on this font information.
-         *
-         * @param baseStyle The base style to use in cases where aspects of the font aren't explicitly specified in the style string.
-         * @return A font.
-         */
+        /// Creates a font based on this font information.
+        ///
+        /// #### Parameters
+        ///
+        /// - `baseStyle`: The base style to use in cases where aspects of the font aren't explicitly specified in the style string.
+        ///
+        /// #### Returns
+        ///
+        /// A font.
         public Font createFont(Style baseStyle) {
             Font f;
             if (name == null) {

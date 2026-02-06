@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -28,40 +26,36 @@ import com.codename1.io.Log;
 import java.util.List;
 
 
-/**
- * Aggregates multiple {@link XYChart} implementations into a single plot so
- * different series can be visualised using different renderers (for example a
- * line overlaid on top of a bar chart).
- * <p>
- * Provide the constructor with an {@link XYMultipleSeriesDataset}, a matching
- * {@link XYMultipleSeriesRenderer} and an array of
- * {@link XYCombinedChartDef} instances that describe which inner chart type
- * should render each data series. The combined chart can then be wrapped in a
- * {@link com.codename1.charts.ChartComponent} for display.
- */
+/// Aggregates multiple `XYChart` implementations into a single plot so
+/// different series can be visualised using different renderers (for example a
+/// line overlaid on top of a bar chart).
+///
+/// Provide the constructor with an `XYMultipleSeriesDataset`, a matching
+/// `XYMultipleSeriesRenderer` and an array of
+/// `XYCombinedChartDef` instances that describe which inner chart type
+/// should render each data series. The combined chart can then be wrapped in a
+/// `com.codename1.charts.ChartComponent` for display.
 public class CombinedXYChart extends XYChart {
 
     private final XYCombinedChartDef[] chartDefinitions;
 
-    /**
-     * The embedded XY charts.
-     */
+    /// The embedded XY charts.
     private final XYChart[] mCharts;
 
-    /**
-     * The supported charts for being combined.
-     */
+    /// The supported charts for being combined.
     private final Class<?>[] xyChartTypes = new Class<?>[]{TimeChart.class, LineChart.class,
             CubicLineChart.class, BarChart.class, BubbleChart.class, ScatterChart.class,
             RangeBarChart.class, RangeStackedBarChart.class};
 
-    /**
-     * Builds a new combined XY chart instance.
-     *
-     * @param dataset          the multiple series dataset
-     * @param renderer         the multiple series renderer
-     * @param chartDefinitions the XY chart definitions
-     */
+    /// Builds a new combined XY chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the multiple series dataset
+    ///
+    /// - `renderer`: the multiple series renderer
+    ///
+    /// - `chartDefinitions`: the XY chart definitions
     public CombinedXYChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer,
                            XYCombinedChartDef[] chartDefinitions) {
         super(dataset, renderer);
@@ -91,14 +85,21 @@ public class CombinedXYChart extends XYChart {
         }
     }
 
-    /**
-     * Returns a chart instance based on the provided type.
-     *
-     * @param type the chart type
-     * @return an instance of a chart implementation
-     * @throws IllegalAccessException
-     * @throws InstantiationException
-     */
+    /// Returns a chart instance based on the provided type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the chart type
+    ///
+    /// #### Returns
+    ///
+    /// an instance of a chart implementation
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalAccessException`
+    ///
+    /// - `InstantiationException`
     private XYChart getXYChart(String type) throws IllegalAccessException, InstantiationException {
         XYChart chart = null;
         int length = xyChartTypes.length;
@@ -111,17 +112,23 @@ public class CombinedXYChart extends XYChart {
         return chart;
     }
 
-    /**
-     * The graphical representation of a series.
-     *
-     * @param canvas         the canvas to paint to
-     * @param paint          the paint to be used for drawing
-     * @param points         the array of points to be used for drawing the series
-     * @param seriesRenderer the series renderer
-     * @param yAxisValue     the minimum value of the y axis
-     * @param seriesIndex    the index of the series currently being drawn
-     * @param startIndex     the start index of the rendering points
-     */
+    /// The graphical representation of a series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesRenderer`: the series renderer
+    ///
+    /// - `yAxisValue`: the minimum value of the y axis
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points,
                            XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
@@ -151,28 +158,36 @@ public class CombinedXYChart extends XYChart {
                 getChartSeriesIndex(seriesIndex), or, startIndex);
     }
 
-    /**
-     * Returns the legend shape width.
-     *
-     * @param seriesIndex the series index
-     * @return the legend shape width
-     */
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
     @Override
     public int getLegendShapeWidth(int seriesIndex) {
         XYChart chart = getXYChart(seriesIndex);
         return chart.getLegendShapeWidth(getChartSeriesIndex(seriesIndex));
     }
 
-    /**
-     * The graphical representation of the legend shape.
-     *
-     * @param canvas      the canvas to paint to
-     * @param renderer    the series renderer
-     * @param x           the x value of the point the shape should be drawn at
-     * @param y           the y value of the point the shape should be drawn at
-     * @param seriesIndex the series index
-     * @param paint       the paint to be used for drawing
-     */
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
@@ -180,11 +195,11 @@ public class CombinedXYChart extends XYChart {
         chart.drawLegendShape(canvas, renderer, x, y, getChartSeriesIndex(seriesIndex), paint);
     }
 
-    /**
-     * Returns the chart type identifier.
-     *
-     * @return the chart type
-     */
+    /// Returns the chart type identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the chart type
     @Override
     public String getChartType() {
         return "Combined";
@@ -210,25 +225,20 @@ public class CombinedXYChart extends XYChart {
         throw new IllegalArgumentException("Unknown series with index " + seriesIndex);
     }
 
-    /**
-     * Definition of a chart inside a combined XY chart.
-     */
+    /// Definition of a chart inside a combined XY chart.
     public static class XYCombinedChartDef {
-        /**
-         * The chart type.
-         */
+        /// The chart type.
         private final String type;
-        /**
-         * The series index.
-         */
+        /// The series index.
         private final int[] seriesIndex;
 
-        /**
-         * Constructs a chart definition.
-         *
-         * @param type        XY chart type
-         * @param seriesIndex corresponding data series indexes
-         */
+        /// Constructs a chart definition.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: XY chart type
+        ///
+        /// - `seriesIndex`: corresponding data series indexes
         public XYCombinedChartDef(String type, int... seriesIndex) {
             this.type = type;
             this.seriesIndex = seriesIndex;

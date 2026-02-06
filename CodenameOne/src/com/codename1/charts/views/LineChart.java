@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -29,48 +27,42 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * Plots series of X/Y points using straight line segments.
- * <p>
- * Supply the chart with an {@link XYMultipleSeriesDataset} and configure its
- * appearance via an {@link XYMultipleSeriesRenderer}. The chart is commonly
- * wrapped in a {@link com.codename1.charts.ChartComponent} before being added
- * to a Codename One form.
- */
+/// Plots series of X/Y points using straight line segments.
+///
+/// Supply the chart with an `XYMultipleSeriesDataset` and configure its
+/// appearance via an `XYMultipleSeriesRenderer`. The chart is commonly
+/// wrapped in a `com.codename1.charts.ChartComponent` before being added
+/// to a Codename One form.
 public class LineChart extends XYChart {
-    /**
-     * The constant to identify this chart type.
-     */
+    /// The constant to identify this chart type.
     public static final String TYPE = "Line";
-    /**
-     * The legend shape width.
-     */
+    /// The legend shape width.
     private static final int SHAPE_WIDTH = 30;
-    /**
-     * The scatter chart to be used to draw the data points.
-     */
+    /// The scatter chart to be used to draw the data points.
     private ScatterChart pointsChart;
 
     LineChart() {
     }
 
-    /**
-     * Builds a new line chart instance.
-     *
-     * @param dataset  the multiple series dataset
-     * @param renderer the multiple series renderer
-     */
+    /// Builds a new line chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the multiple series dataset
+    ///
+    /// - `renderer`: the multiple series renderer
     public LineChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
         super(dataset, renderer);
         pointsChart = new ScatterChart(dataset, renderer);
     }
 
-    /**
-     * Sets the series and the renderer.
-     *
-     * @param dataset  the series dataset
-     * @param renderer the series renderer
-     */
+    /// Sets the series and the renderer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the series dataset
+    ///
+    /// - `renderer`: the series renderer
     @Override
     protected void setDatasetRenderer(XYMultipleSeriesDataset dataset,
                                       XYMultipleSeriesRenderer renderer) {
@@ -78,17 +70,23 @@ public class LineChart extends XYChart {
         pointsChart = new ScatterChart(dataset, renderer);
     }
 
-    /**
-     * The graphical representation of a series.
-     *
-     * @param canvas         the canvas to paint to
-     * @param paint          the paint to be used for drawing
-     * @param points         the array of points to be used for drawing the series
-     * @param seriesRenderer the series renderer
-     * @param yAxisValue     the minimum value of the y axis
-     * @param seriesIndex    the index of the series currently being drawn
-     * @param startIndex     the start index of the rendering points
-     */
+    /// The graphical representation of a series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesRenderer`: the series renderer
+    ///
+    /// - `yAxisValue`: the minimum value of the y axis
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
     @Override
     public void drawSeries(Canvas canvas, Paint paint, List<Float> points, XYSeriesRenderer renderer,
                            float yAxisValue, int seriesIndex, int startIndex) {
@@ -341,27 +339,35 @@ public class LineChart extends XYChart {
         return ret;
     }
 
-    /**
-     * Returns the legend shape width.
-     *
-     * @param seriesIndex the series index
-     * @return the legend shape width
-     */
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
     @Override
     public int getLegendShapeWidth(int seriesIndex) {
         return SHAPE_WIDTH;
     }
 
-    /**
-     * The graphical representation of the legend shape.
-     *
-     * @param canvas      the canvas to paint to
-     * @param renderer    the series renderer
-     * @param x           the x value of the point the shape should be drawn at
-     * @param y           the y value of the point the shape should be drawn at
-     * @param seriesIndex the series index
-     * @param paint       the paint to be used for drawing
-     */
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
@@ -371,32 +377,32 @@ public class LineChart extends XYChart {
         }
     }
 
-    /**
-     * Returns if the chart should display the points as a certain shape.
-     *
-     * @param renderer the series renderer
-     */
+    /// Returns if the chart should display the points as a certain shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: the series renderer
     @Override
     public boolean isRenderPoints(SimpleSeriesRenderer renderer) {
         return renderer instanceof XYSeriesRenderer &&
                 ((XYSeriesRenderer) renderer).getPointStyle() != PointStyle.POINT;
     }
 
-    /**
-     * Returns the scatter chart to be used for drawing the data points.
-     *
-     * @return the data points scatter chart
-     */
+    /// Returns the scatter chart to be used for drawing the data points.
+    ///
+    /// #### Returns
+    ///
+    /// the data points scatter chart
     @Override
     public ScatterChart getPointsChart() {
         return pointsChart;
     }
 
-    /**
-     * Returns the chart type identifier.
-     *
-     * @return the chart type
-     */
+    /// Returns the chart type identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the chart type
     @Override
     public String getChartType() {
         return TYPE;

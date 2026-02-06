@@ -25,18 +25,18 @@ package com.codename1.maps;
 
 import com.codename1.ui.Component;
 
-/**
- * Invoked when the map is panned or zoomed
- *
- * @author Shai Almog
- */
+/// Invoked when the map is panned or zoomed
+///
+/// @author Shai Almog
 public interface MapListener {
-    /**
-     * Invoked when the map is zoomed or panned
-     *
-     * @param source = the component that fired the event
-     * @param zoom   the zoom level of the current map
-     * @param center the center position of the map
-     */
+    /// Invoked when the map is zoomed or panned
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: = the component that fired the event
+    ///
+    /// - `zoom`: the zoom level of the current map
+    ///
+    /// - `center`: the center position of the map
     void mapPositionUpdated(Component source, int zoom, Coord center);
 }

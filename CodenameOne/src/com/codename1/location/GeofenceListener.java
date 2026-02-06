@@ -22,26 +22,54 @@
  */
 package com.codename1.location;
 
-/**
- * Listener interface for the Geofence background tracking functionality. Usage:
- *
- * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
- *
- * @author Chen
- * @see LocationManager#isGeofenceSupported()
- * @see LocationManager#addGeoFencing(java.lang.Class, com.codename1.location.Geofence)
- * @see Geofence
- */
+/// Listener interface for the Geofence background tracking functionality. Usage:
+///
+/// ```java
+/// // File: BGLocationTest.java
+/// public void showForm() {
+///     Form hi = new Form("Hi World");
+///     hi.addComponent(new Label("Hi World"));
+///
+///     Location loc = new Location();
+///     loc.setLatitude(51.5033630);
+///     loc.setLongitude(-0.1276250);
+///
+///     Geofence gf = new Geofence("test", loc, 100, 100000);
+///
+///     LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
+///
+///     hi.show();
+/// }
+/// ```
+///
+/// ```java
+/// // File: GeofenceListenerImpl.java
+/// public class GeofenceListenerImpl implements GeofenceListener {
+///     public void onExit(String id) {
+///         System.out.println("Exited "+id);
+///     }
+///
+///     public void onEntered(String id) {
+///         System.out.println("Entered "+id);
+///     }
+/// }
+/// ```
+///
+/// @author Chen
+///
+/// #### See also
+///
+/// - LocationManager#isGeofenceSupported()
+///
+/// - LocationManager#addGeoFencing(java.lang.Class, com.codename1.location.Geofence)
+///
+/// - Geofence
 public interface GeofenceListener {
 
-    /**
-     * This callback gets called once the device is out of the Geofence area
-     */
+    /// This callback gets called once the device is out of the Geofence area
     void onExit(String id);
 
-    /**
-     * This callback gets called once the device enters the Geofence area
-     */
+    /// This callback gets called once the device enters the Geofence area
     void onEntered(String id);
 
 }

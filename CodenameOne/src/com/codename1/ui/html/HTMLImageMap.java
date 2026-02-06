@@ -30,11 +30,9 @@ import com.codename1.ui.geom.Rectangle;
 
 import java.util.Enumeration;
 
-/**
- * This class implements HTML Image maps (ones defined with the MAP and AREA tags)
- *
- * @author Ofir Leitner
- */
+/// This class implements HTML Image maps (ones defined with the MAP and AREA tags)
+///
+/// @author Ofir Leitner
 class HTMLImageMap extends Button implements ActionListener {
 
     ImageMapData mapData;

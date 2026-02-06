@@ -59,78 +59,55 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * HTMLComponent is a Codename One Component that renders HTML documents that conform to the XHTML Mobile Profile 1.0
- *
- * @author Ofir Leitner
- * @deprecated this component includes some customizability advantages but its probably better for 99% of the use
- * cases to use the WebBrowser Component from the Components package. That component works with the native
- * browser when applicable, which is a far superior approach.
- */
+/// HTMLComponent is a Codename One Component that renders HTML documents that conform to the XHTML Mobile Profile 1.0
+///
+/// @author Ofir Leitner
+///
+/// #### Deprecated
+///
+/// @deprecated this component includes some customizability advantages but its probably better for 99% of the use
+/// cases to use the WebBrowser Component from the Components package. That component works with the native
+/// browser when applicable, which is a far superior approach.
 public class HTMLComponent extends Container implements ActionListener, IOCallback {
-    /**
-     * If true, a full screen width will be assumed, this helps to make less internal components as text is aggregated to long labels
-     * If false, then the width is flexible, but every word will be rendered as a separate label.
-     * Note that if false, RTL texts will display in
-     */
+    /// If true, a full screen width will be assumed, this helps to make less internal components as text is aggregated to long labels
+    /// If false, then the width is flexible, but every word will be rendered as a separate label.
+    /// Note that if false, RTL texts will display in
     static final boolean FIXED_WIDTH = false;
 //    long startTime;
 //    String msg="";
 //    long textTime;
 
     // Internal "tweakable" constants
-    /**
-     * A constant that can be used to obfuscate out HTMLInputFormat if unnecessary
-     */
+    /// A constant that can be used to obfuscate out HTMLInputFormat if unnecessary
     static final boolean SUPPORT_INPUT_FORMAT = true;
-    /**
-     * A constant that can be used to obfuscate out all CSS related code if unnecessary
-     */
+    /// A constant that can be used to obfuscate out all CSS related code if unnecessary
     static final boolean SUPPORT_CSS = true;
-    /**
-     * A constant denoting whether to process only XHTML-MP1 (and WCSS), or some other tags/properties from HTML4/CSS2
-     */
+    /// A constant denoting whether to process only XHTML-MP1 (and WCSS), or some other tags/properties from HTML4/CSS2
     static final boolean PROCESS_HTML_MP1_ONLY = false;
-    /**
-     * Indicates a Justify alignment. Text justification is enabled only in FIXED_WIDTH mode
-     */
+    /// Indicates a Justify alignment. Text justification is enabled only in FIXED_WIDTH mode
     static final int JUSTIFY = 5;
     static final String CLIENT_PROPERTY_QUOTE = "quote"; // Client property added to quote elements to enable changing them later on with CSS
     static final String CLIENT_PROPERTY_IMG_BORDER = "imgBorder";
-    /**
-     * The default background color of an HTML document, can be changed with the BGCOLOR attribute in the BODY tag or via CSS
-     */
+    /// The default background color of an HTML document, can be changed with the BGCOLOR attribute in the BODY tag or via CSS
     static final int DEFAULT_BGCOLOR = 0xffffff;
-    /**
-     * The default color of text in HTML documents, can be changed with the TEXT attribute in the BODY tag or via CSS
-     */
+    /// The default color of text in HTML documents, can be changed with the TEXT attribute in the BODY tag or via CSS
     static final int DEFAULT_TEXT_COLOR = 0;
-    /**
-     * Static variables for HTMLListIndex
-     */
+    /// Static variables for HTMLListIndex
 
     static final String[] CSS_OL_TYPES = {"decimal", "upper-alpha", "lower-alpha", "upper-roman", "lower-roman", "none"};
-    /**
-     * Static variables and methods for HTMLBullet
-     */
+    /// Static variables and methods for HTMLBullet
 
     static final String[] CSS_UL_TYPES = {"none", "disc", "circle", "square"};
-    /**
-     * If true, when a page is requested, the previous page is immediately removed, thus helping conserve memory (Since only 1 page is held in memory simultanously)
-     * In next releases a better and external control over this will be provided.
-     */
+    /// If true, when a page is requested, the previous page is immediately removed, thus helping conserve memory (Since only 1 page is held in memory simultanously)
+    /// In next releases a better and external control over this will be provided.
     private static final boolean CLEAN_ON_PAGE_REQUEST = true; //false;
-    /**
-     * If true, checks will be made on each character in the text to see if it is CJK (Chinese, Japanese, Korean)
-     * If so each character will be considered as an entire word (for line wrapping puposes) as required in CJK.
-     * Since the tests require multiple unicode ranges check, this can be set to false avoiding these tests if the app doesn't use CJK
-     */
+    /// If true, checks will be made on each character in the text to see if it is CJK (Chinese, Japanese, Korean)
+    /// If so each character will be considered as an entire word (for line wrapping puposes) as required in CJK.
+    /// Since the tests require multiple unicode ranges check, this can be set to false avoiding these tests if the app doesn't use CJK
     private static final boolean CJK_SUPPORT = true;
-    /**
-     * If true, then table cells will be preset with a size according to their preferred size, before the table begins calculating needed sizes
-     * This also requires loading all images in table cells prior to page display (Unlike the normal way in which they can be completed afterwards)
-     * This is needed due to some complexity when calculating sizes of tables with complex containers as cells, and especially with nested tables
-     */
+    /// If true, then table cells will be preset with a size according to their preferred size, before the table begins calculating needed sizes
+    /// This also requires loading all images in table cells prior to page display (Unlike the normal way in which they can be completed afterwards)
+    /// This is needed due to some complexity when calculating sizes of tables with complex containers as cells, and especially with nested tables
     //static final boolean TABLES_LOCK_SIZE = true; // The issue that required this patch was solved in the table package
 
     // Indentation for various tags
@@ -139,44 +116,26 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     // The minimum number of visible items of a multiple combobox (Unless it has less)
     private static final int MIN_MULTI_COMBOBOX_ITEMS = 4;
     private static final int MAX_MULTI_COMBOBOX_ITEMS = 6;
-    /**
-     * The default size (in characters) of an input textfield
-     */
+    /// The default size (in characters) of an input textfield
     private static final int DEFAULT_TEXTFIELD_SIZE = 12;
-    /**
-     * The default oolumns (in characters) of a textarea
-     */
+    /// The default oolumns (in characters) of a textarea
     private static final int DEFAULT_TEXTAREA_COLS = 20;
-    /**
-     * The default rows (in characters) of a textarea
-     */
+    /// The default rows (in characters) of a textarea
     private static final int DEFAULT_TEXTAREA_ROWS = 2;
-    /**
-     * The thickness of a line drawn by the HR tag
-     */
+    /// The thickness of a line drawn by the HR tag
     private static final int HR_THICKNESS = 3;
-    /**
-     * The time it takes a marquee to move across the screen (See -wap-marquee in CSS)
-     */
+    /// The time it takes a marquee to move across the screen (See -wap-marquee in CSS)
     private static final int MARQUEE_DELAY = 6000;
-    /**
-     * When this is set to true, only exact fonts will be matched, i.e. if the font matching algorithm needs an arial.12.bold.italic - it will not "settle" for just bold or italic or a different size
-     * Default is false
-     */
+    /// When this is set to true, only exact fonts will be matched, i.e. if the font matching algorithm needs an arial.12.bold.italic - it will not "settle" for just bold or italic or a different size
+    /// Default is false
     private static final boolean MATCH_EXACT_FONTS_ONLY = false;
-    /**
-     * When this is set to true only bitmap fonts will be used for matching (and not system fonts)
-     * Default is true, and false has not been tested thoroughly
-     */
+    /// When this is set to true only bitmap fonts will be used for matching (and not system fonts)
+    /// Default is true, and false has not been tested thoroughly
     private static final boolean MATCH_BITMAP_FONTS_ONLY = true;
-    /**
-     * When this is set to true, only fonts of the same family will be matched. i.e. if we're looking for a bigger font than arial.10, and we have timesnewroman.12 it will not be taken as a matching font
-     * Default is true
-     */
+    /// When this is set to true, only fonts of the same family will be matched. i.e. if we're looking for a bigger font than arial.10, and we have timesnewroman.12 it will not be taken as a matching font
+    /// Default is true
     private static final boolean MATCH_SAME_FONT_FAMILY_ONLY = true;
-    /**
-     * The color given to visited links
-     */
+    /// The color given to visited links
     private static final int COLOR_VISITED_LINKS = 0x990099;
     // Constants for the various possible input types (i.e. allowed values of the INPUT tag)
     private static final int INPUT_CHECKBOX = 0;
@@ -190,50 +149,32 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     private static final int INPUT_BUTTON = 8; //button is not supported in XHTML-MP 1.0
     //private static final int INPUT_FILE = 9; //file upload is not supported in XHTML-MP 1.0
     private static final int INPUT_EMAIL = 9;
-    /**
-     * Ordered list type legal identifiers as can be defined in the ATTR_TYPE of the OL_TAG
-     */
+    /// Ordered list type legal identifiers as can be defined in the ATTR_TYPE of the OL_TAG
     private static final char[] ORDERED_LIST_TYPE_IDENTIFIERS = {'1', 'A', 'a', 'I', 'i'};
-    /**
-     * The default color of links in HTML documents, can be changed with the LINK attribute in the BODY tag or via CSS
-     */
+    /// The default color of links in HTML documents, can be changed with the LINK attribute in the BODY tag or via CSS
     static private final int DEFAULT_LINK_COLOR = 0x0000ff;
-    /**
-     * Strings representing roman numerals 0-9
-     */
+    /// Strings representing roman numerals 0-9
     private static final String[] ROMAN_NUMERALS_ONES = {"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"};
 
     // Ordered list types
-    /**
-     * Strings representing roman numeral tens (10,20,30 etc.)
-     */
+    /// Strings representing roman numeral tens (10,20,30 etc.)
     private static final String[] ROMAN_NUMERALS_TENS = {"", "X", "XX", "XXX", "XL", "L", "LX", "LXX", "LXXX", "XC"};
-    /**
-     * Defines the possible values for the type attribute in the input tag, ordered according to the INPUT_* constants
-     */
+    /// Defines the possible values for the type attribute in the input tag, ordered according to the INPUT_* constants
     private static final String[] INPUT_TYPE_STRINGS = {
             "checkbox", "hidden", "password", "radio", "reset",
             "submit", "text", "image", "button", "email"
     };
-    /**
-     * Vector holding the possible input type strings.
-     */
+    /// Vector holding the possible input type strings.
     private static final Vector INPUT_TYPES = new Vector();
-    /**
-     * A hashtable containing all defined HTMLFont objects
-     */
+    /// A hashtable containing all defined HTMLFont objects
     static Hashtable fonts = new Hashtable();
     private static int INDENT_OL = -1; //Font.getDefaultFont().stringWidth("8888. "); //Ordered list
     private static int INDENT_UL = -1; //Font.getDefaultFont().charWidth('W'); //Unordered list
-    /**
-     * The default font to use
-     */
+    /// The default font to use
     private static HTMLFont DEFAULT_FONT = null; //new HTMLFont(null,Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
 
-    /**
-     * This static segment sets up the INPUT_TYPES vector with values from INPUT_TYPE_STRINGS.
-     * This is used later on for lookup.
-     */
+    /// This static segment sets up the INPUT_TYPES vector with values from INPUT_TYPE_STRINGS.
+    /// This is used later on for lookup.
     static {
         for (String inputType : INPUT_TYPE_STRINGS) {
             INPUT_TYPES.addElement(inputType);
@@ -241,18 +182,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     }
 
     private final ResourceThreadQueue threadQueue; // A reference to the ResourceThreadQueue that handles asynchronous image download
-    /**
-     * Inidcates whether this component should load CSS files and consider STYLE tag and attributes when available..
-     * Note that CSS requires to create significantlly more containers, as almost every tag needs to be in its own container
-     * in order to manipulate style attributes like bgcolor, border etc. This is why the developer can disable CSS.
-     * Currently this is a private variable, once CSS is actually available this will be exposed via public getter/setter.
-     * Also there's no point setting this to true in this release as it will not lead to actual CSS, but just prepare containers for it.
-     */
+    /// Inidcates whether this component should load CSS files and consider STYLE tag and attributes when available..
+    /// Note that CSS requires to create significantlly more containers, as almost every tag needs to be in its own container
+    /// in order to manipulate style attributes like bgcolor, border etc. This is why the developer can disable CSS.
+    /// Currently this is a private variable, once CSS is actually available this will be exposed via public getter/setter.
+    /// Also there's no point setting this to true in this release as it will not lead to actual CSS, but just prepare containers for it.
     boolean loadCSS = SUPPORT_CSS;
-    /**
-     * If true than all active controls will be added event listeners and dispatch them via HTMLCallback
-     * Default is false in order not to add overhead when this feature is not needed
-     */
+    /// If true than all active controls will be added event listeners and dispatch them via HTMLCallback
+    /// Default is false in order not to add overhead when this feature is not needed
     boolean eventsEnabled = false;
     HTMLParser parser;
     boolean showImages = true; //true to download image, false otherwise
@@ -264,13 +201,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     //private Vector elementsWithStyleAttr=new Vector();
     Vector marqueeComponents = new Vector();
     private boolean supressExceptions;
-    /**
-     * Style sheets embedded directly into the style tag (not the style attribute)
-     */
+    /// Style sheets embedded directly into the style tag (not the style attribute)
     private Vector embeddedCSS;
-    /**
-     * External style sheets referenced from LINK tags
-     */
+    /// External style sheets referenced from LINK tags
     private Vector externalCSS;
     // Document colors
     private int bgColor = DEFAULT_BGCOLOR;
@@ -306,22 +239,16 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     private Hashtable inputFields; // A hashtable containing all the input fields in the page. Used for FOR labels
     // this variable is only useful with the properties mostly for the purpose of the resource editor GUI builder
     private String htmlBody;
-    /**
-     * The main container is the top-level container to which other containers are added when building the page.
-     * After the page was built the main container is added to the HTMLComponent.
-     * We do not build directly on the HTMLComponent to allow the building process to be performed not in the EDT thread.
-     */
+    /// The main container is the top-level container to which other containers are added when building the page.
+    /// After the page was built the main container is added to the HTMLComponent.
+    /// We do not build directly on the HTMLComponent to allow the building process to be performed not in the EDT thread.
     private Container mainContainer;
-    /**
-     * curContianer is the current container we are adding components to. AT the start it is the main container.
-     * Later on it can be a certain table cell or a fieldset.
-     */
+    /// curContianer is the current container we are adding components to. AT the start it is the main container.
+    /// Later on it can be a certain table cell or a fieldset.
     private Container curContainer;
     private boolean autoFocus = true; // Determines whether to auto-focus on the first link after page load
-    /**
-     * curLine is the basic container to which components are added in the building process.
-     * Components are added to it horizontally and when there no more space left (or a newline is needed) - it is added to the curContainer
-     */
+    /// curLine is the basic container to which components are added in the building process.
+    /// Components are added to it horizontally and when there no more space left (or a newline is needed) - it is added to the curContainer
     private Container curLine;
     // Layouting - NOTE: In FIXED_WIDTH mode this component assumes the full width of the screen and performs text wrapping due to a bug in the combination of FlowLayout inside BoxLayout. In non fixed width mode the variables x & width are not used.
     private int x; // Holds the horizontal position in the curLine container
@@ -370,18 +297,16 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     private Vector containers = new Vector();
     private Motion marqueeMotion;
 
-    /**
-     * Constructs HTMLComponent
-     */
+    /// Constructs HTMLComponent
     public HTMLComponent() {
         this(new DefaultDocumentRequestHandler());
     }
 
-    /**
-     * Constructs HTMLComponent
-     *
-     * @param handler The HttpRequestHandler to which all requests for links will be sent
-     */
+    /// Constructs HTMLComponent
+    ///
+    /// #### Parameters
+    ///
+    /// - `handler`: The HttpRequestHandler to which all requests for links will be sent
     public HTMLComponent(DocumentRequestHandler handler) {
         initDefaults();
 
@@ -432,37 +357,38 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Sets the given Codename One font for use with HTMLComponents.
-     * <p>
-     * The font key can contain information about the following attributes:
-     * <p>
-     * * The font family - i.e. Arial, Times New Roman etc.
-     * * The font size - in pixels (i.e. 12, 14 etc.)
-     * * The font style - bold, italic or both (no need to specify plain)
-     * * The font tag assignments - if this font should be used for any HTML specific tags they should be specified - i.e. h1, kbd etc.
-     * <p>
-     * The key is just a concatenation of all attributes seperated with a dot.
-     * Examples for valid keys:
-     * arial.12 - Describes a plain font from the arial family in size 12
-     * arial.16.bold - A bold arial font in size 16
-     * courier.italic.bold.20 - A bold and italic courier font in size 20
-     * arial.20.h1 - A plain arial font, size 20, that should be used for contents of the H1 tag
-     * code.kbd.samp - A font that should be used for the CODE, KBD and SAMP tags
-     * <p>
-     * Note that the order of the attributes is not important and also that the case is ignored.
-     * This means that arial.12.bold.italic.h3 is equivalent to itALIc.H3.arial.BOLD.12
-     * <p>
-     * Also note that while you do not have to provide all the info for the font, but the info helps the rendering engine to reuse fonts when suitable.
-     * For example, if you have a 16px arial bold font which you want to use for H2, you can simply add it as "h2", but if you add it as "arial.16.bold.h2"
-     * then if the current font is arial.16 and the renderer encounters a B tag, it will know it can use the font you added as the bold counterpart of the current font.
-     * <p>
-     * When adding system fonts there is no need to describe the font, the usage of setFont with system fonts is usually just to assign them for tags.
-     * The rendering engine knows to derive bold/italic/bigger/smaller fonts from other system fonts (default or tag fonts) even if not added.
-     *
-     * @param fontKey The font key in the format described above
-     * @param font    The actual Codename One font object
-     */
+    /// Sets the given Codename One font for use with HTMLComponents.
+    ///
+    /// The font key can contain information about the following attributes:
+    ///
+    /// * The font family - i.e. Arial, Times New Roman etc.
+    /// * The font size - in pixels (i.e. 12, 14 etc.)
+    /// * The font style - bold, italic or both (no need to specify plain)
+    /// * The font tag assignments - if this font should be used for any HTML specific tags they should be specified - i.e. h1, kbd etc.
+    ///
+    /// The key is just a concatenation of all attributes seperated with a dot.
+    /// Examples for valid keys:
+    /// arial.12 - Describes a plain font from the arial family in size 12
+    /// arial.16.bold - A bold arial font in size 16
+    /// courier.italic.bold.20 - A bold and italic courier font in size 20
+    /// arial.20.h1 - A plain arial font, size 20, that should be used for contents of the H1 tag
+    /// code.kbd.samp - A font that should be used for the CODE, KBD and SAMP tags
+    ///
+    /// Note that the order of the attributes is not important and also that the case is ignored.
+    /// This means that arial.12.bold.italic.h3 is equivalent to itALIc.H3.arial.BOLD.12
+    ///
+    /// Also note that while you do not have to provide all the info for the font, but the info helps the rendering engine to reuse fonts when suitable.
+    /// For example, if you have a 16px arial bold font which you want to use for H2, you can simply add it as "h2", but if you add it as "arial.16.bold.h2"
+    /// then if the current font is arial.16 and the renderer encounters a B tag, it will know it can use the font you added as the bold counterpart of the current font.
+    ///
+    /// When adding system fonts there is no need to describe the font, the usage of setFont with system fonts is usually just to assign them for tags.
+    /// The rendering engine knows to derive bold/italic/bigger/smaller fonts from other system fonts (default or tag fonts) even if not added.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontKey`: The font key in the format described above
+    ///
+    /// - `font`: The actual Codename One font object
     public static void addFont(String fontKey, Font font) {
         if (fontKey == null) {
             if (font.getCharset() != null) {
@@ -474,15 +400,16 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         fonts.put(fontKey, new HTMLFont(fontKey, font));
     }
 
-    /**
-     * Adds support for a special key to be used as an accesskey.
-     * The CSS property -wap-accesskey supports special keys, for example "phone-send" that may have different key codes per device.
-     * This method allows pairing between such keys to their respective key codes.
-     * Note that these keys are valid only for -wap-aceesskey in CSS files, and not for the XHTML accesskey attribute.
-     *
-     * @param specialKeyName The name of the special key as denoted in CSS files
-     * @param specialKeyCode The special key code
-     */
+    /// Adds support for a special key to be used as an accesskey.
+    /// The CSS property -wap-accesskey supports special keys, for example "phone-send" that may have different key codes per device.
+    /// This method allows pairing between such keys to their respective key codes.
+    /// Note that these keys are valid only for -wap-aceesskey in CSS files, and not for the XHTML accesskey attribute.
+    ///
+    /// #### Parameters
+    ///
+    /// - `specialKeyName`: The name of the special key as denoted in CSS files
+    ///
+    /// - `specialKeyCode`: The special key code
     public static void addSpecialKey(String specialKeyName, int specialKeyCode) {
         if (SUPPORT_CSS) {
             CSSEngine.addSpecialKey(specialKeyName, specialKeyCode);
@@ -491,21 +418,21 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Sets the maximum number of threads to use for image download
-     *
-     * @param threadsNum the maximum number of threads to use for image download
-     */
+    /// Sets the maximum number of threads to use for image download
+    ///
+    /// #### Parameters
+    ///
+    /// - `threadsNum`: the maximum number of threads to use for image download
     public static void setMaxThreads(int threadsNum) {
         ResourceThreadQueue.setMaxThreads(threadsNum);
     }
 
-    /**
-     * Sets the supported CSS media types to the given strings.
-     * Usually the default media types ("all","handheld") should be suitable, but in case this runs on a device that matches another profile, the developer can specify it here.
-     *
-     * @param supportedMediaTypes A string array containing the media types that should be supported
-     */
+    /// Sets the supported CSS media types to the given strings.
+    /// Usually the default media types ("all","handheld") should be suitable, but in case this runs on a device that matches another profile, the developer can specify it here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `supportedMediaTypes`: A string array containing the media types that should be supported
     public static void setCSSSupportedMediaTypes(String[] supportedMediaTypes) {
         if (SUPPORT_CSS) {
             CSSParser.setCSSSupportedMediaTypes(supportedMediaTypes);
@@ -514,14 +441,18 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * A convenience method to convert a string to an int.
-     * This is mainly intended to save the try-catch for NumericFormatExceptions
-     *
-     * @param intStr       The string describing the integer
-     * @param defaultValue The value to return if the string is not numeric
-     * @return the integer value of the string, or defaultValue if the string is not numeric
-     */
+    /// A convenience method to convert a string to an int.
+    /// This is mainly intended to save the try-catch for NumericFormatExceptions
+    ///
+    /// #### Parameters
+    ///
+    /// - `intStr`: The string describing the integer
+    ///
+    /// - `defaultValue`: The value to return if the string is not numeric
+    ///
+    /// #### Returns
+    ///
+    /// the integer value of the string, or defaultValue if the string is not numeric
     static int getInt(String intStr, int defaultValue) {
         try {
             return Integer.parseInt(intStr);
@@ -530,25 +461,33 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * A convenience method to convert a string to an int.
-     * This is mainly intended to save the try-catch for NumericFormatExceptions
-     *
-     * @param intStr The string describing the integer
-     * @return the integer value of the string, or 0 if the string is not numeric
-     */
+    /// A convenience method to convert a string to an int.
+    /// This is mainly intended to save the try-catch for NumericFormatExceptions
+    ///
+    /// #### Parameters
+    ///
+    /// - `intStr`: The string describing the integer
+    ///
+    /// #### Returns
+    ///
+    /// the integer value of the string, or 0 if the string is not numeric
     static int getInt(String intStr) {
         return getInt(intStr, 0);
     }
 
-    /**
-     * Calculates width or height of an element according to its original size, requested size and default size
-     *
-     * @param origDim      The original width/height
-     * @param requestedDim The string describing the requested width/height either in pixels or in percentage
-     * @param defaultDim   The default width/height to return in case the calculation fails
-     * @return The new width/height according to the parameters
-     */
+    /// Calculates width or height of an element according to its original size, requested size and default size
+    ///
+    /// #### Parameters
+    ///
+    /// - `origDim`: The original width/height
+    ///
+    /// - `requestedDim`: The string describing the requested width/height either in pixels or in percentage
+    ///
+    /// - `defaultDim`: The default width/height to return in case the calculation fails
+    ///
+    /// #### Returns
+    ///
+    /// The new width/height according to the parameters
     static int calcSize(int origDim, String requestedDim, int defaultDim, boolean negativeAllowed) {
         if (requestedDim == null) {
             return defaultDim;
@@ -595,12 +534,12 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return -1;
     }
 
-    /**
-     * Sets a custom HTMLParser for this HTMLComponent
-     * By default, a new HTMLParser instance is created for each HTMLComponent, use this method if you have a custom parser.
-     *
-     * @param parser The HTMLParser to use
-     */
+    /// Sets a custom HTMLParser for this HTMLComponent
+    /// By default, a new HTMLParser instance is created for each HTMLComponent, use this method if you have a custom parser.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parser`: The HTMLParser to use
     public void setParser(HTMLParser parser) {
         this.parser.setParserCallback(null); //remove the callback
         this.parser.setHTMLComponent(null); // remove the HTMLComponent
@@ -609,69 +548,71 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         parser.setParserCallback(htmlCallback);
     }
 
-    /**
-     * Adds the given symbol and code to the user defined char entities table.
-     * Symbols do not need to include leading &amp; and trailing ; - these will be trimmed if given as the symbol
-     *
-     * @param symbol The symbol to add
-     * @param code   The symbol's code
-     */
+    /// Adds the given symbol and code to the user defined char entities table.
+    /// Symbols do not need to include leading & and trailing ; - these will be trimmed if given as the symbol
+    ///
+    /// #### Parameters
+    ///
+    /// - `symbol`: The symbol to add
+    ///
+    /// - `code`: The symbol's code
     public void addCharEntity(String symbol, int code) {
         parser.addCharEntity(symbol, code);
     }
 
-    /**
-     * Adds the given symbols array  to the user defined char entities table with the startcode provided as the code of the first string, startcode+1 for the second etc.
-     * Some strings in the symbols array may be null thus skipping code numbers.
-     *
-     * @param symbols   The symbols to add
-     * @param startcode The symbol's code
-     */
+    /// Adds the given symbols array  to the user defined char entities table with the startcode provided as the code of the first string, startcode+1 for the second etc.
+    /// Some strings in the symbols array may be null thus skipping code numbers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `symbols`: The symbols to add
+    ///
+    /// - `startcode`: The symbol's code
     public void addCharEntitiesRange(String[] symbols, int startcode) {
         parser.addCharEntitiesRange(symbols, startcode);
     }
 
-    /**
-     * Returns the document request handler
-     *
-     * @return the document request handler
-     */
+    /// Returns the document request handler
+    ///
+    /// #### Returns
+    ///
+    /// the document request handler
     public DocumentRequestHandler getRequestHandler() {
         return handler;
     }
 
-    /**
-     * Changes the document request handler
-     *
-     * @param handler the new document request handler
-     */
+    /// Changes the document request handler
+    ///
+    /// #### Parameters
+    ///
+    /// - `handler`: the new document request handler
     public void setRequestHandler(DocumentRequestHandler handler) {
         this.handler = handler;
     }
 
-    /**
-     * Returns the DocumentInfo that currently represents the document loaded/shown
-     *
-     * @return the DocumentInfo that currently represents the document loaded/shown
-     */
+    /// Returns the DocumentInfo that currently represents the document loaded/shown
+    ///
+    /// #### Returns
+    ///
+    /// the DocumentInfo that currently represents the document loaded/shown
     public DocumentInfo getDocumentInfo() {
         return docInfo;
     }
 
-    /**
-     * Returns the HTMLCallback that is set on this HTMLComponent
-     *
-     * @return the HTMLCallback that is set on this HTMLComponent or null if none
-     */
+    /// Returns the HTMLCallback that is set on this HTMLComponent
+    ///
+    /// #### Returns
+    ///
+    /// the HTMLCallback that is set on this HTMLComponent or null if none
     public HTMLCallback getHTMLCallback() {
         return htmlCallback;
     }
 
-    /**
-     * Sets an HTMLCallback to listen to this HTMLCOmponent
-     *
-     * @param callback The HTMLCallback that will receive events
-     */
+    /// Sets an HTMLCallback to listen to this HTMLCOmponent
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: The HTMLCallback that will receive events
     public void setHTMLCallback(HTMLCallback callback) {
         htmlCallback = callback;
         parser.setParserCallback(htmlCallback);
@@ -680,12 +621,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Sets the default font for this HTMLComponent
-     *
-     * @param fontKey The font key in the format described in setFont (Can be null for default font, but it is recommended to add a descriptive key if this is a bitmap font to enable the font engine to use it in other cases as well)
-     * @param font    The actual Codename One font object
-     */
+    /// Sets the default font for this HTMLComponent
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontKey`: The font key in the format described in setFont (Can be null for default font, but it is recommended to add a descriptive key if this is a bitmap font to enable the font engine to use it in other cases as well)
+    ///
+    /// - `font`: The actual Codename One font object
     public void setDefaultFont(String fontKey, Font font) {
         if (fontKey != null) {
             fontKey = fontKey.toLowerCase();
@@ -696,59 +638,65 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Sets whether this HTMLComponent will download and show linked images or not
-     *
-     * @param show true to show images, false otherwise
-     */
+    /// Sets whether this HTMLComponent will download and show linked images or not
+    ///
+    /// #### Parameters
+    ///
+    /// - `show`: true to show images, false otherwise
     public void setShowImages(boolean show) {
         showImages = show;
     }
 
-    /**
-     * Sets whether this HTMLComponent will ignore all CSS.directives.
-     * This includes external CSS files (which won't be downloaded), embedded CSS segmentsand style tags and attributes.
-     * By default this is false.
-     *
-     * @param ignore true to ignore CSS directives, false otherwise
-     */
+    /// Sets whether this HTMLComponent will ignore all CSS.directives.
+    /// This includes external CSS files (which won't be downloaded), embedded CSS segmentsand style tags and attributes.
+    /// By default this is false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ignore`: true to ignore CSS directives, false otherwise
     public void setIgnoreCSS(boolean ignore) {
         if (SUPPORT_CSS) { // If not supporting CSS, the loadCSS flag is locked on false
             loadCSS = !ignore;
         }
     }
 
-    /**
-     * Scrolls the HTMLComponent several pixels forward/backward.
-     *
-     * @param pixels  The number of pixels to scroll (positive for forward and negative for backward)
-     * @param animate true to animate the scrolling, false otherwise
-     */
+    /// Scrolls the HTMLComponent several pixels forward/backward.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pixels`: The number of pixels to scroll (positive for forward and negative for backward)
+    ///
+    /// - `animate`: true to animate the scrolling, false otherwise
     public void scrollPixels(int pixels, boolean animate) {
         int scrollToY = getScrollY() + pixels;
         scrollTo(scrollToY, animate);
     }
 
-    /**
-     * Scrolls the HTMLComponent several pages forward/backward.
-     * TO scroll to the start or end of the document, one can provide a very big number.
-     *
-     * @param pages   The number of pages to scroll (positive for forward and negative for backward)
-     * @param animate true to animate the scrolling, false otherwise
-     */
+    /// Scrolls the HTMLComponent several pages forward/backward.
+    /// TO scroll to the start or end of the document, one can provide a very big number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pages`: The number of pages to scroll (positive for forward and negative for backward)
+    ///
+    /// - `animate`: true to animate the scrolling, false otherwise
     public void scrollPages(int pages, boolean animate) {
         int scrollToY = getScrollY() + getHeight() * pages;
         scrollTo(scrollToY, animate);
 
     }
 
-    /**
-     * Scrolls the HTMLComponent to the specified element
-     *
-     * @param element The element to scroll to (must be contained in the document)
-     * @param animate true to animate the scrolling, false otherwise
-     * @throws IllegalArgumentException if the element is not contained in the current document.
-     */
+    /// Scrolls the HTMLComponent to the specified element
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element to scroll to (must be contained in the document)
+    ///
+    /// - `animate`: true to animate the scrolling, false otherwise
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the element is not contained in the current document.
     public void scrollToElement(HTMLElement element, boolean animate) {
         if (!pageLoading()) {
             if (!document.contains(element)) {
@@ -772,12 +720,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Scrolls the HTMLComponent to the denoted Y position
-     *
-     * @param y       The Y-coordinate to scroll to
-     * @param animate true to animate the scrolling, false otherwise
-     */
+    /// Scrolls the HTMLComponent to the denoted Y position
+    ///
+    /// #### Parameters
+    ///
+    /// - `y`: The Y-coordinate to scroll to
+    ///
+    /// - `animate`: true to animate the scrolling, false otherwise
     private void scrollTo(int y, boolean animate) {
         if (y < 0) {
             y = 0;
@@ -791,37 +740,47 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Sets the given string containing HTML code as this HTMLComponent's body
-     *
-     * @param htmlText The HTML body to set
-     */
+    /// Sets the given string containing HTML code as this HTMLComponent's body
+    ///
+    /// #### Parameters
+    ///
+    /// - `htmlText`: The HTML body to set
     public void setBodyText(String htmlText) {
         setBodyText(htmlText, null);
     }
 
-    /**
-     * Sets the given string containing HTML code as this HTMLComponent's body.
-     * The string is read using the specified encoding. If the encoding is not supported it will be read without encoding
-     *
-     * @param htmlText The HTML body to set
-     * @param encoding The encoding to use when reading the HTML i.e. UTF8, ISO-8859-1 etc.
-     * @return true if the encoding succeeded, false otherwise
-     */
+    /// Sets the given string containing HTML code as this HTMLComponent's body.
+    /// The string is read using the specified encoding. If the encoding is not supported it will be read without encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `htmlText`: The HTML body to set
+    ///
+    /// - `encoding`: The encoding to use when reading the HTML i.e. UTF8, ISO-8859-1 etc.
+    ///
+    /// #### Returns
+    ///
+    /// true if the encoding succeeded, false otherwise
     public boolean setBodyText(String htmlText, String encoding) {
         return setHTML(htmlText, encoding, null, false);
     }
 
-    /**
-     * Sets the given string containing HTML code either as this HTMLComponent's body or as the full HTML.
-     * The string is read using the specified encoding. If the encoding is not supported it will be read without encoding
-     *
-     * @param htmlText   The HTML to set
-     * @param encoding   The encoding to use when reading the HTML i.e. UTF8, ISO-8859-1 etc.
-     * @param title      The HTML title, or null if none (Used only when isFullHTML is false)
-     * @param isFullHTML true if this is a full HTML document (with html/body tags), false if this HTML should be used as the HTMLComponent's body
-     * @return true if the encoding succeeded, false otherwise
-     */
+    /// Sets the given string containing HTML code either as this HTMLComponent's body or as the full HTML.
+    /// The string is read using the specified encoding. If the encoding is not supported it will be read without encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `htmlText`: The HTML to set
+    ///
+    /// - `encoding`: The encoding to use when reading the HTML i.e. UTF8, ISO-8859-1 etc.
+    ///
+    /// - `title`: The HTML title, or null if none (Used only when isFullHTML is false)
+    ///
+    /// - `isFullHTML`: true if this is a full HTML document (with html/body tags), false if this HTML should be used as the HTMLComponent's body
+    ///
+    /// #### Returns
+    ///
+    /// true if the encoding succeeded, false otherwise
     public boolean setHTML(String htmlText, String encoding, String title, boolean isFullHTML) {
         boolean success = true;
         InputStreamReader isr = getStream(htmlText, encoding, title, isFullHTML); //NOPMD CloseResource
@@ -842,26 +801,36 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return success;
     }
 
-    /**
-     * Convenience method that calls getStream(String,String,String,boolean)
-     *
-     * @param htmlText The HTML to set
-     * @param encoding The encoding to use when reading the HTML i.e. UTF8, ISO-8859-1 etc.
-     * @return A stream representing the HTML
-     */
+    /// Convenience method that calls getStream(String,String,String,boolean)
+    ///
+    /// #### Parameters
+    ///
+    /// - `htmlText`: The HTML to set
+    ///
+    /// - `encoding`: The encoding to use when reading the HTML i.e. UTF8, ISO-8859-1 etc.
+    ///
+    /// #### Returns
+    ///
+    /// A stream representing the HTML
     private InputStreamReader getStream(String htmlText, String encoding) {
         return getStream(htmlText, encoding, null, false);
     }
 
-    /**
-     * Obtains a stream of the given HTML with the given encoding
-     *
-     * @param htmlText   The HTML to set
-     * @param encoding   The encoding to use when reading the HTML i.e. UTF8, ISO-8859-1 etc.
-     * @param title      The HTML title, or null if none
-     * @param isFullHTML true if this is a full HTML document (with html/body tags), false otherwise
-     * @return A stream representing the HTML
-     */
+    /// Obtains a stream of the given HTML with the given encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `htmlText`: The HTML to set
+    ///
+    /// - `encoding`: The encoding to use when reading the HTML i.e. UTF8, ISO-8859-1 etc.
+    ///
+    /// - `title`: The HTML title, or null if none
+    ///
+    /// - `isFullHTML`: true if this is a full HTML document (with html/body tags), false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// A stream representing the HTML
     private InputStreamReader getStream(String htmlText, String encoding, String title, boolean isFullHTML) {
         if (!isFullHTML) {
             String titleStr = "";
@@ -908,20 +877,18 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }*/
 
-    /**
-     * Cancels the loading of the current page
-     */
+    /// Cancels the loading of the current page
     public void cancel() {
         cancelled = true;
         setPageStatus(HTMLCallback.STATUS_CANCELLED);
         cancelRedirectsAndImages();
     }
 
-    /**
-     * Adds the specified cssElement which represents an external CSS file to the external CSS vector
-     *
-     * @param cssElement The element to add
-     */
+    /// Adds the specified cssElement which represents an external CSS file to the external CSS vector
+    ///
+    /// #### Parameters
+    ///
+    /// - `cssElement`: The element to add
     void addToExternalCSS(CSSElement cssElement) {
         if (externalCSS == null) {
             externalCSS = new Vector();
@@ -929,11 +896,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         externalCSS.addElement(cssElement);
     }
 
-    /**
-     * Adds the specified cssElement which represents an embedded CSS segment to the embedded CSS vector
-     *
-     * @param cssElement The element to add
-     */
+    /// Adds the specified cssElement which represents an embedded CSS segment to the embedded CSS vector
+    ///
+    /// #### Parameters
+    ///
+    /// - `cssElement`: The element to add
     void addToEmebeddedCSS(CSSElement cssElement) {
         if (embeddedCSS == null) {
             embeddedCSS = new Vector();
@@ -941,22 +908,22 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         embeddedCSS.addElement(cssElement);
     }
 
-    /**
-     * Sets this HTMLComponent to render the document in the specified URL
-     *
-     * @param pageURL The URL containing the HTML document
-     */
+    /// Sets this HTMLComponent to render the document in the specified URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `pageURL`: The URL containing the HTML document
     public void setPage(final String pageURL) {
         setPage(new DocumentInfo(pageURL));
     }
 
-    /**
-     * Sets the style of the page, allowing for example to set transparency to the main page.
-     * This applies not only to the current page, but rather to all pages created with this HTMLComponent instance.
-     * If both a UIID and a pageStyle were set, the style overrides the UIID.
-     *
-     * @param pageStyle The style to set to the page
-     */
+    /// Sets the style of the page, allowing for example to set transparency to the main page.
+    /// This applies not only to the current page, but rather to all pages created with this HTMLComponent instance.
+    /// If both a UIID and a pageStyle were set, the style overrides the UIID.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pageStyle`: The style to set to the page
     public void setPageStyle(Style pageStyle) {
         this.pageStyle = pageStyle;
         if ((mainContainer != null) && (pageStyle != null)) {
@@ -964,13 +931,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Sets the UIID of the page (the internal container)
-     * This applies not only to the current page, but rather to all pages created with this HTMLComponent instance.
-     * If both a UIID and a pageStyle were set, the style overrides the UIID.
-     *
-     * @param pageUIID The UIID that should be applied to the page
-     */
+    /// Sets the UIID of the page (the internal container)
+    /// This applies not only to the current page, but rather to all pages created with this HTMLComponent instance.
+    /// If both a UIID and a pageStyle were set, the style overrides the UIID.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pageUIID`: The UIID that should be applied to the page
     public void setPageUIID(String pageUIID) {
         this.pageUIID = pageUIID;
         if ((mainContainer != null) && (pageUIID != null)) {
@@ -978,9 +945,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Applies the user defined page style to the main container. This clones the page style and sets the clone to the page, as various CSS directives may change the style of the main container.
-     */
+    /// Applies the user defined page style to the main container. This clones the page style and sets the clone to the page, as various CSS directives may change the style of the main container.
     private void applyPageStyle() {
         Style pageStyleCopy = new Style(pageStyle);
         mainContainer.setUnselectedStyle(pageStyleCopy);
@@ -1019,11 +984,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Sets this HTMLComponent to render the document specified in the DocumentInfo object
-     *
-     * @param docInfo Containing info about the document (url, encoding etc)
-     */
+    /// Sets this HTMLComponent to render the document specified in the DocumentInfo object
+    ///
+    /// #### Parameters
+    ///
+    /// - `docInfo`: Containing info about the document (url, encoding etc)
     void setPage(final DocumentInfo docInfo) {
         cancelCurrent();
         //clickTimer(null);
@@ -1046,12 +1011,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * This method should be called only by AsyncDocumentRequestHandler implementations after an async fetch of a document
-     *
-     * @param is      The InputStream of the document
-     * @param docInfo The document info
-     */
+    /// This method should be called only by AsyncDocumentRequestHandler implementations after an async fetch of a document
+    ///
+    /// #### Parameters
+    ///
+    /// - `is`: The InputStream of the document
+    ///
+    /// - `docInfo`: The document info
     @Override
     public void streamReady(InputStream is, DocumentInfo docInfo) {
         InputStreamReader isr = null; //NOPMD CloseResource
@@ -1118,13 +1084,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Sets this HTMLComponent to render the document in the specified DOM
-     *
-     * @param dom     An HTMLElement representing the root of the HTML document
-     * @param baseURL The base URL for this DOM (Necessary if document references relative links)
-     * @throws IllegalArgumentException if the HTMLElement supplied is not an 'html' tag
-     */
+    /// Sets this HTMLComponent to render the document in the specified DOM
+    ///
+    /// #### Parameters
+    ///
+    /// - `dom`: An HTMLElement representing the root of the HTML document
+    ///
+    /// - `baseURL`: The base URL for this DOM (Necessary if document references relative links)
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the HTMLElement supplied is not an 'html' tag
     public void setDOM(HTMLElement dom, String baseURL) {
         if (dom.getTagId() != HTMLElement.TAG_HTML) {
             throw new IllegalArgumentException("HTML root element must be 'html'");
@@ -1145,12 +1115,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Returns the DOM representing this document
-     *
-     * @return An HTMLElement representing the entire current HTML document
-     * @throws IllegalStateException if the page is still loading
-     */
+    /// Returns the DOM representing this document
+    ///
+    /// #### Returns
+    ///
+    /// An HTMLElement representing the entire current HTML document
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if the page is still loading
     public HTMLElement getDOM() {
         if (pageLoading()) {
             throw new IllegalStateException("Page is still loading");
@@ -1158,30 +1131,32 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return document;
     }
 
-    /**
-     * Sets this HTMLComponent to render the document in the specified DOM.
-     * Note that relative links if any will be disabled. To allow relative links with DOM use setDOM(HTMLElement dom,String baseURL)
-     *
-     * @param dom An HTMLElement representing the root of the HTML document
-     * @throws IllegalArgumentException if the HTMLElement supplied is not an 'html' tag
-     */
+    /// Sets this HTMLComponent to render the document in the specified DOM.
+    /// Note that relative links if any will be disabled. To allow relative links with DOM use setDOM(HTMLElement dom,String baseURL)
+    ///
+    /// #### Parameters
+    ///
+    /// - `dom`: An HTMLElement representing the root of the HTML document
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the HTMLElement supplied is not an 'html' tag
     public void setDOM(HTMLElement dom) {
         setDOM(dom, null);
     }
 
-    /**
-     * Refreshes the current DOM so it any changes done after loading will be rendered.
-     */
+    /// Refreshes the current DOM so it any changes done after loading will be rendered.
     public void refreshDOM() {
         documentReady(docInfo, document);
     }
 
-    /**
-     * Called internally after both reading and parsing of the HTML document has completed
-     *
-     * @param pageURL     The URL of the page
-     * @param newDocument An element which is the root of the document
-     */
+    /// Called internally after both reading and parsing of the HTML document has completed
+    ///
+    /// #### Parameters
+    ///
+    /// - `pageURL`: The URL of the page
+    ///
+    /// - `newDocument`: An element which is the root of the document
     void documentReady(DocumentInfo docInfo, HTMLElement newDocument) {
         //clickTimer("docReady");
         this.pageURL = null;
@@ -1255,22 +1230,22 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         });
     }
 
-    /**
-     * Returns the current status of the events enabled flag
-     *
-     * @return true if events are enabled, false if not
-     */
+    /// Returns the current status of the events enabled flag
+    ///
+    /// #### Returns
+    ///
+    /// true if events are enabled, false if not
     public boolean isEventsEnabled() {
         return eventsEnabled;
     }
 
-    /**
-     * Sets whether the active controls in the HTML will trigger events, and whether the DOM will change dynamically due to user input.
-     * If so the events are dispatched via HTMLCallback methods actionPerformed, focusGained/Lost, selectionChanged and dataChanged
-     * The default is false in order not to add more overhead if these are not needed.
-     *
-     * @param enabled true to enable event dispatching, false otherwise
-     */
+    /// Sets whether the active controls in the HTML will trigger events, and whether the DOM will change dynamically due to user input.
+    /// If so the events are dispatched via HTMLCallback methods actionPerformed, focusGained/Lost, selectionChanged and dataChanged
+    /// The default is false in order not to add more overhead if these are not needed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: true to enable event dispatching, false otherwise
     public void setEventsEnabled(boolean enabled) {
         if (eventsEnabled != enabled) {
             eventsEnabled = enabled;
@@ -1283,19 +1258,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Determines whether to auto-focus on the first link after page load
-     * Note that focusing will happen only if the link is within a visible range (no scrolling is performed since this is rarely a wanted behaviour in this case)
-     *
-     * @param autoFocus true to auto-focus, false otherwise
-     */
+    /// Determines whether to auto-focus on the first link after page load
+    /// Note that focusing will happen only if the link is within a visible range (no scrolling is performed since this is rarely a wanted behaviour in this case)
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoFocus`: true to auto-focus, false otherwise
     public void setAutoFocusOnFirstLink(boolean autoFocus) {
         this.autoFocus = autoFocus;
     }
 
-    /**
-     * Actually displays the HTML page - this should be run on EDT
-     */
+    /// Actually displays the HTML page - this should be run on EDT
     void displayPage() {
         removeAll();
         addComponent(mainContainer);
@@ -1355,38 +1328,38 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return true;
     }
 
-    /**
-     * Returns the HTML page's title as described in its TITLE tag
-     *
-     * @return the HTML page's title as described in its TITLE tag
-     */
+    /// Returns the HTML page's title as described in its TITLE tag
+    ///
+    /// #### Returns
+    ///
+    /// the HTML page's title as described in its TITLE tag
     public String getTitle() {
         return title;
     }
 
-    /**
-     * Returns the page's URL
-     *
-     * @return the current page's URL
-     */
+    /// Returns the page's URL
+    ///
+    /// #### Returns
+    ///
+    /// the current page's URL
     public String getPageURL() {
         return pageURL;
     }
 
-    /**
-     * Returns the page status
-     *
-     * @return the page status (One of the STATUS_* constants in HTMLCallback)
-     */
+    /// Returns the page status
+    ///
+    /// #### Returns
+    ///
+    /// the page status (One of the STATUS_* constants in HTMLCallback)
     public int getPageStatus() {
         return pageStatus;
     }
 
-    /**
-     * Sets the page status to the given one
-     *
-     * @param status The new page status
-     */
+    /// Sets the page status to the given one
+    ///
+    /// #### Parameters
+    ///
+    /// - `status`: The new page status
     void setPageStatus(final int status) {
         if ((!pageError) || (status == HTMLCallback.STATUS_REQUESTED)) { //Once the page error flag has been raised the page status doesn't change until a new page is requested
             pageStatus = status;
@@ -1407,15 +1380,21 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Returns the closest font by the given parameters
-     *
-     * @param family The font family
-     * @param size   The font size
-     * @param style  The font style (Font.STYLE_PLAIN or Font.STYLE_ITALIC)
-     * @param weight The font weight (Font.STYLE_PLAIN or Font.STYLE_BOLD)
-     * @return the closest font the HTMLComponent could find or null if none found.
-     */
+    /// Returns the closest font by the given parameters
+    ///
+    /// #### Parameters
+    ///
+    /// - `family`: The font family
+    ///
+    /// - `size`: The font size
+    ///
+    /// - `style`: The font style (Font.STYLE_PLAIN or Font.STYLE_ITALIC)
+    ///
+    /// - `weight`: The font weight (Font.STYLE_PLAIN or Font.STYLE_BOLD)
+    ///
+    /// #### Returns
+    ///
+    /// the closest font the HTMLComponent could find or null if none found.
     HTMLFont getClosestHTMLFont(String family, int size, int style, int weight) {
         final int factorFontFamily = 30;
         final int factorFontSize = 5;
@@ -1477,13 +1456,16 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return null;
     }
 
-    /**
-     * Returns the HTMLFont that holds the given font.
-     * This is in fact a "reverse lookup" for HTMLFonts
-     *
-     * @param font The font to search
-     * @return the HTMLFont that holds the given font.
-     */
+    /// Returns the HTMLFont that holds the given font.
+    /// This is in fact a "reverse lookup" for HTMLFonts
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: The font to search
+    ///
+    /// #### Returns
+    ///
+    /// the HTMLFont that holds the given font.
     HTMLFont getHTMLFont(Font font) {
         for (Enumeration e = fonts.elements(); e.hasMoreElements(); ) {
             HTMLFont hFont = (HTMLFont) e.nextElement();
@@ -1494,11 +1476,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return null;
     }
 
-    /**
-     * Returns true if there's at least one smallcaps font in the fonts repository, or false otherwise
-     *
-     * @return true if there's at least one smallcaps font in the fonts repository, or false otherwise
-     */
+    /// Returns true if there's at least one smallcaps font in the fonts repository, or false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if there's at least one smallcaps font in the fonts repository, or false otherwise
     boolean isSmallCapsFontAvailable() {
         for (Enumeration e = fonts.elements(); e.hasMoreElements(); ) {
             HTMLFont hFont = (HTMLFont) e.nextElement();
@@ -1509,13 +1491,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return false;
     }
 
-    /**
-     * A utility method to convert between Element TAG_* constants and HTMLFont font attribute constants.
-     *
-     * @param tag  The tag that describes the font attribute
-     * @param font The font for which we want a counterpart font
-     * @return the counterpart font for the given font in the specified tag sense.
-     */
+    /// A utility method to convert between Element TAG_* constants and HTMLFont font attribute constants.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tag`: The tag that describes the font attribute
+    ///
+    /// - `font`: The font for which we want a counterpart font
+    ///
+    /// #### Returns
+    ///
+    /// the counterpart font for the given font in the specified tag sense.
     private HTMLFont getCounterpartFont(int tag, HTMLFont font) {
         int attribute = -1;
         switch (tag) {
@@ -1540,13 +1526,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return getCounterpartFontByAttribute(attribute, font);
     }
 
-    /**
-     * Returns the counterpart font according to the given attribute and font
-     *
-     * @param attribute The requested attribute, one of HTMLFont.BOLD/ITALIC/BIG/SMALL
-     * @param font      The source font
-     * @return the counterpart font according to the given attribute and font
-     */
+    /// Returns the counterpart font according to the given attribute and font
+    ///
+    /// #### Parameters
+    ///
+    /// - `attribute`: The requested attribute, one of HTMLFont.BOLD/ITALIC/BIG/SMALL
+    ///
+    /// - `font`: The source font
+    ///
+    /// #### Returns
+    ///
+    /// the counterpart font according to the given attribute and font
     HTMLFont getCounterpartFontByAttribute(int attribute, HTMLFont font) {
         HTMLFont cFont = font.getCounterpartFont(attribute);
         if (cFont != null) {
@@ -1580,11 +1570,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return bestFit;
     }
 
-    /**
-     * Cleans this element and its children of any associated UI components
-     *
-     * @param element The element to clean
-     */
+    /// Cleans this element and its children of any associated UI components
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element to clean
     private void cleanElementUI(HTMLElement element) {
         element.clearAssociatedComponents();
         int children = element.getNumChildren();
@@ -1594,9 +1584,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Rebuilds the HTMLComponent, this is called usually after a new page was loaded.
-     */
+    /// Rebuilds the HTMLComponent, this is called usually after a new page was loaded.
     private void cleanup() {
         if (document != null) {
             cleanElementUI(document);
@@ -1690,11 +1678,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         textColor = DEFAULT_TEXT_COLOR;
     }
 
-    /**
-     * Handles a LINK tag and extracts any linked CSS file
-     *
-     * @param linkTag AN element containing the LINK tag
-     */
+    /// Handles a LINK tag and extracts any linked CSS file
+    ///
+    /// #### Parameters
+    ///
+    /// - `linkTag`: AN element containing the LINK tag
     private void handleLinkTag(HTMLElement linkTag) {
         String linkType = linkTag.getAttributeById(HTMLElement.ATTR_TYPE);
         String media = linkTag.getAttributeById(HTMLElement.ATTR_MEDIA);
@@ -1841,12 +1829,10 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Applies the CSS according to the following order (As the spec determines):
-     * - External CSS (CSS files linked with the LINK tag)
-     * - Embedded CSS (STYLE tag)
-     * - Inline CSS (STYLE attribute)
-     */
+    /// Applies the CSS according to the following order (As the spec determines):
+    /// - External CSS (CSS files linked with the LINK tag)
+    /// - Embedded CSS (STYLE tag)
+    /// - Inline CSS (STYLE attribute)
     void applyAllCSS() {
         HTMLElement html = null;
         if (document.getTagId() == HTMLElement.TAG_HTML) {
@@ -1862,11 +1848,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Checks if there's a refresh or redirect directive in the META tag and if so executes accordfingly.
-     *
-     * @param head The HEAD element of the document
-     */
+    /// Checks if there's a refresh or redirect directive in the META tag and if so executes accordfingly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `head`: The HEAD element of the document
     @SuppressWarnings("PMD.EmptyCatchBlock")
     private void checkRedirect(HTMLElement head) {
         if (head != null) {
@@ -1912,9 +1898,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Cancels redirects if exists. This is useful when the page has a meta tag with redirection/refresh in X seconds, and in that time the user clicked a link
-     */
+    /// Cancels redirects if exists. This is useful when the page has a meta tag with redirection/refresh in X seconds, and in that time the user clicked a link
     void cancelRedirectsAndImages() {
         if (redirectThread != null) {
             redirectThread.cancel();
@@ -1930,9 +1914,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Adds the container representing the current line to the current container and creates a new one
-     */
+    /// Adds the container representing the current line to the current container and creates a new one
     private void newLine(int align) {
         if (curLine.getComponentCount() == 0) { // If no components are present, create a vertical spacing in the size of the font height
             curLine.setPreferredH(font.getHeight());
@@ -1980,32 +1962,32 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Same as newLine, but only if the current line container is not empty
-     */
+    /// Same as newLine, but only if the current line container is not empty
     private void newLineIfNotEmpty(int align) {
         if (curLine.getComponentCount() > 0) {
             newLine(align);
         }
     }
 
-    /**
-     * Same as newLine, but only if the last line container was not empty
-     */
+    /// Same as newLine, but only if the last line container was not empty
     private void newLineIfLastWasNotEmpty(int align) {
         if (!lastWasEmpty) {
             newLine(align);
         }
     }
 
-    /**
-     * Shows a text that has been marked with the html PRE tag which means the text will be displayed as is
-     * without truncation of white spaces and new lines when reaching the end of the screen.
-     *
-     * @param text  The text to display
-     * @param align The current horizontal alignment
-     * @return a vector containing components each representing a sentence fragment
-     */
+    /// Shows a text that has been marked with the html PRE tag which means the text will be displayed as is
+    /// without truncation of white spaces and new lines when reaching the end of the screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The text to display
+    ///
+    /// - `align`: The current horizontal alignment
+    ///
+    /// #### Returns
+    ///
+    /// a vector containing components each representing a sentence fragment
     Vector showPreTagText(String text, int align) {
         Vector comps = new Vector();
         if ((text == null) || ("".equals(text))) {
@@ -2095,13 +2077,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return getWords(text, align, true);
     }
 
-    /**
-     * Adds the given text to the container as a label or a link.
-     * The string given here does not need line breaking as this was calculated before in the calling method.
-     *
-     * @param str   The text to display
-     * @param align The current horizontal alignment
-     */
+    /// Adds the given text to the container as a label or a link.
+    /// The string given here does not need line breaking as this was calculated before in the calling method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: The text to display
+    ///
+    /// - `align`: The current horizontal alignment
     private Label addString(String str, int align) {
         Label lbl = null;
         int color = textColor;
@@ -2227,13 +2210,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Adds the given access key to make it focus on the given component
-     *
-     * @param accessKey The accesskey key code
-     * @param cmp       The component that should be focused when the access key is pressed
-     * @param override  If true, cancel any previous accesskey associated with this component (Relevant for CSS -wap-accesskey)
-     */
+    /// Adds the given access key to make it focus on the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessKey`: The accesskey key code
+    ///
+    /// - `cmp`: The component that should be focused when the access key is pressed
+    ///
+    /// - `override`: If true, cancel any previous accesskey associated with this component (Relevant for CSS -wap-accesskey)
     void addAccessKey(int accessKey, Component cmp, boolean override) {
         if ((override) && (accessKeys.contains(cmp))) {
             Hashtable newAccessKeys = new Hashtable();
@@ -2254,10 +2239,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Overrides initComponent to add the key listeners to the access keys when the component is first added to the form/displayed
-     * This is useful when the component is added only after the page was read
-     */
+    /// Overrides initComponent to add the key listeners to the access keys when the component is first added to the form/displayed
+    /// This is useful when the component is added only after the page was read
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -2267,9 +2250,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * If the component is taken off for any reason, makes sure access keys are not active
-     */
+    /// If the component is taken off for any reason, makes sure access keys are not active
     @Override
     protected void deinitialize() {
         super.deinitialize();
@@ -2280,13 +2261,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         // TODO - clean DOM's UI references on deinit? Then what happens on init???
     }
 
-    /**
-     * Handles the IMG tag. This includes calculating its size (if available), applying any links/accesskeys and adding it to the download queue
-     *
-     * @param imgElement the IMG element
-     * @param align      th current alignment
-     * @param cmd        The submit command of a form, used only for INPUT type="image"
-     */
+    /// Handles the IMG tag. This includes calculating its size (if available), applying any links/accesskeys and adding it to the download queue
+    ///
+    /// #### Parameters
+    ///
+    /// - `imgElement`: the IMG element
+    ///
+    /// - `align`: th current alignment
+    ///
+    /// - `cmd`: The submit command of a form, used only for INPUT type="image"
     private void handleImage(HTMLElement imgElement, int align, Command cmd) {
 
         String imageUrl = imgElement.getAttributeById(HTMLElement.ATTR_SRC);
@@ -2421,11 +2404,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Handles an area definition for an image map
-     *
-     * @param areaTag The AREA tag
-     */
+    /// Handles an area definition for an image map
+    ///
+    /// #### Parameters
+    ///
+    /// - `areaTag`: The AREA tag
     @SuppressWarnings("PMD.EmptyCatchBlock")
     private void handleImageMapArea(HTMLElement areaTag) {
         if (curImageMap != null) {
@@ -2501,12 +2484,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Handles the INPUT tag
-     *
-     * @param element The input element
-     * @param align   The current aligment
-     */
+    /// Handles the INPUT tag
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The input element
+    ///
+    /// - `align`: The current aligment
     private void handleInput(HTMLElement element, int align) {
         String type = element.getAttributeById(HTMLElement.ATTR_TYPE);
         if (type == null) {
@@ -2677,14 +2661,18 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Sets input format validation for a TextArea or TextField
-     * This is called from the CSSEngine, and since it is done after the TextArea has been added it is a bit more complicated
-     *
-     * @param inputField  The TextArea to place the input format validation on
-     * @param inputFormat The string representing the input format
-     * @return The same TextArea or a new instance representing the element
-     */
+    /// Sets input format validation for a TextArea or TextField
+    /// This is called from the CSSEngine, and since it is done after the TextArea has been added it is a bit more complicated
+    ///
+    /// #### Parameters
+    ///
+    /// - `inputField`: The TextArea to place the input format validation on
+    ///
+    /// - `inputFormat`: The string representing the input format
+    ///
+    /// #### Returns
+    ///
+    /// The same TextArea or a new instance representing the element
     TextArea setInputFormat(final TextArea inputField, String inputFormat) {
         TextArea returnInputField = inputField;
         if (SUPPORT_INPUT_FORMAT) {
@@ -2711,12 +2699,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return returnInputField;
     }
 
-    /**
-     * Sets an input-required restriction on the given input field
-     *
-     * @param inputField    The TextArea to place the input required restriction on
-     * @param inputRequired true if input is required (i.e. emptyok=false), false if input is not required (i.e. emptyok=true)
-     */
+    /// Sets an input-required restriction on the given input field
+    ///
+    /// #### Parameters
+    ///
+    /// - `inputField`: The TextArea to place the input required restriction on
+    ///
+    /// - `inputRequired`: true if input is required (i.e. emptyok=false), false if input is not required (i.e. emptyok=true)
     void setInputRequired(TextArea inputField, boolean inputRequired) {
         if (SUPPORT_INPUT_FORMAT) {
             HTMLForm form = (HTMLForm) textfieldsToForms.get(inputField);
@@ -2727,11 +2716,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Adds the given component to the curLine container after performing size checks
-     *
-     * @param cmp The component to add
-     */
+    /// Adds the given component to the curLine container after performing size checks
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to add
     private void addCmp(Component cmp, int align) {
         if (cmp != null) {
             if ((FIXED_WIDTH) && (x + cmp.getPreferredW() > width)) {
@@ -2742,23 +2731,24 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Updates the current margin with the given delta
-     *
-     * @param delta The pixels to increment (positive value) or decrement (negative value) from the current margin
-     */
+    /// Updates the current margin with the given delta
+    ///
+    /// #### Parameters
+    ///
+    /// - `delta`: The pixels to increment (positive value) or decrement (negative value) from the current margin
     private void updateMargin(int delta) {
         leftIndent += delta;
         x += delta;
         curLine.getStyle().setMargin(Component.LEFT, leftIndent);
     }
 
-    /**
-     * Handles a single table cell (a TD tag)
-     *
-     * @param tdTag The TD tag element
-     * @param align The current alignment
-     */
+    /// Handles a single table cell (a TD tag)
+    ///
+    /// #### Parameters
+    ///
+    /// - `tdTag`: The TD tag element
+    ///
+    /// - `align`: The current alignment
     private void handleTableCell(HTMLElement tdTag, int align) {
         newLineIfNotEmpty(align);
         tableCells.addElement(curContainer);
@@ -2847,12 +2837,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Processes the given tag. This is the main processing method that calls all others and uses itself in a recursive manner.
-     *
-     * @param element The element to process
-     * @param align   The current alignment
-     */
+    /// Processes the given tag. This is the main processing method that calls all others and uses itself in a recursive manner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element to process
+    ///
+    /// - `align`: The current alignment
     private void processTag(HTMLElement element, int align) {
         if ((cancelled) && (!cancelledCaught)) {
             return;
@@ -3637,13 +3628,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return curAlign;
     }
 
-    /**
-     * The following replaces the layout of the curLine container with the correct alignment, in non fixed width alignment is done by flowlayout's orientation.
-     * In case the line is not empty, a new line will be opened by newLineIfNotEmpty below
-     *
-     * @param align    The general alignment of the element
-     * @param curAlign The alignment of the specific component we want to
-     */
+    /// The following replaces the layout of the curLine container with the correct alignment, in non fixed width alignment is done by flowlayout's orientation.
+    /// In case the line is not empty, a new line will be opened by newLineIfNotEmpty below
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: The general alignment of the element
+    ///
+    /// - `curAlign`: The alignment of the specific component we want to
     private void adjustAlignment(int align, int curAlign) {
         if ((!FIXED_WIDTH) && (align != curAlign)) {
             if (curLine.getComponentCount() == 0) {
@@ -3652,13 +3644,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Figures out what is the appropriate list type (i.e. which bullet types) for the unordered list in question
-     *
-     * @param element     The element containing the UL tag
-     * @param defaultType The default list type
-     * @return The UL list type
-     */
+    /// Figures out what is the appropriate list type (i.e. which bullet types) for the unordered list in question
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element containing the UL tag
+    ///
+    /// - `defaultType`: The default list type
+    ///
+    /// #### Returns
+    ///
+    /// The UL list type
     private int getUnorderedListType(HTMLElement element, int defaultType) {
         String listTypeStr = element.getAttributeById(HTMLElement.ATTR_TYPE);
         int type = convertULString(listTypeStr);
@@ -3668,24 +3664,31 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return type;
     }
 
-    /**
-     * Figures out the appropriate list type for the given Ordered List element according to its attributes
-     * This calls the getOrderedListType(Element,int) with LIST_NUMERIC as the default type
-     *
-     * @param element The OL element
-     * @return The OL list type
-     */
+    /// Figures out the appropriate list type for the given Ordered List element according to its attributes
+    /// This calls the getOrderedListType(Element,int) with LIST_NUMERIC as the default type
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The OL element
+    ///
+    /// #### Returns
+    ///
+    /// The OL list type
     private int getOrderedListType(HTMLElement element) {
         return getOrderedListType(element, HTMLListIndex.LIST_NUMERIC);
     }
 
-    /**
-     * Figures out the appropriate list type for the given Ordered List element according to its attributes
-     *
-     * @param element         The OL element
-     * @param defaultListType The default list type
-     * @return The OL list type
-     */
+    /// Figures out the appropriate list type for the given Ordered List element according to its attributes
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The OL element
+    ///
+    /// - `defaultListType`: The default list type
+    ///
+    /// #### Returns
+    ///
+    /// The OL list type
     private int getOrderedListType(HTMLElement element, int defaultListType) {
         String listTypeStr = element.getAttributeById(HTMLElement.ATTR_TYPE);
         if ((listTypeStr != null) && (listTypeStr.length() > 0)) {
@@ -3695,13 +3698,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return defaultListType;
     }
 
-    /**
-     * Figures out the appropriate list type for the given list type identifier
-     *
-     * @param c               The list identifier (one of ORDERED_LIST_TYPE_IDENTIFIERS)
-     * @param defaultListType The default list type
-     * @return The OL list type
-     */
+    /// Figures out the appropriate list type for the given list type identifier
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The list identifier (one of ORDERED_LIST_TYPE_IDENTIFIERS)
+    ///
+    /// - `defaultListType`: The default list type
+    ///
+    /// #### Returns
+    ///
+    /// The OL list type
     private int getOrderedListType(char c, int defaultListType) {
         for (int j = 0; j < ORDERED_LIST_TYPE_IDENTIFIERS.length; j++) {
             if (c == ORDERED_LIST_TYPE_IDENTIFIERS[j]) {
@@ -3734,12 +3741,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Adds a quote according to the current quote count
-     *
-     * @param quoteElement The quote element (TAG_Q)
-     * @param curAlign     The current horizontal alignment
-     */
+    /// Adds a quote according to the current quote count
+    ///
+    /// #### Parameters
+    ///
+    /// - `quoteElement`: The quote element (TAG_Q)
+    ///
+    /// - `curAlign`: The current horizontal alignment
     private void addQuote(HTMLElement quoteElement, int curAlign, boolean isStartTag) {
         String quote = null;
         int quoteNum = isStartTag ? 0 : 1; // 0 is the start tag of primary tag and 1 its closing tag. 2 is the start of secondary tag and 3 the closing tag (Used for CSS_QUOTES)
@@ -3760,13 +3768,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Converts a textual horizontal alignment description to a Codename One alignment constant
-     *
-     * @param alignment    The string describing the alignment
-     * @param defaultAlign The default alignment if the string cannot be converted
-     * @return Component.LEFT, RIGHT or CENTER or the defaultAlign in case no match was found.
-     */
+    /// Converts a textual horizontal alignment description to a Codename One alignment constant
+    ///
+    /// #### Parameters
+    ///
+    /// - `alignment`: The string describing the alignment
+    ///
+    /// - `defaultAlign`: The default alignment if the string cannot be converted
+    ///
+    /// #### Returns
+    ///
+    /// Component.LEFT, RIGHT or CENTER or the defaultAlign in case no match was found.
     private int getHorizAlign(String alignment, int defaultAlign) {
         if (alignment != null) {
             if ("left".equals(alignment)) {
@@ -3784,13 +3796,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Converts a textual vertical alignment description to a Codename One alignment constant
-     *
-     * @param alignment    The string describing the alignment
-     * @param defaultAlign The default alignment if the string cannot be converted
-     * @return Component.TOP, BOTTOM or CENTER or the defaultAlign in case no match was found.
-     */
+    /// Converts a textual vertical alignment description to a Codename One alignment constant
+    ///
+    /// #### Parameters
+    ///
+    /// - `alignment`: The string describing the alignment
+    ///
+    /// - `defaultAlign`: The default alignment if the string cannot be converted
+    ///
+    /// #### Returns
+    ///
+    /// Component.TOP, BOTTOM or CENTER or the defaultAlign in case no match was found.
     private int getVertAlign(String alignment, int defaultAlign) {
         if (alignment != null) {
             if ("top".equals(alignment)) {
@@ -3805,12 +3821,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * A convenience method to convert a string describing a percentage to an int.
-     *
-     * @param percent The string representing the percentage
-     * @return The percentage integer value (i.e. 80% will return 80) or 0 if the string is not a percentage
-     */
+    /// A convenience method to convert a string describing a percentage to an int.
+    ///
+    /// #### Parameters
+    ///
+    /// - `percent`: The string representing the percentage
+    ///
+    /// #### Returns
+    ///
+    /// The percentage integer value (i.e. 80% will return 80) or 0 if the string is not a percentage
     private int getPercentage(String percent) {
         if ((percent == null) || (!percent.endsWith("%"))) {
             return 0;
@@ -3819,21 +3838,21 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * Returns the input fields of this HTMLComponent, used by the FOR label mecahnism.
-     *
-     * @return the input fields of this HTMLComponent
-     */
+    /// Returns the input fields of this HTMLComponent, used by the FOR label mecahnism.
+    ///
+    /// #### Returns
+    ///
+    /// the input fields of this HTMLComponent
     Hashtable getInputFields() {
         return inputFields;
     }
 
-    /**
-     * Focuses on the given component and if it's a checkbox/radiobutton selects it
-     * This is used both for ForLabels and for access keys
-     *
-     * @param cmp The component to focus and select
-     */
+    /// Focuses on the given component and if it's a checkbox/radiobutton selects it
+    /// This is used both for ForLabels and for access keys
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to focus and select
     void selectComponent(Component cmp) {
         getComponentForm().setFocused(cmp);
         getComponentForm().scrollComponentToVisible(cmp);
@@ -3845,12 +3864,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Converts the given URL to an absolute URL based on the current page's URL
-     *
-     * @param url The url to convert (Can be relative)
-     * @return The absolute URL representing the given URL in relation to the current one.
-     */
+    /// Converts the given URL to an absolute URL based on the current page's URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The url to convert (Can be relative)
+    ///
+    /// #### Returns
+    ///
+    /// The absolute URL representing the given URL in relation to the current one.
     String convertURL(String url) {
         if (docInfo != null) {
             return docInfo.convertURL(url);
@@ -3859,11 +3881,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Jumps to the given anchor
-     *
-     * @param anchorName The anchor to jump to
-     */
+    /// Jumps to the given anchor
+    ///
+    /// #### Parameters
+    ///
+    /// - `anchorName`: The anchor to jump to
     void goToAnchor(String anchorName) {
         Label anchorCmp = (Label) anchors.get(anchorName);
         if (anchorCmp != null) {
@@ -3877,9 +3899,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void layoutContainer() {
         if ((FIXED_WIDTH) && (displayWidth != 0) && (Display.getInstance().getDisplayWidth() != displayWidth)) {
@@ -3893,9 +3913,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         super.layoutContainer();
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void actionPerformed(ActionEvent evt) {
         if (getComponentForm().getFocused() instanceof TextField) {
@@ -3925,25 +3943,19 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return threadQueue;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"url", "body", "pageUIID"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, String.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("url".equals(name)) {
@@ -3958,13 +3970,11 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return null;
     }
 
-    /*********
-     * HTMLComponent inner classes
-     *********/
+    /// ******
+    /// HTMLComponent inner classes
+    /// *******
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("url".equals(name)) {
@@ -3989,12 +3999,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * Increments or resets the specified counter (This is CSS related, but since CSSEngine has no class members for storage, we keep control of it here)
-     *
-     * @param counterStr The counter-increment/reset property value which is the string counter name followed optionally by the factor by which to increment or the value to reset to
-     * @param reset      true to reset, false to increment
-     */
+    /// Increments or resets the specified counter (This is CSS related, but since CSSEngine has no class members for storage, we keep control of it here)
+    ///
+    /// #### Parameters
+    ///
+    /// - `counterStr`: The counter-increment/reset property value which is the string counter name followed optionally by the factor by which to increment or the value to reset to
+    ///
+    /// - `reset`: true to reset, false to increment
     @SuppressWarnings("PMD.EmptyCatchBlock")
     void incCounter(String counterStr, boolean reset) {
         counterStr = counterStr.trim();
@@ -4027,12 +4038,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * Return the value of the sperecified counter
-     *
-     * @param counterName The counter name
-     * @return the value of this counter (or 0 if it does not exist)
-     */
+    /// Return the value of the sperecified counter
+    ///
+    /// #### Parameters
+    ///
+    /// - `counterName`: The counter name
+    ///
+    /// #### Returns
+    ///
+    /// the value of this counter (or 0 if it does not exist)
     int getCounterValue(String counterName) {
         if (counters == null) {
             return 0;
@@ -4041,25 +4055,23 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         return obj == null ? 0 : ((Integer) obj).intValue();
     }
 
-    /**
-     * @return the supressExceptions
-     */
+    /// #### Returns
+    ///
+    /// the supressExceptions
     public boolean isSupressExceptions() {
         return supressExceptions;
     }
 
-    /**
-     * @param supressExceptions the supressExceptions to set
-     */
+    /// #### Parameters
+    ///
+    /// - `supressExceptions`: the supressExceptions to set
     public void setSupressExceptions(boolean supressExceptions) {
         this.supressExceptions = supressExceptions;
     }
 
-    /**
-     * A thread used to refresh or redirect to another page in X seconds
-     *
-     * @author Ofir Leitner
-     */
+    /// A thread used to refresh or redirect to another page in X seconds
+    ///
+    /// @author Ofir Leitner
     static class RedirectThread implements Runnable {
 
         int seconds;
@@ -4097,12 +4109,10 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * A label that when clicked focuses (and toggels when applicable) a certain input field.
-     * This implements the LABEL html tag
-     *
-     * @author Ofir Leitner
-     */
+    /// A label that when clicked focuses (and toggels when applicable) a certain input field.
+    /// This implements the LABEL html tag
+    ///
+    /// @author Ofir Leitner
     static class ForLabel extends Label {
 
         String id;
@@ -4114,18 +4124,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             this.htmlC = htmlC;
         }
 
-        /**
-         * {{@inheritDoc}}
-         */
+        /// {{@inheritDoc}}
         @Override
         public void pointerReleased(int x, int y) {
             triggerAction();
             super.pointerReleased(x, y);
         }
 
-        /**
-         * Triggers the needed action for this ForLabel
-         */
+        /// Triggers the needed action for this ForLabel
         void triggerAction() {
             Component cmp = (Component) htmlC.getInputFields().get(id);
             if (cmp != null) {
@@ -4136,25 +4142,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     static class HTMLListIndex extends HTMLListItem {
 
-        /**
-         * Numeric ordered list type (1 ,2, 3)
-         */
+        /// Numeric ordered list type (1 ,2, 3)
         static final int LIST_NUMERIC = 0;
-        /**
-         * Uppercase ordered list type (A, B, C)
-         */
+        /// Uppercase ordered list type (A, B, C)
         private static final int LIST_UPPERCASE = 1;
-        /**
-         * Lowercase ordered list type (a, b, c)
-         */
+        /// Lowercase ordered list type (a, b, c)
         private static final int LIST_LOWERCASE = 2;
-        /**
-         * Roman numerals uppercase ordered list type (I,II,III,IV,V ......)
-         */
+        /// Roman numerals uppercase ordered list type (I,II,III,IV,V ......)
         private static final int LIST_ROMAN_UPPER = 3;
-        /**
-         * Roman numerals lowercase ordered list type (i, ii, iii, iv, v ...)
-         */
+        /// Roman numerals lowercase ordered list type (i, ii, iii, iv, v ...)
         private static final int LIST_ROMAN_LOWER = 4;
         int index;
         int listType;
@@ -4169,13 +4165,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
         }
 
-        /**
-         * Returns a list index text according to the list type
-         *
-         * @param index The list index
-         * @param type  The list type
-         * @return The index converted according to the list style
-         */
+        /// Returns a list index text according to the list type
+        ///
+        /// #### Parameters
+        ///
+        /// - `index`: The list index
+        ///
+        /// - `type`: The list type
+        ///
+        /// #### Returns
+        ///
+        /// The index converted according to the list style
         private String getListIndexString(int index, int type) {
             if (index <= 0) {
                 return index + ". ";
@@ -4206,12 +4206,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             return literal + ". ";
         }
 
-        /**
-         * Converts a number to a roman numeral (Up to 99, should suffice for HTML lists...)
-         *
-         * @param index The list index to convert
-         * @return A roman numeral representing the given index
-         */
+        /// Converts a number to a roman numeral (Up to 99, should suffice for HTML lists...)
+        ///
+        /// #### Parameters
+        ///
+        /// - `index`: The list index to convert
+        ///
+        /// #### Returns
+        ///
+        /// A roman numeral representing the given index
         private String getRomanIndexString(int index) {
             index = index % 100;
             return ROMAN_NUMERALS_TENS[index / 10] + ROMAN_NUMERALS_ONES[index % 10] + ". ";
@@ -4236,34 +4239,24 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * A simple class drawing a bullet in various styles
-     *
-     * @author Ofir Leitner
-     */
+    /// A simple class drawing a bullet in various styles
+    ///
+    /// @author Ofir Leitner
     static class HTMLBullet extends HTMLListItem {
 
 
         // Unordered list types
 
-        /**
-         * Indicates no bullet should be displayed
-         */
+        /// Indicates no bullet should be displayed
         private static final int BULLET_NONE = 0;
 
-        /**
-         * Indicates the disc style (full circle) for an unordered list
-         */
+        /// Indicates the disc style (full circle) for an unordered list
         private static final int BULLET_DISC = 1;
 
-        /**
-         * Indicates the circle (empty circle) style for an unordered list
-         */
+        /// Indicates the circle (empty circle) style for an unordered list
         private static final int BULLET_CIRCLE = 2;
 
-        /**
-         * Indicates the square (full square) style for an unordered list
-         */
+        /// Indicates the square (full square) style for an unordered list
         private static final int BULLET_SQUARE = 3;
 
         int level;
@@ -4297,9 +4290,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
 
-        /**
-         * {{@inheritDoc}}
-         */
+        /// {{@inheritDoc}}
         @Override
         public void paint(Graphics g) {
             if (getIcon() != null) {
@@ -4318,9 +4309,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
 
-        /**
-         * {{@inheritDoc}}
-         */
+        /// {{@inheritDoc}}
         @Override
         protected Dimension calcPreferredSize() {
             if (getIcon() != null) {
@@ -4335,17 +4324,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
-    /**
-     * HTMLComboBox overrides ComboBox to allow usage of MultiComboBox as its list.
-     * This is done for OPTGROUP labels support (Note that multiple features of MultiComboBox will be switched off)
-     *
-     * @author Ofir Leitner
-     */
+    /// HTMLComboBox overrides ComboBox to allow usage of MultiComboBox as its list.
+    /// This is done for OPTGROUP labels support (Note that multiple features of MultiComboBox will be switched off)
+    ///
+    /// @author Ofir Leitner
     static class HTMLComboBox extends ComboBox {
 
-        /**
-         * {{@inheritDoc}}
-         */
+        /// {{@inheritDoc}}
         @Override
         protected List createPopupList() {
             List l = new MultiComboBox(getModel(), false);

@@ -11,26 +11,33 @@ package com.codename1.util;
  * ====================================================
  */
 
-/**
- * MathUtil for Java ME.
- * This fills the gap in Java ME Math with a port of Sun's public FDLIBM C-library for IEEE-754.
- *
- * @author kmashint
- * @see <a href="http://www.netlib.org/fdlibm/readme">http://www.netlib.org/fdlibm/readme</a>
- * For the Freely Distributable C-library conforming to IEEE-754 floating point math.
- * @see <a href="http://web.mit.edu/source/third/gcc/libjava/java/lang/">http://web.mit.edu/source/third/gcc/libjava/java/lang/</a>
- * For the GNU C variant of the same IEEE-754 routines.
- * @see <a href="http://www.dclausen.net/projects/microfloat/">http://www.dclausen.net/projects/microfloat/</a>
- * Another take on the IEEE-754 routines.
- * @see <a href="http://real-java.sourceforge.net/Real.html">http://real-java.sourceforge.net/Real.html</a>
- * Yet another take on the IEEE-754 routines.
- * @see <a href="http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html">http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html</a>
- * For other approximations.
- * @see <a href="http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/">http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/</a>
- * For fast but rough approximations.
- * @see <a href="http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/">http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/</a>
- * For more fast but rough approximations.
- */
+/// MathUtil for Java ME.
+/// This fills the gap in Java ME Math with a port of Sun's public FDLIBM C-library for IEEE-754.
+///
+/// @author kmashint
+///
+/// #### See also
+///
+/// - @see [http://www.netlib.org/fdlibm/readme](http://www.netlib.org/fdlibm/readme)
+/// For the Freely Distributable C-library conforming to IEEE-754 floating point math.
+///
+/// - @see [http://web.mit.edu/source/third/gcc/libjava/java/lang/](http://web.mit.edu/source/third/gcc/libjava/java/lang/)
+/// For the GNU C variant of the same IEEE-754 routines.
+///
+/// - @see [http://www.dclausen.net/projects/microfloat/](http://www.dclausen.net/projects/microfloat/)
+/// Another take on the IEEE-754 routines.
+///
+/// - @see [http://real-java.sourceforge.net/Real.html](http://real-java.sourceforge.net/Real.html)
+/// Yet another take on the IEEE-754 routines.
+///
+/// - @see [http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html](http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html)
+/// For other approximations.
+///
+/// - @see [http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/](http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/)
+/// For fast but rough approximations.
+///
+/// - @see [http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/](http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/)
+/// For more fast but rough approximations.
 public abstract class MathUtil {
 
     /* Common constants. */
@@ -313,68 +320,52 @@ public abstract class MathUtil {
      */
     private static final double MAX_ULP = 1.9958403095347198E292;
 
-    /**
-     * Return Math.E to the exponent a.
-     * This in turn uses ieee7854_exp(double).
-     */
+    /// Return Math.E to the exponent a.
+    /// This in turn uses ieee7854_exp(double).
     public static final double exp(double a) {
         return ieee754Exp(a);
     }
 
-    /**
-     * Return the natural logarithm, ln(a), as it relates to Math.E.
-     * This in turn uses ieee7854_log(double).
-     */
+    /// Return the natural logarithm, ln(a), as it relates to Math.E.
+    /// This in turn uses ieee7854_log(double).
     public static final double log(double a) {
         return ieee754Log(a);
     }
 
-    /**
-     * Return the common base-10 logarithm, log10(a).
-     * This in turn uses ieee7854_log(double)/ieee7854_log(10.0).
-     */
+    /// Return the common base-10 logarithm, log10(a).
+    /// This in turn uses ieee7854_log(double)/ieee7854_log(10.0).
     public static final double log10(double a) {
         return ieee754Log(a) / log10;
     }
 
-    /**
-     * Return a to the power of b, sometimes written as a ** b
-     * but not to be confused with the bitwise ^ operator.
-     * This in turn uses ieee7854_log(double).
-     */
+    /// Return a to the power of b, sometimes written as a ** b
+    /// but not to be confused with the bitwise ^ operator.
+    /// This in turn uses ieee7854_log(double).
     public static final double pow(double a, double b) {
         return ieee754Pow(a, b);
     }
 
-    /**
-     * Return the arcsine of a.
-     */
+    /// Return the arcsine of a.
     public static final double asin(double a) {
         return ieee754Asin(a);
     }
 
-    /**
-     * Return the arccosine of a.
-     */
+    /// Return the arccosine of a.
     public static final double acos(double a) {
         return ieee754Acos(a);
     }
 
-    /**
-     * Return the arctangent of a, call it b, where a = tan(b).
-     */
+    /// Return the arctangent of a, call it b, where a = tan(b).
     public static final double atan(double a) {
         return ieee754Atan(a);
     }
 
-    /**
-     * For any real arguments x and y not both equal to zero, atan2(y, x)
-     * is the angle in radians between the positive x-axis of a plane
-     * and the point given by the coordinates (x, y) on it.
-     * The angle is positive for counter-clockwise angles (upper half-plane, y > 0),
-     * and negative for clockwise angles (lower half-plane, y < 0).
-     * This in turn uses ieee7854_arctan2(double).
-     */
+    /// For any real arguments x and y not both equal to zero, atan2(y, x)
+    /// is the angle in radians between the positive x-axis of a plane
+    /// and the point given by the coordinates (x, y) on it.
+    /// The angle is positive for counter-clockwise angles (upper half-plane, y > 0),
+    /// and negative for clockwise angles (lower half-plane, y < 0).
+    /// This in turn uses ieee7854_arctan2(double).
     public static final double atan2(double b, double a) {
         return ieee754Atan2(a, b);
     }
@@ -1181,12 +1172,10 @@ public abstract class MathUtil {
         }
     }
 
-    /**
-     * scalbn (double x, int n)
-     * scalbn(x,n) returns x* 2**n  computed by  exponent
-     * manipulation rather than by actually performing an
-     * exponentiation or a multiplication.
-     */
+    /// scalbn (double x, int n)
+    /// scalbn(x,n) returns x* 2**n  computed by  exponent
+    /// manipulation rather than by actually performing an
+    /// exponentiation or a multiplication.
     public static double scalb(double x, int n) {
         int k;
         int hx;
@@ -1230,14 +1219,21 @@ public abstract class MathUtil {
         return x * twom54;
     }
 
-    /**
-     * Please update your code to use scalb
-     *
-     * @param x
-     * @param n
-     * @return scalb(x, n)
-     * @deprecated Please update your code to use scalb
-     */
+    /// Please update your code to use scalb
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
+    ///
+    /// - `n`
+    ///
+    /// #### Returns
+    ///
+    /// scalb(x, n)
+    ///
+    /// #### Deprecated
+    ///
+    /// Please update your code to use scalb
     public static double scalbn(double x, int n) {
         return scalb(x, n);
     }
@@ -1265,24 +1261,34 @@ public abstract class MathUtil {
     }
      */
 
-    /**
-     * Please update your code to use copySign
-     *
-     * @param x
-     * @param y
-     * @return copySign(x, y)
-     * @deprecated Please update your code to use copySign
-     */
+    /// Please update your code to use copySign
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`
+    ///
+    /// - `y`
+    ///
+    /// #### Returns
+    ///
+    /// copySign(x, y)
+    ///
+    /// #### Deprecated
+    ///
+    /// Please update your code to use copySign
     public static double copysign(final double x, final double y) {
         return copySign(x, y);
     }
 
-    /**
-     * Returns the size of an ulp (units in the last place) of the argument.
-     *
-     * @param d value whose ulp is to be returned
-     * @return size of an ulp for the argument
-     */
+    /// Returns the size of an ulp (units in the last place) of the argument.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: value whose ulp is to be returned
+    ///
+    /// #### Returns
+    ///
+    /// size of an ulp for the argument
     public static double ulp(double d) {
         if (Double.isNaN(d)) {
             // If the argument is NaN, then the result is NaN.
@@ -1313,16 +1319,20 @@ public abstract class MathUtil {
         return copySign(x, y) == x;
     }
 
-    /**
-     * Returns the next representable floating point number after the first
-     * argument in the direction of the second argument.
-     *
-     * @param start     starting value
-     * @param direction value indicating which of the neighboring representable
-     *                  floating point number to return
-     * @return The floating-point number next to {@code start} in the
-     * direction of {@direction}.
-     */
+    /// Returns the next representable floating point number after the first
+    /// argument in the direction of the second argument.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: starting value
+    ///
+    /// - `direction`: @param direction value indicating which of the neighboring representable
+    /// floating point number to return
+    ///
+    /// #### Returns
+    ///
+    /// @return The floating-point number next to `start` in the
+    /// direction of {@direction}.
     public static double nextAfter(final double start, final double direction) {
         if (Double.isNaN(start) || Double.isNaN(direction)) {
             // If either argument is a NaN, then NaN is returned.
@@ -1359,64 +1369,84 @@ public abstract class MathUtil {
         }
     }
 
-    /**
-     * Rounds the number to the closest integer
-     *
-     * @param a the number
-     * @return the closest integer
-     */
+    /// Rounds the number to the closest integer
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the number
+    ///
+    /// #### Returns
+    ///
+    /// the closest integer
     public static int round(float a) {
         return Math.round(a);
     }
 
-    /**
-     * Rounds the number to the closest integer
-     *
-     * @param a the number
-     * @return the closest integer
-     */
+    /// Rounds the number to the closest integer
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the number
+    ///
+    /// #### Returns
+    ///
+    /// the closest integer
     public static long round(double a) {
         return Math.round(a);
     }
 
-    /**
-     * Rounds the number down
-     *
-     * @param a the number
-     * @return a rounded down number
-     */
+    /// Rounds the number down
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the number
+    ///
+    /// #### Returns
+    ///
+    /// a rounded down number
     public static int floor(float a) {
         return (int) a;
     }
 
-    /**
-     * Rounds the number down
-     *
-     * @param a the number
-     * @return a rounded down number
-     */
+    /// Rounds the number down
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the number
+    ///
+    /// #### Returns
+    ///
+    /// a rounded down number
     public static long floor(double a) {
         return (long) a;
     }
 
-    /**
-     * Compares the two specified {@code float} values. The sign
-     * of the integer value returned is the same as that of the
-     * integer that would be returned by the call:
-     * <pre>
-     *    new Float(f1).compareTo(new Float(f2))
-     * </pre>
-     *
-     * @param f1 the first {@code float} to compare.
-     * @param f2 the second {@code float} to compare.
-     * @return the value {@code 0} if {@code f1} is
-     * numerically equal to {@code f2}; a value less than
-     * {@code 0} if {@code f1} is numerically less than
-     * {@code f2}; and a value greater than {@code 0}
-     * if {@code f1} is numerically greater than
-     * {@code f2}.
-     * @since 1.4
-     */
+    /// Compares the two specified `float` values. The sign
+    /// of the integer value returned is the same as that of the
+    /// integer that would be returned by the call:
+    ///
+    /// ```java
+    ///    new Float(f1).compareTo(new Float(f2))
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `f1`: the first `float` to compare.
+    ///
+    /// - `f2`: the second `float` to compare.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value `0` if `f1` is
+    /// numerically equal to `f2`; a value less than
+    /// `0` if `f1` is numerically less than
+    /// `f2`; and a value greater than `0`
+    /// if `f1` is numerically greater than
+    /// `f2`.
+    ///
+    /// #### Since
+    ///
+    /// 1.4
     public static int compare(float f1, float f2) {
         if (f1 < f2) {
             return -1;           // Neither val is NaN, thisVal is smaller
@@ -1434,24 +1464,32 @@ public abstract class MathUtil {
                         1));                          // (0.0, -0.0) or (NaN, !NaN)
     }
 
-    /**
-     * Compares the two specified {@code double} values. The sign
-     * of the integer value returned is the same as that of the
-     * integer that would be returned by the call:
-     * <pre>
-     *    new Double(d1).compareTo(new Double(d2))
-     * </pre>
-     *
-     * @param d1 the first {@code double} to compare
-     * @param d2 the second {@code double} to compare
-     * @return the value {@code 0} if {@code d1} is
-     * numerically equal to {@code d2}; a value less than
-     * {@code 0} if {@code d1} is numerically less than
-     * {@code d2}; and a value greater than {@code 0}
-     * if {@code d1} is numerically greater than
-     * {@code d2}.
-     * @since 1.4
-     */
+    /// Compares the two specified `double` values. The sign
+    /// of the integer value returned is the same as that of the
+    /// integer that would be returned by the call:
+    ///
+    /// ```java
+    ///    new Double(d1).compareTo(new Double(d2))
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `d1`: the first `double` to compare
+    ///
+    /// - `d2`: the second `double` to compare
+    ///
+    /// #### Returns
+    ///
+    /// @return the value `0` if `d1` is
+    /// numerically equal to `d2`; a value less than
+    /// `0` if `d1` is numerically less than
+    /// `d2`; and a value greater than `0`
+    /// if `d1` is numerically greater than
+    /// `d2`.
+    ///
+    /// #### Since
+    ///
+    /// 1.4
     public static int compare(double d1, double d2) {
         if (d1 < d2) {
             return -1;           // Neither val is NaN, thisVal is smaller

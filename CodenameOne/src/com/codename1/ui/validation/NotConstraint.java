@@ -22,40 +22,40 @@
  */
 package com.codename1.ui.validation;
 
-/**
- * Negates a group of constraints, such that, if any of its child constraints is true, it returns false.
- *
- * @author Diamond Mubaarak
- * @since 7.0
- */
+/// Negates a group of constraints, such that, if any of its child constraints is true, it returns false.
+///
+/// @author Diamond Mubaarak
+///
+/// #### Since
+///
+/// 7.0
 public class NotConstraint implements Constraint {
 
     private final Constraint[] constraints;
     private String failMessage = null;
 
-    /**
-     * Creates a new NotConstraint
-     *
-     * @param children the child constraints
-     */
+    /// Creates a new NotConstraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `children`: the child constraints
     public NotConstraint(Constraint... children) {
         this.constraints = children;
     }
 
-    /**
-     * Creates a new NotConstraint
-     *
-     * @param failMessage the default error message if the constraint fails
-     * @param children    the child constraints
-     */
+    /// Creates a new NotConstraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `failMessage`: the default error message if the constraint fails
+    ///
+    /// - `children`: the child constraints
     public NotConstraint(String failMessage, Constraint... children) {
         this.failMessage = failMessage;
         this.constraints = children;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isValid(Object value) {
         for (Constraint c : constraints) {
@@ -67,9 +67,7 @@ public class NotConstraint implements Constraint {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getDefaultFailMessage() {
         if (failMessage == null) {

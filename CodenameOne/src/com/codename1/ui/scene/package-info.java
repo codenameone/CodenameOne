@@ -4,10 +4,6 @@
     Author     : Steve Hannah
 */
 
-/**
- * <p>
- *     This package provides a light-weight scene graph for Codename One. It is marked deprecated because it is
- *     for internal use only.
- * </p>
- */
+/// This package provides a light-weight scene graph for Codename One. It is marked deprecated because it is
+/// for internal use only.
 package com.codename1.ui.scene;

@@ -30,24 +30,16 @@ import com.codename1.maps.ProxyHttpTile;
 import com.codename1.maps.Tile;
 import com.codename1.ui.geom.Dimension;
 
-/**
- * This is a GoogleMaps Provider https://developers.google.com/maps/documentation/staticmaps/
- *
- * @author Chen
- */
+/// This is a GoogleMaps Provider https://developers.google.com/maps/documentation/staticmaps/
+///
+/// @author Chen
 public class GoogleMapsProvider extends TiledProvider {
 
-    /**
-     * This is a regular road map
-     */
+    /// This is a regular road map
     public static final int REGULAR = 0;
-    /**
-     * This is a satellite map
-     */
+    /// This is a satellite map
     public static final int SATELLITE = 1;
-    /**
-     * This is a satellite + road map
-     */
+    /// This is a satellite + road map
     public static final int HYBRID = 2;
     private static int tileSize = 256;
     private final String apiKey;
@@ -55,58 +47,50 @@ public class GoogleMapsProvider extends TiledProvider {
     private String language;
     private boolean sensor;
 
-    /**
-     * Google map provider Constructor
-     *
-     * @param apiKey google maps api key
-     *               https://developers.google.com/maps/documentation/staticmaps/#api_key
-     */
+    /// Google map provider Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `apiKey`: @param apiKey google maps api key
+    /// https://developers.google.com/maps/documentation/staticmaps/#api_key
     public GoogleMapsProvider(String apiKey) {
         super("https://maps.googleapis.com/maps/api/staticmap?", new Mercator(), new Dimension(tileSize, tileSize));
         this.apiKey = apiKey;
     }
 
-    /**
-     * @return the tileSize
-     */
+    /// #### Returns
+    ///
+    /// the tileSize
     public static int getTileSize() {
         return tileSize;
     }
 
-    /**
-     * @param aTileSize the tileSize to set
-     */
+    /// #### Parameters
+    ///
+    /// - `aTileSize`: the tileSize to set
     public static void setTileSize(int aTileSize) {
         tileSize = aTileSize;
     }
 
-    /**
-     * Sets the map type
-     */
+    /// Sets the map type
     public void setMapType(int type) {
         this.type = type;
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int maxZoomLevel() {
         return 18;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String attribution() {
         return "Google";
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Tile tileFor(BoundingBox bbox) {
         StringBuilder sb = new StringBuilder(_url);
@@ -142,44 +126,44 @@ public class GoogleMapsProvider extends TiledProvider {
         return new ProxyHttpTile(tileSize(), bbox, sb.toString());
     }
 
-    /**
-     * Defines the language to use for display of labels on map tiles.
-     * Note that this parameter is only supported for some country tiles;
-     * if the specific language requested is not supported for the tile set,
-     * then the default language for that tileset will be used.
-     *
-     * @return the language
-     */
+    /// Defines the language to use for display of labels on map tiles.
+    /// Note that this parameter is only supported for some country tiles;
+    /// if the specific language requested is not supported for the tile set,
+    /// then the default language for that tileset will be used.
+    ///
+    /// #### Returns
+    ///
+    /// the language
     public String getLanguage() {
         return language;
     }
 
-    /**
-     * Defines the language to use for display of labels on map tiles.
-     * Note that this parameter is only supported for some country tiles;
-     * if the specific language requested is not supported for the tile set,
-     * then the default language for that tileset will be used.
-     *
-     * @param language the language to set
-     */
+    /// Defines the language to use for display of labels on map tiles.
+    /// Note that this parameter is only supported for some country tiles;
+    /// if the specific language requested is not supported for the tile set,
+    /// then the default language for that tileset will be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: the language to set
     public void setLanguage(String language) {
         this.language = language;
     }
 
-    /**
-     * Specifies whether the application requesting the static map is using a sensor to determine the user's location.
-     *
-     * @return the sensor
-     */
+    /// Specifies whether the application requesting the static map is using a sensor to determine the user's location.
+    ///
+    /// #### Returns
+    ///
+    /// the sensor
     public boolean isSensor() {
         return sensor;
     }
 
-    /**
-     * Specifies whether the application requesting the static map is using a sensor to determine the user's location.
-     *
-     * @param sensor the sensor to set
-     */
+    /// Specifies whether the application requesting the static map is using a sensor to determine the user's location.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sensor`: the sensor to set
     public void setSensor(boolean sensor) {
         this.sensor = sensor;
     }

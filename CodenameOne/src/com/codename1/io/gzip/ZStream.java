@@ -35,11 +35,11 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
-/**
- * ZStream
- *
- * @deprecated Not for public use in the future.
- */
+/// ZStream
+///
+/// #### Deprecated
+///
+/// Not for public use in the future.
 @Deprecated
 public class ZStream {
 
@@ -391,10 +391,8 @@ public class ZStream {
         return msg;
     }
 
-    /**
-     * Those methods are expected to be override by Inflater and Deflater.
-     * In the future, they will become abstract methods.
-     */
+    /// Those methods are expected to be override by Inflater and Deflater.
+    /// In the future, they will become abstract methods.
     public int end() {
         return Z_OK;
     }

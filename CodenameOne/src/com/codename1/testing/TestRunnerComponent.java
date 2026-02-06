@@ -39,16 +39,22 @@ import java.util.Collections;
 
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * A UI component for running unit tests and displaying the results.
- *
- * <p>The sample code below demonstrates usage.</p>
- * <script src="https://gist.github.com/shannah/c54df11845911f928a76b71992a0f76b.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/testrunnercomponent.png" alt="TestRunnerComponnet" />
- *
- * @author Steve Hannah
- * @since 7.0
- */
+/// A UI component for running unit tests and displaying the results.
+///
+/// The sample code below demonstrates usage.
+///
+/// ```java
+/// TestRunnerComponent runner = new TestRunnerComponent();
+/// runner.add(new ResultParserTest());
+/// runner.add(new ElementSelectorTest());
+/// runner.showForm();
+/// ```
+///
+/// @author Steve Hannah
+///
+/// #### Since
+///
+/// 7.0
 public class TestRunnerComponent extends Container {
     private final ArrayList<AbstractTest> tests = new ArrayList<AbstractTest>();
     private final Container resultsPane = new Container(BoxLayout.y());
@@ -72,22 +78,25 @@ public class TestRunnerComponent extends Container {
         add(CN.CENTER, resultsPane);
     }
 
-    /**
-     * Adds tests to the test runner.
-     *
-     * @param tests The tests to add.
-     * @return Self for chaining.
-     */
+    /// Adds tests to the test runner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tests`: The tests to add.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
     public TestRunnerComponent add(AbstractTest... tests) {
         Collections.addAll(this.tests, tests);
         return this;
     }
 
-    /**
-     * Shows a form with the testrunner embedded in it.
-     *
-     * @return The form.
-     */
+    /// Shows a form with the testrunner embedded in it.
+    ///
+    /// #### Returns
+    ///
+    /// The form.
     public Form showForm() {
         Form f = getComponentForm();
         if (f == null) {
@@ -112,9 +121,7 @@ public class TestRunnerComponent extends Container {
         }
     }
 
-    /**
-     * Runs all of the tests in the test running.
-     */
+    /// Runs all of the tests in the test running.
     public void runTests() {
         Form f = getComponentForm();
         resultsPane.removeAll();

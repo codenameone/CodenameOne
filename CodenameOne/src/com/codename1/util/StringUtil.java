@@ -29,32 +29,35 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
-/**
- * Various utility methods for manipulating strings
- *
- * @author Chen Fishbein
- */
+/// Various utility methods for manipulating strings
+///
+/// @author Chen Fishbein
 public abstract class StringUtil {
 
 
     private static CodenameOneImplementation impl;
 
-    /**
-     * @deprecated exposed as part of an internal optimization, this method isn't meant for general access
-     */
+    /// #### Deprecated
+    ///
+    /// exposed as part of an internal optimization, this method isn't meant for general access
     public static void setImplementation(CodenameOneImplementation i) {
         impl = i;
     }
 
-    /**
-     * This method replaces all occurrences of the pattern with the
-     * replacement String
-     *
-     * @param source  the String source
-     * @param pattern String to replace in the source
-     * @param replace replacement String
-     * @return string with replaced elements
-     */
+    /// This method replaces all occurrences of the pattern with the
+    /// replacement String
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String source
+    ///
+    /// - `pattern`: String to replace in the source
+    ///
+    /// - `replace`: replacement String
+    ///
+    /// #### Returns
+    ///
+    /// string with replaced elements
     public static String replaceAll(String source, String pattern, String replace) {
         StringBuilder sb = new StringBuilder();
         int idx = 0;
@@ -75,15 +78,20 @@ public abstract class StringUtil {
         return sb.toString();
     }
 
-    /**
-     * This method replaces the first occurrence of the pattern with the
-     * replacement String
-     *
-     * @param source  the String source
-     * @param pattern String to replace in the source
-     * @param replace replacement String
-     * @return string with replaced elements
-     */
+    /// This method replaces the first occurrence of the pattern with the
+    /// replacement String
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String source
+    ///
+    /// - `pattern`: String to replace in the source
+    ///
+    /// - `replace`: replacement String
+    ///
+    /// #### Returns
+    ///
+    /// string with replaced elements
     public static String replaceFirst(String source, String pattern, String replace) {
         StringBuilder sb = new StringBuilder();
         int idx = 0;
@@ -101,14 +109,21 @@ public abstract class StringUtil {
         return sb.toString();
     }
 
-    /**
-     * Breaks a String to multiple strings.
-     *
-     * @param source    the String to break
-     * @param separator the pattern to search and break.
-     * @return a Vector of Strings
-     * @deprecated use the tokenize() method instead
-     */
+    /// Breaks a String to multiple strings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String to break
+    ///
+    /// - `separator`: the pattern to search and break.
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Strings
+    ///
+    /// #### Deprecated
+    ///
+    /// use the tokenize() method instead
     public static Vector tokenizeString(String source, char separator) {
         Vector tokenized = new Vector();
         int len = source.length();
@@ -139,14 +154,21 @@ public abstract class StringUtil {
     }
 
 
-    /**
-     * Breaks a String to multiple strings (similar to string tokenizer)
-     *
-     * @param source    the String to break
-     * @param separator the characters that can be used to search and break.
-     * @return a Vector of Strings
-     * @deprecated use the {@link #tokenize(java.lang.String, java.lang.String) } method instead
-     */
+    /// Breaks a String to multiple strings (similar to string tokenizer)
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String to break
+    ///
+    /// - `separator`: the characters that can be used to search and break.
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Strings
+    ///
+    /// #### Deprecated
+    ///
+    /// use the `java.lang.String)` method instead
     public static Vector tokenizeString(String source, String separator) {
         if (separator.length() == 1) {
             // slightly faster
@@ -173,13 +195,17 @@ public abstract class StringUtil {
     }
 
 
-    /**
-     * Breaks a String to multiple strings.
-     *
-     * @param source    the String to break
-     * @param separator the pattern to search and break.
-     * @return a Vector of Strings
-     */
+    /// Breaks a String to multiple strings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String to break
+    ///
+    /// - `separator`: the pattern to search and break.
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Strings
     public static List<String> tokenize(String source, char separator) {
         ArrayList<String> tokenized = new ArrayList<String>();
         if (impl == null) {
@@ -214,13 +240,17 @@ public abstract class StringUtil {
     }
 
 
-    /**
-     * Breaks a String to multiple strings (similar to string tokenizer)
-     *
-     * @param source    the String to break
-     * @param separator the characters that can be used to search and break.
-     * @return a Vector of Strings
-     */
+    /// Breaks a String to multiple strings (similar to string tokenizer)
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String to break
+    ///
+    /// - `separator`: the characters that can be used to search and break.
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Strings
     public static List<String> tokenize(String source, String separator) {
         if (separator.length() == 1) {
             // slightly faster
@@ -246,14 +276,21 @@ public abstract class StringUtil {
         return tokenized;
     }
 
-    /**
-     * Joins a list or array of objects together using the specified delimiter.
-     *
-     * @param strings   Objects to be converted to strings.
-     * @param delimiter The delimiter.
-     * @return The joined string.
-     * @since 8.0
-     */
+    /// Joins a list or array of objects together using the specified delimiter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strings`: Objects to be converted to strings.
+    ///
+    /// - `delimiter`: The delimiter.
+    ///
+    /// #### Returns
+    ///
+    /// The joined string.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static String join(Iterable strings, String delimiter) {
         StringBuilder sb = new StringBuilder();
         for (Object obj : strings) {
@@ -265,14 +302,21 @@ public abstract class StringUtil {
         return sb.toString();
     }
 
-    /**
-     * Joins a list or array of objects together using the specified delimiter.
-     *
-     * @param strings   Objects to be converted to strings.
-     * @param delimiter The delimiter.
-     * @return The joined string.
-     * @since 8.0
-     */
+    /// Joins a list or array of objects together using the specified delimiter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strings`: Objects to be converted to strings.
+    ///
+    /// - `delimiter`: The delimiter.
+    ///
+    /// #### Returns
+    ///
+    /// The joined string.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public static String join(Object[] strings, String delimiter) {
         StringBuilder sb = new StringBuilder();
         for (Object obj : strings) {
@@ -284,12 +328,15 @@ public abstract class StringUtil {
         return sb.toString();
     }
 
-    /**
-     * Helper to get bytes from string with UTF-8 encoding
-     *
-     * @param s the string
-     * @return the bytes
-     */
+    /// Helper to get bytes from string with UTF-8 encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the string
+    ///
+    /// #### Returns
+    ///
+    /// the bytes
     public static byte[] getBytes(String s) {
         try {
             return s.getBytes("UTF-8");
@@ -299,12 +346,15 @@ public abstract class StringUtil {
         }
     }
 
-    /**
-     * Helper to get string from bytes with UTF-8 encoding
-     *
-     * @param b the bytes
-     * @return the string
-     */
+    /// Helper to get string from bytes with UTF-8 encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bytes
+    ///
+    /// #### Returns
+    ///
+    /// the string
     public static String newString(byte[] b) {
         try {
             return new String(b, "UTF-8");
@@ -314,14 +364,19 @@ public abstract class StringUtil {
         }
     }
 
-    /**
-     * Helper to get string from bytes with UTF-8 encoding
-     *
-     * @param b      the bytes
-     * @param offset the offset
-     * @param length the length
-     * @return the string
-     */
+    /// Helper to get string from bytes with UTF-8 encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bytes
+    ///
+    /// - `offset`: the offset
+    ///
+    /// - `length`: the length
+    ///
+    /// #### Returns
+    ///
+    /// the string
     public static String newString(byte[] b, int offset, int length) {
         try {
             return new String(b, offset, length, "UTF-8");

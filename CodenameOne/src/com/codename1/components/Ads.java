@@ -45,17 +45,18 @@ import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.Vector;
 
-/**
- * This is an Ads Component, this Component can displays banner/text ads on a
- * Form.
- * This is a generic Ads Component that can support different type of Ads Network
- * Services, at the Moment Codename One supports innerActive ads, to gain an appId
- * please refer to
- * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
- *
- * @author Chen
- * @deprecated we recommend developers check out newer ad options in the cn1lib section of the Codename One website
- */
+/// This is an Ads Component, this Component can displays banner/text ads on a
+/// Form.
+/// This is a generic Ads Component that can support different type of Ads Network
+/// Services, at the Moment Codename One supports innerActive ads, to gain an appId
+/// please refer to
+/// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+///
+/// @author Chen
+///
+/// #### Deprecated
+///
+/// we recommend developers check out newer ad options in the cn1lib section of the Codename One website
 public class Ads extends Container implements HTMLCallback {
 
     private long elapsed;
@@ -64,18 +65,14 @@ public class Ads extends Container implements HTMLCallback {
     private AdsService service;
     private boolean refreshAd;
     private String appId;
-    /**
-     * optional parameters
-     */
+    /// optional parameters
     private String age;
     private String gender;
     private String category;
     private String location;
     private String[] keywords;
 
-    /**
-     * Default constructor for GUI builder
-     */
+    /// Default constructor for GUI builder
     public Ads() {
         setUIIDFinal("Ads");
         setLayout(new BorderLayout());
@@ -90,22 +87,23 @@ public class Ads extends Container implements HTMLCallback {
         addComponent(BorderLayout.CENTER, filler);
     }
 
-    /**
-     * Simple constructor to create an Ad Component
-     *
-     * @param appId unique identifier of the app, to gain an appId please refer to
-     *              http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
-     */
+    /// Simple constructor to create an Ad Component
+    ///
+    /// #### Parameters
+    ///
+    /// - `appId`: @param appId unique identifier of the app, to gain an appId please refer to
+    /// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
     public Ads(String appId) {
         this(appId, true);
     }
 
-    /**
-     * @param appId     unique identifier of the app, to gain an appId please refer to
-     *                  http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
-     * @param refreshAd if true this Component will refresh the Ad every 60 seconds,
-     *                  if false no refresh will occur
-     */
+    /// #### Parameters
+    ///
+    /// - `appId`: @param appId     unique identifier of the app, to gain an appId please refer to
+    /// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+    ///
+    /// - `refreshAd`: @param refreshAd if true this Component will refresh the Ad every 60 seconds,
+    /// if false no refresh will occur
     public Ads(String appId, boolean refreshAd) {
         this();
         this.appId = appId;
@@ -113,9 +111,7 @@ public class Ads extends Container implements HTMLCallback {
         this.service = AdsService.createAdsService();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void initComponent() {
         if (service != null) {
@@ -137,9 +133,7 @@ public class Ads extends Container implements HTMLCallback {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         if (refreshAd) {
@@ -152,9 +146,7 @@ public class Ads extends Container implements HTMLCallback {
         service.requestAd();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         Form parent = getComponentForm();
@@ -170,9 +162,7 @@ public class Ads extends Container implements HTMLCallback {
         return super.animate();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int code) {
         if (Display.getInstance().getGameAction(code) == Display.GAME_FIRE) {
@@ -181,9 +171,7 @@ public class Ads extends Container implements HTMLCallback {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
         if (!isDragActivated()) {
@@ -209,20 +197,20 @@ public class Ads extends Container implements HTMLCallback {
         }
     }
 
-    /**
-     * HTML ad received from the server
-     *
-     * @return the ad
-     */
+    /// HTML ad received from the server
+    ///
+    /// #### Returns
+    ///
+    /// the ad
     public String getAd() {
         return ad;
     }
 
-    /**
-     * HTML ad received from the server
-     *
-     * @param ad the ad to set
-     */
+    /// HTML ad received from the server
+    ///
+    /// #### Parameters
+    ///
+    /// - `ad`: the ad to set
     public void setAd(String ad) {
         this.ad = ad;
         HTMLComponent html = new HTMLComponent(new MyAsyncDocumentRequestHandlerImpl());
@@ -235,34 +223,30 @@ public class Ads extends Container implements HTMLCallback {
         html.getStyle().setBgTransparency(0);
     }
 
-    /**
-     * The amount of time needed to update the ad
-     *
-     * @return the updateDuration
-     */
+    /// The amount of time needed to update the ad
+    ///
+    /// #### Returns
+    ///
+    /// the updateDuration
     public int getUpdateDuration() {
         return updateDuration;
     }
 
-    /**
-     * The amount of time needed to update the ad
-     *
-     * @param updateDuration the updateDuration to set
-     */
+    /// The amount of time needed to update the ad
+    ///
+    /// #### Parameters
+    ///
+    /// - `updateDuration`: the updateDuration to set
     public void setUpdateDuration(int updateDuration) {
         this.updateDuration = updateDuration;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void titleUpdated(HTMLComponent htmlC, String title) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
         if (status == STATUS_COMPLETED) {
@@ -289,33 +273,25 @@ public class Ads extends Container implements HTMLCallback {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String fieldSubmitted(HTMLComponent htmlC, TextArea ta, String actionURL, String id, String value, int type, String errorMsg) {
         return value;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getAutoComplete(HTMLComponent htmlC, String actionURL, String id) {
         return "";
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getLinkProperties(HTMLComponent htmlC, String url) {
         return LINK_REGULAR;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean linkClicked(HTMLComponent htmlC, String url) {
         //this is relevant when the Ad is in Full Screen mode
@@ -324,52 +300,38 @@ public class Ads extends Container implements HTMLCallback {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void actionPerformed(ActionEvent evt, HTMLComponent htmlC, HTMLElement element) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void focusGained(Component cmp, HTMLComponent htmlC, HTMLElement element) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void focusLost(Component cmp, HTMLComponent htmlC, HTMLElement element) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void dataChanged(int type, int index, HTMLComponent htmlC, TextField textField, HTMLElement element) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void selectionChanged(int oldSelected, int newSelected, HTMLComponent htmlC, com.codename1.ui.List list, HTMLElement element) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setHeight(int height) {
         float percent = ((float) height / (float) Display.getInstance().getDisplayHeight());
@@ -388,23 +350,23 @@ public class Ads extends Container implements HTMLCallback {
         }
     }
 
-    /**
-     * Simple getter of the unique identifier of the app on the ads service
-     * network.
-     *
-     * @return the app unique identifier.
-     */
+    /// Simple getter of the unique identifier of the app on the ads service
+    /// network.
+    ///
+    /// #### Returns
+    ///
+    /// the app unique identifier.
     public String getAppID() {
         return appId;
     }
 
-    /**
-     * Simple setter of the unique identifier of the app on the ads service
-     * network, no need to manually use this the createAdsService uses this.
-     *
-     * @param appId unique identifier of the app, to gain an appId please refer to
-     *              http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
-     */
+    /// Simple setter of the unique identifier of the app on the ads service
+    /// network, no need to manually use this the createAdsService uses this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `appId`: @param appId unique identifier of the app, to gain an appId please refer to
+    /// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
     public void setAppID(String appId) {
         this.appId = appId;
         if (service == null) {
@@ -415,126 +377,106 @@ public class Ads extends Container implements HTMLCallback {
         }
     }
 
-    /**
-     * Users age
-     *
-     * @return the user age
-     */
+    /// Users age
+    ///
+    /// #### Returns
+    ///
+    /// the user age
     public String getAge() {
         return age;
     }
 
-    /**
-     * Sets the users age
-     *
-     * @param age
-     */
+    /// Sets the users age
+    ///
+    /// #### Parameters
+    ///
+    /// - `age`
     public void setAge(String age) {
         this.age = age;
     }
 
-    /**
-     * The user gender can be: M/m, F/f, Male, Female.
-     *
-     * @return
-     */
+    /// The user gender can be: M/m, F/f, Male, Female.
     public String getGender() {
         return gender;
     }
 
-    /**
-     * Sets Gender if applicable can be one of the following:
-     * 'F', 'f', 'M', 'm', 'Female', 'female', 'Male', 'male'
-     *
-     * @param gender
-     */
+    /// Sets Gender if applicable can be one of the following:
+    /// 'F', 'f', 'M', 'm', 'Female', 'female', 'Male', 'male'
+    ///
+    /// #### Parameters
+    ///
+    /// - `gender`
     public void setGender(String gender) {
         this.gender = gender;
     }
 
-    /**
-     * Keywords relevant to this user specific session
-     *
-     * @return
-     */
+    /// Keywords relevant to this user specific session
     public String[] getKeywords() {
         return keywords;
     }
 
-    /**
-     * Keywords relevant to this user specific session
-     *
-     * @param keywords
-     */
+    /// Keywords relevant to this user specific session
+    ///
+    /// #### Parameters
+    ///
+    /// - `keywords`
     public void setKeywords(String[] keywords) {
         this.keywords = keywords;
     }
 
-    /**
-     * Category is a single word description of the application.
-     *
-     * @return a single word description of the application.
-     */
+    /// Category is a single word description of the application.
+    ///
+    /// #### Returns
+    ///
+    /// a single word description of the application.
     public String getCategory() {
         return category;
     }
 
-    /**
-     * Category is a single word description of the application.
-     *
-     * @param category
-     */
+    /// Category is a single word description of the application.
+    ///
+    /// #### Parameters
+    ///
+    /// - `category`
     public void setCategory(String category) {
         this.category = category;
     }
 
-    /**
-     * Location string is a comma separated list of country, state/province, city
-     * For example: US, NY, NY
-     *
-     * @return
-     */
+    /// Location string is a comma separated list of country, state/province, city
+    /// For example: US, NY, NY
     public String getLocation() {
         return location;
     }
 
-    /**
-     * Location string is a comma separated list of country, state/province, city
-     * For example: US, NY, NY
-     *
-     * @param location
-     */
+    /// Location string is a comma separated list of country, state/province, city
+    /// For example: US, NY, NY
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`
     public void setLocation(String location) {
         this.location = location;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"appId", "updateDuration", "age", "gender", "category", "location", "keywords"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, Integer.class, String.class, String.class, String.class, String.class, String.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "int", "String", "String", "String", "String", "String[]"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("appId".equals(name)) {
@@ -561,9 +503,7 @@ public class Ads extends Container implements HTMLCallback {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("appId".equals(name)) {

@@ -33,161 +33,110 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-/**
- * Utility class used by the webservice proxy code to invoke server code
- *
- * @author Shai Almog
- */
+/// Utility class used by the webservice proxy code to invoke server code
+///
+/// @author Shai Almog
 public abstract class WebServiceProxyCall {
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_VOID = 0;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_BYTE = 1;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_CHAR = 2;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_SHORT = 3;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_INT = 4;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_LONG = 5;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_DOUBLE = 6;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_FLOAT = 7;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_BOOLEAN = 8;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_BYTE_OBJECT = 9;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_CHARACTER_OBJECT = 10;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_SHORT_OBJECT = 11;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_INTEGER_OBJECT = 12;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_LONG_OBJECT = 13;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_DOUBLE_OBJECT = 14;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_FLOAT_OBJECT = 15;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_BOOLEAN_OBJECT = 16;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_STRING = 17;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_BYTE_ARRAY = 18;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_CHAR_ARRAY = 19;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_SHORT_ARRAY = 20;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_INT_ARRAY = 21;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_LONG_ARRAY = 22;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_DOUBLE_ARRAY = 23;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_FLOAT_ARRAY = 24;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_BOOLEAN_ARRAY = 25;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_STRING_ARRAY = 26;
 
-    /**
-     * Web protocol argument/return type
-     */
+    /// Web protocol argument/return type
     public static final int TYPE_EXTERNALIABLE = 1000;
 
 
-    /**
-     * Invokes a webservice synchronously and returns result
-     *
-     * @param def       definition of the webservice request
-     * @param arguments the arguments to the service
-     * @return the value of the sync call
-     * @throws IOException an exception in case of a webservice fail
-     */
+    /// Invokes a webservice synchronously and returns result
+    ///
+    /// #### Parameters
+    ///
+    /// - `def`: definition of the webservice request
+    ///
+    /// - `arguments`: the arguments to the service
+    ///
+    /// #### Returns
+    ///
+    /// the value of the sync call
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: an exception in case of a webservice fail
     public static Object invokeWebserviceSync(WSDefinition def, Object... arguments) throws IOException {
         WSConnection cr = new WSConnection(def, null, arguments);
         NetworkManager.getInstance().addToQueueAndWait(cr);
@@ -198,41 +147,52 @@ public abstract class WebServiceProxyCall {
         return cr.returnValue;
     }
 
-    /**
-     * Invokes a web asynchronously and calls the callback on completion
-     *
-     * @param def       definition of the webservice request
-     * @param scall     the return value callback
-     * @param fcall     the error callback
-     * @param arguments the arguments to the webservice
-     */
+    /// Invokes a web asynchronously and calls the callback on completion
+    ///
+    /// #### Parameters
+    ///
+    /// - `def`: definition of the webservice request
+    ///
+    /// - `scall`: the return value callback
+    ///
+    /// - `fcall`: the error callback
+    ///
+    /// - `arguments`: the arguments to the webservice
     public static void invokeWebserviceASync(WSDefinition def, SuccessCallback scall,
                                              FailureCallback fcall, Object... arguments) {
         WSConnection cr = new WSConnection(def, scall, fcall, arguments);
         NetworkManager.getInstance().addToQueue(cr);
     }
 
-    /**
-     * Invokes a web asynchronously and calls the callback on completion
-     *
-     * @param def       definition of the webservice request
-     * @param call      the return value containing an error callback or value
-     * @param arguments the arguments to the webservice
-     */
+    /// Invokes a web asynchronously and calls the callback on completion
+    ///
+    /// #### Parameters
+    ///
+    /// - `def`: definition of the webservice request
+    ///
+    /// - `call`: the return value containing an error callback or value
+    ///
+    /// - `arguments`: the arguments to the webservice
     public static void invokeWebserviceASync(WSDefinition def, final Callback call, Object... arguments) {
         WSConnection cr = new WSConnection(def, call, arguments);
         NetworkManager.getInstance().addToQueue(cr);
     }
 
-    /**
-     * Creates a webservice definition object which can be used to invoke the webservice.
-     *
-     * @param url           the url of the webservice
-     * @param serviceName   the name of the service method
-     * @param returnType    the return type for the webservice one of the TYPE_* constants
-     * @param argumentTypes the arguments for the webservice using the TYPE_* constants
-     * @return a WSDefinition object
-     */
+    /// Creates a webservice definition object which can be used to invoke the webservice.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url of the webservice
+    ///
+    /// - `serviceName`: the name of the service method
+    ///
+    /// - `returnType`: the return type for the webservice one of the TYPE_* constants
+    ///
+    /// - `argumentTypes`: the arguments for the webservice using the TYPE_* constants
+    ///
+    /// #### Returns
+    ///
+    /// a WSDefinition object
     public static WSDefinition defineWebService(String url, String serviceName, int returnType, int... argumentTypes) {
         WSDefinition def = new WSDefinition();
         def.url = url;
@@ -242,9 +202,7 @@ public abstract class WebServiceProxyCall {
         return def;
     }
 
-    /**
-     * Webservice definition type, allows defining the argument values for a specific WS call
-     */
+    /// Webservice definition type, allows defining the argument values for a specific WS call
     public static class WSDefinition {
         String url;
         String name;
@@ -272,9 +230,7 @@ public abstract class WebServiceProxyCall {
             setPost(true);
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public boolean equals(Object o) {
             if (this == o) {
@@ -317,9 +273,7 @@ public abstract class WebServiceProxyCall {
             return true;
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public int hashCode() {
             int result = super.hashCode();

@@ -48,39 +48,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * The binding framework can implicitly bind UI elements to properties, this allow seamless model to
- * UI mapping. Most cases allow simple binding by just using the {@link
- * #bind(com.codename1.properties.Property, com.codename1.ui.Component)} method to seamlessly update
- * a property/component based on changes.
- *
- * <p>It contains the following base concepts:
- *
- * <p>1. {@link com.codename1.properties.UiBinding.ObjectConverter} - a converter converts from one
- * type to another. E.g. if we want a {@link com.codename1.ui.TextArea} to map to an {@code Integer}
- * property we'd use an {@link com.codename1.properties.UiBinding.IntegerConverter} to indicate the
- * desired destination value.
- *
- * <p>2. {@link com.codename1.properties.UiBinding.ComponentAdapter} - takes two {@link
- * com.codename1.properties.UiBinding.ObjectConverter} to convert to/from the component and
- * property. It provides the API for event binding and value extraction/setting on the component.
- *
- * <p>3. {@link com.codename1.properties.UiBinding.Binding} - the commit mode.
- *
- * <p>4. {@link #bind(com.codename1.properties.Property, com.codename1.ui.Component)} - the {@code
- * bind} helper methods allow us to bind a component easily without exposure to these complexities.
- *
- * @author Shai Almog
- */
+/// The binding framework can implicitly bind UI elements to properties, this allow seamless model to
+/// UI mapping. Most cases allow simple binding by just using the `com.codename1.ui.Component)` method to seamlessly update
+/// a property/component based on changes.
+///
+/// It contains the following base concepts:
+///
+/// 1. `com.codename1.properties.UiBinding.ObjectConverter` - a converter converts from one
+/// type to another. E.g. if we want a `com.codename1.ui.TextArea` to map to an `Integer`
+/// property we'd use an `com.codename1.properties.UiBinding.IntegerConverter` to indicate the
+/// desired destination value.
+///
+/// 2. `com.codename1.properties.UiBinding.ComponentAdapter` - takes two `com.codename1.properties.UiBinding.ObjectConverter` to convert to/from the component and
+/// property. It provides the API for event binding and value extraction/setting on the component.
+///
+/// 3. `com.codename1.properties.UiBinding.Binding` - the commit mode.
+///
+/// 4. `com.codename1.ui.Component)` - the `bind` helper methods allow us to bind a component easily without exposure to these complexities.
+///
+/// @author Shai Almog
 public class UiBinding {
     private boolean autoCommit = true;
 
-    /**
-     * Allows us to unbind the property from binding, this is equivalent to calling {@link
-     * com.codename1.properties.UiBinding.Binding#disconnect()} on all bindings...
-     *
-     * @param prop the property
-     */
+    /// Allows us to unbind the property from binding, this is equivalent to calling `com.codename1.properties.UiBinding.Binding#disconnect()` on all bindings...
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property
     public static void unbind(PropertyBase prop) {
         if (prop.getListeners() != null) {
             for (Object l : prop.getListeners()) {
@@ -95,11 +89,11 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Unbinds all the properties within the business object
-     *
-     * @param po the business object
-     */
+    /// Unbinds all the properties within the business object
+    ///
+    /// #### Parameters
+    ///
+    /// - `po`: the business object
     public static void unbind(PropertyBusinessObject po) {
         for (PropertyBase pb : po.getPropertyIndex()) {
             unbind(pb);
@@ -120,22 +114,22 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Is auto-commit mode on by default see {@link #setAutoCommit(boolean)}
-     *
-     * @return true if auto-commit is on
-     */
+    /// Is auto-commit mode on by default see `#setAutoCommit(boolean)`
+    ///
+    /// #### Returns
+    ///
+    /// true if auto-commit is on
     public boolean isAutoCommit() {
         return autoCommit;
     }
 
-    /**
-     * Default value for auto-commit mode, in auto-commit mode changes to the component/property are
-     * instantly reflected otherwise {@link com.codename1.properties.UiBinding.CommitMode#commit()}
-     * should be invoked explicitly
-     *
-     * @param b true to enable auto commit mode
-     */
+    /// Default value for auto-commit mode, in auto-commit mode changes to the component/property are
+    /// instantly reflected otherwise `com.codename1.properties.UiBinding.CommitMode#commit()`
+    /// should be invoked explicitly
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to enable auto commit mode
     public void setAutoCommit(boolean b) {
         autoCommit = b;
     }
@@ -170,14 +164,18 @@ public class UiBinding {
         return new GroupBinding(allBindings);
     }
 
-    /**
-     * Binds a hierarchy of Components to a business object by searching the tree and collecting the
-     * bindings. Components are associated with properties based on their name attribute
-     *
-     * @param obj the business object with the properties to bind
-     * @param cnt a container that will be recursed for binding
-     * @return a Binding object that manipulates all of the individual bindings at once
-     */
+    /// Binds a hierarchy of Components to a business object by searching the tree and collecting the
+    /// bindings. Components are associated with properties based on their name attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the business object with the properties to bind
+    ///
+    /// - `cnt`: a container that will be recursed for binding
+    ///
+    /// #### Returns
+    ///
+    /// a Binding object that manipulates all of the individual bindings at once
     public Binding bind(final PropertyBusinessObject obj, final Container cnt) {
         ArrayList<Binding> allBindings = new ArrayList<Binding>();
         bind(obj, cnt, allBindings);
@@ -202,15 +200,20 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Binds the given property to the selected value from the set based on the multiple components.
-     * This is useful for binding multiple radio buttons to a single property value based on selection
-     *
-     * @param prop   the property
-     * @param values the values that can be used
-     * @param cmps   the components
-     * @return a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
-     */
+    /// Binds the given property to the selected value from the set based on the multiple components.
+    /// This is useful for binding multiple radio buttons to a single property value based on selection
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property
+    ///
+    /// - `values`: the values that can be used
+    ///
+    /// - `cmps`: the components
+    ///
+    /// #### Returns
+    ///
+    /// a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
     public Binding bindGroup(
             final PropertyBase prop, final Object[] values, final Component... cmps) {
         ObjectConverter cnv = getPropertyConverter(prop);
@@ -222,13 +225,17 @@ public class UiBinding {
         throw new RuntimeException("Unsupported binding type: " + cmps[0].getClass().getName());
     }
 
-    /**
-     * Binds the given property to the component using default adapters
-     *
-     * @param prop the property
-     * @param cmp  the component
-     * @return a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
-     */
+    /// Binds the given property to the component using default adapters
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property
+    ///
+    /// - `cmp`: the component
+    ///
+    /// #### Returns
+    ///
+    /// a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
     public Binding bind(final PropertyBase prop, final Component cmp) {
         ObjectConverter cnv = getPropertyConverter(prop);
         if (cmp instanceof TextArea) {
@@ -249,38 +256,51 @@ public class UiBinding {
         throw new RuntimeException("Unsupported binding type: " + cmp.getClass().getName());
     }
 
-    /**
-     * Binds the given property to the component using a custom adapter class
-     *
-     * @param prop  the property
-     * @param cmp   the component
-     * @param adapt an implementation of {@link com.codename1.properties.UiBinding.ComponentAdapter}
-     *              that allows us to define the way the component maps to/from the property
-     * @return a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
-     */
+    /// Binds the given property to the component using a custom adapter class
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property
+    ///
+    /// - `cmp`: the component
+    ///
+    /// - `adapt`: @param adapt an implementation of `com.codename1.properties.UiBinding.ComponentAdapter`
+    /// that allows us to define the way the component maps to/from the property
+    ///
+    /// #### Returns
+    ///
+    /// a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
     public Binding bind(final PropertyBase prop, final Component cmp, final ComponentAdapter adapt) {
         return bindImpl(prop, cmp, adapt);
     }
 
-    /**
-     * Creates a table model which is implicitly bound to the properties
-     *
-     * @param objects   list of business objects
-     * @param prototype the type by which we determine the structure of the table
-     * @return a bound table model that can be used in the {@code Table} class
-     */
+    /// Creates a table model which is implicitly bound to the properties
+    ///
+    /// #### Parameters
+    ///
+    /// - `objects`: list of business objects
+    ///
+    /// - `prototype`: the type by which we determine the structure of the table
+    ///
+    /// #### Returns
+    ///
+    /// a bound table model that can be used in the `Table` class
     public BoundTableModel createTableModel(
             List<? extends PropertyBusinessObject> objects, PropertyBusinessObject prototype) {
         return new BoundTableModel(objects, prototype);
     }
 
-    /**
-     * Creates a table model which is implicitly bound to the properties
-     *
-     * @param objects   list of business objects
-     * @param prototype the type by which we determine the structure of the table
-     * @return a bound table model that can be used in the {@code Table} class
-     */
+    /// Creates a table model which is implicitly bound to the properties
+    ///
+    /// #### Parameters
+    ///
+    /// - `objects`: list of business objects
+    ///
+    /// - `prototype`: the type by which we determine the structure of the table
+    ///
+    /// #### Returns
+    ///
+    /// a bound table model that can be used in the `Table` class
     public BoundTableModel createTableModel(
             CollectionProperty<? extends PropertyBusinessObject, ? extends Object> objects,
             PropertyBusinessObject prototype) {
@@ -347,50 +367,57 @@ public class UiBinding {
         return b;
     }
 
-    /**
-     * Changes to the text area are automatically reflected to the given property and visa versa
-     *
-     * @param prop the property value
-     * @param ta   the text area
-     * @deprecated this code was experimental we will use the more generic Adapter/bind framework
-     */
+    /// Changes to the text area are automatically reflected to the given property and visa versa
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property value
+    ///
+    /// - `ta`: the text area
+    ///
+    /// #### Deprecated
+    ///
+    /// this code was experimental we will use the more generic Adapter/bind framework
     public void bindString(Property<String, ? extends Object> prop, TextArea ta) {
         bind(prop, ta);
     }
 
-    /**
-     * Changes to the text area are automatically reflected to the given property and visa versa
-     *
-     * @param prop the property value
-     * @param ta   the text area
-     * @deprecated this code was experimental we will use the more generic Adapter/bind framework
-     */
+    /// Changes to the text area are automatically reflected to the given property and visa versa
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property value
+    ///
+    /// - `ta`: the text area
+    ///
+    /// #### Deprecated
+    ///
+    /// this code was experimental we will use the more generic Adapter/bind framework
     public void bindInteger(Property<Integer, ? extends Object> prop, TextArea ta) {
         bind(prop, ta);
     }
 
-    /**
-     * Object converter can convert an object from one type to another e.g. a String to an integer an
-     * array to a list model. Use this object converter to keep source/values the same e.g. when
-     * converting using a {@link com.codename1.properties.UiBinding.TextAreaAdapter} to a String
-     * property.
-     */
+    /// Object converter can convert an object from one type to another e.g. a String to an integer an
+    /// array to a list model. Use this object converter to keep source/values the same e.g. when
+    /// converting using a `com.codename1.properties.UiBinding.TextAreaAdapter` to a String
+    /// property.
     public static class ObjectConverter {
-        /**
-         * Converts an object of source type to the type matching this class, the default implementation
-         * does nothing and can be used as a stand-in
-         *
-         * @param source an object or null
-         * @return null or a new object instance
-         */
+        /// Converts an object of source type to the type matching this class, the default implementation
+        /// does nothing and can be used as a stand-in
+        ///
+        /// #### Parameters
+        ///
+        /// - `source`: an object or null
+        ///
+        /// #### Returns
+        ///
+        /// null or a new object instance
         public Object convert(Object source) {
             return source;
         }
     }
 
-    /**
-     * Converts the source value to a String.
-     */
+    /// Converts the source value to a String.
     public static class StringConverter extends ObjectConverter {
         @Override
         public Object convert(Object source) {
@@ -401,9 +428,7 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Converts the source value to an Integer.
-     */
+    /// Converts the source value to an Integer.
     public static class IntegerConverter extends ObjectConverter {
         @Override
         public Object convert(Object source) {
@@ -414,9 +439,7 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Converts the source value to a Date.
-     */
+    /// Converts the source value to a Date.
     public static class DateConverter extends ObjectConverter {
         @Override
         public Object convert(Object source) {
@@ -430,9 +453,7 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Converts the source value to a Long.
-     */
+    /// Converts the source value to a Long.
     public static class LongConverter extends ObjectConverter {
         @Override
         public Object convert(Object source) {
@@ -443,9 +464,7 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Converts the source value to a Float.
-     */
+    /// Converts the source value to a Float.
     public static class FloatConverter extends ObjectConverter {
         @Override
         public Object convert(Object source) {
@@ -456,9 +475,7 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Converts the source value to a Double.
-     */
+    /// Converts the source value to a Double.
     public static class DoubleConverter extends ObjectConverter {
         @Override
         public Object convert(Object source) {
@@ -469,9 +486,7 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Converts the source value to a Boolean.
-     */
+    /// Converts the source value to a Boolean.
     public static class BooleanConverter extends ObjectConverter {
         @Override
         public Object convert(Object source) {
@@ -489,11 +504,9 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Maps values to other values for conversion in a similar way to a Map this is pretty useful for
-     * API's like picker where we have a list of Strings and we might want a list of other objects to
-     * match every string
-     */
+    /// Maps values to other values for conversion in a similar way to a Map this is pretty useful for
+    /// API's like picker where we have a list of Strings and we might want a list of other objects to
+    /// match every string
     public static class MappingConverter extends ObjectConverter {
         private final Map<Object, Object> m;
 
@@ -510,87 +523,85 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Adapters can be extended to allow any component to bind to a property via a converter
-     */
+    /// Adapters can be extended to allow any component to bind to a property via a converter
     public abstract static class ComponentAdapter<PropertyType, ComponentType> {
-        /**
-         * Used by the subclass to convert values from the component to the property
-         */
+        /// Used by the subclass to convert values from the component to the property
         protected final ObjectConverter toPropertyType;
 
-        /**
-         * Used by the subclass to convert values from the property to the component
-         */
+        /// Used by the subclass to convert values from the property to the component
         protected final ObjectConverter toComponentType;
 
-        /**
-         * Subclasses usually provide the toComponentType and allow their callers to define the
-         * toPropertyType
-         *
-         * @param toPropertyType  Used by the subclass to convert values from the component to the
-         *                        property
-         * @param toComponentType Used by the subclass to convert values from the property to the
-         *                        component
-         */
+        /// Subclasses usually provide the toComponentType and allow their callers to define the
+        /// toPropertyType
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: @param toPropertyType  Used by the subclass to convert values from the component to the
+        /// property
+        ///
+        /// - `toComponentType`: @param toComponentType Used by the subclass to convert values from the property to the
+        /// component
         public ComponentAdapter(ObjectConverter toPropertyType, ObjectConverter toComponentType) {
             this.toPropertyType = toPropertyType;
             this.toComponentType = toComponentType;
         }
 
-        /**
-         * Assigns the value from the property into the component
-         *
-         * @param value the value that was returned from the property get method
-         * @param cmp   the component instance
-         */
+        /// Assigns the value from the property into the component
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: the value that was returned from the property get method
+        ///
+        /// - `cmp`: the component instance
         public abstract void assignTo(PropertyType value, ComponentType cmp);
 
-        /**
-         * Returns the value for the set method of the property from the given component
-         *
-         * @param cmp the component
-         * @return the value we can place into the set method
-         */
+        /// Returns the value for the set method of the property from the given component
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`: the component
+        ///
+        /// #### Returns
+        ///
+        /// the value we can place into the set method
         public abstract PropertyType getFrom(ComponentType cmp);
 
-        /**
-         * Binds an action listener to changes in the component
-         *
-         * @param cmp the component
-         * @param l   listener
-         */
+        /// Binds an action listener to changes in the component
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`: the component
+        ///
+        /// - `l`: listener
         public abstract void bindListener(ComponentType cmp, ActionListener<ActionEvent> l);
 
-        /**
-         * Removes the action listener from changes in the component
-         *
-         * @param cmp the component
-         * @param l   listener
-         */
+        /// Removes the action listener from changes in the component
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`: the component
+        ///
+        /// - `l`: listener
         public abstract void removeListener(ComponentType cmp, ActionListener<ActionEvent> l);
     }
 
-    /**
-     * Adapts a {@link com.codename1.ui.TextArea} (and it's subclass {@link
-     * com.codename1.ui.TextField} to binding
-     *
-     * @param <PropertyType> the type of the property generic
-     */
+    /// Adapts a `com.codename1.ui.TextArea` (and it's subclass `com.codename1.ui.TextField` to binding
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
     public static class TextAreaAdapter<PropertyType>
             extends ComponentAdapter<PropertyType, TextArea> {
-        /**
-         * Constructs a new binding
-         *
-         * @param toPropertyType the conversion logic to the property
-         */
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
         public TextAreaAdapter(ObjectConverter toPropertyType) {
             super(toPropertyType, new StringConverter());
         }
 
-        /**
-         * Constructs a new binding assuming a String property
-         */
+        /// Constructs a new binding assuming a String property
         public TextAreaAdapter() {
             super(new ObjectConverter(), new ObjectConverter());
         }
@@ -616,25 +627,23 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Adapts a {@link com.codename1.ui.TextComponent} to binding
-     *
-     * @param <PropertyType> the type of the property generic
-     */
+    /// Adapts a `com.codename1.ui.TextComponent` to binding
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
     public static class TextComponentAdapter<PropertyType>
             extends ComponentAdapter<PropertyType, TextComponent> {
-        /**
-         * Constructs a new binding
-         *
-         * @param toPropertyType the conversion logic to the property
-         */
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
         public TextComponentAdapter(ObjectConverter toPropertyType) {
             super(toPropertyType, new StringConverter());
         }
 
-        /**
-         * Constructs a new binding assuming a String property
-         */
+        /// Constructs a new binding assuming a String property
         public TextComponentAdapter() {
             super(new ObjectConverter(), new ObjectConverter());
         }
@@ -660,18 +669,18 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Adapts a {@link com.codename1.ui.CheckBox} or {@link com.codename1.ui.RadioButton} to binding
-     *
-     * @param <PropertyType> the type of the property generic
-     */
+    /// Adapts a `com.codename1.ui.CheckBox` or `com.codename1.ui.RadioButton` to binding
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
     public static class CheckBoxRadioSelectionAdapter<PropertyType>
             extends ComponentAdapter<PropertyType, Button> {
-        /**
-         * Constructs a new binding
-         *
-         * @param toPropertyType the conversion logic to the property
-         */
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
         public CheckBoxRadioSelectionAdapter(ObjectConverter toPropertyType) {
             super(toPropertyType, new BooleanConverter());
         }
@@ -703,21 +712,22 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Adapts a set of {@link com.codename1.ui.RadioButton} to a selection within a list of values
-     *
-     * @param <PropertyType> the type of the property generic
-     */
+    /// Adapts a set of `com.codename1.ui.RadioButton` to a selection within a list of values
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
     public static class RadioListAdapter<PropertyType>
             extends ComponentAdapter<PropertyType, RadioButton[]> {
         private final PropertyType[] values;
 
-        /**
-         * Constructs a new binding
-         *
-         * @param toPropertyType the conversion logic to the property
-         * @param values         potential values for the selection
-         */
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
+        ///
+        /// - `values`: potential values for the selection
         public RadioListAdapter(ObjectConverter toPropertyType, PropertyType... values) {
             super(toPropertyType, null);
             this.values = values;
@@ -758,28 +768,30 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Adapts a {@link com.codename1.ui.spinner.Picker} to binding
-     *
-     * @param <PropertyType> the type of the property generic
-     */
+    /// Adapts a `com.codename1.ui.spinner.Picker` to binding
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
     public static class PickerAdapter<PropertyType> extends ComponentAdapter<PropertyType, Picker> {
-        /**
-         * Constructs a new binding
-         *
-         * @param toPropertyType the conversion logic to the property
-         * @param pickerType     the type of the picker
-         */
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
+        ///
+        /// - `pickerType`: the type of the picker
         public PickerAdapter(ObjectConverter toPropertyType, int pickerType) {
             super(toPropertyType, pickerTypeToConverter(pickerType));
         }
 
-        /**
-         * Constructs a new binding for mapping back and forth of a String Picker
-         *
-         * @param toPropertyType  map to convert objects forth
-         * @param toComponentType map to convert objects back
-         */
+        /// Constructs a new binding for mapping back and forth of a String Picker
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: map to convert objects forth
+        ///
+        /// - `toComponentType`: map to convert objects back
         public PickerAdapter(MappingConverter toPropertyType, MappingConverter toComponentType) {
             super(toPropertyType, toComponentType);
         }
@@ -835,10 +847,8 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Implements table model binding, this is implemented as a class to allow additional features
-     * such as adding/removing rows
-     */
+    /// Implements table model binding, this is implemented as a class to allow additional features
+    /// such as adding/removing rows
     public static class BoundTableModel extends AbstractTableModel {
         private final PropertyBusinessObject prototype;
         private final Set<String> exclude = new HashSet<String>();
@@ -849,34 +859,36 @@ public class UiBinding {
         private List<String> included;
         private PropertyBase[] columnOrder;
 
-        /**
-         * Creates a table model with the business objects
-         *
-         * @param objects   the objects of the model
-         * @param prototype the type by which we determine the structure of the table
-         */
+        /// Creates a table model with the business objects
+        ///
+        /// #### Parameters
+        ///
+        /// - `objects`: the objects of the model
+        ///
+        /// - `prototype`: the type by which we determine the structure of the table
         public BoundTableModel(
                 List<? extends PropertyBusinessObject> objects, PropertyBusinessObject prototype) {
             this.objects = objects;
             this.prototype = prototype;
         }
 
-        /**
-         * Creates a table model with the business objects
-         *
-         * @param objectProperty the objects of the model
-         * @param prototype      the type by which we determine the structure of the table
-         */
+        /// Creates a table model with the business objects
+        ///
+        /// #### Parameters
+        ///
+        /// - `objectProperty`: the objects of the model
+        ///
+        /// - `prototype`: the type by which we determine the structure of the table
         public BoundTableModel(CollectionProperty objectProperty, PropertyBusinessObject prototype) {
             this.objectProperty = objectProperty;
             this.prototype = prototype;
         }
 
-        /**
-         * The properties that are ignored
-         *
-         * @param b the property to ignore
-         */
+        /// The properties that are ignored
+        ///
+        /// #### Parameters
+        ///
+        /// - `b`: the property to ignore
         public void excludeProperty(PropertyBase b) {
             exclude.add(b.getName());
             if (included == null) {
@@ -888,21 +900,22 @@ public class UiBinding {
             included.remove(b.getName());
         }
 
-        /**
-         * Sets the order of the columns explicitly
-         *
-         * @param columnOrder the order of the columns based on the prototype
-         */
+        /// Sets the order of the columns explicitly
+        ///
+        /// #### Parameters
+        ///
+        /// - `columnOrder`: the order of the columns based on the prototype
         public void setColumnOrder(PropertyBase... columnOrder) {
             this.columnOrder = columnOrder;
         }
 
-        /**
-         * Makes the property editable or uneditable
-         *
-         * @param pb       the property base
-         * @param editable true for editable (the default)
-         */
+        /// Makes the property editable or uneditable
+        ///
+        /// #### Parameters
+        ///
+        /// - `pb`: the property base
+        ///
+        /// - `editable`: true for editable (the default)
         public void setEditable(PropertyBase pb, boolean editable) {
             if (editable) {
                 uneditable.remove(pb.getName());
@@ -911,9 +924,7 @@ public class UiBinding {
             }
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public int getRowCount() {
             if (objects != null) {
@@ -922,12 +933,13 @@ public class UiBinding {
             return objectProperty.size();
         }
 
-        /**
-         * Adds a new business object to the table
-         *
-         * @param index the index of the addition
-         * @param b     the business object
-         */
+        /// Adds a new business object to the table
+        ///
+        /// #### Parameters
+        ///
+        /// - `index`: the index of the addition
+        ///
+        /// - `b`: the business object
         public void addRow(int index, PropertyBusinessObject b) {
             if (objects != null) {
                 ((List) objects).add(index, b);
@@ -943,11 +955,11 @@ public class UiBinding {
             }
         }
 
-        /**
-         * Removes the row at the given index
-         *
-         * @param index the position in the table
-         */
+        /// Removes the row at the given index
+        ///
+        /// #### Parameters
+        ///
+        /// - `index`: the position in the table
         public void removeRow(int index) {
             if (objects != null) {
                 objects.remove(index);
@@ -965,9 +977,7 @@ public class UiBinding {
             listeners.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public int getColumnCount() {
             if (columnOrder != null) {
@@ -1050,39 +1060,37 @@ public class UiBinding {
             return pb.getPropertyIndex().get(n);
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public String[] getMultipleChoiceOptions(int row, int column) {
             return (String[]) getPropertyAt(row, column).getClientProperty("multipleChoiceOptions");
         }
 
-        /**
-         * Sets the multiple choice option for a string entry, this is useful if a string property can
-         * have one of several values. It will be rendered as a picker in the table
-         *
-         * @param prop   the property
-         * @param values the supported values
-         */
+        /// Sets the multiple choice option for a string entry, this is useful if a string property can
+        /// have one of several values. It will be rendered as a picker in the table
+        ///
+        /// #### Parameters
+        ///
+        /// - `prop`: the property
+        ///
+        /// - `values`: the supported values
         public void setMultipleChoiceOptions(PropertyBase prop, String... values) {
             prop.putClientProperty("multipleChoiceOptions", values);
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public Constraint getValidationConstraint(int row, int column) {
             return (Constraint) getPropertyAt(row, column).getClientProperty("validationConstraint");
         }
 
-        /**
-         * Sets a validator constraint on the table
-         *
-         * @param prop the property matching the constraint
-         * @param c    the constraint value
-         */
+        /// Sets a validator constraint on the table
+        ///
+        /// #### Parameters
+        ///
+        /// - `prop`: the property matching the constraint
+        ///
+        /// - `c`: the constraint value
         public void setValidationConstraint(PropertyBase prop, Constraint c) {
             prop.putClientProperty("validationConstraint", c);
         }
@@ -1111,56 +1119,48 @@ public class UiBinding {
         }
     }
 
-    /**
-     * Binding allows us to have commit/auto-commit mode. This allows changes to properties to reflect
-     * immediately or only when committed, e.g. if a {@code Form} has "OK" &amp; "Cancel" buttons you
-     * might want to do a commit on OK. We also provide a "rollback" method to reset to the original
-     * property values.
-     *
-     * <p>{@code UiBinding} has a boolean auto commit flag that can be toggled to set the default for
-     * new bindings.
-     *
-     * <p>Binding also provides the ability to disengage a "binding" between a property and a UI
-     * component
-     */
+    /// Binding allows us to have commit/auto-commit mode. This allows changes to properties to reflect
+    /// immediately or only when committed, e.g. if a `Form` has "OK" & "Cancel" buttons you
+    /// might want to do a commit on OK. We also provide a "rollback" method to reset to the original
+    /// property values.
+    ///
+    /// `UiBinding` has a boolean auto commit flag that can be toggled to set the default for
+    /// new bindings.
+    ///
+    /// Binding also provides the ability to disengage a "binding" between a property and a UI
+    /// component
     public abstract class Binding {
         private boolean autoCommit = UiBinding.this.autoCommit;
 
-        /**
-         * Gets the autocommit value see {@link #setAutoCommit(boolean)}
-         *
-         * @return true if autocommit is on
-         */
+        /// Gets the autocommit value see `#setAutoCommit(boolean)`
+        ///
+        /// #### Returns
+        ///
+        /// true if autocommit is on
         public boolean isAutoCommit() {
             return autoCommit;
         }
 
-        /**
-         * Toggles auto-commit mode and overrides the {@code UiBinding} autocommit default. Autocommit
-         * instantly reflects changes to the property or component values.
-         *
-         * @param b true to enable auto-commit
-         */
+        /// Toggles auto-commit mode and overrides the `UiBinding` autocommit default. Autocommit
+        /// instantly reflects changes to the property or component values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `b`: true to enable auto-commit
         public void setAutoCommit(boolean b) {
             autoCommit = b;
         }
 
-        /**
-         * Set the value from the component into the property, note that this will throw an exception if
-         * autocommit is on
-         */
+        /// Set the value from the component into the property, note that this will throw an exception if
+        /// autocommit is on
         public abstract void commit();
 
-        /**
-         * Sets the value from the property into the component, note that this will throw an exception
-         * if autocommit is on
-         */
+        /// Sets the value from the property into the component, note that this will throw an exception
+        /// if autocommit is on
         public abstract void rollback();
 
-        /**
-         * Clears the listeners and disengages binding, this can be important for GC as binding can keep
-         * object references in RAM
-         */
+        /// Clears the listeners and disengages binding, this can be important for GC as binding can keep
+        /// object references in RAM
         public abstract void disconnect();
     }
 

@@ -23,46 +23,43 @@
  */
 package com.codename1.ui.html;
 
-/**
- * A callback used to dispatch errors encountered while parsing CSS resources
- *
- * @author Ofir Leitner
- */
+/// A callback used to dispatch errors encountered while parsing CSS resources
+///
+/// @author Ofir Leitner
 interface CSSParserCallback {
 
-    /**
-     * Error code denoting that an unsupported CSS attribute (by XHTML-MP 1.0 standards) was found in the HTML or external CSS files
-     */
+    /// Error code denoting that an unsupported CSS attribute (by XHTML-MP 1.0 standards) was found in the HTML or external CSS files
     int ERROR_CSS_ATTRIBUTE_NOT_SUPPORTED = 200;
 
-    /**
-     * Error code denoting that an invalid attribute value was found in the CSS
-     */
+    /// Error code denoting that an invalid attribute value was found in the CSS
     int ERROR_CSS_ATTIBUTE_VALUE_INVALID = 201;
 
-    /**
-     * Error code denoting that a CSS file referenced from the HTML or from another external CSS file was not found
-     */
+    /// Error code denoting that a CSS file referenced from the HTML or from another external CSS file was not found
     int ERROR_CSS_NOT_FOUND = 202;
 
-    /**
-     * Error code denoting that a relative URL was referenced from a document with no base URL (A document that was loaded via setBody/setHTML/setDOM and not via setPage)
-     * In this case the return value of parsingError is not considered - parsing continues and the resource at the URL (CSS file/image) is ignored
-     */
+    /// Error code denoting that a relative URL was referenced from a document with no base URL (A document that was loaded via setBody/setHTML/setDOM and not via setPage)
+    /// In this case the return value of parsingError is not considered - parsing continues and the resource at the URL (CSS file/image) is ignored
     int ERROR_CSS_NO_BASE_URL = 203;
 
-    /**
-     * Called when encountering an error while parsing the HTML document.
-     * When implementing this, the developer should return true if the error should be ignored and the document needs to be further parsed, or false to stop parsing and issue an error to the user
-     * Note that this method is always called NOT on the EDT thread.
-     *
-     * @param errorId     The error ID, one of the ERROR_* constants
-     * @param tag         The tag in which the error occured (Can be null for non-tag related errors)
-     * @param attribute   The attribute in which the error occured (Can be null for non-attribute related errors)
-     * @param value       The value in which the error occured (Can be null for non-value related errors)
-     * @param description A verbal description of the error
-     * @return true to continue parsing, false to stop
-     */
+    /// Called when encountering an error while parsing the HTML document.
+    /// When implementing this, the developer should return true if the error should be ignored and the document needs to be further parsed, or false to stop parsing and issue an error to the user
+    /// Note that this method is always called NOT on the EDT thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorId`: The error ID, one of the ERROR_* constants
+    ///
+    /// - `tag`: The tag in which the error occured (Can be null for non-tag related errors)
+    ///
+    /// - `attribute`: The attribute in which the error occured (Can be null for non-attribute related errors)
+    ///
+    /// - `value`: The value in which the error occured (Can be null for non-value related errors)
+    ///
+    /// - `description`: A verbal description of the error
+    ///
+    /// #### Returns
+    ///
+    /// true to continue parsing, false to stop
     boolean parsingError(int errorId, String tag, String attribute, String value, String description);
 
 

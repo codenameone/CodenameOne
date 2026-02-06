@@ -26,11 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * A spinner node for rendering spinnable lists.
- *
- * @author shannah
- */
+/// A spinner node for rendering spinnable lists.
+///
+/// @author shannah
 class SpinnerNode extends Node {
     private static final int numSides = 14;
     private final Label rowTemplate = new Label("", "Spinner3DRow");

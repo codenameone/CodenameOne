@@ -25,25 +25,23 @@ package com.codename1.ui.events;
 
 import com.codename1.ui.Component;
 
-/**
- * Observes focus change events for a given form and invokes the callbacks to
- * enable us to assign functionality based on current focused component.
- *
- * @author Chen Fishbein
- */
+/// Observes focus change events for a given form and invokes the callbacks to
+/// enable us to assign functionality based on current focused component.
+///
+/// @author Chen Fishbein
 public interface FocusListener {
 
-    /**
-     * Invoked when component gains focus
-     *
-     * @param cmp the component that gains focus
-     */
+    /// Invoked when component gains focus
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component that gains focus
     void focusGained(Component cmp);
 
-    /**
-     * Invoked when component loses focus
-     *
-     * @param cmp the component that lost focus
-     */
+    /// Invoked when component loses focus
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component that lost focus
     void focusLost(Component cmp);
 }

@@ -24,12 +24,10 @@ package com.codename1.push;
 
 import com.codename1.ui.Display;
 
-/**
- * Encapsulates the content of a Push message.  Use this class inside the {@link PushCallback#push(java.lang.String) }
- * method to retrieve details of the push, including title, body, image URL, category, type, and metadata if available.
- *
- * @author Steve Hannah
- */
+/// Encapsulates the content of a Push message.  Use this class inside the `PushCallback#push(java.lang.String)`
+/// method to retrieve details of the push, including title, body, image URL, category, type, and metadata if available.
+///
+/// @author Steve Hannah
 public final class PushContent {
     private static final String PROP_PREFIX = "com.codename1.push.prop.";
 
@@ -64,33 +62,30 @@ public final class PushContent {
         return new String[]{"title", "body", "imageUrl", "category", "metaData", "actionId", "textResponse"};
     }
 
-    /**
-     * Checks if there is pending push content to retrieve.
-     *
-     * @return True if there is pending push content to retrieve.
-     */
+    /// Checks if there is pending push content to retrieve.
+    ///
+    /// #### Returns
+    ///
+    /// True if there is pending push content to retrieve.
     public static boolean exists() {
         return anyProperties(keys());
     }
 
-    /**
-     * Gets the most recent push notification content if it exists.  This functions like Stack.pop()
-     * for a single-element stack.  I.e. In addition to returning the PushContent, that push content
-     * is removed from the queue.
-     * <p>
-     * {@code
-     * if (PushContent.exists()) {
-     * PushContent content = PushContent.get();
-     * // content should be non-null
-     * PushContent content2 = PushContent.get();
-     * // content2 should be null
-     * PushContent.exists(); // false
-     * }
-     * }
-     * </p>
-     *
-     * @return Pending push content if it exists.
-     */
+    /// Gets the most recent push notification content if it exists.  This functions like Stack.pop()
+    /// for a single-element stack.  I.e. In addition to returning the PushContent, that push content
+    /// is removed from the queue.
+    ///
+    /// `if (PushContent.exists()) {
+    /// PushContent content = PushContent.get();
+    /// // content should be non-null
+    /// PushContent content2 = PushContent.get();
+    /// // content2 should be null
+    /// PushContent.exists(); // false`
+    /// }
+    ///
+    /// #### Returns
+    ///
+    /// Pending push content if it exists.
     public static PushContent get() {
         if (exists()) {
             PushContent next = new PushContent();
@@ -115,9 +110,7 @@ public final class PushContent {
         }
     }
 
-    /**
-     * Resets the push content.  After calling this, {@link PushContent#exists()} will return {@literal false}.
-     */
+    /// Resets the push content.  After calling this, `PushContent#exists()` will return false.
     public static void reset() {
         clearAll(keys());
     }
@@ -131,174 +124,219 @@ public final class PushContent {
         return false;
     }
 
-    /**
-     * Gets the title of the Push content.
-     *
-     * @return the title
-     */
+    /// Gets the title of the Push content.
+    ///
+    /// #### Returns
+    ///
+    /// the title
     public String getTitle() {
         return title;
     }
 
-    /**
-     * Sets the title of the pending push content.
-     *
-     * @param title the title to set
-     * @deprecated For internal use only.
-     */
+    /// Sets the title of the pending push content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title to set
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
     public static void setTitle(String title) {
         setProperty("title", title);
     }
 
-    /**
-     * Gets the body of the push content.
-     *
-     * @return the body
-     */
+    /// Gets the body of the push content.
+    ///
+    /// #### Returns
+    ///
+    /// the body
     public String getBody() {
         return body;
     }
 
-    /**
-     * Sets the body of pending push content.
-     *
-     * @param body the body to set
-     * @deprecated For internal use only
-     */
+    /// Sets the body of pending push content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `body`: the body to set
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only
     public static void setBody(String body) {
         setProperty("body", body);
     }
 
-    /**
-     * Gets the image URL of the push content.
-     *
-     * @return the imageUrl
-     */
+    /// Gets the image URL of the push content.
+    ///
+    /// #### Returns
+    ///
+    /// the imageUrl
     public String getImageUrl() {
         return imageUrl;
     }
 
-    /**
-     * Sets the image URL of pending push content.
-     *
-     * @param imageUrl the imageUrl to set
-     * @deprecated For internal use only.
-     */
+    /// Sets the image URL of pending push content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageUrl`: the imageUrl to set
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
     public static void setImageUrl(String imageUrl) {
 
         setProperty("imageUrl", imageUrl);
     }
 
-    /**
-     * Gets category of the push content.
-     *
-     * @return the category
-     */
+    /// Gets category of the push content.
+    ///
+    /// #### Returns
+    ///
+    /// the category
     public String getCategory() {
         return category;
     }
 
-    /**
-     * Sets the category of the pending push content.
-     *
-     * @param category the category to set
-     * @deprecated For internal use only.
-     */
+    /// Sets the category of the pending push content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `category`: the category to set
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
     public static void setCategory(String category) {
         setProperty("category", category);
     }
 
-    /**
-     * Gets the metadata associated with push.  This is hidden content not shown to the user.
-     *
-     * @return the metaData
-     */
+    /// Gets the metadata associated with push.  This is hidden content not shown to the user.
+    ///
+    /// #### Returns
+    ///
+    /// the metaData
     public String getMetaData() {
         return metaData;
     }
 
-    /**
-     * Sets the metadata of pending push content.
-     *
-     * @param metaData the metaData to set
-     * @deprecated For internal use only.
-     */
+    /// Sets the metadata of pending push content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `metaData`: the metaData to set
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
     public static void setMetaData(String metaData) {
         setProperty("metaData", metaData);
     }
 
-    /**
-     * Gets the type of the push content.
-     *
-     * @return the type of the push content.
-     */
+    /// Gets the type of the push content.
+    ///
+    /// #### Returns
+    ///
+    /// the type of the push content.
     public int getType() {
         return type;
     }
 
-    /**
-     * Sets the type of the push content.
-     *
-     * @param type the type to set
-     * @deprecated For internal use only.
-     */
+    /// Sets the type of the push content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the type to set
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
     public static void setType(int type) {
         setProperty("type", "" + type);
     }
 
-    /**
-     * If the user selected an action on the push notification, then the ID of the selected action will be stored in the PushContent's
-     * actionId.  If the user did not tap an action, then this will be null.
-     *
-     * @return The action ID that was selected by the user.
-     * @see PushActionsProvider
-     * @see PushActionCategory
-     * @see PushAction
-     */
+    /// If the user selected an action on the push notification, then the ID of the selected action will be stored in the PushContent's
+    /// actionId.  If the user did not tap an action, then this will be null.
+    ///
+    /// #### Returns
+    ///
+    /// The action ID that was selected by the user.
+    ///
+    /// #### See also
+    ///
+    /// - PushActionsProvider
+    ///
+    /// - PushActionCategory
+    ///
+    /// - PushAction
     public String getActionId() {
         return actionId;
     }
 
-    /**
-     * Sets the action ID of the push content.  The action ID is only set if the user tapped on one of the actions
-     * in the push notification; and, if set, it will be set to the ID of the action that was selected.
-     *
-     * @param actionId The ID of the action that was selected by the user.
-     * @see PushActionsProvider
-     * @see PushActionCategory
-     * @see PushAction
-     * @deprecated For internal use only.
-     */
+    /// Sets the action ID of the push content.  The action ID is only set if the user tapped on one of the actions
+    /// in the push notification; and, if set, it will be set to the ID of the action that was selected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `actionId`: The ID of the action that was selected by the user.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
+    ///
+    /// #### See also
+    ///
+    /// - PushActionsProvider
+    ///
+    /// - PushActionCategory
+    ///
+    /// - PushAction
     public static void setActionId(String actionId) {
         setProperty("actionId", actionId);
     }
 
-    /**
-     * If the push notification action included a text field for the user to enter a response, then that response
-     * will be returned here.  For notifications that don't include a response, this will return {@literal null}.
-     *
-     * @return The action ID that was selected by the user.
-     * @see PushActionsProvider
-     * @see PushActionCategory
-     * @see PushAction
-     * @see PushAction#getTextInputButtonText()
-     * @see PushAction#getTextInputPlaceholder()
-     */
+    /// If the push notification action included a text field for the user to enter a response, then that response
+    /// will be returned here.  For notifications that don't include a response, this will return null.
+    ///
+    /// #### Returns
+    ///
+    /// The action ID that was selected by the user.
+    ///
+    /// #### See also
+    ///
+    /// - PushActionsProvider
+    ///
+    /// - PushActionCategory
+    ///
+    /// - PushAction
+    ///
+    /// - PushAction#getTextInputButtonText()
+    ///
+    /// - PushAction#getTextInputPlaceholder()
     public String getTextResponse() {
         return textResponse;
     }
 
-    /**
-     * Sets the text response for the notification.  Only applies to notifications where the user has entered
-     * a text response.
-     *
-     * @see PushActionsProvider
-     * @see PushActionCategory
-     * @see PushAction
-     * @see PushAction#getTextInputButtonText()
-     * @see PushAction#getTextInputPlaceholder()
-     * @deprecated For internal use only.
-     */
+    /// Sets the text response for the notification.  Only applies to notifications where the user has entered
+    /// a text response.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
+    ///
+    /// #### See also
+    ///
+    /// - PushActionsProvider
+    ///
+    /// - PushActionCategory
+    ///
+    /// - PushAction
+    ///
+    /// - PushAction#getTextInputButtonText()
+    ///
+    /// - PushAction#getTextInputPlaceholder()
     public static void setTextResponse(String textResponse) {
         setProperty("textResponse", textResponse);
     }

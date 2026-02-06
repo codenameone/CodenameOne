@@ -36,14 +36,12 @@ import java.util.Date;
 
 import static com.codename1.ui.CN.convertToPixels;
 
-/**
- * Allows selecting a time of day either in 24 hour batches or AM/PM format.
- *
- * <p>If {@link #setDurationMode(boolean) } is {@literal true } then this will allow
- * users to set a duration in hours and minutes.</p>
- *
- * @author Steve Hannah
- */
+/// Allows selecting a time of day either in 24 hour batches or AM/PM format.
+///
+/// If `#setDurationMode(boolean)` is true then this will allow
+/// users to set a duration in hours and minutes.
+///
+/// @author Steve Hannah
 class TimeSpinner3D extends Container implements InternalPickerWidget {
 
     static final int DEFAULT_MINUTE_STEP = 5;
@@ -66,9 +64,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     private int currentMinute = 0;
     private boolean currentMeridiem = false;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public TimeSpinner3D(int minuteStep) {
         this.minuteStep = minuteStep;
         initSpinner();
@@ -78,9 +74,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         this(DEFAULT_MINUTE_STEP);
     }
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     void initSpinner() {
         if (hour == null) {
             hour = Spinner3D.create(startHour, endHour, currentHour, 1);
@@ -157,25 +151,19 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem", "durationMode"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class, Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("durationMode".equals(name)) {
@@ -208,9 +196,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("currentHour".equals(name)) {
@@ -238,20 +224,20 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * Gets the minutes spinner step size.
-     *
-     * @return the minuteStep
-     */
+    /// Gets the minutes spinner step size.
+    ///
+    /// #### Returns
+    ///
+    /// the minuteStep
     public int getMinuteStep() {
         return minuteStep;
     }
 
-    /**
-     * Sets the step-size for the minutes spinner.
-     *
-     * @param minuteStep The step size.  Must be beween 1 and 60.
-     */
+    /// Sets the step-size for the minutes spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minuteStep`: The step size.  Must be beween 1 and 60.
     public void setMinuteStep(int minuteStep) {
         if (minuteStep < 1 || minuteStep > 60) {
             throw new IllegalArgumentException("Minute step must be between 1 and 60");
@@ -262,17 +248,28 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * Sets the hours range to display. Note that the spinner must not be in duration mode, and must by in 24 hour
-     * mode, otherwise this will thrown an {@link IllegalStateException}.
-     *
-     * @param min The minimum hour to display (0-24). Set to -1 to allow any minimum.
-     * @param nax The maximum hour to display (0-24).  Set -1 to allow any maximum.
-     * @throws IllegalStateException If the spinner is not in 24 hour mode.
-     * @see #getMinHour()
-     * @see #getMaxHour()
-     * @since 6.0
-     */
+    /// Sets the hours range to display. Note that the spinner must not be in duration mode, and must by in 24 hour
+    /// mode, otherwise this will thrown an `IllegalStateException`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: The minimum hour to display (0-24). Set to -1 to allow any minimum.
+    ///
+    /// - `nax`: The maximum hour to display (0-24).  Set -1 to allow any maximum.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: If the spinner is not in 24 hour mode.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #getMinHour()
+    ///
+    /// - #getMaxHour()
     public void setHourRange(int min, int max) {
         if (min >= 0 && max >= min && (showMeridiem || durationMode)) {
             throw new IllegalStateException("TimeSpinner hour range only applies when isShowMeridiem() is false and durationMode is false.");
@@ -282,42 +279,56 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         rebuildHours();
     }
 
-    /**
-     * Gets the current minimum hour to display.  -1 for no limit
-     *
-     * @return The current minimum hour (0-24).  -1 for no limit.
-     * @see #setHourRange(int, int)
-     * @see #getMaxHour()
-     * @since 6.0
-     */
+    /// Gets the current minimum hour to display.  -1 for no limit
+    ///
+    /// #### Returns
+    ///
+    /// The current minimum hour (0-24).  -1 for no limit.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #setHourRange(int, int)
+    ///
+    /// - #getMaxHour()
     public int getMinHour() {
         return minHour;
     }
 
-    /**
-     * Gets the current maximum hour to display.  -1 for no limit.
-     *
-     * @return The current maximum hour (0-24). -1 for no limit.
-     * @see #getMinHour()
-     * @see #setHourRange(int, int)
-     * @since 6.0
-     */
+    /// Gets the current maximum hour to display.  -1 for no limit.
+    ///
+    /// #### Returns
+    ///
+    /// The current maximum hour (0-24). -1 for no limit.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    ///
+    /// #### See also
+    ///
+    /// - #getMinHour()
+    ///
+    /// - #setHourRange(int, int)
     public int getMaxHour() {
         return maxHour;
     }
 
-    /**
-     * @return the showMeridiem
-     */
+    /// #### Returns
+    ///
+    /// the showMeridiem
     public boolean isShowMeridiem() {
         return showMeridiem && !durationMode;
     }
 
-    /**
-     * Shows AM/PM indication
-     *
-     * @param showMeridiem the showMeridiem to set
-     */
+    /// Shows AM/PM indication
+    ///
+    /// #### Parameters
+    ///
+    /// - `showMeridiem`: the showMeridiem to set
     public void setShowMeridiem(boolean showMeridiem) {
         if (durationMode) {
             return;
@@ -353,11 +364,11 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * The hour from 1-12 or 0-23
-     *
-     * @return the currentHour
-     */
+    /// The hour from 1-12 or 0-23
+    ///
+    /// #### Returns
+    ///
+    /// the currentHour
     public int getCurrentHour() {
         if (hour != null) {
             return ((Integer) hour.getValue()).intValue();
@@ -365,11 +376,11 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         return currentHour;
     }
 
-    /**
-     * Set the hour from 1-12 or 0-23
-     *
-     * @param currentHour the currentHour to set
-     */
+    /// Set the hour from 1-12 or 0-23
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentHour`: the currentHour to set
     public void setCurrentHour(int currentHour) {
         this.currentHour = currentHour;
         if (hour != null) {
@@ -377,9 +388,9 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the currentMinute
-     */
+    /// #### Returns
+    ///
+    /// the currentMinute
     public int getCurrentMinute() {
         if (minute != null) {
             return ((Integer) minute.getValue()).intValue();
@@ -387,9 +398,9 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         return currentMinute;
     }
 
-    /**
-     * @param currentMinute the currentMinute to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentMinute`: the currentMinute to set
     public void setCurrentMinute(int currentMinute) {
         this.currentMinute = currentMinute;
         if (minute != null) {
@@ -397,9 +408,9 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * @return the currentMeridiem
-     */
+    /// #### Returns
+    ///
+    /// the currentMeridiem
     public boolean isCurrentMeridiem() {
         if (durationMode) {
             return false;
@@ -410,9 +421,9 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         return currentMeridiem;
     }
 
-    /**
-     * @param currentMeridiem the currentMeridiem to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentMeridiem`: the currentMeridiem to set
     public void setCurrentMeridiem(boolean currentMeridiem) {
         if (durationMode) {
             return;
@@ -427,20 +438,20 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
-    /**
-     * Duration mode uses the time spinner to indicate a duration in hours and minutes
-     *
-     * @return the durationMode
-     */
+    /// Duration mode uses the time spinner to indicate a duration in hours and minutes
+    ///
+    /// #### Returns
+    ///
+    /// the durationMode
     public boolean isDurationMode() {
         return durationMode;
     }
 
-    /**
-     * Duration mode uses the time spinner to indicate a duration in hours and minutes
-     *
-     * @param durationMode the durationMode to set
-     */
+    /// Duration mode uses the time spinner to indicate a duration in hours and minutes
+    ///
+    /// #### Parameters
+    ///
+    /// - `durationMode`: the durationMode to set
     public void setDurationMode(boolean durationMode) {
         this.durationMode = durationMode;
         if (durationMode) {
@@ -449,11 +460,11 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         rebuildHours();
     }
 
-    /**
-     * Show or hide the hours spinner.
-     *
-     * @param visible True to show the hours spinner.
-     */
+    /// Show or hide the hours spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`: True to show the hours spinner.
     public void setHoursVisible(boolean visible) {
         showHours = visible;
 
@@ -463,11 +474,11 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
 
     }
 
-    /**
-     * Show or hide the minutes spinner.
-     *
-     * @param visible True to make the minutes spinner visible.
-     */
+    /// Show or hide the minutes spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`: True to make the minutes spinner visible.
     public void setMinutesVisible(boolean visible) {
         showMinutes = visible;
         minute.setVisible(visible);

@@ -26,11 +26,9 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.plaf.UIManager;
 
-/**
- * SearchBar Toolbar.
- *
- * @author Chen
- */
+/// SearchBar Toolbar.
+///
+/// @author Chen
 class SearchBar extends Toolbar {
 
     private final TextField search;
@@ -38,11 +36,11 @@ class SearchBar extends Toolbar {
     private final Toolbar parent;
     private final float iconSize;
 
-    /**
-     * Creates the SearchBar Toolbar
-     *
-     * @param parent the Toolbar parent
-     */
+    /// Creates the SearchBar Toolbar
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the Toolbar parent
     public SearchBar(Toolbar parent, float iconSize) {
         this.parent = parent;
         this.iconSize = iconSize;
@@ -122,11 +120,11 @@ class SearchBar extends Toolbar {
         addCommandToRightBar(clear);
     }
 
-    /**
-     * This method gets called when a text has changed on the search bar.
-     *
-     * @param text the search string
-     */
+    /// This method gets called when a text has changed on the search bar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the search string
     public void onSearch(String text) {
 
     }

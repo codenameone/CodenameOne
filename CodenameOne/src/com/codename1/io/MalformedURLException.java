@@ -25,25 +25,23 @@ package com.codename1.io;
 
 import java.io.IOException;
 
-/**
- * Thrown when attempting to create a URL that doesn't conform to specification.
- *
- * @see URL
- */
+/// Thrown when attempting to create a URL that doesn't conform to specification.
+///
+/// #### See also
+///
+/// - URL
 public class MalformedURLException extends IOException {
 
-    /**
-     * Creates a new exception.
-     */
+    /// Creates a new exception.
     public MalformedURLException() {
         super();
     }
 
-    /**
-     * Creates a new exception with a message.
-     *
-     * @param message The message for this exception
-     */
+    /// Creates a new exception with a message.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: The message for this exception
     public MalformedURLException(String message) {
         super(message);
     }

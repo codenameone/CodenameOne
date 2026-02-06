@@ -22,52 +22,46 @@
  */
 package com.codename1.ui.scene;
 
-/**
- * Encapsulates bounds in a 3D space.
- *
- * @author Steve Hannah
- * @deprecated For Internal use only
- */
+/// Encapsulates bounds in a 3D space.
+///
+/// @author Steve Hannah
+///
+/// #### Deprecated
+///
+/// For Internal use only
 public class Bounds {
 
-    /**
-     * Min X coordinate
-     */
+    /// Min X coordinate
     private double minX;
 
-    /**
-     * Min Y coordinate
-     */
+    /// Min Y coordinate
     private double minY;
 
-    /**
-     * Min Z coordinate
-     */
+    /// Min Z coordinate
     private double minZ;
 
-    /**
-     * Width of the bounding cube.  (along x-axis)
-     */
+    /// Width of the bounding cube.  (along x-axis)
     private double width;
 
-    /**
-     * Height of bounding cube. (along y-axis)
-     */
+    /// Height of bounding cube. (along y-axis)
     private double height;
 
-    /**
-     * Depth of bounding cube (along z-axis)
-     */
+    /// Depth of bounding cube (along z-axis)
     private double depth;
 
-    /**
-     * @param minX
-     * @param minY
-     * @param minZ
-     * @param width
-     * @param height
-     * @param depth
-     */
+    /// #### Parameters
+    ///
+    /// - `minX`
+    ///
+    /// - `minY`
+    ///
+    /// - `minZ`
+    ///
+    /// - `width`
+    ///
+    /// - `height`
+    ///
+    /// - `depth`
     public Bounds(double minX, double minY, double minZ, double width, double height, double depth) {
         this.minX = minX;
         this.minY = minY;
@@ -77,110 +71,110 @@ public class Bounds {
         this.depth = depth;
     }
 
-    /**
-     * Gets min X coordinate of bounding cube.
-     *
-     * @return the minX
-     */
+    /// Gets min X coordinate of bounding cube.
+    ///
+    /// #### Returns
+    ///
+    /// the minX
     public double getMinX() {
         return minX;
     }
 
-    /**
-     * Sets min X coordinate of bounding cube.
-     *
-     * @param minX the minX to set
-     */
+    /// Sets min X coordinate of bounding cube.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minX`: the minX to set
     public void setMinX(double minX) {
         this.minX = minX;
     }
 
-    /**
-     * Gets the min Y coordinate of bounding cube.
-     *
-     * @return the minY
-     */
+    /// Gets the min Y coordinate of bounding cube.
+    ///
+    /// #### Returns
+    ///
+    /// the minY
     public double getMinY() {
         return minY;
     }
 
-    /**
-     * Sets the min Y coordinate of bounding cube.
-     *
-     * @param minY the minY to set
-     */
+    /// Sets the min Y coordinate of bounding cube.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minY`: the minY to set
     public void setMinY(double minY) {
         this.minY = minY;
     }
 
-    /**
-     * Sets the min Z coordinate of bounding cube.
-     *
-     * @return the minZ
-     */
+    /// Sets the min Z coordinate of bounding cube.
+    ///
+    /// #### Returns
+    ///
+    /// the minZ
     public double getMinZ() {
         return minZ;
     }
 
-    /**
-     * Sets the min Z coordinate of the bounding cube.
-     *
-     * @param minZ the minZ to set
-     */
+    /// Sets the min Z coordinate of the bounding cube.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minZ`: the minZ to set
     public void setMinZ(double minZ) {
         this.minZ = minZ;
     }
 
-    /**
-     * Gets the width of the bounding cube (along x-axis)
-     *
-     * @return the width
-     */
+    /// Gets the width of the bounding cube (along x-axis)
+    ///
+    /// #### Returns
+    ///
+    /// the width
     public double getWidth() {
         return width;
     }
 
-    /**
-     * Sets the width of the bouding cube along x-axis.
-     *
-     * @param width the width to set
-     */
+    /// Sets the width of the bouding cube along x-axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the width to set
     public void setWidth(double width) {
         this.width = width;
     }
 
-    /**
-     * Gets the height of the bounding cube along y-axis).
-     *
-     * @return the height
-     */
+    /// Gets the height of the bounding cube along y-axis).
+    ///
+    /// #### Returns
+    ///
+    /// the height
     public double getHeight() {
         return height;
     }
 
-    /**
-     * Sets the height of the bounding cube along y-axis.
-     *
-     * @param height the height to set
-     */
+    /// Sets the height of the bounding cube along y-axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `height`: the height to set
     public void setHeight(double height) {
         this.height = height;
     }
 
-    /**
-     * Gets the depth of the bounding cube along z-axis.
-     *
-     * @return the depth
-     */
+    /// Gets the depth of the bounding cube along z-axis.
+    ///
+    /// #### Returns
+    ///
+    /// the depth
     public double getDepth() {
         return depth;
     }
 
-    /**
-     * Sets the depth of the bounding cube along z-axis
-     *
-     * @param depth the depth to set
-     */
+    /// Sets the depth of the bounding cube along z-axis
+    ///
+    /// #### Parameters
+    ///
+    /// - `depth`: the depth to set
     public void setDepth(double depth) {
         this.depth = depth;
     }

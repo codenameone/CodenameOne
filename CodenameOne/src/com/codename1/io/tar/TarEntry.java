@@ -1,22 +1,18 @@
-/**
- * Copyright 2012 Kamran Zafar
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright 2012 Kamran Zafar
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
-/**
- * The original source has been modified by Paul Williams.
- */
+/// The original source has been modified by Paul Williams.
 
 package com.codename1.io.tar;
 
@@ -24,9 +20,7 @@ import com.codename1.io.FileSystemStorage;
 
 import java.util.Date;
 
-/**
- * @author Kamran Zafar
- */
+/// @author Kamran Zafar
 public class TarEntry {
     protected String file;
     protected TarHeader header;
@@ -142,11 +136,7 @@ public class TarEntry {
         this.header.size = size;
     }
 
-    /**
-     * Checks if the org.xeustechnologies.jtar entry is a directory
-     *
-     * @return
-     */
+    /// Checks if the org.xeustechnologies.jtar entry is a directory
     public boolean isDirectory() {
         if (this.file != null) {
             return FileSystemStorage.getInstance().isDirectory(this.file);
@@ -163,11 +153,11 @@ public class TarEntry {
         return false;
     }
 
-    /**
-     * Extract header from File
-     *
-     * @param entryName
-     */
+    /// Extract header from File
+    ///
+    /// #### Parameters
+    ///
+    /// - `entryName`
     public void extractTarHeader(String entryName) {
         String name = entryName;
 
@@ -203,12 +193,11 @@ public class TarEntry {
         header.devMinor = 0;
     }
 
-    /**
-     * Calculate checksum
-     *
-     * @param buf
-     * @return
-     */
+    /// Calculate checksum
+    ///
+    /// #### Parameters
+    ///
+    /// - `buf`
     public long computeCheckSum(byte[] buf) {
         long sum = 0;
         int blen = buf.length;
@@ -219,11 +208,11 @@ public class TarEntry {
         return sum;
     }
 
-    /**
-     * Writes the header to the byte buffer
-     *
-     * @param outbuf
-     */
+    /// Writes the header to the byte buffer
+    ///
+    /// #### Parameters
+    ///
+    /// - `outbuf`
     public void writeEntryHeader(byte[] outbuf) {
         int offset = 0;
 
@@ -261,12 +250,13 @@ public class TarEntry {
         Octal.getCheckSumOctalBytes(checkSum, outbuf, csOffset, TarHeader.CHKSUMLEN);
     }
 
-    /**
-     * Parses the tar header to the byte buffer
-     *
-     * @param header
-     * @param bh
-     */
+    /// Parses the tar header to the byte buffer
+    ///
+    /// #### Parameters
+    ///
+    /// - `header`
+    ///
+    /// - `bh`
     public void parseTarHeader(byte[] bh) {
         int offset = 0;
 

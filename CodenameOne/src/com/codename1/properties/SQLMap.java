@@ -36,12 +36,10 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-/**
- * A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
- * properly at this time.
- *
- * @author Shai Almog
- */
+/// A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
+/// properly at this time.
+///
+/// @author Shai Almog
 public final class SQLMap {
     private boolean verbose = true;
     private Database db;
@@ -49,12 +47,15 @@ public final class SQLMap {
     private SQLMap() {
     }
 
-    /**
-     * Creates an SQL Map instance to the given database instance
-     *
-     * @param db the database connection instance
-     * @return an instance of the SQL mapping
-     */
+    /// Creates an SQL Map instance to the given database instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `db`: the database connection instance
+    ///
+    /// #### Returns
+    ///
+    /// an instance of the SQL mapping
     public static SQLMap create(Database db) {
         SQLMap s = new SQLMap();
         s.db = db;
@@ -69,44 +70,50 @@ public final class SQLMap {
         return val;
     }
 
-    /**
-     * Sets the primary key for the component
-     *
-     * @param cmp the business object
-     * @param pk  the primary key field
-     */
+    /// Sets the primary key for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the business object
+    ///
+    /// - `pk`: the primary key field
     public void setPrimaryKey(PropertyBusinessObject cmp, Property pk) {
         cmp.getPropertyIndex().putMetaDataOfClass("cn1$pk", pk.getName());
     }
 
 
-    /**
-     * Sets the primary key for the component and makes it auto-increment
-     *
-     * @param cmp the business object
-     * @param pk  the primary key field
-     */
+    /// Sets the primary key for the component and makes it auto-increment
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the business object
+    ///
+    /// - `pk`: the primary key field
     public void setPrimaryKeyAutoIncrement(PropertyBusinessObject cmp, Property pk) {
         cmp.getPropertyIndex().putMetaDataOfClass("cn1$pk", pk.getName());
         cmp.getPropertyIndex().putMetaDataOfClass("cn1$autoinc", Boolean.TRUE);
     }
 
-    /**
-     * Sets the sql type for the column
-     *
-     * @param p    the property
-     * @param type one of the enum values representing supported SQL data types
-     */
+    /// Sets the sql type for the column
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `type`: one of the enum values representing supported SQL data types
     public void setSqlType(PropertyBase p, SqlType type) {
         p.putClientProperty("cn1$colType", type);
     }
 
-    /**
-     * Returns the SQL type for the given column
-     *
-     * @param p the property
-     * @return the sql data type
-     */
+    /// Returns the SQL type for the given column
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// #### Returns
+    ///
+    /// the sql data type
     public SqlType getSqlType(PropertyBase p) {
         SqlType s = (SqlType) p.getClientProperty("cn1$colType");
         if (s == null) {
@@ -166,22 +173,26 @@ public final class SQLMap {
         return s;
     }
 
-    /**
-     * By default the table name matches the property index name unless explicitly modified with this method
-     *
-     * @param cmp  the properties business object
-     * @param name the name of the table
-     */
+    /// By default the table name matches the property index name unless explicitly modified with this method
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the properties business object
+    ///
+    /// - `name`: the name of the table
     public void setTableName(PropertyBusinessObject cmp, String name) {
         cmp.getPropertyIndex().putMetaDataOfClass("cn1$tableName", name);
     }
 
-    /**
-     * By default the table name matches the property index name unless explicitly modified with this method
-     *
-     * @param cmp the properties business object
-     * @return the name of the table
-     */
+    /// By default the table name matches the property index name unless explicitly modified with this method
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the properties business object
+    ///
+    /// #### Returns
+    ///
+    /// the name of the table
     public String getTableName(PropertyBusinessObject cmp) {
         String s = (String) cmp.getPropertyIndex().getMetaDataOfClass("cn1$tableName");
         if (s != null) {
@@ -190,32 +201,39 @@ public final class SQLMap {
         return cmp.getPropertyIndex().getName();
     }
 
-    /**
-     * By default the column name matches the property name unless explicitly modified with this method
-     *
-     * @param prop a property instance, this will apply to all the property instances for the type
-     * @param name the name of the column
-     */
+    /// By default the column name matches the property name unless explicitly modified with this method
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: a property instance, this will apply to all the property instances for the type
+    ///
+    /// - `name`: the name of the column
     public void setColumnName(PropertyBase prop, String name) {
         prop.putClientProperty("cn1$sqlColumn", name);
     }
 
-    /**
-     * By default the column name matches the property name unless explicitly modified with this method
-     *
-     * @param prop a property instance, this will apply to all the property instances for the type
-     * @return the name of the property
-     */
+    /// By default the column name matches the property name unless explicitly modified with this method
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: a property instance, this will apply to all the property instances for the type
+    ///
+    /// #### Returns
+    ///
+    /// the name of the property
     public String getColumnName(PropertyBase prop) {
         return getColumnNameImpl(prop);
     }
 
-    /**
-     * Creates a table matching the given property component if one doesn't exist yet
-     *
-     * @param cmp the business object
-     * @return true if the table was created false if it already existed
-     */
+    /// Creates a table matching the given property component if one doesn't exist yet
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the business object
+    ///
+    /// #### Returns
+    ///
+    /// true if the table was created false if it already existed
     public boolean createTable(PropertyBusinessObject cmp) throws IOException {
         String tableName = getTableName(cmp);
         Cursor cr = null;
@@ -293,21 +311,21 @@ public final class SQLMap {
         return db.executeQuery(stmt);
     }
 
-    /**
-     * Drop a table matching the given property component
-     *
-     * @param cmp the business object
-     */
+    /// Drop a table matching the given property component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the business object
     public void dropTable(PropertyBusinessObject cmp) throws IOException {
         String tableName = getTableName(cmp);
         execute("Drop table " + tableName);
     }
 
-    /**
-     * Adds a new business object into the database
-     *
-     * @param cmp the business component
-     */
+    /// Adds a new business object into the database
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the business component
     public void insert(PropertyBusinessObject cmp) throws IOException {
         String tableName = getTableName(cmp);
         StringBuilder createStatement = new StringBuilder("INSERT INTO ");
@@ -346,12 +364,15 @@ public final class SQLMap {
         execute(createStatement.toString(), values.toArray());
     }
 
-    /**
-     * The equivalent of an SQL update assumes that the object is already in the database
-     *
-     * @param cmp the component
-     * @throws IOException
-     */
+    /// The equivalent of an SQL update assumes that the object is already in the database
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public void update(PropertyBusinessObject cmp) throws IOException {
         String pkName = (String) cmp.getPropertyIndex().getMetaDataOfClass("cn1$pk");
         if (pkName == null) {
@@ -395,11 +416,11 @@ public final class SQLMap {
         execute(createStatement.toString(), values.toArray());
     }
 
-    /**
-     * Deletes a table row matching the component
-     *
-     * @param cmp the component
-     */
+    /// Deletes a table row matching the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component
     public void delete(PropertyBusinessObject cmp) throws IOException {
         String pkName = (String) cmp.getPropertyIndex().getMetaDataOfClass("cn1$pk");
         String tableName = getTableName(cmp);
@@ -435,47 +456,68 @@ public final class SQLMap {
         }
     }
 
-    /**
-     * Fetches the components from the database matching the given cmp description, the fields that aren't
-     * null within the cmp will match the where clause
-     *
-     * @param cmp         the component to match
-     * @param orderBy     the column to order by, can be null to ignore order
-     * @param ascending   true to indicate ascending order
-     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
-     * @param page        the page within the query to match the max elements value
-     * @return the result of the query
-     */
+    /// Fetches the components from the database matching the given cmp description, the fields that aren't
+    /// null within the cmp will match the where clause
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to match
+    ///
+    /// - `orderBy`: the column to order by, can be null to ignore order
+    ///
+    /// - `ascending`: true to indicate ascending order
+    ///
+    /// - `maxElements`: the maximum number of elements returned can be 0 or lower to ignore
+    ///
+    /// - `page`: the page within the query to match the max elements value
+    ///
+    /// #### Returns
+    ///
+    /// the result of the query
     public List<PropertyBusinessObject> select(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         return selectImpl(false, cmp, orderBy, ascending, maxElements, page);
     }
 
-    /**
-     * Fetches the components from the database matching the given cmp description, the fields that aren't
-     * null within the cmp will <strong>NOT</strong> match the where clause
-     *
-     * @param cmp         the component to match
-     * @param orderBy     the column to order by, can be null to ignore order
-     * @param ascending   true to indicate ascending order
-     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
-     * @param page        the page within the query to match the max elements value
-     * @return the result of the query
-     */
+    /// Fetches the components from the database matching the given cmp description, the fields that aren't
+    /// null within the cmp will **NOT** match the where clause
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to match
+    ///
+    /// - `orderBy`: the column to order by, can be null to ignore order
+    ///
+    /// - `ascending`: true to indicate ascending order
+    ///
+    /// - `maxElements`: the maximum number of elements returned can be 0 or lower to ignore
+    ///
+    /// - `page`: the page within the query to match the max elements value
+    ///
+    /// #### Returns
+    ///
+    /// the result of the query
     public List<PropertyBusinessObject> selectNot(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         return selectImpl(true, cmp, orderBy, ascending, maxElements, page);
     }
 
-    /**
-     * Fetches the components from the database matching the given cmp description, the fields that aren't
-     * null within the cmp will match the where clause
-     *
-     * @param not         indicates if the query should be a "not" query
-     * @param orderBy     the column to order by, can be null to ignore order
-     * @param ascending   true to indicate ascending order
-     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
-     * @param page        the page within the query to match the max elements value
-     * @return the result of the query
-     */
+    /// Fetches the components from the database matching the given cmp description, the fields that aren't
+    /// null within the cmp will match the where clause
+    ///
+    /// #### Parameters
+    ///
+    /// - `not`: indicates if the query should be a "not" query
+    ///
+    /// - `orderBy`: the column to order by, can be null to ignore order
+    ///
+    /// - `ascending`: true to indicate ascending order
+    ///
+    /// - `maxElements`: the maximum number of elements returned can be 0 or lower to ignore
+    ///
+    /// - `page`: the page within the query to match the max elements value
+    ///
+    /// #### Returns
+    ///
+    /// the result of the query
     private List<PropertyBusinessObject> selectImpl(boolean not, PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         ArrayList<Object> params = new ArrayList<Object>();
 
@@ -503,19 +545,28 @@ public final class SQLMap {
         return selectImpl(cmp, createStatement.toString(), cmp.getClass(), params.toArray(), orderBy, ascending, maxElements, page);
     }
 
-    /**
-     * Fetches the components from the database matching the given cmp description, the fields that aren't
-     * null within the cmp will match the where clause
-     *
-     * @param where         the where statement
-     * @param propertyClass the class of the property business object
-     * @param params        the parameters to use in the where statement
-     * @param orderBy       the column to order by, can be null to ignore order
-     * @param ascending     true to indicate ascending order
-     * @param maxElements   the maximum number of elements returned can be 0 or lower to ignore
-     * @param page          the page within the query to match the max elements value
-     * @return the result of the query
-     */
+    /// Fetches the components from the database matching the given cmp description, the fields that aren't
+    /// null within the cmp will match the where clause
+    ///
+    /// #### Parameters
+    ///
+    /// - `where`: the where statement
+    ///
+    /// - `propertyClass`: the class of the property business object
+    ///
+    /// - `params`: the parameters to use in the where statement
+    ///
+    /// - `orderBy`: the column to order by, can be null to ignore order
+    ///
+    /// - `ascending`: true to indicate ascending order
+    ///
+    /// - `maxElements`: the maximum number of elements returned can be 0 or lower to ignore
+    ///
+    /// - `page`: the page within the query to match the max elements value
+    ///
+    /// #### Returns
+    ///
+    /// the result of the query
     private List<PropertyBusinessObject> selectImpl(PropertyBusinessObject cmp, String where, Class propertyClass, Object[] params, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         String tableName = getTableName(cmp);
         StringBuilder createStatement = new StringBuilder("SELECT * FROM ");
@@ -575,20 +626,20 @@ public final class SQLMap {
         }
     }
 
-    /**
-     * Fetches the components from the database matching the given select builder query
-     *
-     * @return the result of the query
-     */
+    /// Fetches the components from the database matching the given select builder query
+    ///
+    /// #### Returns
+    ///
+    /// the result of the query
     public SelectBuilder selectBuild() {
         return new SelectBuilder().seed();
     }
 
-    /**
-     * Toggle verbose mode
-     *
-     * @param verbose
-     */
+    /// Toggle verbose mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `verbose`
     public void setVerbose(boolean verbose) {
         this.verbose = verbose;
     }
@@ -701,9 +752,7 @@ public final class SQLMap {
         }
     }
 
-    /**
-     * Used to build the where statement as a builder pattern
-     */
+    /// Used to build the where statement as a builder pattern
     public class SelectBuilder {
         private final PropertyBase property;
         private final String operator;
@@ -727,54 +776,70 @@ public final class SQLMap {
             }
         }
 
-        /**
-         * An orderBy clause
-         *
-         * @param property  the property
-         * @param ascending direction of the order by
-         * @return the builder instance
-         */
+        /// An orderBy clause
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: the property
+        ///
+        /// - `ascending`: direction of the order by
+        ///
+        /// #### Returns
+        ///
+        /// the builder instance
         public SelectBuilder orderBy(PropertyBase property, boolean ascending) {
             return new SelectBuilder(property, null, " ORDER BY ", ascending ? "ASC" : "DESC", this);
         }
 
-        /**
-         * An equals `=` operator
-         *
-         * @param property the property
-         * @return the builder instance
-         */
+        /// An equals `=` operator
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: the property
+        ///
+        /// #### Returns
+        ///
+        /// the builder instance
         @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
         public SelectBuilder equals(PropertyBase property) {
             return new SelectBuilder(property, " = ", null, null, this);
         }
 
-        /**
-         * A not equals `<>` operator
-         *
-         * @param property the property
-         * @return the builder instance
-         */
+        /// A not equals `<>` operator
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: the property
+        ///
+        /// #### Returns
+        ///
+        /// the builder instance
         public SelectBuilder notEquals(PropertyBase property) {
             return new SelectBuilder(property, " <> ", null, null, this);
         }
 
-        /**
-         * A greater that `&gt;` operator
-         *
-         * @param property the property
-         * @return the builder instance
-         */
+        /// A greater that `>` operator
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: the property
+        ///
+        /// #### Returns
+        ///
+        /// the builder instance
         public SelectBuilder gt(PropertyBase property) {
             return new SelectBuilder(property, " > ", null, null, this);
         }
 
-        /**
-         * A lesser than `&lt;` operator
-         *
-         * @param property the property
-         * @return the builder instance
-         */
+        /// A lesser than `<` operator
+        ///
+        /// #### Parameters
+        ///
+        /// - `property`: the property
+        ///
+        /// #### Returns
+        ///
+        /// the builder instance
         public SelectBuilder lt(PropertyBase property) {
             return new SelectBuilder(property, " < ", null, null, this);
         }

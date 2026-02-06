@@ -22,19 +22,23 @@
  */
 package com.codename1.util.promise;
 
-/**
- * Promise API functor {@link com.codename1.util.promise.Promise}
- *
- * @author shannah
- * @since 8.0
- */
+/// Promise API functor `com.codename1.util.promise.Promise`
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 8.0
 public interface Functor<T, V> {
 
-    /**
-     * Calls the function.
-     *
-     * @param arg Argument for the function.
-     * @return Function return value.
-     */
+    /// Calls the function.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arg`: Argument for the function.
+    ///
+    /// #### Returns
+    ///
+    /// Function return value.
     V call(T arg);
 }

@@ -48,14 +48,15 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.ListCellRenderer;
 
-/**
- * Allows a UI developer to completely customize the look of the application by
- * overriding drawing/sizing methods appropriately.
- *
- * @author Chen Fishbein
- * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate
- * our desire to reduce usage/reliance on this class.
- */
+/// Allows a UI developer to completely customize the look of the application by
+/// overriding drawing/sizing methods appropriately.
+///
+/// @author Chen Fishbein
+///
+/// #### Deprecated
+///
+/// @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate
+/// our desire to reduce usage/reliance on this class.
 public abstract class LookAndFeel {
     private static final int fadeScrollEdgeStartAlpha = 0x999999;
     private static final int fadeScrollEdgeEndAlpha = 0;
@@ -65,62 +66,38 @@ public abstract class LookAndFeel {
     private Component horizontalScroll;
     private Component verticalScrollThumb;
     private Component horizontalScrollThumb;
-    /**
-     * Right-To-Left. Default false.
-     */
+    /// Right-To-Left. Default false.
     private boolean rtl;
     private long tickerSpeed = 50;
-    /**
-     * Tint color is set when a form is partially covered be it by a menu or by a
-     * dialog. A look and feel can override this default value.
-     */
+    /// Tint color is set when a form is partially covered be it by a menu or by a
+    /// dialog. A look and feel can override this default value.
     private int defaultFormTintColor = 0x77000000;
-    /**
-     * This color is used to paint disable mode.
-     */
+    /// This color is used to paint disable mode.
     private int disableColor = 0xcccccc;
-    /**
-     * This member allows us to define a default animation that will draw the transition for
-     * entering a form
-     */
+    /// This member allows us to define a default animation that will draw the transition for
+    /// entering a form
     private Transition defaultFormTransitionIn;
-    /**
-     * This member allows us to define a default animation that will draw the transition for
-     * exiting a form
-     */
+    /// This member allows us to define a default animation that will draw the transition for
+    /// exiting a form
     private Transition defaultFormTransitionOut;
-    /**
-     * This member allows us to define a default animation that will draw the transition for
-     * entering a menu
-     */
+    /// This member allows us to define a default animation that will draw the transition for
+    /// entering a menu
     private Transition defaultMenuTransitionIn;
-    /**
-     * This member allows us to define a default animation that will draw the transition for
-     * exiting a menu
-     */
+    /// This member allows us to define a default animation that will draw the transition for
+    /// exiting a menu
     private Transition defaultMenuTransitionOut;
-    /**
-     * This member allows us to define a default animation that will draw the transition for
-     * entering a dialog
-     */
+    /// This member allows us to define a default animation that will draw the transition for
+    /// entering a dialog
     private Transition defaultDialogTransitionIn;
-    /**
-     * This member allows us to define a default animation that will draw the transition for
-     * exiting a form
-     */
+    /// This member allows us to define a default animation that will draw the transition for
+    /// exiting a form
     private Transition defaultDialogTransitionOut;
-    /**
-     * Indicates whether lists and containers should have smooth scrolling by default
-     */
+    /// Indicates whether lists and containers should have smooth scrolling by default
     private boolean defaultSmoothScrolling = true;
-    /**
-     * Indicates whether lists and containers should scroll only via focus and thus "jump" when
-     * moving to a larger component as was the case in older versions of Codename One.
-     */
+    /// Indicates whether lists and containers should scroll only via focus and thus "jump" when
+    /// moving to a larger component as was the case in older versions of Codename One.
     private boolean focusScrolling;
-    /**
-     * Indicates the default speed for smooth scrolling
-     */
+    /// Indicates the default speed for smooth scrolling
     private int defaultSmoothScrollingSpeed = 150;
     private boolean scrollVisible;
     private boolean fadeScrollEdge;
@@ -133,35 +110,21 @@ public abstract class LookAndFeel {
     private Image fadeScrollLeft;
     private int textFieldCursorColor;
     private boolean backgroundImageDetermineSize;
-    /**
-     * Indicates whether softbuttons should be reversed from their default orientation
-     */
+    /// Indicates whether softbuttons should be reversed from their default orientation
     private boolean reverseSoftButtons;
-    /**
-     * This renderer is assigned to all Forms Menu's by default.
-     */
+    /// This renderer is assigned to all Forms Menu's by default.
     private ListCellRenderer menuRenderer;
-    /**
-     * Allows defining a tactile touch device that vibrates when the user presses a component
-     * that should respond with tactile feedback on a touch device (e.g. vibrate).
-     * Setting this to 0 disables tactile feedback completely
-     */
+    /// Allows defining a tactile touch device that vibrates when the user presses a component
+    /// that should respond with tactile feedback on a touch device (e.g. vibrate).
+    /// Setting this to 0 disables tactile feedback completely
     private int tactileTouchDuration = 0;
-    /**
-     * Indicates whether labels should end with 3 points by default
-     */
+    /// Indicates whether labels should end with 3 points by default
     private boolean defaultEndsWith3Points = true;
-    /**
-     * Indicates whether tensile drag should be active by default
-     */
+    /// Indicates whether tensile drag should be active by default
     private boolean defaultTensileDrag = true;
-    /**
-     * Indicates whether tensile highlight should be active by default
-     */
+    /// Indicates whether tensile highlight should be active by default
     private boolean defaultTensileHighlight = false;
-    /**
-     * The MenuBar class
-     */
+    /// The MenuBar class
     private Class menuBar = MenuBar.class;
     private boolean defaultSnapToGrid;
     private boolean defaultAlwaysTensile;
@@ -174,209 +137,276 @@ public abstract class LookAndFeel {
         this.manager = manager;
     }
 
-    /**
-     * Every component binds itself to the look and feel thus allowing the look
-     * and feel to customize the component.  Binding occurs at the end of the
-     * constructor when the component is in a valid state and ready to be used.
-     * Notice that a component might be bound twice or more and it is the
-     * responsibility of the LookAndFeel to protect against that.
-     *
-     * @param cmp component instance that may be customized by the look and feel
-     */
+    /// Every component binds itself to the look and feel thus allowing the look
+    /// and feel to customize the component.  Binding occurs at the end of the
+    /// constructor when the component is in a valid state and ready to be used.
+    /// Notice that a component might be bound twice or more and it is the
+    /// responsibility of the LookAndFeel to protect against that.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: component instance that may be customized by the look and feel
     public void bind(Component cmp) {
     }
 
-    /**
-     * Invoked when a look and feel is removed, allows a look and feel to release
-     * resources related to binding components.
-     *
-     * @see #bind(Component)
-     */
+    /// Invoked when a look and feel is removed, allows a look and feel to release
+    /// resources related to binding components.
+    ///
+    /// #### See also
+    ///
+    /// - #bind(Component)
     public void uninstall() {
     }
 
-    /**
-     * Invoked for drawing a button widget
-     *
-     * @param g graphics context
-     * @param b component to draw
-     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
-     */
+    /// Invoked for drawing a button widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `b`: component to draw
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is no longer used by the implementation, we shifted code away to improve performance
     public abstract void drawButton(Graphics g, Button b);
 
-    /**
-     * Invoked for drawing a checkbox widget
-     *
-     * @param g  graphics context
-     * @param cb component to draw
-     */
+    /// Invoked for drawing a checkbox widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `cb`: component to draw
     public abstract void drawCheckBox(Graphics g, Button cb);
 
-    /**
-     * Invoked for drawing a combo box widget
-     *
-     * @param g  graphics context
-     * @param cb component to draw
-     */
+    /// Invoked for drawing a combo box widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `cb`: component to draw
     public abstract void drawComboBox(Graphics g, List cb);
 
-    /**
-     * Invoked for drawing a label widget
-     *
-     * @param g graphics context
-     * @param l component to draw
-     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
-     */
+    /// Invoked for drawing a label widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `l`: component to draw
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is no longer used by the implementation, we shifted code away to improve performance
     public abstract void drawLabel(Graphics g, Label l);
 
-    /**
-     * Calculates the text selection spans for a given label
-     *
-     * @param sel TextSelection instance
-     * @param l   Label
-     * @return A span representing the positions of characters in the label
-     * @see TextSelection
-     * @since 7.0
-     */
+    /// Calculates the text selection spans for a given label
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: TextSelection instance
+    ///
+    /// - `l`: Label
+    ///
+    /// #### Returns
+    ///
+    /// A span representing the positions of characters in the label
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - TextSelection
     public abstract Span calculateLabelSpan(TextSelection sel, Label l);
 
-    /**
-     * Invoked for drawing a list widget
-     *
-     * @param g graphics context
-     * @param l component to draw
-     */
+    /// Invoked for drawing a list widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `l`: component to draw
     public abstract void drawList(Graphics g, List l);
 
-    /**
-     * Invoked for drawing the radio button widget
-     *
-     * @param g  graphics context
-     * @param rb component to draw
-     */
+    /// Invoked for drawing the radio button widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `rb`: component to draw
     public abstract void drawRadioButton(Graphics g, Button rb);
 
-    /**
-     * Draw the given text area
-     *
-     * @param g  graphics context
-     * @param ta component to draw
-     */
+    /// Draw the given text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `ta`: component to draw
     public abstract void drawTextArea(Graphics g, TextArea ta);
 
-    /**
-     * Calculates the Spans used in text selection for a given text area.
-     *
-     * @param sel The current TextSelection instance.
-     * @param ta  The TextArea to calculate spans for.
-     * @return The spans for the given text field.
-     * @since 7.0
-     */
+    /// Calculates the Spans used in text selection for a given text area.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: The current TextSelection instance.
+    ///
+    /// - `ta`: The TextArea to calculate spans for.
+    ///
+    /// #### Returns
+    ///
+    /// The spans for the given text field.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public abstract Spans calculateTextAreaSpan(TextSelection sel, TextArea ta);
 
-    /**
-     * Draws the text field without its cursor which is drawn in a separate method
-     * input mode indication can also be drawn using this method.
-     *
-     * @param g  graphics context
-     * @param ta component to draw
-     */
+    /// Draws the text field without its cursor which is drawn in a separate method
+    /// input mode indication can also be drawn using this method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `ta`: component to draw
     public abstract void drawTextField(Graphics g, TextArea ta);
 
-    /**
-     * Calculates the Spans used in text selection for a given text field.
-     *
-     * @param sel The current TextSelection instance.
-     * @param ta  The textfield to calculate spans for.
-     * @return The spans for the given text field.
-     * @since 7.0
-     */
+    /// Calculates the Spans used in text selection for a given text field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: The current TextSelection instance.
+    ///
+    /// - `ta`: The textfield to calculate spans for.
+    ///
+    /// #### Returns
+    ///
+    /// The spans for the given text field.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public abstract Spans calculateTextFieldSpan(TextSelection sel, TextArea ta);
 
-    /**
-     * Draws the cursor of the text field, blinking is handled simply by avoiding
-     * a call to this method.
-     *
-     * @param g  graphics context
-     * @param ta component to draw
-     */
+    /// Draws the cursor of the text field, blinking is handled simply by avoiding
+    /// a call to this method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `ta`: component to draw
     public abstract void drawTextFieldCursor(Graphics g, TextArea ta);
 
-    /**
-     * Calculate the preferred size of the component
-     *
-     * @param b component whose size should be calculated
-     * @return the preferred size for the button
-     */
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the button
     public abstract Dimension getButtonPreferredSize(Button b);
 
-    /**
-     * Calculate the preferred size of the component
-     *
-     * @param cb component whose size should be calculated
-     * @return the preferred size for the component
-     */
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cb`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
     public abstract Dimension getCheckBoxPreferredSize(Button cb);
 
-    /**
-     * Calculate the preferred size of the component
-     *
-     * @param l component whose size should be calculated
-     * @return the preferred size for the component
-     */
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
     public abstract Dimension getLabelPreferredSize(Label l);
 
-    /**
-     * Calculate the preferred size of the component
-     *
-     * @param l component whose size should be calculated
-     * @return the preferred size for the component
-     */
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
     public abstract Dimension getListPreferredSize(List l);
 
-    /**
-     * Calculate the preferred size of the component
-     *
-     * @param rb component whose size should be calculated
-     * @return the preferred size for the component
-     */
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
     public abstract Dimension getRadioButtonPreferredSize(Button rb);
 
     //public abstract Dimension getSpinnerPreferredSize(Spinner sp);
 
-    /**
-     * Calculate the preferred size of the component
-     *
-     * @param ta   component whose size should be calculated
-     * @param pref indicates whether preferred or scroll size should be returned
-     * @return the preferred size for the component
-     */
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `ta`: component whose size should be calculated
+    ///
+    /// - `pref`: indicates whether preferred or scroll size should be returned
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
     public abstract Dimension getTextAreaSize(TextArea ta, boolean pref);
 
-    /**
-     * Calculate the preferred size of the component
-     *
-     * @param ta component whose size should be calculated
-     * @return the preferred size for the component
-     */
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `ta`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
     public abstract Dimension getTextFieldPreferredSize(TextArea ta);
 
-    /**
-     * Calculate the preferred size of the component
-     *
-     * @param box component whose size should be calculated
-     * @return the preferred size for the component
-     */
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `box`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
     public abstract Dimension getComboBoxPreferredSize(List box);
 
-    /**
-     * Draws a vertical scroll bar in the given component
-     *
-     * @param g              graphics context
-     * @param c              component to draw on
-     * @param offsetRatio    ratio of the scroll bar from 0 to 1
-     * @param blockSizeRatio block size for the scroll from 0 to 1
-     */
+    /// Draws a vertical scroll bar in the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `c`: component to draw on
+    ///
+    /// - `offsetRatio`: ratio of the scroll bar from 0 to 1
+    ///
+    /// - `blockSizeRatio`: block size for the scroll from 0 to 1
     public void drawVerticalScroll(Graphics g, Component c, float offsetRatio, float blockSizeRatio) {
         if (verticalScroll == null) {
             initScroll();
@@ -434,14 +464,17 @@ public abstract class LookAndFeel {
         return mute.applyMask(mask);
     }
 
-    /**
-     * Draws a horizontal scroll bar in the given component
-     *
-     * @param g              graphics context
-     * @param c              component to draw on
-     * @param offsetRatio    ratio of the scroll bar from 0 to 1
-     * @param blockSizeRatio block size for the scroll from 0 to 1
-     */
+    /// Draws a horizontal scroll bar in the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `c`: component to draw on
+    ///
+    /// - `offsetRatio`: ratio of the scroll bar from 0 to 1
+    ///
+    /// - `blockSizeRatio`: block size for the scroll from 0 to 1
     public void drawHorizontalScroll(Graphics g, Component c, float offsetRatio, float blockSizeRatio) {
         if (horizontalScroll == null) {
             initScroll();
@@ -560,24 +593,25 @@ public abstract class LookAndFeel {
     }
 
 
-    /**
-     * Sets the foreground color and font for a generic component, reuse-able by most component
-     * drawing code
-     *
-     * @param g graphics context
-     * @param c component from which fg styles should be set
-     */
+    /// Sets the foreground color and font for a generic component, reuse-able by most component
+    /// drawing code
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `c`: component from which fg styles should be set
     public void setFG(Graphics g, Component c) {
         Style s = c.getStyle();
         g.setFont(s.getFont());
         g.setColor(s.getFgColor());
     }
 
-    /**
-     * Returns the default width of a vertical scroll bar
-     *
-     * @return default width of a vertical scroll bar
-     */
+    /// Returns the default width of a vertical scroll bar
+    ///
+    /// #### Returns
+    ///
+    /// default width of a vertical scroll bar
     public int getVerticalScrollWidth() {
         if (verticalScroll == null) {
             initScroll();
@@ -589,11 +623,11 @@ public abstract class LookAndFeel {
                 scrollStyle.getPaddingLeftNoRTL() + scrollStyle.getPaddingRightNoRTL();
     }
 
-    /**
-     * Returns the default height of a horizontal scroll bar
-     *
-     * @return default height of a horizontal scroll bar
-     */
+    /// Returns the default height of a horizontal scroll bar
+    ///
+    /// #### Returns
+    ///
+    /// default height of a horizontal scroll bar
     public int getHorizontalScrollHeight() {
         if (horizontalScroll == null) {
             initScroll();
@@ -605,16 +639,12 @@ public abstract class LookAndFeel {
                 scrollStyle.getPaddingTop() + scrollStyle.getPaddingBottom();
     }
 
-    /**
-     * Draws generic component border
-     */
+    /// Draws generic component border
     void drawBorder(Graphics g, Component c, int color, int borderWidth) {
         drawBorder(g, c, color, color, borderWidth);
     }
 
-    /**
-     * Draws generic component border
-     */
+    /// Draws generic component border
     void drawBorder(Graphics g, Component c, int topAndRightColor, int bottomAndLeftColor, int borderWidth) {
         g.setColor(topAndRightColor);     //Text Component upper border color
 
@@ -626,266 +656,274 @@ public abstract class LookAndFeel {
         g.fillRect(c.getX() + c.getWidth() - borderWidth, c.getY(), borderWidth, c.getHeight());
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * entering a form
-     *
-     * @return default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a form
+    ///
+    /// #### Returns
+    ///
+    /// default transition
     public Transition getDefaultFormTransitionIn() {
         return defaultFormTransitionIn;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * entering a form
-     *
-     * @param defaultFormTransitionIn the default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a form
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultFormTransitionIn`: the default transition
     public void setDefaultFormTransitionIn(Transition defaultFormTransitionIn) {
         this.defaultFormTransitionIn = defaultFormTransitionIn;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * exiting a form
-     *
-     * @return default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a form
+    ///
+    /// #### Returns
+    ///
+    /// default transition
     public Transition getDefaultFormTransitionOut() {
         return defaultFormTransitionOut;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * exiting a form
-     *
-     * @param defaultFormTransitionOut the default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a form
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultFormTransitionOut`: the default transition
     public void setDefaultFormTransitionOut(Transition defaultFormTransitionOut) {
         this.defaultFormTransitionOut = defaultFormTransitionOut;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * entering a Menu
-     *
-     * @return default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a Menu
+    ///
+    /// #### Returns
+    ///
+    /// default transition
     public Transition getDefaultMenuTransitionIn() {
         return defaultMenuTransitionIn;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * entering a Menu
-     *
-     * @param defaultMenuTransitionIn the default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a Menu
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultMenuTransitionIn`: the default transition
     public void setDefaultMenuTransitionIn(Transition defaultMenuTransitionIn) {
         this.defaultMenuTransitionIn = defaultMenuTransitionIn;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * exiting a Menu
-     *
-     * @return default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a Menu
+    ///
+    /// #### Returns
+    ///
+    /// default transition
     public Transition getDefaultMenuTransitionOut() {
         return defaultMenuTransitionOut;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * exiting a Menu
-     *
-     * @param defaultMenuTransitionOut the default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a Menu
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultMenuTransitionOut`: the default transition
     public void setDefaultMenuTransitionOut(Transition defaultMenuTransitionOut) {
         this.defaultMenuTransitionOut = defaultMenuTransitionOut;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * entering a dialog
-     *
-     * @return default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a dialog
+    ///
+    /// #### Returns
+    ///
+    /// default transition
     public Transition getDefaultDialogTransitionIn() {
         return defaultDialogTransitionIn;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * entering a dialog
-     *
-     * @param defaultDialogTransitionIn the default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultDialogTransitionIn`: the default transition
     public void setDefaultDialogTransitionIn(Transition defaultDialogTransitionIn) {
         this.defaultDialogTransitionIn = defaultDialogTransitionIn;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * exiting a dialog
-     *
-     * @return default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a dialog
+    ///
+    /// #### Returns
+    ///
+    /// default transition
     public Transition getDefaultDialogTransitionOut() {
         return defaultDialogTransitionOut;
     }
 
-    /**
-     * Allows us to define a default animation that will draw the transition for
-     * exiting a dialog
-     *
-     * @param defaultDialogTransitionOut the default transition
-     */
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultDialogTransitionOut`: the default transition
     public void setDefaultDialogTransitionOut(Transition defaultDialogTransitionOut) {
         this.defaultDialogTransitionOut = defaultDialogTransitionOut;
     }
 
-    /**
-     * Tint color is set when a form is partially covered be it by a menu or by a
-     * dialog. A look and feel can override this default value.
-     *
-     * @return default tint color
-     */
+    /// Tint color is set when a form is partially covered be it by a menu or by a
+    /// dialog. A look and feel can override this default value.
+    ///
+    /// #### Returns
+    ///
+    /// default tint color
     public int getDefaultFormTintColor() {
         return defaultFormTintColor;
     }
 
-    /**
-     * Tint color is set when a form is partially covered be it by a menu or by a
-     * dialog. A look and feel can override this default value.
-     *
-     * @param defaultFormTintColor the default tint color
-     */
+    /// Tint color is set when a form is partially covered be it by a menu or by a
+    /// dialog. A look and feel can override this default value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultFormTintColor`: the default tint color
     public void setDefaultFormTintColor(int defaultFormTintColor) {
         this.defaultFormTintColor = defaultFormTintColor;
     }
 
-    /**
-     * This color is used to paint disable mode text color.
-     *
-     * @return the color value
-     */
+    /// This color is used to paint disable mode text color.
+    ///
+    /// #### Returns
+    ///
+    /// the color value
     public int getDisableColor() {
         return disableColor;
     }
 
-    /**
-     * Simple setter to disable color
-     *
-     * @param disableColor the disable color value
-     */
+    /// Simple setter to disable color
+    ///
+    /// #### Parameters
+    ///
+    /// - `disableColor`: the disable color value
     public void setDisableColor(int disableColor) {
         this.disableColor = disableColor;
     }
 
-    /**
-     * Indicates whether lists and containers should have smooth scrolling by default
-     *
-     * @return true if smooth scrolling should be on by default
-     */
+    /// Indicates whether lists and containers should have smooth scrolling by default
+    ///
+    /// #### Returns
+    ///
+    /// true if smooth scrolling should be on by default
     public boolean isDefaultSmoothScrolling() {
         return defaultSmoothScrolling;
     }
 
-    /**
-     * Indicates whether lists and containers should have smooth scrolling by default
-     *
-     * @param defaultSmoothScrolling true if smooth scrolling should be on by default
-     */
+    /// Indicates whether lists and containers should have smooth scrolling by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultSmoothScrolling`: true if smooth scrolling should be on by default
     public void setDefaultSmoothScrolling(boolean defaultSmoothScrolling) {
         this.defaultSmoothScrolling = defaultSmoothScrolling;
     }
 
-    /**
-     * Indicates the default speed for smooth scrolling
-     *
-     * @return speed for smooth scrollin
-     */
+    /// Indicates the default speed for smooth scrolling
+    ///
+    /// #### Returns
+    ///
+    /// speed for smooth scrollin
     public int getDefaultSmoothScrollingSpeed() {
         return defaultSmoothScrollingSpeed;
     }
 
-    /**
-     * Indicates the default speed for smooth scrolling
-     *
-     * @param defaultSmoothScrollingSpeed speed for smooth scrollin
-     */
+    /// Indicates the default speed for smooth scrolling
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultSmoothScrollingSpeed`: speed for smooth scrollin
     public void setDefaultSmoothScrollingSpeed(int defaultSmoothScrollingSpeed) {
         this.defaultSmoothScrollingSpeed = defaultSmoothScrollingSpeed;
     }
 
-    /**
-     * Indicates whether softbuttons should be reversed from their default orientation
-     *
-     * @return true if softbuttons should be reversed
-     */
+    /// Indicates whether softbuttons should be reversed from their default orientation
+    ///
+    /// #### Returns
+    ///
+    /// true if softbuttons should be reversed
     public boolean isReverseSoftButtons() {
         return reverseSoftButtons;
     }
 
-    /**
-     * Indicates whether softbuttons should be reversed from their default orientation
-     *
-     * @param reverseSoftButtons true if softbuttons should be reversed
-     */
+    /// Indicates whether softbuttons should be reversed from their default orientation
+    ///
+    /// #### Parameters
+    ///
+    /// - `reverseSoftButtons`: true if softbuttons should be reversed
     public void setReverseSoftButtons(boolean reverseSoftButtons) {
         this.reverseSoftButtons = reverseSoftButtons;
     }
 
-    /**
-     * This method returns the MenuBar class.
-     *
-     * @return the MenuBar class.
-     * @deprecated this is no longer supported, Toolbar should be used as
-     * the extension point
-     */
+    /// This method returns the MenuBar class.
+    ///
+    /// #### Returns
+    ///
+    /// the MenuBar class.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this is no longer supported, Toolbar should be used as
+    /// the extension point
     public Class getMenuBarClass() {
         return menuBar;
     }
 
-    /**
-     * Simple setter for the MenuBar Class
-     *
-     * @param menuBar
-     * @deprecated this is no longer supported, Toolbar should be used as
-     * the extension point
-     */
+    /// Simple setter for the MenuBar Class
+    ///
+    /// #### Parameters
+    ///
+    /// - `menuBar`
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this is no longer supported, Toolbar should be used as
+    /// the extension point
     public void setMenuBarClass(Class menuBar) {
         this.menuBar = menuBar;
     }
 
 
-    /**
-     * Returns the Menu default renderer
-     *
-     * @return default renderer for the menu
-     */
+    /// Returns the Menu default renderer
+    ///
+    /// #### Returns
+    ///
+    /// default renderer for the menu
     public ListCellRenderer getMenuRenderer() {
         return menuRenderer;
     }
 
-    /**
-     * Sets the Menu default renderer
-     *
-     * @param menuRenderer default renderer for the menu
-     */
+    /// Sets the Menu default renderer
+    ///
+    /// #### Parameters
+    ///
+    /// - `menuRenderer`: default renderer for the menu
     public void setMenuRenderer(ListCellRenderer menuRenderer) {
         this.menuRenderer = menuRenderer;
     }
 
-    /**
-     * Sets globally the Menu icons
-     *
-     * @param select select icon
-     * @param cancel cancel icon
-     * @param menu   menu icon
-     */
+    /// Sets globally the Menu icons
+    ///
+    /// #### Parameters
+    ///
+    /// - `select`: select icon
+    ///
+    /// - `cancel`: cancel icon
+    ///
+    /// - `menu`: menu icon
     public void setMenuIcons(Image select, Image cancel, Image menu) {
         menuIcons[0] = select;
         menuIcons[1] = cancel;
@@ -893,30 +931,30 @@ public abstract class LookAndFeel {
 
     }
 
-    /**
-     * Simple getter for the menu icons
-     *
-     * @return an Image array at size of 3, where the first is the select image
-     * the second is the cancel image and the last is the menu image.
-     */
+    /// Simple getter for the menu icons
+    ///
+    /// #### Returns
+    ///
+    /// @return an Image array at size of 3, where the first is the select image
+    /// the second is the cancel image and the last is the menu image.
     public Image[] getMenuIcons() {
         return menuIcons;
     }
 
-    /**
-     * Gets the ticker speed
-     *
-     * @return ticker speed in milliseconds
-     */
+    /// Gets the ticker speed
+    ///
+    /// #### Returns
+    ///
+    /// ticker speed in milliseconds
     public long getTickerSpeed() {
         return tickerSpeed;
     }
 
-    /**
-     * Sets the ticker speed
-     *
-     * @param tickerSpeed the speed in milliseconds
-     */
+    /// Sets the ticker speed
+    ///
+    /// #### Parameters
+    ///
+    /// - `tickerSpeed`: the speed in milliseconds
     public void setTickerSpeed(long tickerSpeed) {
         this.tickerSpeed = tickerSpeed;
     }
@@ -932,12 +970,12 @@ public abstract class LookAndFeel {
         horizontalScrollThumb.setUIID("HorizontalScrollThumb");
     }
 
-    /**
-     * This method is a callback to the LookAndFeel when a theme is being
-     * changed in the UIManager
-     *
-     * @param completeClear indicates that the theme is set and not added
-     */
+    /// This method is a callback to the LookAndFeel when a theme is being
+    /// changed in the UIManager
+    ///
+    /// #### Parameters
+    ///
+    /// - `completeClear`: indicates that the theme is set and not added
     public void refreshTheme(boolean completeClear) {
         fadeScrollTop = null;
         fadeScrollBottom = null;
@@ -1134,26 +1172,32 @@ public abstract class LookAndFeel {
         return t;
     }
 
-    /**
-     * Indicates whether the menu UI should target a touch based device or a
-     * standard cell phone
-     *
-     * @return true for touch menus
-     * @deprecated use Display.getCommandBehavior() == Display.COMMAND_BEHAVIOR_TOUCH_MENU
-     */
+    /// Indicates whether the menu UI should target a touch based device or a
+    /// standard cell phone
+    ///
+    /// #### Returns
+    ///
+    /// true for touch menus
+    ///
+    /// #### Deprecated
+    ///
+    /// use Display.getCommandBehavior() == Display.COMMAND_BEHAVIOR_TOUCH_MENU
     public boolean isTouchMenus() {
         int t = Display.getInstance().getCommandBehavior();
         return t == Display.COMMAND_BEHAVIOR_TOUCH_MENU ||
                 (t == Display.COMMAND_BEHAVIOR_DEFAULT && Display.getInstance().isTouchScreenDevice());
     }
 
-    /**
-     * Indicates whether the menu UI should target a touch based device or a
-     * standard cell phone
-     *
-     * @param touchMenus true to enable touch menus false to disable
-     * @deprecated use Display.setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU)
-     */
+    /// Indicates whether the menu UI should target a touch based device or a
+    /// standard cell phone
+    ///
+    /// #### Parameters
+    ///
+    /// - `touchMenus`: true to enable touch menus false to disable
+    ///
+    /// #### Deprecated
+    ///
+    /// use Display.setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU)
     public void setTouchMenus(boolean touchMenus) {
         if (touchMenus) {
             Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU);
@@ -1162,20 +1206,20 @@ public abstract class LookAndFeel {
         }
     }
 
-    /**
-     * Use this to check if the LookAndFeel is in RTL mode
-     *
-     * @return true if the LookAndFeel is in right-to-left mode, false otherwise
-     */
+    /// Use this to check if the LookAndFeel is in RTL mode
+    ///
+    /// #### Returns
+    ///
+    /// true if the LookAndFeel is in right-to-left mode, false otherwise
     public boolean isRTL() {
         return rtl;
     }
 
-    /**
-     * Sets this LookAndFeel to operate in right-to-left mode.
-     *
-     * @param rtl - true if right-to-left, false if left-to-right
-     */
+    /// Sets this LookAndFeel to operate in right-to-left mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: - true if right-to-left, false if left-to-right
     public void setRTL(boolean rtl) {
         if (UIManager.localeAccessible) {
             this.rtl = rtl;
@@ -1185,210 +1229,212 @@ public abstract class LookAndFeel {
         }
     }
 
-    /**
-     * Allows defining a tactile touch device that vibrates when the user presses a component
-     * that should respond with tactile feedback on a touch device (e.g. vibrate).
-     * Setting this to 0 disables tactile feedback completely
-     *
-     * @return the tactileTouchDuration
-     */
+    /// Allows defining a tactile touch device that vibrates when the user presses a component
+    /// that should respond with tactile feedback on a touch device (e.g. vibrate).
+    /// Setting this to 0 disables tactile feedback completely
+    ///
+    /// #### Returns
+    ///
+    /// the tactileTouchDuration
     public int getTactileTouchDuration() {
         return tactileTouchDuration;
     }
 
-    /**
-     * Allows defining a tactile touch device that vibrates when the user presses a component
-     * that should respond with tactile feedback on a touch device (e.g. vibrate).
-     * Setting this to 0 disables tactile feedback completely
-     *
-     * @param tactileTouchDuration the duration of vibration
-     */
+    /// Allows defining a tactile touch device that vibrates when the user presses a component
+    /// that should respond with tactile feedback on a touch device (e.g. vibrate).
+    /// Setting this to 0 disables tactile feedback completely
+    ///
+    /// #### Parameters
+    ///
+    /// - `tactileTouchDuration`: the duration of vibration
     public void setTactileTouchDuration(int tactileTouchDuration) {
         this.tactileTouchDuration = tactileTouchDuration;
     }
 
-    /**
-     * Indicates whether labels should end with 3 points by default
-     *
-     * @return whether labels should end with 3 points by default
-     */
+    /// Indicates whether labels should end with 3 points by default
+    ///
+    /// #### Returns
+    ///
+    /// whether labels should end with 3 points by default
     public boolean isDefaultEndsWith3Points() {
         return defaultEndsWith3Points;
     }
 
-    /**
-     * Indicates whether labels should end with 3 points by default
-     *
-     * @param defaultEndsWith3Points True to indicates that labels should end with 3 points by default
-     */
+    /// Indicates whether labels should end with 3 points by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultEndsWith3Points`: True to indicates that labels should end with 3 points by default
     public void setDefaultEndsWith3Points(boolean defaultEndsWith3Points) {
         this.defaultEndsWith3Points = defaultEndsWith3Points;
     }
 
-    /**
-     * Indicates whether tensile drag should be active by default
-     *
-     * @return whether tensile drag should be active by default
-     */
+    /// Indicates whether tensile drag should be active by default
+    ///
+    /// #### Returns
+    ///
+    /// whether tensile drag should be active by default
     public boolean isDefaultTensileDrag() {
         return defaultTensileDrag;
     }
 
-    /**
-     * Indicates whether tensile drag should be active by default
-     *
-     * @param defaultTensileDrag true if tensile drag should be active by default
-     */
+    /// Indicates whether tensile drag should be active by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultTensileDrag`: true if tensile drag should be active by default
     public void setDefaultTensileDrag(boolean defaultTensileDrag) {
         this.defaultTensileDrag = defaultTensileDrag;
     }
 
-    /**
-     * Indicates whether lists and containers should scroll only via focus and thus "jump" when
-     * moving to a larger component as was the case in older versions of Codename One.
-     *
-     * @return true if focus scrolling is enabled
-     */
+    /// Indicates whether lists and containers should scroll only via focus and thus "jump" when
+    /// moving to a larger component as was the case in older versions of Codename One.
+    ///
+    /// #### Returns
+    ///
+    /// true if focus scrolling is enabled
     public boolean isFocusScrolling() {
         return focusScrolling;
     }
 
-    /**
-     * Indicates whether lists and containers should scroll only via focus and thus "jump" when
-     * moving to a larger component as was the case in older versions of Codename One.
-     *
-     * @param focusScrolling true to enable focus scrolling
-     */
+    /// Indicates whether lists and containers should scroll only via focus and thus "jump" when
+    /// moving to a larger component as was the case in older versions of Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `focusScrolling`: true to enable focus scrolling
     public void setFocusScrolling(boolean focusScrolling) {
         this.focusScrolling = focusScrolling;
     }
 
-    /**
-     * Indicates whether the edge of a scrollable area should fade out
-     *
-     * @return the fadeScrollEdge
-     */
+    /// Indicates whether the edge of a scrollable area should fade out
+    ///
+    /// #### Returns
+    ///
+    /// the fadeScrollEdge
     public boolean isFadeScrollEdge() {
         return fadeScrollEdge;
     }
 
-    /**
-     * Indicates whether the edge of a scrollable area should fade out
-     *
-     * @param fadeScrollEdge the fadeScrollEdge to set
-     */
+    /// Indicates whether the edge of a scrollable area should fade out
+    ///
+    /// #### Parameters
+    ///
+    /// - `fadeScrollEdge`: the fadeScrollEdge to set
     public void setFadeScrollEdge(boolean fadeScrollEdge) {
         this.fadeScrollEdge = fadeScrollEdge;
     }
 
-    /**
-     * Indicates whether the scrollbar should fade when unused
-     *
-     * @return the fadeScrollBar
-     */
+    /// Indicates whether the scrollbar should fade when unused
+    ///
+    /// #### Returns
+    ///
+    /// the fadeScrollBar
     public boolean isFadeScrollBar() {
         return fadeScrollBar;
     }
 
-    /**
-     * Indicates whether the scrollbar should fade when unused
-     *
-     * @param fadeScrollBar the fadeScrollBar to set
-     */
+    /// Indicates whether the scrollbar should fade when unused
+    ///
+    /// #### Parameters
+    ///
+    /// - `fadeScrollBar`: the fadeScrollBar to set
     public void setFadeScrollBar(boolean fadeScrollBar) {
         this.fadeScrollBar = fadeScrollBar;
     }
 
-    /**
-     * Indicates the width/height of the fading edge to indicate scrolling
-     *
-     * @return the fadeScrollEdgeLength
-     */
+    /// Indicates the width/height of the fading edge to indicate scrolling
+    ///
+    /// #### Returns
+    ///
+    /// the fadeScrollEdgeLength
     public int getFadeScrollEdgeLength() {
         return fadeScrollEdgeLength;
     }
 
-    /**
-     * Indicates the width/height of the fading edge to indicate scrolling
-     *
-     * @param fadeScrollEdgeLength the fadeScrollEdgeLength to set
-     */
+    /// Indicates the width/height of the fading edge to indicate scrolling
+    ///
+    /// #### Parameters
+    ///
+    /// - `fadeScrollEdgeLength`: the fadeScrollEdgeLength to set
     public void setFadeScrollEdgeLength(int fadeScrollEdgeLength) {
         this.fadeScrollEdgeLength = fadeScrollEdgeLength;
     }
 
-    /**
-     * The color of the text field cursor
-     *
-     * @return the textFieldCursorColor
-     */
+    /// The color of the text field cursor
+    ///
+    /// #### Returns
+    ///
+    /// the textFieldCursorColor
     public int getTextFieldCursorColor() {
         return textFieldCursorColor;
     }
 
-    /**
-     * The color of the text field cursor
-     *
-     * @param textFieldCursorColor the textFieldCursorColor to set
-     */
+    /// The color of the text field cursor
+    ///
+    /// #### Parameters
+    ///
+    /// - `textFieldCursorColor`: the textFieldCursorColor to set
     public void setTextFieldCursorColor(int textFieldCursorColor) {
         this.textFieldCursorColor = textFieldCursorColor;
     }
 
-    /**
-     * Indicates whether scrolling this component should jump to a specific location
-     * in a grid
-     *
-     * @return the defaultSnapToGrid
-     */
+    /// Indicates whether scrolling this component should jump to a specific location
+    /// in a grid
+    ///
+    /// #### Returns
+    ///
+    /// the defaultSnapToGrid
     public boolean isDefaultSnapToGrid() {
         return defaultSnapToGrid;
     }
 
-    /**
-     * Indicates whether scrolling this component should jump to a specific location
-     * in a grid
-     *
-     * @param defaultSnapToGrid the defaultSnapToGrid to set
-     */
+    /// Indicates whether scrolling this component should jump to a specific location
+    /// in a grid
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultSnapToGrid`: the defaultSnapToGrid to set
     public void setDefaultSnapToGrid(boolean defaultSnapToGrid) {
         this.defaultSnapToGrid = defaultSnapToGrid;
     }
 
-    /**
-     * Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
-     *
-     * @return the defaultAlwaysTensile
-     */
+    /// Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
+    ///
+    /// #### Returns
+    ///
+    /// the defaultAlwaysTensile
     public boolean isDefaultAlwaysTensile() {
         return defaultAlwaysTensile;
     }
 
-    /**
-     * Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
-     *
-     * @param defaultAlwaysTensile the defaultAlwaysTensile to set
-     */
+    /// Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultAlwaysTensile`: the defaultAlwaysTensile to set
     public void setDefaultAlwaysTensile(boolean defaultAlwaysTensile) {
         this.defaultAlwaysTensile = defaultAlwaysTensile;
     }
 
-    /**
-     * Indicates whether tensile highlight should be active by default
-     *
-     * @return the defaultTensileHighlight
-     */
+    /// Indicates whether tensile highlight should be active by default
+    ///
+    /// #### Returns
+    ///
+    /// the defaultTensileHighlight
     public boolean isDefaultTensileHighlight() {
         return defaultTensileHighlight;
     }
 
-    /**
-     * Paints the tensile hightlight image
-     *
-     * @param g       graphics destination for the tensile highlight image
-     * @param top     destination of the tensile highlight image
-     * @param opacity the opacity of the image
-     */
+    /// Paints the tensile hightlight image
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics destination for the tensile highlight image
+    ///
+    /// - `top`: destination of the tensile highlight image
+    ///
+    /// - `opacity`: the opacity of the image
     public void paintTensileHighlight(Component t, Graphics g, boolean top, int opacity) {
         if (opacity > 0 && tensileHighlightTopImage != null && tensileHighlightBottomImage != null) {
             int absX = t.getAbsoluteX();
@@ -1435,57 +1481,57 @@ public abstract class LookAndFeel {
         return manager;
     }
 
-    /**
-     * @return the fadeScrollBarSpeed
-     */
+    /// #### Returns
+    ///
+    /// the fadeScrollBarSpeed
     public int getFadeScrollBarSpeed() {
         return fadeScrollBarSpeed;
     }
 
-    /**
-     * @param fadeScrollBarSpeed the fadeScrollBarSpeed to set
-     */
+    /// #### Parameters
+    ///
+    /// - `fadeScrollBarSpeed`: the fadeScrollBarSpeed to set
     public void setFadeScrollBarSpeed(int fadeScrollBarSpeed) {
         this.fadeScrollBarSpeed = fadeScrollBarSpeed;
     }
 
-    /**
-     * @return scrollVisible
-     */
+    /// #### Returns
+    ///
+    /// scrollVisible
     public boolean isScrollVisible() {
         return scrollVisible;
     }
 
-    /**
-     * Indicates if the bg image of a style should determine the minimum preferred size according to the theme
-     *
-     * @return the backgroundImageDetermineSize
-     */
+    /// Indicates if the bg image of a style should determine the minimum preferred size according to the theme
+    ///
+    /// #### Returns
+    ///
+    /// the backgroundImageDetermineSize
     public boolean isBackgroundImageDetermineSize() {
         return backgroundImageDetermineSize;
     }
 
-    /**
-     * Indicates if the bg image of a style should determine the minimum preferred size according to the theme
-     *
-     * @param backgroundImageDetermineSize the backgroundImageDetermineSize to set
-     */
+    /// Indicates if the bg image of a style should determine the minimum preferred size according to the theme
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundImageDetermineSize`: the backgroundImageDetermineSize to set
     public void setBackgroundImageDetermineSize(boolean backgroundImageDetermineSize) {
         this.backgroundImageDetermineSize = backgroundImageDetermineSize;
     }
 
-    /**
-     * Paints the pull to refresh
-     *
-     * @param g            graphics context
-     * @param cmp          the Component which we draw the pull to refresh beneath it
-     * @param taskExecuted an indication if the refresh task is currently running
-     */
+    /// Paints the pull to refresh
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `cmp`: the Component which we draw the pull to refresh beneath it
+    ///
+    /// - `taskExecuted`: an indication if the refresh task is currently running
     public abstract void drawPullToRefresh(Graphics g, Component cmp, boolean taskExecuted);
 
-    /**
-     * Returns the required height of the pull to refresh feature
-     */
+    /// Returns the required height of the pull to refresh feature
     public abstract int getPullToRefreshHeight();
 
 }

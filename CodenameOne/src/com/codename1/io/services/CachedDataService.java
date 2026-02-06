@@ -31,13 +31,11 @@ import com.codename1.ui.events.ActionListener;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * Simple service that allows downloading and caching data locally.
- * When the data is requested again the server is queried with a conditional
- * get query.
- *
- * @author Shai Almog
- */
+/// Simple service that allows downloading and caching data locally.
+/// When the data is requested again the server is queried with a conditional
+/// get query.
+///
+/// @author Shai Almog
 public final class CachedDataService extends ConnectionRequest {
     private final CachedData data = new CachedData();
     private boolean responseProcessed;
@@ -46,20 +44,19 @@ public final class CachedDataService extends ConnectionRequest {
         setReadResponseForErrors(false);
     }
 
-    /**
-     * Makes sure the cached data class is properly registered as an externalizable. This must
-     * be invoked for caching to work
-     */
+    /// Makes sure the cached data class is properly registered as an externalizable. This must
+    /// be invoked for caching to work
     public static void register() {
         Util.register("CachedData", CachedData.class);
     }
 
-    /**
-     * Checks that the cached data is up to date and if a newer version exits it updates the data in place
-     *
-     * @param d        the data to check
-     * @param callback optional callback to be invoked on request completion
-     */
+    /// Checks that the cached data is up to date and if a newer version exits it updates the data in place
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the data to check
+    ///
+    /// - `callback`: optional callback to be invoked on request completion
     public static void updateData(CachedData d, ActionListener callback) {
         if (d.isFetching()) {
             return;
@@ -99,18 +96,14 @@ public final class CachedDataService extends ConnectionRequest {
         return result;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void handleException(Exception err) {
         data.setFetching(false);
         super.handleException(err);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void handleErrorResponseCode(int code, String message) {
         data.setFetching(false);
@@ -122,9 +115,7 @@ public final class CachedDataService extends ConnectionRequest {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void readHeaders(Object connection) throws IOException {
         String last = getHeader(connection, "Last-Modified");
@@ -135,9 +126,7 @@ public final class CachedDataService extends ConnectionRequest {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void readResponse(InputStream input) throws IOException {
         if (responseProcessed) {

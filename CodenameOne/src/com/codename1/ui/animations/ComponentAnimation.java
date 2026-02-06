@@ -23,18 +23,15 @@
 
 package com.codename1.ui.animations;
 
-import com.codename1.ui.AnimationManager;
 import com.codename1.ui.Container;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Parent class representing an animation object within the AnimationManager queue.
- *
- * @author Shai Almog
- */
+/// Parent class representing an animation object within the AnimationManager queue.
+///
+/// @author Shai Almog
 public abstract class ComponentAnimation {
     private Object notifyLock;
     private Runnable onCompletion;
@@ -42,34 +39,40 @@ public abstract class ComponentAnimation {
     private ArrayList<Runnable> post;
     private boolean completed = false;
 
-    /**
-     * Allows us to create an animation that compounds several separate animations so they appear as a
-     * single animation to the system and process in parallel
-     *
-     * @param anims the animations
-     * @return the compounded animation
-     */
+    /// Allows us to create an animation that compounds several separate animations so they appear as a
+    /// single animation to the system and process in parallel
+    ///
+    /// #### Parameters
+    ///
+    /// - `anims`: the animations
+    ///
+    /// #### Returns
+    ///
+    /// the compounded animation
     public static ComponentAnimation compoundAnimation(ComponentAnimation... anims) {
         return new CompoundAnimation(anims);
     }
 
-    /**
-     * Allows us to create an animation that places several separate animations in a sequence so they appear as a
-     * single animation to the system and process one after the other
-     *
-     * @param anims the animations
-     * @return the sequential animation
-     */
+    /// Allows us to create an animation that places several separate animations in a sequence so they appear as a
+    /// single animation to the system and process one after the other
+    ///
+    /// #### Parameters
+    ///
+    /// - `anims`: the animations
+    ///
+    /// #### Returns
+    ///
+    /// the sequential animation
     public static ComponentAnimation sequentialAnimation(ComponentAnimation... anims) {
         return new CompoundAnimation(anims, 0);
     }
 
-    /**
-     * Invokes the runnable just as the animation finishes thus allowing cleanup of the UI for the upcoming
-     * animations, this is useful when running a complex sequence
-     *
-     * @param r the runnable to call when the animation is done
-     */
+    /// Invokes the runnable just as the animation finishes thus allowing cleanup of the UI for the upcoming
+    /// animations, this is useful when running a complex sequence
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the runnable to call when the animation is done
     public void addOnCompleteCall(Runnable r) {
         if (post == null) {
             post = new ArrayList<Runnable>();
@@ -77,12 +80,12 @@ public abstract class ComponentAnimation {
         post.add(r);
     }
 
-    /**
-     * Step mode allows stepping thru an animation one frame at a time, e.g. when scrolling down an animation
-     * might change title elements then change them back as we scroll up.
-     *
-     * @return true if this animation can be stepped in which case the setStep etc. methods should work.
-     */
+    /// Step mode allows stepping thru an animation one frame at a time, e.g. when scrolling down an animation
+    /// might change title elements then change them back as we scroll up.
+    ///
+    /// #### Returns
+    ///
+    /// true if this animation can be stepped in which case the setStep etc. methods should work.
     public boolean isStepModeSupported() {
         return false;
     }
@@ -91,39 +94,35 @@ public abstract class ComponentAnimation {
         return step;
     }
 
-    /**
-     * Sets the current animation step to a value between 0 and maxSteps
-     *
-     * @param step the current step
-     */
+    /// Sets the current animation step to a value between 0 and maxSteps
+    ///
+    /// #### Parameters
+    ///
+    /// - `step`: the current step
     public void setStep(int step) {
         this.step = step;
     }
 
-    /**
-     * The total number of steps in this animation.
-     *
-     * @return the number of steps
-     */
+    /// The total number of steps in this animation.
+    ///
+    /// #### Returns
+    ///
+    /// the number of steps
     public int getMaxSteps() {
         return 100;
     }
 
-    /**
-     * Indicates if the animation is in progress
-     *
-     * @return true if in progress
-     */
+    /// Indicates if the animation is in progress
+    ///
+    /// #### Returns
+    ///
+    /// true if in progress
     public abstract boolean isInProgress();
 
-    /**
-     * Updates the animation state
-     */
+    /// Updates the animation state
     protected abstract void updateState();
 
-    /**
-     * Invoked by the animation manager internally
-     */
+    /// Invoked by the animation manager internally
     public final void updateAnimationState() {
         updateState();
         if (!isInProgress()) {
@@ -148,18 +147,16 @@ public abstract class ComponentAnimation {
         }
     }
 
-    /**
-     * Flushes the animation immediately, this will be called if the form is de-initialized
-     */
+    /// Flushes the animation immediately, this will be called if the form is de-initialized
     public void flush() {
     }
 
-    /**
-     * This method is used internally by the addAnimationAndBlock method of AnimationManager and shouldn't
-     * be used outside of that.
-     *
-     * @param l the lock object
-     */
+    /// This method is used internally by the addAnimationAndBlock method of AnimationManager and shouldn't
+    /// be used outside of that.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the lock object
     public final void setNotifyLock(Object l) {
         if (notifyLock != null) {
             throw new RuntimeException("setNotifyLock shouldn't be invoked more than once");
@@ -167,12 +164,12 @@ public abstract class ComponentAnimation {
         this.notifyLock = l;
     }
 
-    /**
-     * This method is used internally by the addAnimation method of AnimationManager and shouldn't
-     * be used outside of that.
-     *
-     * @param r the callback
-     */
+    /// This method is used internally by the addAnimation method of AnimationManager and shouldn't
+    /// be used outside of that.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the callback
     public final void setOnCompletion(Runnable r) {
         if (onCompletion != null) {
             throw new RuntimeException("setOnCompletion shouldn't be invoked more than once");
@@ -279,51 +276,56 @@ public abstract class ComponentAnimation {
 
     }
 
-    /**
-     * A special kind of ComponentAnimation that encapsulates a mutation of the
-     * user interface.  This class used internally to allow compatible UI mutation
-     * animations to run concurrently.  Two UI mutations are compatible if the containers
-     * that they mutate reside in separate branches of the UI tree.  I.e. As long as neither
-     * container contains the other, their mutations are compatible.
-     *
-     * @see AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation)
-     * @see AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation, java.lang.Runnable)
-     * @since 7.0
-     */
+    /// A special kind of ComponentAnimation that encapsulates a mutation of the
+    /// user interface.  This class used internally to allow compatible UI mutation
+    /// animations to run concurrently.  Two UI mutations are compatible if the containers
+    /// that they mutate reside in separate branches of the UI tree.  I.e. As long as neither
+    /// container contains the other, their mutations are compatible.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation)
+    ///
+    /// - AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation, java.lang.Runnable)
     public static class UIMutation extends CompoundAnimation {
 
-        /**
-         * Containers that are being mutated as a part of this animation.
-         */
+        /// Containers that are being mutated as a part of this animation.
         private final Set<Container> containers = new HashSet<Container>();
 
-        /**
-         * A flag that is set the first time updateState() is called.  Once this
-         * flag is set, the UIMutation will not accept any more mutations.
-         */
+        /// A flag that is set the first time updateState() is called.  Once this
+        /// flag is set, the UIMutation will not accept any more mutations.
         private boolean isStarted;
 
-        /**
-         * Creates a new UIMutation which mutates the given container with the provided
-         * animation.
-         *
-         * @param cnt  The container that is being mutated.
-         * @param anim The animation.
-         */
+        /// Creates a new UIMutation which mutates the given container with the provided
+        /// animation.
+        ///
+        /// #### Parameters
+        ///
+        /// - `cnt`: The container that is being mutated.
+        ///
+        /// - `anim`: The animation.
         @SuppressWarnings("PMD.UnusedFormalParameter")
         public UIMutation(Container cnt, ComponentAnimation anim) {
             super(new ComponentAnimation[]{anim});
         }
 
-        /**
-         * Tries to add another mutation to this UIMutation.
-         *
-         * @param cnt  The container that is being mutated.
-         * @param anim The animation
-         * @return True if it was successfully added.  False otherwise.  This will return false if
-         * {@link #isLocked() } returns true (i.e. the animation has already stared), or if the mutation
-         * is incompatible with any of the existing mutations in this mutation.
-         */
+        /// Tries to add another mutation to this UIMutation.
+        ///
+        /// #### Parameters
+        ///
+        /// - `cnt`: The container that is being mutated.
+        ///
+        /// - `anim`: The animation
+        ///
+        /// #### Returns
+        ///
+        /// @return True if it was successfully added.  False otherwise.  This will return false if
+        /// `#isLocked()` returns true (i.e. the animation has already stared), or if the mutation
+        /// is incompatible with any of the existing mutations in this mutation.
         public boolean add(Container cnt, ComponentAnimation anim) {
             if (isStarted) {
                 return false;
@@ -342,12 +344,8 @@ public abstract class ComponentAnimation {
             return true;
         }
 
-        /**
-         * Checks if this mutation is locked.  Once a mutation animation has started,
-         * it becomes locked, and cannot have any further mutations added to it.
-         *
-         * @return
-         */
+        /// Checks if this mutation is locked.  Once a mutation animation has started,
+        /// it becomes locked, and cannot have any further mutations added to it.
         public boolean isLocked() {
             return isStarted;
         }

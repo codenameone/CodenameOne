@@ -36,17 +36,14 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.ui.geom.Shape;
 
-/**
- * An internal compatibility class for use by the Charts library.  Since the
- * library was ported from an Android library, it made use of Canvas and Paint,
- * so rather than rewriting all of this, we added a Canvas and Paint compatibility
- * layer.
- * <p>
- * **DO NOT USE DIRECTLY**
- *
- * @author shannah
- * @deprecated
- */
+/// An internal compatibility class for use by the Charts library.  Since the
+/// library was ported from an Android library, it made use of Canvas and Paint,
+/// so rather than rewriting all of this, we added a Canvas and Paint compatibility
+/// layer.
+///
+/// **DO NOT USE DIRECTLY**
+///
+/// @author shannah
 public class Canvas {
 
     public com.codename1.ui.Graphics g;

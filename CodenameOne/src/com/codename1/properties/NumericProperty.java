@@ -23,61 +23,51 @@
 
 package com.codename1.properties;
 
-/**
- * This is the base class to all number properties, it introduces nullability and the ability to convert to all
- * number types.
- *
- * @author Shai Almog
- */
+/// This is the base class to all number properties, it introduces nullability and the ability to convert to all
+/// number types.
+///
+/// @author Shai Almog
 public abstract class NumericProperty<T, K> extends Property<T, K> {
     private boolean nullable;
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public NumericProperty(String name) {
         super(name);
         nullable = true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public NumericProperty(String name, Class genericType) {
         super(name, genericType);
         nullable = true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public NumericProperty(String name, T value) {
         super(name, value);
         nullable = value == null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public NumericProperty(String name, Class genericType, T value) {
         super(name, genericType, value);
         nullable = value == null;
     }
 
-    /**
-     * If the field is nullable {@code set(null)} will fail
-     *
-     * @return the nullable
-     */
+    /// If the field is nullable `set(null)` will fail
+    ///
+    /// #### Returns
+    ///
+    /// the nullable
     public boolean isNullable() {
         return nullable;
     }
 
-    /**
-     * If the field is nullable {@code set(null)} will fail
-     *
-     * @param nullable the nullable to set
-     */
+    /// If the field is nullable `set(null)` will fail
+    ///
+    /// #### Parameters
+    ///
+    /// - `nullable`: the nullable to set
     public void setNullable(boolean nullable) {
         this.nullable = nullable;
     }

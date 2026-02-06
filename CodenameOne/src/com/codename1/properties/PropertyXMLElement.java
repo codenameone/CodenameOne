@@ -33,11 +33,9 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Vector;
 
-/**
- * An XML element mapping to a property
- *
- * @author shai
- */
+/// An XML element mapping to a property
+///
+/// @author shai
 class PropertyXMLElement extends Element {
     private final PropertyIndex parent;
     private int index = -1;

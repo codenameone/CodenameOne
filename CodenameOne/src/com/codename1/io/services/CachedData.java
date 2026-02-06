@@ -29,11 +29,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * Cached data class for use with the cached data service
- *
- * @author Shai Almog
- */
+/// Cached data class for use with the cached data service
+///
+/// @author Shai Almog
 public class CachedData implements Externalizable {
     private byte[] data;
     private String url;
@@ -43,17 +41,13 @@ public class CachedData implements Externalizable {
     // lock to prevent multiple requests to the same data
     private boolean fetching;
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getVersion() {
         return 1;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void externalize(DataOutputStream out) throws IOException {
         Util.writeUTF(url, out);
@@ -63,9 +57,7 @@ public class CachedData implements Externalizable {
         out.write(data);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void internalize(int version, DataInputStream in) throws IOException {
         url = Util.readUTF(in);
@@ -80,72 +72,72 @@ public class CachedData implements Externalizable {
         return "CachedData";
     }
 
-    /**
-     * @return the data
-     */
+    /// #### Returns
+    ///
+    /// the data
     public byte[] getData() {
         return data;
     }
 
-    /**
-     * @param data the data to set
-     */
+    /// #### Parameters
+    ///
+    /// - `data`: the data to set
     public void setData(byte[] data) {
         this.data = data;
     }
 
-    /**
-     * @return the url
-     */
+    /// #### Returns
+    ///
+    /// the url
     public String getUrl() {
         return url;
     }
 
-    /**
-     * @param url the url to set
-     */
+    /// #### Parameters
+    ///
+    /// - `url`: the url to set
     public void setUrl(String url) {
         this.url = url;
     }
 
-    /**
-     * @return the etag
-     */
+    /// #### Returns
+    ///
+    /// the etag
     String getEtag() {
         return etag;
     }
 
-    /**
-     * @param etag the etag to set
-     */
+    /// #### Parameters
+    ///
+    /// - `etag`: the etag to set
     void setEtag(String etag) {
         this.etag = etag;
     }
 
-    /**
-     * @return the modified
-     */
+    /// #### Returns
+    ///
+    /// the modified
     String getModified() {
         return modified;
     }
 
-    /**
-     * @param modified the modified to set
-     */
+    /// #### Parameters
+    ///
+    /// - `modified`: the modified to set
     void setModified(String modified) {
         this.modified = modified;
     }
 
-    /**
-     * @return the fetching
-     */
+    /// #### Returns
+    ///
+    /// the fetching
     boolean isFetching() {
         return fetching;
     }
 
-    /**
-     * @param fetching the fetching to set
-     */
+    /// #### Parameters
+    ///
+    /// - `fetching`: the fetching to set
     void setFetching(boolean fetching) {
         this.fetching = fetching;
     }

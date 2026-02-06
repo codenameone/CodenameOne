@@ -28,38 +28,33 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
 
-/**
- * Encapsulates a WebView that is contained in its own separate window when run on a Desktop (e.g. Simulator).  Platforms
- * that don't have "windows", will fall back to loading a Form with a BrowserComponent in it.
- *
- * @author shannah
- * @since 7.0
- */
+/// Encapsulates a WebView that is contained in its own separate window when run on a Desktop (e.g. Simulator).  Platforms
+/// that don't have "windows", will fall back to loading a Form with a BrowserComponent in it.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public class BrowserWindow {
 
-    /**
-     * Implementation for BrowserWindow provided by the platform implementation.  The default
-     * implementation in the JavaSE port is a JavaFX Stage with a WebView in it.
-     */
+    /// Implementation for BrowserWindow provided by the platform implementation.  The default
+    /// implementation in the JavaSE port is a JavaFX Stage with a WebView in it.
     private final Object nativeWindow;
 
-    /**
-     * Fallback form to contain a webview if the platform implementation doesn't
-     * implement its own BrowserWindow.
-     */
+    /// Fallback form to contain a webview if the platform implementation doesn't
+    /// implement its own BrowserWindow.
     private BrowserForm form;
 
-    /**
-     * Fallback webview to use when platform doesn't implement its own BrowserWindow.  This
-     * would be contained inside {@link #form}.
-     */
+    /// Fallback webview to use when platform doesn't implement its own BrowserWindow.  This
+    /// would be contained inside `#form`.
     private BrowserComponent webview;
 
-    /**
-     * Creates a new browser window with the given starting URL.
-     *
-     * @param startURL The URL to start with.
-     */
+    /// Creates a new browser window with the given starting URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startURL`: The URL to start with.
     public BrowserWindow(String startURL) {
         nativeWindow = createNativeWindow(startURL);
         if (nativeWindow == null) {
@@ -69,22 +64,25 @@ public class BrowserWindow {
         }
     }
 
-    /**
-     * Creates a platform native Browser window with the given start URL.
-     *
-     * @param startURL The URL to open in the browser window.
-     * @return The native browser window.
-     */
+    /// Creates a platform native Browser window with the given start URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startURL`: The URL to open in the browser window.
+    ///
+    /// #### Returns
+    ///
+    /// The native browser window.
     private Object createNativeWindow(String startURL) {
         return Display.impl.createNativeBrowserWindow(startURL);
     }
 
-    /**
-     * Adds listeners to be notified when a page is loaded in the browser window.  ActionEvents
-     * will have the URL of the page as a string as its "source" property.
-     *
-     * @param l Listener to add.
-     */
+    /// Adds listeners to be notified when a page is loaded in the browser window.  ActionEvents
+    /// will have the URL of the page as a string as its "source" property.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: Listener to add.
     public void addLoadListener(ActionListener l) {
         if (nativeWindow != null) {
             Display.impl.addNativeBrowserWindowOnLoadListener(nativeWindow, l);
@@ -93,11 +91,11 @@ public class BrowserWindow {
         }
     }
 
-    /**
-     * Removes listeners from being notified when page is loaded in the browser window.
-     *
-     * @param l
-     */
+    /// Removes listeners from being notified when page is loaded in the browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public void removeLoadListener(ActionListener l) {
         if (nativeWindow != null) {
             Display.impl.removeNativeBrowserWindowOnLoadListener(nativeWindow, l);
@@ -106,11 +104,11 @@ public class BrowserWindow {
         }
     }
 
-    /**
-     * Sets the window title for the browser window.
-     *
-     * @param title The title for the window.
-     */
+    /// Sets the window title for the browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the window.
     public void setTitle(String title) {
         if (nativeWindow != null) {
             Display.impl.nativeBrowserWindowSetTitle(nativeWindow, title);
@@ -119,21 +117,20 @@ public class BrowserWindow {
         }
     }
 
-    /**
-     * Sets the size in pixels of the browser window.
-     *
-     * @param width  The width in pixels
-     * @param height The height in pixels
-     */
+    /// Sets the size in pixels of the browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: The width in pixels
+    ///
+    /// - `height`: The height in pixels
     public void setSize(int width, int height) {
         if (nativeWindow != null) {
             Display.impl.nativeBrowserWindowSetSize(nativeWindow, width, height);
         }
     }
 
-    /**
-     * Closes the browser window.
-     */
+    /// Closes the browser window.
     public void close() {
         if (nativeWindow != null) {
             Display.impl.nativeBrowserWindowHide(nativeWindow);
@@ -143,11 +140,11 @@ public class BrowserWindow {
         }
     }
 
-    /**
-     * Adds listener to be notified when the browser window is closed.
-     *
-     * @param l
-     */
+    /// Adds listener to be notified when the browser window is closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public void addCloseListener(ActionListener l) {
         if (nativeWindow != null) {
             Display.impl.nativeBrowserWindowAddCloseListener(nativeWindow, l);
@@ -156,11 +153,11 @@ public class BrowserWindow {
         }
     }
 
-    /**
-     * Removes listener from being notified when the browser window is closed.
-     *
-     * @param l
-     */
+    /// Removes listener from being notified when the browser window is closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     public void removeCloseListener(ActionListener l) {
         if (nativeWindow != null) {
             Display.impl.nativeBrowserWindowRemoveCloseListener(nativeWindow, l);
@@ -169,9 +166,7 @@ public class BrowserWindow {
         }
     }
 
-    /**
-     * Shows the browser window.
-     */
+    /// Shows the browser window.
     public void show() {
         if (nativeWindow != null) {
             Display.impl.nativeBrowserWindowShow(nativeWindow);
@@ -180,28 +175,24 @@ public class BrowserWindow {
         }
     }
 
-    /**
-     * A future that is returned from the eval() method.
-     *
-     * @since 7.0
-     */
+    /// A future that is returned from the eval() method.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static class EvalRequest extends AsyncResource<String> {
         private String js;
 
-        /**
-         * Gets the JS code to be executed.
-         *
-         * @return
-         */
+        /// Gets the JS code to be executed.
         public String getJS() {
             return js;
         }
 
-        /**
-         * Sets the JS code to be executed
-         *
-         * @param js
-         */
+        /// Sets the JS code to be executed
+        ///
+        /// #### Parameters
+        ///
+        /// - `js`
         public void setJS(String js) {
             this.js = js;
         }
@@ -209,23 +200,15 @@ public class BrowserWindow {
 
     }
 
-    /**
-     * A fallback form implementation that contains a browser for platforms that don't
-     * implement their own browser window.
-     */
+    /// A fallback form implementation that contains a browser for platforms that don't
+    /// implement their own browser window.
     private static class BrowserForm extends Form {
 
-        /**
-         * Listeners to be notified when the browser is closed.
-         */
+        /// Listeners to be notified when the browser is closed.
         private final EventDispatcher closeListeners = new EventDispatcher();
-        /**
-         * The form to go "back" to when browser window is closed.
-         */
+        /// The form to go "back" to when browser window is closed.
         private final Form backForm;
-        /**
-         * Flag that is set when closed() called.
-         */
+        /// Flag that is set when closed() called.
         private boolean closed;
 
         BrowserForm(BrowserWindow owner) {
@@ -262,9 +245,7 @@ public class BrowserWindow {
 
         }
 
-        /**
-         * Closes the browser window - navigating back to the previous form.
-         */
+        /// Closes the browser window - navigating back to the previous form.
         void close() {
             if (closed) {
                 return;

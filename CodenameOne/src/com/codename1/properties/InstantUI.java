@@ -42,58 +42,58 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Instant UI generates a user interface for editing a property business object based on common
- * conventions and settings within the properties. UI's are automatically bound and work seamlessly.
- * <strong>Important</strong>: These UI's are subject to change, e.g. a generated UI might not have
- * validation for a specific property in one build and might introduce it in an update. We try to generate
- * great UI's seamlessly and some improvements might break functionality.
- *
- * @author Shai Almog
- */
+/// Instant UI generates a user interface for editing a property business object based on common
+/// conventions and settings within the properties. UI's are automatically bound and work seamlessly.
+/// **Important**: These UI's are subject to change, e.g. a generated UI might not have
+/// validation for a specific property in one build and might introduce it in an update. We try to generate
+/// great UI's seamlessly and some improvements might break functionality.
+///
+/// @author Shai Almog
 public class InstantUI {
     private PropertyBase[] order;
 
-    /**
-     * Excludes the property from the generated UI
-     *
-     * @param exclude the property to exclude
-     */
+    /// Excludes the property from the generated UI
+    ///
+    /// #### Parameters
+    ///
+    /// - `exclude`: the property to exclude
     public void excludeProperty(PropertyBase exclude) {
         exclude.putClientProperty("cn1$excludeFromUI", Boolean.TRUE);
     }
 
-    /**
-     * Excludes the properties from the generated UI
-     *
-     * @param exclude the properties to exclude
-     */
+    /// Excludes the properties from the generated UI
+    ///
+    /// #### Parameters
+    ///
+    /// - `exclude`: the properties to exclude
     public void excludeProperties(PropertyBase... exclude) {
         for (PropertyBase p : exclude) {
             p.putClientProperty("cn1$excludeFromUI", Boolean.TRUE);
         }
     }
 
-    /**
-     * Returns true if the property was excluded from the GUI
-     *
-     * @param exclude the property
-     * @return true if the property was excluded from the GUI
-     */
+    /// Returns true if the property was excluded from the GUI
+    ///
+    /// #### Parameters
+    ///
+    /// - `exclude`: the property
+    ///
+    /// #### Returns
+    ///
+    /// true if the property was excluded from the GUI
     public boolean isExcludedProperty(PropertyBase exclude) {
         return Boolean.TRUE.equals(exclude.getClientProperty("cn1$excludeFromUI"));
     }
 
-    /**
-     * A property that's a multi-choice can use this API to define the options used e.g.:
-     * {@code
-     * iui.setMultiChoiceLabels(c.gender, "Male", "Female", "Undefined");
-     * iui.setMultiChoiceValues(c.gender, "M", "F", "U");
-     * }
-     *
-     * @param p      the property
-     * @param labels label for each option
-     */
+    /// A property that's a multi-choice can use this API to define the options used e.g.:
+    /// `iui.setMultiChoiceLabels(c.gender, "Male", "Female", "Undefined");
+    /// iui.setMultiChoiceValues(c.gender, "M", "F", "U");`
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `labels`: label for each option
     public void setMultiChoiceLabels(PropertyBase p, String... labels) {
         p.putClientProperty("cn1$multiChceLbl", labels);
         if (p.getClientProperty("cn1$multiChceVal") == null) {
@@ -101,47 +101,53 @@ public class InstantUI {
         }
     }
 
-    /**
-     * A property that's a multi-choice can use this API to define the options used, notice that
-     * this API won't work correctly without {@link #setMultiChoiceLabels(com.codename1.properties.PropertyBase, java.lang.String...)}
-     *
-     * @param p      the property
-     * @param values actual values used for each label
-     */
+    /// A property that's a multi-choice can use this API to define the options used, notice that
+    /// this API won't work correctly without `java.lang.String...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `values`: actual values used for each label
     public void setMultiChoiceValues(PropertyBase p, Object... values) {
         p.putClientProperty("cn1$multiChceVal", values);
     }
 
-    /**
-     * The component class used to map this property
-     *
-     * @param p      the property
-     * @param cmpCls class of the component e.g. {@code Button.class}
-     */
+    /// The component class used to map this property
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `cmpCls`: class of the component e.g. `Button.class`
     public void setComponentClass(PropertyBase p, Class cmpCls) {
         p.putClientProperty("cn1$cmpCls", cmpCls);
     }
 
-    /**
-     * Sets the text field constraint for the property explicitly, notice that some constraints
-     * are implicit unless set manually e.g. numeric for numbers or password for fields with password
-     * in the name
-     *
-     * @param p    the property
-     * @param cons the text field constraint
-     */
+    /// Sets the text field constraint for the property explicitly, notice that some constraints
+    /// are implicit unless set manually e.g. numeric for numbers or password for fields with password
+    /// in the name
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `cons`: the text field constraint
     public void setTextFieldConstraint(PropertyBase p, int cons) {
         p.putClientProperty("cn1$tconstraint", cons);
     }
 
-    /**
-     * The text field constraint for the property. notice that some constraints
-     * are implicit unless set manually e.g. numeric for numbers or password for fields with password
-     * in the name
-     *
-     * @param p the property
-     * @return the constraint matching this property
-     */
+    /// The text field constraint for the property. notice that some constraints
+    /// are implicit unless set manually e.g. numeric for numbers or password for fields with password
+    /// in the name
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// #### Returns
+    ///
+    /// the constraint matching this property
     public int getTextFieldConstraint(PropertyBase p) {
         Integer v = (Integer) p.getClientProperty("cn1$tconstraint");
         if (v != null) {
@@ -173,32 +179,36 @@ public class InstantUI {
         return TextArea.ANY;
     }
 
-    /**
-     * Returns the order of the properties or null if they should use their
-     * natural order as they were submitted to the index object
-     *
-     * @return the property order
-     */
+    /// Returns the order of the properties or null if they should use their
+    /// natural order as they were submitted to the index object
+    ///
+    /// #### Returns
+    ///
+    /// the property order
     public PropertyBase[] getOrder() {
         return order;
     }
 
-    /**
-     * Sets the order of the properties, notice that this can also replace exclude
-     *
-     * @param order the order of the properties
-     */
+    /// Sets the order of the properties, notice that this can also replace exclude
+    ///
+    /// #### Parameters
+    ///
+    /// - `order`: the order of the properties
     public void setOrder(PropertyBase... order) {
         this.order = order;
     }
 
-    /**
-     * Creates editing UI for the given business object
-     *
-     * @param bo         the business object
-     * @param autoCommit true if the bindings used should be auto-committed
-     * @return a UI container that can be used to edit the business object
-     */
+    /// Creates editing UI for the given business object
+    ///
+    /// #### Parameters
+    ///
+    /// - `bo`: the business object
+    ///
+    /// - `autoCommit`: true if the bindings used should be auto-committed
+    ///
+    /// #### Returns
+    ///
+    /// a UI container that can be used to edit the business object
     public Container createEditUI(PropertyBusinessObject bo, boolean autoCommit) {
         Container cnt;
         if (Display.getInstance().isTablet()) {
@@ -308,13 +318,16 @@ public class InstantUI {
                 add(tf);
     }
 
-    /**
-     * Returns the Binding object for the given container which allows us control over the widgets
-     * and their commit status
-     *
-     * @param cnt the container returned by the {@link #createUI(boolean)} method
-     * @return a binding object
-     */
+    /// Returns the Binding object for the given container which allows us control over the widgets
+    /// and their commit status
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container returned by the `#createUI(boolean)` method
+    ///
+    /// #### Returns
+    ///
+    /// a binding object
     public UiBinding.Binding getBindings(Container cnt) {
         return (UiBinding.Binding) cnt.getClientProperty("cn1$iui-binding");
     }

@@ -25,122 +25,129 @@ import com.codename1.maps.Projection;
 import com.codename1.maps.Tile;
 import com.codename1.ui.geom.Dimension;
 
-/**
- * This is a generic map provider.
- *
- * @author Roman Kamyk <roman.kamyk@itiner.pl>
- */
+/// This is a generic map provider.
+///
+/// @author Roman Kamyk
 public abstract class MapProvider {
 
     private final Projection _projection;
     private final Dimension _tileSize;
 
-    /**
-     * Creates a new MapProvider
-     *
-     * @param p        the projection system
-     * @param tileSize the tile size
-     */
+    /// Creates a new MapProvider
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the projection system
+    ///
+    /// - `tileSize`: the tile size
     protected MapProvider(Projection p, Dimension tileSize) {
         _projection = p;
         _tileSize = tileSize;
     }
 
-    /**
-     * Request map to provide tiles of specific sizes. May not be supported by map provider.
-     * By default it does nothing;
-     *
-     * @param size requested tile size
-     */
+    /// Request map to provide tiles of specific sizes. May not be supported by map provider.
+    /// By default it does nothing;
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: requested tile size
     public void tileSize(Dimension size) {
     }
 
-    /**
-     * Returns the bounding box of a position ina given zoom level
-     *
-     * @param position  on the map
-     * @param zoomLevel the zoom level
-     * @return a bounding box
-     */
+    /// Returns the bounding box of a position ina given zoom level
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: on the map
+    ///
+    /// - `zoomLevel`: the zoom level
+    ///
+    /// #### Returns
+    ///
+    /// a bounding box
     public abstract BoundingBox bboxFor(Coord position, int zoomLevel);
 
-    /**
-     * Gets a tile for the given bounding box
-     *
-     * @param bbox a bounding box
-     * @return a Tile for the given bounding box
-     */
+    /// Gets a tile for the given bounding box
+    ///
+    /// #### Parameters
+    ///
+    /// - `bbox`: a bounding box
+    ///
+    /// #### Returns
+    ///
+    /// a Tile for the given bounding box
     public abstract Tile tileFor(BoundingBox bbox);
 
-    /**
-     * Maximal zoom level. Zoom levels are counted from zero to maxZoomLevel().
-     * 0 is farest view, where the scale is greatest.
-     *
-     * @return
-     */
+    /// Maximal zoom level. Zoom levels are counted from zero to maxZoomLevel().
+    /// 0 is farest view, where the scale is greatest.
     public abstract int maxZoomLevel();
 
-    /**
-     * Minimal zoom level user is able to see.
-     *
-     * @return
-     */
+    /// Minimal zoom level user is able to see.
     public int minZoomLevel() {
         return 0;
     }
 
-    /**
-     * Scale is the distance in map units between each pixel in tile at given zoom level.
-     *
-     * @return Scale at given zoom level.
-     */
+    /// Scale is the distance in map units between each pixel in tile at given zoom level.
+    ///
+    /// #### Returns
+    ///
+    /// Scale at given zoom level.
     public abstract Coord scale(int zoomLevel);
 
-    /**
-     * Translates position by [pixelsX, pixelsY] at zoomLevel acordingly to maps scale.
-     *
-     * @param position  in map projection
-     * @param zoomLevel
-     * @param pixelsX
-     * @param pixelsY
-     * @return translated position.
-     */
+    /// Translates position by [pixelsX, pixelsY] at zoomLevel acordingly to maps scale.
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: in map projection
+    ///
+    /// - `zoomLevel`
+    ///
+    /// - `pixelsX`
+    ///
+    /// - `pixelsY`
+    ///
+    /// #### Returns
+    ///
+    /// translated position.
     public Coord translate(Coord position, int zoomLevel, int pixelsX, int pixelsY) {
         Coord scale = scale(zoomLevel);
         return position.translate(pixelsY * scale.getLatitude(), pixelsX * scale.getLongitude());
     }
 
-    /**
-     * Gets the Provider projection
-     *
-     * @return the Provider projection
-     */
+    /// Gets the Provider projection
+    ///
+    /// #### Returns
+    ///
+    /// the Provider projection
     public Projection projection() {
         return _projection;
     }
 
-    /**
-     * Gets the tile size
-     *
-     * @return the tile size
-     */
+    /// Gets the tile size
+    ///
+    /// #### Returns
+    ///
+    /// the tile size
     public Dimension tileSize() {
         return _tileSize;
     }
 
-    /**
-     * The provider attribution.
-     *
-     * @return a String of the provider attribution
-     */
+    /// The provider attribution.
+    ///
+    /// #### Returns
+    ///
+    /// a String of the provider attribution
     public abstract String attribution();
 
-    /**
-     * Returns the maximum zoom of a specific Tile.
-     *
-     * @param tile tile to check the max zoom
-     * @return the max zoom of the tile
-     */
+    /// Returns the maximum zoom of a specific Tile.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tile`: tile to check the max zoom
+    ///
+    /// #### Returns
+    ///
+    /// the max zoom of the tile
     public int maxZoomFor(Tile tile) {
         int zoom;
         int height = tile.dimension().getHeight();

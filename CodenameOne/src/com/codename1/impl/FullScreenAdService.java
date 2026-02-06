@@ -42,12 +42,10 @@ import com.codename1.ui.plaf.UIManager;
 import java.util.Timer;
 import java.util.TimerTask;
 
-/**
- * Abstract class for fullscreen ads that appear before and possibly after application
- * execution as well as randomly between application screen transitions.
- *
- * @author Shai Almog
- */
+/// Abstract class for fullscreen ads that appear before and possibly after application
+/// execution as well as randomly between application screen transitions.
+///
+/// @author Shai Almog
 public abstract class FullScreenAdService {
     private static final Object LOCK = new Object();
     private boolean allowWithoutNetwork = true;
@@ -57,47 +55,41 @@ public abstract class FullScreenAdService {
     private boolean scaleMode;
     private boolean allowSkipping;
 
-    /**
-     * Creates a new request for an ad
-     *
-     * @return the network operation
-     */
+    /// Creates a new request for an ad
+    ///
+    /// #### Returns
+    ///
+    /// the network operation
     protected abstract ConnectionRequest createAdRequest();
 
-    /**
-     * Component representing a given ad
-     *
-     * @return the ad that is currently pending
-     */
+    /// Component representing a given ad
+    ///
+    /// #### Returns
+    ///
+    /// the ad that is currently pending
     protected abstract Component getPendingAd();
 
-    /**
-     * Just checks if an ad is already fetched
-     *
-     * @return returns true if an ad is already waiting in the queue
-     */
+    /// Just checks if an ad is already fetched
+    ///
+    /// #### Returns
+    ///
+    /// returns true if an ad is already waiting in the queue
     protected abstract boolean hasPendingAd();
 
-    /**
-     * Removes the pending ad data so we can fetch a new ad
-     */
+    /// Removes the pending ad data so we can fetch a new ad
     protected abstract void clearPendingAd();
 
-    /**
-     * Returns the URL for the ad
-     *
-     * @return the ad URL
-     */
+    /// Returns the URL for the ad
+    ///
+    /// #### Returns
+    ///
+    /// the ad URL
     protected abstract String getAdDestination();
 
-    /**
-     * Returns true if the connection failed
-     */
+    /// Returns true if the connection failed
     protected abstract boolean failed();
 
-    /**
-     * Invoked on application startup, this code will download an ad or timeout
-     */
+    /// Invoked on application startup, this code will download an ad or timeout
     public void showWelcomeAd() {
         if (!UIManager.getInstance().wasThemeInstalled()) {
             if (Display.getInstance().hasNativeTheme()) {
@@ -129,11 +121,11 @@ public abstract class FullScreenAdService {
         }
     }
 
-    /**
-     * Binds an ad to appear periodically after a given timeout
-     *
-     * @param timeForNext the timeout in which an ad should be shown in milliseconds
-     */
+    /// Binds an ad to appear periodically after a given timeout
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeForNext`: the timeout in which an ad should be shown in milliseconds
     public void bindTransitionAd(final int timeForNext) {
         Runnable onTransitionAndExit = new Runnable() {
             private long lastTime = System.currentTimeMillis();
@@ -168,80 +160,80 @@ public abstract class FullScreenAdService {
         }, tm, tm);
     }
 
-    /**
-     * If set to true this flag allows the application to load even if an Ad cannot be displayed
-     *
-     * @return the allowWithoutNetwork
-     */
+    /// If set to true this flag allows the application to load even if an Ad cannot be displayed
+    ///
+    /// #### Returns
+    ///
+    /// the allowWithoutNetwork
     public boolean isAllowWithoutNetwork() {
         return allowWithoutNetwork;
     }
 
-    /**
-     * If set to true this flag allows the application to load even if an Ad cannot be displayed
-     *
-     * @param allowWithoutNetwork the allowWithoutNetwork to set
-     */
+    /// If set to true this flag allows the application to load even if an Ad cannot be displayed
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowWithoutNetwork`: the allowWithoutNetwork to set
     public void setAllowWithoutNetwork(boolean allowWithoutNetwork) {
         this.allowWithoutNetwork = allowWithoutNetwork;
     }
 
-    /**
-     * The timeout in milliseconds for an ad request
-     *
-     * @return the timeout
-     */
+    /// The timeout in milliseconds for an ad request
+    ///
+    /// #### Returns
+    ///
+    /// the timeout
     public int getTimeout() {
         return timeout;
     }
 
-    /**
-     * The timeout in milliseconds for an ad request
-     *
-     * @param timeout the timeout to set
-     */
+    /// The timeout in milliseconds for an ad request
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: the timeout to set
     public void setTimeout(int timeout) {
         this.timeout = timeout;
     }
 
-    /**
-     * @return the adDisplayTime
-     */
+    /// #### Returns
+    ///
+    /// the adDisplayTime
     public int getAdDisplayTime() {
         return adDisplayTime;
     }
 
-    /**
-     * @param adDisplayTime the adDisplayTime to set
-     */
+    /// #### Parameters
+    ///
+    /// - `adDisplayTime`: the adDisplayTime to set
     public void setAdDisplayTime(int adDisplayTime) {
         this.adDisplayTime = adDisplayTime;
     }
 
-    /**
-     * @return the scaleMode
-     */
+    /// #### Returns
+    ///
+    /// the scaleMode
     public boolean isScaleMode() {
         return scaleMode;
     }
 
-    /**
-     * @param scaleMode the scaleMode to set
-     */
+    /// #### Parameters
+    ///
+    /// - `scaleMode`: the scaleMode to set
     public void setScaleMode(boolean scaleMode) {
         this.scaleMode = scaleMode;
     }
 
-    /**
-     * @return the allowSkipping
-     */
+    /// #### Returns
+    ///
+    /// the allowSkipping
     public boolean isAllowSkipping() {
         return allowSkipping;
     }
 
-    /**
-     * @param allowSkipping the allowSkipping to set
-     */
+    /// #### Parameters
+    ///
+    /// - `allowSkipping`: the allowSkipping to set
     public void setAllowSkipping(boolean allowSkipping) {
         this.allowSkipping = allowSkipping;
     }

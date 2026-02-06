@@ -24,55 +24,60 @@ package com.codename1.plugin.event;
 
 import com.codename1.ui.events.ActionEvent;
 
-/**
- * Parent class for all plugin events.  Plugin events are fired by the Codename One runtime
- * to give plugins an opportunity to override the implementation of certain core methods.
- *
- * <p>For example, the {@link OpenGalleryEvent} is fired when the {@link Display#openGallery()} method
- * is called.  This event will be passed to registered plugins, which  can choose to "consume" the event
- * and override the behaviour.</p>
- *
- * <p>If a plugin wishes to handle the event, it should call {@link #consume()} on the event to prevent
- * Codename One from proceeding to handle the request itself.</p>
- *
- * <p>Events that require a synchronous return value should call the {@link #setPluginEventResponse(Object)} method
- * with the return value.  {@link #setPluginEventResponse(Object)} calls {@link #consume()}, so you do not need
- * to call both of these methods.</p>
- *
- * @param <T> The type of the response to the event. If the event does not require a response, this should be {@link Void}.
- * @author Steve Hannah
- * @since 8.0
- */
+/// Parent class for all plugin events.  Plugin events are fired by the Codename One runtime
+/// to give plugins an opportunity to override the implementation of certain core methods.
+///
+/// For example, the `OpenGalleryEvent` is fired when the `Display#openGallery()` method
+/// is called.  This event will be passed to registered plugins, which  can choose to "consume" the event
+/// and override the behaviour.
+///
+/// If a plugin wishes to handle the event, it should call `#consume()` on the event to prevent
+/// Codename One from proceeding to handle the request itself.
+///
+/// Events that require a synchronous return value should call the `#setPluginEventResponse(Object)` method
+/// with the return value.  `#setPluginEventResponse(Object)` calls `#consume()`, so you do not need
+/// to call both of these methods.
+///
+/// @author Steve Hannah
+///
+/// #### Parameters
+///
+/// - `The`: type of the response to the event. If the event does not require a response, this should be `Void`.
+///
+/// #### Since
+///
+/// 8.0
 public abstract class PluginEvent<T> extends ActionEvent {
 
     private T pluginEventResponse;
 
-    /**
-     * Creates a new plugin event with the given source and type.
-     *
-     * @param source The source of the event.  May be null.
-     * @param type   The type of the event.  All PluginEvent classes should have a corresponding enum type in the
-     *               {@link Type} enum.
-     */
+    /// Creates a new plugin event with the given source and type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: The source of the event.  May be null.
+    ///
+    /// - `type`: @param type   The type of the event.  All PluginEvent classes should have a corresponding enum type in the
+    /// `Type` enum.
     public PluginEvent(Object source, Type type) {
         super(source, type);
     }
 
-    /**
-     * Gets the response to the event.  This will be null if the event has not been consumed.
-     *
-     * @return The result of processing the event.
-     */
+    /// Gets the response to the event.  This will be null if the event has not been consumed.
+    ///
+    /// #### Returns
+    ///
+    /// The result of processing the event.
     public T getPluginEventResponse() {
         return pluginEventResponse;
     }
 
-    /**
-     * Sets the return value of processing the event.  This method calls {@link #consume()}, so you don't need to
-     * call both to consume the event and set the response.
-     *
-     * @param response
-     */
+    /// Sets the return value of processing the event.  This method calls `#consume()`, so you don't need to
+    /// call both to consume the event and set the response.
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`
     public void setPluginEventResponse(T response) {
         this.consume();
         this.pluginEventResponse = response;

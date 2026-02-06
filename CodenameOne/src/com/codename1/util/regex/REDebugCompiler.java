@@ -19,16 +19,12 @@ package com.codename1.util.regex;
 
 import java.util.HashMap;
 
-/**
- * A subclass of RECompiler which can dump a regular expression program
- * for debugging purposes.
- *
- * @author <a href="mailto:jonl@muppetlabs.com">Jonathan Locke</a>
- */
+/// A subclass of RECompiler which can dump a regular expression program
+/// for debugging purposes.
+///
+/// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
 public class REDebugCompiler extends RECompiler {
-    /**
-     * Mapping from opcodes to descriptive strings
-     */
+    /// Mapping from opcodes to descriptive strings
     static HashMap hashOpcode = new HashMap();
 
     static {
@@ -57,12 +53,15 @@ public class REDebugCompiler extends RECompiler {
         hashOpcode.put(Integer.valueOf(RE.OP_CLOSE_CLUSTER), "OP_CLOSE_CLUSTER");
     }
 
-    /**
-     * Returns a descriptive string for an opcode.
-     *
-     * @param opcode Opcode to convert to a string
-     * @return Description of opcode
-     */
+    /// Returns a descriptive string for an opcode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `opcode`: Opcode to convert to a string
+    ///
+    /// #### Returns
+    ///
+    /// Description of opcode
     String opcodeToString(char opcode) {
         // Get string for opcode
         String ret = (String) hashOpcode.get(Integer.valueOf(opcode));
@@ -74,12 +73,15 @@ public class REDebugCompiler extends RECompiler {
         return ret;
     }
 
-    /**
-     * Return a string describing a (possibly unprintable) character.
-     *
-     * @param c Character to convert to a printable representation
-     * @return String representation of character
-     */
+    /// Return a string describing a (possibly unprintable) character.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: Character to convert to a printable representation
+    ///
+    /// #### Returns
+    ///
+    /// String representation of character
     String charToString(char c) {
         // If it's unprintable, convert to '\###'
         if (c < ' ' || c > 127) {
@@ -90,12 +92,15 @@ public class REDebugCompiler extends RECompiler {
         return String.valueOf(c);
     }
 
-    /**
-     * Returns a descriptive string for a node in a regular expression program.
-     *
-     * @param node Node to describe
-     * @return Description of node
-     */
+    /// Returns a descriptive string for a node in a regular expression program.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: Node to describe
+    ///
+    /// #### Returns
+    ///
+    /// Description of node
     String nodeToString(int node) {
         // Get opcode and opdata for node
         char opcode = instruction[node /* + RE.offsetOpcode */];
@@ -106,11 +111,11 @@ public class REDebugCompiler extends RECompiler {
     }
 
 
-    /**
-     * Dumps the current program to a {@link java.io.Writer}.
-     *
-     * @param p Writer for program dump output
-     */
+    /// Dumps the current program to a `java.io.Writer`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: Writer for program dump output
     public void dumpProgram(java.io.Writer p) {
         try {
             // Loop through the whole program
@@ -179,9 +184,7 @@ public class REDebugCompiler extends RECompiler {
         }
     }
 
-    /**
-     * Dumps the current program to a <code>System.out</code>.
-     */
+    /// Dumps the current program to a `System.out`.
     public void dumpProgram() {
         java.io.OutputStreamWriter w = com.codename1.io.Util.getWriter(System.out); //NOPMD CloseResource - should not close System.out
         dumpProgram(w);

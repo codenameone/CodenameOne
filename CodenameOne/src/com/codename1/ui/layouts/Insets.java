@@ -16,11 +16,9 @@
  */
 package com.codename1.ui.layouts;
 
-/**
- * Port of Insets from Harmony for the use of the GridBag code
- *
- * @author Dmitry A. Durnev
- */
+/// Port of Insets from Harmony for the use of the GridBag code
+///
+/// @author Dmitry A. Durnev
 
 public class Insets {
 

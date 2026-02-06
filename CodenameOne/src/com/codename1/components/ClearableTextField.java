@@ -34,23 +34,25 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 
-/**
- * Wraps a text field so it will have an X to clear its content on the right hand side
- *
- * @author Shai Almog
- */
+/// Wraps a text field so it will have an X to clear its content on the right hand side
+///
+/// @author Shai Almog
 public final class ClearableTextField extends Container {
     private ClearableTextField() {
         super(new BorderLayout());
     }
 
-    /**
-     * Wraps the given text field with a UI that will allow us to clear it
-     *
-     * @param tf       the text field
-     * @param iconSize size in millimeters for the clear icon, -1 for default size
-     * @return a Container that should be added to the UI instead of the actual text field
-     */
+    /// Wraps the given text field with a UI that will allow us to clear it
+    ///
+    /// #### Parameters
+    ///
+    /// - `tf`: the text field
+    ///
+    /// - `iconSize`: size in millimeters for the clear icon, -1 for default size
+    ///
+    /// #### Returns
+    ///
+    /// a Container that should be added to the UI instead of the actual text field
     public static ClearableTextField wrap(final TextArea tf, float iconSize) {
         ClearableTextField cf = new ClearableTextField();
         Button b = new Button("", tf.getUIID());
@@ -75,12 +77,15 @@ public final class ClearableTextField extends Container {
         return cf;
     }
 
-    /**
-     * Wraps the given text field with a UI that will allow us to clear it
-     *
-     * @param tf the text field
-     * @return a Container that should be added to the UI instead of the actual text field
-     */
+    /// Wraps the given text field with a UI that will allow us to clear it
+    ///
+    /// #### Parameters
+    ///
+    /// - `tf`: the text field
+    ///
+    /// #### Returns
+    ///
+    /// a Container that should be added to the UI instead of the actual text field
     public static ClearableTextField wrap(final TextArea tf) {
         return wrap(tf, -1);
     }

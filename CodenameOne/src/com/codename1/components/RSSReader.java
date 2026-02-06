@@ -49,13 +49,11 @@ import com.codename1.ui.list.GenericListCellRenderer;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * A List implementing an RSS reader that automatically populates itself with content
- * from the RSS chanel. When clicking an article it displays the HTML content of said
- * article in a new Form.
- *
- * @author Shai Almog
- */
+/// A List implementing an RSS reader that automatically populates itself with content
+/// from the RSS chanel. When clicking an article it displays the HTML content of said
+/// article in a new Form.
+///
+/// @author Shai Almog
 public class RSSReader extends List {
     private static final Hashtable MORE = new Hashtable();
 
@@ -75,20 +73,14 @@ public class RSSReader extends List {
     private Image iconPlaceholder;
     private boolean designMode;
 
-    /**
-     * Sets the form/container to which the RSS will navigate when clicking a RSS
-     * entry
-     */
+    /// Sets the form/container to which the RSS will navigate when clicking a RSS
+    /// entry
     private Container targetContainer;
 
-    /**
-     * Indicates whether a back command should be added implicitly to the target container
-     */
+    /// Indicates whether a back command should be added implicitly to the target container
     private boolean addBackToTaget = true;
 
-    /**
-     * Creates an rss reader instance
-     */
+    /// Creates an rss reader instance
     public RSSReader() {
         setUIIDFinal("RSSReader");
         setRenderer(new GenericListCellRenderer(createRendererContainer(), createRendererContainer()));
@@ -96,20 +88,20 @@ public class RSSReader extends List {
     }
 
 
-    /**
-     * Set the description for the "more" request
-     *
-     * @param d the description
-     */
+    /// Set the description for the "more" request
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the description
     public static void setMoreDescription(String d) {
         MORE.put("description", d);
     }
 
-    /**
-     * Set the title for the "more" request
-     *
-     * @param t new title
-     */
+    /// Set the title for the "more" request
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: new title
     public static void setMoreTitle(String t) {
         MORE.put("title", t);
     }
@@ -140,10 +132,8 @@ public class RSSReader extends List {
         return entries;
     }
 
-    /**
-     * Send the request to the server, will only work once. This is called implicitly
-     * when the list is initialized
-     */
+    /// Send the request to the server, will only work once. This is called implicitly
+    /// when the list is initialized
     public void sendRequest() {
         if (service == null) {
             service = new RSSService(url, limit);
@@ -161,9 +151,7 @@ public class RSSReader extends List {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -174,34 +162,34 @@ public class RSSReader extends List {
         }
     }
 
-    /**
-     * The URL of the RSS stream
-     *
-     * @return The URL of the RSS stream
-     */
+    /// The URL of the RSS stream
+    ///
+    /// #### Returns
+    ///
+    /// The URL of the RSS stream
     public String getURL() {
         return url;
     }
 
-    /**
-     * The URL of the RSS stream
-     *
-     * @param url The URL of the RSS stream
-     */
+    /// The URL of the RSS stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL of the RSS stream
     public void setURL(String url) {
         this.url = url;
     }
 
-    /**
-     * @return the iconPlaceholder
-     */
+    /// #### Returns
+    ///
+    /// the iconPlaceholder
     public Image getIconPlaceholder() {
         return iconPlaceholder;
     }
 
-    /**
-     * @param iconPlaceholder the iconPlaceholder to set
-     */
+    /// #### Parameters
+    ///
+    /// - `iconPlaceholder`: the iconPlaceholder to set
     public void setIconPlaceholder(Image iconPlaceholder) {
         this.iconPlaceholder = iconPlaceholder;
         if (service != null) {
@@ -249,11 +237,11 @@ public class RSSReader extends List {
         }
     }
 
-    /**
-     * Shows a form containing the RSS entry
-     *
-     * @param h the parsed entry
-     */
+    /// Shows a form containing the RSS entry
+    ///
+    /// #### Parameters
+    ///
+    /// - `h`: the parsed entry
     protected void showRSSEntry(Hashtable h) {
         Form newForm = null;
         if (targetContainer != null) {
@@ -284,43 +272,37 @@ public class RSSReader extends List {
         newForm.show();
     }
 
-    /**
-     * Places a limit on the number of RSS entries requested from the server
-     *
-     * @return the limit
-     */
+    /// Places a limit on the number of RSS entries requested from the server
+    ///
+    /// #### Returns
+    ///
+    /// the limit
     public int getLimit() {
         return limit;
     }
 
-    /**
-     * Places a limit on the number of RSS entries requested from the server
-     *
-     * @param limit the limit to set
-     */
+    /// Places a limit on the number of RSS entries requested from the server
+    ///
+    /// #### Parameters
+    ///
+    /// - `limit`: the limit to set
     public void setLimit(int limit) {
         this.limit = limit;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"limit", "url", "blockList", "progressTitle", "displayProgressPercentage", "target"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, String.class, Boolean.class, String.class, Boolean.class, Container.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("limit".equals(name)) {
@@ -357,9 +339,7 @@ public class RSSReader extends List {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("limit".equals(name)) {
@@ -393,68 +373,68 @@ public class RSSReader extends List {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * @return the blockList
-     */
+    /// #### Returns
+    ///
+    /// the blockList
     public boolean isBlockList() {
         return blockList;
     }
 
-    /**
-     * @param blockList the blockList to set
-     */
+    /// #### Parameters
+    ///
+    /// - `blockList`: the blockList to set
     public void setBlockList(boolean blockList) {
         this.blockList = blockList;
     }
 
-    /**
-     * @return the progressTitle
-     */
+    /// #### Returns
+    ///
+    /// the progressTitle
     public String getProgressTitle() {
         return progressTitle;
     }
 
-    /**
-     * @param progressTitle the progressTitle to set
-     */
+    /// #### Parameters
+    ///
+    /// - `progressTitle`: the progressTitle to set
     public void setProgressTitle(String progressTitle) {
         this.progressTitle = progressTitle;
     }
 
-    /**
-     * The form/container to which the RSS will navigate when clicking a RSS
-     * entry
-     *
-     * @return the targetContainer
-     */
+    /// The form/container to which the RSS will navigate when clicking a RSS
+    /// entry
+    ///
+    /// #### Returns
+    ///
+    /// the targetContainer
     public Container getTargetContainer() {
         return targetContainer;
     }
 
-    /**
-     * The form/container to which the RSS will navigate when clicking a RSS
-     * entry
-     *
-     * @param targetContainer the targetContainer to set
-     */
+    /// The form/container to which the RSS will navigate when clicking a RSS
+    /// entry
+    ///
+    /// #### Parameters
+    ///
+    /// - `targetContainer`: the targetContainer to set
     public void setTargetContainer(Container targetContainer) {
         this.targetContainer = targetContainer;
     }
 
-    /**
-     * Indicates whether a back command should be added implicitly to the target container
-     *
-     * @return the addBackToTaget
-     */
+    /// Indicates whether a back command should be added implicitly to the target container
+    ///
+    /// #### Returns
+    ///
+    /// the addBackToTaget
     public boolean isAddBackToTaget() {
         return addBackToTaget;
     }
 
-    /**
-     * Indicates whether a back command should be added implicitly to the target container
-     *
-     * @param addBackToTaget the addBackToTaget to set
-     */
+    /// Indicates whether a back command should be added implicitly to the target container
+    ///
+    /// #### Parameters
+    ///
+    /// - `addBackToTaget`: the addBackToTaget to set
     public void setAddBackToTaget(boolean addBackToTaget) {
         this.addBackToTaget = addBackToTaget;
     }

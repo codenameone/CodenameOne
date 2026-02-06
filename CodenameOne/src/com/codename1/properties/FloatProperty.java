@@ -23,33 +23,27 @@
 
 package com.codename1.properties;
 
-/**
- * This is the float specific version of numeric property
- *
- * @author Shai Almog
- */
+/// This is the float specific version of numeric property
+///
+/// @author Shai Almog
 public class FloatProperty<K> extends NumericProperty<Float, K> {
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public FloatProperty(String name) {
         super(name, Float.class);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public FloatProperty(String name, Float value) {
         super(name, Float.class, value);
     }
 
 
-    /**
-     * Returns the value as a primitive, if the value is null/nullable this will fail...
-     *
-     * @return the numeric value
-     */
+    /// Returns the value as a primitive, if the value is null/nullable this will fail...
+    ///
+    /// #### Returns
+    ///
+    /// the numeric value
     public float getFloat() {
         return get().floatValue();
     }

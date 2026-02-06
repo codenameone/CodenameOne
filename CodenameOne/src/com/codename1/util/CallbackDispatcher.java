@@ -24,11 +24,9 @@ package com.codename1.util;
 
 import com.codename1.ui.Display;
 
-/**
- * A utility class for calling {@link Callback}s on the EDT.
- *
- * @author shannah
- */
+/// A utility class for calling `Callback`s on the EDT.
+///
+/// @author shannah
 public final class CallbackDispatcher<T> implements Runnable {
     private SuccessCallback<T> success;
     private FailureCallback<T> failure;
@@ -49,15 +47,17 @@ public final class CallbackDispatcher<T> implements Runnable {
 
     }
 
-    /**
-     * Calls the given callback's {@link Callback#onSucess(java.lang.Object) } method, passing the supplied arg as
-     * a parameter.  This method guarantees that onSuccess() will be called on the EDT.  If it is already running
-     * on the EDT, it will just call it directly.  Otherwise it will wrap it in {@link Display#callSerially(java.lang.Runnable) }.
-     *
-     * @param <T>     The type of the callback.
-     * @param success The success callback to be called.
-     * @param arg     The argument to pass to the success callback.
-     */
+    /// Calls the given callback's `Callback#onSucess(java.lang.Object)` method, passing the supplied arg as
+    /// a parameter.  This method guarantees that onSuccess() will be called on the EDT.  If it is already running
+    /// on the EDT, it will just call it directly.  Otherwise it will wrap it in `Display#callSerially(java.lang.Runnable)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `The`: type of the callback.
+    ///
+    /// - `success`: The success callback to be called.
+    ///
+    /// - `arg`: The argument to pass to the success callback.
     public static <T> void dispatchSuccess(SuccessCallback<T> success, T arg) {
         if (Display.getInstance().isEdt()) {
             success.onSucess(arg);
@@ -67,14 +67,15 @@ public final class CallbackDispatcher<T> implements Runnable {
         }
     }
 
-    /**
-     * Calls the given callback's {@link Callback#onError(java.lang.Object, java.lang.Throwable, int, java.lang.String) } method, passing the supplied error as
-     * a parameter.  This method guarantees that onError() will be called on the EDT.  If it is already running
-     * on the EDT, it will just call it directly.  Otherwise it will wrap it in {@link Display#callSerially(java.lang.Runnable) }.
-     *
-     * @param failure The failure callback to be called.
-     * @param error   The error to pass to the callback
-     */
+    /// Calls the given callback's `java.lang.Throwable, int, java.lang.String)` method, passing the supplied error as
+    /// a parameter.  This method guarantees that onError() will be called on the EDT.  If it is already running
+    /// on the EDT, it will just call it directly.  Otherwise it will wrap it in `Display#callSerially(java.lang.Runnable)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `failure`: The failure callback to be called.
+    ///
+    /// - `error`: The error to pass to the callback
     public static void dispatchError(FailureCallback failure, Throwable error) {
         if (Display.getInstance().isEdt()) {
             failure.onError(failure, error, 0, error.getMessage());

@@ -15,16 +15,12 @@
  *  limitations under the License.
  */
 
-/**
- * @author Alexander Y. Kleymenov
- */
+/// @author Alexander Y. Kleymenov
 
 package com.codename1.util;
 
-/**
- * This class implements Base64 encoding/decoding functionality
- * as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
- */
+/// This class implements Base64 encoding/decoding functionality
+/// as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
 public abstract class Base64 {
 
     private static final byte[] map = new byte[]
@@ -38,13 +34,17 @@ public abstract class Base64 {
         return decode(in, in.length);
     }
 
-    /**
-     * Decodes an array of bytes containing a Base64 ascii string into binary data
-     *
-     * @param in  the array
-     * @param len the length of the array
-     * @return the decoded array
-     */
+    /// Decodes an array of bytes containing a Base64 ascii string into binary data
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the array
+    ///
+    /// - `len`: the length of the array
+    ///
+    /// #### Returns
+    ///
+    /// the decoded array
     public static byte[] decode(byte[] in, int len) {
         // approximate output length
         int length = len / 4 * 3;
@@ -137,12 +137,15 @@ public abstract class Base64 {
         return result;
     }
 
-    /**
-     * Encodes the given array as a base64 string
-     *
-     * @param in the array to encode
-     * @return the String containing the array
-     */
+    /// Encodes the given array as a base64 string
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the array to encode
+    ///
+    /// #### Returns
+    ///
+    /// the String containing the array
     public static String encode(byte[] in) {
         int length = in.length * 4 / 3;
         length += length / 76 + 3; // for crlr
@@ -185,12 +188,15 @@ public abstract class Base64 {
         return com.codename1.util.StringUtil.newString(out, 0, index);
     }
 
-    /**
-     * Encodes the given array as a base64 string without breaking lines
-     *
-     * @param in the array to encode
-     * @return the String containing the array
-     */
+    /// Encodes the given array as a base64 string without breaking lines
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the array to encode
+    ///
+    /// #### Returns
+    ///
+    /// the String containing the array
     public static String encodeNoNewline(byte[] in) {
         // notice that this method isn't genric to increase performance slightly
         int length = in.length * 4 / 3;

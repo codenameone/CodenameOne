@@ -37,34 +37,35 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
 
-/**
- * Displays a progress dialog with the ability to cancel an ongoing operation
- *
- * @author Shai Almog
- */
+/// Displays a progress dialog with the ability to cancel an ongoing operation
+///
+/// @author Shai Almog
 public class Progress extends Dialog implements ActionListener<NetworkEvent> {
     private final ConnectionRequest request;
     private boolean disposeOnCompletion;
     private boolean autoShow;
     private boolean showing;
 
-    /**
-     * Binds the progress UI to the completion of this request
-     *
-     * @param title   the title of the progress dialog
-     * @param request the network request pending
-     */
+    /// Binds the progress UI to the completion of this request
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title of the progress dialog
+    ///
+    /// - `request`: the network request pending
     public Progress(String title, ConnectionRequest request) {
         this(title, request, false);
     }
 
-    /**
-     * Binds the progress UI to the completion of this request
-     *
-     * @param title          the title of the progress dialog
-     * @param request        the network request pending
-     * @param showPercentage shows percentage on the progress bar
-     */
+    /// Binds the progress UI to the completion of this request
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title of the progress dialog
+    ///
+    /// - `request`: the network request pending
+    ///
+    /// - `showPercentage`: shows percentage on the progress bar
     public Progress(String title, ConnectionRequest request, boolean showPercentage) {
         super(title);
         this.request = request;
@@ -89,9 +90,7 @@ public class Progress extends Dialog implements ActionListener<NetworkEvent> {
         NetworkManager.getInstance().addProgressListener(this);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void actionCommand(Command cmd) {
         if (Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() < 2) {
@@ -109,9 +108,7 @@ public class Progress extends Dialog implements ActionListener<NetworkEvent> {
         dispose();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void dispose() {
         NetworkManager.getInstance().removeProgressListener(this);
@@ -120,23 +117,21 @@ public class Progress extends Dialog implements ActionListener<NetworkEvent> {
         autoShow = false;
     }
 
-    /**
-     * @return the disposeOnCompletion
-     */
+    /// #### Returns
+    ///
+    /// the disposeOnCompletion
     public boolean isDisposeOnCompletion() {
         return disposeOnCompletion;
     }
 
-    /**
-     * @param disposeOnCompletion the disposeOnCompletion to set
-     */
+    /// #### Parameters
+    ///
+    /// - `disposeOnCompletion`: the disposeOnCompletion to set
     public void setDisposeOnCompletion(boolean disposeOnCompletion) {
         this.disposeOnCompletion = disposeOnCompletion;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void actionPerformed(NetworkEvent ev) {
         if (ev.getConnectionRequest() == request) { //NOPMD CompareObjectsWithEquals
@@ -151,20 +146,20 @@ public class Progress extends Dialog implements ActionListener<NetworkEvent> {
         }
     }
 
-    /**
-     * Shows the progress automatically when the request processing is started
-     *
-     * @return the autoShow
-     */
+    /// Shows the progress automatically when the request processing is started
+    ///
+    /// #### Returns
+    ///
+    /// the autoShow
     public boolean isAutoShow() {
         return autoShow;
     }
 
-    /**
-     * Shows the progress automatically when the request processing is started
-     *
-     * @param autoShow the autoShow to set
-     */
+    /// Shows the progress automatically when the request processing is started
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoShow`: the autoShow to set
     public void setAutoShow(boolean autoShow) {
         this.autoShow = autoShow;
     }

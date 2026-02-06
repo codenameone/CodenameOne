@@ -30,17 +30,15 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * A cache map is essentially a hashtable that indexes entries based on age and is
- * limited to a fixed size. Hence when an entry is placed into the cache map and the
- * cache size needs to increase, the least referenced entry is removed.
- * A cache hit is made both on fetching and putting, hence frequently fetched elements
- * will never be removed from a sufficiently large cache.
- * Cache can work purely in memory or swap data into storage based on user definitions.
- * Notice that this class isn't threadsafe.
- *
- * @author Shai Almog
- */
+/// A cache map is essentially a hashtable that indexes entries based on age and is
+/// limited to a fixed size. Hence when an entry is placed into the cache map and the
+/// cache size needs to increase, the least referenced entry is removed.
+/// A cache hit is made both on fetching and putting, hence frequently fetched elements
+/// will never be removed from a sufficiently large cache.
+/// Cache can work purely in memory or swap data into storage based on user definitions.
+/// Notice that this class isn't threadsafe.
+///
+/// @author Shai Almog
 public class CacheMap {
     private final Hashtable memoryCache = new Hashtable();
     private final Hashtable weakCache = new Hashtable();
@@ -50,17 +48,15 @@ public class CacheMap {
     private String cachePrefix = "";
     private boolean alwaysStore;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public CacheMap() {
     }
 
-    /**
-     * Creates a cache map with a prefix string
-     *
-     * @param prefix string to prepend to the cache entries in storage
-     */
+    /// Creates a cache map with a prefix string
+    ///
+    /// #### Parameters
+    ///
+    /// - `prefix`: string to prepend to the cache entries in storage
     public CacheMap(String prefix) {
         this.cachePrefix = prefix;
     }
@@ -75,32 +71,33 @@ public class CacheMap {
         return storageCacheContentVec;
     }
 
-    /**
-     * Indicates the size of the memory cache after which the cache won't grow further
-     * Size is indicated by number of elements stored and not by KB or similar benchmark!
-     *
-     * @return the cacheSize
-     */
+    /// Indicates the size of the memory cache after which the cache won't grow further
+    /// Size is indicated by number of elements stored and not by KB or similar benchmark!
+    ///
+    /// #### Returns
+    ///
+    /// the cacheSize
     public int getCacheSize() {
         return cacheSize;
     }
 
-    /**
-     * Indicates the size of the memory cache after which the cache won't grow further
-     * Size is indicated by number of elements stored and not by KB or similar benchmark!
-     *
-     * @param cacheSize the cacheSize to set
-     */
+    /// Indicates the size of the memory cache after which the cache won't grow further
+    /// Size is indicated by number of elements stored and not by KB or similar benchmark!
+    ///
+    /// #### Parameters
+    ///
+    /// - `cacheSize`: the cacheSize to set
     public void setCacheSize(int cacheSize) {
         this.cacheSize = cacheSize;
     }
 
-    /**
-     * Puts the given key/value pair in the cache
-     *
-     * @param key   the key
-     * @param value the value
-     */
+    /// Puts the given key/value pair in the cache
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    ///
+    /// - `value`: the value
     public void put(Object key, Object value) {
         if (cacheSize <= memoryCache.size()) {
             // we need to find the oldest entry
@@ -130,11 +127,11 @@ public class CacheMap {
     }
 
 
-    /**
-     * Deletes a cached entry
-     *
-     * @param key entry to remove from the cache
-     */
+    /// Deletes a cached entry
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: entry to remove from the cache
     public void delete(Object key) {
         memoryCache.remove(key);
         weakCache.remove(key);
@@ -152,12 +149,15 @@ public class CacheMap {
         }
     }
 
-    /**
-     * Returns the object matching the given key
-     *
-     * @param key key object
-     * @return value from a previous put or null
-     */
+    /// Returns the object matching the given key
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: key object
+    ///
+    /// #### Returns
+    ///
+    /// value from a previous put or null
     public Object get(Object key) {
         Object[] o = (Object[]) memoryCache.get(key);
         if (o != null) {
@@ -191,17 +191,13 @@ public class CacheMap {
         return null;
     }
 
-    /**
-     * Clears the caches for this cache object
-     */
+    /// Clears the caches for this cache object
     public void clearAllCache() {
         clearMemoryCache();
         clearStorageCache();
     }
 
-    /**
-     * Clears the memory cache
-     */
+    /// Clears the memory cache
     public void clearMemoryCache() {
         memoryCache.clear();
         weakCache.clear();
@@ -261,16 +257,17 @@ public class CacheMap {
         Storage.getInstance().writeObject("$CACHE$Idx" + cachePrefix, storageCacheContent);
     }
 
-    /**
-     * Returns the keys for all the objects currently in cache, this is useful
-     * to traverse all the objects and refresh them without actually deleting
-     * the cache and fetching them from scratch.<br>
-     * <b>Important</b> this vector is a copy of a current state, keys might
-     * not exist anymore or might change, others might be added in the interim.
-     *
-     * @return a vector containing a snapshot of the current elements within the
-     * cache.
-     */
+    /// Returns the keys for all the objects currently in cache, this is useful
+    /// to traverse all the objects and refresh them without actually deleting
+    /// the cache and fetching them from scratch.
+    ///
+    /// **Important** this vector is a copy of a current state, keys might
+    /// not exist anymore or might change, others might be added in the interim.
+    ///
+    /// #### Returns
+    ///
+    /// @return a vector containing a snapshot of the current elements within the
+    /// cache.
     public Vector getKeysInCache() {
         Vector r = new Vector();
         Enumeration en = memoryCache.keys();
@@ -287,9 +284,7 @@ public class CacheMap {
         return r;
     }
 
-    /**
-     * Clears the storage cache
-     */
+    /// Clears the storage cache
     public void clearStorageCache() {
         if (storageCacheSize > 0) {
             Vector v = getStorageCacheContent();
@@ -303,22 +298,22 @@ public class CacheMap {
         }
     }
 
-    /**
-     * Indicates the size of the storage cache after which the cache won't grow further
-     * Size is indicated by number of elements stored and not by KB or similar benchmark!
-     *
-     * @return the storageCacheSize
-     */
+    /// Indicates the size of the storage cache after which the cache won't grow further
+    /// Size is indicated by number of elements stored and not by KB or similar benchmark!
+    ///
+    /// #### Returns
+    ///
+    /// the storageCacheSize
     public int getStorageCacheSize() {
         return storageCacheSize;
     }
 
-    /**
-     * Indicates the size of the storage cache after which the cache won't grow further
-     * Size is indicated by number of elements stored and not by KB or similar benchmark!
-     *
-     * @param storageCacheSize the storageCacheSize to set
-     */
+    /// Indicates the size of the storage cache after which the cache won't grow further
+    /// Size is indicated by number of elements stored and not by KB or similar benchmark!
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageCacheSize`: the storageCacheSize to set
     public void setStorageCacheSize(int storageCacheSize) {
         this.storageCacheSize = storageCacheSize;
         /*for(int iter = 0 ; iter < storageCacheSize ; iter++) {
@@ -338,40 +333,40 @@ public class CacheMap {
         }
     }
 
-    /**
-     * A prefix prepended to storage entries to differentiate them
-     *
-     * @return the cachePrefix
-     */
+    /// A prefix prepended to storage entries to differentiate them
+    ///
+    /// #### Returns
+    ///
+    /// the cachePrefix
     public String getCachePrefix() {
         return cachePrefix;
     }
 
-    /**
-     * A prefix prepended to storage entries to differentiate them
-     *
-     * @param cachePrefix the cachePrefix to set
-     */
+    /// A prefix prepended to storage entries to differentiate them
+    ///
+    /// #### Parameters
+    ///
+    /// - `cachePrefix`: the cachePrefix to set
     public void setCachePrefix(String cachePrefix) {
         this.cachePrefix = cachePrefix;
     }
 
-    /**
-     * When set to true indicates that all entries should be persisted to storage
-     * for a constantly persisting cache
-     *
-     * @return the alwaysStore
-     */
+    /// When set to true indicates that all entries should be persisted to storage
+    /// for a constantly persisting cache
+    ///
+    /// #### Returns
+    ///
+    /// the alwaysStore
     public boolean isAlwaysStore() {
         return alwaysStore;
     }
 
-    /**
-     * When set to true indicates that all entries should be persisted to storage
-     * for a constantly persisting cache
-     *
-     * @param alwaysStore the alwaysStore to set
-     */
+    /// When set to true indicates that all entries should be persisted to storage
+    /// for a constantly persisting cache
+    ///
+    /// #### Parameters
+    ///
+    /// - `alwaysStore`: the alwaysStore to set
     public void setAlwaysStore(boolean alwaysStore) {
         this.alwaysStore = alwaysStore;
     }

@@ -34,30 +34,25 @@ import com.codename1.ui.plaf.Style;
 
 import java.util.ArrayList;
 
-/**
- * Allows selecting a time of day either in 24 hour batches or AM/PM format.
- *
- * <p>If {@link #setDurationMode(boolean) } is {@literal true } then this will allow
- * users to set a duration in hours and minutes.</p>
- *
- * <h3>Styles<h3>
- *
- * <table>
- *   <tr><th>UIID</th><th>Description</th></tr>
- *   <tr><td>{@literal SpinnerRenderer}</td><td>Used for each cell/row of the spinner.</td></tr>
- *   <tr><td>{@literal TimeSpinnerHoursLabel}</td><td>Used for the "hours" label to the right of the <em>hours</em> spinner.  Used only in duration mode.</td</tr>
- *   <tr><td>{@literal TimeSpinnerMinutesLabel}</td><td>Used for the "minutes" label to the right of the <em>minutes</em> spinner.  Used only in duration mode.</td></tr
- * </table>
- *
- * <h3>Screenshots</h3>
- *
- * <img src="https://www.codenameone.com/img/developer-guide/components-picker-duration-android.png" alt="Android duration picker" />
- * <img src="https://www.codenameone.com/img/developer-guide/components-picker-duration-hours-android.png" alt="Android duration hours picker" />
- * <img src="https://www.codenameone.com/img/developer-guide/components-picker-time-android.png" alt="Android duration minutes picker" />
- *
- * @author Shai Almog
- * @deprecated use Picker instead
- */
+/// Allows selecting a time of day either in 24 hour batches or AM/PM format.
+///
+/// If `#setDurationMode(boolean)` is true then this will allow
+/// users to set a duration in hours and minutes.
+///
+/// Styles
+///
+///   UIIDDescription
+///   SpinnerRendererUsed for each cell/row of the spinner.
+///   TimeSpinnerHoursLabelUsed for the "hours" label to the right of the *hours* spinner.  Used only in duration mode.
+///   TimeSpinnerMinutesLabelUsed for the "minutes" label to the right of the *minutes* spinner.  Used only in duration mode.
+///
+/// Screenshots
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
 public class TimeSpinner extends BaseSpinner {
     private final ArrayList<Component> hourComponents = new ArrayList<Component>();
     private final ArrayList<Component> minuteComponents = new ArrayList<Component>();
@@ -145,25 +140,19 @@ public class TimeSpinner extends BaseSpinner {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem", "durationMode"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class, Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("durationMode".equals(name)) {
@@ -196,9 +185,7 @@ public class TimeSpinner extends BaseSpinner {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("currentHour".equals(name)) {
@@ -229,20 +216,20 @@ public class TimeSpinner extends BaseSpinner {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * Gets the minutes spinner step size.
-     *
-     * @return the minuteStep
-     */
+    /// Gets the minutes spinner step size.
+    ///
+    /// #### Returns
+    ///
+    /// the minuteStep
     public int getMinuteStep() {
         return minuteStep;
     }
 
-    /**
-     * Sets the step-size for the minutes spinner.
-     *
-     * @param minuteStep The step size.  Must be beween 1 and 60.
-     */
+    /// Sets the step-size for the minutes spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minuteStep`: The step size.  Must be beween 1 and 60.
     public void setMinuteStep(int minuteStep) {
         if (minuteStep < 1 || minuteStep > 60) {
             throw new IllegalArgumentException("Minute step must be between 1 and 60");
@@ -253,18 +240,18 @@ public class TimeSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the showMeridiem
-     */
+    /// #### Returns
+    ///
+    /// the showMeridiem
     public boolean isShowMeridiem() {
         return showMeridiem && !durationMode;
     }
 
-    /**
-     * Shows AM/PM indication
-     *
-     * @param showMeridiem the showMeridiem to set
-     */
+    /// Shows AM/PM indication
+    ///
+    /// #### Parameters
+    ///
+    /// - `showMeridiem`: the showMeridiem to set
     public void setShowMeridiem(boolean showMeridiem) {
         if (durationMode) {
             return;
@@ -287,11 +274,11 @@ public class TimeSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * The hour from 1-12 or 0-23
-     *
-     * @return the currentHour
-     */
+    /// The hour from 1-12 or 0-23
+    ///
+    /// #### Returns
+    ///
+    /// the currentHour
     public int getCurrentHour() {
         if (hour != null) {
             return ((Integer) hour.getValue()).intValue();
@@ -299,11 +286,11 @@ public class TimeSpinner extends BaseSpinner {
         return currentHour;
     }
 
-    /**
-     * Set the hour from 1-12 or 0-23
-     *
-     * @param currentHour the currentHour to set
-     */
+    /// Set the hour from 1-12 or 0-23
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentHour`: the currentHour to set
     public void setCurrentHour(int currentHour) {
         this.currentHour = currentHour;
         if (hour != null) {
@@ -311,9 +298,9 @@ public class TimeSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the currentMinute
-     */
+    /// #### Returns
+    ///
+    /// the currentMinute
     public int getCurrentMinute() {
         if (minute != null) {
             return ((Integer) minute.getValue()).intValue();
@@ -321,9 +308,9 @@ public class TimeSpinner extends BaseSpinner {
         return currentMinute;
     }
 
-    /**
-     * @param currentMinute the currentMinute to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentMinute`: the currentMinute to set
     public void setCurrentMinute(int currentMinute) {
         this.currentMinute = currentMinute;
         if (minute != null) {
@@ -331,9 +318,9 @@ public class TimeSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the currentMeridiem
-     */
+    /// #### Returns
+    ///
+    /// the currentMeridiem
     public boolean isCurrentMeridiem() {
         if (durationMode) {
             return false;
@@ -344,9 +331,9 @@ public class TimeSpinner extends BaseSpinner {
         return currentMeridiem;
     }
 
-    /**
-     * @param currentMeridiem the currentMeridiem to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentMeridiem`: the currentMeridiem to set
     public void setCurrentMeridiem(boolean currentMeridiem) {
         if (durationMode) {
             return;
@@ -361,20 +348,20 @@ public class TimeSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * Duration mode uses the time spinner to indicate a duration in hours and minutes
-     *
-     * @return the durationMode
-     */
+    /// Duration mode uses the time spinner to indicate a duration in hours and minutes
+    ///
+    /// #### Returns
+    ///
+    /// the durationMode
     public boolean isDurationMode() {
         return durationMode;
     }
 
-    /**
-     * Duration mode uses the time spinner to indicate a duration in hours and minutes
-     *
-     * @param durationMode the durationMode to set
-     */
+    /// Duration mode uses the time spinner to indicate a duration in hours and minutes
+    ///
+    /// #### Parameters
+    ///
+    /// - `durationMode`: the durationMode to set
     public void setDurationMode(boolean durationMode) {
         if (durationMode) {
             setShowMeridiem(false);
@@ -392,11 +379,11 @@ public class TimeSpinner extends BaseSpinner {
         this.durationMode = durationMode;
     }
 
-    /**
-     * Show or hide the hours spinner.
-     *
-     * @param visible True to show the hours spinner.
-     */
+    /// Show or hide the hours spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`: True to show the hours spinner.
     public void setHoursVisible(boolean visible) {
         showHours = visible;
         for (Component c : hourComponents) {
@@ -407,11 +394,11 @@ public class TimeSpinner extends BaseSpinner {
 
     }
 
-    /**
-     * Show or hide the minutes spinner.
-     *
-     * @param visible True to make the minutes spinner visible.
-     */
+    /// Show or hide the minutes spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`: True to make the minutes spinner visible.
     public void setMinutesVisible(boolean visible) {
         showMinutes = visible;
         for (Component c : minuteComponents) {

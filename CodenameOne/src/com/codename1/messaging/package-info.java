@@ -4,18 +4,26 @@
     Author     : Chen Fishbein
 */
 
-/**
- * <p>
- *     Send e-mail messages through underlying platforms e-mail clients or thru the Codename One cloud.
- * </p>
- * <p>
- *     You can send messages and include attachments by using the platform native email client like this:
- * </p>
- * <script src="https://gist.github.com/codenameone/3db47a2ff8b35cae6410.js"></script>
- * <p>
- *     The following code demonstrates sending an email via the Codename One cloud, notice that this is a pro
- *     specific feature:
- * </p>
- * <script src="https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js"></script>
- */
+/// Send e-mail messages through underlying platforms e-mail clients or thru the Codename One cloud.
+///
+/// You can send messages and include attachments by using the platform native email client like this:
+///
+/// ```java
+/// Message m = new Message("Body of message");
+/// m.getAttachments().put(textAttachmentUri, "text/plain");
+/// m.getAttachments().put(imageAttachmentUri, "image/png");
+/// Display.getInstance().sendMessage(new String[] {"someone@gmail.com"}, "Subject of message", m);
+/// ```
+///
+/// The following code demonstrates sending an email via the Codename One cloud, notice that this is a pro
+/// specific feature:
+///
+/// ```java
+/// Message m = new Message("Check out Codename One");
+/// m.setMimeType(Message.MIME_HTML);
+///
+/// // notice that we provide a plain text alternative as well in the send method
+/// boolean success = m.sendMessageViaCloudSync("Codename One", "destination@domain.com", "Name Of User", "Message Subject",
+///                             "Check out Codename One at https://www.codenameone.com/");
+/// ```
 package com.codename1.messaging;

@@ -24,32 +24,35 @@ package com.codename1.ui.events;
 
 import com.codename1.ui.Component;
 
-/**
- * An event that is fired when the state of a component is changed to and from initialized.
- *
- * @author shannah
- * @see Component#addStateChangeListener(com.codename1.ui.events.ActionListener)
- * @see Component#removeStateChangeListener(com.codename1.ui.events.ActionListener)
- */
+/// An event that is fired when the state of a component is changed to and from initialized.
+///
+/// @author shannah
+///
+/// #### See also
+///
+/// - Component#addStateChangeListener(com.codename1.ui.events.ActionListener)
+///
+/// - Component#removeStateChangeListener(com.codename1.ui.events.ActionListener)
 public class ComponentStateChangeEvent extends ActionEvent {
     private final boolean initialized;
 
-    /**
-     * Creates a ComponentStateChangeEvent.
-     *
-     * @param source      The component whose state has changed.
-     * @param initialized True if the component state changed to initialized.  False otherwise.
-     */
+    /// Creates a ComponentStateChangeEvent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: The component whose state has changed.
+    ///
+    /// - `initialized`: True if the component state changed to initialized.  False otherwise.
     public ComponentStateChangeEvent(Component source, boolean initialized) {
         super(source);
         this.initialized = initialized;
     }
 
-    /**
-     * Indicates if the component state is initialized.
-     *
-     * @return True if the component state changed to initialized.
-     */
+    /// Indicates if the component state is initialized.
+    ///
+    /// #### Returns
+    ///
+    /// True if the component state changed to initialized.
     public boolean isInitialized() {
         return initialized;
     }

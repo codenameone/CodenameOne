@@ -38,18 +38,14 @@ import com.codename1.ui.util.Resources;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * Facebook sharing service
- *
- * @author Chen
- */
+/// Facebook sharing service
+///
+/// @author Chen
 public class FacebookShare extends ShareService {
 
     private String token;
 
-    /**
-     * Default Constructor
-     */
+    /// Default Constructor
     public FacebookShare() {
         super("Facebook", null);
     }
@@ -75,9 +71,7 @@ public class FacebookShare extends ShareService {
                 (token == null ? that.token == null : token.equals(that.token));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         int result = super.hashCode();
@@ -85,9 +79,7 @@ public class FacebookShare extends ShareService {
         return result;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void actionPerformed(ActionEvent evt) {
         if (!FaceBookAccess.getInstance().isAuthenticated()) {
@@ -104,9 +96,7 @@ public class FacebookShare extends ShareService {
         super.actionPerformed(evt);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void share(String text, final String image, final String mime) {
         final ShareForm[] f = new ShareForm[1];
@@ -194,17 +184,13 @@ public class FacebookShare extends ShareService {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void share(String toShare) {
         share(toShare, null, null);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean canShareImage() {
         return true;

@@ -54,77 +54,65 @@ import com.codename1.ui.util.UITimer;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-/**
- * <p>Binds validation constraints to form elements, when validation fails it can be highlighted directly on
- * the component via an emblem or change of the UIID (to original UIID name + "Invalid" e.g. "TextFieldInvalid").
- * Validators just run thru a set of Constraint objects to decide if validation succeeded or failed.</p>
- *
- * <p>It's possible to create any custom logic of validation. Example (see
- * <a href="https://stackoverflow.com/questions/48481888/codename-one-regexconstraint-to-check-a-valid-phone-number/48483465#48483465">this
- * discussion</a> on StackOverflow): </p>
- *
- * <script src="https://gist.github.com/codenameone/6a67dd4d151bedf1bc3db6abb7b945ee.js"></script>
- *
- * @author Shai Almog
- */
+/// Binds validation constraints to form elements, when validation fails it can be highlighted directly on
+/// the component via an emblem or change of the UIID (to original UIID name + "Invalid" e.g. "TextFieldInvalid").
+/// Validators just run thru a set of Constraint objects to decide if validation succeeded or failed.
+///
+/// It's possible to create any custom logic of validation. Example (see
+/// [this discussion](https://stackoverflow.com/questions/48481888/codename-one-regexconstraint-to-check-a-valid-phone-number/48483465#48483465) on StackOverflow):
+///
+/// ```java
+/// val.addConstraint(phone, new Constraint() {
+///   public  boolean isValid(Object value) {
+///     String v = (String)value;
+///     for(int i = 0 ; i = '0' && c <= '9' || c == '+' || c == '-') {
+///         continue;
+///       }
+///       return false;
+///     }
+///     return true;
+///   }
+///   public String getDefaultFailMessage() {
+///     return "Must be valid phone number";
+///   }
+/// });
+/// ```
+///
+/// @author Shai Almog
 public class Validator {
     private static final String VALID_MARKER = "cn1$$VALID_MARKER";
-    /**
-     * Indicates the default mode in which validation failures are expressed
-     */
+    /// Indicates the default mode in which validation failures are expressed
     private static HighlightMode defaultValidationFailureHighlightMode = HighlightMode.EMBLEM;
-    /**
-     * The emblem that will be drawn on top of the component to indicate the validation failure
-     */
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
     private static Image defaultValidationFailedEmblem = null;
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
     private static float defaultValidationEmblemPositionX = 1;
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
     private static float defaultValidationEmblemPositionY = 0.5f;
-    /**
-     * Indicates whether validation should occur on every key press (data change listener) or
-     * action performed (editing completion)
-     */
+    /// Indicates whether validation should occur on every key press (data change listener) or
+    /// action performed (editing completion)
     private static boolean validateOnEveryKey = false;
     private final HashMap<Component, Constraint> constraintList = new HashMap<Component, Constraint>();
     private final ArrayList<Component> submitButtons = new ArrayList<Component>();
     private InteractionDialog message = new InteractionDialog();
-    /**
-     * Error message UIID defaults to DialogBody. Allows customizing the look of the message
-     */
+    /// Error message UIID defaults to DialogBody. Allows customizing the look of the message
     private String errorMessageUIID = "DialogBody";
-    /**
-     * Indicates the mode in which validation failures are expressed
-     */
+    /// Indicates the mode in which validation failures are expressed
     private HighlightMode validationFailureHighlightMode = defaultValidationFailureHighlightMode;
-    /**
-     * The emblem that will be drawn on top of the component to indicate the validation failure
-     */
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
     private Image validationFailedEmblem = defaultValidationFailedEmblem;
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
     private float validationEmblemPositionX = defaultValidationEmblemPositionX;
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
     private float validationEmblemPositionY = defaultValidationEmblemPositionY;
-    /**
-     * Indicates whether an error message should be shown for the focused component
-     */
+    /// Indicates whether an error message should be shown for the focused component
     private boolean showErrorMessageForFocusedComponent;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public Validator() {
         validationFailedEmblem = initDefaultValidationFailedEmblem();
     }
@@ -139,231 +127,235 @@ public class Validator {
         }
     }
 
-    /**
-     * Indicates the default mode in which validation failures are expressed
-     *
-     * @return the defaultValidationFailureHighlightMode
-     */
+    /// Indicates the default mode in which validation failures are expressed
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValidationFailureHighlightMode
     public static HighlightMode getDefaultValidationFailureHighlightMode() {
         return defaultValidationFailureHighlightMode;
     }
 
-    /**
-     * Indicates the default mode in which validation failures are expressed
-     *
-     * @param aDefaultValidationFailureHighlightMode the defaultValidationFailureHighlightMode to set
-     */
+    /// Indicates the default mode in which validation failures are expressed
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValidationFailureHighlightMode`: the defaultValidationFailureHighlightMode to set
     public static void setDefaultValidationFailureHighlightMode(HighlightMode aDefaultValidationFailureHighlightMode) {
         defaultValidationFailureHighlightMode = aDefaultValidationFailureHighlightMode;
     }
 
-    /**
-     * The emblem that will be drawn on top of the component to indicate the validation failure
-     *
-     * @return the defaultValidationFailedEmblem
-     */
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValidationFailedEmblem
     public static Image getDefaultValidationFailedEmblem() {
         return defaultValidationFailedEmblem;
     }
 
-    /**
-     * The emblem that will be drawn on top of the component to indicate the validation failure
-     *
-     * @param aDefaultValidationFailedEmblem the defaultValidationFailedEmblem to set
-     */
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValidationFailedEmblem`: the defaultValidationFailedEmblem to set
     public static void setDefaultValidationFailedEmblem(Image aDefaultValidationFailedEmblem) {
         defaultValidationFailedEmblem = aDefaultValidationFailedEmblem;
     }
 
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     *
-     * @return the defaultValidationEmblemPositionX
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValidationEmblemPositionX
     public static float getDefaultValidationEmblemPositionX() {
         return defaultValidationEmblemPositionX;
     }
 
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     *
-     * @param aDefaultValidationEmblemPositionX the defaultValidationEmblemPositionX to set
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValidationEmblemPositionX`: the defaultValidationEmblemPositionX to set
     public static void setDefaultValidationEmblemPositionX(float aDefaultValidationEmblemPositionX) {
         defaultValidationEmblemPositionX = aDefaultValidationEmblemPositionX;
     }
 
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     *
-     * @return the defaultValidationEmblemPositionY
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValidationEmblemPositionY
     public static float getDefaultValidationEmblemPositionY() {
         return defaultValidationEmblemPositionY;
     }
 
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     *
-     * @param aDefaultValidationEmblemPositionY the defaultValidationEmblemPositionY to set
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValidationEmblemPositionY`: the defaultValidationEmblemPositionY to set
     public static void setDefaultValidationEmblemPositionY(float aDefaultValidationEmblemPositionY) {
         defaultValidationEmblemPositionY = aDefaultValidationEmblemPositionY;
     }
 
-    /**
-     * Indicates whether validation should occur on every key press (data change listener) or
-     * action performed (editing completion)
-     *
-     * @return the validateOnEveryKey
-     */
+    /// Indicates whether validation should occur on every key press (data change listener) or
+    /// action performed (editing completion)
+    ///
+    /// #### Returns
+    ///
+    /// the validateOnEveryKey
     public static boolean isValidateOnEveryKey() {
         return validateOnEveryKey;
     }
 
-    /**
-     * Indicates whether validation should occur on every key press (data change listener) or
-     * action performed (editing completion)
-     *
-     * @param aValidateOnEveryKey the validateOnEveryKey to set
-     */
+    /// Indicates whether validation should occur on every key press (data change listener) or
+    /// action performed (editing completion)
+    ///
+    /// #### Parameters
+    ///
+    /// - `aValidateOnEveryKey`: the validateOnEveryKey to set
     public static void setValidateOnEveryKey(boolean aValidateOnEveryKey) {
         validateOnEveryKey = aValidateOnEveryKey;
     }
 
-    /**
-     * Indicates the default mode in which validation failures are expressed
-     *
-     * @return the validationFailureHighlightMode
-     */
+    /// Indicates the default mode in which validation failures are expressed
+    ///
+    /// #### Returns
+    ///
+    /// the validationFailureHighlightMode
     public HighlightMode getValidationFailureHighlightMode() {
         return validationFailureHighlightMode;
     }
 
-    /**
-     * Indicates the default mode in which validation failures are expressed
-     *
-     * @param validationFailureHighlightMode the validationFailureHighlightMode to set
-     */
+    /// Indicates the default mode in which validation failures are expressed
+    ///
+    /// #### Parameters
+    ///
+    /// - `validationFailureHighlightMode`: the validationFailureHighlightMode to set
     public void setValidationFailureHighlightMode(HighlightMode validationFailureHighlightMode) {
         this.validationFailureHighlightMode = validationFailureHighlightMode;
     }
 
-    /**
-     * The emblem that will be drawn on top of the component to indicate the validation failure
-     *
-     * @return the validationFailedEmblem
-     */
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+    ///
+    /// #### Returns
+    ///
+    /// the validationFailedEmblem
     public Image getValidationFailedEmblem() {
         return validationFailedEmblem;
     }
 
-    /**
-     * The emblem that will be drawn on top of the component to indicate the validation failure
-     *
-     * @param validationFailedEmblem the validationFailedEmblem to set
-     */
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+    ///
+    /// #### Parameters
+    ///
+    /// - `validationFailedEmblem`: the validationFailedEmblem to set
     public void setValidationFailedEmblem(Image validationFailedEmblem) {
         this.validationFailedEmblem = validationFailedEmblem;
     }
 
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     *
-     * @return the validationEmblemPositionX
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Returns
+    ///
+    /// the validationEmblemPositionX
     public float getValidationEmblemPositionX() {
         return validationEmblemPositionX;
     }
 
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     *
-     * @param validationEmblemPositionX the validationEmblemPositionX to set
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `validationEmblemPositionX`: the validationEmblemPositionX to set
     public void setValidationEmblemPositionX(float validationEmblemPositionX) {
         this.validationEmblemPositionX = validationEmblemPositionX;
     }
 
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     *
-     * @return the validationEmblemPositionY
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Returns
+    ///
+    /// the validationEmblemPositionY
     public float getValidationEmblemPositionY() {
         return validationEmblemPositionY;
     }
 
-    /**
-     * The position of the validation emblem on the component as X/Y values between 0 and 1 where
-     * 0 indicates the start of the component and 1 indicates its end on the given axis.
-     *
-     * @param validationEmblemPositionY the validationEmblemPositionY to set
-     */
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `validationEmblemPositionY`: the validationEmblemPositionY to set
     public void setValidationEmblemPositionY(float validationEmblemPositionY) {
         this.validationEmblemPositionY = validationEmblemPositionY;
     }
 
-    /**
-     * Indicates whether an error message should be shown for the focused component
-     *
-     * @return true if the error message should be displayed
-     */
+    /// Indicates whether an error message should be shown for the focused component
+    ///
+    /// #### Returns
+    ///
+    /// true if the error message should be displayed
     public boolean isShowErrorMessageForFocusedComponent() {
         return showErrorMessageForFocusedComponent;
     }
 
-    /**
-     * Indicates whether an error message should be shown for the focused component
-     *
-     * @param showErrorMessageForFocusedComponent true to show the error message
-     */
+    /// Indicates whether an error message should be shown for the focused component
+    ///
+    /// #### Parameters
+    ///
+    /// - `showErrorMessageForFocusedComponent`: true to show the error message
     public void setShowErrorMessageForFocusedComponent(boolean showErrorMessageForFocusedComponent) {
         this.showErrorMessageForFocusedComponent = showErrorMessageForFocusedComponent;
     }
 
-    /**
-     * Error message UIID defaults to DialogBody. Allows customizing the look of the message
-     *
-     * @return the errorMessageUIID
-     */
+    /// Error message UIID defaults to DialogBody. Allows customizing the look of the message
+    ///
+    /// #### Returns
+    ///
+    /// the errorMessageUIID
     public String getErrorMessageUIID() {
         return errorMessageUIID;
     }
 
-    /**
-     * Error message UIID defaults to DialogBody. Allows customizing the look of the message
-     *
-     * @param errorMessageUIID the errorMessageUIID to set
-     */
+    /// Error message UIID defaults to DialogBody. Allows customizing the look of the message
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorMessageUIID`: the errorMessageUIID to set
     public void setErrorMessageUIID(String errorMessageUIID) {
         this.errorMessageUIID = errorMessageUIID;
     }
 
-    /**
-     * Places a constraint on the validator, returns this object so constraint
-     * additions can be chained. Shows validation errors messages even when the
-     * TextModeLayout is not {@code onTopMode} (it's possible to disable this
-     * functionality setting to false the theme constant
-     * {@code showValidationErrorsIfNotOnTopMode}: basically, the error
-     * message is shown for two second in place of the label on the left of the
-     * InputComponent (or on right of the InputComponent for RTL languages);
-     * this solution never breaks the layout, because the error message is
-     * trimmed to fit the available space. The error message UIID is
-     * "ErrorLabel" when it's not onTopMode.
-     *
-     * @param cmp the component to validate
-     * @param c   the constraint or constraints
-     * @return this object so we can write code like v.addConstraint(cmp1,
-     * cons).addConstraint(cmp2, otherConstraint);
-     */
+    /// Places a constraint on the validator, returns this object so constraint
+    /// additions can be chained. Shows validation errors messages even when the
+    /// TextModeLayout is not `onTopMode` (it's possible to disable this
+    /// functionality setting to false the theme constant
+    /// `showValidationErrorsIfNotOnTopMode`: basically, the error
+    /// message is shown for two second in place of the label on the left of the
+    /// InputComponent (or on right of the InputComponent for RTL languages);
+    /// this solution never breaks the layout, because the error message is
+    /// trimmed to fit the available space. The error message UIID is
+    /// "ErrorLabel" when it's not onTopMode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to validate
+    ///
+    /// - `c`: the constraint or constraints
+    ///
+    /// #### Returns
+    ///
+    /// @return this object so we can write code like v.addConstraint(cmp1,
+    /// cons).addConstraint(cmp2, otherConstraint);
     public Validator addConstraint(Component cmp, Constraint... c) {
         Constraint constraint = null;
         if (c.length == 1) {
@@ -444,14 +436,19 @@ public class Validator {
         return this;
     }
 
-    /**
-     * Long error messages are trimmed to fit the available space in the layout
-     *
-     * @param errorMessage the string to be trimmed
-     * @param uiid         the uiid of the errorMessage
-     * @param width        the maximum width
-     * @return the new String trimmed to fit the available width
-     */
+    /// Long error messages are trimmed to fit the available space in the layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorMessage`: the string to be trimmed
+    ///
+    /// - `uiid`: the uiid of the errorMessage
+    ///
+    /// - `width`: the maximum width
+    ///
+    /// #### Returns
+    ///
+    /// the new String trimmed to fit the available width
     private String trimLongString(String errorMessage, String uiid, int width) {
         Label errorLabel = new Label(errorMessage, uiid);
         while (errorLabel.getPreferredW() > width && errorMessage.length() > 1) {
@@ -461,14 +458,17 @@ public class Validator {
         return errorMessage;
     }
 
-    /**
-     * Submit buttons (or any other component type) can be disabled until all components contain a valid value.
-     * Notice that this method should be invoked after all the constraints are added so the initial state of the buttons
-     * will be correct.
-     *
-     * @param cmp set of buttons or components to disable until everything is valid
-     * @return the validator instance so this method can be chained
-     */
+    /// Submit buttons (or any other component type) can be disabled until all components contain a valid value.
+    /// Notice that this method should be invoked after all the constraints are added so the initial state of the buttons
+    /// will be correct.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: set of buttons or components to disable until everything is valid
+    ///
+    /// #### Returns
+    ///
+    /// the validator instance so this method can be chained
     public Validator addSubmitButtons(Component... cmp) {
         boolean isV = isValid();
         for (Component c : cmp) {
@@ -478,12 +478,15 @@ public class Validator {
         return this;
     }
 
-    /**
-     * Returns the value of the given component, this can be overriden to add support for custom built components
-     *
-     * @param cmp the component
-     * @return the object value
-     */
+    /// Returns the value of the given component, this can be overriden to add support for custom built components
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component
+    ///
+    /// #### Returns
+    ///
+    /// the object value
     protected Object getComponentValue(Component cmp) {
         if (cmp instanceof InputComponent) {
             cmp = ((InputComponent) cmp).getEditor();
@@ -509,13 +512,16 @@ public class Validator {
         return null;
     }
 
-    /**
-     * Binds an event listener to the given component
-     *
-     * @param cmp the component to bind the data listener to
-     * @deprecated this method was exposed by accident, constraint implicitly calls it and you don't need to
-     * call it directly. It will be made protected in a future update to Codename One!
-     */
+    /// Binds an event listener to the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to bind the data listener to
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method was exposed by accident, constraint implicitly calls it and you don't need to
+    /// call it directly. It will be made protected in a future update to Codename One!
     public void bindDataListener(Component cmp) {
         if (showErrorMessageForFocusedComponent) {
             if (!(cmp instanceof InputComponent && ((InputComponent) cmp).isOnTopMode())) {
@@ -608,11 +614,11 @@ public class Validator {
         }
     }
 
-    /**
-     * Returns true if all the constraints are currently valid
-     *
-     * @return true if the entire validator is valid
-     */
+    /// Returns true if all the constraints are currently valid
+    ///
+    /// #### Returns
+    ///
+    /// true if the entire validator is valid
     public boolean isValid() {
         for (Component c : constraintList.keySet()) {
             if (!isValid(c)) {
@@ -622,11 +628,11 @@ public class Validator {
         return true;
     }
 
-    /**
-     * Validates and highlights an individual component
-     *
-     * @param cmp the component to validate
-     */
+    /// Validates and highlights an individual component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to validate
     protected void validate(Component cmp) {
         Object val = getComponentValue(cmp);
         Constraint c = constraintList.get(cmp);
@@ -648,12 +654,15 @@ public class Validator {
         return true;
     }
 
-    /**
-     * Returns the validation error message for the given component or null if no such message exists
-     *
-     * @param cmp the invalid component
-     * @return a string representing the error message
-     */
+    /// Returns the validation error message for the given component or null if no such message exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the invalid component
+    ///
+    /// #### Returns
+    ///
+    /// a string representing the error message
     public String getErrorMessage(Component cmp) {
         return constraintList.get(cmp).getDefaultFailMessage();
     }
@@ -714,9 +723,7 @@ public class Validator {
         }
     }
 
-    /**
-     * Indicates the validation failure modes
-     */
+    /// Indicates the validation failure modes
     public enum HighlightMode {
         UIID,
         EMBLEM,
@@ -760,9 +767,7 @@ public class Validator {
             validate(cmp);
         }
 
-        /**
-         * Handles the glasspane work just to save a new class object (smaller code)
-         */
+        /// Handles the glasspane work just to save a new class object (smaller code)
         @Override
         public void paint(Graphics g, Rectangle rect) {
             for (Component c : constraintList.keySet()) {

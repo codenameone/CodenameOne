@@ -25,11 +25,9 @@ package com.codename1.ui;
 
 import java.util.ArrayList;
 
-/**
- * Class used by callSeriallyAndWait and invokeAndBlock and form to save code size
- *
- * @author Shai Almog
- */
+/// Class used by callSeriallyAndWait and invokeAndBlock and form to save code size
+///
+/// @author Shai Almog
 class RunnableWrapper implements Runnable {
     private static final Object THREADPOOL_LOCK = new Object();
     private static final ArrayList<Runnable> threadPool = new ArrayList<Runnable>();

@@ -4,9 +4,5 @@
     Author     : Shai Almog
 */
 
-/**
- * <p>
- *     These are the map providers, currently http://www.openstreetmap.org/ is supported.
- * </p>
- */
+/// These are the map providers, currently http://www.openstreetmap.org/ is supported.
 package com.codename1.maps.providers;

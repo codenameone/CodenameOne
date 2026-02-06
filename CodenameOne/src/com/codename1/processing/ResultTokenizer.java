@@ -42,13 +42,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
-/**
- * Internal class, do not use.
- * <p>
- * Used internally by Result class apply() methods, this converts a path expression into a List of string tokens.
- *
- * @author Eric Coolman (2012-03 - derivative work from original Sun source).
- */
+/// Internal class, do not use.
+///
+/// Used internally by Result class apply() methods, this converts a path expression into a List of string tokens.
+///
+/// @author Eric Coolman (2012-03 - derivative work from original Sun source).
 class ResultTokenizer {
 
     private final String expression;
@@ -104,24 +102,23 @@ class ResultTokenizer {
         return tokens;
     }
 
-    /**
-     * Handle the predicate expression within outermost brackets.
-     * This allows us to nest predicate expressions.  For example:
-     *
-     * <code>
-     * /result/address_component[/type[position() < 5]='locality']/long_name
-     * </code>
-     * The nested predicate in the above statement is
-     *
-     * <code>
-     * /type[position() < 5]='locality'
-     * </code>
-     * <p>
-     * which is applied against the address_component node.
-     *
-     * @param sbuf
-     * @return full predicate expression
-     */
+    /// Handle the predicate expression within outermost brackets.
+    /// This allows us to nest predicate expressions.  For example:
+    ///
+    /// `/result/address_component[/type[position() < 5]='locality']/long_name`
+    /// The nested predicate in the above statement is
+    ///
+    /// `/type[position() < 5]='locality'`
+    ///
+    /// which is applied against the address_component node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sbuf`
+    ///
+    /// #### Returns
+    ///
+    /// full predicate expression
     private String getPredicate(StringBuffer sbuf) {
         int stack = 1;
 

@@ -36,11 +36,9 @@ import com.codename1.ui.util.Effects;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Spinner renderer that can automatically simulate the iOS perspective transform behavior
- *
- * @author Shai Almog
- */
+/// Spinner renderer that can automatically simulate the iOS perspective transform behavior
+///
+/// @author Shai Almog
 class SpinnerRenderer<T> extends DefaultListCellRenderer<T> {
     private static final int PERSPECTIVES = 9;
     private static final int FRONT_ANGLE = 4;
@@ -107,9 +105,7 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T> {
         }
     }
 
-    /**
-     * Draws the character with the given perspective effect
-     */
+    /// Draws the character with the given perspective effect
     private int drawCharPerspectivePosition(Graphics g, char c, int x, int y) {
         if (imageCache == null) {
             imageCache = new HashMap[PERSPECTIVES];

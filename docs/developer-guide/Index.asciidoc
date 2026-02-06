@@ -208,11 +208,11 @@ Worse. Mobile OS's kill applications that drain the battery. If the app is drain
 
 ==== Sandbox and Permissions
 
-Apps installed on the device are “sandboxed” to a specific area so they won’t harm the device or its functionality. The filesystem of mobile applications is restricted so one application can’t access the files of another application. Things that most developers take for granted on the desktop such as a “file picker” or accessing the image folder don’t work on devices!
+Apps installed on the device are "sandboxed" to a specific area so they won’t harm the device or its functionality. The filesystem of mobile applications is restricted so one application can’t access the files of another application. Things that most developers take for granted on the desktop such as a "file picker" or accessing the image folder don’t work on devices!
 
 This means that when your application works on a file it belongs only to your application. In order to share the file with a different application you need to ask the operating system to do that for you.
 
-Furthermore, some features require a “permission” prompt and in some cases require special flags in system files. Apps need to request permission to use sensitive capabilities e.g. Camera, Contacts etc.  +
+Furthermore, some features require a "permission" prompt and in some cases require special flags in system files. Apps need to request permission to use sensitive capabilities e.g. Camera, Contacts etc.  +
 Historically Android developers just declared required permissions for an app and the user was prompted with permissions during install. Android 6 adopted the approach used by iOS of prompting the user for permission when accessing a feature.
 
 This means that in runtime a user might revoke a permission. A good example in the case of an Uber app is the location permission. If a user revokes that permission the app might lose its location.

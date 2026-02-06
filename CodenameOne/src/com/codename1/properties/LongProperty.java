@@ -23,33 +23,27 @@
 
 package com.codename1.properties;
 
-/**
- * This is the long specific version of numeric property
- *
- * @author Shai Almog
- */
+/// This is the long specific version of numeric property
+///
+/// @author Shai Almog
 public class LongProperty<K> extends NumericProperty<Long, K> {
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public LongProperty(String name) {
         super(name, Long.class);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public LongProperty(String name, Long value) {
         super(name, Long.class, value);
     }
 
 
-    /**
-     * Returns the value as a primitive, if the value is null/nullable this will fail...
-     *
-     * @return the numeric value
-     */
+    /// Returns the value as a primitive, if the value is null/nullable this will fail...
+    ///
+    /// #### Returns
+    ///
+    /// the numeric value
     public long getLong() {
         return get().longValue();
     }

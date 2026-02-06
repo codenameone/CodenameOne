@@ -22,33 +22,29 @@
  */
 package com.codename1.processing;
 
-/**
- * Internal class, do not use.
- * <p>
- * This evaluator handles expressions that test if rvalue is contained in lvalue. Examples:
- *
- * <code>
- * Get all long name of the address component where the types array includes both values "neighborhood" and "political"
- * <p>
- * /results/address_components[types % (neighborhood, political)]/long_name
- * <p>
- * Get all long name of the address component where the types array includes a value of "political"
- * <p>
- * /results/address_components[types % (neighborhood, political)]/long_name
- * <p>
- * Get all long name of the address component where the short name contains "ny"
- * <p>
- * /results/address_components[short_name % ny]/long_name
- * </code>
- *
- * @author Eric Coolman
- */
+/// Internal class, do not use.
+///
+/// This evaluator handles expressions that test if rvalue is contained in lvalue. Examples:
+///
+/// `Get all long name of the address component where the types array includes both values "neighborhood" and "political"
+///
+///  /results/address_components[types % (neighborhood, political)]/long_name
+///
+///  Get all long name of the address component where the types array includes a value of "political"
+///
+///  /results/address_components[types % (neighborhood, political)]/long_name
+///
+///  Get all long name of the address component where the short name contains "ny"
+///
+///  /results/address_components[short_name % ny]/long_name`
+///
+/// @author Eric Coolman
 class ContainsEvaluator extends AbstractEvaluator {
-    /**
-     * Construct with a full predicate expression.
-     *
-     * @param expr a full predicate expression.
-     */
+    /// Construct with a full predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `expr`: a full predicate expression.
     public ContainsEvaluator(String expr) {
         super(expr);
     }

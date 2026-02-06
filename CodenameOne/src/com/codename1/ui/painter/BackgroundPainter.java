@@ -30,26 +30,22 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 
-/**
- * A painter that draws the background of a component based on its style
- *
- * @author Shai Almog
- */
+/// A painter that draws the background of a component based on its style
+///
+/// @author Shai Almog
 public class BackgroundPainter implements Painter {
     private final Component parent;
 
-    /**
-     * Construct a background painter for the given component
-     *
-     * @param parent the parent component
-     */
+    /// Construct a background painter for the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the parent component
     public BackgroundPainter(Component parent) {
         this.parent = parent;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g, Rectangle rect) {
         Style s = parent.getStyle();

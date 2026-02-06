@@ -47,26 +47,22 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-/**
- * A very flexible layout manager.
- * <p>
- * Read the documentation that came with this layout manager for information on
- * usage.
- *
- * @deprecated this is currently an experimental integration and has known bugs
- * do not rely on this layout for production
- */
+/// A very flexible layout manager.
+///
+/// Read the documentation that came with this layout manager for information on
+/// usage.
+///
+/// #### Deprecated
+///
+/// @deprecated this is currently an experimental integration and has known bugs
+/// do not rely on this layout for production
 public final class MigLayout extends Layout {
     // ******** Instance part ********
 
-    /**
-     * The component to string constraints mappings.
-     */
+    /// The component to string constraints mappings.
     private final Map<Component, Object> scrConstrMap = new IdentityHashMap<Component, Object>(8);
     private final Map<ComponentWrapper, CC> ccMap = new HashMap<ComponentWrapper, CC>(8);
-    /**
-     * Hold the serializable text representation of the constraints.
-     */
+    /// Hold the serializable text representation of the constraints.
     private Object layoutConstraints = "";    // Should never be null!
     private Object colConstraints = "";
     private Object rowConstraints = "";
@@ -87,83 +83,87 @@ public final class MigLayout extends Layout {
 
     private boolean dirty = true;
 
-    /**
-     * Constructor with no constraints.
-     */
+    /// Constructor with no constraints.
     public MigLayout() {
         this("", "", "");
     }
 
-    /**
-     * Constructor.
-     *
-     * @param layoutConstraints The constraints that concern the whole layout.
-     *                          <code>null</code> will be treated as "".
-     */
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as "".
     public MigLayout(String layoutConstraints) {
         this(layoutConstraints, "", "");
     }
 
-    /**
-     * Constructor.
-     *
-     * @param layoutConstraints The constraints that concern the whole layout.
-     *                          <code>null</code> will be treated as "".
-     * @param colConstraints    The constraints for the columns in the grid.
-     *                          <code>null</code> will be treated as "".
-     */
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as "".
+    ///
+    /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
+    /// `null` will be treated as "".
     public MigLayout(String layoutConstraints, String colConstraints) {
         this(layoutConstraints, colConstraints, "");
     }
 
-    /**
-     * Constructor.
-     *
-     * @param layoutConstraints The constraints that concern the whole layout.
-     *                          <code>null</code> will be treated as "".
-     * @param colConstraints    The constraints for the columns in the grid.
-     *                          <code>null</code> will be treated as "".
-     * @param rowConstraints    The constraints for the rows in the grid.
-     *                          <code>null</code> will be treated as "".
-     */
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as "".
+    ///
+    /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
+    /// `null` will be treated as "".
+    ///
+    /// - `rowConstraints`: @param rowConstraints    The constraints for the rows in the grid.
+    /// `null` will be treated as "".
     public MigLayout(String layoutConstraints, String colConstraints, String rowConstraints) {
         setLayoutConstraints(layoutConstraints);
         setColumnConstraints(colConstraints);
         setRowConstraints(rowConstraints);
     }
 
-    /**
-     * Constructor.
-     *
-     * @param layoutConstraints The constraints that concern the whole layout.
-     *                          <code>null</code> will be treated as an empty constraint.
-     */
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as an empty constraint.
     public MigLayout(LC layoutConstraints) {
         this(layoutConstraints, null, null);
     }
 
-    /**
-     * Constructor.
-     *
-     * @param layoutConstraints The constraints that concern the whole layout.
-     *                          <code>null</code> will be treated as an empty constraint.
-     * @param colConstraints    The constraints for the columns in the grid.
-     *                          <code>null</code> will be treated as an empty constraint.
-     */
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as an empty constraint.
+    ///
+    /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
+    /// `null` will be treated as an empty constraint.
     public MigLayout(LC layoutConstraints, AC colConstraints) {
         this(layoutConstraints, colConstraints, null);
     }
 
-    /**
-     * Constructor.
-     *
-     * @param layoutConstraints The constraints that concern the whole layout.
-     *                          <code>null</code> will be treated as an empty constraint.
-     * @param colConstraints    The constraints for the columns in the grid.
-     *                          <code>null</code> will be treated as an empty constraint.
-     * @param rowConstraints    The constraints for the rows in the grid.
-     *                          <code>null</code> will be treated as an empty constraint.
-     */
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as an empty constraint.
+    ///
+    /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
+    /// `null` will be treated as an empty constraint.
+    ///
+    /// - `rowConstraints`: @param rowConstraints    The constraints for the rows in the grid.
+    /// `null` will be treated as an empty constraint.
     public MigLayout(LC layoutConstraints, AC colConstraints, AC rowConstraints) {
         setLayoutConstraints(layoutConstraints);
         setColumnConstraints(colConstraints);
@@ -178,30 +178,33 @@ public final class MigLayout extends Layout {
         return (E) comp;
     }
 
-    /**
-     * Returns layout constraints either as a <code>String</code> or
-     * {@link net.miginfocom.layout.LC} depending what was sent in to the
-     * constructor or set with {@link #setLayoutConstraints(Object)}.
-     *
-     * @return The layout constraints either as a <code>String</code> or
-     * {@link net.miginfocom.layout.LC} depending what was sent in to the
-     * constructor or set with {@link #setLayoutConstraints(Object)}. Never
-     * <code>null</code>.
-     */
+    /// Returns layout constraints either as a `String` or
+    /// `net.miginfocom.layout.LC` depending what was sent in to the
+    /// constructor or set with `#setLayoutConstraints(Object)`.
+    ///
+    /// #### Returns
+    ///
+    /// @return The layout constraints either as a `String` or
+    /// `net.miginfocom.layout.LC` depending what was sent in to the
+    /// constructor or set with `#setLayoutConstraints(Object)`. Never
+    /// `null`.
     public Object getLayoutConstraints() {
         return layoutConstraints;
     }
 
-    /**
-     * Sets the layout constraints for the layout manager instance as a String.
-     * <p>
-     * See the class JavaDocs for information on how this string is formatted.
-     *
-     * @param constr The layout constraints as a String pr
-     *               {@link net.miginfocom.layout.LC} representation. <code>null</code> is
-     *               converted to <code>""</code> for storage.
-     * @throws RuntimeException if the constraint was not valid.
-     */
+    /// Sets the layout constraints for the layout manager instance as a String.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr The layout constraints as a String pr
+    /// `net.miginfocom.layout.LC` representation. `null` is
+    /// converted to `""` for storage.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
     public void setLayoutConstraints(Object constr) {
         if (constr == null || constr instanceof String) {
             constr = ConstraintParser.prepare((String) constr);
@@ -217,30 +220,33 @@ public final class MigLayout extends Layout {
         dirty = true;
     }
 
-    /**
-     * Returns the column layout constraints either as a <code>String</code> or
-     * {@link net.miginfocom.layout.AC}.
-     *
-     * @return The column constraints either as a <code>String</code> or
-     * {@link net.miginfocom.layout.AC} depending what was sent in to the
-     * constructor or set with {@link #setColumnConstraints(Object)}. Never
-     * <code>null</code>.
-     */
+    /// Returns the column layout constraints either as a `String` or
+    /// `net.miginfocom.layout.AC`.
+    ///
+    /// #### Returns
+    ///
+    /// @return The column constraints either as a `String` or
+    /// `net.miginfocom.layout.AC` depending what was sent in to the
+    /// constructor or set with `#setColumnConstraints(Object)`. Never
+    /// `null`.
     public Object getColumnConstraints() {
         return colConstraints;
     }
 
-    /**
-     * Sets the column layout constraints for the layout manager instance as a
-     * String.
-     * <p>
-     * See the class JavaDocs for information on how this string is formatted.
-     *
-     * @param constr The column layout constraints as a String or
-     *               {@link net.miginfocom.layout.AC} representation. <code>null</code> is
-     *               converted to <code>""</code> for storage.
-     * @throws RuntimeException if the constraint was not valid.
-     */
+    /// Sets the column layout constraints for the layout manager instance as a
+    /// String.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr The column layout constraints as a String or
+    /// `net.miginfocom.layout.AC` representation. `null` is
+    /// converted to `""` for storage.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
     public void setColumnConstraints(Object constr) {
         if (constr == null || constr instanceof String) {
             constr = ConstraintParser.prepare((String) constr);
@@ -254,30 +260,33 @@ public final class MigLayout extends Layout {
         dirty = true;
     }
 
-    /**
-     * Returns the row layout constraints either as a <code>String</code> or
-     * {@link net.miginfocom.layout.AC}.
-     *
-     * @return The row constraints either as a <code>String</code> or
-     * {@link net.miginfocom.layout.AC} depending what was sent in to the
-     * constructor or set with {@link #setRowConstraints(Object)}. Never
-     * <code>null</code>.
-     */
+    /// Returns the row layout constraints either as a `String` or
+    /// `net.miginfocom.layout.AC`.
+    ///
+    /// #### Returns
+    ///
+    /// @return The row constraints either as a `String` or
+    /// `net.miginfocom.layout.AC` depending what was sent in to the
+    /// constructor or set with `#setRowConstraints(Object)`. Never
+    /// `null`.
     public Object getRowConstraints() {
         return rowConstraints;
     }
 
-    /**
-     * Sets the row layout constraints for the layout manager instance as a
-     * String.
-     * <p>
-     * See the class JavaDocs for information on how this string is formatted.
-     *
-     * @param constr The row layout constraints as a String or
-     *               {@link net.miginfocom.layout.AC} representation. <code>null</code> is
-     *               converted to <code>""</code> for storage.
-     * @throws RuntimeException if the constraint was not valid.
-     */
+    /// Sets the row layout constraints for the layout manager instance as a
+    /// String.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr The row layout constraints as a String or
+    /// `net.miginfocom.layout.AC` representation. `null` is
+    /// converted to `""` for storage.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
     public void setRowConstraints(Object constr) {
         if (constr == null || constr instanceof String) {
             constr = ConstraintParser.prepare((String) constr);
@@ -291,20 +300,20 @@ public final class MigLayout extends Layout {
         dirty = true;
     }
 
-    /**
-     * Returns a shallow copy of the constraints map.
-     *
-     * @return A shallow copy of the constraints map. Never <code>null</code>.
-     */
+    /// Returns a shallow copy of the constraints map.
+    ///
+    /// #### Returns
+    ///
+    /// A shallow copy of the constraints map. Never `null`.
     public Map<Component, Object> getConstraintMap() {
         return new IdentityHashMap<Component, Object>(scrConstrMap);
     }
 
-    /**
-     * Sets the constraints map.
-     *
-     * @param map The map. Will be copied.
-     */
+    /// Sets the constraints map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: The map. Will be copied.
     public void setConstraintMap(Map<Component, Object> map) {
         scrConstrMap.clear();
         ccMap.clear();
@@ -313,56 +322,70 @@ public final class MigLayout extends Layout {
         }
     }
 
-    /**
-     * Returns the component constraints as a String representation. This string
-     * is the exact string as set with
-     * {@link #setComponentConstraints(java.awt.Component, Object)} or set when
-     * adding the component to the parent component.
-     * <p>
-     * See the class JavaDocs for information on how this string is formatted.
-     *
-     * @param comp The component to return the constraints for.
-     * @return The component constraints as a String representation or
-     * <code>null</code> if the component is not registered with this layout
-     * manager. The returned values is either a String or a
-     * {@link net.miginfocom.layout.CC} depending on what constraint was sent in
-     * when the component was added. May be <code>null</code>.
-     */
+    /// Returns the component constraints as a String representation. This string
+    /// is the exact string as set with
+    /// `Object)` or set when
+    /// adding the component to the parent component.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `comp`: The component to return the constraints for.
+    ///
+    /// #### Returns
+    ///
+    /// @return The component constraints as a String representation or
+    /// `null` if the component is not registered with this layout
+    /// manager. The returned values is either a String or a
+    /// `net.miginfocom.layout.CC` depending on what constraint was sent in
+    /// when the component was added. May be `null`.
     public Object getComponentConstraints(Component comp) {
         return scrConstrMap.get(comp);
     }
 
-    /**
-     * Sets the component constraint for the component that already must be
-     * handled by this layout manager.
-     * <p>
-     * See the class JavaDocs for information on how this string is formatted.
-     *
-     * @param constr The component constraints as a String or
-     *               {@link net.miginfocom.layout.CC}. <code>null</code> is ok.
-     * @param comp   The component to set the constraints for.
-     * @throws RuntimeException         if the constraint was not valid.
-     * @throws IllegalArgumentException If the component is not handling the
-     *                                  component.
-     */
+    /// Sets the component constraint for the component that already must be
+    /// handled by this layout manager.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr The component constraints as a String or
+    /// `net.miginfocom.layout.CC`. `null` is ok.
+    ///
+    /// - `comp`: The component to set the constraints for.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException If the component is not handling the
+    /// component.
     public void setComponentConstraints(Component comp, Object constr) {
         setComponentConstraintsImpl(comp, constr, false);
     }
 
-    /**
-     * Sets the component constraint for the component that already must be
-     * handled by this layout manager.
-     * <p>
-     * See the class JavaDocs for information on how this string is formatted.
-     *
-     * @param constr  The component constraints as a String or
-     *                {@link net.miginfocom.layout.CC}. <code>null</code> is ok.
-     * @param comp    The component to set the constraints for.
-     * @param noCheck Doe not check if the component is handled if true
-     * @throws RuntimeException         if the constraint was not valid.
-     * @throws IllegalArgumentException If the component is not handling the
-     *                                  component.
-     */
+    /// Sets the component constraint for the component that already must be
+    /// handled by this layout manager.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr  The component constraints as a String or
+    /// `net.miginfocom.layout.CC`. `null` is ok.
+    ///
+    /// - `comp`: The component to set the constraints for.
+    ///
+    /// - `noCheck`: Doe not check if the component is handled if true
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException If the component is not handling the
+    /// component.
     private void setComponentConstraintsImpl(Component comp, Object constr, boolean noCheck) {
         if (!noCheck && !scrConstrMap.containsKey(comp)) {
             throw new IllegalArgumentException("Component must already be added to parent!");
@@ -388,23 +411,26 @@ public final class MigLayout extends Layout {
         dirty = true;
     }
 
-    /**
-     * Returns if this layout manager is currently managing this component.
-     *
-     * @param c The component to check. If <code>null</code> then
-     *          <code>false</code> will be returned.
-     * @return If this layout manager is currently managing this component.
-     */
+    /// Returns if this layout manager is currently managing this component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: @param c The component to check. If `null` then
+    /// `false` will be returned.
+    ///
+    /// #### Returns
+    ///
+    /// If this layout manager is currently managing this component.
     public boolean isManagingComponent(Component c) {
         return scrConstrMap.containsKey(c);
     }
 
-    /**
-     * Adds the callback function that will be called at different stages of the
-     * layout cylce.
-     *
-     * @param callback The callback. Not <code>null</code>.
-     */
+    /// Adds the callback function that will be called at different stages of the
+    /// layout cylce.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: The callback. Not `null`.
     public void addLayoutCallback(LayoutCallback callback) {
         if (callback == null) {
             throw new NullPointerException();
@@ -419,38 +445,39 @@ public final class MigLayout extends Layout {
         grid = null;
     }
 
-    /**
-     * Removes the callback if it exists.
-     *
-     * @param callback The callback. May be <code>null</code>.
-     */
+    /// Removes the callback if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: The callback. May be `null`.
     public void removeLayoutCallback(LayoutCallback callback) {
         if (callbackList != null) {
             callbackList.remove(callback);
         }
     }
 
-    /**
-     * Sets the debugging state for this layout manager instance. If debug is
-     * turned on a timer will repaint the last laid out parent with debug
-     * information on top.
-     * <p>
-     * Red fill and dashed red outline is used to indicate occupied cells in the
-     * grid. Blue dashed outline indicate component bounds set.
-     * <p>
-     * Note that debug can also be set on the layout constraints. There it will
-     * be persisted. The value set here will not. See the class JavaDocs for
-     * information.
-     *
-     * @param parentW The parent to set debug for.
-     * @param b       <code>true</code> means debug is turned on.
-     */
-    /**
-     * Check if something has changed and if so recreate it to the cached
-     * objects.
-     *
-     * @param parent The parent that is the target for this layout manager.
-     */
+    /// Sets the debugging state for this layout manager instance. If debug is
+    /// turned on a timer will repaint the last laid out parent with debug
+    /// information on top.
+    ///
+    /// Red fill and dashed red outline is used to indicate occupied cells in the
+    /// grid. Blue dashed outline indicate component bounds set.
+    ///
+    /// Note that debug can also be set on the layout constraints. There it will
+    /// be persisted. The value set here will not. See the class JavaDocs for
+    /// information.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parentW`: The parent to set debug for.
+    ///
+    /// - `b`: `true` means debug is turned on.
+    /// Check if something has changed and if so recreate it to the cached
+    /// objects.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The parent that is the target for this layout manager.
     private void checkCache(Container parent) {
         if (parent == null) {
             return;
@@ -512,12 +539,12 @@ public final class MigLayout extends Layout {
         dirty = false;
     }
 
-    /**
-     * Checks so all components in ccMap actually exist in the parent's
-     * collection. Removes any references that don't.
-     *
-     * @param parent The parent to compare ccMap against. Never null.
-     */
+    /// Checks so all components in ccMap actually exist in the parent's
+    /// collection. Removes any references that don't.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The parent to compare ccMap against. Never null.
     private void cleanConstraintMaps(Container parent) {
         HashSet<Component> parentCompSet = new HashSet<Component>();
         for (int iter = 0; iter < parent.getComponentCount(); iter++) {
@@ -534,9 +561,9 @@ public final class MigLayout extends Layout {
         }
     }
 
-    /**
-     * @since 3.7.3
-     */
+    /// #### Since
+    ///
+    /// 3.7.3
     private void resetLastInvalidOnParent(Container parent) {
         while (parent != null) {
             Layout layoutManager = parent.getLayout();
@@ -597,12 +624,12 @@ public final class MigLayout extends Layout {
         lastInvalidSize = null;
     }
 
-    /**
-     * Checks the parent window/popup if its size is within parameters as set by
-     * the LC.
-     *
-     * @param parent The parent who's window to possibly adjust the size for.
-     */
+    /// Checks the parent window/popup if its size is within parameters as set by
+    /// the LC.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The parent who's window to possibly adjust the size for.
     public Dimension minimumLayoutSize(Container parent) {
         return getSizeImpl(parent, LayoutUtil.MIN);
     }

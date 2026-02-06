@@ -23,33 +23,27 @@
 
 package com.codename1.properties;
 
-/**
- * This is the double specific version of numeric property
- *
- * @author Shai Almog
- */
+/// This is the double specific version of numeric property
+///
+/// @author Shai Almog
 public class DoubleProperty<K> extends NumericProperty<Double, K> {
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public DoubleProperty(String name) {
         super(name, Double.class);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public DoubleProperty(String name, Double value) {
         super(name, Double.class, value);
     }
 
 
-    /**
-     * Returns the value as a primitive, if the value is null/nullable this will fail...
-     *
-     * @return the numeric value
-     */
+    /// Returns the value as a primitive, if the value is null/nullable this will fail...
+    ///
+    /// #### Returns
+    ///
+    /// the numeric value
     public double getDouble() {
         return get().doubleValue();
     }

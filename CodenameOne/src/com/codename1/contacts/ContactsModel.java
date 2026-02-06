@@ -28,39 +28,35 @@ import com.codename1.ui.list.DefaultListModel;
 
 import java.util.Hashtable;
 
-/**
- * This Contacts model is responsible for querying Contacts from the device
- * and to cache the data for faster usage
- *
- * @author Chen
- */
+/// This Contacts model is responsible for querying Contacts from the device
+/// and to cache the data for faster usage
+///
+/// @author Chen
 public class ContactsModel extends DefaultListModel {
 
     private final Hashtable contactsCache = new Hashtable();
 
     private Image placeHolder;
 
-    /**
-     * Constructor with contacts ids
-     *
-     * @param ids the contact ids we would like this model to handle
-     */
+    /// Constructor with contacts ids
+    ///
+    /// #### Parameters
+    ///
+    /// - `ids`: the contact ids we would like this model to handle
     public ContactsModel(String... ids) {
         super((Object[]) ids);
     }
 
-    /**
-     * Sets the Contacts place holder image.
-     *
-     * @param placeHolder image place holder for the contacts
-     */
+    /// Sets the Contacts place holder image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `placeHolder`: image place holder for the contacts
     public void setPlaceHolderImage(Image placeHolder) {
         this.placeHolder = placeHolder;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getItemAt(final int index) {
         final String id = (String) super.getItemAt(index);
@@ -87,9 +83,7 @@ public class ContactsModel extends DefaultListModel {
         return contact;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addItem(Object item) {
         if (item instanceof String) {
@@ -105,9 +99,7 @@ public class ContactsModel extends DefaultListModel {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeItem(int index) {
         String id = (String) super.getItemAt(index);

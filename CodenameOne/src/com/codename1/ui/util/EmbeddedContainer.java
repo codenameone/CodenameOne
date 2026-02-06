@@ -27,37 +27,33 @@ package com.codename1.ui.util;
 import com.codename1.ui.Container;
 import com.codename1.ui.layouts.BorderLayout;
 
-/**
- * This class is mostly used internally by the GUI builder and isn't very useful
- * for general purpose. The embedded container allows placing a wholy different UI
- * hierarchy within the current hierarchy and replace it on the fly.
- *
- * @author Shai Almog
- */
+/// This class is mostly used internally by the GUI builder and isn't very useful
+/// for general purpose. The embedded container allows placing a wholy different UI
+/// hierarchy within the current hierarchy and replace it on the fly.
+///
+/// @author Shai Almog
 public class EmbeddedContainer extends Container {
     private String embed;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public EmbeddedContainer() {
         super(new BorderLayout());
     }
 
-    /**
-     * Indicates the name of the container to embed into this container
-     *
-     * @return the embed
-     */
+    /// Indicates the name of the container to embed into this container
+    ///
+    /// #### Returns
+    ///
+    /// the embed
     public String getEmbed() {
         return embed;
     }
 
-    /**
-     * Indicates the name of the container to embed into this container
-     *
-     * @param embed the embed to set
-     */
+    /// Indicates the name of the container to embed into this container
+    ///
+    /// #### Parameters
+    ///
+    /// - `embed`: the embed to set
     public void setEmbed(String embed) {
         this.embed = embed;
     }

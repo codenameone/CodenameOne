@@ -27,12 +27,10 @@ import com.codename1.ui.Transform;
 
 import java.util.ArrayList;
 
-/**
- * Represents a Rectangle position (x, y) and {@link Dimension} (width, height),
- * this is useful for measuring coordinates within the application.
- *
- * @author Chen Fishbein
- */
+/// Represents a Rectangle position (x, y) and `Dimension` (width, height),
+/// this is useful for measuring coordinates within the application.
+///
+/// @author Chen Fishbein
 public class Rectangle implements Shape {
 
     private static final int MAX_POOL_SIZE = 20;
@@ -42,66 +40,78 @@ public class Rectangle implements Shape {
     private int y;
     private GeneralPath path;
 
-    /**
-     * Creates a new instance of Rectangle
-     */
+    /// Creates a new instance of Rectangle
     public Rectangle() {
         size = new Dimension();
     }
 
-    /**
-     * Creates a new instance of Rectangle at position (x, y) and with
-     * predefine dimension
-     *
-     * @param x    the x coordinate of the rectangle
-     * @param y    the y coordinate of the rectangle
-     * @param size the {@link Dimension} of the rectangle
-     */
+    /// Creates a new instance of Rectangle at position (x, y) and with
+    /// predefine dimension
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x coordinate of the rectangle
+    ///
+    /// - `y`: the y coordinate of the rectangle
+    ///
+    /// - `size`: the `Dimension` of the rectangle
     public Rectangle(int x, int y, Dimension size) {
         this.x = x;
         this.y = y;
         this.size = size;
     }
 
-    /**
-     * Creates a new instance of Rectangle at position (x, y) and with
-     * predefine width and height
-     *
-     * @param x the x coordinate of the rectangle
-     * @param y the y coordinate of the rectangle
-     * @param w the width of the rectangle
-     * @param h the height of the rectangle
-     */
+    /// Creates a new instance of Rectangle at position (x, y) and with
+    /// predefine width and height
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x coordinate of the rectangle
+    ///
+    /// - `y`: the y coordinate of the rectangle
+    ///
+    /// - `w`: the width of the rectangle
+    ///
+    /// - `h`: the height of the rectangle
     public Rectangle(int x, int y, int w, int h) {
         this.x = x;
         this.y = y;
         this.size = new Dimension(w, h);
     }
 
-    /**
-     * A copy Constructor
-     *
-     * @param rect the Rectangle to copy
-     */
+    /// A copy Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the Rectangle to copy
     public Rectangle(Rectangle rect) {
         this(rect.getX(), rect.getY(),
                 rect.getSize().getWidth(), rect.getSize().getHeight());
     }
 
-    /**
-     * Creates a rectangle from a Rectangle object pool.  This is handy if you
-     * need to create a temporary Rectangle that you wish to recycle later.
-     *
-     * <p>When you are done with this object you should return it to the pool using
-     * {@link #recycle(com.codename1.ui.geom.Rectangle) }.
-     *
-     * @param x The x coordinate of the rect.
-     * @param y The y coordinate of the rect.
-     * @param w The width of the rect.
-     * @param h The height of the rect.
-     * @return A rectangle with the given dimensions.
-     * @see #recycle(com.codename1.ui.geom.Rectangle)
-     */
+    /// Creates a rectangle from a Rectangle object pool.  This is handy if you
+    /// need to create a temporary Rectangle that you wish to recycle later.
+    ///
+    /// When you are done with this object you should return it to the pool using
+    /// `#recycle(com.codename1.ui.geom.Rectangle)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x coordinate of the rect.
+    ///
+    /// - `y`: The y coordinate of the rect.
+    ///
+    /// - `w`: The width of the rect.
+    ///
+    /// - `h`: The height of the rect.
+    ///
+    /// #### Returns
+    ///
+    /// A rectangle with the given dimensions.
+    ///
+    /// #### See also
+    ///
+    /// - #recycle(com.codename1.ui.geom.Rectangle)
     public static synchronized Rectangle createFromPool(int x, int y, int w, int h) {
         if (pool == null) {
             pool = new ArrayList<Rectangle>();
@@ -115,12 +125,15 @@ public class Rectangle implements Shape {
         }
     }
 
-    /**
-     * Returns the given rectangle to the object pool.
-     *
-     * @param r The rectangle to recycle.
-     * @see #createFromPool(int, int, int, int)
-     */
+    /// Returns the given rectangle to the object pool.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: The rectangle to recycle.
+    ///
+    /// #### See also
+    ///
+    /// - #createFromPool(int, int, int, int)
     public static synchronized void recycle(Rectangle r) {
         if (pool.size() >= MAX_POOL_SIZE || r == null) {
             return;
@@ -128,38 +141,56 @@ public class Rectangle implements Shape {
         pool.add(r);
     }
 
-    /**
-     * Checks wheather the 2nd rectangle is contained in the first rectangle
-     *
-     * @param x1 first rect x
-     * @param y1 first rect y
-     * @param w1 first rect w
-     * @param h1 first rect h
-     * @param x2 second rect x
-     * @param y2 second rect y
-     * @param w2 second rect w
-     * @param h2 second rect h
-     * @return true if x2, y2, w2, h2 is contained in x1, y1, w1, h1
-     */
+    /// Checks wheather the 2nd rectangle is contained in the first rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `x1`: first rect x
+    ///
+    /// - `y1`: first rect y
+    ///
+    /// - `w1`: first rect w
+    ///
+    /// - `h1`: first rect h
+    ///
+    /// - `x2`: second rect x
+    ///
+    /// - `y2`: second rect y
+    ///
+    /// - `w2`: second rect w
+    ///
+    /// - `h2`: second rect h
+    ///
+    /// #### Returns
+    ///
+    /// true if x2, y2, w2, h2 is contained in x1, y1, w1, h1
     public static boolean contains(int x1, int y1, int w1, int h1,
                                    int x2, int y2, int w2, int h2) {
         return x1 <= x2 && y1 <= y2 && x1 + w1 >= x2 + w2 &&
                 y1 + h1 >= y2 + h2;
     }
 
-    /**
-     * Returns a rectangle that intersects the given rectangle with this rectangle
-     *
-     * @param rrX  rectangle to intersect with this rectangle
-     * @param rrY  rectangle to intersect with this rectangle
-     * @param rrW  rectangle to intersect with this rectangle
-     * @param rrH  rectangle to intersect with this rectangle
-     * @param rtx1 rectangle to intersect with this rectangle
-     * @param rty1 rectangle to intersect with this rectangle
-     * @param rtw2 rectangle to intersect with this rectangle
-     * @param rth2 rectangle to intersect with this rectangle
-     * @param dest result of the intersection are stored here
-     */
+    /// Returns a rectangle that intersects the given rectangle with this rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `rrX`: rectangle to intersect with this rectangle
+    ///
+    /// - `rrY`: rectangle to intersect with this rectangle
+    ///
+    /// - `rrW`: rectangle to intersect with this rectangle
+    ///
+    /// - `rrH`: rectangle to intersect with this rectangle
+    ///
+    /// - `rtx1`: rectangle to intersect with this rectangle
+    ///
+    /// - `rty1`: rectangle to intersect with this rectangle
+    ///
+    /// - `rtw2`: rectangle to intersect with this rectangle
+    ///
+    /// - `rth2`: rectangle to intersect with this rectangle
+    ///
+    /// - `dest`: result of the intersection are stored here
     public static void intersection(int rrX, int rrY, int rrW, int rrH, int rtx1, int rty1, int rtw2, int rth2, Rectangle dest) {
         int tx1 = rtx1;
         int ty1 = rty1;
@@ -194,20 +225,30 @@ public class Rectangle implements Shape {
         dest.size.setHeight(ty2);
     }
 
-    /**
-     * Helper method allowing us to determine if two coordinate sets intersect. This saves
-     * us the need of creating a rectangle object for a quick calculation
-     *
-     * @param tx     x of first rectangle
-     * @param ty     y of first rectangle
-     * @param tw     width of first rectangle
-     * @param th     height of first rectangle
-     * @param x      x of second rectangle
-     * @param y      y of second rectangle
-     * @param width  width of second rectangle
-     * @param height height of second rectangle
-     * @return true if the rectangles intersect
-     */
+    /// Helper method allowing us to determine if two coordinate sets intersect. This saves
+    /// us the need of creating a rectangle object for a quick calculation
+    ///
+    /// #### Parameters
+    ///
+    /// - `tx`: x of first rectangle
+    ///
+    /// - `ty`: y of first rectangle
+    ///
+    /// - `tw`: width of first rectangle
+    ///
+    /// - `th`: height of first rectangle
+    ///
+    /// - `x`: x of second rectangle
+    ///
+    /// - `y`: y of second rectangle
+    ///
+    /// - `width`: width of second rectangle
+    ///
+    /// - `height`: height of second rectangle
+    ///
+    /// #### Returns
+    ///
+    /// true if the rectangles intersect
     public static boolean intersects(int tx, int ty, int tw, int th, int x, int y, int width, int height) {
         int rw = width;
         int rh = height;
@@ -227,9 +268,7 @@ public class Rectangle implements Shape {
 
     }
 
-    /**
-     * Helper method to set coordinates
-     */
+    /// Helper method to set coordinates
     public void setBounds(int x, int y, int w, int h) {
         this.x = x;
         this.y = y;
@@ -238,154 +277,171 @@ public class Rectangle implements Shape {
         path = null;
     }
 
-    /**
-     * Convenience method for getSize().getWidth();
-     *
-     * @return width
-     */
+    /// Convenience method for getSize().getWidth();
+    ///
+    /// #### Returns
+    ///
+    /// width
     public int getWidth() {
         return size.getWidth();
 
     }
 
-    /**
-     * Convenience method for getSize().setWidth();
-     *
-     * @param w the width
-     */
+    /// Convenience method for getSize().setWidth();
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the width
     public void setWidth(int w) {
         size.setWidth(w);
         path = null;
     }
 
-    /**
-     * Convenience method for getSize().getHeight();
-     *
-     * @return height
-     */
+    /// Convenience method for getSize().getHeight();
+    ///
+    /// #### Returns
+    ///
+    /// height
     public int getHeight() {
         return size.getHeight();
     }
 
-    /**
-     * Convenience method for getSize().setHeight();
-     *
-     * @param h the height
-     */
+    /// Convenience method for getSize().setHeight();
+    ///
+    /// #### Parameters
+    ///
+    /// - `h`: the height
     public void setHeight(int h) {
         size.setHeight(h);
         path = null;
     }
 
-    /**
-     * Return the dimension of the rectangle
-     *
-     * @return the size of the rectangle
-     */
+    /// Return the dimension of the rectangle
+    ///
+    /// #### Returns
+    ///
+    /// the size of the rectangle
     public Dimension getSize() {
         return size;
     }
 
-    /**
-     * Return the x coordinate of the rectangle
-     *
-     * @return the x coordinate of the rectangle
-     */
+    /// Return the x coordinate of the rectangle
+    ///
+    /// #### Returns
+    ///
+    /// the x coordinate of the rectangle
     public int getX() {
         return x;
     }
 
-    /**
-     * Sets the x position of the rectangle
-     *
-     * @param x the x coordinate of the rectangle
-     */
+    /// Sets the x position of the rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x coordinate of the rectangle
     public void setX(int x) {
         this.x = x;
         path = null;
     }
 
-    /**
-     * Return the y coordinate of the rectangle
-     *
-     * @return the y coordinate of the rectangle
-     */
+    /// Return the y coordinate of the rectangle
+    ///
+    /// #### Returns
+    ///
+    /// the y coordinate of the rectangle
     public int getY() {
         return y;
     }
 
-    /**
-     * Sets the y position of the rectangle
-     *
-     * @param y the y coordinate of the rectangle
-     */
+    /// Sets the y position of the rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `y`: the y coordinate of the rectangle
     public void setY(int y) {
         this.y = y;
         path = null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "x = " + x + " y = " + y + " size = " + size;
     }
 
-    /**
-     * Checks whether or not this Rectangle entirely contains the specified
-     * Rectangle.
-     *
-     * @param rect the specified Rectangle
-     * @return true if the Rectangle is contained entirely inside this
-     * Rectangle; false otherwise
-     */
+    /// Checks whether or not this Rectangle entirely contains the specified
+    /// Rectangle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the specified Rectangle
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the Rectangle is contained entirely inside this
+    /// Rectangle; false otherwise
     public boolean contains(Rectangle rect) {
         return contains(rect.x, rect.y, rect.size.getWidth(), rect.size.getHeight());
     }
 
-    /**
-     * Checks whether this Rectangle entirely contains the Rectangle
-     * at the specified location (rX, rY) with the specified
-     * dimensions (rWidth, rHeight).
-     *
-     * @param rX      the specified x coordinate
-     * @param rY      the specified y coordinate
-     * @param rWidth  the width of the Rectangle
-     * @param rHeight the height of the Rectangle
-     * @return true if the Rectangle specified by (rX, rY, rWidth, rHeight)
-     * is entirely enclosed inside this Rectangle; false otherwise.
-     */
+    /// Checks whether this Rectangle entirely contains the Rectangle
+    /// at the specified location (rX, rY) with the specified
+    /// dimensions (rWidth, rHeight).
+    ///
+    /// #### Parameters
+    ///
+    /// - `rX`: the specified x coordinate
+    ///
+    /// - `rY`: the specified y coordinate
+    ///
+    /// - `rWidth`: the width of the Rectangle
+    ///
+    /// - `rHeight`: the height of the Rectangle
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the Rectangle specified by (rX, rY, rWidth, rHeight)
+    /// is entirely enclosed inside this Rectangle; false otherwise.
     public boolean contains(int rX, int rY, int rWidth, int rHeight) {
         return x <= rX && y <= rY && x + size.getWidth() >= rX + rWidth &&
                 y + size.getHeight() >= rY + rHeight;
     }
 
-    /**
-     * Checks whether or not this Rectangle contains the point at the specified
-     * location (rX, rY).
-     *
-     * @param rX the specified x coordinate
-     * @param rY the specified y coordinate
-     * @return true if the point (rX, rY) is inside this Rectangle;
-     * false otherwise.
-     */
+    /// Checks whether or not this Rectangle contains the point at the specified
+    /// location (rX, rY).
+    ///
+    /// #### Parameters
+    ///
+    /// - `rX`: the specified x coordinate
+    ///
+    /// - `rY`: the specified y coordinate
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the point (rX, rY) is inside this Rectangle;
+    /// false otherwise.
     @Override
     public boolean contains(int rX, int rY) {
         return x <= rX && y <= rY && x + size.getWidth() >= rX &&
                 y + size.getHeight() >= rY;
     }
 
-    /**
-     * Returns a rectangle that intersects the given rectangle with this rectangle.  If they
-     * don't intersect, the resulting rectangle will have a negative width or height.
-     *
-     * @param rX rectangle to intersect with this rectangle
-     * @param rY rectangle to intersect with this rectangle
-     * @param rW rectangle to intersect with this rectangle
-     * @param rH rectangle to intersect with this rectangle
-     * @return the intersection
-     */
+    /// Returns a rectangle that intersects the given rectangle with this rectangle.  If they
+    /// don't intersect, the resulting rectangle will have a negative width or height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rX`: rectangle to intersect with this rectangle
+    ///
+    /// - `rY`: rectangle to intersect with this rectangle
+    ///
+    /// - `rW`: rectangle to intersect with this rectangle
+    ///
+    /// - `rH`: rectangle to intersect with this rectangle
+    ///
+    /// #### Returns
+    ///
+    /// the intersection
     public Rectangle intersection(int rX, int rY, int rW, int rH) {
 
         int tx1 = this.x;
@@ -449,53 +505,63 @@ public class Rectangle implements Shape {
         output.setBounds(tx1, ty1, tx2, ty2);
     }
 
-    /**
-     * Returns a rectangle that intersects the given rectangle with this rectangle
-     *
-     * @param r rectangle to intersect with this rectangle
-     * @return the intersection
-     */
+    /// Returns a rectangle that intersects the given rectangle with this rectangle
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: rectangle to intersect with this rectangle
+    ///
+    /// #### Returns
+    ///
+    /// the intersection
     @Override
     public Rectangle intersection(Rectangle r) {
         return intersection(r.x, r.y, r.size.getWidth(), r.size.getHeight());
     }
 
 
-    /**
-     * Determines whether or not this Rectangle and the specified Rectangle
-     * location (x, y) with the specified dimensions (width, height),
-     * intersect. Two rectangles intersect if their intersection is nonempty.
-     *
-     * @param x      the specified x coordinate
-     * @param y      the specified y coordinate
-     * @param width  the width of the Rectangle
-     * @param height the height of the Rectangle
-     * @return true if the specified Rectangle and this Rectangle intersect;
-     * false otherwise.
-     */
+    /// Determines whether or not this Rectangle and the specified Rectangle
+    /// location (x, y) with the specified dimensions (width, height),
+    /// intersect. Two rectangles intersect if their intersection is nonempty.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the specified x coordinate
+    ///
+    /// - `y`: the specified y coordinate
+    ///
+    /// - `width`: the width of the Rectangle
+    ///
+    /// - `height`: the height of the Rectangle
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the specified Rectangle and this Rectangle intersect;
+    /// false otherwise.
     public boolean intersects(int x, int y, int width, int height) {
         int tw = size.getWidth();
         int th = size.getHeight();
         return intersects(this.x, this.y, tw, th, x, y, width, height);
     }
 
-    /**
-     * Determines whether or not this Rectangle and the specified Rectangle
-     * location (x, y) with the specified dimensions (width, height),
-     * intersect. Two rectangles intersect if their intersection is nonempty.
-     *
-     * @param rect the Rectangle to check intersection with
-     * @return true if the specified Rectangle and this Rectangle intersect;
-     * false otherwise.
-     */
+    /// Determines whether or not this Rectangle and the specified Rectangle
+    /// location (x, y) with the specified dimensions (width, height),
+    /// intersect. Two rectangles intersect if their intersection is nonempty.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the Rectangle to check intersection with
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the specified Rectangle and this Rectangle intersect;
+    /// false otherwise.
     public boolean intersects(Rectangle rect) {
         return intersects(rect.getX(), rect.getY(),
                 rect.getSize().getWidth(), rect.getSize().getHeight());
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public PathIterator getPathIterator(Transform m) {
         if (path == null) {
@@ -513,51 +579,44 @@ public class Rectangle implements Shape {
 
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public PathIterator getPathIterator() {
         return getPathIterator(null);
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public Rectangle getBounds() {
         return this;
     }
 
-    /**
-     * Sets the bounds of this rectangle.
-     *
-     * @param bounds A rectangle whose bounds will be copied.
-     * @since 7.0
-     */
+    /// Sets the bounds of this rectangle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bounds`: A rectangle whose bounds will be copied.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setBounds(Rectangle bounds) {
         setBounds(bounds.x, bounds.y, bounds.size.getWidth(), bounds.size.getHeight());
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public float[] getBounds2D() {
         return new float[]{getX(), getY(), getWidth(), getHeight()};
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public boolean isRectangle() {
         return true;
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof Rectangle) {
@@ -567,9 +626,7 @@ public class Rectangle implements Shape {
         return false;
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public int hashCode() {
         int hash = 7;

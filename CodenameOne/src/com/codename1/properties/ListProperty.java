@@ -29,77 +29,85 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * Base class for a property as a list which can contain multiple elements within
- *
- * @author Shai Almog
- */
+/// Base class for a property as a list which can contain multiple elements within
+///
+/// @author Shai Almog
 public class ListProperty<T, K> extends CollectionProperty<T, K> {
     private final ArrayList<T> value = new ArrayList<T>();
 
-    /**
-     * Constructs a property with the given name and value
-     *
-     * @param name   the name of the property
-     * @param values default values for the property
-     */
+    /// Constructs a property with the given name and value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `values`: default values for the property
     public ListProperty(String name, T... values) {
         this(name, null, values);
     }
 
-    /**
-     * Constructs a property with the given name and values by specifying the
-     * type of the elements explicitly. The element type needs to be specified
-     * if the list should contain {@link PropertyBusinessObject}s and needs
-     * to get deserialized properly!
-     *
-     * @param name        the name of the property
-     * @param elementType subclass of {@link PropertyBusinessObject}
-     * @param values      default values for the property
-     */
+    /// Constructs a property with the given name and values by specifying the
+    /// type of the elements explicitly. The element type needs to be specified
+    /// if the list should contain `PropertyBusinessObject`s and needs
+    /// to get deserialized properly!
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `elementType`: subclass of `PropertyBusinessObject`
+    ///
+    /// - `values`: default values for the property
     public ListProperty(String name, Class<T> elementType, T... values) {
         super(name, elementType);
         Collections.addAll(value, values);
     }
 
-    /**
-     * Constructs a property with null value
-     *
-     * @param name the name of the property
-     */
+    /// Constructs a property with null value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
     public ListProperty(String name) {
         super(name);
     }
 
-    /**
-     * Gets the property value
-     *
-     * @param offset the offset within the list
-     * @return the property value
-     */
+    /// Gets the property value
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the offset within the list
+    ///
+    /// #### Returns
+    ///
+    /// the property value
     public T get(int offset) {
         internalGet();
         return value.get(offset);
     }
 
-    /**
-     * The size of the property list
-     *
-     * @return the number of elements
-     */
+    /// The size of the property list
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements
     @Override
     public int size() {
         internalGet();
         return value.size();
     }
 
-    /**
-     * Sets the property value and potentially fires a change event
-     *
-     * @param offset the position for the new value
-     * @param v      the new value
-     * @return the parent object for chaining
-     */
+    /// Sets the property value and potentially fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the position for the new value
+    ///
+    /// - `v`: the new value
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
     public K set(int offset, T v) {
         value.set(offset, v);
         firePropertyChanged();
@@ -107,12 +115,15 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Sets the entire content of the property
-     *
-     * @param t the collection of elements to set
-     * @return the parent object for chaining
-     */
+    /// Sets the entire content of the property
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the collection of elements to set
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
     @Override
     public K set(Collection<T> t) {
         value.clear();
@@ -122,23 +133,27 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Historical alias of set(Collection<T> t)
-     * Sets the entire content of the property
-     *
-     * @param t the collection of elements to set
-     * @return the parent object for chaining
-     */
+    /// Historical alias of set(Collection t)
+    /// Sets the entire content of the property
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the collection of elements to set
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
     public K setList(Collection<T> t) {
         return set(t);
     }
 
-    /**
-     * Adds a property value and fires a change event
-     *
-     * @param offset the position for the new value
-     * @param v      the new value
-     */
+    /// Adds a property value and fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the position for the new value
+    ///
+    /// - `v`: the new value
     public K add(int offset, T v) {
         value.add(offset, v);
         firePropertyChanged();
@@ -146,11 +161,11 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Adds a property value to the end of the list and fires a change event
-     *
-     * @param v the new value
-     */
+    /// Adds a property value to the end of the list and fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the new value
     @Override
     public K add(T v) {
         value.add(v);
@@ -159,11 +174,11 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Adds a all properties value to the list and fires a change event
-     *
-     * @param v the collection of values to add
-     */
+    /// Adds a all properties value to the list and fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the collection of values to add
     @Override
     public K addAll(Collection<? extends T> v) {
         if (value.addAll(v)) {
@@ -173,11 +188,11 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Removes the item at the given offset
-     *
-     * @param offset the offset
-     */
+    /// Removes the item at the given offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the offset
     @Override
     public K remove(int offset) {
         value.remove(offset);
@@ -186,11 +201,11 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Removes the item with this value
-     *
-     * @param v the value object
-     */
+    /// Removes the item with this value
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the value object
     @Override
     public K remove(T v) {
         if (value.remove(v)) {
@@ -200,11 +215,11 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Removes from the list all values from the given collection and fires a change event if the list has changed
-     *
-     * @param the item to remove
-     */
+    /// Removes from the list all values from the given collection and fires a change event if the list has changed
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: item to remove
     @Override
     public K removeAll(Collection<? extends T> v) {
         if (value.removeAll(v)) {
@@ -214,12 +229,15 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return (K) parent.parent;
     }
 
-    /**
-     * Compares this property to another property
-     *
-     * @param obj the other property
-     * @return true if they are equal in name and value
-     */
+    /// Compares this property to another property
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the other property
+    ///
+    /// #### Returns
+    ///
+    /// true if they are equal in name and value
     @Override
     public boolean equals(Object obj) {
         if (!super.equals(obj)) {
@@ -229,52 +247,50 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         return other.value.equals(value);
     }
 
-    /**
-     * Returns the internal hashcode or 0 for null property
-     *
-     * @return the hashcode value
-     */
+    /// Returns the internal hashcode or 0 for null property
+    ///
+    /// #### Returns
+    ///
+    /// the hashcode value
     @Override
     public int hashCode() {
         return value.hashCode();
     }
 
-    /**
-     * Iterate over the elements of the property
-     *
-     * @return an iterator
-     */
+    /// Iterate over the elements of the property
+    ///
+    /// #### Returns
+    ///
+    /// an iterator
     @Override
     public Iterator<T> iterator() {
         internalGet();
         return value.iterator();
     }
 
-    /**
-     * Returns a copy of the content as a new list
-     *
-     * @return a list
-     */
+    /// Returns a copy of the content as a new list
+    ///
+    /// #### Returns
+    ///
+    /// a list
     @Override
     public List<T> asList() {
         internalGet();
         return new ArrayList<T>(value);
     }
 
-    /**
-     * Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
-     * be converted to a Map
-     *
-     * @return a list
-     */
+    /// Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
+    /// be converted to a Map
+    ///
+    /// #### Returns
+    ///
+    /// a list
     @Override
     public List<Object> asExplodedList() {
         return asExplodedList(value);
     }
 
-    /**
-     * Remove all the elements from the list
-     */
+    /// Remove all the elements from the list
     @Override
     public void clear() {
         if (!value.isEmpty()) {
@@ -284,24 +300,30 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         }
     }
 
-    /**
-     * Returns true if the given element is contained in the list property
-     *
-     * @param element the element
-     * @return true if the given element is contained in the list property
-     */
+    /// Returns true if the given element is contained in the list property
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true if the given element is contained in the list property
     @Override
     public boolean contains(T element) {
         return value.contains(element);
     }
 
 
-    /**
-     * Returns the index of the given element in the list property
-     *
-     * @param element the element
-     * @return the index of the given element in the list property
-     */
+    /// Returns the index of the given element in the list property
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element
+    ///
+    /// #### Returns
+    ///
+    /// the index of the given element in the list property
     public int indexOf(T element) {
         return value.indexOf(element);
     }

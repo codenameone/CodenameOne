@@ -28,33 +28,34 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 
-/**
- * A painter for painting text into a Node.
- *
- * @author shannah
- */
+/// A painter for painting text into a Node.
+///
+/// @author shannah
 public class TextPainter implements NodePainter {
     private String text;
     private int vAlign = Component.CENTER;
 
-    /**
-     * Creates a new TextPainter with the given text and vertical alignment.
-     *
-     * @param text   The text to paint.
-     * @param valign The vertical alignment of the text.  One of {@link Component#CENTER}, {@link Component#TOP}, {@link Component#BOTTOM}.
-     */
+    /// Creates a new TextPainter with the given text and vertical alignment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The text to paint.
+    ///
+    /// - `valign`: The vertical alignment of the text.  One of `Component#CENTER`, `Component#TOP`, `Component#BOTTOM`.
     public TextPainter(String text, int valign) {
         this.text = text;
         this.vAlign = valign;
     }
 
-    /**
-     * Paints the text onto the provided graphics context.
-     *
-     * @param g      The graphics to paint onto.
-     * @param bounds The bounding rect.
-     * @param node   The node whose content we are painting.
-     */
+    /// Paints the text onto the provided graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics to paint onto.
+    ///
+    /// - `bounds`: The bounding rect.
+    ///
+    /// - `node`: The node whose content we are painting.
     @Override
     public void paint(Graphics g, Rectangle bounds, Node node) {
         Style style = node.getStyle();
@@ -102,38 +103,38 @@ public class TextPainter implements NodePainter {
         g.setAlpha(alpha);
     }
 
-    /**
-     * The text of this painter.
-     *
-     * @return the text
-     */
+    /// The text of this painter.
+    ///
+    /// #### Returns
+    ///
+    /// the text
     public String getText() {
         return text;
     }
 
-    /**
-     * Sets the text of this painter
-     *
-     * @param text the text to set
-     */
+    /// Sets the text of this painter
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to set
     public void setText(String text) {
         this.text = text;
     }
 
-    /**
-     * Gets the vertical alignment of this text.  One of {@link Component#CENTER}, {@link Component#TOP}, {@link Component#BOTTOM}.
-     *
-     * @return the vAlign
-     */
+    /// Gets the vertical alignment of this text.  One of `Component#CENTER`, `Component#TOP`, `Component#BOTTOM`.
+    ///
+    /// #### Returns
+    ///
+    /// the vAlign
     public int getvAlign() {
         return vAlign;
     }
 
-    /**
-     * Sets the vertical alignment. One of {@link Component#CENTER}, {@link Component#TOP}, {@link Component#BOTTOM}.
-     *
-     * @param vAlign the vAlign to set
-     */
+    /// Sets the vertical alignment. One of `Component#CENTER`, `Component#TOP`, `Component#BOTTOM`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `vAlign`: the vAlign to set
     public void setvAlign(int vAlign) {
         this.vAlign = vAlign;
     }

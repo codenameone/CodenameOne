@@ -31,11 +31,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Hashtable;
 
-/**
- * Thread class implementing the crash protection functionality
- *
- * @author Shai Almog
- */
+/// Thread class implementing the crash protection functionality
+///
+/// @author Shai Almog
 public class CodenameOneThread extends Thread {
     private static final Class CODE = CodenameOneThread.class;
     private final int[] stack = new int[500];
@@ -43,19 +41,17 @@ public class CodenameOneThread extends Thread {
     private final Hashtable exceptionStack = new Hashtable();
     private int stackPointer;
 
-    /**
-     * Constructor accepting the runnable
-     */
+    /// Constructor accepting the runnable
     public CodenameOneThread(Runnable r, String threadName) {
         super(threadName);
         this.r = r;
     }
 
-    /**
-     * Pushes the method to the current thread stack
-     *
-     * @param method the method id
-     */
+    /// Pushes the method to the current thread stack
+    ///
+    /// #### Parameters
+    ///
+    /// - `method`: the method id
     public static void push(int method) {
         Thread t = Thread.currentThread();
         if (t.getClass() == CODE) {
@@ -64,9 +60,7 @@ public class CodenameOneThread extends Thread {
         }
     }
 
-    /**
-     * Pops the current method from the stack
-     */
+    /// Pops the current method from the stack
     public static void pop() {
         Thread t = Thread.currentThread();
         if (t.getClass() == CODE) {
@@ -75,11 +69,11 @@ public class CodenameOneThread extends Thread {
         }
     }
 
-    /**
-     * Stores the stack for the given exception
-     *
-     * @param th the exception mapping to the given stack
-     */
+    /// Stores the stack for the given exception
+    ///
+    /// #### Parameters
+    ///
+    /// - `th`: the exception mapping to the given stack
     public static void storeStack(Throwable th, int currentStackFrame) {
         Thread t = Thread.currentThread();
         if (t.getClass() == CODE) {
@@ -99,28 +93,26 @@ public class CodenameOneThread extends Thread {
         return stackPointer > 0;
     }
 
-    /**
-     * Pushes a method id into the stack
-     *
-     * @param method the method id
-     */
+    /// Pushes a method id into the stack
+    ///
+    /// #### Parameters
+    ///
+    /// - `method`: the method id
     public void pushStack(int method) {
         stack[stackPointer] = method;
         stackPointer++;
     }
 
-    /**
-     * Pops the method stack pointer
-     */
+    /// Pops the method stack pointer
     public void popStack() {
         stackPointer--;
     }
 
-    /**
-     * Stores the stack for the given exception
-     *
-     * @param t the exception mapping to the given stack
-     */
+    /// Stores the stack for the given exception
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the exception mapping to the given stack
     public void storeStackForException(Throwable t, int currentStackFrame) {
         if (!exceptionStack.containsKey(t)) {
             int[] s = new int[stackPointer + 1];
@@ -130,9 +122,7 @@ public class CodenameOneThread extends Thread {
         }
     }
 
-    /**
-     * Prints the stack trace matching the given stack
-     */
+    /// Prints the stack trace matching the given stack
     public String getStack(Throwable t) {
         InputStream inp = null; //NOPMD CloseResource
         DataInputStream di = null; //NOPMD CloseResource
@@ -182,9 +172,7 @@ public class CodenameOneThread extends Thread {
         return "Failed in stack generation for " + t;
     }
 
-    /**
-     * Catches exception
-     */
+    /// Catches exception
     @Override
     public void run() {
         try {

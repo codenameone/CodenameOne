@@ -29,12 +29,10 @@ import com.codename1.ui.Display;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * An easy API for working with threads similar to call serially/and wait that allows us to
- * create a thread and dispatch tasks to it.
- *
- * @author Shai Almog
- */
+/// An easy API for working with threads similar to call serially/and wait that allows us to
+/// create a thread and dispatch tasks to it.
+///
+/// @author Shai Almog
 public final class EasyThread {
     private static final List<ErrorListener> globalErrorListenenrs = new ArrayList<ErrorListener>();
     private final Object LOCK = new Object();
@@ -82,36 +80,39 @@ public final class EasyThread {
         t.start();
     }
 
-    /**
-     * Starts a new thread
-     *
-     * @param name the display name for the thread
-     * @return a new thread instance
-     */
+    /// Starts a new thread
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the display name for the thread
+    ///
+    /// #### Returns
+    ///
+    /// a new thread instance
     public static EasyThread start(String name) {
         return new EasyThread(name);
     }
 
-    /**
-     * Adds a callback for error events, notice that this code isn't thread
-     * safe and should be invoked synchronously. This method must never be
-     * invoked from within the resulting callback code!
-     *
-     * @param err the error callback
-     */
+    /// Adds a callback for error events, notice that this code isn't thread
+    /// safe and should be invoked synchronously. This method must never be
+    /// invoked from within the resulting callback code!
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the error callback
     public static void addGlobalErrorListener(ErrorListener err) {
         synchronized (globalErrorListenenrs) {
             globalErrorListenenrs.add(err);
         }
     }
 
-    /**
-     * Removes a callback for error events, notice that this code isn't thread
-     * safe and should be invoked synchronously. This method must never be
-     * invoked from within the resulting callback code!
-     *
-     * @param err the error callback
-     */
+    /// Removes a callback for error events, notice that this code isn't thread
+    /// safe and should be invoked synchronously. This method must never be
+    /// invoked from within the resulting callback code!
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the error callback
     public static void removeGlobalErrorListener(ErrorListener err) {
         synchronized (globalErrorListenenrs) {
             globalErrorListenenrs.remove(err);
@@ -130,12 +131,13 @@ public final class EasyThread {
         }
     }
 
-    /**
-     * Runs the given object asynchronously on the thread and returns the result object
-     *
-     * @param r runs this method
-     * @param t object is passed to the success callback
-     */
+    /// Runs the given object asynchronously on the thread and returns the result object
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: runs this method
+    ///
+    /// - `t`: object is passed to the success callback
     public <T> void run(RunnableWithResult<T> r, SuccessCallback<T> t) {
         synchronized (LOCK) {
             queue.add(r);
@@ -144,11 +146,11 @@ public final class EasyThread {
         }
     }
 
-    /**
-     * Runs the given runnable on the thread, the method returns immediately
-     *
-     * @param r the runnable
-     */
+    /// Runs the given runnable on the thread, the method returns immediately
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the runnable
     public void run(Runnable r) {
         synchronized (LOCK) {
             queue.add(r);
@@ -156,12 +158,15 @@ public final class EasyThread {
         }
     }
 
-    /**
-     * Runs the given runnable on the thread and blocks until it completes, returns the value object
-     *
-     * @param r the runnable with result that will execute on the thread
-     * @return value returned by r
-     */
+    /// Runs the given runnable on the thread and blocks until it completes, returns the value object
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the runnable with result that will execute on the thread
+    ///
+    /// #### Returns
+    ///
+    /// value returned by r
     public <T> T run(final RunnableWithResultSync<T> r) {
         // we need the flag and can't use the result object. Since null would be a valid value for the result,
         // we would have a hard time of detecting the case of code completing before the wait call
@@ -178,11 +183,11 @@ public final class EasyThread {
         return (T) result[0];
     }
 
-    /**
-     * Invokes the given runnable on the thread and waits for its execution to complete
-     *
-     * @param r the runnable
-     */
+    /// Invokes the given runnable on the thread and waits for its execution to complete
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the runnable
     public void runAndWait(final Runnable r) {
         final boolean[] flag = new boolean[1];
         synchronized (LOCK) {
@@ -192,9 +197,7 @@ public final class EasyThread {
         Display.getInstance().invokeAndBlock(new RunAndWaitRunnable(flag));
     }
 
-    /**
-     * Stops the thread once the current task completes
-     */
+    /// Stops the thread once the current task completes
     public void kill() {
         synchronized (LOCK) {
             running = false;
@@ -202,23 +205,23 @@ public final class EasyThread {
         }
     }
 
-    /**
-     * Returns true if the current thread is the easy thread and false othewise similar
-     * to the isEDT method
-     *
-     * @return true if we are currently within this easy thread
-     */
+    /// Returns true if the current thread is the easy thread and false othewise similar
+    /// to the isEDT method
+    ///
+    /// #### Returns
+    ///
+    /// true if we are currently within this easy thread
     public boolean isThisIt() {
         return t == Thread.currentThread(); //NOPMD CompareObjectsWithEquals
     }
 
-    /**
-     * Adds a callback for error events, notice that this code isn't thread
-     * safe and should be invoked synchronously. This method must never be
-     * invoked from within the resulting callback code!
-     *
-     * @param err the error callback
-     */
+    /// Adds a callback for error events, notice that this code isn't thread
+    /// safe and should be invoked synchronously. This method must never be
+    /// invoked from within the resulting callback code!
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the error callback
     public void addErrorListener(ErrorListener err) {
         if (errorListenenrs == null) {
             errorListenenrs = new ArrayList<ErrorListener>();
@@ -226,13 +229,13 @@ public final class EasyThread {
         errorListenenrs.add(err);
     }
 
-    /**
-     * Removes a callback for error events, notice that this code isn't thread
-     * safe and should be invoked synchronously. This method must never be
-     * invoked from within the resulting callback code!
-     *
-     * @param err the error callback
-     */
+    /// Removes a callback for error events, notice that this code isn't thread
+    /// safe and should be invoked synchronously. This method must never be
+    /// invoked from within the resulting callback code!
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the error callback
     public void removeErrorListener(ErrorListener err) {
         if (errorListenenrs == null) {
             return;
@@ -243,28 +246,28 @@ public final class EasyThread {
         errorListenenrs = l;
     }
 
-    /**
-     * Changes the priority of this EasyThread.
-     *
-     * @param newPriority priority to set this thread to
-     */
+    /// Changes the priority of this EasyThread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `newPriority`: priority to set this thread to
     public void setPriority(int newPriority) {
         t.setPriority(newPriority);
     }
 
-    /**
-     * Callback listener for errors on easy thread
-     */
+    /// Callback listener for errors on easy thread
     public interface ErrorListener<T> {
-        /**
-         * Invoked when an exception is thrown on an easy thread. Notice
-         * this callback occurs within the thread and not on the EDT. This
-         * method blocks the current easy thread until it completes.
-         *
-         * @param t        the thread
-         * @param callback the callback that triggered the exception
-         * @param error    the exception that occurred
-         */
+        /// Invoked when an exception is thrown on an easy thread. Notice
+        /// this callback occurs within the thread and not on the EDT. This
+        /// method blocks the current easy thread until it completes.
+        ///
+        /// #### Parameters
+        ///
+        /// - `t`: the thread
+        ///
+        /// - `callback`: the callback that triggered the exception
+        ///
+        /// - `error`: the exception that occurred
         void onError(EasyThread t, T callback, Throwable error);
     }
 

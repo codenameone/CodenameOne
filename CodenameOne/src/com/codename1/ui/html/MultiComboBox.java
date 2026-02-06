@@ -34,15 +34,13 @@ import com.codename1.ui.list.ListModel;
 
 import java.util.Vector;
 
-/**
- * A ComboBox control that allows multiple selection and supports OPTGROUP labels.
- * Note that this does not inherit from ComboBox but rather from List, since basically like an HTML multiple ComboBox we show an open List
- * The List/Combo size is controlled from the outside in HTMLComponent using a wrapping Container.
- * <p>
- * This class is also used by HTMLComboBox as the list popup when opening the HTMLComboBox (To allow OPTGROUP support)
- *
- * @author Ofir Leitner
- */
+/// A ComboBox control that allows multiple selection and supports OPTGROUP labels.
+/// Note that this does not inherit from ComboBox but rather from List, since basically like an HTML multiple ComboBox we show an open List
+/// The List/Combo size is controlled from the outside in HTMLComponent using a wrapping Container.
+///
+/// This class is also used by HTMLComboBox as the list popup when opening the HTMLComboBox (To allow OPTGROUP support)
+///
+/// @author Ofir Leitner
 class MultiComboBox extends List {
 
     private final boolean multiple; // true if this is a multiple choice combo
@@ -100,9 +98,7 @@ class MultiComboBox extends List {
 
     // Overiding List's methods to provide for multiple selection and OPTGROUP support:
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void addItem(Object item) {
         super.addItem(item);
@@ -111,18 +107,14 @@ class MultiComboBox extends List {
         }
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void setSelectedItem(Object item) {
         super.setSelectedItem(item);
         model.toggleSelected(item);
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     protected void fireActionEvent() {
         if (multiple) {
@@ -134,9 +126,7 @@ class MultiComboBox extends List {
 
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
@@ -154,9 +144,7 @@ class MultiComboBox extends List {
         }
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     protected void fireClicked() {
         boolean h = handlesInput();
@@ -169,9 +157,7 @@ class MultiComboBox extends List {
         repaint();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int keyCode) {
         // scrolling events are in keyPressed to provide immediate feedback
@@ -231,11 +217,9 @@ class MultiComboBox extends List {
 
     // Inner classes:
 
-    /**
-     * A model that knows to handle both multiple selection and OPTGORUP labels
-     *
-     * @author Ofir Leitner
-     */
+    /// A model that knows to handle both multiple selection and OPTGORUP labels
+    ///
+    /// @author Ofir Leitner
     static class MultiListModel extends DefaultListModel {
 
         Vector selected = new Vector();
@@ -310,11 +294,9 @@ class MultiComboBox extends List {
 
     }
 
-    /**
-     * A renderer that knows to handle both multiple selection and OPTGORUP labels
-     *
-     * @author Ofir Leitner
-     */
+    /// A renderer that knows to handle both multiple selection and OPTGORUP labels
+    ///
+    /// @author Ofir Leitner
     static class MultiCellRenderer extends DefaultListCellRenderer {
 
         private final MultiListModel model;

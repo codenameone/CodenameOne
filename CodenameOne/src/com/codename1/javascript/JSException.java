@@ -22,18 +22,17 @@
  */
 package com.codename1.javascript;
 
-/**
- * Thrown by JavaScript code
- * <p>
- * * <p>
- * <strong>NOTE:</strong> The {@link com.codename1.javascript } package is now
- * deprecated. The preferred method of Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) },
- * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these
- * work asynchronously (except in the XXXAndWait() variants, which use
- * invokeAndBlock() to make the calls synchronously.</p>
- *
- * @author Steve Hannah
- */
+/// Thrown by JavaScript code
+///
+/// *
+///
+/// **NOTE:** The `com.codename1.javascript` package is now
+/// deprecated. The preferred method of Java/Javascript interop is to use `BrowserComponent#execute(java.lang.String)`, `com.codename1.util.SuccessCallback)`,
+/// `BrowserComponent#executeAndWait(java.lang.String)`, etc.. as these
+/// work asynchronously (except in the XXXAndWait() variants, which use
+/// invokeAndBlock() to make the calls synchronously.
+///
+/// @author Steve Hannah
 class JSException extends RuntimeException {
     public JSException(String msg) {
         super(msg);

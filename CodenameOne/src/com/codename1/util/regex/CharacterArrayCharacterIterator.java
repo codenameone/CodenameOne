@@ -17,38 +17,30 @@
 
 package com.codename1.util.regex;
 
-/**
- * Encapsulates char[] as CharacterIterator
- *
- * @author <a href="mailto:ales.novak@netbeans.com">Ales Novak</a>
- * @version CVS $Id: CharacterArrayCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
- */
+/// Encapsulates char[] as CharacterIterator
+///
+/// @author [Ales Novak](mailto:ales.novak@netbeans.com)
+/// @version CVS $Id: CharacterArrayCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public final class CharacterArrayCharacterIterator implements CharacterIterator {
-    /**
-     * encapsulated
-     */
+    /// encapsulated
     private final char[] src;
-    /**
-     * offset in the char array
-     */
+    /// offset in the char array
     private final int off;
-    /**
-     * used portion of the array
-     */
+    /// used portion of the array
     private final int len;
 
-    /**
-     * @param src - encapsulated String
-     */
+    /// #### Parameters
+    ///
+    /// - `src`: - encapsulated String
     public CharacterArrayCharacterIterator(char[] src, int off, int len) {
         this.src = src;
         this.off = off;
         this.len = len;
     }
 
-    /**
-     * @return a substring
-     */
+    /// #### Returns
+    ///
+    /// a substring
     @Override
     public String substring(int beginIndex, int endIndex) {
         if (endIndex > len) {
@@ -62,25 +54,25 @@ public final class CharacterArrayCharacterIterator implements CharacterIterator 
         return new String(src, off + beginIndex, endIndex - beginIndex);
     }
 
-    /**
-     * @return a substring
-     */
+    /// #### Returns
+    ///
+    /// a substring
     @Override
     public String substring(int beginIndex) {
         return substring(beginIndex, len);
     }
 
-    /**
-     * @return a character at the specified position.
-     */
+    /// #### Returns
+    ///
+    /// a character at the specified position.
     @Override
     public char charAt(int pos) {
         return src[off + pos];
     }
 
-    /**
-     * @return <tt>true</tt> iff if the specified index is after the end of the character stream
-     */
+    /// #### Returns
+    ///
+    /// true iff if the specified index is after the end of the character stream
     @Override
     public boolean isEnd(int pos) {
         return (pos >= len);

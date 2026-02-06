@@ -26,17 +26,13 @@ package com.codename1.io;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-/**
- * Callback for establishment of a socket connection. Notice this callback
- * is always invoked on a new separate thread to allow uninterrupted IO.
- *
- * @author Shai Almog
- */
+/// Callback for establishment of a socket connection. Notice this callback
+/// is always invoked on a new separate thread to allow uninterrupted IO.
+///
+/// @author Shai Almog
 public abstract class SocketConnection {
-    /**
-     * Keeping member field so the GC won't collect these objects before the socket itself is collected.
-     * This can cause a problem since there's native reliance on these objects.
-     */
+    /// Keeping member field so the GC won't collect these objects before the socket itself is collected.
+    /// This can cause a problem since there's native reliance on these objects.
     InputStream input;
     OutputStream output;
 
@@ -47,37 +43,42 @@ public abstract class SocketConnection {
 
     }
 
-    /**
-     * Creates a socket connection, setting the connect timeout.  Timeout of 0 is infinite.
-     *
-     * @param connectTimeout The connect timeout.  0 for infinite.
-     * @since 7.0
-     */
+    /// Creates a socket connection, setting the connect timeout.  Timeout of 0 is infinite.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connectTimeout`: The connect timeout.  0 for infinite.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public SocketConnection(int connectTimeout) {
         this.connectTimeout = connectTimeout;
     }
 
-    /**
-     * Invoked in case of an error in the socket connection, this method is invoked off the EDT
-     *
-     * @param errorCode the error code
-     * @param message   error message if applicable
-     */
+    /// Invoked in case of an error in the socket connection, this method is invoked off the EDT
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorCode`: the error code
+    ///
+    /// - `message`: error message if applicable
     public abstract void connectionError(int errorCode, String message);
 
-    /**
-     * Invoked when a socket connection is established, this method is invoked off the EDT
-     *
-     * @param is input stream for the socket
-     * @param os output stream for the socket
-     */
+    /// Invoked when a socket connection is established, this method is invoked off the EDT
+    ///
+    /// #### Parameters
+    ///
+    /// - `is`: input stream for the socket
+    ///
+    /// - `os`: output stream for the socket
     public abstract void connectionEstablished(InputStream is, OutputStream os);
 
-    /**
-     * Returns true if this connection is currently active
-     *
-     * @return true if connected
-     */
+    /// Returns true if this connection is currently active
+    ///
+    /// #### Returns
+    ///
+    /// true if connected
     public boolean isConnected() {
         return connected;
     }
@@ -86,21 +87,24 @@ public abstract class SocketConnection {
         connected = b;
     }
 
-    /**
-     * Gets the connect timeout.
-     *
-     * @return The connect timeout.  0 for infinite.
-     */
+    /// Gets the connect timeout.
+    ///
+    /// #### Returns
+    ///
+    /// The connect timeout.  0 for infinite.
     public int getConnectTimeout() {
         return this.connectTimeout;
     }
 
-    /**
-     * Sets the connect timeout.
-     *
-     * @param connectTimeout The connect timeout.  0 for infinite timeout.
-     * @since 7.0
-     */
+    /// Sets the connect timeout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connectTimeout`: The connect timeout.  0 for infinite timeout.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setConnectTimeout(int connectTimeout) {
         this.connectTimeout = connectTimeout;
     }

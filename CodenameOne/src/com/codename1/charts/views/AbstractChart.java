@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -35,9 +33,7 @@ import com.codename1.ui.plaf.UIManager;
 import java.util.List;
 
 
-/**
- * An abstract class to be implemented by the chart rendering classes.
- */
+/// An abstract class to be implemented by the chart rendering classes.
 public abstract class AbstractChart {
     private static final char[] stopCharCandidates = "!@#$%^&*()?><,./+-qwertyuiop[zxcvbnm,./\\|}{".toCharArray();
 
@@ -131,31 +127,44 @@ public abstract class AbstractChart {
         return parts.toArray(out);
     }
 
-    /**
-     * The graphical representation of the chart.
-     *
-     * @param canvas the canvas to paint to
-     * @param x      the top left x value of the view to draw to
-     * @param y      the top left y value of the view to draw to
-     * @param width  the width of the view to draw to
-     * @param height the height of the view to draw to
-     * @param paint  the paint
-     */
+    /// The graphical representation of the chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `height`: the height of the view to draw to
+    ///
+    /// - `paint`: the paint
     public abstract void draw(Canvas canvas, int x, int y, int width, int height, Paint paint);
 
-    /**
-     * Draws the chart background.
-     *
-     * @param renderer the chart renderer
-     * @param canvas   the canvas to paint to
-     * @param x        the top left x value of the view to draw to
-     * @param y        the top left y value of the view to draw to
-     * @param width    the width of the view to draw to
-     * @param height   the height of the view to draw to
-     * @param paint    the paint used for drawing
-     * @param newColor if a new color is to be used
-     * @param color    the color to be used
-     */
+    /// Draws the chart background.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: the chart renderer
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `height`: the height of the view to draw to
+    ///
+    /// - `paint`: the paint used for drawing
+    ///
+    /// - `newColor`: if a new color is to be used
+    ///
+    /// - `color`: the color to be used
     protected void drawBackground(DefaultRenderer renderer, Canvas canvas, int x, int y, int width,
                                   int height, Paint paint, boolean newColor, int color) {
         if (renderer.isApplyBackgroundColor() || newColor) {
@@ -169,22 +178,35 @@ public abstract class AbstractChart {
         }
     }
 
-    /**
-     * Draws the chart legend.
-     *
-     * @param canvas     the canvas to paint to
-     * @param renderer   the series renderer
-     * @param titles     the titles to go to the legend
-     * @param left       the left X value of the area to draw to
-     * @param right      the right X value of the area to draw to
-     * @param y          the y value of the area to draw to
-     * @param width      the width of the area to draw to
-     * @param height     the height of the area to draw to
-     * @param legendSize the legend size
-     * @param paint      the paint to be used for drawing
-     * @param calculate  if only calculating the legend size
-     * @return the legend height
-     */
+    /// Draws the chart legend.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `titles`: the titles to go to the legend
+    ///
+    /// - `left`: the left X value of the area to draw to
+    ///
+    /// - `right`: the right X value of the area to draw to
+    ///
+    /// - `y`: the y value of the area to draw to
+    ///
+    /// - `width`: the width of the area to draw to
+    ///
+    /// - `height`: the height of the area to draw to
+    ///
+    /// - `legendSize`: the legend size
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `calculate`: if only calculating the legend size
+    ///
+    /// #### Returns
+    ///
+    /// the legend height
     protected int drawLegend(Canvas canvas, DefaultRenderer renderer, String[] titles, int left,
                              int right, int y, int width, int height, int legendSize, Paint paint, boolean calculate) {
         float size = 32;
@@ -238,15 +260,19 @@ public abstract class AbstractChart {
         return Math.round(size + renderer.getLegendTextSize());
     }
 
-    /**
-     * Draw a multiple lines string.
-     *
-     * @param canvas the canvas to paint to
-     * @param text   the text to be painted
-     * @param x      the x value of the area to draw to
-     * @param y      the y value of the area to draw to
-     * @param paint  the paint to be used for drawing
-     */
+    /// Draw a multiple lines string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `text`: the text to be painted
+    ///
+    /// - `x`: the x value of the area to draw to
+    ///
+    /// - `y`: the y value of the area to draw to
+    ///
+    /// - `paint`: the paint to be used for drawing
     protected void drawString(Canvas canvas, String text, float x, float y, Paint paint) {
         if (text != null) {
             String[] lines = split(text, "\n");
@@ -261,15 +287,21 @@ public abstract class AbstractChart {
         }
     }
 
-    /**
-     * Calculates if the current width exceeds the total width.
-     *
-     * @param currentWidth the current width
-     * @param renderer     the renderer
-     * @param right        the right side pixel value
-     * @param width        the total width
-     * @return if the current width exceeds the total width
-     */
+    /// Calculates if the current width exceeds the total width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentWidth`: the current width
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// - `right`: the right side pixel value
+    ///
+    /// - `width`: the total width
+    ///
+    /// #### Returns
+    ///
+    /// if the current width exceeds the total width
     protected boolean getExceed(float currentWidth, DefaultRenderer renderer, int right, int width) {
         boolean exceed = currentWidth > right;
         if (isVertical(renderer)) {
@@ -278,24 +310,31 @@ public abstract class AbstractChart {
         return exceed;
     }
 
-    /**
-     * Checks if the current chart is rendered as vertical.
-     *
-     * @param renderer the renderer
-     * @return if the chart is rendered as a vertical one
-     */
+    /// Checks if the current chart is rendered as vertical.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// #### Returns
+    ///
+    /// if the chart is rendered as a vertical one
     public boolean isVertical(DefaultRenderer renderer) {
         return renderer instanceof XYMultipleSeriesRenderer
                 && ((XYMultipleSeriesRenderer) renderer).getOrientation() == Orientation.VERTICAL;
     }
 
-    /**
-     * Makes sure the fraction digit is not displayed, if not needed.
-     *
-     * @param format the number format for the label
-     * @param label  the input label value
-     * @return the label without the useless fraction digit
-     */
+    /// Makes sure the fraction digit is not displayed, if not needed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `format`: the number format for the label
+    ///
+    /// - `label`: the input label value
+    ///
+    /// #### Returns
+    ///
+    /// the label without the useless fraction digit
     protected String getLabel(NumberFormat format, double label) {
         String text = "";
         if (format != null) {
@@ -308,14 +347,17 @@ public abstract class AbstractChart {
         return text;
     }
 
-    /**
-     * The graphical representation of a path.
-     *
-     * @param canvas   the canvas to paint to
-     * @param points   the points that are contained in the path to paint
-     * @param paint    the paint to be used for painting
-     * @param circular if the path ends with the start point
-     */
+    /// The graphical representation of a path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `points`: the points that are contained in the path to paint
+    ///
+    /// - `paint`: the paint to be used for painting
+    ///
+    /// - `circular`: if the path ends with the start point
     protected void drawPath(Canvas canvas, List<Float> points, Paint paint, boolean circular) {
         GeneralPath path = new GeneralPath();
         int height = canvas.getHeight();
@@ -349,14 +391,17 @@ public abstract class AbstractChart {
         canvas.drawPath(path, paint);
     }
 
-    /**
-     * The graphical representation of a path.
-     *
-     * @param canvas   the canvas to paint to
-     * @param points   the points that are contained in the path to paint
-     * @param paint    the paint to be used for painting
-     * @param circular if the path ends with the start point
-     */
+    /// The graphical representation of a path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `points`: the points that are contained in the path to paint
+    ///
+    /// - `paint`: the paint to be used for painting
+    ///
+    /// - `circular`: if the path ends with the start point
     protected void drawPath(Canvas canvas, float[] points, Paint paint, boolean circular) {
         GeneralPath path = new GeneralPath();
         int height = canvas.getHeight();
@@ -389,35 +434,48 @@ public abstract class AbstractChart {
         canvas.drawPath(path, paint);
     }
 
-    /**
-     * Returns the legend shape width.
-     *
-     * @param seriesIndex the series index
-     * @return the legend shape width
-     */
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
     public abstract int getLegendShapeWidth(int seriesIndex);
 
-    /**
-     * The graphical representation of the legend shape.
-     *
-     * @param canvas      the canvas to paint to
-     * @param renderer    the series renderer
-     * @param x           the x value of the point the shape should be drawn at
-     * @param y           the y value of the point the shape should be drawn at
-     * @param seriesIndex the series index
-     * @param paint       the paint to be used for drawing
-     */
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
     public abstract void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x,
                                          float y, int seriesIndex, Paint paint);
 
-    /**
-     * Calculates the best text to fit into the available space.
-     *
-     * @param text  the entire text
-     * @param width the width to fit the text into
-     * @param paint the paint
-     * @return the text to fit into the space
-     */
+    /// Calculates the best text to fit into the available space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the entire text
+    ///
+    /// - `width`: the width to fit the text into
+    ///
+    /// - `paint`: the paint
+    ///
+    /// #### Returns
+    ///
+    /// the text to fit into the space
     private String getFitText(String text, float width, Paint paint) {
         if (UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points()) {
             String newText = text;
@@ -435,14 +493,19 @@ public abstract class AbstractChart {
         return text;
     }
 
-    /**
-     * Calculates the current legend size.
-     *
-     * @param renderer      the renderer
-     * @param defaultHeight the default height
-     * @param extraHeight   the added extra height
-     * @return the legend size
-     */
+    /// Calculates the current legend size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// - `defaultHeight`: the default height
+    ///
+    /// - `extraHeight`: the added extra height
+    ///
+    /// #### Returns
+    ///
+    /// the legend size
     protected int getLegendSize(DefaultRenderer renderer, int defaultHeight, float extraHeight) {
         int legendSize = renderer.getLegendHeight();
         if (renderer.isShowLegend() && legendSize == 0) {
@@ -454,26 +517,41 @@ public abstract class AbstractChart {
         return legendSize;
     }
 
-    /**
-     * Draws a text label.
-     *
-     * @param canvas           the canvas
-     * @param labelText        the label text
-     * @param renderer         the renderer
-     * @param prevLabelsBounds the previous rendered label bounds
-     * @param centerX          the round chart center on X axis
-     * @param centerY          the round chart center on Y axis
-     * @param shortRadius      the short radius for the round chart
-     * @param longRadius       the long radius for the round chart
-     * @param currentAngle     the current angle
-     * @param angle            the label extra angle
-     * @param left             the left side
-     * @param right            the right side
-     * @param color            the label color
-     * @param paint            the paint
-     * @param line             if a line to the label should be drawn
-     * @param display          display the label anyway
-     */
+    /// Draws a text label.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `labelText`: the label text
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// - `prevLabelsBounds`: the previous rendered label bounds
+    ///
+    /// - `centerX`: the round chart center on X axis
+    ///
+    /// - `centerY`: the round chart center on Y axis
+    ///
+    /// - `shortRadius`: the short radius for the round chart
+    ///
+    /// - `longRadius`: the long radius for the round chart
+    ///
+    /// - `currentAngle`: the current angle
+    ///
+    /// - `angle`: the label extra angle
+    ///
+    /// - `left`: the left side
+    ///
+    /// - `right`: the right side
+    ///
+    /// - `color`: the label color
+    ///
+    /// - `paint`: the paint
+    ///
+    /// - `line`: if a line to the label should be drawn
+    ///
+    /// - `display`: display the label anyway
     protected void drawLabel(Canvas canvas, String labelText, DefaultRenderer renderer,
                              List<Rectangle2D> prevLabelsBounds, int centerX, int centerY, float shortRadius, float longRadius,
                              float currentAngle, float angle, int left, int right, int color, Paint paint, boolean line,
@@ -536,14 +614,17 @@ public abstract class AbstractChart {
         return Double.isNaN(value) || Double.isInfinite(value) || value == MathHelper.NULL_VALUE;
     }
 
-    /**
-     * Given screen coordinates, returns the series and point indexes of a chart
-     * element. If there is no chart element (line, point, bar, etc) at those
-     * coordinates, null is returned.
-     *
-     * @param screenPoint
-     * @return the series and point indexes
-     */
+    /// Given screen coordinates, returns the series and point indexes of a chart
+    /// element. If there is no chart element (line, point, bar, etc) at those
+    /// coordinates, null is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `screenPoint`
+    ///
+    /// #### Returns
+    ///
+    /// the series and point indexes
     public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
         return null;
     }

@@ -76,9 +76,9 @@ final public class JZlib {
 
     private JZlib() {}
 
-    /**
-     * @deprecated Use {@link #adler32Combine(long, long, long)}.
-     */
+    /// #### Deprecated
+    ///
+    /// Use `long, long)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static long adler32_combine(long adler1, long adler2, long len2) {
@@ -89,9 +89,9 @@ final public class JZlib {
         return Adler32.combine(adler1, adler2, len2);
     }
 
-    /**
-     * @deprecated Use {@link #crc32Combine(long, long, long)}.
-     */
+    /// #### Deprecated
+    ///
+    /// Use `long, long)`.
     @Deprecated
     @SuppressWarnings("PMD.MethodNamingConventions")
     public static long crc32_combine(long crc1, long crc2, long len2) {

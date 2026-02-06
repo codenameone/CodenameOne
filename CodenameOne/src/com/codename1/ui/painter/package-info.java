@@ -4,14 +4,10 @@
     Author     : Shai Almog
 */
 
-/**
- * <p>
- *     {@link com.codename1.ui.Painter} allows us to draw arbitrary elements
- *     of graphics from plain/scaled/tiled images to gradients and pretty
- *     much any form of graphic drawing we can imagine. Painters are
- *     "hooked" into the core of the API thus allowing us to customize
- *     every aspect of it. See {@link com.codename1.ui.Component} and
- *     {@link com.codename1.ui.Form}.
- * </p>
- */
+/// `com.codename1.ui.Painter` allows us to draw arbitrary elements
+/// of graphics from plain/scaled/tiled images to gradients and pretty
+/// much any form of graphic drawing we can imagine. Painters are
+/// "hooked" into the core of the API thus allowing us to customize
+/// every aspect of it. See `com.codename1.ui.Component` and
+/// `com.codename1.ui.Form`.
 package com.codename1.ui.painter;

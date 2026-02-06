@@ -28,24 +28,22 @@ package com.codename1.compat.java.util;
 import java.util.Arrays;
 import java.util.Comparator;
 
-/**
- * This is a compatibility class which supports the java.util.Objects API.  On platforms that don't support this class (e.g. Android)
- * the build server will automatically remap all uses of java.util.Objects to use this implementation instead.
- * <p>
- * This class consists of static utility methods for operating on objects. These utilities include null-safe or null-tolerant methods for computing the hash code of an object, returning a string for an object, and comparing two objects.
- *
- * @author shannah
- */
+/// This is a compatibility class which supports the java.util.Objects API.  On platforms that don't support this class (e.g. Android)
+/// the build server will automatically remap all uses of java.util.Objects to use this implementation instead.
+///
+/// This class consists of static utility methods for operating on objects. These utilities include null-safe or null-tolerant methods for computing the hash code of an object, returning a string for an object, and comparing two objects.
+///
+/// @author shannah
 public final class Objects {
     private Objects() {}
 
-    /**
-     * Returns true if the arguments are equal to each other and false otherwise. Consequently, if both arguments are null, true is returned and if exactly one argument is null, false is returned. Otherwise, equality is determined by using the equals method of the first argument.
-     *
-     * @param a
-     * @param b
-     * @return
-     */
+    /// Returns true if the arguments are equal to each other and false otherwise. Consequently, if both arguments are null, true is returned and if exactly one argument is null, false is returned. Otherwise, equality is determined by using the equals method of the first argument.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`
+    ///
+    /// - `b`
     @SuppressWarnings("PMD.SuspiciousEqualsMethodName")
     public static boolean equals(Object a, Object b) {
         if (a == b) { //NOPMD CompareObjectsWithEquals
@@ -54,12 +52,11 @@ public final class Objects {
         return a != null && a.equals(b);
     }
 
-    /**
-     * Returns the hash code of a non-null argument and 0 for a null argument.
-     *
-     * @param o
-     * @return
-     */
+    /// Returns the hash code of a non-null argument and 0 for a null argument.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`
     public static int hashCode(Object o) {
         return o == null ? 0 : o.hashCode();
     }

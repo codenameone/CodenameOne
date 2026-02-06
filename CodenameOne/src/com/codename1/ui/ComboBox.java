@@ -37,95 +37,118 @@ import com.codename1.ui.plaf.UIManager;
 
 import java.util.Vector;
 
-/**
- * <p>A {@code ComboBox} is a list that allows only one selection at a time, when a user clicks
- * the {@code ComboBox} a popup button with the full list of elements allows the selection of
- * a single element. The {@code ComboBox} is driven by the list model and allows all the renderer
- * features of the List as well. <br>
- * The {@code ComboBox} is notoriously hard to style properly as it relies on a complex dynamic of
- * popup renderer and instantly visible renderer. The UIID for the {@code ComboBox}  is "{@code ComboBox}"
- * however if you set it to something else all the other UIID's will also change their prefix. E.g. the "{@code ComboBoxPopup}"
- * UIID will become "{@code MyNewUIIDPopup}". <br>
- * The combo box defines the following UIID's by default:
- * </p>
- * <ul>
- *  <li>{@code ComboBox}</li>
- *  <li>{@code ComboBoxItem}</li>
- *  <li>{@code ComboBoxFocus}</li>
- *  <li>{@code PopupContentPane}</li>
- *  <li>{@code PopupItem}</li>
- *  <li>{@code PopupFocus}</li>
- * </ul>
- * <p>
- * This class also defines theme constants that allow some native themes to manipulate its behavior e.g.:
- * </p>
- * <ul>
- *    <li>popupTitleBool - shows the "label for" value as the title of the popup dialog</li>
- *    <li>popupCancelBodyBool - Adds a cancel button into the popup dialog</li>
- *    <li>centeredPopupBool - shows the popup dialog in the center of the screen instead of under the popup</li>
- *    <li>otherPopupRendererBool - Uses a different list cell render for the popup than the one used for the {@code ComboBox}
- * itself. When this is false {@code PopupItem} &amp; {@code PopupFocus}  become irrelevant. Notice that the
- * Android native theme defines this to true.</li>
- * </ul>
- * <p>
- * <strong>iOS doesn't use combo boxes as part of its UI paradigm</strong>. Its available there mostly in web applications and feels
- * unnatural in iOS which is why we recommend using the {@link com.codename1.ui.spinner.Picker} class.
- * </p>
- * <p>
- * The sample code below uses the {@link com.codename1.ui.list.GenericListCellRenderer} to create a richer
- * {@code ComboBox} UI.
- * </p>
- * <script src="https://gist.github.com/codenameone/7aa88182d6a7f63cbd4e.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-combobox.png" alt="Rich ComboBox" />
- *
- * @author Chen Fishbein
- * @see List
- */
+/// A `ComboBox` is a list that allows only one selection at a time, when a user clicks
+/// the `ComboBox` a popup button with the full list of elements allows the selection of
+/// a single element. The `ComboBox` is driven by the list model and allows all the renderer
+/// features of the List as well.
+///
+/// The `ComboBox` is notoriously hard to style properly as it relies on a complex dynamic of
+/// popup renderer and instantly visible renderer. The UIID for the `ComboBox`  is "`ComboBox`"
+/// however if you set it to something else all the other UIID's will also change their prefix. E.g. the "`ComboBoxPopup`"
+/// UIID will become "`MyNewUIIDPopup`".
+///
+/// The combo box defines the following UIID's by default:
+///
+///
+/// - `ComboBox`
+///
+/// - `ComboBoxItem`
+///
+/// - `ComboBoxFocus`
+///
+/// - `PopupContentPane`
+///
+/// - `PopupItem`
+///
+/// - `PopupFocus`
+///
+/// This class also defines theme constants that allow some native themes to manipulate its behavior e.g.:
+///
+///
+/// - popupTitleBool - shows the "label for" value as the title of the popup dialog
+///
+/// - popupCancelBodyBool - Adds a cancel button into the popup dialog
+///
+/// - centeredPopupBool - shows the popup dialog in the center of the screen instead of under the popup
+///
+/// - otherPopupRendererBool - Uses a different list cell render for the popup than the one used for the `ComboBox`
+/// itself. When this is false `PopupItem` & `PopupFocus`  become irrelevant. Notice that the
+/// Android native theme defines this to true.
+///
+/// **iOS doesn't use combo boxes as part of its UI paradigm**. Its available there mostly in web applications and feels
+/// unnatural in iOS which is why we recommend using the `com.codename1.ui.spinner.Picker` class.
+///
+/// The sample code below uses the `com.codename1.ui.list.GenericListCellRenderer` to create a richer
+/// `ComboBox` UI.
+///
+/// ```java
+/// public void showForm() {
+///   Form hi = new Form("ComboBox", new BoxLayout(BoxLayout.Y_AXIS));
+///   ComboBox> combo = new ComboBox<> (
+///           createListEntry("A Game of Thrones", "1996"),
+///           createListEntry("A Clash Of Kings", "1998"),
+///           createListEntry("A Storm Of Swords", "2000"),
+///           createListEntry("A Feast For Crows", "2005"),
+///           createListEntry("A Dance With Dragons", "2011"),
+///           createListEntry("The Winds of Winter", "2016 (please, please, please)"),
+///           createListEntry("A Dream of Spring", "Ugh"));
+///
+///   combo.setRenderer(new GenericListCellRenderer<>(new MultiButton(), new MultiButton()));
+///   hi.show();
+/// }
+///
+/// private Map createListEntry(String name, String date) {
+///     Map entry = new HashMap<>();
+///     entry.put("Line1", name);
+///     entry.put("Line2", date);
+///     return entry;
+/// }
+/// ```
+///
+/// @author Chen Fishbein
+///
+/// #### See also
+///
+/// - List
 public class ComboBox<T> extends List<T> implements ActionSource {
 
     private static boolean defaultActAsSpinnerDialog;
-    /**
-     * Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
-     */
+    /// Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
     private static boolean defaultIncludeSelectCancel = true;
     private Image comboBoxImage;
     private boolean actAsSpinnerDialog = defaultActAsSpinnerDialog;
-    /**
-     * Indicates whethe the soft buttons for select/cancel should appear for the combo box
-     */
+    /// Indicates whethe the soft buttons for select/cancel should appear for the combo box
     private boolean includeSelectCancel = defaultIncludeSelectCancel;
     private boolean showingPopupDialog;
 
-    /**
-     * Creates a new instance of ComboBox
-     *
-     * @param items set of items placed into the combo box model
-     */
+    /// Creates a new instance of ComboBox
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: set of items placed into the combo box model
     public ComboBox(Vector<T> items) {
         this(new DefaultListModel(items));
     }
 
-    /**
-     * Creates a new instance of ComboBox
-     *
-     * @param items set of items placed into the combo box model
-     */
+    /// Creates a new instance of ComboBox
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: set of items placed into the combo box model
     public ComboBox(Object... items) {
         this(new DefaultListModel(items));
     }
 
-    /**
-     * Constructs an empty combo box
-     */
+    /// Constructs an empty combo box
     public ComboBox() {
         this(new DefaultListModel<T>());
     }
 
-    /**
-     * Creates a new instance of ComboBox
-     *
-     * @param model the model for the combo box elements and selection
-     */
+    /// Creates a new instance of ComboBox
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model for the combo box elements and selection
     public ComboBox(ListModel<T> model) {
         super(model);
         setUIIDFinal("ComboBox");
@@ -152,67 +175,65 @@ public class ComboBox<T> extends List<T> implements ActionSource {
 
     }
 
-    /**
-     * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
-     * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
-     * a combo box paradigm.
-     *
-     * @return the defaultActAsSpinnerDialog
-     */
+    /// When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
+    /// this allows creating user interfaces for touch devices where a spinner UI approach is more common than
+    /// a combo box paradigm.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultActAsSpinnerDialog
     public static boolean isDefaultActAsSpinnerDialog() {
         return defaultActAsSpinnerDialog;
     }
 
-    /**
-     * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
-     * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
-     * a combo box paradigm.
-     *
-     * @param aDefaultActAsSpinnerDialog the defaultActAsSpinnerDialog to set
-     */
+    /// When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
+    /// this allows creating user interfaces for touch devices where a spinner UI approach is more common than
+    /// a combo box paradigm.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultActAsSpinnerDialog`: the defaultActAsSpinnerDialog to set
     public static void setDefaultActAsSpinnerDialog(boolean aDefaultActAsSpinnerDialog) {
         defaultActAsSpinnerDialog = aDefaultActAsSpinnerDialog;
     }
 
-    /**
-     * Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
-     *
-     * @return true if the soft buttons for select/cancel should appear for the combo box
-     */
+    /// Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
+    ///
+    /// #### Returns
+    ///
+    /// true if the soft buttons for select/cancel should appear for the combo box
     public static boolean isDefaultIncludeSelectCancel() {
         return defaultIncludeSelectCancel;
     }
 
-    /**
-     * Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
-     *
-     * @param aDefaultIncludeSelectCancel the new value
-     */
+    /// Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultIncludeSelectCancel`: the new value
     public static void setDefaultIncludeSelectCancel(boolean aDefaultIncludeSelectCancel) {
         defaultIncludeSelectCancel = aDefaultIncludeSelectCancel;
     }
 
-    /**
-     * Gets the ComboBox drop down icon
-     *
-     * @return the drop down icon
-     */
+    /// Gets the ComboBox drop down icon
+    ///
+    /// #### Returns
+    ///
+    /// the drop down icon
     public Image getComboBoxImage() {
         return comboBoxImage;
     }
 
-    /**
-     * Sets the ComboBox drop down icon
-     *
-     * @param comboBoxImage the drop down icon
-     */
+    /// Sets the ComboBox drop down icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `comboBoxImage`: the drop down icon
     public void setComboBoxImage(Image comboBoxImage) {
         this.comboBoxImage = comboBoxImage;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setUIID(String uiid) {
         super.setUIID(uiid);
@@ -232,9 +253,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getBaseline(int width, int height) {
         Component selected;
@@ -248,66 +267,55 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         return getHeight() - getStyle().getPaddingBottom() - selected.getStyle().getPaddingBottom();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void laidOut() {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Rectangle getSelectedRect() {
         // the implemenation from list doesn't make sense here, restore the component implementation
         return new Rectangle(getAbsoluteX(), getAbsoluteY(), getBounds().getSize());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Rectangle getVisibleBounds() {
         return getBounds();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setSelectedIndex(int selection) {
         super.setSelectedIndex(selection, false);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setSelectedIndex(int selection, boolean scroll) {
         super.setSelectedIndex(selection, false);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerHover(int[] x, int[] y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerHoverReleased(int[] x, int[] y) {
     }
 
-    /**
-     * Subclasses can override this method to change the creation of the dialog
-     *
-     * @param l the list of the popup
-     * @return a dialog instance
-     */
+    /// Subclasses can override this method to change the creation of the dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the list of the popup
+    ///
+    /// #### Returns
+    ///
+    /// a dialog instance
     protected Dialog createPopupDialog(List<T> l) {
         Dialog popupDialog = new Dialog(getUIID() + "Popup", getUIID() + "PopupTitle") {
 
@@ -340,24 +348,27 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         return popupDialog;
     }
 
-    /**
-     * Returns true if the popup dialog is currently showing for this combobox.
-     *
-     * @return
-     * @since 8.0
-     */
+    /// Returns true if the popup dialog is currently showing for this combobox.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public boolean isShowingPopupDialog() {
         return showingPopupDialog;
     }
 
-    /**
-     * Shows the popup dialog for the combo box and returns the resulting command.
-     * This method can be overriden by subclasses to modify the behavior of the class.
-     *
-     * @param popupDialog the popup dialog
-     * @param l           the list within
-     * @return the selected command
-     */
+    /// Shows the popup dialog for the combo box and returns the resulting command.
+    /// This method can be overriden by subclasses to modify the behavior of the class.
+    ///
+    /// #### Parameters
+    ///
+    /// - `popupDialog`: the popup dialog
+    ///
+    /// - `l`: the list within
+    ///
+    /// #### Returns
+    ///
+    /// the selected command
     protected Command showPopupDialog(Dialog popupDialog, List l) {
         if (getUIManager().isThemeConstant("popupTitleBool", false)) {
             if (getLabelForComponent() != null) {
@@ -466,9 +477,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireClicked() {
         List<T> l = createPopupList();
@@ -495,12 +504,12 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         }
     }
 
-    /**
-     * Creates the list object used within the popup dialog. This method allows subclasses
-     * to customize the list creation for the popup dialog shown when the combo box is pressed.
-     *
-     * @return a newly created list object used when the user presses the combo box.
-     */
+    /// Creates the list object used within the popup dialog. This method allows subclasses
+    /// to customize the list creation for the popup dialog shown when the combo box is pressed.
+    ///
+    /// #### Returns
+    ///
+    /// a newly created list object used when the user presses the combo box.
     protected List<T> createPopupList() {
         List<T> l = new List<T>(getModel());
         l.setCommandList(isCommandList());
@@ -519,9 +528,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         return l;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
@@ -533,30 +540,22 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         super.keyPressed(keyCode);
     }
 
-    /**
-     * Prevent the combo box from losing selection in some use cases
-     */
+    /// Prevent the combo box from losing selection in some use cases
     @Override
     void selectElement(int selectedIndex) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
         if (isEnabled() && !Display.impl.isScrollWheeling()) {
@@ -564,66 +563,60 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         getUIManager().getLookAndFeel().drawComboBox(g, this);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getComboBoxPreferredSize(this);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getOrientation() {
         return COMBO;
     }
 
-    /**
-     * Indicates whethe the soft buttons for select/cancel should appear for the combo box
-     *
-     * @return true if the soft buttons for select/cancel should appear for the combo box
-     */
+    /// Indicates whethe the soft buttons for select/cancel should appear for the combo box
+    ///
+    /// #### Returns
+    ///
+    /// true if the soft buttons for select/cancel should appear for the combo box
     public boolean isIncludeSelectCancel() {
         return includeSelectCancel;
     }
 
-    /**
-     * Indicates whethe the soft buttons for select/cancel should appear for the combo box
-     *
-     * @param includeSelectCancel the new value
-     */
+    /// Indicates whethe the soft buttons for select/cancel should appear for the combo box
+    ///
+    /// #### Parameters
+    ///
+    /// - `includeSelectCancel`: the new value
     public void setIncludeSelectCancel(boolean includeSelectCancel) {
         this.includeSelectCancel = includeSelectCancel;
     }
 
-    /**
-     * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
-     * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
-     * a combo box paradigm.
-     *
-     * @return the actAsSpinnerDialog
-     */
+    /// When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
+    /// this allows creating user interfaces for touch devices where a spinner UI approach is more common than
+    /// a combo box paradigm.
+    ///
+    /// #### Returns
+    ///
+    /// the actAsSpinnerDialog
     public boolean isActAsSpinnerDialog() {
         return actAsSpinnerDialog;
     }
 
-    /**
-     * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
-     * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
-     * a combo box paradigm.
-     *
-     * @param actAsSpinnerDialog the actAsSpinnerDialog to set
-     */
+    /// When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
+    /// this allows creating user interfaces for touch devices where a spinner UI approach is more common than
+    /// a combo box paradigm.
+    ///
+    /// #### Parameters
+    ///
+    /// - `actAsSpinnerDialog`: the actAsSpinnerDialog to set
     public void setActAsSpinnerDialog(boolean actAsSpinnerDialog) {
         this.actAsSpinnerDialog = actAsSpinnerDialog;
     }

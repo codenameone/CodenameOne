@@ -54,7 +54,7 @@ This means faster debugging cycle and faster development process!
 
 ### Large Selection of Device Skins
 
-Choose from a large selection of device “skins” to see how your app will look on particular devices. The skin takes into account factors such as resolution and
+Choose from a large selection of device "skins" to see how your app will look on particular devices. The skin takes into account factors such as resolution and
 device density to provide a pixel-perfect presentation of your app, as it would appear on the real device.
 Switching between device skins is nearly instant.
 

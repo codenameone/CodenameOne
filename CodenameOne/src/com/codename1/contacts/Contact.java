@@ -28,15 +28,43 @@ import com.codename1.ui.Image;
 import java.util.Collection;
 import java.util.Hashtable;
 
-/**
- * <p>Represents a Contact entry from the device Address Book.<br>
- * The sample below demonstrates listing all the contacts within the device with their photos</p>
- *
- * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
- *
- * @author Chen
- */
+/// Represents a Contact entry from the device Address Book.
+///
+/// The sample below demonstrates listing all the contacts within the device with their photos
+///
+/// ```java
+/// Form hi = new Form("Contacts", new BoxLayout(BoxLayout.Y_AXIS));
+/// hi.add(new InfiniteProgress());
+/// int size = Display.getInstance().convertToPixels(5, true);
+/// FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_PERSON, FontImage.getMaterialDesignFont(), 0xff, size, size);
+///
+/// Display.getInstance().scheduleBackgroundTask(() -> {
+///     Contact[] contacts = Display.getInstance().getAllContacts(true, true, false, true, false, false);
+///     Display.getInstance().callSerially(() -> {
+///         hi.removeAll();
+///         for(Contact c : contacts) {
+///             MultiButton mb = new MultiButton(c.getDisplayName());
+///             mb.setIcon(fi);
+///             mb.setTextLine2(c.getPrimaryPhoneNumber());
+///             hi.add(mb);
+///             mb.putClientProperty("id", c.getId());
+///             Display.getInstance().scheduleBackgroundTask(() -> {
+///                 Contact cc = ContactsManager.getContactById(c.getId(), false, true, false, false, false);
+///                 Display.getInstance().callSerially(() -> {
+///                     Image photo = cc.getPhoto();
+///                     if(photo != null) {
+///                         mb.setIcon(photo.fill(size, size));
+///                         mb.revalidate();
+///                     }
+///                 });
+///             });
+///         }
+///         hi.getContentPane().animateLayout(150);
+///     });
+/// });
+/// ```
+///
+/// @author Chen
 public class Contact {
 
     private String id;
@@ -67,51 +95,51 @@ public class Contact {
 
     private String[] linkedIds;
 
-    /**
-     * Gets the Contact Addresses, the Hashtable contains key/value pairs where
-     * the key is a String which represents the type of the Address, types can
-     * be: "home", "work", "other" the value is an Address Object.
-     *
-     * @return Hashtable of available addresses
-     */
+    /// Gets the Contact Addresses, the Hashtable contains key/value pairs where
+    /// the key is a String which represents the type of the Address, types can
+    /// be: "home", "work", "other" the value is an Address Object.
+    ///
+    /// #### Returns
+    ///
+    /// Hashtable of available addresses
     public Hashtable getAddresses() {
         return addresses;
     }
 
-    /**
-     * Sets the Contact Addresses
-     *
-     * @param addresses the Hashtable contains key/value pairs where
-     *                  the key is a String which represents the type of the Address, types can
-     *                  be: "home", "work", "other" the value is an Address Object.
-     */
+    /// Sets the Contact Addresses
+    ///
+    /// #### Parameters
+    ///
+    /// - `addresses`: @param addresses the Hashtable contains key/value pairs where
+    /// the key is a String which represents the type of the Address, types can
+    /// be: "home", "work", "other" the value is an Address Object.
     public void setAddresses(Hashtable addresses) {
         this.addresses = addresses;
     }
 
-    /**
-     * Gets the Contact birthday
-     *
-     * @return birth time
-     */
+    /// Gets the Contact birthday
+    ///
+    /// #### Returns
+    ///
+    /// birth time
     public long getBirthday() {
         return birthday;
     }
 
-    /**
-     * Sets the Contact birthday date
-     *
-     * @param birthday
-     */
+    /// Sets the Contact birthday date
+    ///
+    /// #### Parameters
+    ///
+    /// - `birthday`
     public void setBirthday(long birthday) {
         this.birthday = birthday;
     }
 
-    /**
-     * Gets the Contact Display Name
-     *
-     * @return Display Name
-     */
+    /// Gets the Contact Display Name
+    ///
+    /// #### Returns
+    ///
+    /// Display Name
     public String getDisplayName() {
         if (displayName == null || "".equals(displayName)) {
             if (familyName != null && firstName != null) {
@@ -131,157 +159,153 @@ public class Contact {
         return displayName;
     }
 
-    /**
-     * Sets the Contact display name
-     *
-     * @param displayName
-     */
+    /// Sets the Contact display name
+    ///
+    /// #### Parameters
+    ///
+    /// - `displayName`
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
     }
 
-    /**
-     * Gets the Contact Emails, the Hashtable contains key/value pairs where
-     * the key is a String which represents the type of the Email, types can
-     * be: "home", "mobile", "work", "other" the value is String of the email.
-     *
-     * @return Hashtable of available emails
-     */
+    /// Gets the Contact Emails, the Hashtable contains key/value pairs where
+    /// the key is a String which represents the type of the Email, types can
+    /// be: "home", "mobile", "work", "other" the value is String of the email.
+    ///
+    /// #### Returns
+    ///
+    /// Hashtable of available emails
     public Hashtable getEmails() {
         return emails;
     }
 
-    /**
-     * Sets the Contact emails
-     *
-     * @param emails the Hashtable contains key/value pairs where
-     *               the key is a String which represents the type of the Email, types can
-     *               be: "home", "mobile", "work", "other" the value is String of the email.
-     */
+    /// Sets the Contact emails
+    ///
+    /// #### Parameters
+    ///
+    /// - `emails`: @param emails the Hashtable contains key/value pairs where
+    /// the key is a String which represents the type of the Email, types can
+    /// be: "home", "mobile", "work", "other" the value is String of the email.
     public void setEmails(Hashtable emails) {
         this.emails = emails;
     }
 
-    /**
-     * Gets the Contact unique id
-     *
-     * @return Contact unique id
-     */
+    /// Gets the Contact unique id
+    ///
+    /// #### Returns
+    ///
+    /// Contact unique id
     public String getId() {
         return id;
     }
 
-    /**
-     * Sets the Contact unique id
-     *
-     * @param id
-     */
+    /// Sets the Contact unique id
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`
     public void setId(String id) {
         this.id = id;
     }
 
-    /**
-     * Gets Contact First Name
-     *
-     * @return Contact Name
-     */
+    /// Gets Contact First Name
+    ///
+    /// #### Returns
+    ///
+    /// Contact Name
     public String getFirstName() {
         return firstName;
     }
 
-    /**
-     * Sets Contact first name
-     *
-     * @param name
-     */
+    /// Sets Contact first name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`
     public void setFirstName(String name) {
         this.firstName = name;
     }
 
-    /**
-     * Gets Contact family name
-     *
-     * @return
-     */
+    /// Gets Contact family name
     public String getFamilyName() {
         return familyName;
     }
 
-    /**
-     * Sets Contact family name
-     *
-     * @param familyName
-     */
+    /// Sets Contact family name
+    ///
+    /// #### Parameters
+    ///
+    /// - `familyName`
     public void setFamilyName(String familyName) {
         this.familyName = familyName;
     }
 
-    /**
-     * Gets Contact Note
-     *
-     * @return Contact Note
-     */
+    /// Gets Contact Note
+    ///
+    /// #### Returns
+    ///
+    /// Contact Note
     public String getNote() {
         return note;
     }
 
-    /**
-     * Sets Contact note
-     *
-     * @param note
-     */
+    /// Sets Contact note
+    ///
+    /// #### Parameters
+    ///
+    /// - `note`
     public void setNote(String note) {
         this.note = note;
     }
 
-    /**
-     * Gets the Contact phone numbers, the Hashtable contains key/value pairs where
-     * the key is a String which represents the type of the phone number, types can
-     * be: "home", "mobile", "work", "fax", "other" the value is String of the
-     * phone number.
-     *
-     * @return Hashtable of available phone numbers
-     */
+    /// Gets the Contact phone numbers, the Hashtable contains key/value pairs where
+    /// the key is a String which represents the type of the phone number, types can
+    /// be: "home", "mobile", "work", "fax", "other" the value is String of the
+    /// phone number.
+    ///
+    /// #### Returns
+    ///
+    /// Hashtable of available phone numbers
     public Hashtable getPhoneNumbers() {
         return phoneNumbers;
     }
 
-    /**
-     * Sets Contact phone numbers
-     *
-     * @param phoneNumbers the Hashtable contains key/value pairs where
-     *                     the key is a String which represents the type of the phone number, types can
-     *                     be: "home", "mobile", "work", "fax", "other" the value is String of the
-     *                     phone number.
-     */
+    /// Sets Contact phone numbers
+    ///
+    /// #### Parameters
+    ///
+    /// - `phoneNumbers`: @param phoneNumbers the Hashtable contains key/value pairs where
+    /// the key is a String which represents the type of the phone number, types can
+    /// be: "home", "mobile", "work", "fax", "other" the value is String of the
+    /// phone number.
     public void setPhoneNumbers(Hashtable phoneNumbers) {
         this.phoneNumbers = phoneNumbers;
     }
 
-    /**
-     * Gets the Contact photo
-     *
-     * @return the Contact Photo or null if not available
-     */
+    /// Gets the Contact photo
+    ///
+    /// #### Returns
+    ///
+    /// the Contact Photo or null if not available
     public Image getPhoto() {
         return photo;
     }
 
-    /**
-     * Sets Contact photo
-     *
-     * @param photo
-     */
+    /// Sets Contact photo
+    ///
+    /// #### Parameters
+    ///
+    /// - `photo`
     public void setPhoto(Image photo) {
         this.photo = photo;
     }
 
-    /**
-     * Gets the primary email of this Contact, notice this can be null even though
-     * the Contact has emails declared
-     *
-     * @return the Contact primary email or null if not declared
-     */
+    /// Gets the primary email of this Contact, notice this can be null even though
+    /// the Contact has emails declared
+    ///
+    /// #### Returns
+    ///
+    /// the Contact primary email or null if not declared
     public String getPrimaryEmail() {
         if (primaryEmail == null && emails != null) {
             Collection c = emails.values();
@@ -292,21 +316,21 @@ public class Contact {
         return primaryEmail;
     }
 
-    /**
-     * Sets Contact primary email
-     *
-     * @param primaryEmail
-     */
+    /// Sets Contact primary email
+    ///
+    /// #### Parameters
+    ///
+    /// - `primaryEmail`
     public void setPrimaryEmail(String primaryEmail) {
         this.primaryEmail = primaryEmail;
     }
 
-    /**
-     * Gets the primary phone number of this Contact, notice this can be null
-     * even though the Contact has phone numbers declared
-     *
-     * @return the Contact primary phone number or null if not declared
-     */
+    /// Gets the primary phone number of this Contact, notice this can be null
+    /// even though the Contact has phone numbers declared
+    ///
+    /// #### Returns
+    ///
+    /// the Contact primary phone number or null if not declared
     public String getPrimaryPhoneNumber() {
         if (primaryPhoneNumber == null && phoneNumbers != null) {
             Collection c = phoneNumbers.values();
@@ -317,46 +341,43 @@ public class Contact {
         return primaryPhoneNumber;
     }
 
-    /**
-     * Sets Contact primary phone number
-     *
-     * @param primaryPhoneNumber
-     */
+    /// Sets Contact primary phone number
+    ///
+    /// #### Parameters
+    ///
+    /// - `primaryPhoneNumber`
     public void setPrimaryPhoneNumber(String primaryPhoneNumber) {
         this.primaryPhoneNumber = primaryPhoneNumber;
     }
 
-    /**
-     * Gets Contact urls
-     *
-     * @return
-     */
+    /// Gets Contact urls
     public String[] getUrls() {
         return urls;
     }
 
-    /**
-     * Sets Contact urls
-     *
-     * @param urls
-     */
+    /// Sets Contact urls
+    ///
+    /// #### Parameters
+    ///
+    /// - `urls`
     public void setUrls(String[] urls) {
         this.urls = urls;
     }
 
-    /**
-     * Returns all of the contacts that are linked to this contact.
-     * @return The contacts that are linked to this contact.
-     */
+    /// Returns all of the contacts that are linked to this contact.
+    ///
+    /// #### Returns
+    ///
+    /// The contacts that are linked to this contact.
     //public Contact[] getLinkedContacts() {
     //    return ContactsManager.getLinkedContacts(this);
     //}
 
-    /**
-     * Returns the IDs of all contacts that are linked to this contact.
-     *
-     * @return IDs of all contacts that are linked to this contact.
-     */
+    /// Returns the IDs of all contacts that are linked to this contact.
+    ///
+    /// #### Returns
+    ///
+    /// IDs of all contacts that are linked to this contact.
     public String[] getLinkedContactIds() {
         if (linkedIds == null) {
             linkedIds = Display.getInstance().getLinkedContactIds(this);

@@ -28,12 +28,13 @@ import com.codename1.ui.List;
 import java.util.Calendar;
 import java.util.Map;
 
-/**
- * A date spinner allows selecting a date value within the given date range
- *
- * @author Shai Almog
- * @deprecated use Picker instead
- */
+/// A date spinner allows selecting a date value within the given date range
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
 public class DateSpinner extends BaseSpinner {
     private Spinner month;
     private Spinner day;
@@ -51,9 +52,7 @@ public class DateSpinner extends BaseSpinner {
 
     private String monthRenderingPrototype = "WWW";
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public DateSpinner() {
         Calendar c = Calendar.getInstance();
         currentDay = c.get(Calendar.DAY_OF_MONTH);
@@ -116,16 +115,16 @@ public class DateSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the startYear
-     */
+    /// #### Returns
+    ///
+    /// the startYear
     public int getStartYear() {
         return startYear;
     }
 
-    /**
-     * @param startYear the startYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `startYear`: the startYear to set
     public void setStartYear(int startYear) {
         this.startYear = startYear;
         if (year != null) {
@@ -133,16 +132,16 @@ public class DateSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the endYear
-     */
+    /// #### Returns
+    ///
+    /// the endYear
     public int getEndYear() {
         return endYear;
     }
 
-    /**
-     * @param endYear the endYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `endYear`: the endYear to set
     public void setEndYear(int endYear) {
         this.endYear = endYear;
         if (year != null) {
@@ -150,9 +149,9 @@ public class DateSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the currentYear
-     */
+    /// #### Returns
+    ///
+    /// the currentYear
     public int getCurrentYear() {
         if (year != null) {
             return ((Integer) year.getValue()).intValue();
@@ -160,9 +159,9 @@ public class DateSpinner extends BaseSpinner {
         return currentYear;
     }
 
-    /**
-     * @param currentYear the currentYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentYear`: the currentYear to set
     public void setCurrentYear(int currentYear) {
         this.currentYear = currentYear;
         if (year != null) {
@@ -170,9 +169,9 @@ public class DateSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the currentDay
-     */
+    /// #### Returns
+    ///
+    /// the currentDay
     public int getCurrentDay() {
         if (day == null || day.getValue() == null) {
             return 1;
@@ -180,9 +179,9 @@ public class DateSpinner extends BaseSpinner {
         return ((Integer) day.getValue()).intValue();
     }
 
-    /**
-     * @param currentDay the currentDay to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentDay`: the currentDay to set
     public void setCurrentDay(int currentDay) {
         this.currentDay = currentDay;
         if (day != null) {
@@ -190,9 +189,9 @@ public class DateSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the currentMonth
-     */
+    /// #### Returns
+    ///
+    /// the currentMonth
     public int getCurrentMonth() {
         if (month != null) {
             return ((Integer) month.getValue()).intValue();
@@ -200,9 +199,9 @@ public class DateSpinner extends BaseSpinner {
         return currentMonth;
     }
 
-    /**
-     * @param currentMonth the currentMonth to set
-     */
+    /// #### Parameters
+    ///
+    /// - `currentMonth`: the currentMonth to set
     public void setCurrentMonth(int currentMonth) {
         this.currentMonth = currentMonth;
         if (month != null) {
@@ -210,32 +209,32 @@ public class DateSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * @return the monthDayYear
-     */
+    /// #### Returns
+    ///
+    /// the monthDayYear
     public boolean isMonthDayYear() {
         return monthDayYear;
     }
 
-    /**
-     * @param monthDayYear the monthDayYear to set
-     */
+    /// #### Parameters
+    ///
+    /// - `monthDayYear`: the monthDayYear to set
     public void setMonthDayYear(boolean monthDayYear) {
         this.monthDayYear = monthDayYear;
         removeAll();
         addComponents();
     }
 
-    /**
-     * @return the numericMonths
-     */
+    /// #### Returns
+    ///
+    /// the numericMonths
     public boolean isNumericMonths() {
         return numericMonths;
     }
 
-    /**
-     * @param numericMonths the numericMonths to set
-     */
+    /// #### Parameters
+    ///
+    /// - `numericMonths`: the numericMonths to set
     public void setNumericMonths(boolean numericMonths) {
         this.numericMonths = numericMonths;
         if (month != null) {
@@ -244,25 +243,19 @@ public class DateSpinner extends BaseSpinner {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"startYear", "endYear", "currentYear", "currentDay", "currentMonth", "monthDayYear", "numericMonths"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("startYear".equals(name)) {
@@ -289,9 +282,7 @@ public class DateSpinner extends BaseSpinner {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("startYear".equals(name)) {
@@ -327,12 +318,12 @@ public class DateSpinner extends BaseSpinner {
     }
 
 
-    /**
-     * Sets the Month Rendering Prototype to be used, useful when the language
-     * is changed and you need the month spinner to be wider.
-     *
-     * @param monthPrototype a prototype to be used to calc the month cell size
-     */
+    /// Sets the Month Rendering Prototype to be used, useful when the language
+    /// is changed and you need the month spinner to be wider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `monthPrototype`: a prototype to be used to calc the month cell size
     public void setMonthRenderingPrototype(String monthPrototype) {
         this.monthRenderingPrototype = monthPrototype;
     }

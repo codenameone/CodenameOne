@@ -1,41 +1,40 @@
-/**
- * Copyright 2012 Kamran Zafar
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright 2012 Kamran Zafar
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
-/**
- * The original source has been modified by Paul Williams.
- */
+/// The original source has been modified by Paul Williams.
 
 package com.codename1.io.tar;
 
-/**
- * @author Kamran Zafar
- */
+/// @author Kamran Zafar
 public final class Octal {
 
     private Octal() {}
 
-    /**
-     * Parse an octal string from a header buffer. This is used for the file
-     * permission mode value.
-     *
-     * @param header The header buffer from which to parse.
-     * @param offset The offset into the buffer from which to parse.
-     * @param length The number of header bytes to parse.
-     * @return The long value of the octal string.
-     */
+    /// Parse an octal string from a header buffer. This is used for the file
+    /// permission mode value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `header`: The header buffer from which to parse.
+    ///
+    /// - `offset`: The offset into the buffer from which to parse.
+    ///
+    /// - `length`: The number of header bytes to parse.
+    ///
+    /// #### Returns
+    ///
+    /// The long value of the octal string.
     public static long parseOctal(byte[] header, int offset, int length) {
         long result = 0;
         boolean stillPadding = true;
@@ -64,15 +63,21 @@ public final class Octal {
         return result;
     }
 
-    /**
-     * Parse an octal integer from a header buffer.
-     *
-     * @param value
-     * @param buf    The header buffer from which to parse.
-     * @param offset The offset into the buffer from which to parse.
-     * @param length The number of header bytes to parse.
-     * @return The integer value of the octal bytes.
-     */
+    /// Parse an octal integer from a header buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`
+    ///
+    /// - `buf`: The header buffer from which to parse.
+    ///
+    /// - `offset`: The offset into the buffer from which to parse.
+    ///
+    /// - `length`: The number of header bytes to parse.
+    ///
+    /// #### Returns
+    ///
+    /// The integer value of the octal bytes.
     public static int getOctalBytes(long value, byte[] buf, int offset, int length) {
         int idx = length - 1;
 
@@ -98,15 +103,21 @@ public final class Octal {
         return offset + length;
     }
 
-    /**
-     * Parse the checksum octal integer from a header buffer.
-     *
-     * @param value
-     * @param buf    The header buffer from which to parse.
-     * @param offset The offset into the buffer from which to parse.
-     * @param length The number of header bytes to parse.
-     * @return The integer value of the entry's checksum.
-     */
+    /// Parse the checksum octal integer from a header buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`
+    ///
+    /// - `buf`: The header buffer from which to parse.
+    ///
+    /// - `offset`: The offset into the buffer from which to parse.
+    ///
+    /// - `length`: The number of header bytes to parse.
+    ///
+    /// #### Returns
+    ///
+    /// The integer value of the entry's checksum.
     public static int getCheckSumOctalBytes(long value, byte[] buf, int offset, int length) {
         getOctalBytes(value, buf, offset, length);
         buf[offset + length - 1] = (byte) ' ';
@@ -114,15 +125,21 @@ public final class Octal {
         return offset + length;
     }
 
-    /**
-     * Parse an octal long integer from a header buffer.
-     *
-     * @param value
-     * @param buf    The header buffer from which to parse.
-     * @param offset The offset into the buffer from which to parse.
-     * @param length The number of header bytes to parse.
-     * @return The long value of the octal bytes.
-     */
+    /// Parse an octal long integer from a header buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`
+    ///
+    /// - `buf`: The header buffer from which to parse.
+    ///
+    /// - `offset`: The offset into the buffer from which to parse.
+    ///
+    /// - `length`: The number of header bytes to parse.
+    ///
+    /// #### Returns
+    ///
+    /// The long value of the octal bytes.
     public static int getLongOctalBytes(long value, byte[] buf, int offset, int length) {
         byte[] temp = new byte[length + 1];
         getOctalBytes(value, temp, 0, length + 1);

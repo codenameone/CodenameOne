@@ -26,25 +26,19 @@ package com.codename1.io;
 import java.io.IOException;
 import java.io.OutputStream;
 
-/**
- * Based on the buffered output stream from the JDK with some minor tweaks to allow
- * external classes to monitor stream status and progress.
- */
+/// Based on the buffered output stream from the JDK with some minor tweaks to allow
+/// external classes to monitor stream status and progress.
 public class BufferedOutputStream extends OutputStream {
     private static int streamCount = 0;
     private static int defaultBufferSize = 8192;
     private final OutputStream out;
     private final String name;
-    /**
-     * The internal buffer where data is stored.
-     */
+    /// The internal buffer where data is stored.
     protected byte[] buf;
-    /**
-     * The number of valid bytes in the buffer. This value is always
-     * in the range <tt>0</tt> through <tt>buf.length</tt>; elements
-     * <tt>buf[0]</tt> through <tt>buf[count-1]</tt> contain valid
-     * byte data.
-     */
+    /// The number of valid bytes in the buffer. This value is always
+    /// in the range 0 through buf.length; elements
+    /// buf[0] through buf[count-1] contain valid
+    /// byte data.
     protected int count;
     private Object connection;
     private boolean closed;
@@ -52,50 +46,60 @@ public class BufferedOutputStream extends OutputStream {
     private int totalBytesWritten;
     private IOProgressListener progressListener;
 
-    /**
-     * Creates a new buffered output stream to write data to the
-     * specified underlying output stream.
-     *
-     * @param out the underlying output stream.
-     */
+    /// Creates a new buffered output stream to write data to the
+    /// specified underlying output stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the underlying output stream.
     public BufferedOutputStream(OutputStream out) {
         this(out, defaultBufferSize);
     }
 
-    /**
-     * Creates a new buffered output stream to write data to the
-     * specified underlying output stream.
-     *
-     * @param out  the underlying output stream.
-     * @param name the name of the stream used for debugging/logging purposes
-     */
+    /// Creates a new buffered output stream to write data to the
+    /// specified underlying output stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the underlying output stream.
+    ///
+    /// - `name`: the name of the stream used for debugging/logging purposes
     public BufferedOutputStream(OutputStream out, String name) {
         this(out, defaultBufferSize, name);
     }
 
-    /**
-     * Creates a new buffered output stream to write data to the
-     * specified underlying output stream with the specified buffer
-     * size.
-     *
-     * @param out  the underlying output stream.
-     * @param size the buffer size.
-     * @throws IllegalArgumentException if size &lt;= 0.
-     */
+    /// Creates a new buffered output stream to write data to the
+    /// specified underlying output stream with the specified buffer
+    /// size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the underlying output stream.
+    ///
+    /// - `size`: the buffer size.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if size <= 0.
     public BufferedOutputStream(OutputStream out, int size) {
         this(out, size, "unnamed");
     }
 
-    /**
-     * Creates a new buffered output stream to write data to the
-     * specified underlying output stream with the specified buffer
-     * size.
-     *
-     * @param out  the underlying output stream.
-     * @param size the buffer size.
-     * @param name the name of the stream used for debugging/logging purposes
-     * @throws IllegalArgumentException if size &lt;= 0.
-     */
+    /// Creates a new buffered output stream to write data to the
+    /// specified underlying output stream with the specified buffer
+    /// size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the underlying output stream.
+    ///
+    /// - `size`: the buffer size.
+    ///
+    /// - `name`: the name of the stream used for debugging/logging purposes
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if size <= 0.
     public BufferedOutputStream(OutputStream out, int size, String name) {
         this.out = out;
         if (size <= 0) {
@@ -107,36 +111,34 @@ public class BufferedOutputStream extends OutputStream {
         Util.getImplementation().logStreamCreate(name, false, streamCount);
     }
 
-    /**
-     * The default size for a stream buffer
-     *
-     * @return the defaultBufferSize
-     */
+    /// The default size for a stream buffer
+    ///
+    /// #### Returns
+    ///
+    /// the defaultBufferSize
     public static int getDefaultBufferSize() {
         return defaultBufferSize;
     }
 
-    /**
-     * The default size for a stream buffer
-     *
-     * @param aDefaultBufferSize the defaultBufferSize to set
-     */
+    /// The default size for a stream buffer
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultBufferSize`: the defaultBufferSize to set
     public static void setDefaultBufferSize(int aDefaultBufferSize) {
         defaultBufferSize = aDefaultBufferSize;
     }
 
-    /**
-     * Indicates the name of the stream for debugging purposes
-     *
-     * @return the name of the stream
-     */
+    /// Indicates the name of the stream for debugging purposes
+    ///
+    /// #### Returns
+    ///
+    /// the name of the stream
     public String getName() {
         return name;
     }
 
-    /**
-     * Flush the internal buffer
-     */
+    /// Flush the internal buffer
     public synchronized void flushBuffer() throws IOException {
         if (closed) {
             return;
@@ -147,12 +149,15 @@ public class BufferedOutputStream extends OutputStream {
         }
     }
 
-    /**
-     * Writes the specified byte to this buffered output stream.
-     *
-     * @param b the byte to be written.
-     * @throws IOException if an I/O error occurs.
-     */
+    /// Writes the specified byte to this buffered output stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the byte to be written.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
     @Override
     public synchronized void write(int b) throws IOException {
         if (count >= buf.length) {
@@ -164,22 +169,27 @@ public class BufferedOutputStream extends OutputStream {
         buf[count++] = (byte) b;
     }
 
-    /**
-     * Writes <code>len</code> bytes from the specified byte array
-     * starting at offset <code>off</code> to this buffered output stream.
-     *
-     * <p> Ordinarily this method stores bytes from the given array into this
-     * stream's buffer, flushing the buffer to the underlying output stream as
-     * needed.  If the requested length is at least as large as this stream's
-     * buffer, however, then this method will flush the buffer and write the
-     * bytes directly to the underlying output stream.  Thus redundant
-     * <code>BufferedOutputStream</code>s will not copy data unnecessarily.
-     *
-     * @param b   the data.
-     * @param off the start offset in the data.
-     * @param len the number of bytes to write.
-     * @throws IOException if an I/O error occurs.
-     */
+    /// Writes `len` bytes from the specified byte array
+    /// starting at offset `off` to this buffered output stream.
+    ///
+    ///  Ordinarily this method stores bytes from the given array into this
+    /// stream's buffer, flushing the buffer to the underlying output stream as
+    /// needed.  If the requested length is at least as large as this stream's
+    /// buffer, however, then this method will flush the buffer and write the
+    /// bytes directly to the underlying output stream.  Thus redundant
+    /// `BufferedOutputStream`s will not copy data unnecessarily.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the data.
+    ///
+    /// - `off`: the start offset in the data.
+    ///
+    /// - `len`: the number of bytes to write.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
     @Override
     public synchronized void write(byte[] b, int off, int len) throws IOException {
         if (len >= buf.length) {
@@ -200,12 +210,12 @@ public class BufferedOutputStream extends OutputStream {
         lastActivityTime = System.currentTimeMillis();
     }
 
-    /**
-     * Flushes this buffered output stream. This forces any buffered
-     * output bytes to be written out to the underlying output stream.
-     *
-     * @throws IOException if an I/O error occurs.
-     */
+    /// Flushes this buffered output stream. This forces any buffered
+    /// output bytes to be written out to the underlying output stream.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
     @Override
     public synchronized void flush() throws IOException {
         if (closed) {
@@ -216,29 +226,29 @@ public class BufferedOutputStream extends OutputStream {
         lastActivityTime = System.currentTimeMillis();
     }
 
-    /**
-     * Returns the time of the last activity
-     *
-     * @return time of the last activity on this stream
-     */
+    /// Returns the time of the last activity
+    ///
+    /// #### Returns
+    ///
+    /// time of the last activity on this stream
     public synchronized long getLastActivityTime() {
         return lastActivityTime;
     }
 
-    /**
-     * Returns the total amount of bytes written to this stream so far
-     *
-     * @return the total amount of bytes written to this stream so far
-     */
+    /// Returns the total amount of bytes written to this stream so far
+    ///
+    /// #### Returns
+    ///
+    /// the total amount of bytes written to this stream so far
     public synchronized int getTotalBytesWritten() {
         return totalBytesWritten;
     }
 
-    /**
-     * Sets the callback for IO updates from a buffered stream
-     *
-     * @param progressListener the progressListener to set
-     */
+    /// Sets the callback for IO updates from a buffered stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `progressListener`: the progressListener to set
     public void setProgressListener(IOProgressListener progressListener) {
         this.progressListener = progressListener;
     }
@@ -249,36 +259,39 @@ public class BufferedOutputStream extends OutputStream {
         }
     }
 
-    /**
-     * Writes <code>b.length</code> bytes to this output stream.
-     * <p>
-     * The <code>write</code> method of <code>FilterOutputStream</code>
-     * calls its <code>write</code> method of three arguments with the
-     * arguments <code>b</code>, <code>0</code>, and
-     * <code>b.length</code>.
-     * <p>
-     * Note that this method does not call the one-argument
-     * <code>write</code> method of its underlying stream with the single
-     * argument <code>b</code>.
-     *
-     * @param b the data to be written.
-     * @throws IOException if an I/O error occurs.
-     */
+    /// Writes `b.length` bytes to this output stream.
+    ///
+    /// The `write` method of `FilterOutputStream`
+    /// calls its `write` method of three arguments with the
+    /// arguments `b`, `0`, and
+    /// `b.length`.
+    ///
+    /// Note that this method does not call the one-argument
+    /// `write` method of its underlying stream with the single
+    /// argument `b`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the data to be written.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
     @Override
     public void write(byte[] b) throws IOException {
         write(b, 0, b.length);
     }
 
-    /**
-     * Closes this output stream and releases any system resources
-     * associated with the stream.
-     * <p>
-     * The <code>close</code> method of <code>FilterOutputStream</code>
-     * calls its <code>flush</code> method, and then calls the
-     * <code>close</code> method of its underlying output stream.
-     *
-     * @throws IOException if an I/O error occurs.
-     */
+    /// Closes this output stream and releases any system resources
+    /// associated with the stream.
+    ///
+    /// The `close` method of `FilterOutputStream`
+    /// calls its `flush` method, and then calls the
+    /// `close` method of its underlying output stream.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
     @Override
     public void close() throws IOException {
         if (!closed) {
@@ -300,20 +313,20 @@ public class BufferedOutputStream extends OutputStream {
         }
     }
 
-    /**
-     * If applicable this member represents the connection object for the stream
-     *
-     * @return the connection
-     */
+    /// If applicable this member represents the connection object for the stream
+    ///
+    /// #### Returns
+    ///
+    /// the connection
     public Object getConnection() {
         return connection;
     }
 
-    /**
-     * If applicable this member represents the connection object for the stream
-     *
-     * @param connection the connection to set
-     */
+    /// If applicable this member represents the connection object for the stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to set
     public void setConnection(Object connection) {
         this.connection = connection;
     }

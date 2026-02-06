@@ -23,34 +23,27 @@
  */
 package com.codename1.ui.events;
 
-/**
- * Event callback interface invoked when a {@link com.codename1.ui.list.ListModel}
- * changes its state thus indicating to the view that it should refresh.
- *
- * @author Chen Fishbein
- */
+/// Event callback interface invoked when a `com.codename1.ui.list.ListModel`
+/// changes its state thus indicating to the view that it should refresh.
+///
+/// @author Chen Fishbein
 public interface DataChangedListener {
-    /**
-     * Type value for removed data in ListModel
-     */
+    /// Type value for removed data in ListModel
     int REMOVED = 0;
 
-    /**
-     * Type value for added data in ListModel
-     */
+    /// Type value for added data in ListModel
     int ADDED = 1;
 
-    /**
-     * Type value for changed data in ListModel
-     */
+    /// Type value for changed data in ListModel
     int CHANGED = 2;
 
-    /**
-     * Invoked when there was a change in the underlying model
-     *
-     * @param type  the type data change; REMOVED, ADDED or CHANGED
-     * @param index item index in a list model
-     */
+    /// Invoked when there was a change in the underlying model
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the type data change; REMOVED, ADDED or CHANGED
+    ///
+    /// - `index`: item index in a list model
     void dataChanged(int type, int index);
 
 }

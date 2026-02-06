@@ -24,20 +24,24 @@ package com.codename1.cloud;
 
 import com.codename1.ui.Component;
 
-/**
- * Allows binding arbitrary components to data storage
- *
- * @author Shai Almog
- * @deprecated this mapped to an older iteration of properties that is no longer used
- */
+/// Allows binding arbitrary components to data storage
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// this mapped to an older iteration of properties that is no longer used
 public interface BindTarget {
-    /**
-     * Fired when a property of the component changes to a new value
-     *
-     * @param source       the source component
-     * @param propertyName the name of the property
-     * @param oldValue     the old value of the property
-     * @param newValue     the new value for the property
-     */
+    /// Fired when a property of the component changes to a new value
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the source component
+    ///
+    /// - `propertyName`: the name of the property
+    ///
+    /// - `oldValue`: the old value of the property
+    ///
+    /// - `newValue`: the new value for the property
     void propertyChanged(Component source, String propertyName, Object oldValue, Object newValue); // PMD Fix: UnnecessaryModifier removed
 }

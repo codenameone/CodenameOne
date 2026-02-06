@@ -35,13 +35,9 @@ package com.codename1.ui.layouts.mig;
 
 import com.codename1.ui.Container;
 
-/**
- *
- */
+///
 final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrapper implements ContainerWrapper {
-    /**
-     * Debug color for cell outline.
-     */
+    /// Debug color for cell outline.
     //private static final Color DB_CELL_OUTLINE = new Color(255, 0, 0);
     public CodenameOneMiGContainerWrapper(Container c) {
         super(c);

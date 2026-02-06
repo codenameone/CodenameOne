@@ -24,13 +24,14 @@ package com.codename1.media;
 
 import com.codename1.ui.Image;
 
-/**
- * MetaData for use by {@link RemoteControlListener} to provide information about
- * the currently playing background media on the device's lock screen.
- *
- * @author shannah
- * @since 7.0
- */
+/// MetaData for use by `RemoteControlListener` to provide information about
+/// the currently playing background media on the device's lock screen.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
 public class MediaMetaData {
 
     private String title;
@@ -41,128 +42,128 @@ public class MediaMetaData {
     private Image albumArt;
     private Image art;
 
-    /**
-     * Gets the media title.
-     *
-     * @return the title
-     */
+    /// Gets the media title.
+    ///
+    /// #### Returns
+    ///
+    /// the title
     public String getTitle() {
         return title;
     }
 
-    /**
-     * Sets the media title.
-     *
-     * @param title the title to set
-     */
+    /// Sets the media title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title to set
     public void setTitle(String title) {
         this.title = title;
     }
 
-    /**
-     * Gets the media subtitle.
-     *
-     * @return the subtitle
-     */
+    /// Gets the media subtitle.
+    ///
+    /// #### Returns
+    ///
+    /// the subtitle
     public String getSubtitle() {
         return subtitle;
     }
 
-    /**
-     * Sets the media subtitle.
-     *
-     * @param subtitle the subtitle to set
-     */
+    /// Sets the media subtitle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `subtitle`: the subtitle to set
     public void setSubtitle(String subtitle) {
         this.subtitle = subtitle;
     }
 
-    /**
-     * Gets the media track number.
-     *
-     * @return the trackNumber
-     */
+    /// Gets the media track number.
+    ///
+    /// #### Returns
+    ///
+    /// the trackNumber
     public int getTrackNumber() {
         return trackNumber;
     }
 
-    /**
-     * Sets the media track number.
-     *
-     * @param trackNumber the trackNumber to set
-     */
+    /// Sets the media track number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trackNumber`: the trackNumber to set
     public void setTrackNumber(int trackNumber) {
         this.trackNumber = trackNumber;
     }
 
-    /**
-     * Gets the current number of tracks in the current play list.
-     *
-     * @return the numTracks
-     */
+    /// Gets the current number of tracks in the current play list.
+    ///
+    /// #### Returns
+    ///
+    /// the numTracks
     public int getNumTracks() {
         return numTracks;
     }
 
-    /**
-     * Sets the current number of tracks in the current play list.
-     *
-     * @param numTracks the numTracks to set
-     */
+    /// Sets the current number of tracks in the current play list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `numTracks`: the numTracks to set
     public void setNumTracks(int numTracks) {
         this.numTracks = numTracks;
     }
 
-    /**
-     * Gets the display icon for the media.
-     *
-     * @return the displayIcon
-     */
+    /// Gets the display icon for the media.
+    ///
+    /// #### Returns
+    ///
+    /// the displayIcon
     public Image getDisplayIcon() {
         return displayIcon;
     }
 
-    /**
-     * Sets the display icon for the media.
-     *
-     * @param displayIcon the displayIcon to set
-     */
+    /// Sets the display icon for the media.
+    ///
+    /// #### Parameters
+    ///
+    /// - `displayIcon`: the displayIcon to set
     public void setDisplayIcon(Image displayIcon) {
         this.displayIcon = displayIcon;
     }
 
-    /**
-     * Gets the album art for the media.
-     *
-     * @return the albumArt
-     */
+    /// Gets the album art for the media.
+    ///
+    /// #### Returns
+    ///
+    /// the albumArt
     public Image getAlbumArt() {
         return albumArt;
     }
 
-    /**
-     * Sets the album art for the media.
-     *
-     * @param albumArt the albumArt to set
-     */
+    /// Sets the album art for the media.
+    ///
+    /// #### Parameters
+    ///
+    /// - `albumArt`: the albumArt to set
     public void setAlbumArt(Image albumArt) {
         this.albumArt = albumArt;
     }
 
-    /**
-     * Gets the art for the current media.
-     *
-     * @return the art
-     */
+    /// Gets the art for the current media.
+    ///
+    /// #### Returns
+    ///
+    /// the art
     public Image getArt() {
         return art;
     }
 
-    /**
-     * Sets the art for the current media.
-     *
-     * @param art the art to set
-     */
+    /// Sets the art for the current media.
+    ///
+    /// #### Parameters
+    ///
+    /// - `art`: the art to set
     public void setArt(Image art) {
         this.art = art;
     }

@@ -29,20 +29,16 @@ import java.io.OutputStream;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
-/**
- * Test reports can be overriden to provide custom test reporting options
- * you can replace the test reporter on the device by sending the build
- * argument build.testReporter='com.x.MyTestReporterClass'.
- *
- * @author Shai Almog
- */
+/// Test reports can be overriden to provide custom test reporting options
+/// you can replace the test reporter on the device by sending the build
+/// argument build.testReporter='com.x.MyTestReporterClass'.
+///
+/// @author Shai Almog
 public class TestReporting {
     private static TestReporting instanceOverride;
     private final Hashtable<String, Boolean> testsExecuted = new Hashtable<String, Boolean>();
 
-    /**
-     * Gets the test reporting instance
-     */
+    /// Gets the test reporting instance
     public static TestReporting getInstance() {
         TestReporting override = instanceOverride;
         if (override != null) {
@@ -51,53 +47,52 @@ public class TestReporting {
         return TestReportingHolder.INSTANCE;
     }
 
-    /**
-     * Sets the test reporting instance to a subclass of this class.
-     *
-     * @param i the new instance
-     */
+    /// Sets the test reporting instance to a subclass of this class.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the new instance
     public static void setInstance(TestReporting i) {
         instanceOverride = i;
     }
 
-    /**
-     * Invoked when a unit test is started
-     */
+    /// Invoked when a unit test is started
     public void startingTestCase(String testName) {
         Log.p("Starting test case " + testName);
     }
 
-    /**
-     * @deprecated this method is no longer invoked by the testing framework; please use {@link #startingTestCase(String)}
-     */
+    /// #### Deprecated
+    ///
+    /// this method is no longer invoked by the testing framework; please use `#startingTestCase(String)`
     public void startingTestCase(UnitTest test) {
         startingTestCase(test.getClass().getName());
     }
 
-    /**
-     * Indicates a message from the current test case
-     *
-     * @param message the message
-     */
+    /// Indicates a message from the current test case
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: the message
     public void logMessage(String message) {
         Log.p(message);
     }
 
-    /**
-     * Indicates an error from the current test case
-     *
-     * @param err the error message
-     */
+    /// Indicates an error from the current test case
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the error message
     public void logException(Throwable err) {
         Log.e(err);
     }
 
-    /**
-     * Invoked when a unit test has completed
-     *
-     * @param testName the name of the test case
-     * @param passed   true if the test passed and false otherwise
-     */
+    /// Invoked when a unit test has completed
+    ///
+    /// #### Parameters
+    ///
+    /// - `testName`: the name of the test case
+    ///
+    /// - `passed`: true if the test passed and false otherwise
     public void finishedTestCase(String testName, boolean passed) {
         if (passed) {
             Log.p(testName + " passed");
@@ -108,19 +103,20 @@ public class TestReporting {
         }
     }
 
-    /**
-     * @deprecated this method is no longer invoked by the testing framework; please use {@link #finishedTestCase(String, boolean)}
-     */
+    /// #### Deprecated
+    ///
+    /// this method is no longer invoked by the testing framework; please use `boolean)`
     public void finishedTestCase(UnitTest test, boolean passed) {
         finishedTestCase(test.getClass().getName(), passed);
     }
 
-    /**
-     * Writes a test report to the given stream
-     *
-     * @param testSuiteName the name of the test suite
-     * @param os            the destination stream
-     */
+    /// Writes a test report to the given stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `testSuiteName`: the name of the test suite
+    ///
+    /// - `os`: the destination stream
     public void writeReport(String testSuiteName, OutputStream os) throws IOException {
         Enumeration<String> e = testsExecuted.keys();
         while (e.hasMoreElements()) {
@@ -133,24 +129,22 @@ public class TestReporting {
         }
     }
 
-    /**
-     * @deprecated this method is no longer invoked by the testing framework; please use {@link #writeReport(String, OutputStream)}
-     */
+    /// #### Deprecated
+    ///
+    /// this method is no longer invoked by the testing framework; please use `OutputStream)`
     public void writeReport(OutputStream os) throws IOException {
     }
 
-    /**
-     * Callback to indicate the test execution has finished allowing
-     * for a report to be generated if appropriate
-     */
+    /// Callback to indicate the test execution has finished allowing
+    /// for a report to be generated if appropriate
     public void testExecutionFinished(String testSuiteName) {
         // Call the legacy method in case it has been overridden by a subclass
         testExecutionFinished();
     }
 
-    /**
-     * @deprecated this method is no longer invoked by the testing framework; please use {@link #testExecutionFinished(String)}
-     */
+    /// #### Deprecated
+    ///
+    /// this method is no longer invoked by the testing framework; please use `#testExecutionFinished(String)`
     @SuppressWarnings("DeprecatedIsStillUsed")
     public void testExecutionFinished() {
     }

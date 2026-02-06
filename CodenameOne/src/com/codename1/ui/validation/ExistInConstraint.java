@@ -26,83 +26,88 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * Creates a validation constraint to ensure input value exists in a list of items
- *
- * @author Diamond Mubaarak
- * @since 7.0
- */
+/// Creates a validation constraint to ensure input value exists in a list of items
+///
+/// @author Diamond Mubaarak
+///
+/// #### Since
+///
+/// 7.0
 public class ExistInConstraint implements Constraint {
 
     private final List<String> items;
     private final boolean caseSensitive;
     private final String errorMessage;
 
-    /**
-     * Creates a new ExistIn constraint
-     *
-     * @param items         the array items the input value must exist in
-     * @param caseSensitive compare the input with the items with case-sensitivity or not
-     * @param errorMessage  the default error message if the constraint fails
-     */
+    /// Creates a new ExistIn constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the array items the input value must exist in
+    ///
+    /// - `caseSensitive`: compare the input with the items with case-sensitivity or not
+    ///
+    /// - `errorMessage`: the default error message if the constraint fails
     public ExistInConstraint(List<String> items, boolean caseSensitive, String errorMessage) {
         this.items = new ArrayList(items);
         this.caseSensitive = caseSensitive;
         this.errorMessage = errorMessage;
     }
 
-    /**
-     * Creates a new ExistIn constraint
-     *
-     * @param items         the array items the input value must exist in
-     * @param caseSensitive compare the input with the items with case-sensitivity or not
-     * @param errorMessage  the default error message if the constraint fails
-     */
+    /// Creates a new ExistIn constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the array items the input value must exist in
+    ///
+    /// - `caseSensitive`: compare the input with the items with case-sensitivity or not
+    ///
+    /// - `errorMessage`: the default error message if the constraint fails
     public ExistInConstraint(String[] items, boolean caseSensitive, String errorMessage) {
         this(Arrays.asList(items), caseSensitive, errorMessage);
     }
 
-    /**
-     * Creates a new ExistIn constraint
-     *
-     * @param items        the array items the input value must exist in
-     * @param errorMessage the default error message if the constraint fails
-     */
+    /// Creates a new ExistIn constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the array items the input value must exist in
+    ///
+    /// - `errorMessage`: the default error message if the constraint fails
     public ExistInConstraint(List<String> items, String errorMessage) {
         this(items, false, errorMessage);
     }
 
-    /**
-     * Creates a new ExistIn constraint
-     *
-     * @param items        the array items the input value must exist in
-     * @param errorMessage the default error message if the constraint fails
-     */
+    /// Creates a new ExistIn constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the array items the input value must exist in
+    ///
+    /// - `errorMessage`: the default error message if the constraint fails
     public ExistInConstraint(String[] items, String errorMessage) {
         this(items, false, errorMessage);
     }
 
-    /**
-     * Creates a new ExistIn constraint
-     *
-     * @param items the array items the input value must exist in
-     */
+    /// Creates a new ExistIn constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the array items the input value must exist in
     public ExistInConstraint(List<String> items) {
         this(items, false, null);
     }
 
-    /**
-     * Creates a new ExistIn constraint
-     *
-     * @param items the array items the input value must exist in
-     */
+    /// Creates a new ExistIn constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the array items the input value must exist in
     public ExistInConstraint(String[] items) {
         this(items, false, null);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isValid(Object value) {
         if (!caseSensitive) {
@@ -112,9 +117,7 @@ public class ExistInConstraint implements Constraint {
         return items.contains(value.toString());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getDefaultFailMessage() {
         if (errorMessage == null) {

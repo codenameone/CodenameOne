@@ -29,270 +29,316 @@ import com.codename1.ui.Form;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
-/**
- * <p>Layout manager that places elements in a row (<code>X_AXIS</code>) or column (<code>Y_AXIS</code>)
- * according to box orientation. Box is a very simple and predictable layout that serves as the "workhorse" of
- * component lists in Codename One<br>
- * You can create a box layout Y UI using syntax such as this</p>
- *
- * <script src="https://gist.github.com/codenameone/99f5e43061b4c6413d16.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/box-layout-y.png" alt="Box Layout Y" />
- *
- * <p>
- * This can also be expressed with more terse syntax e.g. an X axis layout like this:
- * </p>
- * <script src="https://gist.github.com/codenameone/5d2908517241126b5803.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/box-layout-x.png" alt="Box Layout X" />
- *
- * <p>
- * The <code>BoxLayout</code> keeps the preferred size of its destination orientation and scales elements on the other axis.
- * Specifically <code>X_AXIS</code> will keep the preferred width of the component while growing all
- * the components vertically to match in size. Its <code>Y_AXIS</code> counterpart keeps the preferred height
- * while growing the components horizontally.<br>
- * This behavior is very useful since it allows elements to align as they would all have the same size.
- * </p>
- * <p>
- * In some cases the growing behavior in the X axis is undesired, for these cases we can use the <code>X_AXIS_NO_GROW</code>
- * variant.
- * </p>
- * <img src="https://www.codenameone.com/img/developer-guide/box-layout-x-no-grow.png" alt="Box Layout X No Grow" />
- *
- * <h4>FlowLayout vs. BoxLayout.X_AXIS/X_AXIS_NO_GROW</h4>
- * <p>
- * There are quite a few differences between {@link FlowLayout} and <code>BoxLayout</code>. When it doesn't
- * matter to you we tend to recommend <code>BoxLayout</code> as it acts more consistently in all situations since
- * its far simpler. Another advantage of <code>BoxLayout</code> is the fact that it grows and thus aligns nicely.
- * </p>
- *
- * @author Chen Fishbein
- */
+/// Layout manager that places elements in a row (`X_AXIS`) or column (`Y_AXIS`)
+/// according to box orientation. Box is a very simple and predictable layout that serves as the "workhorse" of
+/// component lists in Codename One
+///
+/// You can create a box layout Y UI using syntax such as this
+///
+/// ```java
+/// Form hi = new Form("Box Y Layout", new BoxLayout(BoxLayout.Y_AXIS));
+/// hi.add(new Label("First")).
+///     add(new Label("Second")).
+///     add(new Label("Third")).
+///     add(new Label("Fourth")).
+///     add(new Label("Fifth"));
+/// ```
+///
+/// This can also be expressed with more terse syntax e.g. an X axis layout like this:
+///
+/// ```java
+/// Container box = BoxLayout.encloseX(new Label("First"),
+///         new Label("Second"),
+///         new Label("Third"),
+///         new Label("Fourth"),
+///         new Label("Fifth")));
+/// ```
+///
+/// The `BoxLayout` keeps the preferred size of its destination orientation and scales elements on the other axis.
+/// Specifically `X_AXIS` will keep the preferred width of the component while growing all
+/// the components vertically to match in size. Its `Y_AXIS` counterpart keeps the preferred height
+/// while growing the components horizontally.
+///
+/// This behavior is very useful since it allows elements to align as they would all have the same size.
+///
+/// In some cases the growing behavior in the X axis is undesired, for these cases we can use the `X_AXIS_NO_GROW`
+/// variant.
+///
+/// FlowLayout vs. BoxLayout.X_AXIS/X_AXIS_NO_GROW
+///
+/// There are quite a few differences between `FlowLayout` and `BoxLayout`. When it doesn't
+/// matter to you we tend to recommend `BoxLayout` as it acts more consistently in all situations since
+/// its far simpler. Another advantage of `BoxLayout` is the fact that it grows and thus aligns nicely.
+///
+/// @author Chen Fishbein
 public class BoxLayout extends Layout {
 
-    /**
-     * Horizontal layout where components are arranged from left to right
-     */
+    /// Horizontal layout where components are arranged from left to right
     public static final int X_AXIS = 1;
 
-    /**
-     * Vertical layout where components are arranged from top to bottom
-     */
+    /// Vertical layout where components are arranged from top to bottom
     public static final int Y_AXIS = 2;
 
-    /**
-     * Horizontal layout where components are arranged from left to right but don't grow vertically beyond their preferred size
-     */
+    /// Horizontal layout where components are arranged from left to right but don't grow vertically beyond their preferred size
     public static final int X_AXIS_NO_GROW = 3;
 
-    /**
-     * Same as Y_AXIS with a special case for the last component. The last
-     * component is glued to the end of the available space
-     */
+    /// Same as Y_AXIS with a special case for the last component. The last
+    /// component is glued to the end of the available space
     public static final int Y_AXIS_BOTTOM_LAST = 4;
     private final int axis;
     private final Dimension dim = new Dimension(0, 0);
-    /**
-     * @since 7.0
-     */
+    /// #### Since
+    ///
+    /// 7.0
     private int align = Component.TOP;
 
-    /**
-     * Creates a new instance of BoxLayout
-     *
-     * @param axis the axis to lay out components along.
-     *             Can be: BoxLayout.X_AXIS or BoxLayout.Y_AXIS
-     */
+    /// Creates a new instance of BoxLayout
+    ///
+    /// #### Parameters
+    ///
+    /// - `axis`: @param axis the axis to lay out components along.
+    /// Can be: BoxLayout.X_AXIS or BoxLayout.Y_AXIS
     public BoxLayout(int axis) {
         this.axis = axis;
     }
 
-    /**
-     * Shorthand for {@code new BoxLayout(BoxLayout.Y_AXIS)}
-     *
-     * @return a new Y axis {@code BoxLayout}
-     */
+    /// Shorthand for `new BoxLayout(BoxLayout.Y_AXIS)`
+    ///
+    /// #### Returns
+    ///
+    /// a new Y axis `BoxLayout`
     public static BoxLayout y() {
         return new BoxLayout(BoxLayout.Y_AXIS);
     }
 
-    /**
-     * Shorthand for {@code new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST)}
-     *
-     * @return a new Y bottom last axis {@code BoxLayout}
-     */
+    /// Shorthand for `new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST)`
+    ///
+    /// #### Returns
+    ///
+    /// a new Y bottom last axis `BoxLayout`
     public static BoxLayout yLast() {
         return new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);
     }
 
-    /**
-     * Creates a new layout with {@link #Y_AXIS}, and align center.
-     *
-     * @return BoxLayout with center alignment on Y_AXIS.
-     * @since 7.0
-     */
+    /// Creates a new layout with `#Y_AXIS`, and align center.
+    ///
+    /// #### Returns
+    ///
+    /// BoxLayout with center alignment on Y_AXIS.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static BoxLayout yCenter() {
         BoxLayout out = new BoxLayout(BoxLayout.Y_AXIS);
         out.setAlign(Component.CENTER);
         return out;
     }
 
-    /**
-     * Creates a new layout with {@link #Y_AXIS}, and align bottom.
-     *
-     * @return BoxLayout with bottom alignment on Y_AXIS.
-     * @since 7.0
-     */
+    /// Creates a new layout with `#Y_AXIS`, and align bottom.
+    ///
+    /// #### Returns
+    ///
+    /// BoxLayout with bottom alignment on Y_AXIS.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static BoxLayout yBottom() {
         BoxLayout out = new BoxLayout(BoxLayout.Y_AXIS);
         out.setAlign(Component.BOTTOM);
         return out;
     }
 
-    /**
-     * Shorthand for {@code new BoxLayout(BoxLayout.X_AXIS)}
-     *
-     * @return a new X axis {@code BoxLayout}
-     */
+    /// Shorthand for `new BoxLayout(BoxLayout.X_AXIS)`
+    ///
+    /// #### Returns
+    ///
+    /// a new X axis `BoxLayout`
     public static BoxLayout x() {
         return new BoxLayout(BoxLayout.X_AXIS);
     }
 
-    /**
-     * Creates a new layout with {@link #X_AXIS}, and align center.
-     *
-     * @return BoxLayout with center alignment on X_AXIS.
-     * @since 7.0
-     */
+    /// Creates a new layout with `#X_AXIS`, and align center.
+    ///
+    /// #### Returns
+    ///
+    /// BoxLayout with center alignment on X_AXIS.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static BoxLayout xCenter() {
         BoxLayout out = new BoxLayout(BoxLayout.X_AXIS);
         out.setAlign(Component.CENTER);
         return out;
     }
 
-    /**
-     * Creates a new layout with {@link #X_AXIS}, and align right.
-     *
-     * @return BoxLayout with right alignment on X_AXIS.
-     * @since 7.0
-     */
+    /// Creates a new layout with `#X_AXIS`, and align right.
+    ///
+    /// #### Returns
+    ///
+    /// BoxLayout with right alignment on X_AXIS.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static BoxLayout xRight() {
         BoxLayout out = new BoxLayout(BoxLayout.X_AXIS);
         out.setAlign(Component.RIGHT);
         return out;
     }
 
-    /**
-     * The equivalent of Container.enclose() with a box layout Y
-     * <img src="https://www.codenameone.com/img/developer-guide/box-layout-y.png" alt="Box Layout Y" />
-     *
-     * @param cmps the set of components
-     * @return the newly created container
-     */
+    /// The equivalent of Container.enclose() with a box layout Y
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the set of components
+    ///
+    /// #### Returns
+    ///
+    /// the newly created container
     public static Container encloseY(Component... cmps) {
         return Container.encloseIn(new BoxLayout(BoxLayout.Y_AXIS), cmps);
     }
 
-    /**
-     * The equivalent of Container.enclose() with a box layout Y, with center alignment.
-     *
-     * @param cmps the set of components
-     * @return the newly created container
-     * @since 7.0
-     */
+    /// The equivalent of Container.enclose() with a box layout Y, with center alignment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the set of components
+    ///
+    /// #### Returns
+    ///
+    /// the newly created container
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static Container encloseYCenter(Component... cmps) {
         return Container.encloseIn(yCenter(), cmps);
     }
 
-    /**
-     * The equivalent of Container.enclose() with a box layout Y, with bottom alignment.
-     *
-     * @param cmps the set of components
-     * @return the newly created container
-     * @since 7.0
-     */
+    /// The equivalent of Container.enclose() with a box layout Y, with bottom alignment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the set of components
+    ///
+    /// #### Returns
+    ///
+    /// the newly created container
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static Container encloseYBottom(Component... cmps) {
         return Container.encloseIn(yBottom(), cmps);
     }
 
-    /**
-     * The equivalent of Container.enclose() with a box layout Y in bottom
-     * last mode
-     *
-     * @param cmps the set of components
-     * @return the newly created container
-     */
+    /// The equivalent of Container.enclose() with a box layout Y in bottom
+    /// last mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the set of components
+    ///
+    /// #### Returns
+    ///
+    /// the newly created container
     public static Container encloseYBottomLast(Component... cmps) {
         return Container.encloseIn(new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST), cmps);
     }
 
-    /**
-     * The equivalent of Container.enclose() with a box layout X
-     * <img src="https://www.codenameone.com/img/developer-guide/box-layout-x.png" alt="Box Layout X" />
-     *
-     * @param cmps the set of components
-     * @return the newly created container
-     */
+    /// The equivalent of Container.enclose() with a box layout X
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the set of components
+    ///
+    /// #### Returns
+    ///
+    /// the newly created container
     public static Container encloseX(Component... cmps) {
         return Container.encloseIn(new BoxLayout(BoxLayout.X_AXIS), cmps);
     }
 
-    /**
-     * The equivalent of Container.enclose() with a box layout X no grow option
-     * <img src="https://www.codenameone.com/img/developer-guide/box-layout-x.png" alt="Box Layout X" />
-     *
-     * @param cmps the set of components
-     * @return the newly created container
-     */
+    /// The equivalent of Container.enclose() with a box layout X no grow option
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the set of components
+    ///
+    /// #### Returns
+    ///
+    /// the newly created container
     public static Container encloseXNoGrow(Component... cmps) {
         return Container.encloseIn(new BoxLayout(BoxLayout.X_AXIS_NO_GROW), cmps);
     }
 
-    /**
-     * The equivalent of Container.enclose() with a box layout X, with center alignment.
-     *
-     * @param cmps the set of components
-     * @return the newly created container
-     * @since 7.0
-     */
+    /// The equivalent of Container.enclose() with a box layout X, with center alignment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the set of components
+    ///
+    /// #### Returns
+    ///
+    /// the newly created container
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static Container encloseXCenter(Component... cmps) {
         return Container.encloseIn(xCenter(), cmps);
     }
 
-    /**
-     * The equivalent of Container.enclose() with a box layout X, with right alignment.
-     *
-     * @param cmps the set of components
-     * @return the newly created container
-     * @since 7.0
-     */
+    /// The equivalent of Container.enclose() with a box layout X, with right alignment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the set of components
+    ///
+    /// #### Returns
+    ///
+    /// the newly created container
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public static Container encloseXRight(Component... cmps) {
         return Container.encloseIn(xRight(), cmps);
     }
 
-    /**
-     * Gets the alignment of this layout.  By default Y_AXIS aligns top, and X_AXIS aligns left (RTL-aware).  You can specify an align value of {@link Component#CENTER} to align items vertically centered (for Y_AXIS), and horizontally centered (for X_AXIS),
-     * of {@link Component#BOTTOM} to align vertically bottom (Y_AXIS), and {@link Component#RIGHT} to align right (RTL-aware), for X_AXIS.
-     *
-     * @return The alignment.
-     * @since 7.0
-     */
+    /// Gets the alignment of this layout.  By default Y_AXIS aligns top, and X_AXIS aligns left (RTL-aware).  You can specify an align value of `Component#CENTER` to align items vertically centered (for Y_AXIS), and horizontally centered (for X_AXIS),
+    /// of `Component#BOTTOM` to align vertically bottom (Y_AXIS), and `Component#RIGHT` to align right (RTL-aware), for X_AXIS.
+    ///
+    /// #### Returns
+    ///
+    /// The alignment.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public int getAlign() {
         return this.align;
     }
 
-    /**
-     * Sets the alignment of this layout. By default Y_AXIS aligns top, and X_AXIS aligns left (RTL-aware).  You can specify an align value of {@link Component#CENTER} to align items vertically centered (for Y_AXIS), and horizontally centered (for X_AXIS),
-     * of {@link Component#BOTTOM} to align vertically bottom (Y_AXIS), and {@link Component#RIGHT} to align right (RTL-aware), for X_AXIS.
-     *
-     * @param align One of {@link Component#CENTER}, {@link Component#BOTTOM}, {@link Component#RIGHT}, to adjust the alignment of children.
-     * @since 7.0
-     */
+    /// Sets the alignment of this layout. By default Y_AXIS aligns top, and X_AXIS aligns left (RTL-aware).  You can specify an align value of `Component#CENTER` to align items vertically centered (for Y_AXIS), and horizontally centered (for X_AXIS),
+    /// of `Component#BOTTOM` to align vertically bottom (Y_AXIS), and `Component#RIGHT` to align right (RTL-aware), for X_AXIS.
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: One of `Component#CENTER`, `Component#BOTTOM`, `Component#RIGHT`, to adjust the alignment of children.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void setAlign(int align) {
         this.align = align;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void layoutContainer(Container parent) {
         Style ps = parent.getStyle();
@@ -474,9 +520,7 @@ public class BoxLayout extends Layout {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getPreferredSize(Container parent) {
         int width = 0;
@@ -503,18 +547,16 @@ public class BoxLayout extends Layout {
         return dim;
     }
 
-    /**
-     * Returns the layout axis x/y
-     *
-     * @return the layout axis
-     */
+    /// Returns the layout axis x/y
+    ///
+    /// #### Returns
+    ///
+    /// the layout axis
     public int getAxis() {
         return axis;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         if (axis == X_AXIS) {
@@ -523,9 +565,7 @@ public class BoxLayout extends Layout {
         return "BoxLayout Y";
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         return super.equals(o) && axis == ((BoxLayout) o).axis;

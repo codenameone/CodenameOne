@@ -29,39 +29,46 @@ import com.codename1.ui.Display;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
-/**
- * <p>The components are arranged in a grid based on available space, all cells in the grid are given exactly
- * the same size which matches the largest preferred size or available space. The main use case for this layout
- * is a grid of icons e.g. like one would see in the iPhone home screen. <br>
- * If the number of rows * columns is smaller than the number of components added a new row is implicitly added to the grid.
- * However, if the number of components is smaller than available cells (won't fill the last row) blank spaces will
- * be left in place.
- * </p>
- * <p>
- * In this example we can see that a 2x2 grid is used to add 5 elements, this results in an additional row that's implicitly
- * added turning the grid to a 3x2 grid implicitly and leaving one blank cell.
- * </p>
- * <script src="https://gist.github.com/codenameone/cd69363cc953f6bdb66c.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-2x2.png" alt="Grid Layout 2x2" />
- * <p>
- * When we use a 2x4 size ratio we would see elements getting cropped as we do here. The grid layout uses the grid
- * size first and doesn't pay too much attention to the preferred size of the components it holds.
- * </p>
- * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-2x4.png" alt="Grid Layout 2x4" />
- * <p>
- * Grid also has an autoFit attribute that can be used to automatically calculate the column count based on
- * available space and preferred width. This is really useful for working with UI's where the device orientation
- * might change.<br>
- * There is also a terse syntax for working with a grid that has two versions, one that uses the "auto fit" option and
- * another that accepts the column names. Heres a sample of the terse syntax coupled with the auto fit screenshots
- * of the same code in two orientations:
- * </p>
- * <script src="https://gist.github.com/codenameone/acb3e2dc10ea767a72db.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-autofit-portrait.png" alt="Grid Layout autofit portrait" />
- * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-autofit-landscape.png" alt="Grid Layout autofit landscape" />
- *
- * @author Chen Fishbein
- */
+/// The components are arranged in a grid based on available space, all cells in the grid are given exactly
+/// the same size which matches the largest preferred size or available space. The main use case for this layout
+/// is a grid of icons e.g. like one would see in the iPhone home screen.
+///
+/// If the number of rows * columns is smaller than the number of components added a new row is implicitly added to the grid.
+/// However, if the number of components is smaller than available cells (won't fill the last row) blank spaces will
+/// be left in place.
+///
+/// In this example we can see that a 2x2 grid is used to add 5 elements, this results in an additional row that's implicitly
+/// added turning the grid to a 3x2 grid implicitly and leaving one blank cell.
+///
+/// ```java
+/// Form hi = new Form("Grid Layout 2x2", new GridLayout(2, 2));
+/// hi.add(new Label("First")).
+///     add(new Label("Second")).
+///     add(new Label("Third")).
+///     add(new Label("Fourth")).
+///     add(new Label("Fifth"));
+/// ```
+///
+/// When we use a 2x4 size ratio we would see elements getting cropped as we do here. The grid layout uses the grid
+/// size first and doesn't pay too much attention to the preferred size of the components it holds.
+///
+/// Grid also has an autoFit attribute that can be used to automatically calculate the column count based on
+/// available space and preferred width. This is really useful for working with UI's where the device orientation
+/// might change.
+///
+/// There is also a terse syntax for working with a grid that has two versions, one that uses the "auto fit" option and
+/// another that accepts the column names. Heres a sample of the terse syntax coupled with the auto fit screenshots
+/// of the same code in two orientations:
+///
+/// ```java
+/// GridLayout.encloseIn(new Label("First"),
+///     new Label("Second"),
+///     new Label("Third"),
+///     new Label("Fourth"),
+///     new Label("Fifth")));
+/// ```
+///
+/// @author Chen Fishbein
 public class GridLayout extends Layout {
     private boolean fillLastRow;
     private int portraitRows;
@@ -70,24 +77,24 @@ public class GridLayout extends Layout {
     private int landscapeRows = -1;
     private int landscapeColumns = -1;
 
-    /**
-     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
-     * makes animating a grid layout component MUCH easier.
-     */
+    /// When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+    /// makes animating a grid layout component MUCH easier.
     private boolean hideZeroSized;
 
-    /**
-     * Auto fits columns/rows to available screen space
-     */
+    /// Auto fits columns/rows to available screen space
     private boolean autoFit;
 
-    /**
-     * Creates a new instance of GridLayout with the given rows and columns
-     *
-     * @param rows    - number of rows.
-     * @param columns - number of columns.
-     * @throws IllegalArgumentException if rows &lt; 1 or columns &lt; 1
-     */
+    /// Creates a new instance of GridLayout with the given rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: - number of rows.
+    ///
+    /// - `columns`: - number of columns.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows < 1 or columns < 1
     public GridLayout(int rows, int columns) {
         this.portraitRows = rows;
         this.portraitColumns = columns;
@@ -96,15 +103,21 @@ public class GridLayout extends Layout {
         }
     }
 
-    /**
-     * Creates a new instance of GridLayout with the given rows and columns
-     *
-     * @param rows             - number of rows.
-     * @param columns          - number of columns.
-     * @param landscapeRows    - number of rows when in landscape mode
-     * @param landscapeColumns - number of columns when in landscape mode
-     * @throws IllegalArgumentException if rows &lt; 1 or columns &lt; 1
-     */
+    /// Creates a new instance of GridLayout with the given rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: - number of rows.
+    ///
+    /// - `columns`: - number of columns.
+    ///
+    /// - `landscapeRows`: - number of rows when in landscape mode
+    ///
+    /// - `landscapeColumns`: - number of columns when in landscape mode
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows < 1 or columns < 1
     public GridLayout(int rows, int columns, int landscapeRows, int landscapeColumns) {
         this.portraitRows = rows;
         this.portraitColumns = columns;
@@ -115,45 +128,55 @@ public class GridLayout extends Layout {
         }
     }
 
-    /**
-     * Creates a new instance of GridLayout with the given columns, rows is set to 1 but will implicitly grow
-     * if more components are added
-     *
-     * @param columns - number of columns.
-     * @throws IllegalArgumentException if rows &lt; 1 or columns &lt; 1
-     */
+    /// Creates a new instance of GridLayout with the given columns, rows is set to 1 but will implicitly grow
+    /// if more components are added
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: - number of columns.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows < 1 or columns < 1
     public GridLayout(int columns) {
         this(1, columns);
     }
 
-    /**
-     * Returns a grid layout that implicitly auto-fits to width in term of number of columns
-     *
-     * @return a grid layout that automatically adapts its size
-     */
+    /// Returns a grid layout that implicitly auto-fits to width in term of number of columns
+    ///
+    /// #### Returns
+    ///
+    /// a grid layout that automatically adapts its size
     public static GridLayout autoFit() {
         GridLayout g = new GridLayout(1);
         g.setAutoFit(true);
         return g;
     }
 
-    /**
-     * Creates a new container with an auto fit grid layout and the components added to it
-     *
-     * @param cmp the components
-     * @return a new container
-     */
+    /// Creates a new container with an auto fit grid layout and the components added to it
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the components
+    ///
+    /// #### Returns
+    ///
+    /// a new container
     public static Container encloseIn(Component... cmp) {
         return Container.encloseIn(autoFit(), cmp);
     }
 
-    /**
-     * Creates a new container with the grid layout and the components added to it
-     *
-     * @param columns the number of columns for the grid
-     * @param cmp     the components
-     * @return a new container
-     */
+    /// Creates a new container with the grid layout and the components added to it
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: the number of columns for the grid
+    ///
+    /// - `cmp`: the components
+    ///
+    /// #### Returns
+    ///
+    /// a new container
     public static Container encloseIn(int columns, Component... cmp) {
         return Container.encloseIn(new GridLayout(columns), cmp);
     }
@@ -206,9 +229,7 @@ public class GridLayout extends Layout {
         return totalComponentCount;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
@@ -282,9 +303,7 @@ public class GridLayout extends Layout {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Dimension getPreferredSize(Container parent) {
         int width = 0;
@@ -331,31 +350,27 @@ public class GridLayout extends Layout {
                 height + s.getVerticalPadding());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "GridLayout";
     }
 
-    /**
-     * @return the rows
-     */
+    /// #### Returns
+    ///
+    /// the rows
     public int getRows() {
         return portraitRows;
     }
 
-    /**
-     * @return the columns
-     */
+    /// #### Returns
+    ///
+    /// the columns
     public int getColumns() {
         return portraitColumns;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean equals(Object o) {
         return super.equals(o) && ((GridLayout) o).getRows() == getRows() &&
@@ -367,68 +382,66 @@ public class GridLayout extends Layout {
         return super.hashCode() ^ getRows() ^ getColumns() ^ (autoFit ? 1231 : 1237);
     }
 
-    /**
-     * When set to true makes the grid layout fill the last row of the layout
-     * entirely if the number of elements in that row is bigger.
-     *
-     * @return the fillLastRow
-     */
+    /// When set to true makes the grid layout fill the last row of the layout
+    /// entirely if the number of elements in that row is bigger.
+    ///
+    /// #### Returns
+    ///
+    /// the fillLastRow
     public boolean isFillLastRow() {
         return fillLastRow;
     }
 
-    /**
-     * When set to true makes the grid layout fill the last row of the layout
-     * entirely if the number of elements in that row is bigger.
-     *
-     * @param fillLastRow the fillLastRow to set
-     */
+    /// When set to true makes the grid layout fill the last row of the layout
+    /// entirely if the number of elements in that row is bigger.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fillLastRow`: the fillLastRow to set
     public void setFillLastRow(boolean fillLastRow) {
         this.fillLastRow = fillLastRow;
     }
 
-    /**
-     * Auto fits columns/rows to available screen space
-     *
-     * @return the autoFit
-     */
+    /// Auto fits columns/rows to available screen space
+    ///
+    /// #### Returns
+    ///
+    /// the autoFit
     public boolean isAutoFit() {
         return autoFit;
     }
 
-    /**
-     * Auto fits columns/rows to available screen space
-     *
-     * @param autoFit the autoFit to set
-     */
+    /// Auto fits columns/rows to available screen space
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoFit`: the autoFit to set
     public void setAutoFit(boolean autoFit) {
         this.autoFit = autoFit;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean obscuresPotential(Container parent) {
         return parent.getComponentCount() == portraitRows * portraitColumns || autoFit;
     }
 
-    /**
-     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
-     * makes animating a grid layout component MUCH easier.
-     *
-     * @return the hideZeroSized
-     */
+    /// When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+    /// makes animating a grid layout component MUCH easier.
+    ///
+    /// #### Returns
+    ///
+    /// the hideZeroSized
     public boolean isHideZeroSized() {
         return hideZeroSized;
     }
 
-    /**
-     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
-     * makes animating a grid layout component MUCH easier.
-     *
-     * @param hideZeroSized the hideZeroSized to set
-     */
+    /// When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+    /// makes animating a grid layout component MUCH easier.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hideZeroSized`: the hideZeroSized to set
     public void setHideZeroSized(boolean hideZeroSized) {
         this.hideZeroSized = hideZeroSized;
     }

@@ -36,49 +36,106 @@ import com.codename1.ui.RGBImage;
 import com.codename1.ui.plaf.Style;
 import com.codename1.util.LazyValue;
 
-/**
- * <p>Contains common transition animations that can be applied to forms &amp; components
- * including the following types:
- * <ol>
- * <li>Slide - the exiting form slides out of the screen while the new form slides in (can be vertical or horizontal). </li>
- * <li>Slide Fade - slides the content pane while fading the title. This is the default iOS transition. </li>
- * <li>Cover/Uncover - like slide only one of the forms remains in place while the other moves. </li>
- * <li>Fade - components fade into/out of the screen</li>
- * <li>Timeline - uses an animation image as an alpha mask between the source/destination</li>
- * </ol>
- *
- * <p>
- * The code below demonstrates the common transitions
- * </p>
- * <script src="https://gist.github.com/codenameone/47602e679f61712693bd.js"></script>
- * <h4>Slide</h4>
- * <img src="https://www.codenameone.com/img/developer-guide/transition-slide.jpg" alt="Slide" />
- * <img src="https://www.codenameone.com/img/developer-guide/transition-slide-vertical.jpg" alt="Slide" />
- *
- * <h4>Slide Fade</h4>
- * <img src="https://www.codenameone.com/img/developer-guide/transition-slide-fade.jpg" alt="Slide Fade" />
- *
- * <h4>Cover/Uncover</h4>
- * <img src="https://www.codenameone.com/img/developer-guide/transition-cover.jpg" alt="Cover" />
- * <img src="https://www.codenameone.com/img/developer-guide/transition-uncover.jpg" alt="Uncover" />
- *
- * <h4>Fade</h4>
- * <img src="https://www.codenameone.com/img/developer-guide/transition-fade.jpg" alt="Fade" />
- *
- * @author Shai Almog, Chen Fishbein
- */
+/// Contains common transition animations that can be applied to forms & components
+/// including the following types:
+///
+/// - Slide - the exiting form slides out of the screen while the new form slides in (can be vertical or horizontal).
+///
+/// - Slide Fade - slides the content pane while fading the title. This is the default iOS transition.
+///
+/// - Cover/Uncover - like slide only one of the forms remains in place while the other moves.
+///
+/// - Fade - components fade into/out of the screen
+///
+/// - Timeline - uses an animation image as an alpha mask between the source/destination
+///
+/// The code below demonstrates the common transitions
+///
+/// ```java
+/// Toolbar.setGlobalToolbar(true);
+/// Form hi = new Form("Transitions", new BoxLayout(BoxLayout.Y_AXIS));
+/// Style bg = hi.getContentPane().getUnselectedStyle();
+/// bg.setBgTransparency(255);
+/// bg.setBgColor(0xff0000);
+/// Button showTransition = new Button("Show");
+/// Picker pick = new Picker();
+/// pick.setStrings("Slide", "SlideFade", "Cover", "Uncover", "Fade", "Flip");
+/// pick.setSelectedString("Slide");
+/// TextField duration = new TextField("10000", "Duration", 6, TextArea.NUMERIC);
+/// CheckBox horizontal = CheckBox.createToggle("Horizontal");
+/// pick.addActionListener((e) -> {
+///     String s = pick.getSelectedString().toLowerCase();
+///     horizontal.setEnabled(s.equals("slide") || s.indexOf("cover") > -1);
+/// });
+/// horizontal.setSelected(true);
+/// hi.add(showTransition).
+///     add(pick).
+///     add(duration).
+///     add(horizontal);
+///
+/// Form dest = new Form("Destination");
+/// bg = dest.getContentPane().getUnselectedStyle();
+/// bg.setBgTransparency(255);
+/// bg.setBgColor(0xff);
+/// dest.setBackCommand(
+///         dest.getToolbar().addCommandToLeftBar("Back", null, (e) -> hi.showBack()));
+///
+/// showTransition.addActionListener((e) -> {
+///     int h = CommonTransitions.SLIDE_HORIZONTAL;
+///     if(!horizontal.isSelected()) {
+///         h = CommonTransitions.SLIDE_VERTICAL;
+///     }
+///     switch(pick.getSelectedString()) {
+///         case "Slide":
+///             hi.setTransitionOutAnimator(CommonTransitions.createSlide(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createSlide(h, true, duration.getAsInt(3000)));
+///             break;
+///         case "SlideFade":
+///             hi.setTransitionOutAnimator(CommonTransitions.createSlideFadeTitle(true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createSlideFadeTitle(true, duration.getAsInt(3000)));
+///             break;
+///         case "Cover":
+///             hi.setTransitionOutAnimator(CommonTransitions.createCover(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createCover(h, true, duration.getAsInt(3000)));
+///             break;
+///         case "Uncover":
+///             hi.setTransitionOutAnimator(CommonTransitions.createUncover(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createUncover(h, true, duration.getAsInt(3000)));
+///             break;
+///         case "Fade":
+///             hi.setTransitionOutAnimator(CommonTransitions.createFade(duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createFade(duration.getAsInt(3000)));
+///             break;
+///         case "Flip":
+///             hi.setTransitionOutAnimator(new FlipTransition(-1, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(new FlipTransition(-1, duration.getAsInt(3000)));
+///             break;
+///     }
+///     dest.show();
+/// });
+/// hi.show();
+/// ```
+/// Slide
+///
+/// Slide Fade
+///
+/// Cover/Uncover
+///
+/// Fade
+///
+/// @author Shai Almog, Chen Fishbein
 public final class CommonTransitions extends Transition {
-    /**
-     * Slide the transition horizontally
-     *
-     * @see #createSlide
-     */
+    /// Slide the transition horizontally
+    ///
+    /// #### See also
+    ///
+    /// - #createSlide
     public static final int SLIDE_HORIZONTAL = 0;
-    /**
-     * Slide the transition vertically
-     *
-     * @see #createSlide
-     */
+    /// Slide the transition vertically
+    ///
+    /// #### See also
+    ///
+    /// - #createSlide
     public static final int SLIDE_VERTICAL = 1;
     private static final int TYPE_EMPTY = 0;
     private static final int TYPE_SLIDE = 1;
@@ -109,9 +166,7 @@ public final class CommonTransitions extends Transition {
     private int originalY;
 
 
-    /**
-     * The transition is a special case where we "keep" an allocated buffer
-     */
+    /// The transition is a special case where we "keep" an allocated buffer
     private RGBImage rgbBuffer;
     private boolean forward;
     private boolean drawDialogMenu;
@@ -122,24 +177,25 @@ public final class CommonTransitions extends Transition {
         transitionType = type;
     }
 
-    /**
-     * Creates an empty transition that does nothing. This has the same effect as
-     * setting a transition to null.
-     *
-     * @return empty transition
-     */
+    /// Creates an empty transition that does nothing. This has the same effect as
+    /// setting a transition to null.
+    ///
+    /// #### Returns
+    ///
+    /// empty transition
     public static CommonTransitions createEmpty() {
         return new CommonTransitions(TYPE_EMPTY);
     }
 
-    /**
-     * Creates a slide transition for the body of the form that fades the title in while sliding
-     *
-     * @param forward  forward is a boolean value, represent the directions of
-     *                 switching forms, for example for a horizontally type, true means
-     *                 horizontally movement to right.
-     * @param duration represent the time the transition should take in millisecond
-     */
+    /// Creates a slide transition for the body of the form that fades the title in while sliding
+    ///
+    /// #### Parameters
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
     public static CommonTransitions createSlideFadeTitle(boolean forward, int duration) {
         CommonTransitions c = new CommonTransitions(TYPE_SLIDE_AND_FADE);
         c.forward = forward;
@@ -147,29 +203,35 @@ public final class CommonTransitions extends Transition {
         return c;
     }
 
-    /**
-     * Creates a dialog pulsate transition
-     */
+    /// Creates a dialog pulsate transition
     public static CommonTransitions createDialogPulsate() {
         return new CommonTransitions(TYPE_PULSATE_DIALOG);
     }
 
-    /**
-     * Creates a slide transition with the given duration and direction, this differs from the
-     * standard slide animation by focusing on speed rather than on minimizing heap usage.
-     * This method works by creating two images and sliding them which works much faster for
-     * all devices however takes up more ram. Notice that this method of painting doesn't
-     * support various basic CodenameOne abilities such as translucent menus/dialogs etc.
-     *
-     * @param type     type can be either vertically or horizontally, which means
-     *                 the movement direction of the transition
-     * @param forward  forward is a boolean value, represent the directions of
-     *                 switching forms, for example for a horizontally type, true means
-     *                 horizontally movement to right.
-     * @param duration represent the time the transition should take in millisecond
-     * @return a transition object
-     * @deprecated this is not faster than slide on modern devices, you should use that {@link #createSlide(int, boolean, int) }
-     */
+    /// Creates a slide transition with the given duration and direction, this differs from the
+    /// standard slide animation by focusing on speed rather than on minimizing heap usage.
+    /// This method works by creating two images and sliding them which works much faster for
+    /// all devices however takes up more ram. Notice that this method of painting doesn't
+    /// support various basic CodenameOne abilities such as translucent menus/dialogs etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type     type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    ///
+    /// #### Deprecated
+    ///
+    /// this is not faster than slide on modern devices, you should use that `boolean, int)`
     public static CommonTransitions createFastSlide(int type, boolean forward, int duration) {
         if (Display.getInstance().areMutableImagesFast()) {
             return createFastSlide(type, forward, duration, false);
@@ -177,35 +239,46 @@ public final class CommonTransitions extends Transition {
         return createSlide(type, forward, duration);
     }
 
-    /**
-     * Creates a slide transition with the given duration and direction
-     *
-     * @param type     type can be either vertically or horizontally, which means
-     *                 the movement direction of the transition
-     * @param forward  forward is a boolean value, represent the directions of
-     *                 switching forms, for example for a horizontally type, true means
-     *                 horizontally movement to right.
-     * @param duration represent the time the transition should take in millisecond
-     * @return a transition object
-     */
+    /// Creates a slide transition with the given duration and direction
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type     type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
     public static CommonTransitions createSlide(int type, boolean forward, int duration) {
         return createSlide(type, forward, duration, false);
     }
 
-    /**
-     * Creates a slide transition with the given duration and direction
-     *
-     * @param type           type can be either vertically or horizontally, which means
-     *                       the movement direction of the transition
-     * @param forward        forward is a boolean value, represent the directions of
-     *                       switching forms, for example for a horizontally type, true means
-     *                       horizontally movement to right.
-     * @param duration       represent the time the transition should take in millisecond
-     * @param drawDialogMenu indicates that the menu (softkey area) of the dialog
-     *                       should be kept during a slide transition. This is only relevant for
-     *                       dialog in/out transitions.
-     * @return a transition object
-     */
+    /// Creates a slide transition with the given duration and direction
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type           type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward        forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// - `drawDialogMenu`: @param drawDialogMenu indicates that the menu (softkey area) of the dialog
+    /// should be kept during a slide transition. This is only relevant for
+    /// dialog in/out transitions.
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
     public static CommonTransitions createSlide(int type, boolean forward, int duration, boolean drawDialogMenu) {
         CommonTransitions t = new CommonTransitions(TYPE_SLIDE);
         t.slideType = type;
@@ -216,17 +289,22 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
-    /**
-     * Creates a cover transition with the given duration and direction
-     *
-     * @param type     type can be either vertically or horizontally, which means
-     *                 the movement direction of the transition
-     * @param forward  forward is a boolean value, represent the directions of
-     *                 switching forms, for example for a horizontally type, true means
-     *                 horizontally movement to right.
-     * @param duration represent the time the transition should take in millisecond
-     * @return a transition object
-     */
+    /// Creates a cover transition with the given duration and direction
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type     type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
     public static CommonTransitions createCover(int type, boolean forward, int duration) {
         CommonTransitions t = new CommonTransitions(TYPE_COVER);
         t.slideType = type;
@@ -236,17 +314,22 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
-    /**
-     * Creates a uncover transition with the given duration and direction
-     *
-     * @param type     type can be either vertically or horizontally, which means
-     *                 the movement direction of the transition
-     * @param forward  forward is a boolean value, represent the directions of
-     *                 switching forms, for example for a horizontally type, true means
-     *                 horizontally movement to right.
-     * @param duration represent the time the transition should take in millisecond
-     * @return a transition object
-     */
+    /// Creates a uncover transition with the given duration and direction
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type     type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
     public static CommonTransitions createUncover(int type, boolean forward, int duration) {
         CommonTransitions t = new CommonTransitions(TYPE_UNCOVER);
         t.slideType = type;
@@ -256,25 +339,34 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
-    /**
-     * Creates a slide transition with the given duration and direction, this differs from the
-     * standard slide animation by focusing on speed rather than on minimizing heap usage
-     * This method works by creating two images and sliding them which works much faster for
-     * all devices however takes up more ram. Notice that this method of painting doesn't
-     * support various basic CodenameOne abilities such as translucent menus/dialogs etc.
-     *
-     * @param type           type can be either vertically or horizontally, which means
-     *                       the movement direction of the transition
-     * @param forward        forward is a boolean value, represent the directions of
-     *                       switching forms, for example for a horizontally type, true means
-     *                       horizontally movement to right.
-     * @param duration       represent the time the transition should take in millisecond
-     * @param drawDialogMenu indicates that the menu (softkey area) of the dialog
-     *                       should be kept during a slide transition. This is only relevant for
-     *                       dialog in/out transitions.
-     * @return a transition object
-     * @deprecated this is not faster than slide on modern devices, you should use that {@link #createSlide(int, boolean, int, boolean) }
-     */
+    /// Creates a slide transition with the given duration and direction, this differs from the
+    /// standard slide animation by focusing on speed rather than on minimizing heap usage
+    /// This method works by creating two images and sliding them which works much faster for
+    /// all devices however takes up more ram. Notice that this method of painting doesn't
+    /// support various basic CodenameOne abilities such as translucent menus/dialogs etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type           type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward        forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// - `drawDialogMenu`: @param drawDialogMenu indicates that the menu (softkey area) of the dialog
+    /// should be kept during a slide transition. This is only relevant for
+    /// dialog in/out transitions.
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    ///
+    /// #### Deprecated
+    ///
+    /// this is not faster than slide on modern devices, you should use that `boolean, int, boolean)`
     public static CommonTransitions createFastSlide(int type, boolean forward, int duration, boolean drawDialogMenu) {
         CommonTransitions t = new CommonTransitions(TYPE_SLIDE);
         t.slideType = type;
@@ -285,25 +377,31 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
-    /**
-     * Creates a transition for fading a form in while fading out the original form
-     *
-     * @param duration represent the time the transition should take in millisecond
-     * @return a transition object
-     */
+    /// Creates a transition for fading a form in while fading out the original form
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
     public static CommonTransitions createFade(int duration) {
         CommonTransitions t = new CommonTransitions(TYPE_FADE);
         t.speed = duration;
         return t;
     }
 
-    /**
-     * Creates a transition using an animated image object (e.g. timeline object) as an
-     * alpha mask between the source/target
-     *
-     * @param animation the image object to execute
-     * @return a transition object
-     */
+    /// Creates a transition using an animated image object (e.g. timeline object) as an
+    /// alpha mask between the source/target
+    ///
+    /// #### Parameters
+    ///
+    /// - `animation`: the image object to execute
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
     public static CommonTransitions createTimeline(Image animation) {
         CommonTransitions t = new CommonTransitions(TYPE_TIMELINE);
         t.timeline = animation;
@@ -311,74 +409,74 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
-    /**
-     * Indicates whether the motion associated with these transitions by default is linear or spline motion
-     *
-     * @return the defaultLinearMotion
-     */
+    /// Indicates whether the motion associated with these transitions by default is linear or spline motion
+    ///
+    /// #### Returns
+    ///
+    /// the defaultLinearMotion
     public static boolean isDefaultLinearMotion() {
         return defaultLinearMotion;
     }
 
-    /**
-     * Indicates whether the motion associated with these transitions by default is linear or spline motion
-     *
-     * @param aDefaultLinearMotion the defaultLinearMotion to set
-     */
+    /// Indicates whether the motion associated with these transitions by default is linear or spline motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultLinearMotion`: the defaultLinearMotion to set
     public static void setDefaultLinearMotion(boolean aDefaultLinearMotion) {
         defaultLinearMotion = aDefaultLinearMotion;
     }
 
-    /**
-     * Returns true if this is a horizontal slide transition
-     *
-     * @return true if this is a horizontal slide transition
-     */
+    /// Returns true if this is a horizontal slide transition
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a horizontal slide transition
     public boolean isHorizontalSlide() {
         return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_HORIZONTAL;
     }
 
-    /**
-     * Returns true if this is a vertical slide transition
-     *
-     * @return true if this is a vertical slide transition
-     */
+    /// Returns true if this is a vertical slide transition
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a vertical slide transition
     public boolean isVerticalSlide() {
         return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_VERTICAL;
     }
 
-    /**
-     * Returns true if this is a horizontal cover transition
-     *
-     * @return true if this is a horizontal cover transition
-     */
+    /// Returns true if this is a horizontal cover transition
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a horizontal cover transition
     public boolean isHorizontalCover() {
         return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_HORIZONTAL;
     }
 
-    /**
-     * Returns true if this is a vertical cover transition
-     *
-     * @return true if this is a vertical cover transition
-     */
+    /// Returns true if this is a vertical cover transition
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a vertical cover transition
     public boolean isVerticalCover() {
         return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_VERTICAL;
     }
 
-    /**
-     * Indicates the slide/cover transition direction
-     *
-     * @return true for forward
-     */
+    /// Indicates the slide/cover transition direction
+    ///
+    /// #### Returns
+    ///
+    /// true for forward
     public boolean isForwardSlide() {
         return forward;
     }
 
-    /**
-     * Returns the speed of the transition in milliseconds
-     *
-     * @return The speed of the transition in milliseconds
-     */
+    /// Returns the speed of the transition in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// The speed of the transition in milliseconds
     public int getTransitionSpeed() {
         return speed;
     }
@@ -387,9 +485,7 @@ public final class CommonTransitions extends Transition {
         return ((Dialog) dlg).getDialogComponent();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void initTransition() {
         firstFinished = false;
@@ -645,14 +741,19 @@ public final class CommonTransitions extends Transition {
         return Image.createImage(Math.min(d.getDisplayWidth(), w), Math.min(d.getDisplayHeight(), h));
     }
 
-    /**
-     * This method can be overriden by subclasses to create their own motion object on the fly
-     *
-     * @param startOffset the start offset for the menu
-     * @param dest        the destination of the motion
-     * @param speed       the speed of the motion
-     * @return a motion instance
-     */
+    /// This method can be overriden by subclasses to create their own motion object on the fly
+    ///
+    /// #### Parameters
+    ///
+    /// - `startOffset`: the start offset for the menu
+    ///
+    /// - `dest`: the destination of the motion
+    ///
+    /// - `speed`: the speed of the motion
+    ///
+    /// #### Returns
+    ///
+    /// a motion instance
     private Motion createMotion(int startOffset, int dest, int speed) {
         if (motionSetManually) {
             if (lazyMotion != null) {
@@ -667,9 +768,7 @@ public final class CommonTransitions extends Transition {
         return Motion.createEaseInOutMotion(startOffset, dest, speed);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
     public boolean animate() {
@@ -709,9 +808,7 @@ public final class CommonTransitions extends Transition {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         try {
@@ -996,9 +1093,7 @@ public final class CommonTransitions extends Transition {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void cleanup() {
         if (transitionType == TYPE_SLIDE_AND_FADE) {
@@ -1224,41 +1319,39 @@ public final class CommonTransitions extends Transition {
         cmp.setVisible(b);
     }
 
-    /**
-     * Motion represents the physical movement within a transition, it can
-     * be replaced by the user to provide a more appropriate physical feel
-     *
-     * @return the instanceo of the motion class used by this transition
-     */
+    /// Motion represents the physical movement within a transition, it can
+    /// be replaced by the user to provide a more appropriate physical feel
+    ///
+    /// #### Returns
+    ///
+    /// the instanceo of the motion class used by this transition
     public Motion getMotion() {
         return motion;
     }
 
-    /**
-     * Motion represents the physical movement within a transition, it can
-     * be replaced by the user to provide a more appropriate physical feel
-     *
-     * @param motion new instance of the motion class that will be used by the transition
-     */
+    /// Motion represents the physical movement within a transition, it can
+    /// be replaced by the user to provide a more appropriate physical feel
+    ///
+    /// #### Parameters
+    ///
+    /// - `motion`: new instance of the motion class that will be used by the transition
     public void setMotion(Motion motion) {
         motionSetManually = true;
         this.motion = motion;
     }
 
-    /**
-     * Motion represents the physical movement within a transition, it can
-     * be replaced by the user to provide a more appropriate physical feel
-     *
-     * @param motion new instance of the motion class that will be used by the transition
-     */
+    /// Motion represents the physical movement within a transition, it can
+    /// be replaced by the user to provide a more appropriate physical feel
+    ///
+    /// #### Parameters
+    ///
+    /// - `motion`: new instance of the motion class that will be used by the transition
     public void setMotion(LazyValue<Motion> motion) {
         motionSetManually = true;
         this.lazyMotion = motion;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Transition copy(boolean reverse) {
         CommonTransitions retVal = null;
@@ -1332,20 +1425,20 @@ public final class CommonTransitions extends Transition {
         return retVal;
     }
 
-    /**
-     * Indicates whether the motion associated with this transition is linear or spline motion
-     *
-     * @return the linearMotion
-     */
+    /// Indicates whether the motion associated with this transition is linear or spline motion
+    ///
+    /// #### Returns
+    ///
+    /// the linearMotion
     public boolean isLinearMotion() {
         return linearMotion;
     }
 
-    /**
-     * Indicates whether the motion associated with this transition is linear or spline motion
-     *
-     * @param linearMotion the linearMotion to set
-     */
+    /// Indicates whether the motion associated with this transition is linear or spline motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `linearMotion`: the linearMotion to set
     public void setLinearMotion(boolean linearMotion) {
         this.linearMotion = linearMotion;
     }

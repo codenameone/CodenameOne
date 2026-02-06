@@ -33,18 +33,18 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.RGBImage;
 import com.codename1.ui.geom.Rectangle;
 
-/**
- * Base class that allows us to render a border for a component, a border is drawn before
- * the component and is drawn within the padding region of the component. It is the
- * responsibility of the component not to draw outside of the border line.
- * <p>This class can be extended to provide additional border types and custom made
- * border types.
- * <p>A border can optionally paint the background of the component, this depends on
- * the border type and is generally required for rounded borders that "know" the area
- * that should be filled.
- *
- * @author Shai Almog
- */
+/// Base class that allows us to render a border for a component, a border is drawn before
+/// the component and is drawn within the padding region of the component. It is the
+/// responsibility of the component not to draw outside of the border line.
+///
+/// This class can be extended to provide additional border types and custom made
+/// border types.
+///
+/// A border can optionally paint the background of the component, this depends on
+/// the border type and is generally required for rounded borders that "know" the area
+/// that should be filled.
+///
+/// @author Shai Almog
 public class Border {
     private static final int TYPE_EMPTY = 0;
     private static final int TYPE_LINE = 1;
@@ -73,10 +73,8 @@ public class Border {
     // variables are package protected for the benefit of the resource editor!
     int type;
     Image[] images;
-    /**
-     * Indicates whether theme colors should be used or whether colors are specified
-     * in the border
-     */
+    /// Indicates whether theme colors should be used or whether colors are specified
+    /// in the border
     boolean themeColors;
     int colorA;
     int colorB;
@@ -96,53 +94,65 @@ public class Border {
     private Rectangle trackComponent;
     private boolean paintOuterBorderFirst;
     private boolean emptyType;
-    /**
-     * Prevents usage of new operator, use the factory methods in the class or subclass
-     * to create new border types.
-     */
+    /// Prevents usage of new operator, use the factory methods in the class or subclass
+    /// to create new border types.
     protected Border() {
     }
 
-    /**
-     * Returns an empty border, this is mostly useful for overriding components that
-     * have a border by default
-     *
-     * @return a border than draws nothing
-     * @deprecated use createEmpty instead
-     */
+    /// Returns an empty border, this is mostly useful for overriding components that
+    /// have a border by default
+    ///
+    /// #### Returns
+    ///
+    /// a border than draws nothing
+    ///
+    /// #### Deprecated
+    ///
+    /// use createEmpty instead
     public static Border getEmpty() {
         return EmptyBorderHolder.EMPTY;
     }
 
-    /**
-     * Creates an empty border, this is useful where we don't want a border for a
-     * component but want a focus border etc...
-     *
-     * @return a border than draws nothing
-     */
+    /// Creates an empty border, this is useful where we don't want a border for a
+    /// component but want a focus border etc...
+    ///
+    /// #### Returns
+    ///
+    /// a border than draws nothing
     public static Border createEmpty() {
         Border b = new Border();
         b.emptyType = true;
         return b;
     }
 
-    /**
-     * The given top/bottom/left/right images are tiled appropriately across the matching sides of the border and the corners are placed
-     * as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
-     *
-     * <p>By default this border does not override background unless a background image is specified
-     *
-     * @param top         the image of the top line
-     * @param bottom      the image of the bottom line
-     * @param left        the image of the left line
-     * @param right       the image of the right line
-     * @param topLeft     the image of the top left corner
-     * @param topRight    the image of the top right corner
-     * @param bottomLeft  the image of the bottom left corner
-     * @param bottomRight the image of the bottom right corner
-     * @param background  the image of the background (optional)
-     * @return new border instance
-     */
+    /// The given top/bottom/left/right images are tiled appropriately across the matching sides of the border and the corners are placed
+    /// as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
+    ///
+    /// By default this border does not override background unless a background image is specified
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the image of the top line
+    ///
+    /// - `bottom`: the image of the bottom line
+    ///
+    /// - `left`: the image of the left line
+    ///
+    /// - `right`: the image of the right line
+    ///
+    /// - `topLeft`: the image of the top left corner
+    ///
+    /// - `topRight`: the image of the top right corner
+    ///
+    /// - `bottomLeft`: the image of the bottom left corner
+    ///
+    /// - `bottomRight`: the image of the bottom right corner
+    ///
+    /// - `background`: the image of the background (optional)
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createImageBorder(Image top, Image bottom, Image left, Image right, Image topLeft, Image topRight,
                                            Image bottomLeft, Image bottomRight, Image background) {
         Border b = new Border();
@@ -152,19 +162,26 @@ public class Border {
         return b;
     }
 
-    /**
-     * The given image is spliced into 9 pieces based on the provided top, right, bottom, and left insets, and the resulting
-     * sub-images are used to form a 9-piece image border via {@link #createImageBorder(com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image) }
-     *
-     * <p>Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.</p>
-     *
-     * @param img         The image to be used as a background image and spliced.
-     * @param topInset
-     * @param rightInset
-     * @param bottomInset
-     * @param leftInset
-     * @return A 9-piece image border.
-     */
+    /// The given image is spliced into 9 pieces based on the provided top, right, bottom, and left insets, and the resulting
+    /// sub-images are used to form a 9-piece image border via `com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image)`
+    ///
+    /// Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: The image to be used as a background image and spliced.
+    ///
+    /// - `topInset`
+    ///
+    /// - `rightInset`
+    ///
+    /// - `bottomInset`
+    ///
+    /// - `leftInset`
+    ///
+    /// #### Returns
+    ///
+    /// A 9-piece image border.
     public static Border createImageSplicedBorder(Image img, double topInset, double rightInset, double bottomInset, double leftInset) {
 
         Border b = new Border();
@@ -205,23 +222,34 @@ public class Border {
         return b;
     }
 
-    /**
-     * The given top/bottom/left/right images are scaled appropriately across the matching sides of the border and the corners are placed
-     * as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
-     *
-     * <p>By default this border does not override background unless a background image is specified
-     *
-     * @param top         the image of the top line
-     * @param bottom      the image of the bottom line
-     * @param left        the image of the left line
-     * @param right       the image of the right line
-     * @param topLeft     the image of the top left corner
-     * @param topRight    the image of the top right corner
-     * @param bottomLeft  the image of the bottom left corner
-     * @param bottomRight the image of the bottom right corner
-     * @param background  the image of the background (optional)
-     * @return new border instance
-     */
+    /// The given top/bottom/left/right images are scaled appropriately across the matching sides of the border and the corners are placed
+    /// as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
+    ///
+    /// By default this border does not override background unless a background image is specified
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the image of the top line
+    ///
+    /// - `bottom`: the image of the bottom line
+    ///
+    /// - `left`: the image of the left line
+    ///
+    /// - `right`: the image of the right line
+    ///
+    /// - `topLeft`: the image of the top left corner
+    ///
+    /// - `topRight`: the image of the top right corner
+    ///
+    /// - `bottomLeft`: the image of the bottom left corner
+    ///
+    /// - `bottomRight`: the image of the bottom right corner
+    ///
+    /// - `background`: the image of the background (optional)
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createImageScaledBorder(Image top, Image bottom, Image left, Image right, Image topLeft, Image topRight,
                                                  Image bottomLeft, Image bottomRight, Image background) {
         Border b = new Border();
@@ -231,14 +259,19 @@ public class Border {
         return b;
     }
 
-    /**
-     * This is an image border that can only grow horizontally
-     *
-     * @param left   the image of the left side
-     * @param right  the image of the right side
-     * @param center the image of the center
-     * @return new border instance
-     */
+    /// This is an image border that can only grow horizontally
+    ///
+    /// #### Parameters
+    ///
+    /// - `left`: the image of the left side
+    ///
+    /// - `right`: the image of the right side
+    ///
+    /// - `center`: the image of the center
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createHorizonalImageBorder(Image left, Image right, Image center) {
         Border b = new Border();
         b.type = TYPE_IMAGE_HORIZONTAL;
@@ -246,14 +279,19 @@ public class Border {
         return b;
     }
 
-    /**
-     * This is an image border that can only grow vertically
-     *
-     * @param top    the image of the top
-     * @param bottom the image of the bottom
-     * @param center the image of the center
-     * @return new border instance
-     */
+    /// This is an image border that can only grow vertically
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the image of the top
+    ///
+    /// - `bottom`: the image of the bottom
+    ///
+    /// - `center`: the image of the center
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createVerticalImageBorder(Image top, Image bottom, Image center) {
         Border b = new Border();
         b.type = TYPE_IMAGE_VERTICAL;
@@ -261,21 +299,29 @@ public class Border {
         return b;
     }
 
-    /**
-     * The given images are tiled appropriately across the matching side of the border, rotated and placed
-     * as expected in the four corners. The background image is optional and it will be tiled in
-     * the background if necessary.
-     * <p>By default this border does not override background unless a background image is specified.
-     * <p>Notice that this version of the method is potentially much more efficient since images
-     * are rotated internally and this might save quite a bit of memory!
-     * <p><b>The top and topLeft images must be square!</b> The width and height of these images
-     * must be equal otherwise rotation won't work as you expect.
-     *
-     * @param top        the image of the top line
-     * @param topLeft    the image of the top left corner
-     * @param background the image of the background (optional)
-     * @return new border instance
-     */
+    /// The given images are tiled appropriately across the matching side of the border, rotated and placed
+    /// as expected in the four corners. The background image is optional and it will be tiled in
+    /// the background if necessary.
+    ///
+    /// By default this border does not override background unless a background image is specified.
+    ///
+    /// Notice that this version of the method is potentially much more efficient since images
+    /// are rotated internally and this might save quite a bit of memory!
+    ///
+    /// **The top and topLeft images must be square!** The width and height of these images
+    /// must be equal otherwise rotation won't work as you expect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the image of the top line
+    ///
+    /// - `topLeft`: the image of the top left corner
+    ///
+    /// - `background`: the image of the background (optional)
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createImageBorder(Image top, Image topLeft, Image background) {
         Border b = new Border();
         b.type = TYPE_IMAGE;
@@ -284,12 +330,15 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a line border that uses the color of the component foreground for drawing
-     *
-     * @param thickness thickness of the border in pixels
-     * @return new border instance
-     */
+    /// Creates a line border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createLineBorder(int thickness) {
         Border b = new Border();
         b.type = TYPE_LINE;
@@ -299,12 +348,15 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a line border that uses the color of the component foreground for drawing
-     *
-     * @param thickness thickness of the border in millimeters
-     * @return new border instance
-     */
+    /// Creates a line border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createLineBorder(float thickness) {
         Border b = new Border();
         b.type = TYPE_LINE;
@@ -314,13 +366,19 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates an underline border that uses the color of the component foreground for drawing
-     *
-     * @param thickness thickness of the border in pixels
-     * @return new border instance
-     * @deprecated due to a spelling mistake. Use {@link #createUnderlineBorder(int thickness)}
-     */
+    /// Creates an underline border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// due to a spelling mistake. Use `thickness)`
     public static Border createUndelineBorder(int thickness) {
         Border b = new Border();
         b.type = TYPE_UNDERLINE;
@@ -329,12 +387,15 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates an underline border that uses the color of the component foreground for drawing
-     *
-     * @param thickness thickness of the border in pixels
-     * @return new border instance
-     */
+    /// Creates an underline border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createUnderlineBorder(int thickness) {
         Border b = new Border();
         b.type = TYPE_UNDERLINE;
@@ -343,13 +404,19 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates an underline border that uses the color of the component foreground for drawing
-     *
-     * @param thickness thickness of the border in millimeters
-     * @return new border instance
-     * @deprecated due to a spelling mistake. Use {@link #createUnderlineBorder(float thickness)}
-     */
+    /// Creates an underline border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// due to a spelling mistake. Use `thickness)`
     public static Border createUndelineBorder(float thickness) {
         Border b = new Border();
         b.type = TYPE_UNDERLINE;
@@ -359,12 +426,15 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates an underline border that uses the color of the component foreground for drawing
-     *
-     * @param thickness thickness of the border in millimeters
-     * @return new border instance
-     */
+    /// Creates an underline border that uses the color of the component foreground for drawing
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createUnderlineBorder(float thickness) {
         Border b = new Border();
         b.type = TYPE_UNDERLINE;
@@ -374,13 +444,17 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates an underline border that uses the given color
-     *
-     * @param thickness thickness of the border in pixels
-     * @param color     the color
-     * @return new border instance
-     */
+    /// Creates an underline border that uses the given color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// - `color`: the color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createUnderlineBorder(int thickness, int color) {
         Border b = new Border();
         b.type = TYPE_UNDERLINE;
@@ -390,13 +464,17 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates an underline border that uses the given color
-     *
-     * @param thickness thickness of the border in millimeters
-     * @param color     the color
-     * @return new border instance
-     */
+    /// Creates an underline border that uses the given color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// - `color`: the color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createUnderlineBorder(float thickness, int color) {
         Border b = new Border();
         b.type = TYPE_UNDERLINE;
@@ -407,149 +485,198 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a dotted border with the specified thickness and color
-     *
-     * @param thickness The border thickness in pixels
-     * @param color     The border color
-     * @return The border
-     */
+    /// Creates a dotted border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createDottedBorder(int thickness, int color) {
         return createCSSBorder(TYPE_DOTTED, thickness, color);
     }
 
-    /**
-     * Creates a dashed border with the specified thickness and color
-     *
-     * @param thickness The border thickness in pixels
-     * @param color     The border color
-     * @return The border
-     */
+    /// Creates a dashed border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createDashedBorder(int thickness, int color) {
         return createCSSBorder(TYPE_DASHED, thickness, color);
     }
 
-    /**
-     * Creates a double border with the specified thickness and color
-     *
-     * @param thickness The border thickness in pixels
-     * @param color     The border color
-     * @return The border
-     */
+    /// Creates a double border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createDoubleBorder(int thickness, int color) {
         return createCSSBorder(TYPE_DOUBLE, thickness, color);
     }
 
-    /**
-     * Creates a dotted border with the specified thickness and the theme colors
-     *
-     * @param thickness The border thickness in pixels
-     * @return The border
-     */
+    /// Creates a dotted border with the specified thickness and the theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createDottedBorder(int thickness) {
         return createCSSBorder(TYPE_DOTTED, thickness);
     }
 
-    /**
-     * Creates a dashed border with the specified thickness and the theme colors
-     *
-     * @param thickness The border thickness in pixels
-     * @return The border
-     */
+    /// Creates a dashed border with the specified thickness and the theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createDashedBorder(int thickness) {
         return createCSSBorder(TYPE_DASHED, thickness);
     }
 
-    /**
-     * Creates a double border with the specified thickness and color
-     *
-     * @param thickness The border thickness in pixels
-     * @return The border
-     */
+    /// Creates a double border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createDoubleBorder(int thickness) {
         return createCSSBorder(TYPE_DOUBLE, thickness);
     }
 
-    /**
-     * Creates an outset border with the specified thickness and theme colors
-     *
-     * @param thickness The border thickness in pixels
-     * @return The border
-     */
+    /// Creates an outset border with the specified thickness and theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createOutsetBorder(int thickness) {
         return createCSSBorder(TYPE_OUTSET, thickness);
     }
 
-    /**
-     * Creates an outset border with the specified thickness and color
-     *
-     * @param thickness The border thickness in pixels
-     * @param color     The border color
-     * @return The border
-     */
+    /// Creates an outset border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createOutsetBorder(int thickness, int color) {
         return createCSSBorder(TYPE_OUTSET, thickness, color);
     }
 
-    /**
-     * Creates an inset border with the specified thickness and theme colors
-     *
-     * @param thickness The border thickness in pixels
-     * @return The border
-     */
+    /// Creates an inset border with the specified thickness and theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createInsetBorder(int thickness) {
         return createCSSBorder(TYPE_INSET, thickness);
     }
 
-    /**
-     * Creates an inset border with the specified thickness and color
-     *
-     * @param thickness The border thickness in pixels
-     * @param color     The border color
-     * @return The border
-     */
+    /// Creates an inset border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createInsetBorder(int thickness, int color) {
         return createCSSBorder(TYPE_INSET, thickness, color);
     }
 
-    /**
-     * Creates a groove border with the specified thickness and theme colors
-     *
-     * @param thickness The border thickness in pixels
-     * @return The border
-     */
+    /// Creates a groove border with the specified thickness and theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createGrooveBorder(int thickness) {
         return createCSSBorder(TYPE_GROOVE, thickness);
     }
 
-    /**
-     * Creates a groove border with the specified thickness and color
-     *
-     * @param thickness The border thickness in pixels
-     * @param color     The border color
-     * @return The border
-     */
+    /// Creates a groove border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createGrooveBorder(int thickness, int color) {
         return createCSSBorder(TYPE_GROOVE, thickness, color);
     }
 
-    /**
-     * Creates a ridge border with the specified thickness and theme colors
-     *
-     * @param thickness The border thickness in pixels
-     * @return The border
-     */
+    /// Creates a ridge border with the specified thickness and theme colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createRidgeBorder(int thickness) {
         return createCSSBorder(TYPE_RIDGE, thickness);
     }
 
-    /**
-     * Creates a ridge border with the specified thickness and color
-     *
-     * @param thickness The border thickness in pixels
-     * @param color     The border color
-     * @return The border
-     */
+    /// Creates a ridge border with the specified thickness and color
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: The border thickness in pixels
+    ///
+    /// - `color`: The border color
+    ///
+    /// #### Returns
+    ///
+    /// The border
     public static Border createRidgeBorder(int thickness, int color) {
         return createCSSBorder(TYPE_RIDGE, thickness, color);
     }
@@ -570,13 +697,17 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a line border with the specified title
-     *
-     * @param thickness thickness of the border in pixels
-     * @param title     The borders title
-     * @return new border instance
-     */
+    /// Creates a line border with the specified title
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// - `title`: The borders title
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createLineBorder(int thickness, String title) {
         Border b = new Border();
         b.type = TYPE_LINE;
@@ -586,14 +717,19 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a line border that uses the given color for the component
-     *
-     * @param thickness thickness of the border in pixels
-     * @param color     the color for the border
-     * @param title     The borders title
-     * @return new border instance
-     */
+    /// Creates a line border that uses the given color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// - `title`: The borders title
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createLineBorder(int thickness, int color, String title) {
         Border b = new Border();
         b.type = TYPE_LINE;
@@ -604,13 +740,17 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a line border that uses the given color for the component
-     *
-     * @param thickness thickness of the border in pixels
-     * @param color     the color for the border
-     * @return new border instance
-     */
+    /// Creates a line border that uses the given color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in pixels
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createLineBorder(int thickness, int color) {
         Border b = new Border();
         b.type = TYPE_LINE;
@@ -620,13 +760,17 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a line border that uses the given color for the component
-     *
-     * @param thickness thickness of the border in millimeters
-     * @param color     the color for the border
-     * @return new border instance
-     */
+    /// Creates a line border that uses the given color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: thickness of the border in millimeters
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createLineBorder(float thickness, int color) {
         Border b = new Border();
         b.type = TYPE_LINE;
@@ -637,18 +781,26 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a rounded corner border that uses the color of the component foreground for drawing.
-     * Due to technical issues (lack of shaped clipping) performance and memory overhead of round
-     * borders can be low if used with either a bgImage or translucency!
-     * <p>This border overrides any painter used on the component and would ignor such a painter.
-     *
-     * @param arcWidth  the horizontal diameter of the arc at the four corners.
-     * @param arcHeight the vertical diameter of the arc at the four corners.
-     * @return new border instance
-     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
-     * which are faster, more portable and better looking
-     */
+    /// Creates a rounded corner border that uses the color of the component foreground for drawing.
+    /// Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+    /// borders can be low if used with either a bgImage or translucency!
+    ///
+    /// This border overrides any painter used on the component and would ignor such a painter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
+    /// which are faster, more portable and better looking
     public static Border createRoundBorder(int arcWidth, int arcHeight) {
         Border b = new Border();
         b.type = TYPE_ROUNDED;
@@ -658,38 +810,56 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a rounded corner border that uses the color of the component foreground for drawing.
-     * Due to technical issues (lack of shaped clipping) performance and memory overhead of round
-     * borders can be low if used with either a bgImage or translucency!
-     * <p>This border overrides any painter used on the component and would ignor such a painter.
-     *
-     * @param arcWidth  the horizontal diameter of the arc at the four corners.
-     * @param arcHeight the vertical diameter of the arc at the four corners.
-     * @param outline   whether the round rect border outline should be drawn
-     * @return new border instance
-     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
-     * which are faster, more portable and better looking
-     */
+    /// Creates a rounded corner border that uses the color of the component foreground for drawing.
+    /// Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+    /// borders can be low if used with either a bgImage or translucency!
+    ///
+    /// This border overrides any painter used on the component and would ignor such a painter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// - `outline`: whether the round rect border outline should be drawn
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
+    /// which are faster, more portable and better looking
     public static Border createRoundBorder(int arcWidth, int arcHeight, boolean outline) {
         Border b = createRoundBorder(arcWidth, arcHeight);
         b.outline = outline;
         return b;
     }
 
-    /**
-     * Creates a rounded border that uses the given color for the component.
-     * Due to technical issues (lack of shaped clipping) performance and memory overhead of round
-     * borders can be low if used with either a bgImage or translucency!
-     * <p>This border overrides any painter used on the component and would ignor such a painter.
-     *
-     * @param arcWidth  the horizontal diameter of the arc at the four corners.
-     * @param arcHeight the vertical diameter of the arc at the four corners.
-     * @param color     the color for the border
-     * @return new border instance
-     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
-     * which are faster, more portable and better looking
-     */
+    /// Creates a rounded border that uses the given color for the component.
+    /// Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+    /// borders can be low if used with either a bgImage or translucency!
+    ///
+    /// This border overrides any painter used on the component and would ignor such a painter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
+    /// which are faster, more portable and better looking
     public static Border createRoundBorder(int arcWidth, int arcHeight, int color) {
         Border b = new Border();
         b.type = TYPE_ROUNDED;
@@ -700,32 +870,42 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a rounded border that uses the given color for the component.
-     * Due to technical issues (lack of shaped clipping) performance and memory overhead of round
-     * borders can be low if used with either a bgImage or translucency!
-     * <p>This border overrides any painter used on the component and would ignor such a painter.
-     *
-     * @param arcWidth  the horizontal diameter of the arc at the four corners.
-     * @param arcHeight the vertical diameter of the arc at the four corners.
-     * @param color     the color for the border
-     * @param outline   whether the round rect border outline should be drawn
-     * @return new border instance
-     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
-     * which are faster, more portable and better looking
-     */
+    /// Creates a rounded border that uses the given color for the component.
+    /// Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+    /// borders can be low if used with either a bgImage or translucency!
+    ///
+    /// This border overrides any painter used on the component and would ignor such a painter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `arcWidth`: the horizontal diameter of the arc at the four corners.
+    ///
+    /// - `arcHeight`: the vertical diameter of the arc at the four corners.
+    ///
+    /// - `color`: the color for the border
+    ///
+    /// - `outline`: whether the round rect border outline should be drawn
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
+    /// which are faster, more portable and better looking
     public static Border createRoundBorder(int arcWidth, int arcHeight, int color, boolean outline) {
         Border b = createRoundBorder(arcWidth, arcHeight, color);
         b.outline = outline;
         return b;
     }
 
-    /**
-     * Creates a lowered etched border with default colors, highlight is derived
-     * from the component and shadow is a plain dark color
-     *
-     * @return new border instance
-     */
+    /// Creates a lowered etched border with default colors, highlight is derived
+    /// from the component and shadow is a plain dark color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createEtchedLowered() {
         Border b = new Border();
         b.type = TYPE_ETCHED_LOWERED;
@@ -733,13 +913,17 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a raised etched border with the given colors
-     *
-     * @param highlight color RGB value
-     * @param shadow    color RGB value
-     * @return new border instance
-     */
+    /// Creates a raised etched border with the given colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `highlight`: color RGB value
+    ///
+    /// - `shadow`: color RGB value
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createEtchedLowered(int highlight, int shadow) {
         Border b = new Border();
         b.type = TYPE_ETCHED_LOWERED;
@@ -749,12 +933,12 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a lowered etched border with default colors, highlight is derived
-     * from the component and shadow is a plain dark color
-     *
-     * @return new border instance
-     */
+    /// Creates a lowered etched border with default colors, highlight is derived
+    /// from the component and shadow is a plain dark color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createEtchedRaised() {
         Border b = new Border();
         b.type = TYPE_ETCHED_RAISED;
@@ -763,13 +947,17 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a raised etched border with the given colors
-     *
-     * @param highlight color RGB value
-     * @param shadow    color RGB value
-     * @return new border instance
-     */
+    /// Creates a raised etched border with the given colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `highlight`: color RGB value
+    ///
+    /// - `shadow`: color RGB value
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createEtchedRaised(int highlight, int shadow) {
         Border b = new Border();
         b.type = TYPE_ETCHED_RAISED;
@@ -780,13 +968,17 @@ public class Border {
         return b;
     }
 
-    /**
-     * Compares two object including the scenario one of them is null (thus avoiding equals pitfalls)
-     *
-     * @param obj1 The first object to compare
-     * @param obj2 The second object to compare
-     * @return true if the two object are equal (or both null), false otherwise
-     */
+    /// Compares two object including the scenario one of them is null (thus avoiding equals pitfalls)
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj1`: The first object to compare
+    ///
+    /// - `obj2`: The second object to compare
+    ///
+    /// #### Returns
+    ///
+    /// true if the two object are equal (or both null), false otherwise
     private static boolean isSame(Object obj1, Object obj2) {
         if (obj1 == null) {
             return (obj2 == null);
@@ -796,16 +988,22 @@ public class Border {
         return obj1.equals(obj2);
     }
 
-    /**
-     * Creates a border that is comprised of multiple border types so one border type can be used on top
-     * while another one can be used at the bottom. Notice that this doesn't work well with all border types (e.g. image borders)
-     *
-     * @param top    the top border
-     * @param bottom the bottom border
-     * @param left   the left border
-     * @param right  the right border
-     * @return a compound border
-     */
+    /// Creates a border that is comprised of multiple border types so one border type can be used on top
+    /// while another one can be used at the bottom. Notice that this doesn't work well with all border types (e.g. image borders)
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top border
+    ///
+    /// - `bottom`: the bottom border
+    ///
+    /// - `left`: the left border
+    ///
+    /// - `right`: the right border
+    ///
+    /// #### Returns
+    ///
+    /// a compound border
     public static Border createCompoundBorder(Border top, Border bottom, Border left, Border right) {
 
         if ((top != null && !top.isRectangleType()) ||
@@ -841,12 +1039,12 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a lowered bevel border with default colors, highlight is derived
-     * from the component and shadow is a plain dark color
-     *
-     * @return new border instance
-     */
+    /// Creates a lowered bevel border with default colors, highlight is derived
+    /// from the component and shadow is a plain dark color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createBevelLowered() {
         Border b = new Border();
         b.type = TYPE_BEVEL_LOWERED;
@@ -855,15 +1053,21 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a raised bevel border with the given colors
-     *
-     * @param highlightOuter RGB of the outer edge of the highlight area
-     * @param highlightInner RGB of the inner edge of the highlight area
-     * @param shadowOuter    RGB of the outer edge of the shadow area
-     * @param shadowInner    RGB of the inner edge of the shadow area
-     * @return new border instance
-     */
+    /// Creates a raised bevel border with the given colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `highlightOuter`: RGB of the outer edge of the highlight area
+    ///
+    /// - `highlightInner`: RGB of the inner edge of the highlight area
+    ///
+    /// - `shadowOuter`: RGB of the outer edge of the shadow area
+    ///
+    /// - `shadowInner`: RGB of the inner edge of the shadow area
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createBevelLowered(int highlightOuter, int highlightInner,
                                             int shadowOuter, int shadowInner) {
         Border b = new Border();
@@ -877,12 +1081,12 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a lowered bevel border with default colors, highlight is derived
-     * from the component and shadow is a plain dark color
-     *
-     * @return new border instance
-     */
+    /// Creates a lowered bevel border with default colors, highlight is derived
+    /// from the component and shadow is a plain dark color
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createBevelRaised() {
         Border b = new Border();
         b.type = TYPE_BEVEL_RAISED;
@@ -891,15 +1095,21 @@ public class Border {
         return b;
     }
 
-    /**
-     * Creates a raised bevel border with the given colors
-     *
-     * @param highlightOuter RGB of the outer edge of the highlight area
-     * @param highlightInner RGB of the inner edge of the highlight area
-     * @param shadowOuter    RGB of the outer edge of the shadow area
-     * @param shadowInner    RGB of the inner edge of the shadow area
-     * @return new border instance
-     */
+    /// Creates a raised bevel border with the given colors
+    ///
+    /// #### Parameters
+    ///
+    /// - `highlightOuter`: RGB of the outer edge of the highlight area
+    ///
+    /// - `highlightInner`: RGB of the inner edge of the highlight area
+    ///
+    /// - `shadowOuter`: RGB of the outer edge of the shadow area
+    ///
+    /// - `shadowInner`: RGB of the inner edge of the shadow area
+    ///
+    /// #### Returns
+    ///
+    /// new border instance
     public static Border createBevelRaised(int highlightOuter, int highlightInner,
                                            int shadowOuter, int shadowInner) {
         Border b = new Border();
@@ -913,29 +1123,29 @@ public class Border {
         return b;
     }
 
-    /**
-     * Gets the default border to the given value
-     *
-     * @return the default border
-     */
+    /// Gets the default border to the given value
+    ///
+    /// #### Returns
+    ///
+    /// the default border
     public static Border getDefaultBorder() {
         return defaultBorder;
     }
 
-    /**
-     * Sets the default border to the given value
-     *
-     * @param border new border value
-     */
+    /// Sets the default border to the given value
+    ///
+    /// #### Parameters
+    ///
+    /// - `border`: new border value
     public static void setDefaultBorder(Border border) {
         defaultBorder = border;
     }
 
-    /**
-     * If a border is a horizontal image border it can be mirrored which is useful for an RTL scenario
-     *
-     * @return the current border or a mirrored instance
-     */
+    /// If a border is a horizontal image border it can be mirrored which is useful for an RTL scenario
+    ///
+    /// #### Returns
+    ///
+    /// the current border or a mirrored instance
     public Border mirrorBorder() {
         if (type == TYPE_IMAGE_HORIZONTAL) {
             return createHorizonalImageBorder(images[1].mirror(), images[0].mirror(), images[2].mirror());
@@ -943,93 +1153,99 @@ public class Border {
         return this;
     }
 
-    /**
-     * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
-     * the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
-     * so it points at the center of the track component
-     *
-     * @param tileTop        an image that will replace one of the tiles on the top if the track component is there
-     * @param tileBottom     an image that will replace one of the tiles on the bottom if the track component is there
-     * @param tileLeft       an image that will replace one of the tiles on the left if the track component is there
-     * @param tileRight      an image that will replace one of the tiles on the right if the track component is there
-     * @param trackComponent the component that will be tracked for the positioning of the tile
-     */
+    /// This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
+    /// the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
+    /// so it points at the center of the track component
+    ///
+    /// #### Parameters
+    ///
+    /// - `tileTop`: an image that will replace one of the tiles on the top if the track component is there
+    ///
+    /// - `tileBottom`: an image that will replace one of the tiles on the bottom if the track component is there
+    ///
+    /// - `tileLeft`: an image that will replace one of the tiles on the left if the track component is there
+    ///
+    /// - `tileRight`: an image that will replace one of the tiles on the right if the track component is there
+    ///
+    /// - `trackComponent`: the component that will be tracked for the positioning of the tile
     public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Component trackComponent) {
         specialTile = new Image[]{tileTop, tileBottom, tileLeft, tileRight};
         this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());
     }
 
-    /**
-     * The track component is an area to which an arrow based border should point at.
-     * It's assumed to be outside of the border region in absolute screen coordinates.
-     *
-     * @return the rectangle to point at or null if this isn't an arrow border
-     */
+    /// The track component is an area to which an arrow based border should point at.
+    /// It's assumed to be outside of the border region in absolute screen coordinates.
+    ///
+    /// #### Returns
+    ///
+    /// the rectangle to point at or null if this isn't an arrow border
     protected Rectangle getTrackComponent() {
         return trackComponent;
     }
 
-    /**
-     * In the case of an arrow border the track component lets us track the position
-     * to which the border is pointing
-     *
-     * @param trackComponent the track component
-     */
+    /// In the case of an arrow border the track component lets us track the position
+    /// to which the border is pointing
+    ///
+    /// #### Parameters
+    ///
+    /// - `trackComponent`: the track component
     public void setTrackComponent(Component trackComponent) {
         this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());
     }
 
-    /**
-     * In the case of an arrow border the track component lets us track the position
-     * to which the border is pointing
-     *
-     * @param trackComponent the track component
-     */
+    /// In the case of an arrow border the track component lets us track the position
+    /// to which the border is pointing
+    ///
+    /// #### Parameters
+    ///
+    /// - `trackComponent`: the track component
     public void setTrackComponent(Rectangle trackComponent) {
         this.trackComponent = trackComponent;
     }
 
-    /**
-     * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
-     * the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
-     * so it points at the center of the track component
-     *
-     * @param tileTop        an image that will replace one of the tiles on the top if the track component is there
-     * @param tileBottom     an image that will replace one of the tiles on the bottom if the track component is there
-     * @param tileLeft       an image that will replace one of the tiles on the left if the track component is there
-     * @param tileRight      an image that will replace one of the tiles on the right if the track component is there
-     * @param trackComponent the component that will be tracked for the positioning of the tile
-     */
+    /// This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
+    /// the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
+    /// so it points at the center of the track component
+    ///
+    /// #### Parameters
+    ///
+    /// - `tileTop`: an image that will replace one of the tiles on the top if the track component is there
+    ///
+    /// - `tileBottom`: an image that will replace one of the tiles on the bottom if the track component is there
+    ///
+    /// - `tileLeft`: an image that will replace one of the tiles on the left if the track component is there
+    ///
+    /// - `tileRight`: an image that will replace one of the tiles on the right if the track component is there
+    ///
+    /// - `trackComponent`: the component that will be tracked for the positioning of the tile
     public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Rectangle trackComponent) {
         specialTile = new Image[]{tileTop, tileBottom, tileLeft, tileRight};
         this.trackComponent = trackComponent;
     }
 
-    /**
-     * Cleans the tile tracking state allowing the garbage collector to pick up the component and the image data
-     */
+    /// Cleans the tile tracking state allowing the garbage collector to pick up the component and the image data
     public void clearImageBorderSpecialTile() {
         specialTile = null;
         trackComponent = null;
     }
 
-    /**
-     * Ads a border that wraps this border
-     *
-     * @param outer The outer border
-     */
+    /// Ads a border that wraps this border
+    ///
+    /// #### Parameters
+    ///
+    /// - `outer`: The outer border
     public void addOuterBorder(Border outer) {
         outerBorder = outer;
     }
 
-    /**
-     * Returns the minimum size required to properly display this border, normally this
-     * is 0 but a border might deem itself undisplayable with too small a size e.g. for
-     * the case of an image border the minimum height would be top + bottom and the minimum
-     * width would be left+right
-     *
-     * @return 0 if not applicable or a dimension if it is.
-     */
+    /// Returns the minimum size required to properly display this border, normally this
+    /// is 0 but a border might deem itself undisplayable with too small a size e.g. for
+    /// the case of an image border the minimum height would be top + bottom and the minimum
+    /// width would be left+right
+    ///
+    /// #### Returns
+    ///
+    /// 0 if not applicable or a dimension if it is.
     public int getMinimumHeight() {
         if (images != null) {
             if (images.length < 4) {
@@ -1046,14 +1262,14 @@ public class Border {
         return 0;
     }
 
-    /**
-     * Returns the minimum size required to properly display this border, normally this
-     * is 0 but a border might deem itself undisplayable with too small a size e.g. for
-     * the case of an image border the minimum height would be top + bottom and the minimum
-     * width would be left+right
-     *
-     * @return 0 if not applicable or a dimension if it is.
-     */
+    /// Returns the minimum size required to properly display this border, normally this
+    /// is 0 but a border might deem itself undisplayable with too small a size e.g. for
+    /// the case of an image border the minimum height would be top + bottom and the minimum
+    /// width would be left+right
+    ///
+    /// #### Returns
+    ///
+    /// 0 if not applicable or a dimension if it is.
     public int getMinimumWidth() {
         if (images != null) {
             if (images.length < 4) {
@@ -1070,18 +1286,16 @@ public class Border {
         return 0;
     }
 
-    /**
-     * Indicates whether this is an empty border
-     *
-     * @return true if this is an empty border
-     */
+    /// Indicates whether this is an empty border
+    ///
+    /// #### Returns
+    ///
+    /// true if this is an empty border
     public boolean isEmptyBorder() {
         return emptyType;
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public boolean equals(Object obj) {
         if (obj != null && obj.getClass() == getClass()) {
@@ -1122,9 +1336,7 @@ public class Border {
         return false;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int hashCode() {
         int hash = 7;
@@ -1141,21 +1353,21 @@ public class Border {
         return hash;
     }
 
-    /**
-     * Returns true if installing this border will override the painting of the component background
-     *
-     * @return true if this border replaces the painter
-     */
+    /// Returns true if installing this border will override the painting of the component background
+    ///
+    /// #### Returns
+    ///
+    /// true if this border replaces the painter
     public boolean isBackgroundPainter() {
         return type == TYPE_ROUNDED || type == TYPE_ROUNDED_PRESSED || type == TYPE_IMAGE
                 || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED;
     }
 
-    /**
-     * Returns true if this border type is a rectangle border.
-     *
-     * @return true if this border is rectangle
-     */
+    /// Returns true if this border type is a rectangle border.
+    ///
+    /// #### Returns
+    ///
+    /// true if this border is rectangle
     public boolean isRectangleType() {
         return type == TYPE_LINE || type == TYPE_BEVEL_LOWERED ||
                 type == TYPE_BEVEL_RAISED || type == TYPE_ETCHED_LOWERED ||
@@ -1164,12 +1376,15 @@ public class Border {
                 || type == TYPE_OUTSET || type == TYPE_INSET || type == TYPE_GROOVE || type == TYPE_RIDGE;
     }
 
-    /**
-     * Returns the focused version of the border if one is installed
-     *
-     * @return a focused version of this border if one exists
-     * @deprecated use the getSelectedStyle() method in the component class
-     */
+    /// Returns the focused version of the border if one is installed
+    ///
+    /// #### Returns
+    ///
+    /// a focused version of this border if one exists
+    ///
+    /// #### Deprecated
+    ///
+    /// use the getSelectedStyle() method in the component class
     public Border getFocusedInstance() {
         if (focusBorder != null) {
             return focusBorder;
@@ -1177,21 +1392,24 @@ public class Border {
         return this;
     }
 
-    /**
-     * Allows us to define a border that will act as the focused version of this border
-     *
-     * @param focused a border that will be returned by the focused version method
-     * @deprecated use the getSelectedStyle() method in the component class
-     */
+    /// Allows us to define a border that will act as the focused version of this border
+    ///
+    /// #### Parameters
+    ///
+    /// - `focused`: a border that will be returned by the focused version method
+    ///
+    /// #### Deprecated
+    ///
+    /// use the getSelectedStyle() method in the component class
     public void setFocusedInstance(Border focused) {
         focusBorder = focused;
     }
 
-    /**
-     * Returns the pressed version of the border if one is set by the user
-     *
-     * @return the pressed instance of this border
-     */
+    /// Returns the pressed version of the border if one is set by the user
+    ///
+    /// #### Returns
+    ///
+    /// the pressed instance of this border
     public Border getPressedInstance() {
         if (pressedBorder != null) {
             return pressedBorder;
@@ -1199,21 +1417,21 @@ public class Border {
         return this;
     }
 
-    /**
-     * Allows us to define a border that will act as the pressed version of this border
-     *
-     * @param pressed a border that will be returned by the pressed version method
-     */
+    /// Allows us to define a border that will act as the pressed version of this border
+    ///
+    /// #### Parameters
+    ///
+    /// - `pressed`: a border that will be returned by the pressed version method
     public void setPressedInstance(Border pressed) {
         pressedBorder = pressed;
     }
 
-    /**
-     * When applied to buttons borders produce a version that reverses the effects
-     * of the border providing a pressed feel
-     *
-     * @return a border that will make the button feel pressed
-     */
+    /// When applied to buttons borders produce a version that reverses the effects
+    /// of the border providing a pressed feel
+    ///
+    /// #### Returns
+    ///
+    /// a border that will make the button feel pressed
     public Border createPressedVersion() {
         if (pressedBorder != null) {
             return pressedBorder;
@@ -1260,14 +1478,15 @@ public class Border {
         }
     }
 
-    /**
-     * Has effect when the border demands responsibility for background painting
-     * normally the painter will perform this work but in this case the border might
-     * do it instead.
-     *
-     * @param g graphics context to draw onto
-     * @param c component whose border should be drawn
-     */
+    /// Has effect when the border demands responsibility for background painting
+    /// normally the painter will perform this work but in this case the border might
+    /// do it instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context to draw onto
+    ///
+    /// - `c`: component whose border should be drawn
     public void paintBorderBackground(Graphics g, Component c) {
         int x = c.getX();
         int y = c.getY();
@@ -1553,13 +1772,14 @@ public class Border {
         return false;
     }
 
-    /**
-     * Draws the border for the given component, this method is called before a call to
-     * background painting is made.
-     *
-     * @param g graphics context to draw onto
-     * @param c component whose border should be drawn
-     */
+    /// Draws the border for the given component, this method is called before a call to
+    /// background painting is made.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context to draw onto
+    ///
+    /// - `c`: component whose border should be drawn
     public void paint(Graphics g, Component c) {
         int x = c.getX();
         int y = c.getY();
@@ -1876,22 +2096,26 @@ public class Border {
         }
     }
 
-    /**
-     * Utility method used to save the current clip area
-     *
-     * @param g The graphics to obtain the clip area from
-     * @return A Rectangle object representing the current clip area
-     */
+    /// Utility method used to save the current clip area
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics to obtain the clip area from
+    ///
+    /// #### Returns
+    ///
+    /// A Rectangle object representing the current clip area
     private Rectangle saveClip(Graphics g) {
         return new Rectangle(g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());
     }
 
-    /**
-     * Utility method used to restore a previously saved clip area
-     *
-     * @param g    The graphics to apply the clip area on
-     * @param rect A Rectangle representing the saved clip area
-     */
+    /// Utility method used to restore a previously saved clip area
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics to apply the clip area on
+    ///
+    /// - `rect`: A Rectangle representing the saved clip area
     private void restoreClip(Graphics g, Rectangle rect) {
         g.setClip(rect.getX(), rect.getY(), rect.getSize().getWidth(), rect.getSize().getHeight());
     }
@@ -1946,11 +2170,11 @@ public class Border {
         }
     }
 
-    /**
-     * This method returns how thick is the border in pixels, notice this doesn't apply to most border types
-     *
-     * @return the Border thickness
-     */
+    /// This method returns how thick is the border in pixels, notice this doesn't apply to most border types
+    ///
+    /// #### Returns
+    ///
+    /// the Border thickness
     public int getThickness() {
         if (millimeters) {
             return Display.getInstance().convertToPixels(thickness);
@@ -1958,53 +2182,51 @@ public class Border {
         return (int) thickness;
     }
 
-    /**
-     * This method returns sets the border thickness in pixels, notice this doesn't apply to most border types
-     *
-     * @param thickness the Border thickness
-     */
+    /// This method returns sets the border thickness in pixels, notice this doesn't apply to most border types
+    ///
+    /// #### Parameters
+    ///
+    /// - `thickness`: the Border thickness
     public void setThickness(int thickness) {
         this.thickness = thickness;
     }
 
-    /**
-     * Allows toggling the order in which the outer and inner borders are painted for the Outer border type
-     *
-     * @return whether the outside border should be painter first
-     */
+    /// Allows toggling the order in which the outer and inner borders are painted for the Outer border type
+    ///
+    /// #### Returns
+    ///
+    /// whether the outside border should be painter first
     public boolean isPaintOuterBorderFirst() {
         return paintOuterBorderFirst;
     }
 
-    /**
-     * Allows toggling the order in which the outer and inner borders are painted for the Outer border type
-     *
-     * @param paintOuterBorderFirst whether the outside border should be painter first
-     */
+    /// Allows toggling the order in which the outer and inner borders are painted for the Outer border type
+    ///
+    /// #### Parameters
+    ///
+    /// - `paintOuterBorderFirst`: whether the outside border should be painter first
     public void setPaintOuterBorderFirst(boolean paintOuterBorderFirst) {
         this.paintOuterBorderFirst = paintOuterBorderFirst;
     }
 
-    /**
-     * This method returns the Compound Borders array.
-     * The array size is 4 and the borders arranged as follows :
-     * Border[] borders = getCompoundBorders();
-     * Border top = borders[Component.TOP];
-     * Border bottom = borders[Component.BOTTOM];
-     * Border left = borders[Component.LEFT];
-     * Border right = borders[Component.RIGHT];
-     *
-     * @return the borders array or null if this is not a Compound Border
-     */
+    /// This method returns the Compound Borders array.
+    /// The array size is 4 and the borders arranged as follows :
+    /// Border[] borders = getCompoundBorders();
+    /// Border top = borders[Component.TOP];
+    /// Border bottom = borders[Component.BOTTOM];
+    /// Border left = borders[Component.LEFT];
+    /// Border right = borders[Component.RIGHT];
+    ///
+    /// #### Returns
+    ///
+    /// the borders array or null if this is not a Compound Border
     public Border[] getCompoundBorders() {
         return compoundBorders;
     }
 
-    /**
-     * This callback indicates that a component pointing at this border is initialized, this
-     * method is useful for image borders whose lock methods are implicitly invoked.
-     * This method may be invoked multiple times.
-     */
+    /// This callback indicates that a component pointing at this border is initialized, this
+    /// method is useful for image borders whose lock methods are implicitly invoked.
+    /// This method may be invoked multiple times.
     public void lock() {
         if (images != null) {
             int ilen = images.length;
@@ -2016,10 +2238,8 @@ public class Border {
         }
     }
 
-    /**
-     * This callback indicates that a component pointing at this border is now deinitilized
-     * This method may be invoked multiple times.
-     */
+    /// This callback indicates that a component pointing at this border is now deinitilized
+    /// This method may be invoked multiple times.
     public void unlock() {
         if (images != null) {
             int ilen = images.length;
@@ -2031,9 +2251,7 @@ public class Border {
         }
     }
 
-    /**
-     * This method is for internal usage only!
-     */
+    /// This method is for internal usage only!
     public Object getProperty(String n) {
         if ("ThemeColors".equals(n)) {
             if (themeColors) {

@@ -30,27 +30,35 @@ import java.io.IOException;
 import java.io.Reader;
 import java.util.Hashtable;
 
-/**
- * <p>Parser class used to parse an XML document into a DOM object (Element). This code was originally
- * developed to parse HTML and as a result isn't as strict as most XML parsers and can parse many HTML documents
- * out of the box.  The parser is mostly stateful (although it does have an event callback API as well), its modeled closely
- * to the Java DOM API's.
- * </p>
- *
- * <p>
- * In this sample an XML hierarchy is displayed using a {@link com.codename1.ui.tree.Tree}:
- * </p>
- * <script src="https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" alt="Tree with XML data" />
- *
- * @author Ofir Leitner
- */
+/// Parser class used to parse an XML document into a DOM object (Element). This code was originally
+/// developed to parse HTML and as a result isn't as strict as most XML parsers and can parse many HTML documents
+/// out of the box.  The parser is mostly stateful (although it does have an event callback API as well), its modeled closely
+/// to the Java DOM API's.
+///
+/// In this sample an XML hierarchy is displayed using a `com.codename1.ui.tree.Tree`:
+///
+/// ```java
+/// class XMLTreeModel implements TreeModel {
+///     private Element root;
+///     public XMLTreeModel(Element e) {
+///         root = e;
+///     }
+///
+///     public Vector getChildren(Object parent) {
+///         if(parent == null) {
+///             Vector c = new Vector();
+///             c.addElement(root);
+///             return c;
+///         }
+///         Vector result = new Vector();
+///         Element e = (Element)parent;
+///         for(int iter = 0 ; iter
+///
+/// @author Ofir Leitner
 public class XMLParser {
     private static final Element END_TAG = new Element();
-    /**
-     * A constant containing the CDATA tag identifier (minus the C which is read anyway first)
-     * CDATA nodes will be converted to text nodes
-     */
+    /// A constant containing the CDATA tag identifier (minus the C which is read anyway first)
+    /// CDATA nodes will be converted to text nodes
     private static final String CDATA_STR = "DATA[";
     private static final char[] buffer = new char[8192];
     private static int buffOffset;
@@ -59,36 +67,32 @@ public class XMLParser {
     boolean includeWhitespacesBetweenTags; // For HTML white spaces between tags are significant to seperate words, in XML less so and it mostly creates garbage elements (Text with one space)
     private boolean eventParser;
 
-    /**
-     * The char entities strings supported in XML. When a char entity is found these will be compared against first.
-     * <p>
-     * private static final String[] XML_CHAR_ENTITIES = {
-     * "lt", // lesser-than
-     * "gt", // greater-than
-     * "amp", // ampersand
-     * "quot", //quotation mark
-     * "apos", // apostrophe
-     * //"bull", //bullet
-     * //"euro" //euro
-     * };
-     * <p>
-     * /**
-     * The numericals value of char entities strings above.
-     * <p>
-     * private static final int[] XML_CHAR_ENTITIES_VALS = {
-     * 60, // "lt", // lesser-than
-     * 62, // "gt", // greater-than
-     * 38, // "amp", // ampersand
-     * 34, // "quot", //quotation mark
-     * 39, // "apos", // apostrophe
-     * //8226, // "bull", //bullet
-     * //8364 // "euro"}; //euro
-     * };
-     */
+    /// The char entities strings supported in XML. When a char entity is found these will be compared against first.
+    ///
+    /// private static final String[] XML_CHAR_ENTITIES = {
+    /// "lt", // lesser-than
+    /// "gt", // greater-than
+    /// "amp", // ampersand
+    /// "quot", //quotation mark
+    /// "apos", // apostrophe
+    /// //"bull", //bullet
+    /// //"euro" //euro
+    /// };
+    ///
+    /// /**
+    /// The numericals value of char entities strings above.
+    ///
+    /// private static final int[] XML_CHAR_ENTITIES_VALS = {
+    /// 60, // "lt", // lesser-than
+    /// 62, // "gt", // greater-than
+    /// 38, // "amp", // ampersand
+    /// 34, // "quot", //quotation mark
+    /// 39, // "apos", // apostrophe
+    /// //8226, // "bull", //bullet
+    /// //8364 // "euro"}; //euro
+    /// };
     private boolean caseSensitive;
-    /**
-     * This hashtable contains user defined char entities
-     */
+    /// This hashtable contains user defined char entities
     private Hashtable userDefinedCharEntities;
 
     private static int read(Reader is) throws IOException {
@@ -106,12 +110,15 @@ public class XMLParser {
         return c;
     }
 
-    /**
-     * Trims unneeded &amp; and ; from the symbol if exist
-     *
-     * @param symbol The char entity symbol
-     * @return A trimmed char entity without &amp; and ;
-     */
+    /// Trims unneeded & and ; from the symbol if exist
+    ///
+    /// #### Parameters
+    ///
+    /// - `symbol`: The char entity symbol
+    ///
+    /// #### Returns
+    ///
+    /// A trimmed char entity without & and ;
     private static String trimCharEntity(String symbol) {
         int start = 0;
         int end = symbol.length();
@@ -124,23 +131,24 @@ public class XMLParser {
         return symbol.substring(start, end);
     }
 
-    /**
-     * Returns a string identifying the document type this parser supports.
-     * This should be overriden by subclassing parsers.
-     *
-     * @return a string identifying the document type this parser supports.
-     */
+    /// Returns a string identifying the document type this parser supports.
+    /// This should be overriden by subclassing parsers.
+    ///
+    /// #### Returns
+    ///
+    /// a string identifying the document type this parser supports.
     protected String getSupportedStandardName() {
         return "XML";
     }
 
-    /**
-     * Adds the given symbol and code to the user defined char entities table
-     * <a href="http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references">http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references</a>
-     *
-     * @param symbol The symbol to add
-     * @param code   The symbol's code
-     */
+    /// Adds the given symbol and code to the user defined char entities table
+    /// [http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references](http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references)
+    ///
+    /// #### Parameters
+    ///
+    /// - `symbol`: The symbol to add
+    ///
+    /// - `code`: The symbol's code
     public void addCharEntity(String symbol, int code) {
         if (userDefinedCharEntities == null) {
             userDefinedCharEntities = new Hashtable();
@@ -148,13 +156,14 @@ public class XMLParser {
         userDefinedCharEntities.put(trimCharEntity(symbol), Integer.valueOf(code));
     }
 
-    /**
-     * Adds the given symbols array  to the user defined char entities table with the startcode provided as the code of the first string, startcode+1 for the second etc.
-     * Some strings in the symbols array may be null thus skipping code numbers.
-     *
-     * @param symbols   The symbols to add
-     * @param startcode The symbol's code
-     */
+    /// Adds the given symbols array  to the user defined char entities table with the startcode provided as the code of the first string, startcode+1 for the second etc.
+    /// Some strings in the symbols array may be null thus skipping code numbers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `symbols`: The symbols to add
+    ///
+    /// - `startcode`: The symbol's code
     public void addCharEntitiesRange(String[] symbols, int startcode) {
         if (userDefinedCharEntities == null) {
             userDefinedCharEntities = new Hashtable();
@@ -168,46 +177,53 @@ public class XMLParser {
     }
 
 
-    /**
-     * This method translates between a XML char entity string to the according char code.
-     * The string is first compared to the 5 XML supported strings: quot,apos,amp,lt and gt.
-     * If still not found it goes to look in the user defined char entities hashtable
-     *
-     * @param symbol The symbol to lookup
-     * @return The char code of the symbol, or -1 if none found
-     *
-    protected int getCharEntityCode(String symbol,Hashtable userDefined) {
-    // First tries the XML basic char entities
-    int val=-1;
-    for (int i=0;i<XML_CHAR_ENTITIES.length;i++) {
-    if (symbol.equalsIgnoreCase(XML_CHAR_ENTITIES[i])) {
-    return XML_CHAR_ENTITIES_VALS[i];
-    }
-    }
-    if (val!=-1) {
-    return val;
-    } else {
+    /// This method translates between a XML char entity string to the according char code.
+    /// The string is first compared to the 5 XML supported strings: quot,apos,amp,lt and gt.
+    /// If still not found it goes to look in the user defined char entities hashtable
+    ///
+    /// #### Parameters
+    ///
+    /// - `symbol`: The symbol to lookup
+    ///
+    /// #### Returns
+    ///
+    /// @return The char code of the symbol, or -1 if none found
+    ///
+    ///     protected int getCharEntityCode(String symbol,Hashtable userDefined) {
+    ///     // First tries the XML basic char entities
+    ///     int val=-1;
+    ///     for (int i=0;i<XML_CHAR_ENTITIES.length;i++) {
+    ///     if (symbol.equalsIgnoreCase(XML_CHAR_ENTITIES[i])) {
+    ///     return XML_CHAR_ENTITIES_VALS[i];
+    ///     }
+    ///     }
+    ///     if (val!=-1) {
+    ///     return val;
+    ///     } else {
+    ///
+    ///     // Not found in the standard symbol table, see if it is in the user defined symbols table
+    ///     if (userDefined!=null) {
+    ///     Object charObj=userDefined.get(symbol);
+    ///     if (charObj!=null) {
+    ///     return ((Integer)charObj).intValue();
+    ///     }
+    ///     }
+    ///
+    ///     // Not found anywhere
+    ///     return -1;
+    ///     }
+    ///     }
 
-    // Not found in the standard symbol table, see if it is in the user defined symbols table
-    if (userDefined!=null) {
-    Object charObj=userDefined.get(symbol);
-    if (charObj!=null) {
-    return ((Integer)charObj).intValue();
-    }
-    }
-
-    // Not found anywhere
-    return -1;
-    }
-    }*/
-
-    /**
-     * Converts a char entity to the matching character.
-     * This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
-     *
-     * @param charEntity The char entity to convert
-     * @return A string containing a single char, or the original char entity string (with &amp; and ;) if the char entity couldn't be resolved
-     */
+    /// Converts a char entity to the matching character.
+    /// This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
+    ///
+    /// #### Parameters
+    ///
+    /// - `charEntity`: The char entity to convert
+    ///
+    /// #### Returns
+    ///
+    /// A string containing a single char, or the original char entity string (with & and ;) if the char entity couldn't be resolved
     protected String convertCharEntity(String charEntity) {
         try {
             return HTMLUtils.convertCharEntity(charEntity, false, userDefinedCharEntities);
@@ -246,12 +262,15 @@ public class XMLParser {
     }
 
 
-    /**
-     * This is the entry point for parsing a document and the only non-private member method in this class
-     *
-     * @param is The InputStream containing the XML
-     * @return an Element object describing the parsed document (Basically its DOM)
-     */
+    /// This is the entry point for parsing a document and the only non-private member method in this class
+    ///
+    /// #### Parameters
+    ///
+    /// - `is`: The InputStream containing the XML
+    ///
+    /// #### Returns
+    ///
+    /// an Element object describing the parsed document (Basically its DOM)
     public Element parse(Reader is) {
         buffOffset = 0;
         buffSize = -1;
@@ -292,24 +311,30 @@ public class XMLParser {
         return rootElement;
     }
 
-    /**
-     * Creates a new element. This should be overriden by parsers that use a subclass of Element.
-     *
-     * @param name The new element's name
-     * @return a new instance of the element
-     */
+    /// Creates a new element. This should be overriden by parsers that use a subclass of Element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The new element's name
+    ///
+    /// #### Returns
+    ///
+    /// a new instance of the element
     protected Element createNewElement(String name) {
         Element e = new Element(name);
         e.caseSensitive = caseSensitive;
         return e;
     }
 
-    /**
-     * Creates a new text element. This should be overriden by parsers that use a subclass of Element.
-     *
-     * @param text The new element's text
-     * @return a new instance of the element
-     */
+    /// Creates a new text element. This should be overriden by parsers that use a subclass of Element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: The new element's text
+    ///
+    /// #### Returns
+    ///
+    /// a new instance of the element
     protected Element createNewTextElement(String text) {
         Element e = new Element(text, true);
         e.caseSensitive = caseSensitive;
@@ -320,78 +345,91 @@ public class XMLParser {
         includeWhitespacesBetweenTags = include;
     }
 
-    /**
-     * The event parser requires deriving this class and overriding callback
-     * methods to work effectively. To stop the event parser in mid way a
-     * callback can simply throw an IOException on purpose.
-     *
-     * @param r the reader from which the data should be parsed
-     * @throws java.io.IOException if an exception is thrown by the reader
-     */
+    /// The event parser requires deriving this class and overriding callback
+    /// methods to work effectively. To stop the event parser in mid way a
+    /// callback can simply throw an IOException on purpose.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the reader from which the data should be parsed
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if an exception is thrown by the reader
     public void eventParser(Reader r) throws IOException {
         eventParser = true;
         parseTagContent(null, r);
     }
 
-    /**
-     * Invoked when the event parser encounters a text element.
-     * This callback method is invoked only on the eventParser.
-     *
-     * @param text the text encountered
-     */
+    /// Invoked when the event parser encounters a text element.
+    /// This callback method is invoked only on the eventParser.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text encountered
     protected void textElement(String text) {
     }
 
-    /**
-     * Invoked when a tag is opened, this method should return true to process
-     * the tag or return false to skip the tag.
-     * This callback method is invoked only on the eventParser.
-     *
-     * @param tag the tag name
-     * @return true to process the tag, false to skip the tag
-     */
+    /// Invoked when a tag is opened, this method should return true to process
+    /// the tag or return false to skip the tag.
+    /// This callback method is invoked only on the eventParser.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tag`: the tag name
+    ///
+    /// #### Returns
+    ///
+    /// true to process the tag, false to skip the tag
     protected boolean startTag(String tag) {
         return true;
     }
 
-    /**
-     * Invoked when a tag ends
-     * This callback method is invoked only on the eventParser.
-     *
-     * @param tag the tag name
-     */
+    /// Invoked when a tag ends
+    /// This callback method is invoked only on the eventParser.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tag`: the tag name
     protected void endTag(String tag) {
     }
 
-    /**
-     * Invoked for every attribute value of the givne tag
-     * This callback method is invoked only on the eventParser.
-     *
-     * @param tag the tag name
-     */
+    /// Invoked for every attribute value of the givne tag
+    /// This callback method is invoked only on the eventParser.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tag`: the tag name
     protected void attribute(String tag, String attributeName, String value) {
     }
 
 
-    /**
-     * Checks if this character is a legal character for char entities
-     *
-     * @param c The character to check
-     * @return true if legal, false otherwise
-     */
+    /// Checks if this character is a legal character for char entities
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: The character to check
+    ///
+    /// #### Returns
+    ///
+    /// true if legal, false otherwise
     private boolean isLegalCharEntityCharacter(char c) {
         return (((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')) || ((c >= '0') && (c <= '9')) || (c == '#'));
     }
 
-    /**
-     * Parses tags content, accumulating text and child elements .
-     * Upon bumping a start tag character it calls the parseTag method.
-     * This method is called at first from the parse method, and later on from parseTag (which creates the recursion).
-     *
-     * @param element The current parent element
-     * @param is      The InputStream containing the XML
-     * @throws IOException if an I/O error in the stream is encountered
-     */
+    /// Parses tags content, accumulating text and child elements .
+    /// Upon bumping a start tag character it calls the parseTag method.
+    /// This method is called at first from the parse method, and later on from parseTag (which creates the recursion).
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The current parent element
+    ///
+    /// - `is`: The InputStream containing the XML
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error in the stream is encountered
     protected void parseTagContent(Element element, Reader is) throws IOException {
         StringBuilder text = null;
         boolean leadingSpace = false;
@@ -503,26 +541,35 @@ public class XMLParser {
         }
     }
 
-    /**
-     * Checks if the specified character is a white space or not.
-     * Exposed to packaage since used by HTMLComponent as well
-     *
-     * @param ch The character to check
-     * @return true if the character is a white space, false otherwise
-     */
+    /// Checks if the specified character is a white space or not.
+    /// Exposed to packaage since used by HTMLComponent as well
+    ///
+    /// #### Parameters
+    ///
+    /// - `ch`: The character to check
+    ///
+    /// #### Returns
+    ///
+    /// true if the character is a white space, false otherwise
     protected boolean isWhiteSpace(char ch) {
         return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == '\r'));
     }
 
-    /**
-     * This method collects the tag name and all of its attributes.
-     * For comments and XML declarations this will call the parseCommentOrXMLDeclaration method.
-     * Note that this method returns an Element with a name and attrbutes, but not its content/children which will be done by parseTagContent
-     *
-     * @param is The InputStream containing the XML
-     * @return The parsed element
-     * @throws IOException if an I/O error in the stream is encountered
-     */
+    /// This method collects the tag name and all of its attributes.
+    /// For comments and XML declarations this will call the parseCommentOrXMLDeclaration method.
+    /// Note that this method returns an Element with a name and attrbutes, but not its content/children which will be done by parseTagContent
+    ///
+    /// #### Parameters
+    ///
+    /// - `is`: The InputStream containing the XML
+    ///
+    /// #### Returns
+    ///
+    /// The parsed element
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error in the stream is encountered
     protected Element parseTag(Reader is) throws IOException {
         StringBuilder tagName = new StringBuilder();
         StringBuilder curAttribute = new StringBuilder();
@@ -820,16 +867,23 @@ public class XMLParser {
 
     }
 
-    /**
-     * This utility method is used to parse comments and XML declarations in the XML.
-     * The comment/declaration is returned as an Element, but is flagged as a comment since both comments and XML declarations are not part of the XML DOM.
-     * This method can be overridden to process specific XML declarations
-     *
-     * @param is     The inputstream
-     * @param endTag The endtag to look for
-     * @return An Element representing the comment or XML declartaion
-     * @throws IOException
-     */
+    /// This utility method is used to parse comments and XML declarations in the XML.
+    /// The comment/declaration is returned as an Element, but is flagged as a comment since both comments and XML declarations are not part of the XML DOM.
+    /// This method can be overridden to process specific XML declarations
+    ///
+    /// #### Parameters
+    ///
+    /// - `is`: The inputstream
+    ///
+    /// - `endTag`: The endtag to look for
+    ///
+    /// #### Returns
+    ///
+    /// An Element representing the comment or XML declartaion
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     protected Element parseCommentOrXMLDeclaration(Reader is, String endTag) throws IOException {
         char[] endTagChars = endTag.toCharArray();
         int endTagPos = 0;
@@ -886,26 +940,36 @@ public class XMLParser {
         return comment;
     }
 
-    /**
-     * Checks whether the specified tag is an empty tag
-     *
-     * @param tagName The tag name to check
-     * @return true if that tag is defined as an empty tag, false otherwise
-     */
+    /// Checks whether the specified tag is an empty tag
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagName`: The tag name to check
+    ///
+    /// #### Returns
+    ///
+    /// true if that tag is defined as an empty tag, false otherwise
     protected boolean isEmptyTag(String tagName) {
         return false;
     }
 
-    /**
-     * A utility method used to notify an error to the ParserCallback and throw an IllegalArgumentException if parsingError returned false
-     *
-     * @param errorId     The error ID, one of the ERROR_* constants in ParserCallback
-     * @param tag         The tag in which the error occured (Can be null for non-tag related errors)
-     * @param attribute   The attribute in which the error occured (Can be null for non-attribute related errors)
-     * @param value       The value in which the error occured (Can be null for non-value related errors)
-     * @param description A verbal description of the error
-     * @throws IllegalArgumentException If the parser callback returned false on this error
-     */
+    /// A utility method used to notify an error to the ParserCallback and throw an IllegalArgumentException if parsingError returned false
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorId`: The error ID, one of the ERROR_* constants in ParserCallback
+    ///
+    /// - `tag`: The tag in which the error occured (Can be null for non-tag related errors)
+    ///
+    /// - `attribute`: The attribute in which the error occured (Can be null for non-attribute related errors)
+    ///
+    /// - `value`: The value in which the error occured (Can be null for non-value related errors)
+    ///
+    /// - `description`: A verbal description of the error
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: If the parser callback returned false on this error
     protected void notifyError(int errorId, String tag, String attribute, String value, String description) {
         if (parserCallback != null) {
             boolean cont = parserCallback.parsingError(errorId, tag, attribute, value, description);
@@ -915,53 +979,59 @@ public class XMLParser {
         }
     }
 
-    /**
-     * Returns true if this element is supported, false otherwise
-     * In XMLParser this always returns true, but subclasses can determine if an element is supported in their context according to its name etc.
-     * Unsupported elements will be skipped by the parser and excluded from the resulting DOM object
-     *
-     * @param element The element to check
-     * @return true if the element is supported, false otherwise
-     */
+    /// Returns true if this element is supported, false otherwise
+    /// In XMLParser this always returns true, but subclasses can determine if an element is supported in their context according to its name etc.
+    /// Unsupported elements will be skipped by the parser and excluded from the resulting DOM object
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element to check
+    ///
+    /// #### Returns
+    ///
+    /// true if the element is supported, false otherwise
     protected boolean isSupported(Element element) {
         return true;
     }
 
-    /**
-     * Checks if this element should be evaluated by the parser
-     * This can be overriden by subclasses to skip certain elements
-     *
-     * @param element The element to check
-     * @return true if this element should be evaluated by the parser, false to skip it completely
-     */
+    /// Checks if this element should be evaluated by the parser
+    /// This can be overriden by subclasses to skip certain elements
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: The element to check
+    ///
+    /// #### Returns
+    ///
+    /// true if this element should be evaluated by the parser, false to skip it completely
     protected boolean shouldEvaluate(Element element) {
         return true;
     }
 
 
-    /**
-     * Sets the specified callback to serve as the callback for parsing errors
-     *
-     * @param parserCallback The callback to use for parsing errors
-     */
+    /// Sets the specified callback to serve as the callback for parsing errors
+    ///
+    /// #### Parameters
+    ///
+    /// - `parserCallback`: The callback to use for parsing errors
     public void setParserCallback(ParserCallback parserCallback) {
         this.parserCallback = parserCallback;
     }
 
-    /**
-     * Sets the parser to be case sensitive and retain case, otherwise it will convert all data to lower case
-     *
-     * @return the caseSensitive
-     */
+    /// Sets the parser to be case sensitive and retain case, otherwise it will convert all data to lower case
+    ///
+    /// #### Returns
+    ///
+    /// the caseSensitive
     public boolean isCaseSensitive() {
         return caseSensitive;
     }
 
-    /**
-     * Sets the parser to be case sensitive and retain case, otherwise it will convert all data to lower case
-     *
-     * @param caseSensitive the caseSensitive to set
-     */
+    /// Sets the parser to be case sensitive and retain case, otherwise it will convert all data to lower case
+    ///
+    /// #### Parameters
+    ///
+    /// - `caseSensitive`: the caseSensitive to set
     public void setCaseSensitive(boolean caseSensitive) {
         this.caseSensitive = caseSensitive;
     }

@@ -28,18 +28,20 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.list.ListModel;
 
-/**
- * A list of Radio buttons that can be managed as a single component.
- *
- * @author Steve Hannah
- * @see ButtonList for code samples
- * @since 6.0
- */
+/// A list of Radio buttons that can be managed as a single component.
+///
+/// @author Steve Hannah
+///
+/// #### Since
+///
+/// 6.0
+///
+/// #### See also
+///
+/// - ButtonList for code samples
 public class RadioButtonList extends ButtonList {
 
-    /**
-     * Change listener added to individual radio buttons to keep them in sync with the model.
-     */
+    /// Change listener added to individual radio buttons to keep them in sync with the model.
     private final ActionListener<ActionEvent> changeListener = new ActionListener<ActionEvent>() {
         @Override
         public void actionPerformed(ActionEvent evt) {
@@ -54,12 +56,12 @@ public class RadioButtonList extends ButtonList {
 
     };
 
-    /**
-     * Creates a new RadioButton list with the given model of options.  It will result in
-     * one RadioButton per item in the model.
-     *
-     * @param model The model that defines the options that the user can choose between.
-     */
+    /// Creates a new RadioButton list with the given model of options.  It will result in
+    /// one RadioButton per item in the model.
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: The model that defines the options that the user can choose between.
     public RadioButtonList(ListModel model) {
         super(model, false);
         fireReady();

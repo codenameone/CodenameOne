@@ -23,32 +23,26 @@
 
 package com.codename1.properties;
 
-/**
- * This is the integer specific version of numeric property
- *
- * @author Shai Almog
- */
+/// This is the integer specific version of numeric property
+///
+/// @author Shai Almog
 public class IntProperty<K> extends NumericProperty<Integer, K> {
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public IntProperty(String name) {
         super(name, Integer.class);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     public IntProperty(String name, Integer value) {
         super(name, Integer.class, value);
     }
 
-    /**
-     * Returns the value as a primitive, if the value is null/nullable this will fail...
-     *
-     * @return the numeric value
-     */
+    /// Returns the value as a primitive, if the value is null/nullable this will fail...
+    ///
+    /// #### Returns
+    ///
+    /// the numeric value
     public int getInt() {
         return get().intValue();
     }

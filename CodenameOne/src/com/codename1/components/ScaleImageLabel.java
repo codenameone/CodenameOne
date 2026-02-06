@@ -30,36 +30,46 @@ import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
-/**
- * <p>Label that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
- * on a label but more convenient for some special circumstances. One major difference is that preferred size
- * equals the image in this case.<br>
- * The default UIID for this component is "{@code Label}".
- * </p>
- * <script src="https://gist.github.com/codenameone/7289bbe5dad9e279eabb.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-scaleimage.png" alt="ScaleImageButton and ScaleImageLabel samples" />
- *
- * @author Shai Almog
- */
+/// Label that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
+/// on a label but more convenient for some special circumstances. One major difference is that preferred size
+/// equals the image in this case.
+///
+/// The default UIID for this component is "`Label`".
+///
+/// ```java
+/// TableLayout tl = new TableLayout(2, 2);
+/// Form hi = new Form("ScaleImageButton/Label", tl);
+/// Style s = UIManager.getInstance().getComponentStyle("Button");
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_WARNING, s);
+/// ScaleImageLabel fillLabel = new ScaleImageLabel(icon);
+/// fillLabel.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
+/// ScaleImageButton fillButton = new ScaleImageButton(icon);
+/// fillButton.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
+/// hi.add(tl.createConstraint().widthPercentage(20), new ScaleImageButton(icon)).
+///         add(tl.createConstraint().widthPercentage(80), new ScaleImageLabel(icon)).
+///         add(fillLabel).
+///         add(fillButton);
+/// hi.show();
+/// ```
+///
+/// @author Shai Almog
 public class ScaleImageLabel extends Label {
 
     private int preferredH = -1;
     private int preferredW = -1;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public ScaleImageLabel() {
         setUIIDFinal("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
     }
 
-    /**
-     * Create a version with the given image
-     *
-     * @param i image
-     */
+    /// Create a version with the given image
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: image
     public ScaleImageLabel(Image i) {
         setUIIDFinal("Label");
         setShowEvenIfBlank(true);
@@ -67,29 +77,27 @@ public class ScaleImageLabel extends Label {
         setIcon(i);
     }
 
-    /**
-     * Returns the background type for the component
-     *
-     * @return One of Style.BACKGROUND_IMAGE_SCALED_FIT,
-     * Style.BACKGROUND_IMAGE_SCALED_FILL or Style.BACKGROUND_IMAGE_SCALE
-     */
+    /// Returns the background type for the component
+    ///
+    /// #### Returns
+    ///
+    /// @return One of Style.BACKGROUND_IMAGE_SCALED_FIT,
+    /// Style.BACKGROUND_IMAGE_SCALED_FILL or Style.BACKGROUND_IMAGE_SCALE
     public byte getBackgroundType() {
         return getUnselectedStyle().getBackgroundType();
     }
 
-    /**
-     * Sets the behavior of the background to one of Style.BACKGROUND_IMAGE_SCALED_FIT,
-     * Style.BACKGROUND_IMAGE_SCALED_FILL, Style.BACKGROUND_IMAGE_SCALE
-     *
-     * @param behavior the background behavior
-     */
+    /// Sets the behavior of the background to one of Style.BACKGROUND_IMAGE_SCALED_FIT,
+    /// Style.BACKGROUND_IMAGE_SCALED_FILL, Style.BACKGROUND_IMAGE_SCALE
+    ///
+    /// #### Parameters
+    ///
+    /// - `behavior`: the background behavior
     public void setBackgroundType(byte behavior) {
         getAllStyles().setBackgroundType(behavior);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         Image i = getIcon();
@@ -112,11 +120,9 @@ public class ScaleImageLabel extends Label {
                 s.getPaddingTop() + s.getPaddingBottom());
     }
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Overriden to support animations
-     */
+    /// {@inheritDoc}
+    ///
+    /// Overriden to support animations
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -134,21 +140,21 @@ public class ScaleImageLabel extends Label {
         }
     }
 
-    /**
-     * Returns the background image
-     *
-     * @return the bg image
-     */
+    /// Returns the background image
+    ///
+    /// #### Returns
+    ///
+    /// the bg image
     @Override
     public Image getIcon() {
         return getUnselectedStyle().getBgImage();
     }
 
-    /**
-     * Instead of setting the icon sets the background image
-     *
-     * @param i the image
-     */
+    /// Instead of setting the icon sets the background image
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the image
     @Override
     public void setIcon(Image i) {
         setShouldCalcPreferredSize(true);
@@ -159,17 +165,13 @@ public class ScaleImageLabel extends Label {
         repaint();
     }
 
-    /**
-     * Scale image label doesn't support text this method is overriden to do nothing
-     */
+    /// Scale image label doesn't support text this method is overriden to do nothing
     @Override
     public void setText(String text) {
     }
 
-    /**
-     * {@inheritDoc}
-     * Overriden to prevent the setUIID from replacing the code
-     */
+    /// {@inheritDoc}
+    /// Overriden to prevent the setUIID from replacing the code
     @Override
     public void setUIID(String id) {
         byte type = getBackgroundType();
@@ -188,33 +190,25 @@ public class ScaleImageLabel extends Label {
         getAllStyles().setBackgroundType(type);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"backgroundType"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Byte.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"Byte"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("backgroundType".equals(name)) {
@@ -223,9 +217,7 @@ public class ScaleImageLabel extends Label {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("backgroundType".equals(name)) {

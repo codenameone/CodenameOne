@@ -26,24 +26,18 @@ package com.codename1.components;
 
 import com.codename1.ui.tree.Tree;
 
-/**
- * Simple class showing off the filesystem as a tree component
- *
- * @author Shai Almog
- */
+/// Simple class showing off the filesystem as a tree component
+///
+/// @author Shai Almog
 public class FileTree extends Tree {
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public FileTree() {
         super(new FileTreeModel(true));
         setUIIDFinal("FileTree");
     }
 
-    /**
-     * Constructor with a model
-     */
+    /// Constructor with a model
     public FileTree(FileTreeModel model) {
         super(model);
         setUIIDFinal("FileTree");

@@ -1,22 +1,18 @@
-/**
- * Copyright 2012 Kamran Zafar
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright 2012 Kamran Zafar
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
-/**
- * The original source has been modified by Paul Williams.
- */
+/// The original source has been modified by Paul Williams.
 
 package com.codename1.io.tar;
 
@@ -25,9 +21,7 @@ import com.codename1.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-/**
- * @author Kamran Zafar
- */
+/// @author Kamran Zafar
 public class TarOutputStream extends BufferedOutputStream {
     private long bytesWritten;
     private long currentFileSize;
@@ -39,11 +33,11 @@ public class TarOutputStream extends BufferedOutputStream {
         currentFileSize = 0;
     }
 
-    /**
-     * Appends the EOF record and closes the stream
-     *
-     * @see java.io.FilterOutputStream#close()
-     */
+    /// Appends the EOF record and closes the stream
+    ///
+    /// #### See also
+    ///
+    /// - java.io.FilterOutputStream#close()
     @Override
     public void close() throws IOException {
         closeCurrentEntry();
@@ -51,11 +45,11 @@ public class TarOutputStream extends BufferedOutputStream {
         super.close();
     }
 
-    /**
-     * Writes a byte to the stream and updates byte counters
-     *
-     * @see java.io.FilterOutputStream#write(int)
-     */
+    /// Writes a byte to the stream and updates byte counters
+    ///
+    /// #### See also
+    ///
+    /// - java.io.FilterOutputStream#write(int)
     @Override
     public void write(int b) throws IOException {
         super.write(b);
@@ -66,11 +60,11 @@ public class TarOutputStream extends BufferedOutputStream {
         }
     }
 
-    /**
-     * Checks if the bytes being written exceed the current entry size.
-     *
-     * @see java.io.FilterOutputStream#write(byte[], int, int)
-     */
+    /// Checks if the bytes being written exceed the current entry size.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.FilterOutputStream#write(byte[], int, int)
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
         if (currentEntry != null && !currentEntry.isDirectory()) {
@@ -87,12 +81,15 @@ public class TarOutputStream extends BufferedOutputStream {
         super.write(b, off, len);
     }
 
-    /**
-     * Writes the next tar entry header on the stream
-     *
-     * @param entry
-     * @throws IOException
-     */
+    /// Writes the next tar entry header on the stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `entry`
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     public void putNextEntry(TarEntry entry) throws IOException {
         closeCurrentEntry();
 
@@ -104,11 +101,11 @@ public class TarOutputStream extends BufferedOutputStream {
         currentEntry = entry;
     }
 
-    /**
-     * Closes the current tar entry
-     *
-     * @throws IOException
-     */
+    /// Closes the current tar entry
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     protected void closeCurrentEntry() throws IOException {
         if (currentEntry != null) {
             if (currentEntry.getSize() > currentFileSize) {
@@ -123,11 +120,11 @@ public class TarOutputStream extends BufferedOutputStream {
         }
     }
 
-    /**
-     * Pads the last content block
-     *
-     * @throws IOException
-     */
+    /// Pads the last content block
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
     protected void pad() throws IOException {
         if (bytesWritten > 0) {
             int extra = (int) (bytesWritten % TarConstants.DATA_BLOCK);

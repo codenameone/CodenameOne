@@ -22,22 +22,21 @@
  */
 package com.codename1.system;
 
-/**
- * Invoked to indicate that an exception occurred, it is up to the developer to decide
- * whether to send the device log to the server by invoking Log.sendLog(). Notice
- * that sending a log only works for paid accounts. This interface should be registered
- * with the Display class.
- * <p>Notice that exceptions will only be reported for threads created by Codename One
- * using the API's within the Display class, this will not work for exceptions within
- * threads that are created by the new Thread() API.
- *
- * @author Shai Almog
- */
+/// Invoked to indicate that an exception occurred, it is up to the developer to decide
+/// whether to send the device log to the server by invoking Log.sendLog(). Notice
+/// that sending a log only works for paid accounts. This interface should be registered
+/// with the Display class.
+///
+/// Notice that exceptions will only be reported for threads created by Codename One
+/// using the API's within the Display class, this will not work for exceptions within
+/// threads that are created by the new Thread() API.
+///
+/// @author Shai Almog
 public interface CrashReport {
-    /**
-     * Callback for an exception that was not handled by the developer
-     *
-     * @param t the exception
-     */
+    /// Callback for an exception that was not handled by the developer
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the exception
     void exception(Throwable t);
 }

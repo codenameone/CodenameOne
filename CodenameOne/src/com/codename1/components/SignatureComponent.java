@@ -46,45 +46,59 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 
-/**
- * A component to allow a user to enter their signature.  This is just a button that, when pressed,
- * will pop up a dialog where the user can draw their signature with their finger.  The user
- * is given the option to save/reset/cancel the signature.  On save, the {@link #signatureImage} property
- * will be set with a full-size image of the signature, and the "icon" on the button will show a thumbnail of
- * the image.
- *
- * <h3>Example Usage</h3>
- *
- * <script src="https://gist.github.com/shannah/d118e34e2cf390acf93d.js"></script>
- *
- * <h3>Screenshots</h3>
- *
- * <p><img src="https://www.codenameone.com/img/developer-guide/components-signature1.png" alt="Signature Component button"/></p>
- * <p><img src="https://www.codenameone.com/img/developer-guide/components-signature2.png" alt="Signature Component dialog"/></p>
- *
- * <h3>Video Demo</h3>
- *
- * <iframe width="640" height="480" src="https://www.youtube.com/embed/6PXKLyeeFb8" frameborder="0" allowfullscreen></iframe>
- *
- * <p>Source available <a href="https://github.com/codenameone/codenameone-demos/SignatureComponentDemo">here</a></p>.
- *
- *
- * <h2>Styles</h2>
- *
- * <p>You can customize the styles of various aspects of the Signature component using the following Styles (UIIDs) in
- * the theme:</p>
- *
- * <ul>
- *    <li>{@literal SignatureButton}  - The style for the main signature component button.</li>
- *    <li>{@literal SignatureButtonBox} - A style to specify the "X" and "Box" that is drawn around the signature in the button.</li>
- *    <li>{@literal SignaturePanel} - The panel that the user actually draws the signature in.</li>
- *    <li>{@literal SignaturePanelBox} - The box and "X" in the SignaturePanel.  Uses only the {@link Style#getFgColor() } property.</li>
- *    <li>{@literal SignaturePanelSignature} - The signature that is drawn by the user.  Uses only the {@link Style#getFgColor()} property.</li>
- * </ul>
- *
- * @author shannah
- * @since 3.4
- */
+/// A component to allow a user to enter their signature.  This is just a button that, when pressed,
+/// will pop up a dialog where the user can draw their signature with their finger.  The user
+/// is given the option to save/reset/cancel the signature.  On save, the `#signatureImage` property
+/// will be set with a full-size image of the signature, and the "icon" on the button will show a thumbnail of
+/// the image.
+///
+/// Example Usage
+///
+/// ```java
+/// Form hi = new Form("Signature Component");
+/// hi.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+/// hi.add("Enter Your Name:");
+/// hi.add(new TextField());
+/// hi.add("Signature:");
+/// SignatureComponent sig = new SignatureComponent();
+/// sig.addActionListener((evt)-> {
+///     System.out.println("The signature was changed");
+///     Image img = sig.getSignatureImage();
+///     // Now we can do whatever we want with the image of this signature.
+/// });
+/// hi.addComponent(sig);
+/// hi.show();
+/// ```
+///
+/// Screenshots
+///
+/// Video Demo
+///
+/// Source available [here](https://github.com/codenameone/codenameone-demos/SignatureComponentDemo)
+///
+/// .
+///
+/// Styles
+///
+/// You can customize the styles of various aspects of the Signature component using the following Styles (UIIDs) in
+/// the theme:
+///
+///
+/// - SignatureButton  - The style for the main signature component button.
+///
+/// - SignatureButtonBox - A style to specify the "X" and "Box" that is drawn around the signature in the button.
+///
+/// - SignaturePanel - The panel that the user actually draws the signature in.
+///
+/// - SignaturePanelBox - The box and "X" in the SignaturePanel.  Uses only the `Style#getFgColor()` property.
+///
+/// - SignaturePanelSignature - The signature that is drawn by the user.  Uses only the `Style#getFgColor()` property.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 3.4
 public class SignatureComponent extends Container implements ActionSource<ActionEvent> {
 
     private final SignaturePanel signaturePanel = new SignaturePanel();
@@ -92,10 +106,8 @@ public class SignatureComponent extends Container implements ActionSource<Action
     private final EventDispatcher eventDispatcher = new EventDispatcher();
     private final Font xFont;
     private Image signatureImage;
-    /**
-     * We need to use a animation on this field to detect when the signature image changes
-     * so that the icon can be correctly scaled to be shown on the button.
-     */
+    /// We need to use a animation on this field to detect when the signature image changes
+    /// so that the icon can be correctly scaled to be shown on the button.
     private final Animation iconAnimation = new Animation() {
 
         @Override
@@ -122,9 +134,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
         }
     };
 
-    /**
-     * Creates a new signature component.
-     */
+    /// Creates a new signature component.
     public SignatureComponent() {
         super.setLayout(new BorderLayout());
         xFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);
@@ -184,69 +194,61 @@ public class SignatureComponent extends Container implements ActionSource<Action
         super.addComponent(BorderLayout.CENTER, lead);
     }
 
-    /**
-     * A hook that can be overridden by subclasses to be notified when the user
-     * resets the signature in the signature dialog.
-     *
-     * <p><strong>NOTE: Use of this hook to clear the current image in the signature
-     * component is discouraged.</strong>  The intention of the signature component's internal
-     * dialog is to provide a staging area for the user to draw their signature.  Changes
-     * should only take effect in the app when the user commits their changes by pressing
-     * "OK" or "Cancel".  The "Reset" button in the signature dialog is intended to only
-     * allow the user to fix a mistake and start over.  Using this hook to cause
-     * a change in application state (by, for example, calling {@link #setSignatureImage(com.codename1.ui.Image) } with
-     * a {@literal null} argument}) may confuse the user.</p>
-     *
-     * <p>If you want to provide the user with a mechanism to "clear" the signature
-     * from the signature component, you should add a button to your form which, when
-     * pressed, will remove the image by calling {@link #setSignatureImage(com.codename1.ui.Image) }.</p>
-     */
+    /// A hook that can be overridden by subclasses to be notified when the user
+    /// resets the signature in the signature dialog.
+    ///
+    /// **NOTE: Use of this hook to clear the current image in the signature
+    /// component is discouraged.**  The intention of the signature component's internal
+    /// dialog is to provide a staging area for the user to draw their signature.  Changes
+    /// should only take effect in the app when the user commits their changes by pressing
+    /// "OK" or "Cancel".  The "Reset" button in the signature dialog is intended to only
+    /// allow the user to fix a mistake and start over.  Using this hook to cause
+    /// a change in application state (by, for example, calling `#setSignatureImage(com.codename1.ui.Image)` with
+    /// a null argument}) may confuse the user.
+    ///
+    /// If you want to provide the user with a mechanism to "clear" the signature
+    /// from the signature component, you should add a button to your form which, when
+    /// pressed, will remove the image by calling `#setSignatureImage(com.codename1.ui.Image)`.
     protected void onSignatureReset() {
 
     }
 
-    /**
-     * Adds a listener to be notified when the signature image is changed.
-     *
-     * @param l
-     */
+    /// Adds a listener to be notified when the signature image is changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     @Override
     public void addActionListener(ActionListener<ActionEvent> l) {
         eventDispatcher.addListener(l);
     }
 
-    /**
-     * Removes a listener from being notified when signature image is changed.
-     *
-     * @param l
-     */
+    /// Removes a listener from being notified when signature image is changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
     @Override
     public void removeActionListener(ActionListener<ActionEvent> l) {
         eventDispatcher.removeListener(l);
     }
 
-    /**
-     * Fires an event to all listeners to notify them that the signature image has
-     * been changed.
-     */
+    /// Fires an event to all listeners to notify them that the signature image has
+    /// been changed.
     // PMD stupidly thinks this method overrides a package private method
     @SuppressWarnings("PMD.MissingOverride")
     protected void fireActionEvent() {
         eventDispatcher.fireActionEvent(new ActionEvent(this));
     }
 
-    /**
-     * Overridden to register the icon animation when the field is added to the form.
-     */
+    /// Overridden to register the icon animation when the field is added to the form.
     @Override
     protected void initComponent() {
         super.initComponent();
         getComponentForm().registerAnimated(iconAnimation);
     }
 
-    /**
-     * Overridden to deregister the icon animation when the field is removed from the form.
-     */
+    /// Overridden to deregister the icon animation when the field is removed from the form.
     @Override
     protected void deinitialize() {
         getComponentForm().deregisterAnimated(iconAnimation);
@@ -257,11 +259,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
         return UIManager.getInstance().localize(key, defaultVal);
     }
 
-    /**
-     * Calculates the preferred size of the button itself (not the signature canvas... but the button you press to show the signature panel).
-     *
-     * @return
-     */
+    /// Calculates the preferred size of the button itself (not the signature canvas... but the button you press to show the signature panel).
     @Override
     protected Dimension calcPreferredSize() {
         int w = Display.getInstance().convertToPixels(75, true);
@@ -269,11 +267,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
         return new Dimension(w, h);
     }
 
-    /**
-     * Gets the image of the signature - or null if no signature has been drawn.
-     *
-     * @return
-     */
+    /// Gets the image of the signature - or null if no signature has been drawn.
     public Image getSignatureImage() {
         if (signatureImage != null) {
             return signatureImage;
@@ -282,12 +276,12 @@ public class SignatureComponent extends Container implements ActionSource<Action
         }
     }
 
-    /**
-     * Sets the signature image for this field.  This will also scale the image and
-     * show it as the icon for the button.
-     *
-     * @param img The image to set as the signature image.
-     */
+    /// Sets the signature image for this field.  This will also scale the image and
+    /// show it as the icon for the button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: The image to set as the signature image.
     public void setSignatureImage(Image img) {
         if (img != signatureImage) { //NOPMD CompareObjectsWithEquals
             signatureImage = img;
@@ -309,30 +303,22 @@ public class SignatureComponent extends Container implements ActionSource<Action
         }
     }
 
-    /**
-     * Get the component that is the actual panel for drawing a signature.
-     * The component can be used instead of the SignatureComponent if an embedded signature is needed.
-     * <p>
-     * Use the clearSignaturePanel() and the getSignatureImage() functions to work with this component.
-     *
-     * @return
-     */
+    /// Get the component that is the actual panel for drawing a signature.
+    /// The component can be used instead of the SignatureComponent if an embedded signature is needed.
+    ///
+    /// Use the clearSignaturePanel() and the getSignatureImage() functions to work with this component.
     public Component getSignaturePanel() {
         return signaturePanel;
     }
 
-    /**
-     * Clear the signature image and allow it to draw a new one.
-     * Use only if you use the signature panel component from the getSignaturePanel() method.
-     */
+    /// Clear the signature image and allow it to draw a new one.
+    /// Use only if you use the signature panel component from the getSignaturePanel() method.
     public void clearSignaturePanel() {
         signaturePanel.clear();
     }
 
-    /**
-     * The actual panel for drawing a signature.  This doesn't include any buttons (like done, reset, or cancel),
-     * it merely provides the functionality to record the drawing of a signature.
-     */
+    /// The actual panel for drawing a signature.  This doesn't include any buttons (like done, reset, or cancel),
+    /// it merely provides the functionality to record the drawing of a signature.
     private static class SignaturePanel extends Component {
 
         private final GeneralPath path = new GeneralPath();
@@ -349,23 +335,23 @@ public class SignatureComponent extends Container implements ActionSource<Action
             stroke.setLineWidth(Math.max(1, Display.getInstance().convertToPixels(1, true) / 2));
         }
 
-        /**
-         * Overridden to try to make this component as sensitive as possible to
-         * drag events.  If we don't do this, it requires a longer drag before the "drag"
-         * events will kick in.
-         *
-         * @param x
-         * @param y
-         * @return
-         */
+        /// Overridden to try to make this component as sensitive as possible to
+        /// drag events.  If we don't do this, it requires a longer drag before the "drag"
+        /// events will kick in.
+        ///
+        /// #### Parameters
+        ///
+        /// - `x`
+        ///
+        /// - `y`
         @Override
         protected int getDragRegionStatus(int x, int y) {
             return Component.DRAG_REGION_LIKELY_DRAG_XY;
         }
 
-        /**
-         * @param g
-         */
+        /// #### Parameters
+        ///
+        /// - `g`
         @Override
         public void paint(Graphics g) {
             super.paint(g);
@@ -383,12 +369,12 @@ public class SignatureComponent extends Container implements ActionSource<Action
 
         }
 
-        /**
-         * Paints just the signature portion of the panel.  This is is reuised to
-         * also create the image of the signature.
-         *
-         * @param g
-         */
+        /// Paints just the signature portion of the panel.  This is is reuised to
+        /// also create the image of the signature.
+        ///
+        /// #### Parameters
+        ///
+        /// - `g`
         private void paintSignature(Graphics g) {
             g.setColor(signatureStyle.getFgColor());
             int alpha = g.concatenateAlpha(signatureStyle.getFgAlpha());
@@ -399,13 +385,13 @@ public class SignatureComponent extends Container implements ActionSource<Action
             g.setAlpha(alpha);
         }
 
-        /**
-         * Calculates a rectangle (in parent component space) used for the drawn "rectangle" inside
-         * which the user should draw their signature.  It tries to create a 16x9 rectangle that
-         * fits inside the component with a bit of padding (3mm on each edge).
-         *
-         * @param r Output variable.
-         */
+        /// Calculates a rectangle (in parent component space) used for the drawn "rectangle" inside
+        /// which the user should draw their signature.  It tries to create a 16x9 rectangle that
+        /// fits inside the component with a bit of padding (3mm on each edge).
+        ///
+        /// #### Parameters
+        ///
+        /// - `r`: Output variable.
         private void calcSignatureRect(Rectangle r) {
             int w = getWidth() - Display.getInstance().convertToPixels(6, true);
             int h = (int) (w * 9.0 / 16.0);
@@ -450,32 +436,26 @@ public class SignatureComponent extends Container implements ActionSource<Action
             repaint();
         }
 
-        /**
-         * Converts an x coordinate from screen space, to parent component space.
-         *
-         * @param x
-         * @return
-         */
+        /// Converts an x coordinate from screen space, to parent component space.
+        ///
+        /// #### Parameters
+        ///
+        /// - `x`
         private int x(int x) {
             return x - getParent().getAbsoluteX();
         }
 
-        /**
-         * Converts a y coordinate from screen space to parent component space.
-         *
-         * @param y
-         * @return
-         */
+        /// Converts a y coordinate from screen space to parent component space.
+        ///
+        /// #### Parameters
+        ///
+        /// - `y`
         private int y(int y) {
             return y - getParent().getAbsoluteY();
         }
 
-        /**
-         * Gets the currently drawn signature as an image.  This only includes the
-         * areas inside the {@link #signatureRect}
-         *
-         * @return
-         */
+        /// Gets the currently drawn signature as an image.  This only includes the
+        /// areas inside the `#signatureRect`
         public Image getImage() {
             if (path.getPointsSize() < 2) {
                 return null;
@@ -489,20 +469,16 @@ public class SignatureComponent extends Container implements ActionSource<Action
             return img;
         }
 
-        /**
-         * Resets the signature as a blank path.
-         */
+        /// Resets the signature as a blank path.
         public void clear() {
             path.reset();
         }
     }
 
-    /**
-     * Inner class with the actual body of the dialog for drawing the signature.  This dialog
-     * is shown when the user clicks on the main button.
-     *
-     * @author shannah
-     */
+    /// Inner class with the actual body of the dialog for drawing the signature.  This dialog
+    /// is shown when the user clicks on the main button.
+    ///
+    /// @author shannah
     private class SignatureDialogBody extends Container {
         private final EventDispatcher eventDispatcher = new EventDispatcher();
         private Image value;
@@ -558,37 +534,36 @@ public class SignatureComponent extends Container implements ActionSource<Action
             super.addComponent(BorderLayout.SOUTH, GridLayout.encloseIn(3, cancelButton, resetButton, doneButton));
         }
 
-        /**
-         * Called when the cancel button is pressed.  Should be overridden by subclasses to
-         * actually do something (like close the dialog).
-         */
+        /// Called when the cancel button is pressed.  Should be overridden by subclasses to
+        /// actually do something (like close the dialog).
         protected void onCancel() {
 
         }
 
-        /**
-         * Adds a listener to be informed when the "done" button is pressed and a new
-         * signature has been saved as an image.
-         *
-         * @param l
-         */
+        /// Adds a listener to be informed when the "done" button is pressed and a new
+        /// signature has been saved as an image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `l`
         public void addActionListener(ActionListener l) {
             eventDispatcher.addListener(l);
         }
 
 
-        /**
-         * @param l
-         * @see #addActionListener(com.codename1.ui.events.ActionListener)
-         */
+        /// #### Parameters
+        ///
+        /// - `l`
+        ///
+        /// #### See also
+        ///
+        /// - #addActionListener(com.codename1.ui.events.ActionListener)
         public void removeActionListener(ActionListener l) {
             eventDispatcher.removeListener(l);
         }
 
-        /**
-         * Overridden to automatically save the image of the current SignaturePanel
-         * when the dialog is disposed.
-         */
+        /// Overridden to automatically save the image of the current SignaturePanel
+        /// when the dialog is disposed.
         @Override
         protected void deinitialize() {
             if (value == null) {
@@ -598,11 +573,7 @@ public class SignatureComponent extends Container implements ActionSource<Action
             super.deinitialize();
         }
 
-        /**
-         * Gets the signature that was drawn, as an Image.
-         *
-         * @return
-         */
+        /// Gets the signature that was drawn, as an Image.
         public Image getValue() {
             if (value == null) {
                 value = signaturePanel.getImage();

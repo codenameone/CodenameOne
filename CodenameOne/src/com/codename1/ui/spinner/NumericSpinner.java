@@ -24,12 +24,13 @@ package com.codename1.ui.spinner;
 
 import com.codename1.ui.layouts.BorderLayout;
 
-/**
- * A spinner class that allows picking a number
- *
- * @author Shai Almog
- * @deprecated use Picker instead
- */
+/// A spinner class that allows picking a number
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
 public class NumericSpinner extends BaseSpinner {
     private Spinner spin;
     private double min = 0;
@@ -37,16 +38,12 @@ public class NumericSpinner extends BaseSpinner {
     private double value = 0;
     private double step = 1;
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public NumericSpinner() {
         setLayout(new BorderLayout());
     }
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     @Override
     void initSpinner() {
         if (spin == null) {
@@ -59,20 +56,20 @@ public class NumericSpinner extends BaseSpinner {
         return Spinner.create(min, max, value, step);
     }
 
-    /**
-     * The minimum value for the spinner
-     *
-     * @return the min
-     */
+    /// The minimum value for the spinner
+    ///
+    /// #### Returns
+    ///
+    /// the min
     public double getMin() {
         return min;
     }
 
-    /**
-     * The minimum value for the spinner
-     *
-     * @param min the min to set
-     */
+    /// The minimum value for the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: the min to set
     public void setMin(double min) {
         this.min = min;
         if (min > value) {
@@ -83,20 +80,20 @@ public class NumericSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * The maximum value for the spinner
-     *
-     * @return the max
-     */
+    /// The maximum value for the spinner
+    ///
+    /// #### Returns
+    ///
+    /// the max
     public double getMax() {
         return max;
     }
 
-    /**
-     * The maximum value for the spinner
-     *
-     * @param max the max to set
-     */
+    /// The maximum value for the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `max`: the max to set
     public void setMax(double max) {
         this.max = max;
         if (max < value) {
@@ -107,11 +104,11 @@ public class NumericSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * The value for the spinner
-     *
-     * @return the value
-     */
+    /// The value for the spinner
+    ///
+    /// #### Returns
+    ///
+    /// the value
     public double getValue() {
         if (spin != null) {
             return ((Double) ((SpinnerNumberModel) spin.getModel()).getValue()).doubleValue();
@@ -119,11 +116,11 @@ public class NumericSpinner extends BaseSpinner {
         return value;
     }
 
-    /**
-     * The value for the spinner
-     *
-     * @param value the value to set
-     */
+    /// The value for the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to set
     public void setValue(double value) {
         this.value = value;
         if (spin != null) {
@@ -131,20 +128,20 @@ public class NumericSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * Step for spinner gap
-     *
-     * @return the step
-     */
+    /// Step for spinner gap
+    ///
+    /// #### Returns
+    ///
+    /// the step
     public double getStep() {
         return step;
     }
 
-    /**
-     * Step for spinner gap
-     *
-     * @param step the step to set
-     */
+    /// Step for spinner gap
+    ///
+    /// #### Parameters
+    ///
+    /// - `step`: the step to set
     public void setStep(double step) {
         this.step = step;
         if (spin != null) {
@@ -152,33 +149,25 @@ public class NumericSpinner extends BaseSpinner {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"min", "max", "value", "step"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Double.class, Double.class, Double.class, Double.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"double", "double", "double", "double", "double"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("min".equals(name)) {
@@ -196,9 +185,7 @@ public class NumericSpinner extends BaseSpinner {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("min".equals(name)) {

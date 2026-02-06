@@ -24,19 +24,17 @@ package com.codename1.ui;
 
 import com.codename1.ui.events.ActionListener;
 
-/**
- * A Button that is rendered by the native platform, over top of the light-weight components.
- * The action listener is also fired on the native main thread.
- *
- * <p>Currently this is only used in the Javascript port because there are some functions
- * that can only be performed in direct response to user action.  Using a HeavyButton
- * rather than a button to invoke the action will solve this.</p>
- *
- * <p>WARNING: You can't use any concurrency (wait, sleep, etc..) in the action listener
- * or it will break Javascript.  Only use this class if you know what you're doing.</p>
- *
- * @author shannah
- */
+/// A Button that is rendered by the native platform, over top of the light-weight components.
+/// The action listener is also fired on the native main thread.
+///
+/// Currently this is only used in the Javascript port because there are some functions
+/// that can only be performed in direct response to user action.  Using a HeavyButton
+/// rather than a button to invoke the action will solve this.
+///
+/// WARNING: You can't use any concurrency (wait, sleep, etc..) in the action listener
+/// or it will break Javascript.  Only use this class if you know what you're doing.
+///
+/// @author shannah
 class HeavyButton extends Button {
     Object peer;
 

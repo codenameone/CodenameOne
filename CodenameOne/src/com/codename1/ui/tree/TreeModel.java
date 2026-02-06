@@ -25,43 +25,103 @@ package com.codename1.ui.tree;
 
 import java.util.Vector;
 
-/**
- * <p>Arranges tree node objects, a node can essentially be anything and it will be displayed in a hierarchy
- * using the {@link com.codename1.ui.tree.Tree}</p>
- *
- * <script src="https://gist.github.com/codenameone/870d4412694bca3092c4.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/tree.png" alt="Tree sample code" />
- *
- * <p>
- * And heres a more "real world" example showing an XML hierarchy in a {@code Tree}:
- * </p>
- * <script src="https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" alt="Tree with XML data" />
- *
- * <p>
- * Another real world example showing the {@link com.codename1.io.FileSystemStorage} as a tree:
- * </p>
- * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
- *
- * @author Shai Almog
- */
+/// Arranges tree node objects, a node can essentially be anything and it will be displayed in a hierarchy
+/// using the `com.codename1.ui.tree.Tree`
+///
+/// ```java
+/// class StringArrayTreeModel implements TreeModel {
+///     String[][] arr = new String[][] {
+///             {"Colors", "Letters", "Numbers"},
+///             {"Red", "Green", "Blue"},
+///             {"A", "B", "C"},
+///             {"1", "2", "3"}
+///         };
+///
+///     public Vector getChildren(Object parent) {
+///         if(parent == null) {
+///             Vector v = new Vector();
+///             for(int iter = 0 ; iter  iter + 1 && arr[iter + 1] != null) {
+///                     for(int i = 0 ; i
+///
+/// And heres a more "real world" example showing an XML hierarchy in a `Tree`:
+///
+/// ```java
+/// class XMLTreeModel implements TreeModel {
+/// private Element root;
+/// public XMLTreeModel(Element e) {
+/// root = e;
+/// }
+///
+/// public Vector getChildren(Object parent) {
+/// if(parent == null) {
+/// Vector c = new Vector();
+/// c.addElement(root);
+/// return c;
+/// }
+/// Vector result = new Vector();
+/// Element e = (Element)parent;
+/// for(int iter = 0 ; iter
+///
+/// Another real world example showing the `com.codename1.io.FileSystemStorage` as a tree:
+///
+/// ```java
+/// Form hi = new Form("FileSystemTree", new BorderLayout());
+/// TreeModel tm = new TreeModel() {
+/// @Override
+///     public Vector getChildren(Object parent) {
+///         String[] files;
+///         if(parent == null) {
+///             files = FileSystemStorage.getInstance().getRoots();
+///             return new Vector(Arrays.asList(files));
+///         } else {
+///             try {
+///                 files = FileSystemStorage.getInstance().listFiles((String)parent);
+///             } catch(IOException err) {
+///                 Log.e(err);
+///                 files = new String[0];
+///             }
+///         }
+///         String p = (String)parent;
+///         Vector result = new Vector();
+///         for(String s : files) {
+///             result.add(p + s);
+///         }
+///         return result;
+///     }
+/// @Override
+///     public boolean isLeaf(Object node) {
+///         return !FileSystemStorage.getInstance().isDirectory((String)node);
+///     }
+/// };
+/// Tree t = new Tree(tm) {
+/// @Override
+///     protected String childToDisplayLabel(Object child) {
+///         String n = (String)child;
+///         int pos = n.lastIndexOf("/");
+///         if(pos
+/// @author Shai Almog
 public interface TreeModel {
-    /**
-     * Returns the child objects representing the given parent, null should return
-     * the root objects
-     *
-     * @param parent the parent object whose children should be returned, null would return the
-     *               tree roots
-     * @return the children of the given node within the tree
-     */
+    /// Returns the child objects representing the given parent, null should return
+    /// the root objects
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: @param parent the parent object whose children should be returned, null would return the
+    ///               tree roots
+    ///
+    /// #### Returns
+    ///
+    /// the children of the given node within the tree
     Vector getChildren(Object parent);
 
-    /**
-     * Is the node a leaf or a folder
-     *
-     * @param node a node within the tree
-     * @return true if the node is a leaf that can't be expanded
-     */
+    /// Is the node a leaf or a folder
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: a node within the tree
+    ///
+    /// #### Returns
+    ///
+    /// true if the node is a leaf that can't be expanded
     boolean isLeaf(Object node);
 }

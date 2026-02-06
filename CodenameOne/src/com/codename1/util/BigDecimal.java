@@ -4,32 +4,30 @@
 
 package com.codename1.util;
 
-/**
- * Class representing a simple version of a big decimal. A
- * <code>BigDecimal</code> is basically a
- * {@link java.math.BigInteger BigInteger} with a few digits on the right of
- * the decimal point. The number of (binary) digits on the right of the decimal
- * point is called the <code>scale</code> of the <code>BigDecimal</code>.
- * Unlike in {@link java.math.BigDecimal BigDecimal}, the scale is not adjusted
- * automatically, but must be set manually. All <code>BigDecimal</code>s
- * taking part in the same arithmetic operation must have equal scale. The
- * result of a multiplication of two <code>BigDecimal</code>s returns a
- * <code>BigDecimal</code> with double scale.
- */
+/// Class representing a simple version of a big decimal. A
+/// `BigDecimal` is basically a
+/// `BigInteger` with a few digits on the right of
+/// the decimal point. The number of (binary) digits on the right of the decimal
+/// point is called the `scale` of the `BigDecimal`.
+/// Unlike in `BigDecimal`, the scale is not adjusted
+/// automatically, but must be set manually. All `BigDecimal`s
+/// taking part in the same arithmetic operation must have equal scale. The
+/// result of a multiplication of two `BigDecimal`s returns a
+/// `BigDecimal` with double scale.
 public class BigDecimal {
     //private final BigInteger bigInt;
     //private final int scale;
 
     TBigDecimal peer;
 
-    /**
-     * Constructor for <code>BigDecimal</code>. The value of the
-     * constructed <code>BigDecimal</code> equals <code>bigInt /
-     * 10<sup>scale</sup></code>.
-     *
-     * @param bigInt The <code>bigInt</code> value parameter.
-     * @param scale  The scale of the constructed <code>BigDecimal</code>.
-     */
+    /// Constructor for `BigDecimal`. The value of the
+    /// constructed `BigDecimal` equals `bigInt / 10scale`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bigInt`: The `bigInt` value parameter.
+    ///
+    /// - `scale`: The scale of the constructed `BigDecimal`.
     public BigDecimal(BigInteger bigInt, int scale) {
         peer = new TBigDecimal(bigInt.peer, scale);
     }
@@ -42,21 +40,28 @@ public class BigDecimal {
         this.peer = peer;
     }
 
-    /**
-     * Returns a <code>BigDecimal</code> with value <code>value / 2<sup>scale</sup> / 10<sup>scale</sup></code>
-     *
-     * @param value The value of the <code>BigDecimal</code> to be
-     *              created.
-     * @param scale The scale of the <code>BigDecimal</code> to be
-     *              created.
-     * @return The such created <code>BigDecimal</code>.
-     * @deprecated This method is not part of the JDK's <code>BigDecimal</code> class and its presence is historical,
-     * as the first implementation of Codename One's BigDecimal class was ported from BouncyCastle, which is different
-     * than the JDK's BigDecimal class in that is optimizes binary arithmetic. The implementation of this method
-     * is counter-intuitive since it performs a bitwise left shift on <code>value</code> before scaling it.  Use {@link #BigDecimal(com.codename1.util.BigInteger, int) }
-     * instead if you just want to convert a <code>BigInteger</code> into a <code>BigDecimal</code>.  <strong>Do not rely on this method
-     * as it will be removed in a future version of Codename One.</strong>.
-     */
+    /// Returns a `BigDecimal` with value `value / 2scale / 10scale`
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: @param value The value of the `BigDecimal` to be
+    /// created.
+    ///
+    /// - `scale`: @param scale The scale of the `BigDecimal` to be
+    /// created.
+    ///
+    /// #### Returns
+    ///
+    /// The such created `BigDecimal`.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated This method is not part of the JDK's `BigDecimal` class and its presence is historical,
+    /// as the first implementation of Codename One's BigDecimal class was ported from BouncyCastle, which is different
+    /// than the JDK's BigDecimal class in that is optimizes binary arithmetic. The implementation of this method
+    /// is counter-intuitive since it performs a bitwise left shift on `value` before scaling it.  Use `int)`
+    /// instead if you just want to convert a `BigInteger` into a `BigDecimal`.  **Do not rely on this method
+    /// as it will be removed in a future version of Codename One.**.
     public static BigDecimal getInstance(BigInteger value, int scale) {
         return new BigDecimal(value.shiftLeft(scale), scale);
     }

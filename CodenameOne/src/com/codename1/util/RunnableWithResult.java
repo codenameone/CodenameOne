@@ -23,16 +23,14 @@
 
 package com.codename1.util;
 
-/**
- * A Runnable like interface that can return a result possibly asynchronously
- *
- * @author Shai Almog
- */
+/// A Runnable like interface that can return a result possibly asynchronously
+///
+/// @author Shai Almog
 public interface RunnableWithResult<T> {
-    /**
-     * Similar to the runnable interface but can return a result
-     *
-     * @param onSuccess the result of the call
-     */
+    /// Similar to the runnable interface but can return a result
+    ///
+    /// #### Parameters
+    ///
+    /// - `onSuccess`: the result of the call
     void run(SuccessCallback<T> onSuccess);
 }

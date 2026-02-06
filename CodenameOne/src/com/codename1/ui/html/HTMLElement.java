@@ -30,12 +30,10 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
-/**
- * The HTMLElement class defines a single HTML element with its attributes and children.
- * Due to its hierarchial nature, this class can be used for a single "leaf" Element, for more complex elements (with child elements), and up to describing the entire document.
- *
- * @author Ofir Leitner
- */
+/// The HTMLElement class defines a single HTML element with its attributes and children.
+/// Due to its hierarchial nature, this class can be used for a single "leaf" Element, for more complex elements (with child elements), and up to describing the entire document.
+///
+/// @author Ofir Leitner
 public class HTMLElement extends Element {
 
 //////////////////////////////////
@@ -267,9 +265,7 @@ public class HTMLElement extends Element {
     public static final int COLOR_WHITE = 0xffffff;
     public static final int COLOR_YELLOW = 0xffff00;
     public static final int COLOR_ORANGE = 0xffa500; // Orange is added in CSS 2.1
-    /**
-     * Defines the tag names, these are specified according to the tag constants numbering.
-     */
+    /// Defines the tag names, these are specified according to the tag constants numbering.
     static final String[] TAG_NAMES = {
             "body", "head", "html", "title"
             , "abbr", "acronym", "address", "blockquote", "br", "cite", "code", "dfn", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6", "kbd", "p", "pre", "q", "samp", "span", "strong", "var"
@@ -288,9 +284,7 @@ public class HTMLElement extends Element {
             , "thead", "tbody", "tfoot", "button"
             , "text"
     };
-    /**
-     * Defines the allowed attribute names, these are specified according to the ATTR_* constants numbering.
-     */
+    /// Defines the allowed attribute names, these are specified according to the ATTR_* constants numbering.
     static final String[] ATTRIBUTE_NAMES = {
             "class", "id", "style", "title", "xmlns", "xml:lang", "align", "bgcolor", "link", "text", "version", "cite",
             "accesskey", "charset", "href", "hreflang", "rel", "rev", "tabindex", "type", "action", "enctype", "method",
@@ -337,15 +331,11 @@ public class HTMLElement extends Element {
     static final int TYPE_CSS_LENGTH_OR_PERCENTAGE = 25; // values with CSS suffixes (px/em/ex etc.) or percentages
     static final int TYPE_CSS_URL = 26;
     static final int TYPE_CSS_LENGTH_OR_PERCENTAGE_OR_MULTIPLIER = 27; // values with CSS suffixes (px/em/ex etc.) or percentages or a number without unit that represents multiply by (i.e. 1 is 100% of the font size, 2 is 200% and so on)
-    /**
-     * The allowed values for the 'frame' attribute in the 'table' tag
-     * (This was not placed in the ALLOWED_STRINGS in order not to add more data types, since it is very specific for this attribute)
-     */
+    /// The allowed values for the 'frame' attribute in the 'table' tag
+    /// (This was not placed in the ALLOWED_STRINGS in order not to add more data types, since it is very specific for this attribute)
     static final String[] ALLOWED_TABLE_FRAME_STRINGS =
             {"void", "above", "below", "hsides", "vsides", "lhs", "rhs", "box", "border"};
-    /**
-     * The values each string of ALLOWED_TABLE_FRAME_STRINGS represents
-     */
+    /// The values each string of ALLOWED_TABLE_FRAME_STRINGS represents
     static final int[][] ALLOWED_TABLE_FRAME_VALS =
             {
                     {}, // void
@@ -358,31 +348,23 @@ public class HTMLElement extends Element {
                     {Component.LEFT, Component.RIGHT, Component.TOP, Component.BOTTOM}, //box
                     {Component.LEFT, Component.RIGHT, Component.TOP, Component.BOTTOM}, //border
             };
-    /**
-     * The allowed values for the 'rules' attribute in the 'table' tag
-     * (This was not placed in the ALLOWED_STRINGS in order not to add more data types, since it is very specific for this attribute)
-     */
+    /// The allowed values for the 'rules' attribute in the 'table' tag
+    /// (This was not placed in the ALLOWED_STRINGS in order not to add more data types, since it is very specific for this attribute)
     static final String[] ALLOWED_TABLE_RULES_STRINGS =
             {"none", "rows", "cols", "all", "groups"};
-    /**
-     * Defines the allowed color string that are acceptable as a value to color attributes in HTML-MP1
-     */
+    /// Defines the allowed color string that are acceptable as a value to color attributes in HTML-MP1
     static final String[] COLOR_STRINGS = {
             "aqua", "black", "blue", "fuchsia", "gray", "green", "lime", "maroon",
             "navy", "olive", "purple", "red", "silver", "teal", "white", "yellow",
             "orange", "grey"
     };
-    /**
-     * Assigns a color constant to each of the colors defined in COLOR_STRINGS
-     */
+    /// Assigns a color constant to each of the colors defined in COLOR_STRINGS
     static final int[] COLOR_VALS = {
             COLOR_AQUA, COLOR_BLACK, COLOR_BLUE, COLOR_FUCHSIA, COLOR_GRAY, COLOR_GREEN, COLOR_LIME, COLOR_MAROON,
             COLOR_NAVY, COLOR_OLIVE, COLOR_PURPLE, COLOR_RED, COLOR_SILVER, COLOR_TEAL, COLOR_WHITE, COLOR_YELLOW,
             COLOR_ORANGE, COLOR_GRAY
     };
-    /**
-     * Defines additional allowed color string that are acceptable as a value to color attributes in HTML4
-     */
+    /// Defines additional allowed color string that are acceptable as a value to color attributes in HTML4
     static final String[] MORE_COLOR_STRINGS = {
             "AliceBlue", "AntiqueWhite", "Aqua", "Aquamarine", "Azure", "Beige", "Bisque", "Black", "BlanchedAlmond", "Blue", "BlueViolet", "Brown", "BurlyWood",
             "CadetBlue", "Chartreuse", "Chocolate", "Coral", "CornflowerBlue", "Cornsilk", "Crimson", "Cyan", "DarkBlue", "DarkCyan", "DarkGoldenRod", "DarkGray",
@@ -398,9 +380,7 @@ public class HTMLElement extends Element {
             "SaddleBrown", "Salmon", "SandyBrown", "SeaGreen", "SeaShell", "Sienna", "Silver", "SkyBlue", "SlateBlue", "SlateGray", "SlateGrey", "Snow", "SpringGreen",
             "SteelBlue", "Tan", "Teal", "Thistle", "Tomato", "Turquoise", "Violet", "Wheat", "White", "WhiteSmoke", "Yellow", "YellowGreen"
     };
-    /**
-     * Assigns a color constant to each of the colors defined in MORE_COLOR_STRINGS
-     */
+    /// Assigns a color constant to each of the colors defined in MORE_COLOR_STRINGS
     static final int[] MORE_COLOR_VALS = {
             0xF0F8FF, 0xFAEBD7, 0x00FFFF, 0x7FFFD4, 0xF0FFFF, 0xF5F5DC, 0xFFE4C4, 0x000000, 0xFFEBCD, 0x0000FF, 0x8A2BE2, 0xA52A2A, 0xDEB887, 0x5F9EA0, 0x7FFF00, 0xD2691E,
             0xFF7F50, 0x6495ED, 0xFFF8DC, 0xDC143C, 0x00FFFF, 0x00008B, 0x008B8B, 0xB8860B, 0xA9A9A9, 0xA9A9A9, 0x006400, 0xBDB76B, 0x8B008B, 0x556B2F, 0xFF8C00, 0x9932CC,
@@ -413,13 +393,9 @@ public class HTMLElement extends Element {
             0xC0C0C0, 0x87CEEB, 0x6A5ACD, 0x708090, 0x708090, 0xFFFAFA, 0x00FF7F, 0x4682B4, 0xD2B48C, 0x008080, 0xD8BFD8, 0xFF6347, 0x40E0D0, 0xEE82EE, 0xF5DEB3, 0xFFFFFF,
             0xF5F5F5, 0xFFFF00, 0x9ACD32
     };
-    /**
-     * This array defines the 6 common attributes that each tag has
-     */
+    /// This array defines the 6 common attributes that each tag has
     private static final int[] COMMON_ATTRIBUTES = {ATTR_CLASS, ATTR_ID, ATTR_STYLE, ATTR_TITLE, ATTR_XMLNS, ATTR_XMLLANG, ATTR_LANG};
-    /**
-     * This array defines the allowed attributes for each tag, according to the XHTML-MP 1.0 spec
-     */
+    /// This array defines the allowed attributes for each tag, according to the XHTML-MP 1.0 spec
     private static final int[][] TAG_ATTRIBUTES = {
             //Structure Module
             {
@@ -750,9 +726,7 @@ public class HTMLElement extends Element {
             {}, //TEXT = 82;
 
     };
-    /**
-     * This array assigns a type to each of the attributes.
-     */
+    /// This array assigns a type to each of the attributes.
     private static final int[] ATTRIBUTE_TYPES = {
             TYPE_NMTOKENS, //"class",
             TYPE_ID, //"id",
@@ -834,11 +808,9 @@ public class HTMLElement extends Element {
     private static final int HEX = 2;
     private static final int ABC = 4;
     private static final int LAST_TAG_INDEX = HTMLComponent.PROCESS_HTML_MP1_ONLY ? TAG_FIELDSET : TAG_BUTTON; // In any case we exclude TAG_TEXT, which is given only on text element creation
-    /**
-     * Some types accept only a specific set of strings. For these this array defines the allowed strings.
-     * If the value is null it means that the type has another rule set (for example numbers only).
-     * This is checked against in the DOM building process.
-     */
+    /// Some types accept only a specific set of strings. For these this array defines the allowed strings.
+    /// If the value is null it means that the type has another rule set (for example numbers only).
+    /// This is checked against in the DOM building process.
     private static final String[][] ALLOWED_STRINGS = {
             null, // TYPE_NUMBER = 0;
             null, // TYPE_PIXELS_OR_PERCENTAGE = 1;
@@ -865,46 +837,39 @@ public class HTMLElement extends Element {
             null, // TYPE_NMTOKEN = 22; // top/middle/bottom
             {"ltr", "rtl"}, // TYPE_DIRECTION
     };
-    /**
-     * The tag ID. Upon construction of tag with a name, a lookup is performed to assign it an ID accordign to the TAG_NAMES array.
-     * THe ID is used to find what are the allowed attributes, and also prevents the need for further string parsing later on.
-     */
+    /// The tag ID. Upon construction of tag with a name, a lookup is performed to assign it an ID accordign to the TAG_NAMES array.
+    /// THe ID is used to find what are the allowed attributes, and also prevents the need for further string parsing later on.
     private int id = TAG_UNSUPPORTED;
 
 
 // Member variables:
-    /**
-     * A vector holding all associate components
-     */
+    /// A vector holding all associate components
     private Vector comps;
-    /**
-     * If true than the UI components where calculated automatically
-     */
+    /// If true than the UI components where calculated automatically
     private boolean calculatedUi = false;
 
-    /**
-     * Constructs and HTMLElement without specifying a name.
-     * This can be used by subclasses that do not require name assigments.
-     */
+    /// Constructs and HTMLElement without specifying a name.
+    /// This can be used by subclasses that do not require name assigments.
     protected HTMLElement() {
     }
 
 
-    /**
-     * Constructor for HTMLElement. This mostly sets up the element's ID.
-     *
-     * @param tagName The HTMLElement's name
-     */
+    /// Constructor for HTMLElement. This mostly sets up the element's ID.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagName`: The HTMLElement's name
     public HTMLElement(String tagName) {
         init(tagName);
     }
 
-    /**
-     * Constructor for HTMLElement. This mostly sets up the element's ID.
-     *
-     * @param tagName       The HTMLElement's name, or the text for text elements
-     * @param isTextElement true for a text element, false otherwise
-     */
+    /// Constructor for HTMLElement. This mostly sets up the element's ID.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagName`: The HTMLElement's name, or the text for text elements
+    ///
+    /// - `isTextElement`: true for a text element, false otherwise
     public HTMLElement(String tagName, boolean isTextElement) {
         setTextElement(isTextElement);
         if (isTextElement) {
@@ -915,14 +880,18 @@ public class HTMLElement extends Element {
         }
     }
 
-    /**
-     * Converts a color string into an int value.
-     * This method supports color denoted in hex (with a leading #), named colors (from the standard HTML colors) and rgb(x,y,z)
-     *
-     * @param colorStr     The string representing the color
-     * @param defaultColor Default color if color parsing can't be done
-     * @return The int value of the parsed color
-     */
+    /// Converts a color string into an int value.
+    /// This method supports color denoted in hex (with a leading #), named colors (from the standard HTML colors) and rgb(x,y,z)
+    ///
+    /// #### Parameters
+    ///
+    /// - `colorStr`: The string representing the color
+    ///
+    /// - `defaultColor`: Default color if color parsing can't be done
+    ///
+    /// #### Returns
+    ///
+    /// The int value of the parsed color
     static int getColor(String colorStr, int defaultColor) {
         if ((colorStr == null) || ("".equals(colorStr))) {
             return defaultColor;
@@ -1002,12 +971,12 @@ public class HTMLElement extends Element {
         }
     }
 
-    /**
-     * Sets the given component or Vector of components to be associated with this element.
-     * This is used internally to apply CSS styling.
-     *
-     * @param obj The component (or vector of components) representing this HTMLElement
-     */
+    /// Sets the given component or Vector of components to be associated with this element.
+    /// This is used internally to apply CSS styling.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: The component (or vector of components) representing this HTMLElement
     void setAssociatedComponents(Object obj) {
         if (obj instanceof Vector) {
             comps = (Vector) obj;
@@ -1017,19 +986,17 @@ public class HTMLElement extends Element {
         }
     }
 
-    /**
-     * Clears the associated components object
-     */
+    /// Clears the associated components object
     void clearAssociatedComponents() {
         comps = null;
     }
 
-    /**
-     * Adds the given component to be associated with this element.
-     * This is used internally to apply CSS styling.
-     *
-     * @param cmp The component to add
-     */
+    /// Adds the given component to be associated with this element.
+    /// This is used internally to apply CSS styling.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to add
     void addAssociatedComponent(Component cmp) {
         if (comps == null) {
             comps = new Vector();
@@ -1037,13 +1004,14 @@ public class HTMLElement extends Element {
         comps.addElement(cmp);
     }
 
-    /**
-     * Adds the given component to be associated with this element.
-     * This is used internally to apply CSS styling.
-     *
-     * @param index The index to insert the component to
-     * @param cmp   The component to add
-     */
+    /// Adds the given component to be associated with this element.
+    /// This is used internally to apply CSS styling.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: The index to insert the component to
+    ///
+    /// - `cmp`: The component to add
     void addAssociatedComponentAt(int index, Component cmp) {
         if (comps == null) {
             comps = new Vector();
@@ -1051,27 +1019,31 @@ public class HTMLElement extends Element {
         comps.insertElementAt(cmp, index);
     }
 
-    /**
-     * Returns whether this element supports the common core attributes.
-     * These are attributes most HTML tags support, with a few exceptions that are checked here.
-     * Note that to be exact the common atributes are divided to 2 groups: core attributes (class,id,title,style) and language attributes (xmlns,xml:lang)
-     * The tags checked here all don't support the core attributes but in fact may support the language attributes.
-     * Since the language attributes are not implemented anyway, this is not critical.
-     * For reference, tags that do not support the language attributes in XHTML-MP1 are: param, hr, base, br
-     *
-     * @return true if core attributes are supported, false otherwise
-     */
+    /// Returns whether this element supports the common core attributes.
+    /// These are attributes most HTML tags support, with a few exceptions that are checked here.
+    /// Note that to be exact the common atributes are divided to 2 groups: core attributes (class,id,title,style) and language attributes (xmlns,xml:lang)
+    /// The tags checked here all don't support the core attributes but in fact may support the language attributes.
+    /// Since the language attributes are not implemented anyway, this is not critical.
+    /// For reference, tags that do not support the language attributes in XHTML-MP1 are: param, hr, base, br
+    ///
+    /// #### Returns
+    ///
+    /// true if core attributes are supported, false otherwise
     private boolean supportsCoreAttributes() {
         return ((id != TAG_STYLE) && (id != TAG_META) && (id != TAG_HEAD) && (id != TAG_HTML) && (id != TAG_TITLE) && (id != TAG_PARAM) && (id != TAG_BASE));
     }
 
-    /**
-     * Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
-     *
-     * @param attribute The attribute's name
-     * @param value     The attribute's value
-     * @return a positive error code or -1 if attribute is supported and valid
-     */
+    /// Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `attribute`: The attribute's name
+    ///
+    /// - `value`: The attribute's value
+    ///
+    /// #### Returns
+    ///
+    /// a positive error code or -1 if attribute is supported and valid
     @Override
     public int setAttribute(String attribute, String value) {
         if (id == TAG_UNSUPPORTED) {
@@ -1113,12 +1085,13 @@ public class HTMLElement extends Element {
         return -1;
     }
 
-    /**
-     * Allows setting an attribute with an attribute id
-     *
-     * @param attrId The attribute Id (One of the ATTR_ constants)
-     * @param value  The value to set to the attribute
-     */
+    /// Allows setting an attribute with an attribute id
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrId`: The attribute Id (One of the ATTR_ constants)
+    ///
+    /// - `value`: The value to set to the attribute
     public void setAttributeById(int attrId, String value) {
         if ((attrId < 0) || (attrId >= ATTRIBUTE_NAMES.length)) {
             throw new IllegalArgumentException("Attribute Id must be in the range of 0-" + (ATTRIBUTE_NAMES.length - 1));
@@ -1130,11 +1103,11 @@ public class HTMLElement extends Element {
         }
     }
 
-    /**
-     * Removes the specified attribute
-     *
-     * @param attrId The attribute Id (One of the ATTR_ constants)
-     */
+    /// Removes the specified attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrId`: The attribute Id (One of the ATTR_ constants)
     public void removeAttributeById(int attrId) {
         if ((attrId < 0) || (attrId >= ATTRIBUTE_NAMES.length)) {
             throw new IllegalArgumentException("Attribute Id must be in the range of 0-" + (ATTRIBUTE_NAMES.length - 1));
@@ -1142,11 +1115,11 @@ public class HTMLElement extends Element {
         removeAttribute(Integer.valueOf(attrId));
     }
 
-    /**
-     * Returns a list of supported attributes for this tag. Note that the list does not include the core attributes that are supported on almost all tags
-     *
-     * @return a list of supported attributes for this tag
-     */
+    /// Returns a list of supported attributes for this tag. Note that the list does not include the core attributes that are supported on almost all tags
+    ///
+    /// #### Returns
+    ///
+    /// a list of supported attributes for this tag
     public String getSupportedAttributesList() {
         if ((id < 0) || (id >= TAG_ATTRIBUTES.length)) {
             return "Unknown";
@@ -1170,14 +1143,18 @@ public class HTMLElement extends Element {
         return list.toString();
     }
 
-    /**
-     * Verifies that the specified value conforms with the attribute's type restrictions.
-     * This basically checks the attribute type and according to that checks the value.
-     *
-     * @param attrId The attribute ID
-     * @param value  The value to be checked
-     * @return true if the value is valid for this attribute, false otherwise
-     */
+    /// Verifies that the specified value conforms with the attribute's type restrictions.
+    /// This basically checks the attribute type and according to that checks the value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrId`: The attribute ID
+    ///
+    /// - `value`: The value to be checked
+    ///
+    /// #### Returns
+    ///
+    /// true if the value is valid for this attribute, false otherwise
     private boolean isValid(int type, String value) {
         if (value == null) { // a null value is invalid for all attributes
             return false;
@@ -1213,28 +1190,40 @@ public class HTMLElement extends Element {
         }
     }
 
-    /**
-     * A convenience method for verifying strings with no length restrictions
-     *
-     * @param value        The string to be checked
-     * @param allowedMask  DIGITS or HEX or ABC or a combination of those
-     * @param allowedChars Characters that are allowed even if they don't conform to the mask
-     * @return true if the string is valid, false otherwise.
-     */
+    /// A convenience method for verifying strings with no length restrictions
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The string to be checked
+    ///
+    /// - `allowedMask`: DIGITS or HEX or ABC or a combination of those
+    ///
+    /// - `allowedChars`: Characters that are allowed even if they don't conform to the mask
+    ///
+    /// #### Returns
+    ///
+    /// true if the string is valid, false otherwise.
     private boolean verify(String value, int allowedMask, char[] allowedChars) {
         return verify(value, allowedMask, allowedChars, -1, -1);
     }
 
-    /**
-     * Verifies that the specified string conforms with the specified restrictions.
-     *
-     * @param value        The string to be checked
-     * @param allowedMask  DIGITS or HEX or ABC or a combination of those
-     * @param allowedChars Characters that are allowed even if they don't conform to the mask
-     * @param minLength    Minimum length
-     * @param maxLength    Maximum length
-     * @return true if the string is valid, false otherwise.
-     */
+    /// Verifies that the specified string conforms with the specified restrictions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The string to be checked
+    ///
+    /// - `allowedMask`: DIGITS or HEX or ABC or a combination of those
+    ///
+    /// - `allowedChars`: Characters that are allowed even if they don't conform to the mask
+    ///
+    /// - `minLength`: Minimum length
+    ///
+    /// - `maxLength`: Maximum length
+    ///
+    /// #### Returns
+    ///
+    /// true if the string is valid, false otherwise.
     private boolean verify(String value, int allowedMask, char[] allowedChars, int minLength, int maxLength) {
         if ((minLength != -1) && (value.length() < minLength)) {
             return false;
@@ -1291,13 +1280,17 @@ public class HTMLElement extends Element {
         return true;
     }
 
-    /**
-     * Verifies that the specified string equals to one of the allowed strings
-     *
-     * @param value   The string to be checked
-     * @param allowed The list of allowed strings
-     * @return true if the string equals to one of the allowed, false otherwise
-     */
+    /// Verifies that the specified string equals to one of the allowed strings
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The string to be checked
+    ///
+    /// - `allowed`: The list of allowed strings
+    ///
+    /// #### Returns
+    ///
+    /// true if the string equals to one of the allowed, false otherwise
     boolean verifyStringGroup(String value, String[] allowed) {
         for (String allowedValue : allowed) {
             if (value.equalsIgnoreCase(allowedValue)) {
@@ -1307,11 +1300,11 @@ public class HTMLElement extends Element {
         return false;
     }
 
-    /**
-     * Returns this HTMLElement's tag name
-     *
-     * @return the HTMLElement's tag name
-     */
+    /// Returns this HTMLElement's tag name
+    ///
+    /// #### Returns
+    ///
+    /// the HTMLElement's tag name
     @Override
     public String getTagName() {
         String name = super.getTagName();
@@ -1325,30 +1318,33 @@ public class HTMLElement extends Element {
         return TAG_NAMES[id];
     }
 
-    /**
-     * Returns this HTMLElement's ID
-     *
-     * @return the HTMLELement's ID
-     */
+    /// Returns this HTMLElement's ID
+    ///
+    /// #### Returns
+    ///
+    /// the HTMLELement's ID
     public int getTagId() {
         return id;
     }
 
-    /**
-     * Sets this HTMLElement's ID
-     *
-     * @param tagId The tag ID to set, one of the TAG_* constants (Not to be confused with the id attribute)
-     */
+    /// Sets this HTMLElement's ID
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagId`: The tag ID to set, one of the TAG_* constants (Not to be confused with the id attribute)
     protected void setTagId(int tagId) {
         this.id = tagId;
     }
 
-    /**
-     * Returns an HTMLElement's child by a tag ID (One of the TAG_* constants)
-     *
-     * @param tagId The child's tag ID, one of the TAG_* constants (Not to be confused with the id attribute)
-     * @return the first child with the specified ID, or null if not found
-     */
+    /// Returns an HTMLElement's child by a tag ID (One of the TAG_* constants)
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagId`: The child's tag ID, one of the TAG_* constants (Not to be confused with the id attribute)
+    ///
+    /// #### Returns
+    ///
+    /// the first child with the specified ID, or null if not found
     public HTMLElement getFirstChildByTagId(int tagId) {
         Vector children = getChildren();
         if (children == null) {
@@ -1368,12 +1364,15 @@ public class HTMLElement extends Element {
 
     }
 
-    /**
-     * Returns an HTMLElement's attribute by the attribute's ID (One of the ATTR_* constants)
-     *
-     * @param id The attribute's ID
-     * @return the attribute with the specified ID, or null if not found
-     */
+    /// Returns an HTMLElement's attribute by the attribute's ID (One of the ATTR_* constants)
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The attribute's ID
+    ///
+    /// #### Returns
+    ///
+    /// the attribute with the specified ID, or null if not found
     public String getAttributeById(int id) {
         Hashtable attributes = getAttributes();
         if (attributes == null) {
@@ -1382,21 +1381,22 @@ public class HTMLElement extends Element {
         return (String) attributes.get(Integer.valueOf(id));
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public String toString() {
         return toString("");
     }
 
 
-    /**
-     * Returns the attribute name of the requested attribute
-     *
-     * @param attrKey The attribute key, which is typically an Integer object made of its int attrId
-     * @return the attribute name of the requested attribute
-     */
+    /// Returns the attribute name of the requested attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `attrKey`: The attribute key, which is typically an Integer object made of its int attrId
+    ///
+    /// #### Returns
+    ///
+    /// the attribute name of the requested attribute
     public String getAttributeName(Integer attrKey) { // This method is not static since it needs to be overriden in CSSElement
         return ATTRIBUTE_NAMES[attrKey.intValue()];
     }
@@ -1414,13 +1414,16 @@ public class HTMLElement extends Element {
         return null;
     }
 
-    /**
-     * A recursive method for creating a printout of a full tag with its entire hierarchy.
-     * This is used by the public method toString().
-     *
-     * @param spacing Increased by one in each recursion phase to provide with indentation
-     * @return the printout of this tag
-     */
+    /// A recursive method for creating a printout of a full tag with its entire hierarchy.
+    /// This is used by the public method toString().
+    ///
+    /// #### Parameters
+    ///
+    /// - `spacing`: Increased by one in each recursion phase to provide with indentation
+    ///
+    /// #### Returns
+    ///
+    /// the printout of this tag
     @Override
     public String toString(String spacing) {
         StringBuilder str = new StringBuilder(spacing);
@@ -1451,11 +1454,11 @@ public class HTMLElement extends Element {
         return str.toString();
     }
 
-    /**
-     * Returns a vector of Components associated with this HTMLElement
-     *
-     * @return a vector of Components associated with this HTMLElement
-     */
+    /// Returns a vector of Components associated with this HTMLElement
+    ///
+    /// #### Returns
+    ///
+    /// a vector of Components associated with this HTMLElement
     Vector getUi() {
         if (comps == null) { // If no UI exists this may be a tag with children that do have UI, such as TAG_A
             comps = new Vector();
@@ -1474,9 +1477,7 @@ public class HTMLElement extends Element {
         return comps;
     }
 
-    /**
-     * Causes a recalculation of the UI, if the UI of this element was deduced from children components
-     */
+    /// Causes a recalculation of the UI, if the UI of this element was deduced from children components
     void recalcUi() {
         if (calculatedUi) {
             comps = null;
@@ -1484,9 +1485,7 @@ public class HTMLElement extends Element {
         }
     }
 
-    /**
-     * {{@inheritDoc}}
-     */
+    /// {{@inheritDoc}}
     @Override
     public void removeChildAt(int index) { // Overiding is done to clear the associated components vector of the child
         HTMLElement child = (HTMLElement) getChildAt(index);
@@ -1512,13 +1511,17 @@ public class HTMLElement extends Element {
 
     }
 
-    /**
-     * Returns all descendants with the specified tag id
-     *
-     * @param tagId The tag ID to look for, one of the TAG_* constants (Not to be confused with the id attribute)
-     * @param depth The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
-     * @return A vector containing descendants with the specified tag id
-     */
+    /// Returns all descendants with the specified tag id
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagId`: The tag ID to look for, one of the TAG_* constants (Not to be confused with the id attribute)
+    ///
+    /// - `depth`: The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing descendants with the specified tag id
     public Vector getDescendantsByTagId(int tagId, int depth) {
         if (depth < 1) {
             throw new IllegalArgumentException("Depth must be 1 or higher");
@@ -1531,22 +1534,25 @@ public class HTMLElement extends Element {
         return v;
     }
 
-    /**
-     * Returns all descendants with the specified tag id
-     *
-     * @param tagId The tag ID to look for, one of the TAG_* constants (Not to be confused with the id attribute)
-     * @return A vector containing descendants with the specified tag id
-     */
+    /// Returns all descendants with the specified tag id
+    ///
+    /// #### Parameters
+    ///
+    /// - `tagId`: The tag ID to look for, one of the TAG_* constants (Not to be confused with the id attribute)
+    ///
+    /// #### Returns
+    ///
+    /// A vector containing descendants with the specified tag id
     public Vector getDescendantsByTagId(int tagId) {
         return getDescendantsByTagId(tagId, DEPTH_INFINITE);
     }
 
-    /**
-     * Returns true if this element is the first non-text child of its parent
-     * This is used internally for the :first-child pseudo class
-     *
-     * @return true if this element is the first non-text child of its parent
-     */
+    /// Returns true if this element is the first non-text child of its parent
+    /// This is used internally for the :first-child pseudo class
+    ///
+    /// #### Returns
+    ///
+    /// true if this element is the first non-text child of its parent
     boolean isFirstChild() {
         if ((HTMLComponent.PROCESS_HTML_MP1_ONLY) || (isTextElement())) { // :first-child is not supported in HTML-MP1
             return false;

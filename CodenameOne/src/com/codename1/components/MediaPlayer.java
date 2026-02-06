@@ -47,15 +47,35 @@ import java.io.InputStream;
 import java.util.Timer;
 import java.util.TimerTask;
 
-/**
- * <p>Video playback component with control buttons for back, play/pause and
- * forward buttons. In the simulator those controls are implemented locally but on the
- * device the native playback controls are used.
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
- */
+/// Video playback component with control buttons for back, play/pause and
+/// forward buttons. In the simulator those controls are implemented locally but on the
+/// device the native playback controls are used.
+///
+/// ```java
+/// final Form hi = new Form("MediaPlayer", new BorderLayout());
+/// hi.setToolbar(new Toolbar());
+/// Style s = UIManager.getInstance().getComponentStyle("Title");
+/// FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_VIDEO_LIBRARY, s);
+/// hi.getToolbar().addCommandToRightBar(new Command("", icon) {
+/// @Override
+///     public void actionPerformed(ActionEvent evt) {
+///         Display.getInstance().openGallery((e) -> {
+///             if(e != null && e.getSource() != null) {
+///                 String file = (String)e.getSource();
+///                 try {
+///                     Media video = MediaManager.createMedia(file, true);
+///                     hi.removeAll();
+///                     hi.add(BorderLayout.CENTER, new MediaPlayer(video));
+///                     hi.revalidate();
+///                 } catch(IOException err) {
+///                     Log.e(err);
+///                 }
+///             }
+///         }, Display.GALLERY_VIDEO);
+///     }
+/// });
+/// hi.show();
+/// ```
 public class MediaPlayer extends Container {
     private Image playIcon;
     private Image pauseIcon;
@@ -69,24 +89,16 @@ public class MediaPlayer extends Container {
     private Slider progress;
     private UITimer progressUpdater;
 
-    /**
-     * Shows the buttons on top of the video
-     */
+    /// Shows the buttons on top of the video
     private boolean onTopMode = true;
 
-    /**
-     * Shows video position bar as a slider
-     */
+    /// Shows video position bar as a slider
     private boolean seekBar = true;
 
-    /**
-     * UIID for the seekBar slider
-     */
+    /// UIID for the seekBar slider
     private String seekBarUIID = null;
 
-    /**
-     * Includes a maximize icon in the bar to show the native player
-     */
+    /// Includes a maximize icon in the bar to show the native player
     private boolean maximize = true;
 
     private boolean userSetIcons = false;
@@ -98,9 +110,7 @@ public class MediaPlayer extends Container {
     private boolean loop;
     //private Runnable onCompletion;
 
-    /**
-     * Empty constructor
-     */
+    /// Empty constructor
     public MediaPlayer() {
         playIcon = FontImage.createMaterial(FontImage.MATERIAL_PLAY_ARROW, "Button", 3);
         pauseIcon = FontImage.createMaterial(FontImage.MATERIAL_PAUSE, "Button", 3);
@@ -109,9 +119,7 @@ public class MediaPlayer extends Container {
         maxIcon = FontImage.createMaterial(FontImage.MATERIAL_FULLSCREEN, "Button", 3);
     }
 
-    /**
-     * Empty constructor
-     */
+    /// Empty constructor
     public MediaPlayer(Media video) {
         this();
         this.video = video;
@@ -119,28 +127,38 @@ public class MediaPlayer extends Container {
         //initUI();
     }
 
-    /**
-     * On platforms that include native video player controls (Android and iOS), this indicates whether
-     * these controls should be hidden for this media player.
-     *
-     * @return {@literal true} if native video player controls should be hidden.
-     * @see Display#isNativeVideoPlayerControlsIncluded()
-     * @see #setHideNativeVideoControls(boolean)
-     * @see #usesNativeVideoControls()
-     */
+    /// On platforms that include native video player controls (Android and iOS), this indicates whether
+    /// these controls should be hidden for this media player.
+    ///
+    /// #### Returns
+    ///
+    /// true if native video player controls should be hidden.
+    ///
+    /// #### See also
+    ///
+    /// - Display#isNativeVideoPlayerControlsIncluded()
+    ///
+    /// - #setHideNativeVideoControls(boolean)
+    ///
+    /// - #usesNativeVideoControls()
     public boolean isHideNativeVideoControls() {
         return hideNativeVideoControls;
     }
 
-    /**
-     * On platforms that include native video player controls (Android and iOS), this allows you
-     * to hide those controls.
-     *
-     * @param hideNativeControls Set {@literal true} to hide the native video controls for this player.
-     * @see Display#isNativeVideoPlayerControlsIncluded()
-     * @see #setHideNativeVideoControls(boolean)
-     * @see #usesNativeVideoControls()
-     */
+    /// On platforms that include native video player controls (Android and iOS), this allows you
+    /// to hide those controls.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hideNativeControls`: Set true to hide the native video controls for this player.
+    ///
+    /// #### See also
+    ///
+    /// - Display#isNativeVideoPlayerControlsIncluded()
+    ///
+    /// - #setHideNativeVideoControls(boolean)
+    ///
+    /// - #usesNativeVideoControls()
     public void setHideNativeVideoControls(boolean hideNativeControls) {
         this.hideNativeVideoControls = hideNativeControls;
         if (video != null) {
@@ -148,33 +166,37 @@ public class MediaPlayer extends Container {
         }
     }
 
-    /**
-     * Checks to see if this player uses native video controls.  For this to be {@literal true},
-     * the platform must support native video controls (iOS and Android) (See {@link Display#isNativeVideoPlayerControlsIncluded() }
-     * to find out if current platform supports this; <strong>AND</strong> {@link #isHideNativeVideoControls() }
-     * must be false.
-     *
-     * <p>Note: on IOS, the controls won't display until the video's {@link Media#prepare() }
-     * is called.  This will happen automatically if {@link #isAutoplay() } is true, or if {@link Media#play() }
-     * is called.</p>
-     *
-     * @return True if this player uses native video controls.
-     * @see #isHideNativeVideoControls()
-     * @see #setHideNativeVideoControls(boolean)
-     * @see Display#isNativeVideoPlayerControlsIncluded()
-     */
+    /// Checks to see if this player uses native video controls.  For this to be true,
+    /// the platform must support native video controls (iOS and Android) (See `Display#isNativeVideoPlayerControlsIncluded()`
+    /// to find out if current platform supports this; **AND** `#isHideNativeVideoControls()`
+    /// must be false.
+    ///
+    /// Note: on IOS, the controls won't display until the video's `Media#prepare()`
+    /// is called.  This will happen automatically if `#isAutoplay()` is true, or if `Media#play()`
+    /// is called.
+    ///
+    /// #### Returns
+    ///
+    /// True if this player uses native video controls.
+    ///
+    /// #### See also
+    ///
+    /// - #isHideNativeVideoControls()
+    ///
+    /// - #setHideNativeVideoControls(boolean)
+    ///
+    /// - Display#isNativeVideoPlayerControlsIncluded()
     public boolean usesNativeVideoControls() {
         return Display.getInstance().isNativeVideoPlayerControlsIncluded() && !hideNativeVideoControls;
     }
 
-    /**
-     * Shows the controls for this media player.  If the player is set to use
-     * native controls, then this will show the native controls.  Otherwise it
-     * shows the lightweight controls.
-     * <p>Note: on IOS, the controls won't display until the video's {@link Media#prepare() }
-     * is called.  This will happen automatically if {@link #isAutoplay() } is true, or if {@link Media#play() }
-     * is called.</p>
-     */
+    /// Shows the controls for this media player.  If the player is set to use
+    /// native controls, then this will show the native controls.  Otherwise it
+    /// shows the lightweight controls.
+    ///
+    /// Note: on IOS, the controls won't display until the video's `Media#prepare()`
+    /// is called.  This will happen automatically if `#isAutoplay()` is true, or if `Media#play()`
+    /// is called.
     public void showControls() {
         if (!showControls) {
             showControls = true;
@@ -189,11 +211,9 @@ public class MediaPlayer extends Container {
         }
     }
 
-    /**
-     * Hides the controls for this media player.  If the player is set to use native
-     * controls, then this will hide the native controls.  Otherwise it hides the
-     * lightweight controls.
-     */
+    /// Hides the controls for this media player.  If the player is set to use native
+    /// controls, then this will hide the native controls.  Otherwise it hides the
+    /// lightweight controls.
     public void hideControls() {
         if (showControls) {
             showControls = false;
@@ -208,18 +228,12 @@ public class MediaPlayer extends Container {
         }
     }
 
-    /**
-     * Returns the Media Object of this MediaPlayer
-     *
-     * @return
-     */
+    /// Returns the Media Object of this MediaPlayer
     public Media getMedia() {
         return video;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         if (userSetIcons) {
@@ -278,9 +292,7 @@ public class MediaPlayer extends Container {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         super.deinitialize();
@@ -290,9 +302,7 @@ public class MediaPlayer extends Container {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         if (video == null && dataSource == null) {
@@ -301,23 +311,26 @@ public class MediaPlayer extends Container {
         return super.calcPreferredSize();
     }
 
-    /**
-     * Sets the maximize Button Icon
-     *
-     * @param maxIcon
-     */
+    /// Sets the maximize Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxIcon`
     public void setMaxIcon(Image maxIcon) {
         this.maxIcon = maxIcon;
         userSetIcons = true;
     }
 
-    /**
-     * Sets the data source of this video player
-     *
-     * @param uri the uri of the media can start with file://, http:// (can also
-     *            use rtsp:// although may not be supported on all target platforms)
-     * @throws IOException if creation of media from the given URI has failed
-     */
+    /// Sets the data source of this video player
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: @param uri the uri of the media can start with file://, http:// (can also
+    /// use rtsp:// although may not be supported on all target platforms)
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if creation of media from the given URI has failed
     public void setDataSource(String uri, Runnable onCompletion) throws IOException {
         dataSource = uri;
         video = MediaManager.createMedia(uri, true, onCompletion);
@@ -327,11 +340,11 @@ public class MediaPlayer extends Container {
         }
     }
 
-    /**
-     * Convenience JavaBean method, see other version of this method
-     *
-     * @return the data source uri
-     */
+    /// Convenience JavaBean method, see other version of this method
+    ///
+    /// #### Returns
+    ///
+    /// the data source uri
     public String getDataSource() {
         if (!isInitialized() && dataSource == null) {
             return pendingDataURI;
@@ -339,11 +352,11 @@ public class MediaPlayer extends Container {
         return dataSource;
     }
 
-    /**
-     * Convenience JavaBean method, see other version of this method
-     *
-     * @param uri the URL for the media
-     */
+    /// Convenience JavaBean method, see other version of this method
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: the URL for the media
     public void setDataSource(final String uri) {
         if (!isInitialized()) {
             pendingDataURI = uri;
@@ -363,13 +376,17 @@ public class MediaPlayer extends Container {
         }
     }
 
-    /**
-     * Sets the data source of this video player
-     *
-     * @param is       the stream containing the media data
-     * @param mimeType the type of the data in the stream
-     * @throws java.io.IOException if the creation of the Media has failed
-     */
+    /// Sets the data source of this video player
+    ///
+    /// #### Parameters
+    ///
+    /// - `is`: the stream containing the media data
+    ///
+    /// - `mimeType`: the type of the data in the stream
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the creation of the Media has failed
     public void setDataSource(InputStream is, String mimeType, Runnable onCompletion) throws IOException {
 
         video = MediaManager.createMedia(is, mimeType, onCompletion);
@@ -643,25 +660,19 @@ public class MediaPlayer extends Container {
     public void run() {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"backIcon", "forwardIcon", "pauseIcon", "playIcon", "dataSource"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Image.class, Image.class, Image.class, Image.class, String.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("backIcon".equals(name)) {
@@ -682,9 +693,7 @@ public class MediaPlayer extends Container {
         return super.getPropertyValue(name);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("backIcon".equals(name)) {
@@ -710,106 +719,106 @@ public class MediaPlayer extends Container {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * @return the playIcon
-     */
+    /// #### Returns
+    ///
+    /// the playIcon
     public Image getPlayIcon() {
         return playIcon;
     }
 
-    /**
-     * Sets the play Button Icon
-     *
-     * @param playIcon
-     */
+    /// Sets the play Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `playIcon`
     public void setPlayIcon(Image playIcon) {
         this.playIcon = playIcon;
         userSetIcons = true;
     }
 
-    /**
-     * @return the pauseIcon
-     */
+    /// #### Returns
+    ///
+    /// the pauseIcon
     public Image getPauseIcon() {
         return pauseIcon;
     }
 
-    /**
-     * Sets the pause Button Icon
-     *
-     * @param pauseIcon
-     */
+    /// Sets the pause Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `pauseIcon`
     public void setPauseIcon(Image pauseIcon) {
         this.pauseIcon = pauseIcon;
         userSetIcons = true;
     }
 
-    /**
-     * @return the backIcon
-     */
+    /// #### Returns
+    ///
+    /// the backIcon
     public Image getBackIcon() {
         return backIcon;
     }
 
-    /**
-     * Sets the back Button Icon
-     *
-     * @param backIcon
-     */
+    /// Sets the back Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `backIcon`
     public void setBackIcon(Image backIcon) {
         this.backIcon = backIcon;
         userSetIcons = true;
     }
 
-    /**
-     * @return the fwdIcon
-     */
+    /// #### Returns
+    ///
+    /// the fwdIcon
     public Image getFwdIcon() {
         return fwdIcon;
     }
 
-    /**
-     * Sets the forward Button Icon
-     *
-     * @param fwdIcon
-     */
+    /// Sets the forward Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `fwdIcon`
     public void setFwdIcon(Image fwdIcon) {
         this.fwdIcon = fwdIcon;
         userSetIcons = true;
     }
 
-    /**
-     * Sets playback to start automatically
-     *
-     * @return the autoplay
-     */
+    /// Sets playback to start automatically
+    ///
+    /// #### Returns
+    ///
+    /// the autoplay
     public boolean isAutoplay() {
         return autoplay;
     }
 
-    /**
-     * Sets playback to start automatically
-     *
-     * @param autoplay the autoplay to set
-     */
+    /// Sets playback to start automatically
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoplay`: the autoplay to set
     public void setAutoplay(boolean autoplay) {
         this.autoplay = autoplay;
     }
 
-    /**
-     * Sets playback to loop
-     *
-     * @return the loop
-     */
+    /// Sets playback to loop
+    ///
+    /// #### Returns
+    ///
+    /// the loop
     public boolean isLoop() {
         return loop;
     }
 
-    /**
-     * Sets playback to loop
-     *
-     * @param loop the loop to set
-     */
+    /// Sets playback to loop
+    ///
+    /// #### Parameters
+    ///
+    /// - `loop`: the loop to set
     public void setLoop(boolean loop) {
         if (loop != this.loop) {
             this.loop = loop;
@@ -858,74 +867,74 @@ public class MediaPlayer extends Container {
     }
     */
 
-    /**
-     * Shows the buttons on top of the video
-     *
-     * @return the onTopMode
-     */
+    /// Shows the buttons on top of the video
+    ///
+    /// #### Returns
+    ///
+    /// the onTopMode
     public boolean isOnTopMode() {
         return onTopMode;
     }
 
-    /**
-     * Shows the buttons on top of the video
-     *
-     * @param onTopMode the onTopMode to set
-     */
+    /// Shows the buttons on top of the video
+    ///
+    /// #### Parameters
+    ///
+    /// - `onTopMode`: the onTopMode to set
     public void setOnTopMode(boolean onTopMode) {
         this.onTopMode = onTopMode;
     }
 
-    /**
-     * Shows video position bar as a slider
-     *
-     * @return the seekBar
-     */
+    /// Shows video position bar as a slider
+    ///
+    /// #### Returns
+    ///
+    /// the seekBar
     public boolean isSeekBar() {
         return seekBar;
     }
 
-    /**
-     * Shows video position bar as a slider
-     *
-     * @param seekBar the seekBar to set
-     */
+    /// Shows video position bar as a slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `seekBar`: the seekBar to set
     public void setSeekBar(boolean seekBar) {
         this.seekBar = seekBar;
     }
 
-    /**
-     * UIID for the seekBar slider
-     *
-     * @return the seekBarUIID
-     */
+    /// UIID for the seekBar slider
+    ///
+    /// #### Returns
+    ///
+    /// the seekBarUIID
     public String getSeekBarUIID() {
         return seekBarUIID;
     }
 
-    /**
-     * UIID for the seekBar slider
-     *
-     * @param seekBarUIID the seekBarUIID to set
-     */
+    /// UIID for the seekBar slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `seekBarUIID`: the seekBarUIID to set
     public void setSeekBarUIID(String seekBarUIID) {
         this.seekBarUIID = seekBarUIID;
     }
 
-    /**
-     * Includes a maximize icon in the bar to show the native player
-     *
-     * @return the maximize
-     */
+    /// Includes a maximize icon in the bar to show the native player
+    ///
+    /// #### Returns
+    ///
+    /// the maximize
     public boolean isMaximize() {
         return maximize;
     }
 
-    /**
-     * Includes a maximize icon in the bar to show the native player
-     *
-     * @param maximize the maximize to set
-     */
+    /// Includes a maximize icon in the bar to show the native player
+    ///
+    /// #### Parameters
+    ///
+    /// - `maximize`: the maximize to set
     public void setMaximize(boolean maximize) {
         this.maximize = maximize;
     }

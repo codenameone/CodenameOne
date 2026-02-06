@@ -32,12 +32,13 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Calendar;
 import java.util.Date;
 
-/**
- * Represents a date model for the spinner
- *
- * @author Shai Almog
- * @deprecated use Picker instead
- */
+/// Represents a date model for the spinner
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
 class SpinnerDateModel implements ListModel {
     private static final long DAY = 24 * 60 * 60 * 1000;
     private final EventDispatcher dataListener = new EventDispatcher();
@@ -46,13 +47,15 @@ class SpinnerDateModel implements ListModel {
     private final long max;
     private long currentValue;
 
-    /**
-     * Indicates the range of the spinner
-     *
-     * @param min          lowest value allowed
-     * @param max          maximum value allowed
-     * @param currentValue the starting value for the mode
-     */
+    /// Indicates the range of the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: lowest value allowed
+    ///
+    /// - `max`: maximum value allowed
+    ///
+    /// - `currentValue`: the starting value for the mode
     public SpinnerDateModel(long min, long max, long currentValue) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(new Date(max));
@@ -100,9 +103,7 @@ class SpinnerDateModel implements ListModel {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getItemAt(int index) {
         //return new Date(min + DAY * index + 12 * 60 * 60000);
@@ -110,27 +111,21 @@ class SpinnerDateModel implements ListModel {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getSize() {
         return (int) ((max - min) / DAY) + 1;
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getSelectedIndex() {
         return (int) ((currentValue - min) / DAY);
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setSelectedIndex(int index) {
         int oldIndex = getSelectedIndex();
@@ -139,48 +134,36 @@ class SpinnerDateModel implements ListModel {
         selectionListener.fireSelectionEvent(oldIndex, newIndex);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addDataChangedListener(DataChangedListener l) {
         dataListener.addListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeDataChangedListener(DataChangedListener l) {
         dataListener.removeListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addItem(Object item) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeItem(int index) {
     }

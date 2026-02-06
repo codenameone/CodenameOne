@@ -47,29 +47,84 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
 
-/**
- * <p>The {@code Tree} component allows constructing simple tree component hierarchies that can be expanded
- * seamlessly with no limit. The tree is bound to a model that can provide data with free form depth such as file system
- * or similarly structured data.<br>
- * To customize the look of the tree the component can be derived and component creation can be replaced.</p>
- *
- * <script src="https://gist.github.com/codenameone/870d4412694bca3092c4.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/tree.png" alt="Tree sample code" />
- *
- * <p>
- * And heres a more "real world" example showing an XML hierarchy in a {@code Tree}:
- * </p>
- * <script src="https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" alt="Tree with XML data" />
- *
- * <p>
- * Another real world example showing the {@link com.codename1.io.FileSystemStorage} as a tree:
- * </p>
- * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
- *
- * @author Shai Almog
- */
+/// The `Tree` component allows constructing simple tree component hierarchies that can be expanded
+/// seamlessly with no limit. The tree is bound to a model that can provide data with free form depth such as file system
+/// or similarly structured data.
+///
+/// To customize the look of the tree the component can be derived and component creation can be replaced.
+///
+/// ```java
+/// class StringArrayTreeModel implements TreeModel {
+///     String[][] arr = new String[][] {
+///             {"Colors", "Letters", "Numbers"},
+///             {"Red", "Green", "Blue"},
+///             {"A", "B", "C"},
+///             {"1", "2", "3"}
+///         };
+///
+///     public Vector getChildren(Object parent) {
+///         if(parent == null) {
+///             Vector v = new Vector();
+///             for(int iter = 0 ; iter  iter + 1 && arr[iter + 1] != null) {
+///                     for(int i = 0 ; i
+///
+/// And heres a more "real world" example showing an XML hierarchy in a `Tree`:
+///
+/// ```java
+/// class XMLTreeModel implements TreeModel {
+/// private Element root;
+/// public XMLTreeModel(Element e) {
+/// root = e;
+/// }
+///
+/// public Vector getChildren(Object parent) {
+/// if(parent == null) {
+/// Vector c = new Vector();
+/// c.addElement(root);
+/// return c;
+/// }
+/// Vector result = new Vector();
+/// Element e = (Element)parent;
+/// for(int iter = 0 ; iter
+///
+/// Another real world example showing the `com.codename1.io.FileSystemStorage` as a tree:
+///
+/// ```java
+/// Form hi = new Form("FileSystemTree", new BorderLayout());
+/// TreeModel tm = new TreeModel() {
+/// @Override
+///     public Vector getChildren(Object parent) {
+///         String[] files;
+///         if(parent == null) {
+///             files = FileSystemStorage.getInstance().getRoots();
+///             return new Vector(Arrays.asList(files));
+///         } else {
+///             try {
+///                 files = FileSystemStorage.getInstance().listFiles((String)parent);
+///             } catch(IOException err) {
+///                 Log.e(err);
+///                 files = new String[0];
+///             }
+///         }
+///         String p = (String)parent;
+///         Vector result = new Vector();
+///         for(String s : files) {
+///             result.add(p + s);
+///         }
+///         return result;
+///     }
+/// @Override
+///     public boolean isLeaf(Object node) {
+///         return !FileSystemStorage.getInstance().isDirectory((String)node);
+///     }
+/// };
+/// Tree t = new Tree(tm) {
+/// @Override
+///     protected String childToDisplayLabel(Object child) {
+///         String n = (String)child;
+///         int pos = n.lastIndexOf("/");
+///         if(pos
+/// @author Shai Almog
 public class Tree extends Container {
     private static final String KEY_OBJECT = "TREE_OBJECT";
     private static final String KEY_PARENT = "TREE_PARENT";
@@ -84,10 +139,8 @@ public class Tree extends Container {
     private TreeModel model;
     private boolean multilineMode;
 
-    /**
-     * Constructor for usage by GUI builder and automated tools, normally one
-     * should use the version that accepts the model
-     */
+    /// Constructor for usage by GUI builder and automated tools, normally one
+    /// should use the version that accepts the model
     public Tree() {
         this(new StringArrayTreeModel(new String[][]{
                 {"Colors", "Letters", "Numbers"},
@@ -97,11 +150,11 @@ public class Tree extends Container {
         }));
     }
 
-    /**
-     * Construct a tree with the given tree model
-     *
-     * @param model represents the contents of the tree
-     */
+    /// Construct a tree with the given tree model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: represents the contents of the tree
     public Tree(TreeModel model) {
         this.model = model;
         setLayout(new BoxLayout(BoxLayout.Y_AXIS));
@@ -119,104 +172,96 @@ public class Tree extends Container {
         }
     }
 
-    /**
-     * Sets the icon for a tree folder
-     *
-     * @param folderIcon the icon for a folder within the tree
-     */
+    /// Sets the icon for a tree folder
+    ///
+    /// #### Parameters
+    ///
+    /// - `folderIcon`: the icon for a folder within the tree
     public static void setFolderIcon(Image folderIcon) {
         folder = folderIcon;
     }
 
-    /**
-     * Sets the icon for a tree folder in its expanded state
-     *
-     * @param folderIcon the icon for a folder within the tree
-     */
+    /// Sets the icon for a tree folder in its expanded state
+    ///
+    /// #### Parameters
+    ///
+    /// - `folderIcon`: the icon for a folder within the tree
     public static void setFolderOpenIcon(Image folderIcon) {
         openFolder = folderIcon;
     }
 
-    /**
-     * Sets the icon for a tree node
-     *
-     * @param nodeIcon the icon for a node within the tree
-     */
+    /// Sets the icon for a tree node
+    ///
+    /// #### Parameters
+    ///
+    /// - `nodeIcon`: the icon for a node within the tree
     public static void setNodeIcon(Image nodeIcon) {
         nodeImage = nodeIcon;
     }
 
-    /**
-     * Gets the state of the tree in a format that can be restored later
-     * by either the same tree or a different tree whose model includes the same
-     * nodes.
-     *
-     * @return A TreeState object that can be passed to {@link #setTreeState(com.codename1.ui.tree.Tree.TreeState) }
-     */
+    /// Gets the state of the tree in a format that can be restored later
+    /// by either the same tree or a different tree whose model includes the same
+    /// nodes.
+    ///
+    /// #### Returns
+    ///
+    /// A TreeState object that can be passed to `#setTreeState(com.codename1.ui.tree.Tree.TreeState)`
     public TreeState getTreeState() {
         State out = new State();
         out.extractStateFrom(this);
         return out;
     }
 
-    /**
-     * Sets the tree state.
-     *
-     * @param state The state, which was returned from the {@link #getTreeState() } method.
-     */
+    /// Sets the tree state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: The state, which was returned from the `#getTreeState()` method.
     public void setTreeState(TreeState state) {
         if (state instanceof State) {
             ((State) state).applyStateTo(this);
         }
     }
 
-    /**
-     * Toggles a mode where rows in the tree can be broken since span buttons will
-     * be used instead of plain buttons.
-     *
-     * @return the multilineMode
-     */
+    /// Toggles a mode where rows in the tree can be broken since span buttons will
+    /// be used instead of plain buttons.
+    ///
+    /// #### Returns
+    ///
+    /// the multilineMode
     public boolean isMultilineMode() {
         return multilineMode;
     }
 
-    /**
-     * Toggles a mode where rows in the tree can be broken since span buttons will
-     * be used instead of plain buttons.
-     *
-     * @param multilineMode the multilineMode to set
-     */
+    /// Toggles a mode where rows in the tree can be broken since span buttons will
+    /// be used instead of plain buttons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `multilineMode`: the multilineMode to set
     public void setMultilineMode(boolean multilineMode) {
         this.multilineMode = multilineMode;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"data"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String[][]"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("data".equals(name)) {
@@ -225,9 +270,7 @@ public class Tree extends Container {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("data".equals(name)) {
@@ -237,20 +280,20 @@ public class Tree extends Container {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * Returns the tree model instance
-     *
-     * @return the tree model
-     */
+    /// Returns the tree model instance
+    ///
+    /// #### Returns
+    ///
+    /// the tree model
     public TreeModel getModel() {
         return model;
     }
 
-    /**
-     * Sets the tree model to a new value
-     *
-     * @param model the model of the tree
-     */
+    /// Sets the tree model to a new value
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model of the tree
     public void setModel(TreeModel model) {
         this.model = model;
         removeAll();
@@ -302,12 +345,15 @@ public class Tree extends Container {
         return dest;
     }
 
-    /**
-     * This method returns true if the given node is expanded.
-     *
-     * @param node a Component that represents a tree node.
-     * @return true if this tree node is expanded
-     */
+    /// This method returns true if the given node is expanded.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: a Component that represents a tree node.
+    ///
+    /// #### Returns
+    ///
+    /// true if this tree node is expanded
     protected boolean isExpanded(Component node) {
         Object e = node.getClientProperty(KEY_EXPANDED);
         return e != null && "true".equals(e);
@@ -356,25 +402,38 @@ public class Tree extends Container {
         }
     }
 
-    /**
-     * Finds the component for a model node.
-     *
-     * @param node The node from the model.
-     * @return The corresponding component in the UI or null if not found.
-     * @since 7.0
-     */
+    /// Finds the component for a model node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: The node from the model.
+    ///
+    /// #### Returns
+    ///
+    /// The corresponding component in the UI or null if not found.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public Component findNodeComponent(Object node) {
         return findNodeComponent(node, this);
     }
 
-    /**
-     * Finds the component for a model node.
-     *
-     * @param node Model node whose view we seek.
-     * @param root A root component - we check root and its descendents.
-     * @return The corresponding UI component for node, or null if not found.
-     * @since 7.0
-     */
+    /// Finds the component for a model node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: Model node whose view we seek.
+    ///
+    /// - `root`: A root component - we check root and its descendents.
+    ///
+    /// #### Returns
+    ///
+    /// The corresponding UI component for node, or null if not found.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public Component findNodeComponent(Object node, Component root) {
         if (root == null) {
             return findNodeComponent(node, this);
@@ -396,21 +455,22 @@ public class Tree extends Container {
         return null;
     }
 
-    /**
-     * Expands the tree path
-     *
-     * @param path the path to expand
-     */
+    /// Expands the tree path
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path to expand
     public void expandPath(Object... path) {
         expandPath(isInitialized(), path);
     }
 
-    /**
-     * Expands the tree path
-     *
-     * @param path    the path to expand
-     * @param animate whether to animate expansion
-     */
+    /// Expands the tree path
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path to expand
+    ///
+    /// - `animate`: whether to animate expansion
     public void expandPath(boolean animate, Object... path) {
         Container c = this;
         int plen = path.length;
@@ -422,11 +482,11 @@ public class Tree extends Container {
         }
     }
 
-    /**
-     * Collapses the last element in the path
-     *
-     * @param path the path to the element that should be collapsed
-     */
+    /// Collapses the last element in the path
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path to the element that should be collapsed
     public void collapsePath(Object... path) {
         Container c = this;
         int plen = path.length;
@@ -469,11 +529,11 @@ public class Tree extends Container {
         }
     }
 
-    /**
-     * Returns the currently selected item in the tree
-     *
-     * @return the object selected within the tree
-     */
+    /// Returns the currently selected item in the tree
+    ///
+    /// #### Returns
+    ///
+    /// the object selected within the tree
     public Object getSelectedItem() {
         Component c = getComponentForm().getFocused();
         if (c != null) {
@@ -482,12 +542,15 @@ public class Tree extends Container {
         return null;
     }
 
-    /**
-     * Gets the parent model node for a component.
-     *
-     * @param nodeComponent The UI for a node.
-     * @return The model node's parent, or null if not found.
-     */
+    /// Gets the parent model node for a component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nodeComponent`: The UI for a node.
+    ///
+    /// #### Returns
+    ///
+    /// The model node's parent, or null if not found.
     public Object getParentNode(Component nodeComponent) {
         if (nodeComponent == null) {
             return null;
@@ -496,14 +559,20 @@ public class Tree extends Container {
 
     }
 
-    /**
-     * Gets the UI component corresponding to the parent model mode of the node
-     * corresponding with the given UI component.
-     *
-     * @param nodeComponent UI component, whose node we seek the parent.
-     * @return UI component for the given node's parent.
-     * @since 7.0
-     */
+    /// Gets the UI component corresponding to the parent model mode of the node
+    /// corresponding with the given UI component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nodeComponent`: UI component, whose node we seek the parent.
+    ///
+    /// #### Returns
+    ///
+    /// UI component for the given node's parent.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public Component getParentComponent(Component nodeComponent) {
         if (nodeComponent == null) {
             return null;
@@ -511,12 +580,15 @@ public class Tree extends Container {
         return findNodeComponent(getParentNode(nodeComponent));
     }
 
-    /**
-     * Refreshes a node of the tree.
-     *
-     * @param nodeComponent The node component.
-     * @since 7.0
-     */
+    /// Refreshes a node of the tree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nodeComponent`: The node component.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public void refreshNode(Component nodeComponent) {
         if (nodeComponent == null) {
             throw new IllegalArgumentException("refreshNode expects a non-null argument");
@@ -555,9 +627,7 @@ public class Tree extends Container {
         revalidateLater();
     }
 
-    /**
-     * Adds the child components of a tree branch to the given container.
-     */
+    /// Adds the child components of a tree branch to the given container.
     private void buildBranch(Object parent, int depth, Container destination) {
         Vector children = model.getChildren(parent);
         int size = children.size();
@@ -580,15 +650,22 @@ public class Tree extends Container {
         }
     }
 
-    /**
-     * Creates a node within the tree, this method is protected allowing tree to be
-     * subclassed to replace the rendering logic of individual tree buttons.
-     *
-     * @param node  the node object from the model to display on the button
-     * @param depth the depth within the tree (normally represented by indenting the entry)
-     * @return a button representing the node within the tree
-     * @deprecated replaced with createNode, bindNodeListener and setNodeIcon
-     */
+    /// Creates a node within the tree, this method is protected allowing tree to be
+    /// subclassed to replace the rendering logic of individual tree buttons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the node object from the model to display on the button
+    ///
+    /// - `depth`: the depth within the tree (normally represented by indenting the entry)
+    ///
+    /// #### Returns
+    ///
+    /// a button representing the node within the tree
+    ///
+    /// #### Deprecated
+    ///
+    /// replaced with createNode, bindNodeListener and setNodeIcon
     protected Button createNodeComponent(Object node, int depth) {
         Button cmp = new Button(childToDisplayLabel(node));
         cmp.setUIID("TreeNode");
@@ -609,13 +686,14 @@ public class Tree extends Container {
         return cmp;
     }
 
-    /**
-     * Since a node may be any component type developers should override this method to
-     * add support for binding the click listener to the given component.
-     *
-     * @param l    listener interface
-     * @param node node component returned by createNode
-     */
+    /// Since a node may be any component type developers should override this method to
+    /// add support for binding the click listener to the given component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: listener interface
+    ///
+    /// - `node`: node component returned by createNode
     protected void bindNodeListener(ActionListener l, Component node) {
         if (node instanceof Button) {
             ((Button) node).addActionListener(l);
@@ -624,12 +702,13 @@ public class Tree extends Container {
         ((SpanButton) node).addActionListener(l);
     }
 
-    /**
-     * Sets the icon for the given node similar in scope to bindNodeListener
-     *
-     * @param icon the icon for the node
-     * @param node the node instance
-     */
+    /// Sets the icon for the given node similar in scope to bindNodeListener
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon for the node
+    ///
+    /// - `node`: the node instance
     protected void setNodeIcon(Image icon, Component node) {
         if (node instanceof Button) {
             ((Button) node).setIcon(icon);
@@ -638,26 +717,35 @@ public class Tree extends Container {
         ((SpanButton) node).setIcon(icon);
     }
 
-    /**
-     * Sets material icon for the node.
-     *
-     * @param c    Material icon code.  See {@link FontImage}
-     * @param node The node to set the icon for.
-     * @param size The size in millimetres for the icon.
-     * @since 7.0
-     */
+    /// Sets material icon for the node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: Material icon code.  See `FontImage`
+    ///
+    /// - `node`: The node to set the icon for.
+    ///
+    /// - `size`: The size in millimetres for the icon.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected void setNodeMaterialIcon(char c, Component node, float size) {
         FontImage.setMaterialIcon(node, FontImage.MATERIAL_FOLDER, 3);
     }
 
-    /**
-     * Creates a node within the tree, this method is protected allowing tree to be
-     * subclassed to replace the rendering logic of individual tree buttons.
-     *
-     * @param node  the node object from the model to display on the button
-     * @param depth the depth within the tree (normally represented by indenting the entry)
-     * @return a button representing the node within the tree
-     */
+    /// Creates a node within the tree, this method is protected allowing tree to be
+    /// subclassed to replace the rendering logic of individual tree buttons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the node object from the model to display on the button
+    ///
+    /// - `depth`: the depth within the tree (normally represented by indenting the entry)
+    ///
+    /// #### Returns
+    ///
+    /// a button representing the node within the tree
     protected Component createNode(Object node, int depth) {
         if (multilineMode) {
             SpanButton cmp = new SpanButton(childToDisplayLabel(node));
@@ -679,48 +767,52 @@ public class Tree extends Container {
         s.setMarginLeft(depth * depthIndent);
     }
 
-    /**
-     * Converts a tree child to a label, this method can be overriden for
-     * simple rendering effects
-     *
-     * @return a string representing the given tree node
-     */
+    /// Converts a tree child to a label, this method can be overriden for
+    /// simple rendering effects
+    ///
+    /// #### Returns
+    ///
+    /// a string representing the given tree node
     protected String childToDisplayLabel(Object child) {
         return child.toString();
     }
 
-    /**
-     * A listener that fires when a leaf is clicked
-     *
-     * @param l listener to fire when the leaf is clicked
-     */
+    /// A listener that fires when a leaf is clicked
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: listener to fire when the leaf is clicked
     public void addLeafListener(ActionListener l) {
         leafListener.addListener(l);
     }
 
-    /**
-     * Removes the listener that fires when a leaf is clicked
-     *
-     * @param l listener to remove
-     */
+    /// Removes the listener that fires when a leaf is clicked
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: listener to remove
     public void removeLeafListener(ActionListener l) {
         leafListener.removeListener(l);
     }
 
-    /**
-     * Gets the model for a component in the tree.
-     *
-     * @param node The component whose model we want to obtain.
-     * @return The model.
-     * @since 7.0
-     */
+    /// Gets the model for a component in the tree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: The component whose model we want to obtain.
+    ///
+    /// #### Returns
+    ///
+    /// The model.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected Object getModel(Component node) {
         return node.getClientProperty(KEY_OBJECT);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         Dimension d = super.calcPreferredSize();
@@ -740,11 +832,9 @@ public class Tree extends Container {
         return d;
     }
 
-    /**
-     * A marker interface used for Tree state returned from {@link #getTreeState() } and
-     * passed to {@link #setTreeState(com.codename1.ui.tree.Tree.TreeState) } for retaining
-     * state in a Tree when the model is changed.
-     */
+    /// A marker interface used for Tree state returned from `#getTreeState()` and
+    /// passed to `#setTreeState(com.codename1.ui.tree.Tree.TreeState)` for retaining
+    /// state in a Tree when the model is changed.
     public interface TreeState {
 
     }
@@ -842,9 +932,7 @@ public class Tree extends Container {
         }
     }
 
-    /**
-     * This class unifies two action listeners into a single class to reduce the size overhead
-     */
+    /// This class unifies two action listeners into a single class to reduce the size overhead
     private class Handler implements ActionListener {
         private Object current;
 

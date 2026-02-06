@@ -43,111 +43,110 @@ import com.codename1.ui.util.EventDispatcher;
 
 import java.util.Collection;
 
-/**
- * <p>
- * The on/off switch is a checkbox of sort (although it derives container) that
- * represents its state as a switch When using the Android native theme, this implementation follows the Material
- * Design Switch guidelines:
- * https://material.io/guidelines/components/selection-controls.html#selection-controls-radio-button
- *
- * </p>
- *
- * <h3>Customizing Look and Feel</h3>
- *
- * <p>You can customize the look and feel of a switch using styles, either directly
- * in the theme.res file or in CSS.  This component consists of two elements: the "thumb" the "track".
- * The "thumb" is the circular handle that can be toggled/dragged between an on and off position.
- * The "track" is the background track along which the "thumb" appears to slide when it is dragged/toggled.
- *
- * <p>The thumb will be rendered using Switch's {@link Style#getFgColor() }.  It will use the
- * selected style, when in the "on" position, the unselected style when in the "off" position,
- * and the disabled style, when {@link #isEnabled() } is {@literal false}.</p>
- *
- * <p>The track will be rendered using the Switch's {@link Style#getBgColor() }.  It will
- * use the selected style, when in the "on" position, and the unselected style when in the "off"
- * position.</p>
- *
- * <p>You can also adjust the thumb and track sizes using the following theme constants:</p>
- *
- * <table>
- * <tr><td>{@literal switchThumbScaleY}</td><td>A floating point value used to scale the thumb's diameter, relative to the font size.  In the android native theme, this value is set to 1.5.  On iOS, it is set to 1.4.</td></tr>
- * <tr><td>{@literal switchTrackScaleY}</td><td>A floating point value used to scale the track's height, relative the the font size.  In the android native theme, this value is set to 0.9.  On iOS, it is set to 1.5</td></tr>
- * <tr><td>{@literal switchTrackScaleX}</td><td>A floating point value used to scale the track's width relative to the font size.  In the Android native theme, this value is set to 3.0.  On iOS it is 2.5</td></tr>
- * <tr><td>{@literal switchTrackOffOutlineWidthMM}</td><td>A floating point value used to set the stroke/outline thickness of the track when the switch is in the "off" position.  In the Android native theme, this is set to 0.  On iOS it is 0.25</td></tr>
- * <tr><td>{@literal switchTrackOnOutlineWidthMM}</td><td>A floating point value used to set the stroke/outline thickness of the track when the switch is in the "on" position.  In both the Android native theme and the iOS native theme, this is set to 0.</td></tr>
- * <tr><td>{@literal switchTrackOffOutlineColor}</td><td>The color used to stroke the outline for the track when the switch is in the "off" position, expressed as a base-16 int.  In the iOS native theme, this is set to "cccccc".</td></tr>
- * <tr><td>{@literal switchTrackOnOutlineColor}</td><td>The color used to stroke the outline for the track when the switch is in the "on" position, expressed as a base-16 int.  This is currently not used in either Android or iOS.</td></tr>
- * <tr><td>{@literal switchThumbInsetMM}</td><td>An inset to use when rendering the thumb that will cause it to be inset from the edge of the track. In the iOS native theme, this is 0.25</td></tr>
- * </table>
- *
- * <p>
- * <strong>IMPORTANT:</strong> when changing the UIID of the switch the constants
- * above implicitly change to match the new UIID with the same convetion. So if
- * your UIID is {@code MySwitch} then a theme constant will become:
- * {@code myswitchTrackScaleY}. Notice that the whole UIID is lower cased...
- * </p>
- *
- * <p><strong>CSS used in the Android native theme:</strong></p>
- * <pre>{@code
- * #Constants {
- * ...
- * switchThumbPaddingInt: 2;
- * switchThumbScaleY: "1.5";
- * switchTrackScaleY: "0.9";
- * switchTrackScaleX: "3";
- * switchTrackOffOutlineWidthMM: "0";
- * switchTrackOnOutlineWidthMM: "0";
- * switchTrackOffOutlineColor: "cccccc";
- * switchThumbInsetMM: "0";
- * }
- * Switch {
- * color: rgb(237, 237, 237);
- * background-color: rgb(159, 158, 158);
- *
- * }
- * Switch.selected {
- * color: rgb(34,44,50);
- * background-color: rgb(117, 126, 132);
- * }
- * }</pre>
- *
- * <p><strong>CSS used in the iOS native theme:</strong></p>
- * <pre>{@code
- * #Constants {
- * ...
- * switchThumbPaddingInt: 2;
- * switchThumbScaleY: "1.4";
- * switchTrackScaleY: "1.5";
- * switchTrackScaleX: "2.5";
- * switchTrackOffOutlineWidthMM: "0.25";
- * switchTrackOnOutlineWidthMM: "0";
- * switchTrackOffOutlineColor: "cccccc";
- * switchThumbInsetMM: "0.25";
- * }
- * Switch {
- * color: white;
- * background-color: white;
- *
- * }
- * Switch.selected {
- * color: white;
- * background-color: rgb(61, 216, 76);
- *
- * }
- * }
- * </pre>
- * <h4>Using Custom Thumb and Track Images</h4>
- * <p>You can optionally provide custom images for use as the track or thumb via the following
- * theme constants</p>
- * <ul>
- *   <li>{@literal switchThumbOnImage}</li>
- *   <li>{@literal switchThumbOffImage}</li>
- *   <li>{@literal switchThumbDisabledImage}</li>
- *   <li>{@literal switchOnTrackImage}</li>
- *   <li>{@literal switchOffTrackImage}</li>
- *   <li>{@literal switchDisabledTrackImage}</li>
- * </ul>
- */
+/// The on/off switch is a checkbox of sort (although it derives container) that
+/// represents its state as a switch When using the Android native theme, this implementation follows the Material
+/// Design Switch guidelines:
+/// https://material.io/guidelines/components/selection-controls.html#selection-controls-radio-button
+///
+/// Customizing Look and Feel
+///
+/// You can customize the look and feel of a switch using styles, either directly
+/// in the theme.res file or in CSS.  This component consists of two elements: the "thumb" the "track".
+/// The "thumb" is the circular handle that can be toggled/dragged between an on and off position.
+/// The "track" is the background track along which the "thumb" appears to slide when it is dragged/toggled.
+///
+/// The thumb will be rendered using Switch's `Style#getFgColor()`.  It will use the
+/// selected style, when in the "on" position, the unselected style when in the "off" position,
+/// and the disabled style, when `#isEnabled()` is false.
+///
+/// The track will be rendered using the Switch's `Style#getBgColor()`.  It will
+/// use the selected style, when in the "on" position, and the unselected style when in the "off"
+/// position.
+///
+/// You can also adjust the thumb and track sizes using the following theme constants:
+///
+/// switchThumbScaleYA floating point value used to scale the thumb's diameter, relative to the font size.  In the android native theme, this value is set to 1.5.  On iOS, it is set to 1.4.
+/// switchTrackScaleYA floating point value used to scale the track's height, relative the the font size.  In the android native theme, this value is set to 0.9.  On iOS, it is set to 1.5
+/// switchTrackScaleXA floating point value used to scale the track's width relative to the font size.  In the Android native theme, this value is set to 3.0.  On iOS it is 2.5
+/// switchTrackOffOutlineWidthMMA floating point value used to set the stroke/outline thickness of the track when the switch is in the "off" position.  In the Android native theme, this is set to 0.  On iOS it is 0.25
+/// switchTrackOnOutlineWidthMMA floating point value used to set the stroke/outline thickness of the track when the switch is in the "on" position.  In both the Android native theme and the iOS native theme, this is set to 0.
+/// switchTrackOffOutlineColorThe color used to stroke the outline for the track when the switch is in the "off" position, expressed as a base-16 int.  In the iOS native theme, this is set to "cccccc".
+/// switchTrackOnOutlineColorThe color used to stroke the outline for the track when the switch is in the "on" position, expressed as a base-16 int.  This is currently not used in either Android or iOS.
+/// switchThumbInsetMMAn inset to use when rendering the thumb that will cause it to be inset from the edge of the track. In the iOS native theme, this is 0.25
+///
+/// **IMPORTANT:** when changing the UIID of the switch the constants
+/// above implicitly change to match the new UIID with the same convetion. So if
+/// your UIID is `MySwitch` then a theme constant will become:
+/// `myswitchTrackScaleY`. Notice that the whole UIID is lower cased...
+///
+/// **CSS used in the Android native theme:**
+///
+/// ```java
+/// `#Constants {
+/// ...
+/// switchThumbPaddingInt: 2;
+/// switchThumbScaleY: "1.5";
+/// switchTrackScaleY: "0.9";
+/// switchTrackScaleX: "3";
+/// switchTrackOffOutlineWidthMM: "0";
+/// switchTrackOnOutlineWidthMM: "0";
+/// switchTrackOffOutlineColor: "cccccc";
+/// switchThumbInsetMM: "0";`
+/// Switch {
+/// color: rgb(237, 237, 237);
+/// background-color: rgb(159, 158, 158);
+///
+/// }
+/// Switch.selected {
+/// color: rgb(34,44,50);
+/// background-color: rgb(117, 126, 132);
+/// }
+/// }
+/// ```
+///
+/// **CSS used in the iOS native theme:**
+///
+/// ```java
+/// `#Constants {
+/// ...
+/// switchThumbPaddingInt: 2;
+/// switchThumbScaleY: "1.4";
+/// switchTrackScaleY: "1.5";
+/// switchTrackScaleX: "2.5";
+/// switchTrackOffOutlineWidthMM: "0.25";
+/// switchTrackOnOutlineWidthMM: "0";
+/// switchTrackOffOutlineColor: "cccccc";
+/// switchThumbInsetMM: "0.25";`
+/// Switch {
+/// color: white;
+/// background-color: white;
+///
+/// }
+/// Switch.selected {
+/// color: white;
+/// background-color: rgb(61, 216, 76);
+///
+/// }
+/// }
+/// ```
+///
+/// Using Custom Thumb and Track Images
+///
+/// You can optionally provide custom images for use as the track or thumb via the following
+/// theme constants
+///
+///
+/// - switchThumbOnImage
+///
+/// - switchThumbOffImage
+///
+/// - switchThumbDisabledImage
+///
+/// - switchOnTrackImage
+///
+/// - switchOffTrackImage
+///
+/// - switchDisabledTrackImage
 public class Switch extends Component implements ActionSource, ReleasableComponent {
 
     private final EventDispatcher dispatcher = new EventDispatcher();
@@ -263,20 +262,18 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         }
     };
 
-    /**
-     * Default constructor
-     */
+    /// Default constructor
     public Switch() {
         this("Switch");
     }
 
-    /**
-     * This constructor should be used when customizing theme constants
-     * for a different UIID
-     *
-     * @param uiid accepts an alternate UIID for switch which might be
-     *             necessary for theme constants
-     */
+    /// This constructor should be used when customizing theme constants
+    /// for a different UIID
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: @param uiid accepts an alternate UIID for switch which might be
+    /// necessary for theme constants
     public Switch(String uiid) {
         setUIIDFinal(uiid);
         setOpaque(false);
@@ -526,12 +523,12 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return trackDisabledImage;
     }
 
-    /**
-     * Sets the image to be used for track when the component is disabled.
-     * Use the "switchDisabledTrackImage" theme constant as a default value.
-     *
-     * @param image
-     */
+    /// Sets the image to be used for track when the component is disabled.
+    /// Use the "switchDisabledTrackImage" theme constant as a default value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`
     private void setTrackDisabledImage(Image image) {
         if (image != null) {
             this.trackDisabledImage = image;
@@ -560,12 +557,12 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return trackOffImage;
     }
 
-    /**
-     * Sets the image to use for the track when the switch is set to "off".
-     * Use the "switchOffTrackImage" theme constant as a default value.
-     *
-     * @param image The image to use.
-     */
+    /// Sets the image to use for the track when the switch is set to "off".
+    /// Use the "switchOffTrackImage" theme constant as a default value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: The image to use.
     private void setTrackOffImage(Image image) {
         if (image != null) {
             this.trackOffImage = image;
@@ -587,9 +584,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void styleChanged(String propertyName, Style source) {
         if (Style.FG_COLOR.equals(propertyName) || Style.BG_COLOR.equals(propertyName) || Style.FONT.equals(propertyName)) {
@@ -598,9 +593,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         super.styleChanged(propertyName, source);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         return new Dimension(
@@ -609,9 +602,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void resetFocusable() {
         setFocusable(true);
@@ -622,9 +613,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         initTheme();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -659,59 +648,60 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 getThemeImageConstant(getUIID().toLowerCase() + "DisabledTrackImage"));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isStickyDrag() {
         return true;
     }
 
-    /**
-     * Adds a listener to the switch which will cause an event to dispatch on
-     * click
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Adds a listener to the switch which will cause an event to dispatch on
+    /// click
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     @Override
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
 
-    /**
-     * Removes the given action listener from the switch
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Removes the given action listener from the switch
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     @Override
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
 
-    /**
-     * Adds a listener to the switch which will cause an event on change
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Adds a listener to the switch which will cause an event on change
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     public void addChangeListener(ActionListener l) {
         changeDispatcher.addListener(l);
     }
 
-    /**
-     * Removes the given change listener from the switch
-     *
-     * @param l implementation of the action listener interface
-     */
+    /// Removes the given change listener from the switch
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
     public void removeChangeListener(ActionListener l) {
         changeDispatcher.removeListener(l);
     }
 
-    /**
-     * Returns a collection containing the action listeners for this button
-     *
-     * @return the action listeners
-     * @deprecated This will be removed in a future version.
-     */
+    /// Returns a collection containing the action listeners for this button
+    ///
+    /// #### Returns
+    ///
+    /// the action listeners
+    ///
+    /// #### Deprecated
+    ///
+    /// This will be removed in a future version.
     public Collection getListeners() {
         return dispatcher.getListenerCollection();
     }
@@ -730,9 +720,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         changeDispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
 
@@ -857,9 +845,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initComponent() {
         super.initComponent();
@@ -868,9 +854,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         addPointerReleasedListener(pointerReleased);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void deinitialize() {
         removePointerPressedListener(pointerPressed);
@@ -919,20 +903,20 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     }
 
-    /**
-     * The value of the switch
-     *
-     * @return the value
-     */
+    /// The value of the switch
+    ///
+    /// #### Returns
+    ///
+    /// the value
     public boolean isValue() {
         return value;
     }
 
-    /**
-     * The value of the switch
-     *
-     * @param value the value to set
-     */
+    /// The value of the switch
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to set
     public void setValue(boolean value) {
         setValue(value, false);
     }
@@ -954,52 +938,46 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         animationLock = orig;
     }
 
-    /**
-     * Checks if switch is in the "on" position.
-     *
-     * @return True if switch is on.
-     */
+    /// Checks if switch is in the "on" position.
+    ///
+    /// #### Returns
+    ///
+    /// True if switch is on.
     public boolean isOn() {
         return value;
     }
 
-    /**
-     * Sets the switch to the "on" position.
-     */
+    /// Sets the switch to the "on" position.
     public void setOn() {
         setValue(true);
     }
 
-    /**
-     * Checks if the switch is in the "off" position.
-     *
-     * @return True of switch is currently off.
-     */
+    /// Checks if the switch is in the "off" position.
+    ///
+    /// #### Returns
+    ///
+    /// True of switch is currently off.
     public boolean isOff() {
         return !value;
     }
 
-    /**
-     * Switches the switch to the "off" position.
-     */
+    /// Switches the switch to the "off" position.
     public void setOff() {
         setValue(false);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[] {"value"};
     }
 
-    /**
-     * Some components may optionally generate a state which can then be
-     * restored using setCompnentState(). This method is used by the UIBuilder.
-     *
-     * @return the component state or null for undefined state.
-     */
+    /// Some components may optionally generate a state which can then be
+    /// restored using setCompnentState(). This method is used by the UIBuilder.
+    ///
+    /// #### Returns
+    ///
+    /// the component state or null for undefined state.
     @Override
     public Object getComponentState() {
         if (value) {
@@ -1008,29 +986,25 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return Boolean.FALSE;
     }
 
-    /**
-     * If getComponentState returned a value the setter can update the value and
-     * restore the prior state.
-     *
-     * @param state the non-null state
-     */
+    /// If getComponentState returned a value the setter can update the value and
+    /// restore the prior state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the non-null state
     @Override
     public void setComponentState(Object state) {
         System.out.println("Setting component state " + state);
         value = ((Boolean) state).booleanValue();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[] { Boolean.class };
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("value".equals(name)) {
@@ -1042,9 +1016,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("value".equals(name)) {
@@ -1060,41 +1032,31 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     weren't a ReleasableComponent, some pointerReleased() events may not be called.
     */
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public boolean isAutoRelease() {
         return false;
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public void setAutoRelease(boolean arg0) {
 
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public int getReleaseRadius() {
         return 0;
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public void setReleaseRadius(int arg0) {
 
     }
 
-    /**
-     * {@inheritDoc }
-     */
+    /// {@inheritDoc }
     @Override
     public void setReleased() {
 

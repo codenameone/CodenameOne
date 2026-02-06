@@ -44,62 +44,74 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Vector;
 
-/**
- * <p>A composite pattern with {@link Component}, allows nesting and arranging multiple
- * components using a pluggable layout manager architecture. Containers can be nested
- * one within the other to form elaborate UI's. By default Containers use {@link com.codename1.ui.layouts.FlowLayout}
- * which isn't ideal for most use cases.</p>
- * <img src="https://www.codenameone.com/img/developer-guide/component-uml.png" alt="Component/Container Relationship Diagram" />
- * <p>
- * Components within the Container <b>MUST</b> be arranged using a layout manager! <br>
- * This allows the UI to adapt to different resolutions, DPI, orientation changes etc. seamlessly. Invoking any
- * bounds setting method will produce unpredictable results. To learn about layout managers check out the
- * <a href="https://www.codenameone.com/manual/basics.html#_layout_managers">relevant section in the developer guide</a>.
- * </p>
- * <p>
- * A container doesn't implicitly reflow its elements and in that regard follows the direction of AWT/Swing. As
- * a result the layout can be animated to create a flowing effect for UI changes. This also provides improved
- * performance as a bonus. See this sample of {@code Container} animation:
- * </p>
- * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
- *
- * <p>
- * Many components within Codename One (e.g. {@link com.codename1.ui.tree.Tree},
- * {@link com.codename1.ui.table.Table},
- * {@link com.codename1.components.MultiButton} etc.) derive from Container instead of Component. This allows
- * such components to provide very rich functionality by building on top of the existing functionality.
- * Container also provides the lead component functionality that allows treating an entire Container hierarchy
- * as a single component. This is discussed in depth within the <a href="https://www.codenameone.com/manual/misc-features.html#_lead_component">developer guide</a>.
- * </p>
- *
- * @author Chen Fishbein
- * @see com.codename1.ui.layouts
- * @see Component
- */
+/// A composite pattern with `Component`, allows nesting and arranging multiple
+/// components using a pluggable layout manager architecture. Containers can be nested
+/// one within the other to form elaborate UI's. By default Containers use `com.codename1.ui.layouts.FlowLayout`
+/// which isn't ideal for most use cases.
+///
+/// Components within the Container **MUST** be arranged using a layout manager!
+///
+/// This allows the UI to adapt to different resolutions, DPI, orientation changes etc. seamlessly. Invoking any
+/// bounds setting method will produce unpredictable results. To learn about layout managers check out the
+/// [relevant section in the developer guide](https://www.codenameone.com/manual/basics.html#_layout_managers).
+///
+/// A container doesn't implicitly reflow its elements and in that regard follows the direction of AWT/Swing. As
+/// a result the layout can be animated to create a flowing effect for UI changes. This also provides improved
+/// performance as a bonus. See this sample of `Container` animation:
+///
+/// ```java
+/// Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
+/// Button fall = new Button("Fall");
+/// fall.addActionListener((e) -> {
+///     for(int iter = 0 ; iter < 10 ; iter++) {
+///         Label b = new Label ("Label " + iter);
+///         b.setWidth(fall.getWidth());
+///         b.setHeight(fall.getHeight());
+///         b.setY(-fall.getHeight());
+///         hi.add(b);
+///     }
+///     hi.getContentPane().animateLayout(20000);
+/// });
+/// hi.add(fall);
+/// ```
+///
+/// Many components within Codename One (e.g. `com.codename1.ui.tree.Tree`,
+/// `com.codename1.ui.table.Table`,
+/// `com.codename1.components.MultiButton` etc.) derive from Container instead of Component. This allows
+/// such components to provide very rich functionality by building on top of the existing functionality.
+/// Container also provides the lead component functionality that allows treating an entire Container hierarchy
+/// as a single component. This is discussed in depth within the [developer guide](https://www.codenameone.com/manual/misc-features.html#_lead_component).
+///
+/// @author Chen Fishbein
+///
+/// #### See also
+///
+/// - com.codename1.ui.layouts
+///
+/// - Component
 public class Container extends Component implements Iterable<Component> {
-    /**
-     * Workaround for the behavior of the sidemenu bar on iOS etc. which translates aggressively,
-     * this is visible with the table component where the lines slide out of place
-     */
+    /// Workaround for the behavior of the sidemenu bar on iOS etc. which translates aggressively,
+    /// this is visible with the table component where the lines slide out of place
     static int sidemenuBarTranslation;
     private static boolean enableLayoutOnPaint = true;
     private static boolean blockOverdraw;
     private final ArrayList<Component> components = new ArrayList<Component>();
-    /**
-     * A queue that keeps track of changes to the children while an animation is in progress.
-     *
-     * @see #getChildrenAsList(boolean)
-     * @see #iterator(boolean)
-     * @see #insertComponentAt(int, java.lang.Object, com.codename1.ui.Component)
-     * @see #removeComponentImpl(com.codename1.ui.Component)
-     */
+    /// A queue that keeps track of changes to the children while an animation is in progress.
+    ///
+    /// #### See also
+    ///
+    /// - #getChildrenAsList(boolean)
+    ///
+    /// - #iterator(boolean)
+    ///
+    /// - #insertComponentAt(int, java.lang.Object, com.codename1.ui.Component)
+    ///
+    /// - #removeComponentImpl(com.codename1.ui.Component)
     private final ArrayList<QueuedChange> changeQueue = new ArrayList<QueuedChange>();
     boolean scrollableX;
     boolean scrollableY;
-    /**
-     * A set used in {@link #paintElevatedPane(Graphics)} to gather all of the elevated descendent components
-     * of this container.
-     */
+    /// A set used in `#paintElevatedPane(Graphics)` to gather all of the elevated descendent components
+    /// of this container.
     ArrayList<Component> _tmpRenderingElevatedComponents;
     // A 2nd flag for enabling layout on paint.  In order for layoutOnPaint to occur,
     // both the enableLayoutOnPaint and allowEnableLayoutOnPaint flags must be true.
@@ -117,33 +129,26 @@ public class Container extends Component implements Iterable<Component> {
     private UIManager uiManager;
     private boolean surface;
     private boolean revalidatePending;
-    /**
-     * Set to keep track of elevated components to render against this surface.
-     */
+    /// Set to keep track of elevated components to render against this surface.
     private HashSet<Component> elevatedComponents;
-    /**
-     * Index variable used to assign indices to components within the same elevation level.
-     */
+    /// Index variable used to assign indices to components within the same elevation level.
     private int nextElevationComponentIndex;
-    /**
-     * Flag to
-     */
+    /// Flag to
     private boolean safeArea;
-    /**
-     * Indicates that this container is a "safe area" root.
-     */
+    /// Indicates that this container is a "safe area" root.
     private boolean safeAreaRoot;
     private TmpInsets tmpInsets;
     private int doLayoutDepth;
     private TmpInsets calcTmpInsets;
     private int calcPreferredSizeDepth;
 
-    /**
-     * Constructs a new Container with a new layout manager and UIID
-     *
-     * @param layout the specified layout manager
-     * @param uiid   the uiid of the container
-     */
+    /// Constructs a new Container with a new layout manager and UIID
+    ///
+    /// #### Parameters
+    ///
+    /// - `layout`: the specified layout manager
+    ///
+    /// - `uiid`: the uiid of the container
     public Container(Layout layout, String uiid) {
         super();
         setUIIDFinal(uiid);
@@ -151,18 +156,16 @@ public class Container extends Component implements Iterable<Component> {
         setFocusable(false);
     }
 
-    /**
-     * Constructs a new Container with a new layout manager.
-     *
-     * @param layout the specified layout manager
-     */
+    /// Constructs a new Container with a new layout manager.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layout`: the specified layout manager
     public Container(Layout layout) {
         this(layout, "Container");
     }
 
-    /**
-     * Constructs a new Container, with a {@link FlowLayout}.
-     */
+    /// Constructs a new Container, with a `FlowLayout`.
     public Container() {
         this(new FlowLayout());
     }
@@ -175,14 +178,19 @@ public class Container extends Component implements Iterable<Component> {
         blockOverdraw = b;
     }
 
-    /**
-     * Short-hand for enclosing a component within a Container
-     *
-     * @param l    the layout
-     * @param cmp  the component to enclose
-     * @param cons the constraint for the component
-     * @return a newly created container containing the given component
-     */
+    /// Short-hand for enclosing a component within a Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the layout
+    ///
+    /// - `cmp`: the component to enclose
+    ///
+    /// - `cons`: the constraint for the component
+    ///
+    /// #### Returns
+    ///
+    /// a newly created container containing the given component
     public static Container encloseIn(Layout l, Component cmp, Object cons) {
         Container cnt = new Container(l);
         if (cons instanceof Component) {
@@ -197,13 +205,17 @@ public class Container extends Component implements Iterable<Component> {
         return cnt;
     }
 
-    /**
-     * Short-hand for enclosing multiple components in a container typically a box layout
-     *
-     * @param l   the layout
-     * @param cmp the components to enclose
-     * @return a newly created container containing the given components
-     */
+    /// Short-hand for enclosing multiple components in a container typically a box layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the layout
+    ///
+    /// - `cmp`: the components to enclose
+    ///
+    /// #### Returns
+    ///
+    /// a newly created container containing the given components
     public static Container encloseIn(Layout l, Component... cmp) {
         Container cnt = new Container(l);
         for (Component c : cmp) {
@@ -216,9 +228,7 @@ public class Container extends Component implements Iterable<Component> {
         enableLayoutOnPaint = val;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initLaf(UIManager uim) {
         if (uim == getUIManager() && isInitialized()) { //NOPMD CompareObjectsWithEquals
@@ -237,9 +247,7 @@ public class Container extends Component implements Iterable<Component> {
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public UIManager getUIManager() {
         if (uiManager != null) {
@@ -248,27 +256,27 @@ public class Container extends Component implements Iterable<Component> {
         return super.getUIManager();
     }
 
-    /**
-     * Allows replacing the UIManager in a component hierarchy to update the look and feel
-     * only to a specific hierarchy
-     *
-     * @param uiManager UIManager instance
-     */
+    /// Allows replacing the UIManager in a component hierarchy to update the look and feel
+    /// only to a specific hierarchy
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiManager`: UIManager instance
     public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
     }
 
-    /**
-     * An atomic operation that wraps the current component in a Container with
-     * a layered layout.  This prevents us from having to initialize and deinitialize
-     * all of the components in a sub-tree because we want to re-root it.  In particular
-     * Form.getLayeredPane() re-roots the entire content pane the first time it is
-     * called on a form.  If the form contains native peers there is a flicker which
-     * is quite annoying.  Providing a way to do this atomically results in a better
-     * user experience.
-     *
-     * @return The Container that is the new parent of this component.
-     */
+    /// An atomic operation that wraps the current component in a Container with
+    /// a layered layout.  This prevents us from having to initialize and deinitialize
+    /// all of the components in a sub-tree because we want to re-root it.  In particular
+    /// Form.getLayeredPane() re-roots the entire content pane the first time it is
+    /// called on a form.  If the form contains native peers there is a flicker which
+    /// is quite annoying.  Providing a way to do this atomically results in a better
+    /// user experience.
+    ///
+    /// #### Returns
+    ///
+    /// The Container that is the new parent of this component.
     Container wrapInLayeredPane() {
         final Container oldParent = getParent();
         final Container newParent = new Container(new LayeredLayout());
@@ -317,26 +325,36 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Checks if this container acts as a Material Design surface.  "Surface" containers render drop-shadows for their
-     * elevated descendents.
-     *
-     * @return True if this container is a surface.
-     * @since 8.0
-     */
+    /// Checks if this container acts as a Material Design surface.  "Surface" containers render drop-shadows for their
+    /// elevated descendents.
+    ///
+    /// #### Returns
+    ///
+    /// True if this container is a surface.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
     public boolean isSurface() {
         return surface;
     }
 
-    /**
-     * Enables or disables "surface" features for this container.  If {@literal surface} is true, then the container
-     * will act as a surface.  As such, it will paint the drop-shadows for elevated descendents.
-     *
-     * @param surface True to set this container as a surface.
-     * @see Style#getElevation()
-     * @see Component#paintShadows(Graphics, int, int)
-     * @since 8.0
-     */
+    /// Enables or disables "surface" features for this container.  If surface is true, then the container
+    /// will act as a surface.  As such, it will paint the drop-shadows for elevated descendents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `surface`: True to set this container as a surface.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    ///
+    /// #### See also
+    ///
+    /// - Style#getElevation()
+    ///
+    /// - Component#paintShadows(Graphics, int, int)
     @Override
     void setSurface(boolean surface) {
         if (surface != this.surface) {
@@ -375,23 +393,29 @@ public class Container extends Component implements Iterable<Component> {
 
     }
 
-    /**
-     * Simpler version of addComponent that allows chaining the calls for shorter syntax
-     *
-     * @param cmp the component to add
-     * @return this for call chaining
-     */
+    /// Simpler version of addComponent that allows chaining the calls for shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to add
+    ///
+    /// #### Returns
+    ///
+    /// this for call chaining
     public final Container add(Component cmp) {
         addComponent(cmp);
         return this;
     }
 
-    /**
-     * Identical to add(x).add(y) only with a shorter syntax
-     *
-     * @param cmps the other components to add
-     * @return this for call chaining
-     */
+    /// Identical to add(x).add(y) only with a shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: the other components to add
+    ///
+    /// #### Returns
+    ///
+    /// this for call chaining
     public Container addAll(Component... cmps) {
         for (Component c : cmps) {
             addComponent(c);
@@ -399,56 +423,74 @@ public class Container extends Component implements Iterable<Component> {
         return this;
     }
 
-    /**
-     * Simpler version of addComponent that allows chaining the calls for shorter syntax
-     *
-     * @param constraint the layout constraint if applicable
-     * @param cmp        the component to add
-     * @return this for call chaining
-     */
+    /// Simpler version of addComponent that allows chaining the calls for shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`: the layout constraint if applicable
+    ///
+    /// - `cmp`: the component to add
+    ///
+    /// #### Returns
+    ///
+    /// this for call chaining
     public Container add(Object constraint, Component cmp) {
         addComponent(constraint, cmp);
         return this;
     }
 
-    /**
-     * Simpler version of addComponent that allows chaining the calls for shorter syntax
-     *
-     * @param label a string that will be wrapped as a label, this is equivalent to calling add(new Label(l))
-     * @return this for call chaining
-     */
+    /// Simpler version of addComponent that allows chaining the calls for shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `label`: a string that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+    ///
+    /// #### Returns
+    ///
+    /// this for call chaining
     public Container add(String label) {
         return add(new Label(label));
     }
 
-    /**
-     * Simpler version of addComponent that allows chaining the calls for shorter syntax
-     *
-     * @param img an image that will be wrapped as a label, this is equivalent to calling add(new Label(l))
-     * @return this for call chaining
-     */
+    /// Simpler version of addComponent that allows chaining the calls for shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: an image that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+    ///
+    /// #### Returns
+    ///
+    /// this for call chaining
     public Container add(Image img) {
         return add(new Label(img));
     }
 
-    /**
-     * Simpler version of addComponent that allows chaining the calls for shorter syntax
-     *
-     * @param constraint the layout constraint if applicable
-     * @param label      a component that will be wrapped as a label, this is equivalent to calling add(new Label(l))
-     * @return this for call chaining
-     */
+    /// Simpler version of addComponent that allows chaining the calls for shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`: the layout constraint if applicable
+    ///
+    /// - `label`: a component that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+    ///
+    /// #### Returns
+    ///
+    /// this for call chaining
     public Container add(Object constraint, String label) {
         return add(constraint, new Label(label));
     }
 
-    /**
-     * Simpler version of addComponent that allows chaining the calls for shorter syntax
-     *
-     * @param constraint the layout constraint if applicable
-     * @param img        an image that will be wrapped as a label, this is equivalent to calling add(new Label(l))
-     * @return this for call chaining
-     */
+    /// Simpler version of addComponent that allows chaining the calls for shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`: the layout constraint if applicable
+    ///
+    /// - `img`: an image that will be wrapped as a label, this is equivalent to calling add(new Label(l))
+    ///
+    /// #### Returns
+    ///
+    /// this for call chaining
     public Container add(Object constraint, Image img) {
         return add(constraint, new Label(img));
     }
@@ -469,11 +511,11 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Returns the lead component for this hierarchy if such a component is defined
-     *
-     * @return the lead component
-     */
+    /// Returns the lead component for this hierarchy if such a component is defined
+    ///
+    /// #### Returns
+    ///
+    /// the lead component
     @Override
     public Component getLeadComponent() {
 
@@ -489,12 +531,12 @@ public class Container extends Component implements Iterable<Component> {
         return null;
     }
 
-    /**
-     * Sets the lead component for this container, a lead component takes over the entire
-     * component hierarchy and receives all the events for the container hierarchy.
-     *
-     * @param lead component that takes over the hierarchy
-     */
+    /// Sets the lead component for this container, a lead component takes over the entire
+    /// component hierarchy and receives all the events for the container hierarchy.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lead`: component that takes over the hierarchy
     public final void setLeadComponent(Component lead) {
         if (lead == leadComponent) { //NOPMD CompareObjectsWithEquals
             return;
@@ -518,12 +560,12 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Returns the lead container thats handling the leading, this is useful for
-     * a container hierarchy where the parent container might not be the leader
-     *
-     * @return the lead component
-     */
+    /// Returns the lead container thats handling the leading, this is useful for
+    /// a container hierarchy where the parent container might not be the leader
+    ///
+    /// #### Returns
+    ///
+    /// the lead component
     public Container getLeadParent() {
 
         if (leadComponent != null) {
@@ -544,9 +586,7 @@ public class Container extends Component implements Iterable<Component> {
         hasLead = leadComponent != null || !isBlockLead();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyPressed(int k) {
         if (leadComponent != null) {
@@ -555,9 +595,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void keyReleased(int k) {
         if (leadComponent != null) {
@@ -607,20 +645,20 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Returns the layout manager responsible for arranging this container.
-     *
-     * @return the container layout manager
-     */
+    /// Returns the layout manager responsible for arranging this container.
+    ///
+    /// #### Returns
+    ///
+    /// the container layout manager
     public Layout getLayout() {
         return layout;
     }
 
-    /**
-     * Sets the layout manager responsible for arranging this container
-     *
-     * @param layout the specified layout manager
-     */
+    /// Sets the layout manager responsible for arranging this container
+    ///
+    /// #### Parameters
+    ///
+    /// - `layout`: the specified layout manager
     public void setLayout(Layout layout) {
         if (layout.isConstraintTracking()) {
             for (int iter = 0; iter < getComponentCount(); iter++) {
@@ -637,31 +675,25 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Returns the actual layout of this container.  For most components this just
-     * wraps {@link #getLayout()}, but some classes (e.g. Form) don't return their
-     * *actual* layout.  In such cases, this method will return the component's *actual*
-     * layout.
-     *
-     * @return
-     */
+    /// Returns the actual layout of this container.  For most components this just
+    /// wraps `#getLayout()`, but some classes (e.g. Form) don't return their
+    /// *actual* layout.  In such cases, this method will return the component's *actual*
+    /// layout.
     final Layout getActualLayout() {
         return layout;
     }
 
-    /**
-     * Same as setShouldCalcPreferredSize(true) but made accessible for
-     * layout managers
-     */
+    /// Same as setShouldCalcPreferredSize(true) but made accessible for
+    /// layout managers
     public void invalidate() {
         setShouldCalcPreferredSize(true);
     }
 
-    /**
-     * Flags this container to preform layout
-     *
-     * @param layout
-     */
+    /// Flags this container to preform layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `layout`
     protected void setShouldLayout(boolean layout) {
         if (!shouldCalcScrollSize) {
             this.shouldCalcScrollSize = layout;
@@ -684,9 +716,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
         // minor optimization preventing repeated invokations to setShouldCalcPreferredSize
@@ -709,12 +739,12 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Returns the width for layout manager purposes, this takes scrolling
-     * into consideration unlike the getWidth method.
-     *
-     * @return the layout width
-     */
+    /// Returns the width for layout manager purposes, this takes scrolling
+    /// into consideration unlike the getWidth method.
+    ///
+    /// #### Returns
+    ///
+    /// the layout width
     public int getLayoutWidth() {
         if (scrollableX) {
             return Math.max(getWidth(), getPreferredW());
@@ -731,12 +761,12 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Returns the height for layout manager purposes, this takes scrolling
-     * into consideration unlike the getHeight method.
-     *
-     * @return the layout height
-     */
+    /// Returns the height for layout manager purposes, this takes scrolling
+    /// into consideration unlike the getHeight method.
+    ///
+    /// #### Returns
+    ///
+    /// the layout height
     public int getLayoutHeight() {
         if (scrollableY) {
             return Math.max(getHeight(), getPreferredH());
@@ -753,12 +783,15 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Invokes apply/setRTL recursively on all the children components of this container
-     *
-     * @param rtl right to left bidi indication
-     * @see Component#setRTL(boolean)
-     */
+    /// Invokes apply/setRTL recursively on all the children components of this container
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: right to left bidi indication
+    ///
+    /// #### See also
+    ///
+    /// - Component#setRTL(boolean)
     public void applyRTL(boolean rtl) {
         setRTL(rtl);
         int c = getComponentCount();
@@ -772,16 +805,16 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Returns a parent container that is scrollableX or null if no parent is
-     * scrollable.
-     * <p>
-     * NOTE:  This is a utility method that is designed for the getLayoutWidth()
-     * method, which is why it obeys the constrainHeightWhenScrollable() attribute.
-     *
-     * @return a parent container that is scrollable or null if no parent is
-     * scrollable.
-     */
+    /// Returns a parent container that is scrollableX or null if no parent is
+    /// scrollable.
+    ///
+    /// NOTE:  This is a utility method that is designed for the getLayoutWidth()
+    /// method, which is why it obeys the constrainHeightWhenScrollable() attribute.
+    ///
+    /// #### Returns
+    ///
+    /// @return a parent container that is scrollable or null if no parent is
+    /// scrollable.
     private Container getScrollableParentX() {
         Container parent = getParent();
         while (parent != null) {
@@ -796,16 +829,16 @@ public class Container extends Component implements Iterable<Component> {
         return null;
     }
 
-    /**
-     * Returns a parent container that is scrollableY or null if no parent is
-     * scrollable.
-     * <p>
-     * NOTE:  This is a utility method that is designed for the getLayoutHeight()
-     * method, which is why it obeys the constrainHeightWhenScrollable() attribute.
-     *
-     * @return a parent container that is scrollable or null if no parent is
-     * scrollable.
-     */
+    /// Returns a parent container that is scrollableY or null if no parent is
+    /// scrollable.
+    ///
+    /// NOTE:  This is a utility method that is designed for the getLayoutHeight()
+    /// method, which is why it obeys the constrainHeightWhenScrollable() attribute.
+    ///
+    /// #### Returns
+    ///
+    /// @return a parent container that is scrollable or null if no parent is
+    /// scrollable.
     private Container getScrollableParentY() {
         Container parent = getParent();
         while (parent != null) {
@@ -820,76 +853,85 @@ public class Container extends Component implements Iterable<Component> {
         return null;
     }
 
-    /**
-     * Indicates that children's widths should be calculated as if this component weren't
-     * scrollable-X, even when the component is scrollable X.  Normally, when a component
-     * is figuring out its layout width, it will walk up the UI hierarchy to find the
-     * first scrollable container.  If there is a scrollable container, then the component
-     * will try to grow as big as it wants.  If there are no scrollable containers found,
-     * it will constrain itself to the space available.   In some cases, we may want the children
-     * of a component to lay themselves out conservatively though because it wants to use its
-     * scrollability for other features.
-     *
-     * @return True if children should calculate their layout widgets as if the component
-     * weren't scrollable.
-     * @since 7.0
-     */
+    /// Indicates that children's widths should be calculated as if this component weren't
+    /// scrollable-X, even when the component is scrollable X.  Normally, when a component
+    /// is figuring out its layout width, it will walk up the UI hierarchy to find the
+    /// first scrollable container.  If there is a scrollable container, then the component
+    /// will try to grow as big as it wants.  If there are no scrollable containers found,
+    /// it will constrain itself to the space available.   In some cases, we may want the children
+    /// of a component to lay themselves out conservatively though because it wants to use its
+    /// scrollability for other features.
+    ///
+    /// #### Returns
+    ///
+    /// @return True if children should calculate their layout widgets as if the component
+    /// weren't scrollable.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected boolean constrainWidthWhenScrollable() {
         return false;
     }
 
-    /**
-     * Indicates that children's widths should be calculated as if this component weren't
-     * scrollable-X, even when the component is scrollable Y.  Normally, when a component
-     * is figuring out its layout width, it will walk up the UI hierarchy to find the
-     * first scrollable container.  If there is a scrollable container, then the component
-     * will try to grow as big as it wants.  If there are no scrollable containers found,
-     * it will constrain itself to the space available.   In some cases, we may want the children
-     * of a component to lay themselves out conservatively though because it wants to use its
-     * scrollability for other features.
-     *
-     * @return True if children should calculate their layout widgets as if the component
-     * weren't scrollable.
-     * @since 7.0
-     */
+    /// Indicates that children's widths should be calculated as if this component weren't
+    /// scrollable-X, even when the component is scrollable Y.  Normally, when a component
+    /// is figuring out its layout width, it will walk up the UI hierarchy to find the
+    /// first scrollable container.  If there is a scrollable container, then the component
+    /// will try to grow as big as it wants.  If there are no scrollable containers found,
+    /// it will constrain itself to the space available.   In some cases, we may want the children
+    /// of a component to lay themselves out conservatively though because it wants to use its
+    /// scrollability for other features.
+    ///
+    /// #### Returns
+    ///
+    /// @return True if children should calculate their layout widgets as if the component
+    /// weren't scrollable.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     protected boolean constrainHeightWhenScrollable() {
         return false;
     }
 
-    /**
-     * Adds a Component to the Container
-     *
-     * @param cmp the component to be added
-     */
+    /// Adds a Component to the Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to be added
     public void addComponent(Component cmp) {
         layout.addLayoutComponent(null, cmp, this);
         insertComponentAt(Integer.MAX_VALUE, null, cmp);
     }
 
-    /**
-     * Adds a Component to the Container
-     *
-     * @param constraints this method is useful when the Layout requires a constraint
-     *                    such as the BorderLayout.
-     *                    In this case you need to specify an additional data when you add a Component,
-     *                    such as "CENTER", "NORTH"...
-     * @param cmp         component to add
-     */
+    /// Adds a Component to the Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraints`: @param constraints this method is useful when the Layout requires a constraint
+    /// such as the BorderLayout.
+    /// In this case you need to specify an additional data when you add a Component,
+    /// such as "CENTER", "NORTH"...
+    ///
+    /// - `cmp`: component to add
     public void addComponent(final Object constraints, final Component cmp) {
         layout.addLayoutComponent(constraints, cmp, this);
         insertComponentAt(Integer.MAX_VALUE, null, cmp);
     }
 
-    /**
-     * Adds a Component to the Container
-     *
-     * @param index       location to insert the Component
-     * @param constraints this method is useful when the Layout requires a constraint
-     *                    such as the BorderLayout.
-     *                    In this case you need to specify an additional data when you add a Component,
-     *                    such as "CENTER", "NORTH"...
-     * @param cmp         component to add
-     */
+    /// Adds a Component to the Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: location to insert the Component
+    ///
+    /// - `constraints`: @param constraints this method is useful when the Layout requires a constraint
+    /// such as the BorderLayout.
+    /// In this case you need to specify an additional data when you add a Component,
+    /// such as "CENTER", "NORTH"...
+    ///
+    /// - `cmp`: component to add
     public void addComponent(int index, Object constraints, Component cmp) {
         insertComponentAt(index, constraints, cmp);
     }
@@ -975,45 +1017,55 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * This method adds the Component at a specific index location in the Container
-     * Components array.
-     *
-     * @param index location to insert the Component
-     * @param cmp   the Component to add
-     * @throws ArrayIndexOutOfBoundsException if index is out of bounds
-     * @throws IllegalArgumentException       if Component is already contained or
-     *                                        the cmp is a Form Component
-     */
+    /// This method adds the Component at a specific index location in the Container
+    /// Components array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: location to insert the Component
+    ///
+    /// - `cmp`: the Component to add
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if index is out of bounds
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException       if Component is already contained or
+    /// the cmp is a Form Component
     public void addComponent(int index, Component cmp) {
         insertComponentAt(index, null, cmp);
     }
 
-    /**
-     * This method replaces the current Component with the next Component.
-     * Current Component must be contained in this Container.
-     * This method returns when transition has finished.
-     *
-     * @param current a Component to remove from the Container
-     * @param next    a Component that replaces the current Component
-     * @param t       a Transition between the add and removal of the Components
-     *                a Transition can be null
-     */
+    /// This method replaces the current Component with the next Component.
+    /// Current Component must be contained in this Container.
+    /// This method returns when transition has finished.
+    ///
+    /// #### Parameters
+    ///
+    /// - `current`: a Component to remove from the Container
+    ///
+    /// - `next`: a Component that replaces the current Component
+    ///
+    /// - `t`: @param t       a Transition between the add and removal of the Components
+    /// a Transition can be null
     public void replaceAndWait(final Component current, final Component next, final Transition t) {
         replaceComponents(current, next, t, true, null, 0, 0, true);
     }
 
-    /**
-     * This method replaces the current Component with the next Component.
-     * Current Component must be contained in this Container.
-     * This method returns when transition has finished.
-     *
-     * @param current              a Component to remove from the Container
-     * @param next                 a Component that replaces the current Component
-     * @param t                    a Transition between the add and removal of the Components
-     *                             a Transition can be null
-     * @param layoutAnimationSpeed the speed of the layout animation after replace  is completed
-     */
+    /// This method replaces the current Component with the next Component.
+    /// Current Component must be contained in this Container.
+    /// This method returns when transition has finished.
+    ///
+    /// #### Parameters
+    ///
+    /// - `current`: a Component to remove from the Container
+    ///
+    /// - `next`: a Component that replaces the current Component
+    ///
+    /// - `t`: @param t                    a Transition between the add and removal of the Components
+    /// a Transition can be null
+    ///
+    /// - `layoutAnimationSpeed`: the speed of the layout animation after replace  is completed
     public void replaceAndWait(final Component current, final Component next, final Transition t, int layoutAnimationSpeed) {
         setEnableLayoutOnPaint(false);
         replaceComponents(current, next, t, true, null, 0, layoutAnimationSpeed, true);
@@ -1024,64 +1076,78 @@ public class Container extends Component implements Iterable<Component> {
         setEnableLayoutOnPaint(true);
     }
 
-    /**
-     * This method replaces the current Component with the next Component
-     *
-     * @param current   a Component to remove from the Container
-     * @param next      a Component that replaces the current Component
-     * @param t         a Transition between the add and removal of the Components
-     *                  a Transition can be null
-     * @param onFinish  invoked when the replace operation is completed, may be null
-     * @param growSpeed after replace is completed the component can gradually grow/shrink to fill up
-     *                  available room, set this to 0 for immediate growth or any larger number for gradual animation. -1 indicates
-     *                  a special case where no validation occurs
-     */
+    /// This method replaces the current Component with the next Component
+    ///
+    /// #### Parameters
+    ///
+    /// - `current`: a Component to remove from the Container
+    ///
+    /// - `next`: a Component that replaces the current Component
+    ///
+    /// - `t`: @param t         a Transition between the add and removal of the Components
+    /// a Transition can be null
+    ///
+    /// - `onFinish`: invoked when the replace operation is completed, may be null
+    ///
+    /// - `growSpeed`: @param growSpeed after replace is completed the component can gradually grow/shrink to fill up
+    /// available room, set this to 0 for immediate growth or any larger number for gradual animation. -1 indicates
+    /// a special case where no validation occurs
     public void replace(final Component current, final Component next, final Transition t, Runnable onFinish, int growSpeed) {
         replaceComponents(current, next, t, false, onFinish, growSpeed, 0, true);
     }
 
-    /**
-     * This method replaces the current Component with the next Component.
-     * Current Component must be contained in this Container.
-     * This method returns when transition has finished.
-     *
-     * @param current    a Component to remove from the Container
-     * @param next       a Component that replaces the current Component
-     * @param t          a Transition between the add and removal of the Components
-     *                   a Transition can be null
-     * @param dropEvents indicates if the display should drop all events
-     *                   while this Component replacing is happening
-     */
+    /// This method replaces the current Component with the next Component.
+    /// Current Component must be contained in this Container.
+    /// This method returns when transition has finished.
+    ///
+    /// #### Parameters
+    ///
+    /// - `current`: a Component to remove from the Container
+    ///
+    /// - `next`: a Component that replaces the current Component
+    ///
+    /// - `t`: @param t          a Transition between the add and removal of the Components
+    /// a Transition can be null
+    ///
+    /// - `dropEvents`: @param dropEvents indicates if the display should drop all events
+    /// while this Component replacing is happening
     public void replaceAndWait(final Component current, final Component next,
                                final Transition t, boolean dropEvents) {
         replaceComponents(current, next, t, true, null, 0, 0, true);
     }
 
-    /**
-     * This method replaces the current Component with the next Component.
-     * Current Component must be contained in this Container.
-     * This method return immediately.
-     *
-     * @param current a Component to remove from the Container
-     * @param next    a Component that replaces the current Component
-     * @param t       a Transition between the add and removal of the Components
-     *                a Transition can be null
-     */
+    /// This method replaces the current Component with the next Component.
+    /// Current Component must be contained in this Container.
+    /// This method return immediately.
+    ///
+    /// #### Parameters
+    ///
+    /// - `current`: a Component to remove from the Container
+    ///
+    /// - `next`: a Component that replaces the current Component
+    ///
+    /// - `t`: @param t       a Transition between the add and removal of the Components
+    /// a Transition can be null
     public void replace(final Component current, final Component next, final Transition t) {
         replaceComponents(current, next, t, false, null, 0, 0, true);
     }
 
-    /**
-     * This method creates an animation component that replaces the current Component with the next Component.
-     * Current Component must be contained in this Container.
-     * This method return immediately.
-     *
-     * @param current a Component to remove from the Container
-     * @param next    a Component that replaces the current Component
-     * @param t       a Transition between the add and removal of the Components
-     *                a Transition can be null
-     * @return animation component that can be queued
-     */
+    /// This method creates an animation component that replaces the current Component with the next Component.
+    /// Current Component must be contained in this Container.
+    /// This method return immediately.
+    ///
+    /// #### Parameters
+    ///
+    /// - `current`: a Component to remove from the Container
+    ///
+    /// - `next`: a Component that replaces the current Component
+    ///
+    /// - `t`: @param t       a Transition between the add and removal of the Components
+    /// a Transition can be null
+    ///
+    /// #### Returns
+    ///
+    /// animation component that can be queued
     public ComponentAnimation createReplaceTransition(Component current, Component next, Transition t) {
         return replaceComponents(current, next, t, false, null, 0, 0, false);
     }
@@ -1231,9 +1297,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     void initComponentImpl() {
         if (!isInitialized()) {
@@ -1253,9 +1317,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isEnabled() {
         // Normally a container shouldn't be a lead component but this happens
@@ -1267,14 +1329,14 @@ public class Container extends Component implements Iterable<Component> {
         return super.isEnabled();
     }
 
-    /**
-     * This method will recursively set all the Container chidrens to be
-     * enabled/disabled.
-     * If the Container is disabled and a child Component changed it's state to
-     * be enabled, the child Component will be treated as an enabled Component.
-     *
-     * @param enabled
-     */
+    /// This method will recursively set all the Container chidrens to be
+    /// enabled/disabled.
+    /// If the Container is disabled and a child Component changed it's state to
+    /// be enabled, the child Component will be treated as an enabled Component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`
     @Override
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
@@ -1285,25 +1347,26 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * removes a Component from the Container, notice that removed component might still have
-     * a pending repaint in the queue that won't be removed. Calling form.repaint() will workaround
-     * such an issue.
-     *
-     * @param cmp the removed component
-     */
+    /// removes a Component from the Container, notice that removed component might still have
+    /// a pending repaint in the queue that won't be removed. Calling form.repaint() will workaround
+    /// such an issue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the removed component
     public void removeComponent(Component cmp) {
         removeComponentImpl(cmp);
     }
 
-    /**
-     * Changes the component index of a child component without revalidating or animating. This is useful
-     * for complex animations or z-order manipulation but might collide with ongoing animations hence the
-     * package protected nature.
-     *
-     * @param cmp      The component to be moved
-     * @param location The new component index
-     */
+    /// Changes the component index of a child component without revalidating or animating. This is useful
+    /// for complex animations or z-order manipulation but might collide with ongoing animations hence the
+    /// package protected nature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to be moved
+    ///
+    /// - `location`: The new component index
     void setComponentIndex(Component cmp, int location) {
         if (location < components.size()) {
             components.remove(cmp);
@@ -1350,11 +1413,11 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * removes a Component from the Container
-     *
-     * @param cmp the removed component
-     */
+    /// removes a Component from the Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the removed component
     void removeComponentImplNoAnimationSafety(Component cmp) {
         Form parentForm = getComponentForm();
         layout.removeLayoutComponent(cmp);
@@ -1385,9 +1448,7 @@ public class Container extends Component implements Iterable<Component> {
         Display.impl.componentRemoved(cmp);
     }
 
-    /**
-     * remove this component and it's children from the painting queue
-     */
+    /// remove this component and it's children from the painting queue
     @Override
     protected void cancelRepaints() {
         super.cancelRepaints();
@@ -1397,9 +1458,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Cleansup the initialization flags in the hierachy
-     */
+    /// Cleansup the initialization flags in the hierachy
     @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
@@ -1411,12 +1470,12 @@ public class Container extends Component implements Iterable<Component> {
         flushReplace();
     }
 
-    /**
-     * Flushes ongoing replace operations to prevent two concurrent replace operations from colliding.
-     * If there is no ongoing replace nothing will occur
-     *
-     * @deprecated this method is no longer used in the new animation framework
-     */
+    /// Flushes ongoing replace operations to prevent two concurrent replace operations from colliding.
+    /// If there is no ongoing replace nothing will occur
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is no longer used in the new animation framework
     public void flushReplace() {
         /*if (cmpTransitions != null) {
             int size = cmpTransitions.size();
@@ -1428,12 +1487,10 @@ public class Container extends Component implements Iterable<Component> {
         }*/
     }
 
-    /**
-     * remove all Components from container, notice that removed component might still have
-     * a pending repaint in the queue that won't be removed. Calling form.repaint() will workaround
-     * such an issue. Notice that this method doesn't recurse and only removes from
-     * the current container.
-     */
+    /// remove all Components from container, notice that removed component might still have
+    /// a pending repaint in the queue that won't be removed. Calling form.repaint() will workaround
+    /// such an issue. Notice that this method doesn't recurse and only removes from
+    /// the current container.
     public void removeAll() {
         Form parentForm = getComponentForm();
         if (parentForm != null) {
@@ -1463,16 +1520,16 @@ public class Container extends Component implements Iterable<Component> {
         resetScroll();
     }
 
-    /**
-     * Revalidates the container in a way that doesn't conflict with
-     * running animations.  If you simply call {@link #revalidate() }
-     * on a container while an animation is in progress, it will produce
-     * paint artifacts as it will insert frames in the animation with
-     * the container at its final position.  Using this method, it will
-     * wait until running animations are complete before it revalidates.
-     *
-     * @since 6.0
-     */
+    /// Revalidates the container in a way that doesn't conflict with
+    /// running animations.  If you simply call `#revalidate()`
+    /// on a container while an animation is in progress, it will produce
+    /// paint artifacts as it will insert frames in the animation with
+    /// the container at its final position.  Using this method, it will
+    /// wait until running animations are complete before it revalidates.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
     public void revalidateWithAnimationSafety() {
         if (revalidatePending) {
             return;
@@ -1525,20 +1582,18 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Re-layout the container, this is useful when we modify the container hierarchy and
-     * need to redo the layout
-     */
+    /// Re-layout the container, this is useful when we modify the container hierarchy and
+    /// need to redo the layout
     public void revalidate() {
         revalidateInternal(true);
     }
 
-    /**
-     * Internal revalidate method.  Takes parameter {@literal fromRoot} that
-     * allows you to disable the default behaviour of revalidating the form.
-     *
-     * @param fromRoot
-     */
+    /// Internal revalidate method.  Takes parameter fromRoot that
+    /// allows you to disable the default behaviour of revalidating the form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fromRoot`
     void revalidateInternal(boolean fromRoot) {
         setShouldCalcPreferredSize(true);
         Form root = getComponentForm();
@@ -1566,15 +1621,13 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Revalidates the container before the next paint cycle.  Prefer this
-     * method to {@link #revalidate() } and {@link #revalidateWithAnimationSafety() }
-     * if you don't need the revalidate (layout and repaint) to happen immediately,
-     * but you *do* want it to happen before the next paint.  This is can be far more
-     * efficient as it will squash the revalidation calls into the minimal set
-     * of containers that require revalidation, so that the system doesn't end up
-     * revalidating the same container multiple times between paints.
-     */
+    /// Revalidates the container before the next paint cycle.  Prefer this
+    /// method to `#revalidate()` and `#revalidateWithAnimationSafety()`
+    /// if you don't need the revalidate (layout and repaint) to happen immediately,
+    /// but you *do* want it to happen before the next paint.  This is can be far more
+    /// efficient as it will squash the revalidation calls into the minimal set
+    /// of containers that require revalidation, so that the system doesn't end up
+    /// revalidating the same container multiple times between paints.
     public void revalidateLater() {
         Form root = getComponentForm();
         if (root != null) {
@@ -1583,9 +1636,7 @@ public class Container extends Component implements Iterable<Component> {
 
     }
 
-    /**
-     * A more powerful form of revalidate that recursively lays out the full hierarchy
-     */
+    /// A more powerful form of revalidate that recursively lays out the full hierarchy
     public void forceRevalidate() {
         forceRevalidateImpl();
         revalidate();
@@ -1604,9 +1655,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void clearClientProperties() {
         super.clearClientProperties();
@@ -1641,12 +1690,12 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Invoked internally to indicate if child components are hiding this container
-     * thus removing the need to invoke its own paint methods
-     *
-     * @return true if child components are obscuring this component
-     */
+    /// Invoked internally to indicate if child components are hiding this container
+    /// thus removing the need to invoke its own paint methods
+    ///
+    /// #### Returns
+    ///
+    /// true if child components are obscuring this component
     boolean isObscuredByChildren() {
         if (!blockOverdraw) {
             return false;
@@ -1687,33 +1736,41 @@ public class Container extends Component implements Iterable<Component> {
         return true;
     }
 
-    /**
-     * Efficiently finds the first child component that is visible in the specified
-     * bounds.
-     * <p>This is only really helpful if the child components are sorted
-     * in some way so that we can quickly (with a binary search) find the first
-     * visible component.  E.g. In BoxLayout.Y_AXIS, the components are arranged
-     * vertically in order of their index so we can use a binary search to find
-     * the first visible element.  For most other layout managers we can't as easily
-     * do a sort like this.</p>
-     *
-     * <p>If the layout manager doesn't allow for a binary search, then this will
-     * just return 0 (meaning that you need to scan the children from the beginning
-     * to find visible children).</p>
-     *
-     * <p>After you obtain this value, use the {@link #calculateLastPaintableOffset(int, int) } method
-     * to get the end of the visible region.</p>
-     *
-     * <p>The motivation for this is to try to improve performance in places where the container
-     * has many (say 2500) children, and most of them aren't actually visible.</p>
-     *
-     * @param clipY1 Top bounds of region to check.  (0,0) is top left corner of this component.
-     * @param clipY2 Bottom bounds of region to check.  (0,0) is top left corner of this component.
-     * @return The index within the "components" array where the first child that intersects the provided
-     * clip occurs, or -1 if there is no "fast" way to find it.  If there was a fast way to do it, but no visible
-     * components were found, then this will return components.size().
-     * @see #calculateLastPaintableOffset(int, int)
-     */
+    /// Efficiently finds the first child component that is visible in the specified
+    /// bounds.
+    ///
+    /// This is only really helpful if the child components are sorted
+    /// in some way so that we can quickly (with a binary search) find the first
+    /// visible component.  E.g. In BoxLayout.Y_AXIS, the components are arranged
+    /// vertically in order of their index so we can use a binary search to find
+    /// the first visible element.  For most other layout managers we can't as easily
+    /// do a sort like this.
+    ///
+    /// If the layout manager doesn't allow for a binary search, then this will
+    /// just return 0 (meaning that you need to scan the children from the beginning
+    /// to find visible children).
+    ///
+    /// After you obtain this value, use the `int)` method
+    /// to get the end of the visible region.
+    ///
+    /// The motivation for this is to try to improve performance in places where the container
+    /// has many (say 2500) children, and most of them aren't actually visible.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clipY1`: Top bounds of region to check.  (0,0) is top left corner of this component.
+    ///
+    /// - `clipY2`: Bottom bounds of region to check.  (0,0) is top left corner of this component.
+    ///
+    /// #### Returns
+    ///
+    /// @return The index within the "components" array where the first child that intersects the provided
+    /// clip occurs, or -1 if there is no "fast" way to find it.  If there was a fast way to do it, but no visible
+    /// components were found, then this will return components.size().
+    ///
+    /// #### See also
+    ///
+    /// - #calculateLastPaintableOffset(int, int)
     private int calculateFirstPaintableOffset(int clipY1, int clipY2) {
         int len = components.size();
         Layout l = getLayout();
@@ -1732,16 +1789,20 @@ public class Container extends Component implements Iterable<Component> {
         return -1;
     }
 
-    /**
-     * Gets the index of the "last" child component that intersects the given rectangle.  This is
-     * only helpful if the components are sorted (e.g. with BoxLayout.Y_AXIS).  If they aren't
-     * sorted then this will just return components.size()-1.
-     *
-     * @param pos    The starting position to search.  It is assumed that this starting
-     *               position is in the visible region.
-     * @param clipY2 The bottom bounds of the region to search. (0,0) is the top left corner of the container.
-     * @return The index of the last visible component in this container - or components.size()-1
-     */
+    /// Gets the index of the "last" child component that intersects the given rectangle.  This is
+    /// only helpful if the components are sorted (e.g. with BoxLayout.Y_AXIS).  If they aren't
+    /// sorted then this will just return components.size()-1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: @param pos    The starting position to search.  It is assumed that this starting
+    /// position is in the visible region.
+    ///
+    /// - `clipY2`: The bottom bounds of the region to search. (0,0) is the top left corner of the container.
+    ///
+    /// #### Returns
+    ///
+    /// The index of the last visible component in this container - or components.size()-1
     private int calculateLastPaintableOffset(int pos, int clipY2) {
         final int len = components.size();
         if (pos >= len - 1) {
@@ -1770,19 +1831,25 @@ public class Container extends Component implements Iterable<Component> {
         return len - 1;
     }
 
-    /**
-     * Performs a binary search within the children of the container to find components
-     * that intersect the given range on the y-axis.  <b>This should only be used
-     * if it is known that the child components are sorted by their y coordinates
-     * in ascending order.  Otherwise you'll get undefined results.</b>
-     *
-     * @param y1    The lower y-bound of the region to search.  (0,0) is top-left corner of container.
-     * @param y2    The upper y-bound of the region to search.  (0,0) is top-left corner of container.
-     * @param start The lower "index" to search.
-     * @param end   The upper "index" to search.
-     * @return The index within the components array of the first child component
-     * that intersects the given region.  Or -1 if none is found.
-     */
+    /// Performs a binary search within the children of the container to find components
+    /// that intersect the given range on the y-axis.  **This should only be used
+    /// if it is known that the child components are sorted by their y coordinates
+    /// in ascending order.  Otherwise you'll get undefined results.**
+    ///
+    /// #### Parameters
+    ///
+    /// - `y1`: The lower y-bound of the region to search.  (0,0) is top-left corner of container.
+    ///
+    /// - `y2`: The upper y-bound of the region to search.  (0,0) is top-left corner of container.
+    ///
+    /// - `start`: The lower "index" to search.
+    ///
+    /// - `end`: The upper "index" to search.
+    ///
+    /// #### Returns
+    ///
+    /// @return The index within the components array of the first child component
+    /// that intersects the given region.  Or -1 if none is found.
     private int binarySearchFirstIntersectionY(int y1, int y2, int start, int end) {
         if (start >= end) {
             return -1;
@@ -1807,33 +1874,39 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Activates enableLayoutOnPaint behaviour for this container. This is package private because
-     * this flag is more complicated than a simple setter.  When the container is initialized
-     * it will take on the value of its parent, so it only makes sense to call this method on the
-     * top-level container, like a Form.  Form overrides this method and makes it public.
-     *
-     * <p>Development Note:  enableLayoutOnPaint causes the container to be laid out whenever paint()
-     * is called.  This has been part of codename one since the beginning (initial commit to google code), but
-     * this taxes rendering performance fairly seriously in some of the complex layouts, and it isn't clear
-     * why it was ever necessary.  Perhaps it was to help in an edge case that is no longer relevant.</p>
-     *
-     * <p>We are adding this additionally flag which defaults to false to try to gain performance, and just in
-     * case the edge case still exists, developers are able to "enable" it again on a form-by-form basis.</p>
-     *
-     * @param allow Whether to allow enable layout on paint.
-     * @see #enableLayoutOnPaint
-     * @since 7.0
-     */
+    /// Activates enableLayoutOnPaint behaviour for this container. This is package private because
+    /// this flag is more complicated than a simple setter.  When the container is initialized
+    /// it will take on the value of its parent, so it only makes sense to call this method on the
+    /// top-level container, like a Form.  Form overrides this method and makes it public.
+    ///
+    /// Development Note:  enableLayoutOnPaint causes the container to be laid out whenever paint()
+    /// is called.  This has been part of codename one since the beginning (initial commit to google code), but
+    /// this taxes rendering performance fairly seriously in some of the complex layouts, and it isn't clear
+    /// why it was ever necessary.  Perhaps it was to help in an edge case that is no longer relevant.
+    ///
+    /// We are adding this additionally flag which defaults to false to try to gain performance, and just in
+    /// case the edge case still exists, developers are able to "enable" it again on a form-by-form basis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allow`: Whether to allow enable layout on paint.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #enableLayoutOnPaint
     void setAllowEnableLayoutOnPaint(boolean allow) {
         allowEnableLayoutOnPaint = allow;
     }
 
-    /**
-     * Registers a component with this surface as an elevated component.
-     *
-     * @param cmp
-     */
+    /// Registers a component with this surface as an elevated component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`
     void addElevatedComponent(Component cmp) {
         if (elevatedComponents == null) {
             elevatedComponents = new HashSet<Component>();
@@ -1841,11 +1914,11 @@ public class Container extends Component implements Iterable<Component> {
         elevatedComponents.add(cmp);
     }
 
-    /**
-     * Unregisters a component with this surface as an elevated components.
-     *
-     * @param cmp
-     */
+    /// Unregisters a component with this surface as an elevated components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`
     void removeElevatedComponent(Component cmp) {
         if (elevatedComponents == null) {
             return;
@@ -1853,32 +1926,40 @@ public class Container extends Component implements Iterable<Component> {
         elevatedComponents.remove(cmp);
     }
 
-    /**
-     * Paints the all of the elevated components in this surface.
-     *
-     * @param g
-     */
+    /// Paints the all of the elevated components in this surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
     void paintElevatedPane(Graphics g) {
         nextElevationComponentIndex = 0;
         paintElevatedPane(g, false, -1, -1, -1, -1, -1, -1, false);
     }
 
-    /**
-     * Paints the elevated pane for a surface.
-     *
-     * @param g                                THe graphics context
-     * @param useIntersection                  Enable intersection checking.  This is used when trying to paint components above and below other components,
-     *                                         as it checks the intersection for painting.
-     * @param intersectionX                    IntersectionX in abs screen coords.
-     * @param intersectionY                    The intersectonY in abs screen coords
-     * @param intersectionWidth                THe intersection width in abs screen coords
-     * @param intersectionHeight               The intersection height in abs screen coords
-     * @param elevationThreshold               The elevation threshold used when useIntersection is true. If above is true, then this threshold is used to paint
-     *                                         only the components on the same elevation level and higher.
-     * @param elevationComponentIndexThreshold The elevation component index threshold used when useIntersection is true.  This is used to differentiate the
-     *                                         z-index of components in the same elevation level.
-     * @param above                            Indicate whether to render components above or below the thresholds specified by elevationThreshold and elevationComponentIndexThreshold.  Only used if useIntersection is true.
-     */
+    /// Paints the elevated pane for a surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: THe graphics context
+    ///
+    /// - `useIntersection`: @param useIntersection                  Enable intersection checking.  This is used when trying to paint components above and below other components,
+    /// as it checks the intersection for painting.
+    ///
+    /// - `intersectionX`: IntersectionX in abs screen coords.
+    ///
+    /// - `intersectionY`: The intersectonY in abs screen coords
+    ///
+    /// - `intersectionWidth`: THe intersection width in abs screen coords
+    ///
+    /// - `intersectionHeight`: The intersection height in abs screen coords
+    ///
+    /// - `elevationThreshold`: @param elevationThreshold               The elevation threshold used when useIntersection is true. If above is true, then this threshold is used to paint
+    /// only the components on the same elevation level and higher.
+    ///
+    /// - `elevationComponentIndexThreshold`: @param elevationComponentIndexThreshold The elevation component index threshold used when useIntersection is true.  This is used to differentiate the
+    /// z-index of components in the same elevation level.
+    ///
+    /// - `above`: Indicate whether to render components above or below the thresholds specified by elevationThreshold and elevationComponentIndexThreshold.  Only used if useIntersection is true.
     void paintElevatedPane(Graphics g, final boolean useIntersection, int intersectionX, int intersectionY, int intersectionWidth, int intersectionHeight, int elevationThreshold, int elevationComponentIndexThreshold, boolean above) {
         CodenameOneImplementation impl = Display.impl;
         int absX = getAbsoluteX();
@@ -1997,13 +2078,13 @@ public class Container extends Component implements Iterable<Component> {
 
     }
 
-    /**
-     * This is used to "tag" components in this surface that should be rendered in the elevated pane.
-     * This just sets or unsets the {@link Component#doNotPaint} flag so that rendering of the non-elevated
-     * pane can proceed without rendering elevated components.
-     *
-     * @param shouldPaintInElevatedPane True if we are setting the doNotPaint flag.  False if we are unsetting it.
-     */
+    /// This is used to "tag" components in this surface that should be rendered in the elevated pane.
+    /// This just sets or unsets the `Component#doNotPaint` flag so that rendering of the non-elevated
+    /// pane can proceed without rendering elevated components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shouldPaintInElevatedPane`: True if we are setting the doNotPaint flag.  False if we are unsetting it.
     void markComponentsToBePaintedInElevatedPane(boolean shouldPaintInElevatedPane) {
         if (elevatedComponents != null && !elevatedComponents.isEmpty()) {
             for (Component child : elevatedComponents) {
@@ -2045,9 +2126,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
         // Q: Why two flags for enableLayoutOnPaint?
@@ -2122,13 +2201,13 @@ public class Container extends Component implements Iterable<Component> {
         g.translate(-getX(), -getY());
     }
 
-    /**
-     * This method can be overriden by a component to draw on top of itself or its children
-     * after the component or the children finished drawing in a similar way to the glass
-     * pane but more refined per component
-     *
-     * @param g the graphics context
-     */
+    /// This method can be overriden by a component to draw on top of itself or its children
+    /// after the component or the children finished drawing in a similar way to the glass
+    /// pane but more refined per component
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the graphics context
     protected void paintGlass(Graphics g) {
     }
 
@@ -2170,9 +2249,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Performs the layout of the container if a layout is necessary
-     */
+    /// Performs the layout of the container if a layout is necessary
     public void layoutContainer() {
         //will compute the container + components and will layout the components.
         if (shouldLayout) {
@@ -2201,79 +2278,96 @@ public class Container extends Component implements Iterable<Component> {
         return getParent().hasScrollableXParentInternal();
     }
 
-    /**
-     * Checks if this container is a "safe area".  A "safe area" is a container whose
-     * contents will always be displayed inside the device's "safe display area".
-     * <p>This feature was added primarily for the iPhone X which covers some parts of
-     * the screen and would cover or interfere with any content drawn in those regions. In particular,
-     * the notch, the rounded corners, and the task bar cover portions of the screen.</p>
-     *
-     * <p>A container that is a safe area will automatically add appropriate padding
-     * on layout so that its children will be rendered completely in the safe area of
-     * the screen.  This only applies if the container has no scrollable parents.  If a
-     * "safe" container has scrollable parents, then it is assumed that the user can
-     * just scroll it into a safe area.</p>
-     *
-     * @return True if this container is a safe area.
-     * @see #setSafeArea(boolean)
-     * @see Form#getSafeArea()
-     * @since 7.0
-     */
+    /// Checks if this container is a "safe area".  A "safe area" is a container whose
+    /// contents will always be displayed inside the device's "safe display area".
+    ///
+    /// This feature was added primarily for the iPhone X which covers some parts of
+    /// the screen and would cover or interfere with any content drawn in those regions. In particular,
+    /// the notch, the rounded corners, and the task bar cover portions of the screen.
+    ///
+    /// A container that is a safe area will automatically add appropriate padding
+    /// on layout so that its children will be rendered completely in the safe area of
+    /// the screen.  This only applies if the container has no scrollable parents.  If a
+    /// "safe" container has scrollable parents, then it is assumed that the user can
+    /// just scroll it into a safe area.
+    ///
+    /// #### Returns
+    ///
+    /// True if this container is a safe area.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setSafeArea(boolean)
+    ///
+    /// - Form#getSafeArea()
     public boolean isSafeArea() {
         return this.safeArea;
     }
 
-    /**
-     * Marks this container as a "safe area", meaning that it will automatically supply
-     * sufficient padding as necessary for its children to be laid out inside the
-     * safe area of the screen.
-     *
-     * <p>This was primarily added for the iPhone X which covers portions of the screen
-     * and may interfere with components that are rendered there.</p>
-     *
-     * <p>The "safe" area is calculated against a "safe area root"'s bounds, which is
-     * the parent form by default.  In some cases it may be helpful to make the root
-     * a sub-container, such as if you need to lay a component out off-screen.  See
-     * {@link #setSafeAreaRoot(boolean)} for more details.</p>
-     *
-     * @param safeArea True to make this container a safe area.
-     * @see Form#getSafeArea()
-     * @see #isSafeArea()
-     * @see #setSafeAreaRoot(boolean)
-     * @since 7.0
-     */
+    /// Marks this container as a "safe area", meaning that it will automatically supply
+    /// sufficient padding as necessary for its children to be laid out inside the
+    /// safe area of the screen.
+    ///
+    /// This was primarily added for the iPhone X which covers portions of the screen
+    /// and may interfere with components that are rendered there.
+    ///
+    /// The "safe" area is calculated against a "safe area root"'s bounds, which is
+    /// the parent form by default.  In some cases it may be helpful to make the root
+    /// a sub-container, such as if you need to lay a component out off-screen.  See
+    /// `#setSafeAreaRoot(boolean)` for more details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `safeArea`: True to make this container a safe area.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - Form#getSafeArea()
+    ///
+    /// - #isSafeArea()
+    ///
+    /// - #setSafeAreaRoot(boolean)
     public void setSafeArea(boolean safeArea) {
         this.safeArea = safeArea;
     }
 
-    /**
-     * Checks if this container is a safe area root.  A safe area root is a container
-     * against whose bounds, safe area margins are calculated for child components.
-     *
-     * <p>Forms are safe area roots by default.</p>
-     *
-     * @return
-     * @see #setSafeAreaRoot(boolean)
-     * @since 7.0
-     */
+    /// Checks if this container is a safe area root.  A safe area root is a container
+    /// against whose bounds, safe area margins are calculated for child components.
+    ///
+    /// Forms are safe area roots by default.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setSafeAreaRoot(boolean)
     public boolean isSafeAreaRoot() {
         return safeAreaRoot;
     }
 
-    /**
-     * Gets the Safe area "root" container for this container.  This method will walk
-     * up the component hierarchy until is finds a Container with {@link #isSafeAreaRoot() } true.
-     *
-     * <p>Forms are safe area roots by default, but it is possible to mark other containers
-     * as safe area roots.</p>
-     *
-     * <p>A safe area root is a container from which safe area margins are applied when
-     * calculating the safe areas of child components.  Setting a root can facilitate the
-     * layout of a container's children before it appears on the screen.</p>
-     *
-     * @return
-     * @since 7.0
-     */
+    /// Gets the Safe area "root" container for this container.  This method will walk
+    /// up the component hierarchy until is finds a Container with `#isSafeAreaRoot()` true.
+    ///
+    /// Forms are safe area roots by default, but it is possible to mark other containers
+    /// as safe area roots.
+    ///
+    /// A safe area root is a container from which safe area margins are applied when
+    /// calculating the safe areas of child components.  Setting a root can facilitate the
+    /// layout of a container's children before it appears on the screen.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
     public Container getSafeAreaRoot() {
         if (safeAreaRoot) {
             return this;
@@ -2285,40 +2379,45 @@ public class Container extends Component implements Iterable<Component> {
         return null;
     }
 
-    /**
-     * Set whether this container is a safe area root.   A safe area root is a container
-     * against whose bounds, safe area margins are calculated for child components.
-     *
-     * <p><strong>Safe Area root vs Safe Area</strong></p>
-     *
-     * <p>A Safe Area root is not actually a safe area.  It will lay out its children
-     * normally, without any adjustments to padding to accommodate the display safe area.  They
-     * are rather <em>used</em> by safe area child containers to calculate safe area margins,
-     * according to if the safe area root container spanned the entire screen</p>
-     *
-     * <p>In most cases you don't need to explicitly set a safe area root, since Forms are
-     * marked as roots by default.  However, there are edge cases where components may be
-     * initially laid out off-screen (in which safe areas are not applied), but are transitioned
-     * in.  Once on the screen, the safe margins would be applied which may cause an abrupt
-     * re-layout at the moment that the safe margins are applied.  This edge case occurs in,
-     * for example, a side menu bar which is rendered off-screen.  By making the side menu bar
-     * container a "root" itself, the safe areas will be applied to the layout, even when
-     * the menu is off-screen.  Then there is no "jerk" when it transitions in.</p>
-     *
-     * @param root True to make this a root.  False to make it "not" a root.
-     * @see #isSafeAreaRoot()
-     * @since 7.0
-     */
+    /// Set whether this container is a safe area root.   A safe area root is a container
+    /// against whose bounds, safe area margins are calculated for child components.
+    ///
+    /// **Safe Area root vs Safe Area**
+    ///
+    /// A Safe Area root is not actually a safe area.  It will lay out its children
+    /// normally, without any adjustments to padding to accommodate the display safe area.  They
+    /// are rather *used* by safe area child containers to calculate safe area margins,
+    /// according to if the safe area root container spanned the entire screen
+    ///
+    /// In most cases you don't need to explicitly set a safe area root, since Forms are
+    /// marked as roots by default.  However, there are edge cases where components may be
+    /// initially laid out off-screen (in which safe areas are not applied), but are transitioned
+    /// in.  Once on the screen, the safe margins would be applied which may cause an abrupt
+    /// re-layout at the moment that the safe margins are applied.  This edge case occurs in,
+    /// for example, a side menu bar which is rendered off-screen.  By making the side menu bar
+    /// container a "root" itself, the safe areas will be applied to the layout, even when
+    /// the menu is off-screen.  Then there is no "jerk" when it transitions in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: True to make this a root.  False to make it "not" a root.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #isSafeAreaRoot()
     public void setSafeAreaRoot(boolean root) {
         this.safeAreaRoot = root;
     }
 
-    /**
-     * Checks to see if this container or any of its parents are safe areas.
-     *
-     * @param checkParents True to check parents too.  False to just check this container.
-     * @return
-     */
+    /// Checks to see if this container or any of its parents are safe areas.
+    ///
+    /// #### Parameters
+    ///
+    /// - `checkParents`: True to check parents too.  False to just check this container.
     private boolean isSafeAreaInternal(boolean checkParents) {
         if (safeArea) {
             return true;
@@ -2332,10 +2431,8 @@ public class Container extends Component implements Iterable<Component> {
         return false;
     }
 
-    /**
-     * For iPhone X primarily.  This will check if the current bounds goes outside the
-     * safe area.  If so, it will add padding to make the contents fit the safe area.
-     */
+    /// For iPhone X primarily.  This will check if the current bounds goes outside the
+    /// safe area.  If so, it will add padding to make the contents fit the safe area.
     private boolean snapToSafeAreaInternal() {
         if (isHidden()) {
             return false;
@@ -2495,33 +2592,42 @@ public class Container extends Component implements Iterable<Component> {
 
     }
 
-    /**
-     * Returns the number of components
-     *
-     * @return the Component count
-     */
+    /// Returns the number of components
+    ///
+    /// #### Returns
+    ///
+    /// the Component count
     public int getComponentCount() {
         return components.size();
     }
 
-    /**
-     * Returns the Component at a given index
-     *
-     * @param index of the Component you wish to get
-     * @return a Component
-     * @throws ArrayIndexOutOfBoundsException if an invalid index was given.
-     */
+    /// Returns the Component at a given index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: of the Component you wish to get
+    ///
+    /// #### Returns
+    ///
+    /// a Component
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if an invalid index was given.
     public Component getComponentAt(
             int index) {
         return components.get(index);
     }
 
-    /**
-     * Returns the Component index in the Container
-     *
-     * @param cmp the component to search for
-     * @return the Component index in the Container or -1 if not found
-     */
+    /// Returns the Component index in the Container
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to search for
+    ///
+    /// #### Returns
+    ///
+    /// the Component index in the Container or -1 if not found
     public int getComponentIndex(Component cmp) {
         int count = getComponentCount();
         for (int i = 0; i <
@@ -2534,12 +2640,15 @@ public class Container extends Component implements Iterable<Component> {
         return -1;
     }
 
-    /**
-     * Returns true if the given component is within the hierarchy of this container
-     *
-     * @param cmp a Component to check
-     * @return true if this Component contains in this Container
-     */
+    /// Returns true if the given component is within the hierarchy of this container
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: a Component to check
+    ///
+    /// #### Returns
+    ///
+    /// true if this Component contains in this Container
     public boolean contains(Component cmp) {
         if (cmp == null) {
             return false;
@@ -2554,12 +2663,12 @@ public class Container extends Component implements Iterable<Component> {
         return false;
     }
 
-    /**
-     * Makes sure the component is visible in the scroll if this container is
-     * scrollable
-     *
-     * @param c the component that will be scrolling for visibility
-     */
+    /// Makes sure the component is visible in the scroll if this container is
+    /// scrollable
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component that will be scrolling for visibility
     public void scrollComponentToVisible(final Component c) {
         if (isScrollable()) {
             if (c != null) {
@@ -2609,15 +2718,19 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * This method scrolls the Container if Scrollable towards the given
-     * Component based on the given direction.
-     *
-     * @param direction is the direction of the navigation (Display.GAME_UP,
-     *                  Display.GAME_DOWN, ...)
-     * @param next      the Component to move the scroll towards.
-     * @return true if next Component is now visible.
-     */
+    /// This method scrolls the Container if Scrollable towards the given
+    /// Component based on the given direction.
+    ///
+    /// #### Parameters
+    ///
+    /// - `direction`: @param direction is the direction of the navigation (Display.GAME_UP,
+    /// Display.GAME_DOWN, ...)
+    ///
+    /// - `next`: the Component to move the scroll towards.
+    ///
+    /// #### Returns
+    ///
+    /// true if next Component is now visible.
     boolean moveScrollTowards(int direction, Component next) {
         if (isScrollable()) {
             Component current = null;
@@ -2757,13 +2870,17 @@ public class Container extends Component implements Iterable<Component> {
         return (int) Math.sqrt(x * x + y * y);
     }
 
-    /**
-     * Very useful for touch events or drop events that need approximation more than accuracy
-     *
-     * @param x location in container relative coordinates
-     * @param y location in container relative coordinates
-     * @return the closest component in the container or null if no component is in the container
-     */
+    /// Very useful for touch events or drop events that need approximation more than accuracy
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: location in container relative coordinates
+    ///
+    /// - `y`: location in container relative coordinates
+    ///
+    /// #### Returns
+    ///
+    /// the closest component in the container or null if no component is in the container
     public Component getClosestComponentTo(int x, int y) {
         int count = getComponentCount();
         if (count == 0) {
@@ -2788,24 +2905,31 @@ public class Container extends Component implements Iterable<Component> {
         return closest;
     }
 
-    /**
-     * Returns the top-most component that responds to pointer events at absolute
-     * coordinate {@literal (x, y)}.  This may return {@literal null} if there are
-     * no components at this coordinate that respond to pointer events.
-     *
-     * <p><strong>Note:</strong> This method is stricter than {@link #getComponentAt(int, int) }
-     * about which component is returned.  Whereas {@link #getComponentAt(int, int) } will return
-     * {@literal this } when there are no matches, as long as it contains {@literal (x, y)}, {@link #getResponderAt(int, int) }
-     * will return null in this case.  {@link #getComponentAt(int, int) } may also return components
-     * that are not visible or are not enabled.  In generaly, if you are trying to retrieve a component
-     * that responds to pointer events, you should use this method over {@link #getComponentAt(int, int) } unless
-     * you have a good reason and really know what you are doing.</p>
-     *
-     * @param x Absolute x-coordinate.
-     * @param y Absolute y-coordinate.
-     * @return Top-most component that responds to pointer events at given coordinate.  May be {@literal null}.
-     * @see Component#respondsToPointerEvents()
-     */
+    /// Returns the top-most component that responds to pointer events at absolute
+    /// coordinate (x, y).  This may return null if there are
+    /// no components at this coordinate that respond to pointer events.
+    ///
+    /// **Note:** This method is stricter than `int)`
+    /// about which component is returned.  Whereas `int)` will return
+    /// this when there are no matches, as long as it contains (x, y), `int)`
+    /// will return null in this case.  `int)` may also return components
+    /// that are not visible or are not enabled.  In generaly, if you are trying to retrieve a component
+    /// that responds to pointer events, you should use this method over `int)` unless
+    /// you have a good reason and really know what you are doing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Absolute x-coordinate.
+    ///
+    /// - `y`: Absolute y-coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// Top-most component that responds to pointer events at given coordinate.  May be null.
+    ///
+    /// #### See also
+    ///
+    /// - Component#respondsToPointerEvents()
     public Component getResponderAt(int x, int y) {
         if (!isVisible() || !contains(x, y)) {
             return null;
@@ -2843,21 +2967,29 @@ public class Container extends Component implements Iterable<Component> {
         return null;
     }
 
-    /**
-     * Returns a Component at coordinate {@literal (x, y)}.
-     *
-     * <p><strong>WARNING:</strong>  This method may return components that are disabled,
-     * or invisible, or that do not respond to pointer events.  If you are looking for the
-     * top-most component that responds to pointer events, you should use {@link #getResponderAt(int, int) }
-     * as it is guaranteed to return a component with {@link Component#respondsToPointerEvents() } {@literal true};
-     * or {@literal null} if none is found at the coordinate.</p>
-     *
-     * @param x absolute screen location
-     * @param y absolute screen location
-     * @return a Component if found, null otherwise
-     * @see Component#contains
-     * @see #getResponderAt(int, int)
-     */
+    /// Returns a Component at coordinate (x, y).
+    ///
+    /// **WARNING:**  This method may return components that are disabled,
+    /// or invisible, or that do not respond to pointer events.  If you are looking for the
+    /// top-most component that responds to pointer events, you should use `int)`
+    /// as it is guaranteed to return a component with `Component#respondsToPointerEvents()` true;
+    /// or null if none is found at the coordinate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: absolute screen location
+    ///
+    /// - `y`: absolute screen location
+    ///
+    /// #### Returns
+    ///
+    /// a Component if found, null otherwise
+    ///
+    /// #### See also
+    ///
+    /// - Component#contains
+    ///
+    /// - #getResponderAt(int, int)
     public Component getComponentAt(int x, int y) {
         if (!contains(x, y) || !isVisible()) {
             return this;
@@ -2983,13 +3115,17 @@ public class Container extends Component implements Iterable<Component> {
         return this;
     }
 
-    /**
-     * Recursively searches the container hierarchy for a drop target
-     *
-     * @param x position in which we are searching for a drop target
-     * @param y position in which we are searching for a drop target
-     * @return a drop target or null if no drop target could be found at the x/y position
-     */
+    /// Recursively searches the container hierarchy for a drop target
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: position in which we are searching for a drop target
+    ///
+    /// - `y`: position in which we are searching for a drop target
+    ///
+    /// #### Returns
+    ///
+    /// a drop target or null if no drop target could be found at the x/y position
     public Component findDropTargetAt(int x, int y) {
         int count = getComponentCount();
         for (int i = count - 1; i >= 0; i--) {
@@ -3009,9 +3145,7 @@ public class Container extends Component implements Iterable<Component> {
         return null;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
         Component leadParent = LeadUtil.leadParentImpl(this);
@@ -3036,9 +3170,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
         calcPreferredSizeDepth++;
@@ -3077,9 +3209,7 @@ public class Container extends Component implements Iterable<Component> {
         return d;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected String paramString() {
         String className = layout.getClass().getName();
@@ -3090,11 +3220,11 @@ public class Container extends Component implements Iterable<Component> {
                 ", components = " + getComponentsNames();
     }
 
-    /**
-     * Return the container components objects as list of Strings
-     *
-     * @return the container components objects as list of Strings
-     */
+    /// Return the container components objects as list of Strings
+    ///
+    /// #### Returns
+    ///
+    /// the container components objects as list of Strings
     private String getComponentsNames() {
         StringBuilder ret = new StringBuilder("[");
         int componentCount = components.size();
@@ -3110,9 +3240,7 @@ public class Container extends Component implements Iterable<Component> {
         return ret.toString();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -3133,19 +3261,17 @@ public class Container extends Component implements Iterable<Component> {
         return scrollableY;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isScrollableX() {
         return scrollableX && (getScrollDimension().getWidth() + getStyle().getHorizontalPadding() > getWidth());
     }
 
-    /**
-     * Sets whether the component should/could scroll on the X axis
-     *
-     * @param scrollableX whether the component should/could scroll on the X axis
-     */
+    /// Sets whether the component should/could scroll on the X axis
+    ///
+    /// #### Parameters
+    ///
+    /// - `scrollableX`: whether the component should/could scroll on the X axis
     public void setScrollableX(boolean scrollableX) {
         if (layout instanceof BorderLayout) {
             this.scrollableX = false;
@@ -3154,9 +3280,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isScrollableY() {
         Form f = getComponentForm();
@@ -3167,11 +3291,11 @@ public class Container extends Component implements Iterable<Component> {
         return scrollableY && (getScrollDimension().getHeight() + getStyle().getVerticalPadding() > getHeight() - v || isAlwaysTensile());
     }
 
-    /**
-     * Sets whether the component should/could scroll on the Y axis
-     *
-     * @param scrollableY whether the component should/could scroll on the Y axis
-     */
+    /// Sets whether the component should/could scroll on the Y axis
+    ///
+    /// #### Parameters
+    ///
+    /// - `scrollableY`: whether the component should/could scroll on the Y axis
     public void setScrollableY(boolean scrollableY) {
         if (layout instanceof BorderLayout) {
             this.scrollableY = false;
@@ -3180,9 +3304,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getSideGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
@@ -3196,9 +3318,7 @@ public class Container extends Component implements Iterable<Component> {
         return 0;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getBottomGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
@@ -3208,21 +3328,22 @@ public class Container extends Component implements Iterable<Component> {
         return 0;
     }
 
-    /**
-     * The equivalent of calling both setScrollableY and setScrollableX
-     *
-     * @param scrollable whether the component should/could scroll on the
-     *                   X and Y axis
-     * @deprecated use setScrollableX and setScrollableY instead. This method is deprecated since it breeds confusion and is often misunderstood.
-     */
+    /// The equivalent of calling both setScrollableY and setScrollableX
+    ///
+    /// #### Parameters
+    ///
+    /// - `scrollable`: @param scrollable whether the component should/could scroll on the
+    /// X and Y axis
+    ///
+    /// #### Deprecated
+    ///
+    /// use setScrollableX and setScrollableY instead. This method is deprecated since it breeds confusion and is often misunderstood.
     public void setScrollable(boolean scrollable) {
         setScrollableX(scrollable);
         setScrollableY(scrollable);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setCellRenderer(boolean cellRenderer) {
         if (isCellRenderer() != cellRenderer) {
@@ -3235,31 +3356,31 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Gets the Container scroll increment
-     *
-     * @return the scroll increment in pixels.
-     */
+    /// Gets the Container scroll increment
+    ///
+    /// #### Returns
+    ///
+    /// the scroll increment in pixels.
     public int getScrollIncrement() {
         return scrollIncrement;
     }
 
-    /**
-     * Determines the scroll increment size of this Container.
-     * This value is in use when the current foucs element within this Container
-     * is larger than this Container size.
-     *
-     * @param scrollIncrement the size in pixels.
-     */
+    /// Determines the scroll increment size of this Container.
+    /// This value is in use when the current foucs element within this Container
+    /// is larger than this Container size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scrollIncrement`: the size in pixels.
     public void setScrollIncrement(int scrollIncrement) {
         this.scrollIncrement = scrollIncrement;
     }
 
-    /**
-     * Finds the first focusable Component on this Container
-     *
-     * @return a focusable Component or null if not exists;
-     */
+    /// Finds the first focusable Component on this Container
+    ///
+    /// #### Returns
+    ///
+    /// a focusable Component or null if not exists;
     public Component findFirstFocusable() {
         int size = getComponentCount();
 
@@ -3280,9 +3401,7 @@ public class Container extends Component implements Iterable<Component> {
         return null;
     }
 
-    /**
-     * Recusively focuses components for the lead component functionality
-     */
+    /// Recusively focuses components for the lead component functionality
     private void setFocusLead(boolean f) {
         int count = getComponentCount();
         for (int i = 0; i < count; i++) {
@@ -3299,9 +3418,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void dragInitiated() {
         super.dragInitiated();
@@ -3310,9 +3427,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void fireClicked() {
         if (leadComponent != null) {
@@ -3322,9 +3437,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected boolean isSelectableInteraction() {
         if (leadComponent != null) {
@@ -3334,9 +3447,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * This is a callback method for the peer component class
-     */
+    /// This is a callback method for the peer component class
     @Override
     void setLightweightMode(boolean l) {
         int size = getComponentCount();
@@ -3345,9 +3456,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected int getGridPosY() {
         int scroll = getScrollY();
@@ -3366,17 +3475,13 @@ public class Container extends Component implements Iterable<Component> {
         return scroll;
     }
 
-    /**
-     * Returns false for the special case where a container has an opaque/flattened child that
-     * occupies its entire face
-     */
+    /// Returns false for the special case where a container has an opaque/flattened child that
+    /// occupies its entire face
     private boolean shouldPaintContainerBackground() {
         return !isObscuredByChildren();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void paintComponentBackground(Graphics g) {
         if (isFlatten()) {
@@ -3389,9 +3494,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected int getGridPosX() {
         int scroll = getScrollX();
@@ -3410,166 +3513,203 @@ public class Container extends Component implements Iterable<Component> {
         return scroll;
     }
 
-    /**
-     * Returns true if focus is blocked for this Container
-     *
-     * @return
-     */
+    /// Returns true if focus is blocked for this Container
     boolean isBlockFocus() {
         return blockFocus;
     }
 
-    /**
-     * This method blocks all children from getting focus
-     *
-     * @param blockFocus
-     */
+    /// This method blocks all children from getting focus
+    ///
+    /// #### Parameters
+    ///
+    /// - `blockFocus`
     void setBlockFocus(boolean blockFocus) {
         this.blockFocus = blockFocus;
     }
 
-    /**
-     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with
-     * a more visual form of animation. This method waits until the operation is completed before returning
-     *
-     * @param duration the duration in milliseconds for the animation
-     */
+    /// Animates a pending hierarchy of components into place, this effectively replaces revalidate with
+    /// a more visual form of animation. This method waits until the operation is completed before returning
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
     public void animateHierarchyAndWait(final int duration) {
         animateHierarchy(duration, true, 255, true);
     }
 
-    /**
-     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with
-     * a more visual form of animation.
-     *
-     * @param duration the duration in milliseconds for the animation
-     * @return the animation object that should be added to the animation manager
-     */
+    /// Animates a pending hierarchy of components into place, this effectively replaces revalidate with
+    /// a more visual form of animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// #### Returns
+    ///
+    /// the animation object that should be added to the animation manager
     public ComponentAnimation createAnimateHierarchy(final int duration) {
         return animateHierarchy(duration, false, 255, false);
     }
 
-    /**
-     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with
-     * a more visual form of animation
-     *
-     * @param duration the duration in milliseconds for the animation
-     */
+    /// Animates a pending hierarchy of components into place, this effectively replaces revalidate with
+    /// a more visual form of animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
     public void animateHierarchy(final int duration) {
         animateHierarchy(duration, false, 255, true);
     }
 
-    /**
-     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with
-     * a more visual form of animation. This method waits until the operation is completed before returning
-     *
-     * @param duration        the duration in milliseconds for the animation
-     * @param startingOpacity the initial opacity to give to the animated components
-     */
+    /// Animates a pending hierarchy of components into place, this effectively replaces revalidate with
+    /// a more visual form of animation. This method waits until the operation is completed before returning
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// - `startingOpacity`: the initial opacity to give to the animated components
     public void animateHierarchyFadeAndWait(final int duration, int startingOpacity) {
         animateHierarchy(duration, true, startingOpacity, true);
     }
 
-    /**
-     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with
-     * a more visual form of animation.
-     *
-     * @param duration        the duration in milliseconds for the animation
-     * @param startingOpacity the initial opacity to give to the animated components
-     * @return the animation object that should be added to the animation manager
-     */
+    /// Animates a pending hierarchy of components into place, this effectively replaces revalidate with
+    /// a more visual form of animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// - `startingOpacity`: the initial opacity to give to the animated components
+    ///
+    /// #### Returns
+    ///
+    /// the animation object that should be added to the animation manager
     public ComponentAnimation createAnimateHierarchyFade(final int duration, int startingOpacity) {
         return animateHierarchy(duration, false, startingOpacity, false);
     }
 
-    /**
-     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with
-     * a more visual form of animation
-     *
-     * @param duration        the duration in milliseconds for the animation
-     * @param startingOpacity the initial opacity to give to the animated components
-     */
+    /// Animates a pending hierarchy of components into place, this effectively replaces revalidate with
+    /// a more visual form of animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// - `startingOpacity`: the initial opacity to give to the animated components
     public void animateHierarchyFade(final int duration, int startingOpacity) {
         animateHierarchy(duration, false, startingOpacity, true);
     }
 
-    /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
-     * waits until the operation is completed before returning
-     *
-     * @param duration        the duration in milliseconds for the animation
-     * @param startingOpacity the initial opacity to give to the animated components
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
+    /// waits until the operation is completed before returning
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// - `startingOpacity`: the initial opacity to give to the animated components
     public void animateLayoutFadeAndWait(final int duration, int startingOpacity) {
         animateLayout(duration, true, startingOpacity, true);
     }
 
-    /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
-     * waits until the operation is completed before returning
-     *
-     * @param duration        the duration in milliseconds for the animation
-     * @param startingOpacity the initial opacity to give to the animated components
-     * @return the animation object that should be added to the animation manager
-     * @deprecated this was added by mistake!
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
+    /// waits until the operation is completed before returning
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// - `startingOpacity`: the initial opacity to give to the animated components
+    ///
+    /// #### Returns
+    ///
+    /// the animation object that should be added to the animation manager
+    ///
+    /// #### Deprecated
+    ///
+    /// this was added by mistake!
     public ComponentAnimation createAnimateLayoutFadeAndWait(final int duration, int startingOpacity) {
         return null;
     }
 
-    /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
-     *
-     * @param duration        the duration in milliseconds for the animation
-     * @param startingOpacity the initial opacity to give to the animated components
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// - `startingOpacity`: the initial opacity to give to the animated components
     public void animateLayoutFade(final int duration, int startingOpacity) {
         animateLayout(duration, false, startingOpacity, true);
     }
 
-    /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
-     *
-     * @param duration        the duration in milliseconds for the animation
-     * @param startingOpacity the initial opacity to give to the animated components
-     * @return the animation object that should be added to the animation manager
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// - `startingOpacity`: the initial opacity to give to the animated components
+    ///
+    /// #### Returns
+    ///
+    /// the animation object that should be added to the animation manager
     public ComponentAnimation createAnimateLayoutFade(final int duration, int startingOpacity) {
         return animateLayout(duration, false, startingOpacity, false);
     }
 
-    /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
-     * waits until the operation is completed before returning
-     *
-     * @param duration the duration in milliseconds for the animation
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
+    /// waits until the operation is completed before returning
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
     public void animateLayoutAndWait(final int duration) {
         animateLayout(duration, true, 255, true);
     }
 
-    /**
-     * <p>
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation<br>
-     * See:
-     * </p>
-     *
-     * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
-     *
-     * @param duration the duration in milliseconds for the animation
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+    ///
+    /// See:
+    ///
+    /// ```java
+    /// Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
+    /// Button fall = new Button("Fall");
+    /// fall.addActionListener((e) -> {
+    ///     for(int iter = 0 ; iter < 10 ; iter++) {
+    ///         Label b = new Label ("Label " + iter);
+    ///         b.setWidth(fall.getWidth());
+    ///         b.setHeight(fall.getHeight());
+    ///         b.setY(-fall.getHeight());
+    ///         hi.add(b);
+    ///     }
+    ///     hi.getContentPane().animateLayout(20000);
+    /// });
+    /// hi.add(fall);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
     public void animateLayout(final int duration) {
         animateLayout(duration, false, 255, true);
     }
 
-    /**
-     * Updates the tab indices in this container recursively. This method is used internally by
-     * layout managers when calculating the traversal order of components in a form.
-     *
-     * @param offset The starting tab index.
-     * @return The ending tab index (+1)
-     * @deprecated For internal use only.
-     */
+    /// Updates the tab indices in this container recursively. This method is used internally by
+    /// layout managers when calculating the traversal order of components in a form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: The starting tab index.
+    ///
+    /// #### Returns
+    ///
+    /// The ending tab index (+1)
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
     public int updateTabIndices(int offset) {
         Container parent = this;
         Layout l = parent.getActualLayout();
@@ -3594,24 +3734,38 @@ public class Container extends Component implements Iterable<Component> {
         return idx;
     }
 
-    /**
-     * <p>
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation<br>
-     * See:
-     * </p>
-     *
-     * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
-     *
-     * @param duration the duration in milliseconds for the animation
-     * @return the animation object that should be added to the animation manager
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+    ///
+    /// See:
+    ///
+    /// ```java
+    /// Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
+    /// Button fall = new Button("Fall");
+    /// fall.addActionListener((e) -> {
+    ///     for(int iter = 0 ; iter < 10 ; iter++) {
+    ///         Label b = new Label ("Label " + iter);
+    ///         b.setWidth(fall.getWidth());
+    ///         b.setHeight(fall.getHeight());
+    ///         b.setY(-fall.getHeight());
+    ///         hi.add(b);
+    ///     }
+    ///     hi.getContentPane().animateLayout(20000);
+    /// });
+    /// hi.add(fall);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
+    ///
+    /// #### Returns
+    ///
+    /// the animation object that should be added to the animation manager
     public ComponentAnimation createAnimateLayout(final int duration) {
         return animateLayout(duration, false, 255, false);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void drop(Component dragged, int x, int y) {
         int i = getComponentIndex(dragged);
@@ -3640,15 +3794,20 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Creates a motion object for animation, allows subclasses to replace the motion type
-     * used in animations (currently defaults to ease-in).
-     *
-     * @param start       start value
-     * @param destination destination value
-     * @param duration    duration of animation
-     * @return motion object
-     */
+    /// Creates a motion object for animation, allows subclasses to replace the motion type
+    /// used in animations (currently defaults to ease-in).
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: start value
+    ///
+    /// - `destination`: destination value
+    ///
+    /// - `duration`: duration of animation
+    ///
+    /// #### Returns
+    ///
+    /// motion object
     protected Motion createAnimateMotion(int start, int destination, int duration) {
         return Motion.createEaseInMotion(start, destination, duration);
     }
@@ -3670,37 +3829,44 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Morph is similar to the replace functionality where a component might be replaced with
-     * a component that isn't within the container. However, unlike the replace functionality which
-     * uses a transition and assumes the position of the component (and is hence quite flexible) morph
-     * can move and resize the component. E.g. after entering text into a text field and pressing submit
-     * it can "morph" into a chat bubble located in a different part of the screen.<br>
-     * It is the responsibility of the caller to remove the source component (if desired) and revalidate the
-     * container when the animation completes.
-     *
-     * @param source       source component assumed to be within this container or one of its children
-     * @param destination  the destination component
-     * @param duration     the time the morph operation should take
-     * @param onCompletion invoked when the morphing completes
-     */
+    /// Morph is similar to the replace functionality where a component might be replaced with
+    /// a component that isn't within the container. However, unlike the replace functionality which
+    /// uses a transition and assumes the position of the component (and is hence quite flexible) morph
+    /// can move and resize the component. E.g. after entering text into a text field and pressing submit
+    /// it can "morph" into a chat bubble located in a different part of the screen.
+    ///
+    /// It is the responsibility of the caller to remove the source component (if desired) and revalidate the
+    /// container when the animation completes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: source component assumed to be within this container or one of its children
+    ///
+    /// - `destination`: the destination component
+    ///
+    /// - `duration`: the time the morph operation should take
+    ///
+    /// - `onCompletion`: invoked when the morphing completes
     public void morph(Component source, Component destination, int duration, Runnable onCompletion) {
         morph(source, destination, duration, false, onCompletion);
     }
 
-    /**
-     * Morph is similar to the replace functionality where a component might be replaced with
-     * a component that isn't within the container. However, unlike the replace functionality which
-     * uses a transition and assumes the position of the component (and is hence quite flexible) morph
-     * can move and resize the component. E.g. after entering text into a text field and pressing submit
-     * it can "morph" into a chat bubble located in a different part of the screen.<br>
-     * It is the responsibility of the caller to remove the source component (if desired) and revalidate the
-     * container when the animation completes.
-     *
-     * @param source      source component assumed to be within this container or one of its children
-     * @param destination the destination component
-     * @param duration    the time the morph operation should take
-     */
+    /// Morph is similar to the replace functionality where a component might be replaced with
+    /// a component that isn't within the container. However, unlike the replace functionality which
+    /// uses a transition and assumes the position of the component (and is hence quite flexible) morph
+    /// can move and resize the component. E.g. after entering text into a text field and pressing submit
+    /// it can "morph" into a chat bubble located in a different part of the screen.
+    ///
+    /// It is the responsibility of the caller to remove the source component (if desired) and revalidate the
+    /// container when the animation completes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: source component assumed to be within this container or one of its children
+    ///
+    /// - `destination`: the destination component
+    ///
+    /// - `duration`: the time the morph operation should take
     public void morphAndWait(Component source, Component destination, int duration) {
         morph(source, destination, duration, true, null);
     }
@@ -3755,11 +3921,11 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
-     *
-     * @param duration the duration in milliseconds for the animation
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
     private ComponentAnimation animateHierarchy(final int duration, boolean wait, int opacity, boolean add) {
         setShouldCalcPreferredSize(true);
         setEnableLayoutOnPaint(false);
@@ -3813,51 +3979,90 @@ public class Container extends Component implements Iterable<Component> {
         return a;
     }
 
-    /**
-     * <p>This method is the exact reverse of animateLayout, when completed it leaves the container in
-     * an invalid state. It is useful to invoke this in order to remove a component, transition to a
-     * different form or provide some other interaction. E.g.:</p>
-     * <script src="https://gist.github.com/codenameone/ba6fdc5f841b083e13e9.js"></script>
-     *
-     * @param duration the duration of the animation
-     * @param opacity  the opacity to which the layout will reach, allows fading out the components
-     * @param callback if not null will be invoked when unlayouting is complete
-     */
+    /// This method is the exact reverse of animateLayout, when completed it leaves the container in
+    /// an invalid state. It is useful to invoke this in order to remove a component, transition to a
+    /// different form or provide some other interaction. E.g.:
+    ///
+    /// ```java
+    /// Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
+    /// Button fall = new Button("Fall");
+    /// fall.addActionListener((e) -> {
+    ///     if(hi.getContentPane().getComponentCount() == 1) {
+    ///         fall.setText("Rise");
+    ///         for(int iter = 0 ; iter  {
+    ///             hi.removeAll();
+    ///             hi.add(fall);
+    ///             hi.revalidate();
+    ///         });*/
+    ///
+    ///     }
+    /// });
+    /// hi.add(fall);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the animation
+    ///
+    /// - `opacity`: the opacity to which the layout will reach, allows fading out the components
+    ///
+    /// - `callback`: if not null will be invoked when unlayouting is complete
     public void animateUnlayout(final int duration, int opacity, Runnable callback) {
         animateUnlayout(duration, false, opacity, callback, true);
     }
 
-    /**
-     * <p>This method is the exact reverse of animateLayoutAndWait, when completed it leaves the container in
-     * an invalid state. It is useful to invoke this in order to remove a component, transition to a
-     * different form or provide some other interaction. E.g.:</p>
-     * <script src="https://gist.github.com/codenameone/ba6fdc5f841b083e13e9.js"></script>
-     *
-     * @param duration the duration of the animation
-     * @param opacity  the opacity to which the layout will reach, allows fading out the components
-     */
+    /// This method is the exact reverse of animateLayoutAndWait, when completed it leaves the container in
+    /// an invalid state. It is useful to invoke this in order to remove a component, transition to a
+    /// different form or provide some other interaction. E.g.:
+    ///
+    /// ```java
+    /// Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
+    /// Button fall = new Button("Fall");
+    /// fall.addActionListener((e) -> {
+    ///     if(hi.getContentPane().getComponentCount() == 1) {
+    ///         fall.setText("Rise");
+    ///         for(int iter = 0 ; iter  {
+    ///             hi.removeAll();
+    ///             hi.add(fall);
+    ///             hi.revalidate();
+    ///         });*/
+    ///
+    ///     }
+    /// });
+    /// hi.add(fall);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the animation
+    ///
+    /// - `opacity`: the opacity to which the layout will reach, allows fading out the components
     public void animateUnlayoutAndWait(final int duration, int opacity) {
         animateUnlayout(duration, true, opacity, null, true);
     }
 
-    /**
-     * <p>This method is the exact reverse of createAnimateLayout, when animation is completed it leaves the container in
-     * an invalid state. It is useful to invoke this in order to remove a component, transition to a
-     * different form or provide some other interaction. E.g.:</p>
-     *
-     * @param duration the duration of the animation
-     * @param opacity  the opacity to which the layout will reach, allows fading out the components
-     * @return the animation object that should be added to the animation manager
-     */
+    /// This method is the exact reverse of createAnimateLayout, when animation is completed it leaves the container in
+    /// an invalid state. It is useful to invoke this in order to remove a component, transition to a
+    /// different form or provide some other interaction. E.g.:
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the animation
+    ///
+    /// - `opacity`: the opacity to which the layout will reach, allows fading out the components
+    ///
+    /// #### Returns
+    ///
+    /// the animation object that should be added to the animation manager
     public ComponentAnimation createAnimateUnlayout(int duration, int opacity, Runnable callback) {
         return animateUnlayout(duration, false, opacity, callback, false);
     }
 
-    /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
-     *
-     * @param duration the duration in milliseconds for the animation
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
     private ComponentAnimation animateUnlayout(final int duration, boolean wait, int opacity, Runnable callback, boolean add) {
         setShouldCalcPreferredSize(true);
         setEnableLayoutOnPaint(false);
@@ -3908,11 +4113,11 @@ public class Container extends Component implements Iterable<Component> {
         return a;
     }
 
-    /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
-     *
-     * @param duration the duration in milliseconds for the animation
-     */
+    /// Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration in milliseconds for the animation
     private ComponentAnimation animateLayout(final int duration, boolean wait, int opacity, boolean addAnimation) {
         // this happens for some reason
         Form f = getComponentForm();
@@ -3978,40 +4183,45 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Gets the child components of this Container as a List.  Using {@literal true} as the
-     * argument provides a way to obtain all of the children, including children whose full
-     * addition is pending while an animation is in progress.
-     *
-     * <p><strong>Animation Discussion</strong>: If children are added or removed from a Container
-     * while its containing Form has an animation in progress, the insertion/deletion isn't complete
-     * until after the animation is finished.  Most methods to interact with a container's children
-     * won't see these pending changes until that time.  E.g.:</p>
-     *
-     * <p>{@code
-     * // Assume an animation is in progress on the form containing cnt.
-     * Label lbl = new Label("Test");
-     * int len = cnt.getComponentCount(); // 0
-     * cnt.addComponent(lbl);
-     * int lenAfter = cnt.getComponentCount(); // 0
-     * cnt.contains(lbl);  // true
-     * cnt.getChildrenAsList(true).size(); // 1
-     * cnt.getChildrenAsList(false).size(); // 0
-     * <p>
-     * Button btn = new Button("Press me");
-     * cnt.addComponent(btn);
-     * cnt.getComponentCount(); // 0
-     * cnt.getChildrenAsList(true).size(); // 2
-     * cnt.removeComponent(btn);
-     * cnt.getComponentCount(); // 0
-     * cnt.getChildrenAsList(true).size(); // 1
-     * <p>
-     * }</p>
-     *
-     * @param includeQueued True to reflect queued inserts and removals while an animation is in progress.
-     * @return A list including all of the children of this container.
-     * @see #iterator(boolean)
-     */
+    /// Gets the child components of this Container as a List.  Using true as the
+    /// argument provides a way to obtain all of the children, including children whose full
+    /// addition is pending while an animation is in progress.
+    ///
+    /// **Animation Discussion**: If children are added or removed from a Container
+    /// while its containing Form has an animation in progress, the insertion/deletion isn't complete
+    /// until after the animation is finished.  Most methods to interact with a container's children
+    /// won't see these pending changes until that time.  E.g.:
+    ///
+    /// `// Assume an animation is in progress on the form containing cnt.
+    /// Label lbl = new Label("Test");
+    /// int len = cnt.getComponentCount(); // 0
+    /// cnt.addComponent(lbl);
+    /// int lenAfter = cnt.getComponentCount(); // 0
+    /// cnt.contains(lbl);  // true
+    /// cnt.getChildrenAsList(true).size(); // 1
+    /// cnt.getChildrenAsList(false).size(); // 0
+    ///
+    /// Button btn = new Button("Press me");
+    /// cnt.addComponent(btn);
+    /// cnt.getComponentCount(); // 0
+    /// cnt.getChildrenAsList(true).size(); // 2
+    /// cnt.removeComponent(btn);
+    /// cnt.getComponentCount(); // 0
+    /// cnt.getChildrenAsList(true).size(); // 1
+    ///
+    /// `
+    ///
+    /// #### Parameters
+    ///
+    /// - `includeQueued`: True to reflect queued inserts and removals while an animation is in progress.
+    ///
+    /// #### Returns
+    ///
+    /// A list including all of the children of this container.
+    ///
+    /// #### See also
+    ///
+    /// - #iterator(boolean)
     public java.util.List<Component> getChildrenAsList(boolean includeQueued) {
         if (includeQueued) {
             ArrayList<Component> out = new ArrayList<Component>();
@@ -4043,15 +4253,22 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Obtains an iterator that iterates over the children of this container.  If argument is true,
-     * then the iteratator will include queued insertions/deletions while an animation is in progress.
-     *
-     * @param includeQueued True to include queued component insertions and removals while animation is in progress.
-     * @return An iterator that iterates over the children of this component.
-     * @see #iterator()
-     * @see #getChildrenAsList(boolean)
-     */
+    /// Obtains an iterator that iterates over the children of this container.  If argument is true,
+    /// then the iteratator will include queued insertions/deletions while an animation is in progress.
+    ///
+    /// #### Parameters
+    ///
+    /// - `includeQueued`: True to include queued component insertions and removals while animation is in progress.
+    ///
+    /// #### Returns
+    ///
+    /// An iterator that iterates over the children of this component.
+    ///
+    /// #### See also
+    ///
+    /// - #iterator()
+    ///
+    /// - #getChildrenAsList(boolean)
     public Iterator<Component> iterator(boolean includeQueued) {
         if (includeQueued) {
             return getChildrenAsList(includeQueued).iterator();
@@ -4060,84 +4277,68 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
-    /**
-     * Part of the Iterable interface allowing us to do a for-each loop on Container
-     *
-     * @return the iterator of the components
-     */
+    /// Part of the Iterable interface allowing us to do a for-each loop on Container
+    ///
+    /// #### Returns
+    ///
+    /// the iterator of the components
     @Override
     public Iterator<Component> iterator() {
         return components.iterator();
     }
 
-    /**
-     * Encapsulates a change to the container's children.  Used to keep track of
-     * queued inserts and removes that occur while an animation is in progress.
-     */
+    /// Encapsulates a change to the container's children.  Used to keep track of
+    /// queued inserts and removes that occur while an animation is in progress.
     private static class QueuedChange {
-        /**
-         * For {@link #type} to indicate an insertion.
-         */
+        /// For `#type` to indicate an insertion.
         static final int TYPE_INSERT = 0;
-        /**
-         * For {@link #type} to indicate a removal.
-         */
+        /// For `#type` to indicate a removal.
         static final int TYPE_REMOVE = 1;
-        /**
-         * The component that was inserted or removed.
-         */
+        /// The component that was inserted or removed.
         private final Component component;
-        /**
-         * The type of change.  Either {@link #TYPE_INSERT} or {@link #TYPE_REMOVE}
-         */
+        /// The type of change.  Either `#TYPE_INSERT` or `#TYPE_REMOVE`
         private final int type;
 
-        /**
-         * Creates a new queued change.
-         *
-         * @param type Either {@link #TYPE_INSERT} or {@link #TYPE_REMOVE}
-         * @param cmp  The component that was inserted or removed.
-         */
+        /// Creates a new queued change.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: Either `#TYPE_INSERT` or `#TYPE_REMOVE`
+        ///
+        /// - `cmp`: The component that was inserted or removed.
         QueuedChange(int type, Component cmp) {
             this.type = type;
             this.component = cmp;
         }
     }
 
-    /**
-     * Encapsulates a child component insertion that occurs during an animation.
-     */
+    /// Encapsulates a child component insertion that occurs during an animation.
     private static class QueuedInsertion extends QueuedChange {
-        /**
-         * The index where the component should be inserted.
-         */
+        /// The index where the component should be inserted.
         private final int index;
 
-        /**
-         * Creates a new queued insertion.
-         *
-         * @param index The index where the component is inserted.
-         * @param cmp   The component that was inserted.
-         */
+        /// Creates a new queued insertion.
+        ///
+        /// #### Parameters
+        ///
+        /// - `index`: The index where the component is inserted.
+        ///
+        /// - `cmp`: The component that was inserted.
         QueuedInsertion(int index, Component cmp) {
             super(TYPE_INSERT, cmp);
             this.index = index;
         }
     }
 
-    /**
-     * Encapsulates the removal of a component from the children while an animation
-     * is in progress.
-     */
+    /// Encapsulates the removal of a component from the children while an animation
+    /// is in progress.
     private static class QueuedRemoval extends QueuedChange {
         QueuedRemoval(Component cmp) {
             super(TYPE_REMOVE, cmp);
         }
     }
 
-    /**
-     * Lays out the container
-     */
+    /// Lays out the container
 
     private static class TmpInsets {
         float top;

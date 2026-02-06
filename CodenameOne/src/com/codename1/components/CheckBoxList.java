@@ -28,18 +28,20 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.list.MultipleSelectionListModel;
 
-/**
- * A list of checkboxes.
- *
- * @author Steve Hannah
- * @see ButtonList for code samples.
- * @since 6.0
- */
+/// A list of checkboxes.
+///
+/// @author Steve Hannah
+///
+/// #### Since
+///
+/// 6.0
+///
+/// #### See also
+///
+/// - ButtonList for code samples.
 public class CheckBoxList extends ButtonList {
 
-    /**
-     * Change listener added to individual checkboxes to keep them in sync with the model.
-     */
+    /// Change listener added to individual checkboxes to keep them in sync with the model.
     private final ActionListener changeListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {

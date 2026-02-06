@@ -26,45 +26,36 @@ import com.codename1.charts.ChartComponent;
 import com.codename1.charts.models.XYMultipleSeriesDataset;
 import com.codename1.charts.models.XYSeries;
 
-/**
- * A transition to animate the values of a MultipleSeriesDataset (used by BarChart).
- *
- * @author shannah
- */
+/// A transition to animate the values of a MultipleSeriesDataset (used by BarChart).
+///
+/// @author shannah
 public class XYMultiSeriesTransition extends SeriesTransition {
 
-    /**
-     * The data set whose values are to be animated.
-     */
+    /// The data set whose values are to be animated.
     private final XYMultipleSeriesDataset dataset;
 
-    /**
-     * A buffer or cache dataset to store values before they are applied to the
-     * target dataset.
-     */
+    /// A buffer or cache dataset to store values before they are applied to the
+    /// target dataset.
     private XYMultipleSeriesDataset datasetCache;
 
-    /**
-     * Transitions for the individual series of the dataset.
-     */
+    /// Transitions for the individual series of the dataset.
     private XYSeriesTransition[] seriesTransitions;
 
 
-    /**
-     * Creates a new transition for the given chart and dataset.  The dataset
-     * must be rendered by the given chart for this to work correctly.
-     *
-     * @param chart
-     * @param dataset
-     */
+    /// Creates a new transition for the given chart and dataset.  The dataset
+    /// must be rendered by the given chart for this to work correctly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `chart`
+    ///
+    /// - `dataset`
     public XYMultiSeriesTransition(ChartComponent chart, XYMultipleSeriesDataset dataset) {
         super(chart);
         this.dataset = dataset;
     }
 
-    /**
-     * @inherit
-     */
+    /// @inherit
     @Override
     protected void initTransition() {
 
@@ -81,10 +72,11 @@ public class XYMultiSeriesTransition extends SeriesTransition {
     }
 
 
-    /**
-     * @param progress
-     * @inherit
-     */
+    /// @inherit
+    ///
+    /// #### Parameters
+    ///
+    /// - `progress`
     @Override
     protected void update(int progress) {
         getBuffer(); // initializes the buffer and seriesTranslations
@@ -96,9 +88,7 @@ public class XYMultiSeriesTransition extends SeriesTransition {
         }
     }
 
-    /**
-     * @inherit
-     */
+    /// @inherit
     @Override
     protected void cleanup() {
         super.cleanup();
@@ -112,12 +102,8 @@ public class XYMultiSeriesTransition extends SeriesTransition {
     }
 
 
-    /**
-     * Gets the buffer/cache for values.  Values set in the buffer will be applied
-     * to the target dataset when the transition takes place.
-     *
-     * @return
-     */
+    /// Gets the buffer/cache for values.  Values set in the buffer will be applied
+    /// to the target dataset when the transition takes place.
     public XYMultipleSeriesDataset getBuffer() {
         if (datasetCache == null) {
             datasetCache = new XYMultipleSeriesDataset();

@@ -41,46 +41,37 @@ import com.codename1.ui.util.Resources;
 
 import java.util.Vector;
 
-/**
- * This is Menu Bar that displays it's commands on a side bar navigation similar
- * to Google+/Facbook apps navigation
- *
- * @author Chen
- * @deprecated this class is still used internally but code should be migrated to use the
- * {@link com.codename1.ui.Toolbar}
- */
+/// This is Menu Bar that displays it's commands on a side bar navigation similar
+/// to Google+/Facbook apps navigation
+///
+/// @author Chen
+///
+/// #### Deprecated
+///
+/// @deprecated this class is still used internally but code should be migrated to use the
+/// `com.codename1.ui.Toolbar`
 public class SideMenuBar extends MenuBar {
 
-    /**
-     * This string can be used in putClientProperty within command to hint about
-     * the placement of the command
-     */
+    /// This string can be used in putClientProperty within command to hint about
+    /// the placement of the command
     public static final String COMMAND_PLACEMENT_KEY = "placement";
-    /**
-     * This string can be used in putClientProperty within command to hint about
-     * the placement of the command e.g.
-     * putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
-     */
+    /// This string can be used in putClientProperty within command to hint about
+    /// the placement of the command e.g.
+    /// putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
     public static final String COMMAND_PLACEMENT_VALUE_RIGHT = "right";
-    /**
-     * This string can be used in putClientProperty within command to hint about
-     * the placement of the command e.g.
-     * putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_TOP);
-     */
+    /// This string can be used in putClientProperty within command to hint about
+    /// the placement of the command e.g.
+    /// putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_TOP);
     public static final String COMMAND_PLACEMENT_VALUE_TOP = "top";
-    /**
-     * Allows placing a component instance into the client properties of the command so
-     * it is shown instead of the command e.g.:
-     * putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, myCustomComponentInstance);
-     */
+    /// Allows placing a component instance into the client properties of the command so
+    /// it is shown instead of the command e.g.:
+    /// putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, myCustomComponentInstance);
     public static final String COMMAND_SIDE_COMPONENT = "SideComponent";
-    /**
-     * When using a side component we might want to only have it behave as a visual tool
-     * and still execute the command when it is clicked. The default behavior is to
-     * delegate events to the component, however if this flag is used the command
-     * will act as normal while using the COMMAND_SIDE_COMPONENT only for visual effect e.g.:
-     * putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
-     */
+    /// When using a side component we might want to only have it behave as a visual tool
+    /// and still execute the command when it is clicked. The default behavior is to
+    /// delegate events to the component, however if this flag is used the command
+    /// will act as normal while using the COMMAND_SIDE_COMPONENT only for visual effect e.g.:
+    /// putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
     public static final String COMMAND_ACTIONABLE = "Actionable";
     int initialDragX;
     int initialDragY;
@@ -103,20 +94,18 @@ public class SideMenuBar extends MenuBar {
     private boolean rightSideSwipePotential;
     private boolean topSwipePotential;
 
-    /**
-     * Returns true if a side menu is currently controlling the screen
-     *
-     * @return true if a side menu is currently controlling the screen
-     */
+    /// Returns true if a side menu is currently controlling the screen
+    ///
+    /// #### Returns
+    ///
+    /// true if a side menu is currently controlling the screen
     public static boolean isShowing() {
         Form f = Display.getInstance().getCurrent();
         return f.getClientProperty("cn1$sideMenuParent") != null;
     }
 
-    /**
-     * Folds the current side menu if it is open, notice that the menu will
-     * close asynchronously
-     */
+    /// Folds the current side menu if it is open, notice that the menu will
+    /// close asynchronously
     public static void closeCurrentMenu() {
         Form f = Display.getInstance().getCurrent();
         SideMenuBar b = (SideMenuBar) f.getClientProperty("cn1$sideMenuParent");
@@ -125,12 +114,12 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    /**
-     * Folds the current side menu if it is open, when the menu is closed it
-     * will invoke the runnable callback method
-     *
-     * @param callback will be invoked when the menu is actually closed
-     */
+    /// Folds the current side menu if it is open, when the menu is closed it
+    /// will invoke the runnable callback method
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: will be invoked when the menu is actually closed
     public static void closeCurrentMenu(final Runnable callback) {
         if (Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
             Display.getInstance().getCurrent().getToolbar().closeSideMenu();
@@ -153,9 +142,7 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void initMenuBar(Form parent) {
         if (parent.getClientProperty("Menu") != null) {
@@ -165,9 +152,7 @@ public class SideMenuBar extends MenuBar {
         this.parent = parent;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void removeAllCommands() {
         Container t = getTitleAreaContainer();
@@ -194,9 +179,7 @@ public class SideMenuBar extends MenuBar {
         initTitleBarStatus();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void unInstallMenuBar() {
         super.unInstallMenuBar();
@@ -208,11 +191,11 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    /**
-     * Creates the Side Menu open button.
-     *
-     * @return a Button instance to place on the TitleArea
-     */
+    /// Creates the Side Menu open button.
+    ///
+    /// #### Returns
+    ///
+    /// a Button instance to place on the TitleArea
     protected Button createOpenButton() {
         Button ob = new Button();
         ob.setUIID("MenuButton");
@@ -236,9 +219,7 @@ public class SideMenuBar extends MenuBar {
         return ob;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void installMenuBar() {
         if (parent == null) {
@@ -375,9 +356,7 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected int getDragRegionStatus(int x, int y) {
         if (getUIManager().isThemeConstant("sideMenuFoldedSwipeBool", true)) {
@@ -538,9 +517,7 @@ public class SideMenuBar extends MenuBar {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addCommand(Command cmd) {
         if (cmd.getClientProperty("TitleCommand") != null) {
@@ -567,9 +544,7 @@ public class SideMenuBar extends MenuBar {
         addOpenButton(cmd, false);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setBackCommand(Command backCommand) {
         super.setBackCommand(backCommand);
@@ -592,9 +567,7 @@ public class SideMenuBar extends MenuBar {
         return Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void addCommand(Command cmd, int index) {
         if (cmd.getClientProperty("TitleCommand") != null) {
@@ -645,9 +618,7 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected void removeCommand(Command cmd) {
         super.removeCommand(cmd);
@@ -709,9 +680,7 @@ public class SideMenuBar extends MenuBar {
         super.keyReleased(keyCode);
     }
 
-    /**
-     * Closes the menu if it is currently open
-     */
+    /// Closes the menu if it is currently open
     public void closeMenu() {
         if (Toolbar.isOnTopSideMenu() && Display.getInstance().getCurrent().getToolbar() != null && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
             Display.getInstance().getCurrent().getToolbar().closeSideMenu();
@@ -725,16 +694,12 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    /**
-     * Opens the menu if it is currently closed
-     */
+    /// Opens the menu if it is currently closed
     public void openMenu(String direction) {
         openMenu(direction, -1, getUIManager().getThemeConstant("sideMenuAnimSpeedInt", 300), true);
     }
 
-    /**
-     * Opens the menu if it is currently closed
-     */
+    /// Opens the menu if it is currently closed
     void openMenu(String direction, int time, int dest, boolean transition) {
         if (Display.getInstance().getCurrent() == parent) { //NOPMD CompareObjectsWithEquals
             menu = createMenu(direction);
@@ -753,12 +718,15 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    /**
-     * Returns true if the Menu is currently open
-     *
-     * @return true if menu open
-     * @deprecated this code references functionality that is no longer supported and currently always returns false
-     */
+    /// Returns true if the Menu is currently open
+    ///
+    /// #### Returns
+    ///
+    /// true if menu open
+    ///
+    /// #### Deprecated
+    ///
+    /// this code references functionality that is no longer supported and currently always returns false
     public boolean isMenuOpen() {
         return Display.getInstance().getCurrent() == menu; //NOPMD CompareObjectsWithEquals
     }
@@ -975,29 +943,33 @@ public class SideMenuBar extends MenuBar {
 
     }
 
-    /**
-     * Creates the side navigation component with the Commands
-     *
-     * @param commands the Command objects
-     * @return the Component to display on the navigation
-     */
+    /// Creates the side navigation component with the Commands
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the Command objects
+    ///
+    /// #### Returns
+    ///
+    /// the Component to display on the navigation
     protected Container createSideNavigationComponent(Vector commands) {
         return createSideNavigationComponent(commands, null);
     }
 
-    /**
-     * Creates the side navigation component with the Commands
-     *
-     * @param commands the Command objects
-     * @return the Component to display on the navigation
-     */
+    /// Creates the side navigation component with the Commands
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the Command objects
+    ///
+    /// #### Returns
+    ///
+    /// the Component to display on the navigation
     protected Container createSideNavigationComponent(Vector commands, String placement) {
         return createSideNavigationPanel(commands, placement);
     }
 
-    /**
-     * Creates an empty side navigation panel.
-     */
+    /// Creates an empty side navigation panel.
     protected Container constructSideNavigationComponent() {
         return constructSideNavigationPanel();
     }
@@ -1107,13 +1079,14 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
-    /**
-     * This method responsible to add a Component to the side navigation panel.
-     *
-     * @param menu the Menu Container that was created in the
-     *             constructSideNavigationComponent() method
-     * @param cmp  the Component to add to the side menu
-     */
+    /// This method responsible to add a Component to the side navigation panel.
+    ///
+    /// #### Parameters
+    ///
+    /// - `menu`: @param menu the Menu Container that was created in the
+    /// constructSideNavigationComponent() method
+    ///
+    /// - `cmp`: the Component to add to the side menu
     protected void addComponentToSideMenu(Container menu, Component cmp) {
         addComponentToSideMenuImpl(menu, cmp);
     }
@@ -1122,9 +1095,7 @@ public class SideMenuBar extends MenuBar {
         menu.addComponent(cmp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     protected Button createTouchCommandButton(final Command c) {
 
@@ -1545,11 +1516,11 @@ public class SideMenuBar extends MenuBar {
         return new CommandWrapper(cmd);
     }
 
-    /**
-     * Returns the Parent Form of this menu
-     *
-     * @return Form Object
-     */
+    /// Returns the Parent Form of this menu
+    ///
+    /// #### Returns
+    ///
+    /// Form Object
     @Override
     public Form getParentForm() {
         return parent;
@@ -1814,9 +1785,7 @@ public class SideMenuBar extends MenuBar {
                     (cmd == null ? that.cmd == null : cmd.equals(that.cmd));
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        /// {@inheritDoc}
         @Override
         public int hashCode() {
             int result = super.hashCode();

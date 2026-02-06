@@ -24,25 +24,24 @@ package com.codename1.payment;
 
 import com.codename1.util.SuccessCallback;
 
-/**
- * Interface that can be implemented to provide store of receipts.
- *
- * @author shannah
- */
+/// Interface that can be implemented to provide store of receipts.
+///
+/// @author shannah
 public interface ReceiptStore {
 
-    /**
-     * Load receipts from the data source.
-     *
-     * @param callback
-     */
+    /// Load receipts from the data source.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`
     void fetchReceipts(SuccessCallback<Receipt[]> callback);
 
-    /**
-     * Submits a receipt to the data source.
-     *
-     * @param receipt
-     * @param callback
-     */
+    /// Submits a receipt to the data source.
+    ///
+    /// #### Parameters
+    ///
+    /// - `receipt`
+    ///
+    /// - `callback`
     void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback);
 }

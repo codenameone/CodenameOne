@@ -17,45 +17,49 @@
 
 package com.codename1.util;
 
-/**
- * Static library that provides all operations related with division and modular
- * arithmetic to {@link TBigInteger}. Some methods are provided in both mutable
- * and immutable way. There are several variants provided listed below:
- *
- * <ul type="circle">
- * <li><b>Division</b>
- * <ul type="circle">
- * <li>{@link TBigInteger} division and remainder by {@link TBigInteger}.</li>
- * <li>{@link TBigInteger} division and remainder by {@code int}.</li>
- * <li><i>gcd</i> between {@link TBigInteger} numbers.</li>
- * </ul>
- * </li>
- * <li><b>Modular arithmetic </b>
- * <ul type="circle">
- * <li>Modular exponentiation between {@link TBigInteger} numbers.</li>
- * <li>Modular inverse of a {@link TBigInteger} numbers.</li>
- * </ul>
- * </li>
- * </ul>
- */
+/// Static library that provides all operations related with division and modular
+/// arithmetic to `TBigInteger`. Some methods are provided in both mutable
+/// and immutable way. There are several variants provided listed below:
+///
+/// - **Division**
+///
+/// - `TBigInteger` division and remainder by `TBigInteger`.
+///
+/// - `TBigInteger` division and remainder by `int`.
+///
+/// - *gcd* between `TBigInteger` numbers.
+///
+/// - **Modular arithmetic **
+///
+/// - Modular exponentiation between `TBigInteger` numbers.
+///
+/// - Modular inverse of a `TBigInteger` numbers.
 final class TDivision {
 
     private TDivision() {}
 
-    /**
-     * Divides the array 'a' by the array 'b' and gets the quotient and the
-     * remainder. Implements the Knuth's division algorithm. See D. Knuth, The
-     * Art of Computer Programming, vol. 2. Steps D1-D8 correspond the steps in
-     * the algorithm description.
-     *
-     * @param quot       the quotient
-     * @param quotLength the quotient's length
-     * @param a          the dividend
-     * @param aLength    the dividend's length
-     * @param b          the divisor
-     * @param bLength    the divisor's length
-     * @return the remainder
-     */
+    /// Divides the array 'a' by the array 'b' and gets the quotient and the
+    /// remainder. Implements the Knuth's division algorithm. See D. Knuth, The
+    /// Art of Computer Programming, vol. 2. Steps D1-D8 correspond the steps in
+    /// the algorithm description.
+    ///
+    /// #### Parameters
+    ///
+    /// - `quot`: the quotient
+    ///
+    /// - `quotLength`: the quotient's length
+    ///
+    /// - `a`: the dividend
+    ///
+    /// - `aLength`: the dividend's length
+    ///
+    /// - `b`: the divisor
+    ///
+    /// - `bLength`: the divisor's length
+    ///
+    /// #### Returns
+    ///
+    /// the remainder
     static int[] divide(int[] quot, int quotLength, int[] a, int aLength, int[] b, int bLength) {
 
         int[] normA = new int[aLength + 1]; // the normalized dividend
@@ -159,16 +163,22 @@ final class TDivision {
         return normA;
     }
 
-    /**
-     * Divides an array by an integer value. Implements the Knuth's division
-     * algorithm. See D. Knuth, The Art of Computer Programming, vol. 2.
-     *
-     * @param dest      the quotient
-     * @param src       the dividend
-     * @param srcLength the length of the dividend
-     * @param divisor   the divisor
-     * @return remainder
-     */
+    /// Divides an array by an integer value. Implements the Knuth's division
+    /// algorithm. See D. Knuth, The Art of Computer Programming, vol. 2.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dest`: the quotient
+    ///
+    /// - `src`: the dividend
+    ///
+    /// - `srcLength`: the length of the dividend
+    ///
+    /// - `divisor`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// remainder
     static int divideArrayByInt(int[] dest, int[] src, final int srcLength, final int divisor) {
 
         long rem = 0;
@@ -211,15 +221,20 @@ final class TDivision {
         return (int) rem;
     }
 
-    /**
-     * Divides an array by an integer value. Implements the Knuth's division
-     * algorithm. See D. Knuth, The Art of Computer Programming, vol. 2.
-     *
-     * @param src       the dividend
-     * @param srcLength the length of the dividend
-     * @param divisor   the divisor
-     * @return remainder
-     */
+    /// Divides an array by an integer value. Implements the Knuth's division
+    /// algorithm. See D. Knuth, The Art of Computer Programming, vol. 2.
+    ///
+    /// #### Parameters
+    ///
+    /// - `src`: the dividend
+    ///
+    /// - `srcLength`: the length of the dividend
+    ///
+    /// - `divisor`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// remainder
     static int remainderArrayByInt(int[] src, final int srcLength, final int divisor) {
 
         long result = 0;
@@ -232,27 +247,35 @@ final class TDivision {
         return (int) result;
     }
 
-    /**
-     * Divides a <code>BigInteger</code> by a signed <code>int</code> and
-     * returns the remainder.
-     *
-     * @param dividend the BigInteger to be divided. Must be non-negative.
-     * @param divisor  a signed int
-     * @return divide % divisor
-     */
+    /// Divides a `BigInteger` by a signed `int` and
+    /// returns the remainder.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dividend`: the BigInteger to be divided. Must be non-negative.
+    ///
+    /// - `divisor`: a signed int
+    ///
+    /// #### Returns
+    ///
+    /// divide % divisor
     static int remainder(TBigInteger dividend, int divisor) {
         return remainderArrayByInt(dividend.digits, dividend.numberLength, divisor);
     }
 
-    /**
-     * Divides an unsigned long a by an unsigned int b. It is supposed that the
-     * most significant bit of b is set to 1, i.e. b < 0
-     *
-     * @param a the dividend
-     * @param b the divisor
-     * @return the long value containing the unsigned integer remainder in the
-     * left half and the unsigned integer quotient in the right half
-     */
+    /// Divides an unsigned long a by an unsigned int b. It is supposed that the
+    /// most significant bit of b is set to 1, i.e. b < 0
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the dividend
+    ///
+    /// - `b`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// @return the long value containing the unsigned integer remainder in the
+    /// left half and the unsigned integer quotient in the right half
     static long divideLongByInt(long a, int b) {
         long quot;
         long rem;
@@ -289,12 +312,12 @@ final class TDivision {
         return (rem << 32) | (quot & 0xffffffffL);
     }
 
-    /**
-     * Computes the quotient and the remainder after a division by an
-     * {@code int} number.
-     *
-     * @return an array of the form {@code [quotient, remainder]}.
-     */
+    /// Computes the quotient and the remainder after a division by an
+    /// `int` number.
+    ///
+    /// #### Returns
+    ///
+    /// an array of the form `[quotient, remainder]`.
     static TBigInteger[] divideAndRemainderByInteger(TBigInteger val, int divisor, int divisorSign) {
         // res[0] is a quotient and res[1] is a remainder:
         int[] valDigits = val.digits;
@@ -325,17 +348,24 @@ final class TDivision {
         return new TBigInteger[]{result0, result1};
     }
 
-    /**
-     * Multiplies an array by int and subtracts it from a subarray of another
-     * array.
-     *
-     * @param a     the array to subtract from
-     * @param start the start element of the subarray of a
-     * @param b     the array to be multiplied and subtracted
-     * @param bLen  the length of b
-     * @param c     the multiplier of b
-     * @return the carry element of subtraction
-     */
+    /// Multiplies an array by int and subtracts it from a subarray of another
+    /// array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the array to subtract from
+    ///
+    /// - `start`: the start element of the subarray of a
+    ///
+    /// - `b`: the array to be multiplied and subtracted
+    ///
+    /// - `bLen`: the length of b
+    ///
+    /// - `c`: the multiplier of b
+    ///
+    /// #### Returns
+    ///
+    /// the carry element of subtraction
     static int multiplyAndSubtract(int[] a, int start, int[] b, int bLen, int c) {
         long carry0 = 0;
         long carry1 = 0;
@@ -353,14 +383,22 @@ final class TDivision {
         return (int) (carry1 >> 32); // -1 or 0
     }
 
-    /**
-     * @param m   a positive modulus Return the greatest common divisor of op1
-     *            and op2,
-     * @param op1 must be greater than zero
-     * @param op2 must be greater than zero
-     * @return {@code GCD(op1, op2)}
-     * @see TBigInteger#gcd(TBigInteger)
-     */
+    /// #### Parameters
+    ///
+    /// - `m`: @param m   a positive modulus Return the greatest common divisor of op1
+    /// and op2,
+    ///
+    /// - `op1`: must be greater than zero
+    ///
+    /// - `op2`: must be greater than zero
+    ///
+    /// #### Returns
+    ///
+    /// `GCD(op1, op2)`
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#gcd(TBigInteger)
     static TBigInteger gcdBinary(TBigInteger op1, TBigInteger op2) {
         // PRE: (op1 > 0) and (op2 > 0)
 
@@ -415,16 +453,23 @@ final class TDivision {
         return op2.shiftLeft(pow2Count);
     }
 
-    /**
-     * Performs the same as {@link #gcdBinary(TBigInteger, TBigInteger)}, but
-     * with numbers of 63 bits, represented in positives values of {@code long}
-     * type.
-     *
-     * @param op1 a positive number
-     * @param op2 a positive number
-     * @return <code>GCD(op1, op2)</code>
-     * @see #gcdBinary(TBigInteger, TBigInteger)
-     */
+    /// Performs the same as `TBigInteger)`, but
+    /// with numbers of 63 bits, represented in positives values of `long`
+    /// type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op1`: a positive number
+    ///
+    /// - `op2`: a positive number
+    ///
+    /// #### Returns
+    ///
+    /// `GCD(op1, op2)`
+    ///
+    /// #### See also
+    ///
+    /// - #gcdBinary(TBigInteger, TBigInteger)
     static long gcdBinary(long op1, long op2) {
         // PRE: (op1 > 0) and (op2 > 0)
         int lsb1 = TBigDecimal.numberOfTrailingZeros(op1);
@@ -449,10 +494,8 @@ final class TDivision {
         return (op2 << pow2Count);
     }
 
-    /**
-     * Calculates a.modInverse(p) Based on: Savas, E; Koc, C "The Montgomery
-     * Modular Inverse - Revised"
-     */
+    /// Calculates a.modInverse(p) Based on: Savas, E; Koc, C "The Montgomery
+    /// Modular Inverse - Revised"
     static TBigInteger modInverseMontgomery(TBigInteger a, TBigInteger p) {
 
         if (a.sign == 0) {
@@ -544,9 +587,7 @@ final class TDivision {
         return r;
     }
 
-    /**
-     * Calculate the first digit of the inverse
-     */
+    /// Calculate the first digit of the inverse
     private static int calcN(TBigInteger a) {
         long m0 = a.digits[0] & 0xFFFFFFFFL;
         long n2 = 1L; // this is a'[0]
@@ -573,15 +614,19 @@ final class TDivision {
         return res;
     }
 
-    /**
-     * Implements the "Shifting Euclidean modular inverse algorithm". "Laszlo
-     * Hars - Modular Inverse Algorithms Without Multiplications for
-     * Cryptographic Applications"
-     *
-     * @param a a positive number
-     * @param m a positive modulus
-     * @see TBigInteger#modInverse(TBigInteger)
-     */
+    /// Implements the "Shifting Euclidean modular inverse algorithm". "Laszlo
+    /// Hars - Modular Inverse Algorithms Without Multiplications for
+    /// Cryptographic Applications"
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a positive number
+    ///
+    /// - `m`: a positive modulus
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#modInverse(TBigInteger)
     static TBigInteger modInverseHars(TBigInteger a, TBigInteger m) {
         // PRE: (a > 0) and (m > 0)
         TBigInteger u;
@@ -697,17 +742,20 @@ final class TDivision {
         return res;
     }
 
-    /**
-     * Performs modular exponentiation using the Montgomery Reduction. It
-     * requires that all parameters be positive and the modulus be odd. >
-     *
-     * @see TBigInteger#modPow(TBigInteger, TBigInteger)
-     * @see #monPro(TBigInteger, TBigInteger, TBigInteger, int)
-     * @see #slidingWindow(TBigInteger, TBigInteger, TBigInteger, TBigInteger,
-     * int)
-     * @see #squareAndMultiply(TBigInteger, TBigInteger, TBigInteger,
-     * TBigInteger, int)
-     */
+    /// Performs modular exponentiation using the Montgomery Reduction. It
+    /// requires that all parameters be positive and the modulus be odd. >
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#modPow(TBigInteger, TBigInteger)
+    ///
+    /// - #monPro(TBigInteger, TBigInteger, TBigInteger, int)
+    ///
+    /// - @see #slidingWindow(TBigInteger, TBigInteger, TBigInteger, TBigInteger,
+    /// int)
+    ///
+    /// - @see #squareAndMultiply(TBigInteger, TBigInteger, TBigInteger,
+    /// TBigInteger, int)
     static TBigInteger oddModPow(TBigInteger base, TBigInteger exponent, TBigInteger modulus) {
         // PRE: (base > 0), (exponent > 0), (modulus > 0) and (odd modulus)
         int k = (modulus.numberLength << 5); // r = 2^k
@@ -728,16 +776,17 @@ final class TDivision {
         return monPro(res, TBigInteger.ONE, modulus, n2);
     }
 
-    /**
-     * Performs modular exponentiation using the Montgomery Reduction. It
-     * requires that all parameters be positive and the modulus be even. Based
-     * <i>The square and multiply algorithm and the Montgomery Reduction C. K.
-     * Koc - Montgomery Reduction with Even Modulus</i>. The square and multiply
-     * algorithm and the Montgomery Reduction.
-     *
-     * @ar.org.fitc.ref "C. K. Koc - Montgomery Reduction with Even Modulus"
-     * @see TBigInteger#modPow(TBigInteger, TBigInteger)
-     */
+    /// Performs modular exponentiation using the Montgomery Reduction. It
+    /// requires that all parameters be positive and the modulus be even. Based
+    /// *The square and multiply algorithm and the Montgomery Reduction C. K.
+    /// Koc - Montgomery Reduction with Even Modulus*. The square and multiply
+    /// algorithm and the Montgomery Reduction.
+    ///
+    /// @ar.org.fitc.ref "C. K. Koc - Montgomery Reduction with Even Modulus"
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#modPow(TBigInteger, TBigInteger)
     static TBigInteger evenModPow(TBigInteger base, TBigInteger exponent, TBigInteger modulus) {
         // PRE: (base > 0), (exponent > 0), (modulus > 0) and (modulus even)
         // STEP 1: Obtain the factorization 'modulus'= q * 2^j.
@@ -761,12 +810,15 @@ final class TDivision {
         return x1.add(q.multiply(y));
     }
 
-    /**
-     * It requires that all parameters be positive.
-     *
-     * @return {@code base<sup>exponent</sup> mod (2<sup>j</sup>)}.
-     * @see TBigInteger#modPow(TBigInteger, TBigInteger)
-     */
+    /// It requires that all parameters be positive.
+    ///
+    /// #### Returns
+    ///
+    /// `baseexponent mod (2j)`.
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#modPow(TBigInteger, TBigInteger)
     static TBigInteger pow2ModPow(TBigInteger base, TBigInteger exponent, int j) {
         // PRE: (base > 0), (exponent > 0) and (j > 0)
         TBigInteger res = TBigInteger.ONE;
@@ -824,19 +876,26 @@ final class TDivision {
         }
     }
 
-    /**
-     * Implements the Montgomery Product of two integers represented by
-     * {@code int} arrays. The arrays are supposed in <i>little endian</i>
-     * notation.
-     *
-     * @param a       The first factor of the product.
-     * @param b       The second factor of the product.
-     * @param modulus The modulus of the operations. Z<sub>modulus</sub>.
-     * @param n2      The digit modulus'[0].
-     * @ar.org.fitc.ref "C. K. Koc - Analyzing and Comparing Montgomery
-     * Multiplication Algorithms"
-     * @see #modPowOdd(TBigInteger, TBigInteger, TBigInteger)
-     */
+    /// Implements the Montgomery Product of two integers represented by
+    /// `int` arrays. The arrays are supposed in *little endian*
+    /// notation.
+    ///
+    /// @ar.org.fitc.ref "C. K. Koc - Analyzing and Comparing Montgomery
+    /// Multiplication Algorithms"
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: The first factor of the product.
+    ///
+    /// - `b`: The second factor of the product.
+    ///
+    /// - `modulus`: The modulus of the operations. Zmodulus.
+    ///
+    /// - `n2`: The digit modulus'[0].
+    ///
+    /// #### See also
+    ///
+    /// - #modPowOdd(TBigInteger, TBigInteger, TBigInteger)
     static TBigInteger monPro(TBigInteger a, TBigInteger b, TBigInteger modulus, int n2) {
         int modulusLen = modulus.numberLength;
         int[] res = new int[(modulusLen << 1) + 1];
@@ -847,12 +906,13 @@ final class TDivision {
 
     }
 
-    /**
-     * Performs the final reduction of the Montgomery algorithm.
-     *
-     * @see #monPro(TBigInteger, TBigInteger, TBigInteger, long)
-     * @see #monSquare(TBigInteger, TBigInteger, long)
-     */
+    /// Performs the final reduction of the Montgomery algorithm.
+    ///
+    /// #### See also
+    ///
+    /// - #monPro(TBigInteger, TBigInteger, TBigInteger, long)
+    ///
+    /// - #monSquare(TBigInteger, TBigInteger, long)
     static TBigInteger finalSubtraction(int[] res, TBigInteger modulus) {
 
         // skipping leading zeros
@@ -880,11 +940,15 @@ final class TDivision {
         return result;
     }
 
-    /**
-     * @param x an odd positive number.
-     * @param n the exponent by which 2 is raised.
-     * @return {@code x<sup>-1</sup> (mod 2<sup>n</sup>)}.
-     */
+    /// #### Parameters
+    ///
+    /// - `x`: an odd positive number.
+    ///
+    /// - `n`: the exponent by which 2 is raised.
+    ///
+    /// #### Returns
+    ///
+    /// `x-1 (mod 2n)`.
     static TBigInteger modPow2Inverse(TBigInteger x, int n) {
         // PRE: (x > 0), (x is odd), and (n > 0)
         TBigInteger y = new TBigInteger(1, new int[1 << n]);
@@ -901,12 +965,13 @@ final class TDivision {
         return y;
     }
 
-    /**
-     * Performs {@code x = x mod (2<sup>n</sup>)}.
-     *
-     * @param x a positive number, it will store the result.
-     * @param n a positive exponent of {@code 2}.
-     */
+    /// Performs `x = x mod (2n)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: a positive number, it will store the result.
+    ///
+    /// - `n`: a positive exponent of `2`.
     static void inplaceModPow2(TBigInteger x, int n) {
         // PRE: (x > 0) and (n >= 0)
         int fd = n >> 5;

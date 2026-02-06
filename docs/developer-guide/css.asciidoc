@@ -907,12 +907,12 @@ You can use system fonts, true type fonts, and native fonts in your CSS styleshe
 
 .Normalizing Default Font Size
 ****
-When trying to make a design look “good” across multiple platforms it can be difficult to deal with the differing default font sizes on different platforms. You may spend hours tweaking your UI to look perfect on iPhone X, only to find out that the fonts are too small when viewed on an android device. We have now added theme constants to explicitly set the the default font size in “screen-independent-pixels”.
+When trying to make a design look "good" across multiple platforms it can be difficult to deal with the differing default font sizes on different platforms. You may spend hours tweaking your UI to look perfect on iPhone X, only to find out that the fonts are too small when viewed on an android device. We have now added theme constants to explicitly set the the default font size in "screen-independent-pixels".
 
 Note
 In this case, 1 screen-independent-pixel is defined as 1/160th of an inch on a device, and 1/96th of an inch on desktop. These values correspond to Android’s definition on device, and Windows' definition on the desktop.
 
-If you add the following to your stylesheet, it will set the default font size to 18 screen-independent pixels (or 18/160th of an inch), which corresponds to the Android native default “medium” font size.
+If you add the following to your stylesheet, it will set the default font size to 18 screen-independent pixels (or 18/160th of an inch), which corresponds to the Android native default "medium" font size.
 
 [source,css]
 ----

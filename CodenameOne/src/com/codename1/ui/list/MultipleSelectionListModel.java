@@ -22,41 +22,42 @@
  */
 package com.codename1.ui.list;
 
-/**
- * Events {@link ListModel} to support multiple selection.
- *
- * @author Steve Hannah
- * @since 6.0
- */
+/// Events `ListModel` to support multiple selection.
+///
+/// @author Steve Hannah
+///
+/// #### Since
+///
+/// 6.0
 public interface MultipleSelectionListModel<T> extends ListModel<T> {
-    /**
-     * Adds indices to set of selected indices.
-     *
-     * @param indices Indices to add to selected indices.
-     */
+    /// Adds indices to set of selected indices.
+    ///
+    /// #### Parameters
+    ///
+    /// - `indices`: Indices to add to selected indices.
     void addSelectedIndices(int... indices);
 
-    /**
-     * Removes indices from the set of selected indices.
-     *
-     * @param indices Indices to remove from selected indices.
-     */
+    /// Removes indices from the set of selected indices.
+    ///
+    /// #### Parameters
+    ///
+    /// - `indices`: Indices to remove from selected indices.
     void removeSelectedIndices(int... indices);
 
-    /**
-     * Gets the selected indices in this model.  Indices should be returned
-     * in increasing order with no duplicates.
-     *
-     * @return Selected indices in increasing order with no duplicates.  If there
-     * are no selected indices, then this will return a zero-length array.
-     */
+    /// Gets the selected indices in this model.  Indices should be returned
+    /// in increasing order with no duplicates.
+    ///
+    /// #### Returns
+    ///
+    /// @return Selected indices in increasing order with no duplicates.  If there
+    /// are no selected indices, then this will return a zero-length array.
     int[] getSelectedIndices();
 
-    /**
-     * Sets the selected indices in this model.
-     *
-     * @param indices
-     */
+    /// Sets the selected indices in this model.
+    ///
+    /// #### Parameters
+    ///
+    /// - `indices`
     void setSelectedIndices(int... indices);
 
 }

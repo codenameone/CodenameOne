@@ -29,41 +29,86 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
 import java.util.Collections;
 
-/**
- * <p>A default implementation of the table model based on a two dimensional array.
- * </p>
- *
- * <script src="https://gist.github.com/codenameone/6b106772ad1d58c50270.js"></script>
- *
- * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png" alt="Table with customize cells using the pinstripe effect" />
- * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe-edit.png" alt="Picker table cell during edit" />
- *
- * @author Shai Almog
- */
+/// A default implementation of the table model based on a two dimensional array.
+///
+/// ```java
+/// Form hi = new Form("Table", new BorderLayout());
+/// TableModel model = new DefaultTableModel(new String[] {"Col 1", "Col 2", "Col 3"}, new Object[][] {
+///     {"Row 1", "Row A", "Row X"},
+///     {"Row 2", "Row B can now stretch", null},
+///     {"Row 3", "Row C", "Row Z"},
+///     {"Row 4", "Row D", "Row K"},
+///     }) {
+///         public boolean isCellEditable(int row, int col) {
+///             return col != 0;
+///         }
+///     };
+/// Table table = new Table(model) {
+/// @Override
+///     protected Component createCell(Object value, int row, int column, boolean editable) { // (1)
+///         Component cell;
+///         if(row == 1 && column == 1) { // (2)
+///             Picker p = new Picker();
+///             p.setType(Display.PICKER_TYPE_STRINGS);
+///             p.setStrings("Row B can now stretch", "This is a good value", "So Is This", "Better than text field");
+///             p.setSelectedString((String)value); // (3)
+///             p.setUIID("TableCell");
+///             p.addActionListener((e) -> getModel().setValueAt(row, column, p.getSelectedString())); // (4)
+///             cell = p;
+///         } else {
+///             cell = super.createCell(value, row, column, editable);
+///         }
+///         if(row > -1 && row % 2 == 0) { // (5)
+///             // pinstripe effect
+///             cell.getAllStyles().setBgColor(0xeeeeee);
+///             cell.getAllStyles().setBgTransparency(255);
+///         }
+///         return cell;
+///     }
+/// @Override
+///     protected TableLayout.Constraint createCellConstraint(Object value, int row, int column) {
+///         TableLayout.Constraint con =  super.createCellConstraint(value, row, column);
+///         if(row == 1 && column == 1) {
+///             con.setHorizontalSpan(2);
+///         }
+///         con.setWidthPercentage(33);
+///         return con;
+///     }
+/// };
+/// hi.add(BorderLayout.CENTER, table);
+/// hi.show();
+/// ```
+/// @author Shai Almog
 public class DefaultTableModel extends AbstractTableModel {
     private final EventDispatcher dispatcher = new EventDispatcher();
     ArrayList<Object[]> data = new ArrayList<Object[]>();
     String[] columnNames;
     boolean editable;
 
-    /**
-     * Constructs a new table with a 2 dimensional array for row/column data
-     *
-     * @param columnNames the names of the columns
-     * @param data        the data within the table
-     */
+    /// Constructs a new table with a 2 dimensional array for row/column data
+    ///
+    /// #### Parameters
+    ///
+    /// - `columnNames`: the names of the columns
+    ///
+    /// - `data`: the data within the table
     public DefaultTableModel(String[] columnNames, Object[][] data) {
         this(columnNames, data, false);
     }
 
-    /**
-     * Constructs a new table with a 2 dimensional array for row/column data
-     *
-     * @param columnNames the names of the columns
-     * @param data        the data within the table
-     * @param editable    indicates whether table cells are editable or not by default
-     * @see #isCellEditable(int, int)
-     */
+    /// Constructs a new table with a 2 dimensional array for row/column data
+    ///
+    /// #### Parameters
+    ///
+    /// - `columnNames`: the names of the columns
+    ///
+    /// - `data`: the data within the table
+    ///
+    /// - `editable`: indicates whether table cells are editable or not by default
+    ///
+    /// #### See also
+    ///
+    /// - #isCellEditable(int, int)
     public DefaultTableModel(String[] columnNames, Object[][] data, boolean editable) {
         Collections.addAll(this.data, data);
         this.columnNames = columnNames;
@@ -76,41 +121,31 @@ public class DefaultTableModel extends AbstractTableModel {
         this.editable = editable;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getRowCount() {
         return data.size();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getColumnCount() {
         return columnNames.length;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getColumnName(int i) {
         return columnNames[i];
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isCellEditable(int row, int column) {
         return editable;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getValueAt(int row, int column) {
         try {
@@ -122,36 +157,30 @@ public class DefaultTableModel extends AbstractTableModel {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void setValueAt(int row, int column, Object o) {
         data.get(row)[column] = o;
         dispatcher.fireDataChangeEvent(column, row);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void addDataChangeListener(DataChangedListener d) {
         dispatcher.addListener(d);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void removeDataChangeListener(DataChangedListener d) {
         dispatcher.removeListener(d);
     }
 
-    /**
-     * Adds the given row to the table data
-     *
-     * @param row array or row items, notice that row.length should match the column count exactly!
-     */
+    /// Adds the given row to the table data
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: array or row items, notice that row.length should match the column count exactly!
     public void addRow(Object... row) {
         data.add(row);
         for (int col = 0; col < row.length; col++) {
@@ -159,12 +188,13 @@ public class DefaultTableModel extends AbstractTableModel {
         }
     }
 
-    /**
-     * Inserts the given row to the table data at the given offset
-     *
-     * @param offset position within the table that is 0 or larger yet smaller than the row count
-     * @param row    array or row items, notice that row.length should match the column count exactly!
-     */
+    /// Inserts the given row to the table data at the given offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: position within the table that is 0 or larger yet smaller than the row count
+    ///
+    /// - `row`: array or row items, notice that row.length should match the column count exactly!
     public void insertRow(int offset, Object... row) {
         data.add(offset, row);
         for (int col = 0; col < row.length; col++) {
@@ -173,11 +203,11 @@ public class DefaultTableModel extends AbstractTableModel {
         }
     }
 
-    /**
-     * Removes the given row offset from the table
-     *
-     * @param offset position within the table that is 0 or larger yet smaller than the row count
-     */
+    /// Removes the given row offset from the table
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: position within the table that is 0 or larger yet smaller than the row count
     public void removeRow(int offset) {
         data.remove(offset);
         dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);

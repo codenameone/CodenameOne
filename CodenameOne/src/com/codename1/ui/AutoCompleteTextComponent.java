@@ -28,26 +28,25 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.list.ListModel;
 
-/**
- * A {@link TextComponent} version of {@link com.codename1.ui.AutoCompleteTextField}
- * <p>
- * This component was contributed here https://github.com/codenameone/CodenameOne/issues/2705
- *
- * @author Francesco Galgani
- */
+/// A `TextComponent` version of `com.codename1.ui.AutoCompleteTextField`
+///
+/// This component was contributed here https://github.com/codenameone/CodenameOne/issues/2705
+///
+/// @author Francesco Galgani
 public class AutoCompleteTextComponent extends TextComponent {
     private static final int animationSpeed = 100;
     private final AutoCompleteTextField field;
     private Container animationLayer;
     private Boolean focusAnimation;
 
-    /**
-     * This constructor allows us to create an AutoCompleteTextComponent with the
-     * given listModel and customFilter
-     *
-     * @param listModel
-     * @param customFilter
-     */
+    /// This constructor allows us to create an AutoCompleteTextComponent with the
+    /// given listModel and customFilter
+    ///
+    /// #### Parameters
+    ///
+    /// - `listModel`
+    ///
+    /// - `customFilter`
     public AutoCompleteTextComponent(ListModel<String> listModel, final AutoCompleteFilter customFilter) {
         field = new AutoCompleteTextField(listModel) {
             @Override
@@ -133,11 +132,11 @@ public class AutoCompleteTextComponent extends TextComponent {
         initInput();
     }
 
-    /**
-     * Allows us to invoke setters/getters and bind listeners to the text field
-     *
-     * @return the text field instance
-     */
+    /// Allows us to invoke setters/getters and bind listeners to the text field
+    ///
+    /// #### Returns
+    ///
+    /// the text field instance
     @Override
     public TextField getField() {
         return field;
@@ -171,11 +170,11 @@ public class AutoCompleteTextComponent extends TextComponent {
         }
     }
 
-    /**
-     * Returns the editor component e.g. text field picker etc.
-     *
-     * @return the editor component
-     */
+    /// Returns the editor component e.g. text field picker etc.
+    ///
+    /// #### Returns
+    ///
+    /// the editor component
     @Override
     public final Component getEditor() {
         return field;
@@ -191,16 +190,16 @@ public class AutoCompleteTextComponent extends TextComponent {
         }
     }
 
-    /**
-     * The focus animation mode forces the hint and text to be identical and
-     * animates the hint to the label when focus is in the text field as is
-     * common on Android. This can be customized using the theme constant
-     * {@code textComponentAnimBool} which is true by default on Android. Notice
-     * that this is designed for the {@code onTopMode} and might not work if
-     * that is set to false...
-     *
-     * @return true if the text should be on top
-     */
+    /// The focus animation mode forces the hint and text to be identical and
+    /// animates the hint to the label when focus is in the text field as is
+    /// common on Android. This can be customized using the theme constant
+    /// `textComponentAnimBool` which is true by default on Android. Notice
+    /// that this is designed for the `onTopMode` and might not work if
+    /// that is set to false...
+    ///
+    /// #### Returns
+    ///
+    /// true if the text should be on top
     @Override
     public boolean isFocusAnimation() {
         if (focusAnimation != null) {
@@ -209,19 +208,21 @@ public class AutoCompleteTextComponent extends TextComponent {
         return getUIManager().isThemeConstant("textComponentAnimBool", false);
     }
 
-    /**
-     * The focus animation mode forces the hint and text to be identical and
-     * animates the hint to the label when focus is in the text field as is
-     * common on Android. This can be customized using the theme constant
-     * {@code textComponentAnimBool} which is true by default on Android. Notice
-     * that this is designed for the {@code onTopMode} and might not work if
-     * that is set to false...
-     *
-     * @param focusAnimation true for the label to animate into place on focus,
-     *                       false otherwise
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// The focus animation mode forces the hint and text to be identical and
+    /// animates the hint to the label when focus is in the text field as is
+    /// common on Android. This can be customized using the theme constant
+    /// `textComponentAnimBool` which is true by default on Android. Notice
+    /// that this is designed for the `onTopMode` and might not work if
+    /// that is set to false...
+    ///
+    /// #### Parameters
+    ///
+    /// - `focusAnimation`: @param focusAnimation true for the label to animate into place on focus,
+    /// false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent focusAnimation(boolean focusAnimation) {
         this.focusAnimation = Boolean.valueOf(focusAnimation);
@@ -229,13 +230,15 @@ public class AutoCompleteTextComponent extends TextComponent {
         return this;
     }
 
-    /**
-     * Sets the text of the field
-     *
-     * @param text the text
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// Sets the text of the field
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent text(String text) {
         field.setText(text);
@@ -243,50 +246,44 @@ public class AutoCompleteTextComponent extends TextComponent {
         return this;
     }
 
-    /**
-     * Overridden for covariant return type {@inheritDoc}
-     */
+    /// Overridden for covariant return type {@inheritDoc}
     @Override
     public AutoCompleteTextComponent onTopMode(boolean onTopMode) {
         return (AutoCompleteTextComponent) super.onTopMode(onTopMode);
     }
 
-    /**
-     * Overridden for covariant return type
-     * {@inheritDoc}
-     */
+    /// Overridden for covariant return type
+    /// {@inheritDoc}
     @Override
     public AutoCompleteTextComponent descriptionMessage(String descriptionMessage) {
         super.descriptionMessage(descriptionMessage);
         return this;
     }
 
-    /**
-     * Overridden for covariant return type {@inheritDoc}
-     */
+    /// Overridden for covariant return type {@inheritDoc}
     @Override
     public AutoCompleteTextComponent errorMessage(String errorMessage) {
         super.errorMessage(errorMessage);
         return this;
     }
 
-    /**
-     * Overridden for covariant return type      * {@inheritDoc}
-     * }
-     */
+    /// Overridden for covariant return type      * {@inheritDoc}
+    /// }
     @Override
     public AutoCompleteTextComponent label(String text) {
         super.label(text);
         return this;
     }
 
-    /**
-     * Convenience method for setting the label and hint together
-     *
-     * @param text the text and hint
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// Convenience method for setting the label and hint together
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text and hint
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent labelAndHint(String text) {
         super.label(text);
@@ -294,13 +291,15 @@ public class AutoCompleteTextComponent extends TextComponent {
         return this;
     }
 
-    /**
-     * Sets the hint of the field
-     *
-     * @param hint the text of the hint
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// Sets the hint of the field
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the text of the hint
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent hint(String hint) {
         field.setHint(hint);
@@ -308,13 +307,15 @@ public class AutoCompleteTextComponent extends TextComponent {
         return this;
     }
 
-    /**
-     * Sets the hint of the field
-     *
-     * @param hint the icon for the hint
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// Sets the hint of the field
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the icon for the hint
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent hint(Image hint) {
         field.setHintIcon(hint);
@@ -322,13 +323,15 @@ public class AutoCompleteTextComponent extends TextComponent {
         return this;
     }
 
-    /**
-     * Sets the text field to multiline or single line
-     *
-     * @param multiline true for multiline, false otherwise
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// Sets the text field to multiline or single line
+    ///
+    /// #### Parameters
+    ///
+    /// - `multiline`: true for multiline, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent multiline(boolean multiline) {
         field.setSingleLineTextArea(!multiline);
@@ -336,14 +339,16 @@ public class AutoCompleteTextComponent extends TextComponent {
         return this;
     }
 
-    /**
-     * Sets the columns in the text field
-     *
-     * @param columns the number of columns which is used for preferred size
-     *                calculations
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// Sets the columns in the text field
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: @param columns the number of columns which is used for preferred size
+    /// calculations
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent columns(int columns) {
         field.setColumns(columns);
@@ -351,14 +356,16 @@ public class AutoCompleteTextComponent extends TextComponent {
         return this;
     }
 
-    /**
-     * Sets the rows in the text field
-     *
-     * @param rows the number of rows which is used for preferred size
-     *             calculations
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// Sets the rows in the text field
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: @param rows the number of rows which is used for preferred size
+    /// calculations
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent rows(int rows) {
         field.setRows(rows);
@@ -366,58 +373,52 @@ public class AutoCompleteTextComponent extends TextComponent {
         return this;
     }
 
-    /**
-     * Sets the constraint for text input matching the constraints from the text
-     * area class
-     *
-     * @param constraint one of the constants from the
-     *                   {@link com.codename1.ui.TextArea} class see
-     *                   {@link com.codename1.ui.TextArea#setConstraint(int)}
-     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
-     * }
-     */
+    /// Sets the constraint for text input matching the constraints from the text
+    /// area class
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`: @param constraint one of the constants from the
+    /// `com.codename1.ui.TextArea` class see
+    /// `com.codename1.ui.TextArea#setConstraint(int)`
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");`
     @Override
     public AutoCompleteTextComponent constraint(int constraint) {
         field.setConstraint(constraint);
         return this;
     }
 
-    /**
-     * Allows us to invoke setters/getters and bind listeners to the text field
-     *
-     * @return the text field instance
-     */
+    /// Allows us to invoke setters/getters and bind listeners to the text field
+    ///
+    /// #### Returns
+    ///
+    /// the text field instance
     public AutoCompleteTextField getAutoCompleteField() {
         return field;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
         return new String[]{"text", "label", "hint", "multiline", "columns", "rows", "constraint"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, String.class, Boolean.class, Integer.class, Integer.class, Integer.class};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String", "String", "String", "Boolean", "Integer", "Integer", "Integer"};
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public Object getPropertyValue(String name) {
         if ("text".equals(name)) {
@@ -442,9 +443,7 @@ public class AutoCompleteTextComponent extends TextComponent {
         return super.getPropertyValue(name);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String setPropertyValue(String name, Object value) {
         if ("text".equals(name)) {
@@ -474,26 +473,27 @@ public class AutoCompleteTextComponent extends TextComponent {
         return super.setPropertyValue(name, value);
     }
 
-    /**
-     * Returns the text in the field {@link com.codename1.ui.TextArea#getText()}
-     *
-     * @return the text
-     */
+    /// Returns the text in the field `com.codename1.ui.TextArea#getText()`
+    ///
+    /// #### Returns
+    ///
+    /// the text
     @Override
     public String getText() {
         return field.getText();
     }
 
-    /**
-     * Allows filtering the entries in the auto complete
-     */
+    /// Allows filtering the entries in the auto complete
     public interface AutoCompleteFilter {
-        /**
-         * Callback to filter based on this given text
-         *
-         * @param text the text for filtering
-         * @return true if the entry should be filtered in
-         */
+        /// Callback to filter based on this given text
+        ///
+        /// #### Parameters
+        ///
+        /// - `text`: the text for filtering
+        ///
+        /// #### Returns
+        ///
+        /// true if the entry should be filtered in
         boolean filter(String text);
     }
 }

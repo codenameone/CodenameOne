@@ -32,13 +32,17 @@ import com.codename1.ui.list.MultipleSelectionListModel;
 
 import static com.codename1.ui.ComponentSelector.$;
 
-/**
- * A list of switches.
- *
- * @author shannah
- * @see ButtonList for code samples;
- * @since 6.0
- */
+/// A list of switches.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 6.0
+///
+/// #### See also
+///
+/// - ButtonList for code samples;
 public class SwitchList extends ButtonList {
 
 

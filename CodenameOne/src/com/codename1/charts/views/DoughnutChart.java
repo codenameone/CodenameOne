@@ -1,18 +1,16 @@
-/**
- * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
@@ -28,46 +26,46 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * Visualises a {@link MultipleCategorySeries} as concentric rings that share a
- * common centre (also known as a doughnut chart).
- * <p>
- * Each category in the dataset is drawn as a separate ring, making it suitable
- * for representing hierarchical proportions. Construct the chart with the
- * dataset and a {@link DefaultRenderer} and wrap it in a
- * {@link com.codename1.charts.ChartComponent} to place it on screen.
- */
+/// Visualises a `MultipleCategorySeries` as concentric rings that share a
+/// common centre (also known as a doughnut chart).
+///
+/// Each category in the dataset is drawn as a separate ring, making it suitable
+/// for representing hierarchical proportions. Construct the chart with the
+/// dataset and a `DefaultRenderer` and wrap it in a
+/// `com.codename1.charts.ChartComponent` to place it on screen.
 public class DoughnutChart extends RoundChart {
-    /**
-     * The series dataset.
-     */
+    /// The series dataset.
     private final MultipleCategorySeries mDataset;
-    /**
-     * A step variable to control the size of the legend shape.
-     */
+    /// A step variable to control the size of the legend shape.
     private int mStep;
 
-    /**
-     * Builds a new doughnut chart instance.
-     *
-     * @param dataset  the series dataset
-     * @param renderer the series renderer
-     */
+    /// Builds a new doughnut chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the series dataset
+    ///
+    /// - `renderer`: the series renderer
     public DoughnutChart(MultipleCategorySeries dataset, DefaultRenderer renderer) {
         super(null, renderer);
         mDataset = dataset;
     }
 
-    /**
-     * The graphical representation of the doughnut chart.
-     *
-     * @param canvas the canvas to paint to
-     * @param x      the top left x value of the view to draw to
-     * @param y      the top left y value of the view to draw to
-     * @param width  the width of the view to draw to
-     * @param height the height of the view to draw to
-     * @param paint  the paint
-     */
+    /// The graphical representation of the doughnut chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `height`: the height of the view to draw to
+    ///
+    /// - `paint`: the paint
     @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
         paint.setAntiAlias(mRenderer.isAntialiasing());
@@ -141,27 +139,35 @@ public class DoughnutChart extends RoundChart {
         drawTitle(canvas, x, y, width, paint);
     }
 
-    /**
-     * Returns the legend shape width.
-     *
-     * @param seriesIndex the series index
-     * @return the legend shape width
-     */
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
     @Override
     public int getLegendShapeWidth(int seriesIndex) {
         return SHAPE_WIDTH;
     }
 
-    /**
-     * The graphical representation of the legend shape.
-     *
-     * @param canvas      the canvas to paint to
-     * @param renderer    the series renderer
-     * @param x           the x value of the point the shape should be drawn at
-     * @param y           the y value of the point the shape should be drawn at
-     * @param seriesIndex the series index
-     * @param paint       the paint to be used for drawing
-     */
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
     @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {

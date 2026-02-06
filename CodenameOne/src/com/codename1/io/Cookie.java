@@ -28,11 +28,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * A cookie for an HTTP request
- *
- * @author Shai Almog
- */
+/// A cookie for an HTTP request
+///
+/// @author Shai Almog
 public class Cookie implements Externalizable {
     public static final String STORAGE_NAME = "Cookies";
     private static boolean autoStored = true;
@@ -49,27 +47,25 @@ public class Cookie implements Externalizable {
     private boolean httpOnly = false;
     private long expires;
 
-    /**
-     * Returns true if the Cookies are auto stored to storage
-     *
-     * @return autoStored
-     */
+    /// Returns true if the Cookies are auto stored to storage
+    ///
+    /// #### Returns
+    ///
+    /// autoStored
     public static boolean isAutoStored() {
         return autoStored;
     }
 
-    /**
-     * This method configures the auto storage of cookies
-     *
-     * @param autoStored
-     */
+    /// This method configures the auto storage of cookies
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoStored`
     public static void setAutoStored(boolean autoStored) {
         Cookie.autoStored = autoStored;
     }
 
-    /**
-     * Clears all cookies history from storage
-     */
+    /// Clears all cookies history from storage
     public static void clearCookiesFromStorage() {
         if (Storage.getInstance().exists(Cookie.STORAGE_NAME)) {
             Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
@@ -79,16 +75,16 @@ public class Cookie implements Externalizable {
         Util.getImplementation().clearNativeCookies();
     }
 
-    /**
-     * @return the name
-     */
+    /// #### Returns
+    ///
+    /// the name
     public String getName() {
         return name;
     }
 
-    /**
-     * @param name the name to set
-     */
+    /// #### Parameters
+    ///
+    /// - `name`: the name to set
     public void setName(String name) {
         this.name = name;
     }
@@ -117,59 +113,55 @@ public class Cookie implements Externalizable {
         this.path = path;
     }
 
-    /**
-     * @return the value
-     */
+    /// #### Returns
+    ///
+    /// the value
     public String getValue() {
         return value;
     }
 
-    /**
-     * @param value the value to set
-     */
+    /// #### Parameters
+    ///
+    /// - `value`: the value to set
     public void setValue(String value) {
         this.value = value;
     }
 
-    /**
-     * @return the domain
-     */
+    /// #### Returns
+    ///
+    /// the domain
     public String getDomain() {
         return domain;
     }
 
-    /**
-     * @param domain the domain to set
-     */
+    /// #### Parameters
+    ///
+    /// - `domain`: the domain to set
     public void setDomain(String domain) {
         this.domain = domain;
     }
 
-    /**
-     * @return the expires
-     */
+    /// #### Returns
+    ///
+    /// the expires
     public long getExpires() {
         return expires;
     }
 
-    /**
-     * @param expires the expires to set
-     */
+    /// #### Parameters
+    ///
+    /// - `expires`: the expires to set
     public void setExpires(long expires) {
         this.expires = expires;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public int getVersion() {
         return 1;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void externalize(DataOutputStream out) throws IOException {
         out.writeUTF(name);
@@ -188,9 +180,7 @@ public class Cookie implements Externalizable {
         out.writeLong(expires);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void internalize(int version, DataInputStream in) throws IOException {
         name = in.readUTF();
@@ -203,17 +193,13 @@ public class Cookie implements Externalizable {
         expires = in.readLong();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String getObjectId() {
         return "Cookie";
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public String toString() {
         return "name = " + name + " value = " + value + " domain = " + domain + "expires = " + expires + " secure = " + secure + " path = " + path;

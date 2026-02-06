@@ -23,11 +23,9 @@
 
 package com.codename1.properties;
 
-/**
- * Allows mapping properties generically
- *
- * @author Shai Almog
- */
+/// Allows mapping properties generically
+///
+/// @author Shai Almog
 public interface PropertyBusinessObject {
     PropertyIndex getPropertyIndex();
 }

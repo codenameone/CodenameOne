@@ -30,16 +30,77 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Transform;
 import com.codename1.util.MathUtil;
 
-/**
- * <p>A Transitions that flips between 2 components/forms using perspective transform where available.<br>
- * Notice that this looks rather different on devices as perspective transform is available there but isn't
- * on the simulator.
- * </p>
- * <script src="https://gist.github.com/codenameone/47602e679f61712693bd.js"></script>
- * <img src="https://www.codenameone.com/img/developer-guide/transition-flip.jpg" alt="Flip" />
- *
- * @author Chen, Steve
- */
+/// A Transitions that flips between 2 components/forms using perspective transform where available.
+///
+/// Notice that this looks rather different on devices as perspective transform is available there but isn't
+/// on the simulator.
+///
+/// ```java
+/// Toolbar.setGlobalToolbar(true);
+/// Form hi = new Form("Transitions", new BoxLayout(BoxLayout.Y_AXIS));
+/// Style bg = hi.getContentPane().getUnselectedStyle();
+/// bg.setBgTransparency(255);
+/// bg.setBgColor(0xff0000);
+/// Button showTransition = new Button("Show");
+/// Picker pick = new Picker();
+/// pick.setStrings("Slide", "SlideFade", "Cover", "Uncover", "Fade", "Flip");
+/// pick.setSelectedString("Slide");
+/// TextField duration = new TextField("10000", "Duration", 6, TextArea.NUMERIC);
+/// CheckBox horizontal = CheckBox.createToggle("Horizontal");
+/// pick.addActionListener((e) -> {
+///     String s = pick.getSelectedString().toLowerCase();
+///     horizontal.setEnabled(s.equals("slide") || s.indexOf("cover") > -1);
+/// });
+/// horizontal.setSelected(true);
+/// hi.add(showTransition).
+///     add(pick).
+///     add(duration).
+///     add(horizontal);
+///
+/// Form dest = new Form("Destination");
+/// bg = dest.getContentPane().getUnselectedStyle();
+/// bg.setBgTransparency(255);
+/// bg.setBgColor(0xff);
+/// dest.setBackCommand(
+///         dest.getToolbar().addCommandToLeftBar("Back", null, (e) -> hi.showBack()));
+///
+/// showTransition.addActionListener((e) -> {
+///     int h = CommonTransitions.SLIDE_HORIZONTAL;
+///     if(!horizontal.isSelected()) {
+///         h = CommonTransitions.SLIDE_VERTICAL;
+///     }
+///     switch(pick.getSelectedString()) {
+///         case "Slide":
+///             hi.setTransitionOutAnimator(CommonTransitions.createSlide(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createSlide(h, true, duration.getAsInt(3000)));
+///             break;
+///         case "SlideFade":
+///             hi.setTransitionOutAnimator(CommonTransitions.createSlideFadeTitle(true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createSlideFadeTitle(true, duration.getAsInt(3000)));
+///             break;
+///         case "Cover":
+///             hi.setTransitionOutAnimator(CommonTransitions.createCover(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createCover(h, true, duration.getAsInt(3000)));
+///             break;
+///         case "Uncover":
+///             hi.setTransitionOutAnimator(CommonTransitions.createUncover(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createUncover(h, true, duration.getAsInt(3000)));
+///             break;
+///         case "Fade":
+///             hi.setTransitionOutAnimator(CommonTransitions.createFade(duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createFade(duration.getAsInt(3000)));
+///             break;
+///         case "Flip":
+///             hi.setTransitionOutAnimator(new FlipTransition(-1, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(new FlipTransition(-1, duration.getAsInt(3000)));
+///             break;
+///     }
+///     dest.show();
+/// });
+/// hi.show();
+/// ```
+///
+/// @author Chen, Steve
 public class FlipTransition extends Transition {
 
     private static final int STATE_MOVE_AWAY = 1;
@@ -68,29 +129,28 @@ public class FlipTransition extends Transition {
     private Transform perspectiveT;
     private Transform currTransform;
 
-    /**
-     * Creates  a Flip Transition
-     */
+    /// Creates  a Flip Transition
     public FlipTransition() {
     }
 
-    /**
-     * Creates  a Flip Transition
-     *
-     * @param bgColor the color to paint in the background when the transition
-     *                paints, use -1 to not paint a background color
-     */
+    /// Creates  a Flip Transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgColor`: @param bgColor the color to paint in the background when the transition
+    /// paints, use -1 to not paint a background color
     public FlipTransition(int bgColor) {
         this.bgColor = bgColor;
     }
 
-    /**
-     * Creates  a Flip Transition
-     *
-     * @param bgColor  the color to paint in the background when the transition
-     *                 paints, use -1 to not paint a background color
-     * @param duration the duration of the transition
-     */
+    /// Creates  a Flip Transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgColor`: @param bgColor  the color to paint in the background when the transition
+    /// paints, use -1 to not paint a background color
+    ///
+    /// - `duration`: the duration of the transition
     public FlipTransition(int bgColor, int duration) {
         this.bgColor = bgColor;
         this.duration = duration;
@@ -337,48 +397,51 @@ public class FlipTransition extends Transition {
 
     }
 
-    /**
-     * The duration for the flip transition
-     *
-     * @return the duration
-     */
+    /// The duration for the flip transition
+    ///
+    /// #### Returns
+    ///
+    /// the duration
     public int getDuration() {
         return duration;
     }
 
-    /**
-     * The duration for the flip transition
-     *
-     * @param duration the duration to set
-     */
+    /// The duration for the flip transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration to set
     public void setDuration(int duration) {
         this.duration = duration;
     }
 
-    /**
-     * The background color that is painted behind the flipping effect or -1 to use the paintBackgrounds method instead
-     *
-     * @return the bgColor
-     */
+    /// The background color that is painted behind the flipping effect or -1 to use the paintBackgrounds method instead
+    ///
+    /// #### Returns
+    ///
+    /// the bgColor
     public int getBgColor() {
         return bgColor;
     }
 
-    /**
-     * The background color that is painted behind the flipping effect or -1 to use the paintBackgrounds method instead
-     *
-     * @param bgColor the bgColor to set
-     */
+    /// The background color that is painted behind the flipping effect or -1 to use the paintBackgrounds method instead
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgColor`: the bgColor to set
     public void setBgColor(int bgColor) {
         this.bgColor = bgColor;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param reverse {@inheritDoc}
-     * @return {@inheritDoc}
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `reverse`: {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// {@inheritDoc}
     @Override
     public Transition copy(boolean reverse) {
         return new FlipTransition(bgColor, duration);

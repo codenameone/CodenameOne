@@ -26,19 +26,13 @@ package com.codename1.properties;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Base class for property types
- *
- * @author Shai Almog
- */
+/// Base class for property types
+///
+/// @author Shai Almog
 public class PropertyBase<T, K> {
-    /**
-     * Used internally to detect if a property was read by a user
-     */
+    /// Used internally to detect if a property was read by a user
     static PropertyChangeListener onGlobalGetProperty;
-    /**
-     * Used internally to detect if a property was modified by a user
-     */
+    /// Used internally to detect if a property was modified by a user
     static PropertyChangeListener onGlobalSetProperty;
     private static PropertyChangeListener lastChangeListener;
     private final String name;
@@ -46,34 +40,41 @@ public class PropertyBase<T, K> {
     private Class genericType;
     private ArrayList<PropertyChangeListener<T, K>> listeners;
 
-    /**
-     * All properties must have a name
-     *
-     * @param name the name of the property
-     */
+    /// All properties must have a name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
     protected PropertyBase(String name) {
         this.name = name;
     }
 
 
-    /**
-     * All properties must have a name, a generic type is helpful
-     *
-     * @param name        the name of the property
-     * @param genericType the property type to workaround issues with erasure
-     */
+    /// All properties must have a name, a generic type is helpful
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `genericType`: the property type to workaround issues with erasure
     protected PropertyBase(String name, Class genericType) {
         this.name = name;
         this.genericType = genericType;
     }
 
-    /**
-     * Binds an event callback for set calls and property mutation
-     *
-     * @param listener will be invoked whenever any mutable property is changed
-     * @throws RuntimeException if a set listener is already bound, there can be only one per application
-     * @deprecated Usage of this method isn't recommended, it's designed for internal use
-     */
+    /// Binds an event callback for set calls and property mutation
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: will be invoked whenever any mutable property is changed
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if a set listener is already bound, there can be only one per application
+    ///
+    /// #### Deprecated
+    ///
+    /// Usage of this method isn't recommended, it's designed for internal use
     public static void bindGlobalSetListener(PropertyChangeListener listener) {
         if (onGlobalSetProperty != null && listener != null) {
             throw new RuntimeException("Set Listener already bound");
@@ -81,13 +82,19 @@ public class PropertyBase<T, K> {
         onGlobalSetProperty = listener;
     }
 
-    /**
-     * Binds an event callback for get calls and property reads
-     *
-     * @param listener will be invoked whenever any property is read
-     * @throws RuntimeException if a get listener is already bound, there can be only one per application
-     * @deprecated Usage of this method isn't recommended, it's designed for internal use
-     */
+    /// Binds an event callback for get calls and property reads
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: will be invoked whenever any property is read
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if a get listener is already bound, there can be only one per application
+    ///
+    /// #### Deprecated
+    ///
+    /// Usage of this method isn't recommended, it's designed for internal use
     public static void bindGlobalGetListener(PropertyChangeListener listener) {
         if (onGlobalGetProperty != null && listener != null) {
             throw new RuntimeException("Get Listener already bound");
@@ -95,11 +102,11 @@ public class PropertyBase<T, K> {
         onGlobalGetProperty = listener;
     }
 
-    /**
-     * Provides the internal list of listeners
-     *
-     * @return internal list of listeners
-     */
+    /// Provides the internal list of listeners
+    ///
+    /// #### Returns
+    ///
+    /// internal list of listeners
     List<PropertyChangeListener<T, K>> getListeners() {
         return listeners;
     }
@@ -116,18 +123,16 @@ public class PropertyBase<T, K> {
         }
     }
 
-    /**
-     * The property name is immutable and can't be changed after creation it should match the parent field name by convention
-     *
-     * @return the property name;
-     */
+    /// The property name is immutable and can't be changed after creation it should match the parent field name by convention
+    ///
+    /// #### Returns
+    ///
+    /// the property name;
     public String getName() {
         return name;
     }
 
-    /**
-     * Delivers the property change event to listeners if applicable
-     */
+    /// Delivers the property change event to listeners if applicable
     protected void firePropertyChanged() {
         if (listeners != null) {
             for (PropertyChangeListener pl : listeners) {
@@ -138,21 +143,19 @@ public class PropertyBase<T, K> {
         }
     }
 
-    /**
-     * This method will work when invoked from a propertyChanged callback and should be similar to
-     * {@code removePropertyChangeListener(this)}. It's useful for lambda's where {@code this}
-     * means the base class and not the listener so {@code removePropertyChangeListener(this)}
-     * won't do what we want unless we convert to an inner class
-     */
+    /// This method will work when invoked from a propertyChanged callback and should be similar to
+    /// `removePropertyChangeListener(this)`. It's useful for lambda's where `this`
+    /// means the base class and not the listener so `removePropertyChangeListener(this)`
+    /// won't do what we want unless we convert to an inner class
     public void stopListening() {
         removeChangeListener(lastChangeListener);
     }
 
-    /**
-     * Fires a notification that a property value changed to the given listener
-     *
-     * @param pl the listener
-     */
+    /// Fires a notification that a property value changed to the given listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `pl`: the listener
     public void addChangeListener(PropertyChangeListener<T, K> pl) {
         if (listeners == null) {
             listeners = new ArrayList<PropertyChangeListener<T, K>>();
@@ -160,11 +163,11 @@ public class PropertyBase<T, K> {
         listeners.add(pl);
     }
 
-    /**
-     * Removes the property change listener from the list of listeners
-     *
-     * @param pl the change listener
-     */
+    /// Removes the property change listener from the list of listeners
+    ///
+    /// #### Parameters
+    ///
+    /// - `pl`: the change listener
     public void removeChangeListener(PropertyChangeListener<T, K> pl) {
         if (listeners != null) {
             listeners.remove(pl);
@@ -174,32 +177,39 @@ public class PropertyBase<T, K> {
         }
     }
 
-    /**
-     * Places a property that will apply statically to all instances of this property
-     *
-     * @param key the key to put
-     * @param o   the value object
-     */
+    /// Places a property that will apply statically to all instances of this property
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key to put
+    ///
+    /// - `o`: the value object
     public void putClientProperty(String key, Object o) {
         parent.putMetaDataOfClass("cn1$field" + name + "-" + key, o);
     }
 
-    /**
-     * Returns the client property set to this property name
-     *
-     * @param key the key of the property
-     * @return the value that was previously placed with put client property
-     */
+    /// Returns the client property set to this property name
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the property
+    ///
+    /// #### Returns
+    ///
+    /// the value that was previously placed with put client property
     public Object getClientProperty(String key) {
         return parent.getMetaDataOfClass("cn1$field" + name + "-" + key);
     }
 
-    /**
-     * Compares this property to another property
-     *
-     * @param obj the other property
-     * @return true if they are equal in name and value
-     */
+    /// Compares this property to another property
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the other property
+    ///
+    /// #### Returns
+    ///
+    /// true if they are equal in name and value
     @Override
     public boolean equals(Object obj) {
         if (obj != null && obj.getClass() == getClass()) {
@@ -221,11 +231,11 @@ public class PropertyBase<T, K> {
     void setImpl(Object val) {
     }
 
-    /**
-     * Default toString that provides easier debug information
-     *
-     * @return a formatted representation of the property for debugging
-     */
+    /// Default toString that provides easier debug information
+    ///
+    /// #### Returns
+    ///
+    /// a formatted representation of the property for debugging
     @Override
     public String toString() {
         T o = get();
@@ -235,20 +245,20 @@ public class PropertyBase<T, K> {
         return getName() + " = '" + o + "' : " + o.getClass().getName();
     }
 
-    /**
-     * Returns the generic type of this property if it is known or null
-     *
-     * @return the generic type
-     */
+    /// Returns the generic type of this property if it is known or null
+    ///
+    /// #### Returns
+    ///
+    /// the generic type
     public Class getGenericType() {
         return genericType;
     }
 
-    /**
-     * The label of the property defaults to its name but can be changed to anything
-     *
-     * @return the label for the property
-     */
+    /// The label of the property defaults to its name but can be changed to anything
+    ///
+    /// #### Returns
+    ///
+    /// the label for the property
     public String getLabel() {
         String l = (String) getClientProperty("cn1PropertyLabel");
         if (l == null) {
@@ -257,21 +267,21 @@ public class PropertyBase<T, K> {
         return l;
     }
 
-    /**
-     * The label of the property defaults to its name but can be changed to anything, it can be used
-     * when binding a property to UI elements
-     *
-     * @param label the new label value
-     */
+    /// The label of the property defaults to its name but can be changed to anything, it can be used
+    /// when binding a property to UI elements
+    ///
+    /// #### Parameters
+    ///
+    /// - `label`: the new label value
     public void setLabel(String label) {
         putClientProperty("cn1PropertyLabel", label);
     }
 
-    /**
-     * Validates that the collection type is valid and throws an exception otherwise
-     *
-     * @param elementType the generic type of the collection
-     */
+    /// Validates that the collection type is valid and throws an exception otherwise
+    ///
+    /// #### Parameters
+    ///
+    /// - `elementType`: the generic type of the collection
     protected final void validateCollectionType(Class elementType) {
         if (elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) {
             if (elementType == String.class || elementType == Integer.class ||

@@ -4,9 +4,5 @@
     Author     : Shai Almog
 */
 
-/**
- * <p>
- *     General utilities classes
- * </p>
- */
+/// General utilities classes
 package com.codename1.util;

@@ -279,14 +279,14 @@ The https://www.codenameone.com/javadoc/com/codename1/db/Database.html[Database]
 
 [source,java]
 ----
-Database db = Display.getInstance().openOrCreate(“databaseName”);
+Database db = Display.getInstance().openOrCreate("databaseName");
 ----
 
 Some SQLite apps ship with a "ready made" database. We allow you to replace the DB file by using the code:
 
 [source,java]
 ----
-String path = Display.getInstance().getDatabasePath(“databaseName”);
+String path = Display.getInstance().getDatabasePath("databaseName");
 ----
 
 You can then use the `FileSystemStorage` class to write the content of your DB file into the path. Notice that it must be a valid SQLite file!
@@ -405,7 +405,7 @@ ConnectionRequest request = new ConnectionRequest(url, false) {
    }
 
    protected void buildRequestBody(OutputStream os) {
-        // writes post data, by default this “just works” but if you want to write this
+        // writes post data, by default this "just works" but if you want to write this
        // manually then override this
    }
 };

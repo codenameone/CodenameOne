@@ -23,21 +23,22 @@
  */
 package com.codename1.ui.events;
 
-/**
- * Invoked to indicate a scroll change events
- *
- * @author Chen
- */
+/// Invoked to indicate a scroll change events
+///
+/// @author Chen
 public interface ScrollListener {
 
-    /**
-     * Indicates the scroll changed events
-     *
-     * @param scrollX    the current scroll x value
-     * @param scrollY    the current scroll y value
-     * @param oldscrollX the previous scroll x value
-     * @param oldscrollY the previous scroll y value
-     */
+    /// Indicates the scroll changed events
+    ///
+    /// #### Parameters
+    ///
+    /// - `scrollX`: the current scroll x value
+    ///
+    /// - `scrollY`: the current scroll y value
+    ///
+    /// - `oldscrollX`: the previous scroll x value
+    ///
+    /// - `oldscrollY`: the previous scroll y value
     void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY);
 
 }

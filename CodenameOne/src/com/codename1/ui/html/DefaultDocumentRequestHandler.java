@@ -34,57 +34,51 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Vector;
 
-/**
- * Default implementation of the HTML components document request handler to allow simple
- * HTML support in Codename One. This version includes only the basics supported by MIDP
- * e.g. resources and jar file URL's such as jar:// and res://
- *
- * @author Shai Almog
- */
+/// Default implementation of the HTML components document request handler to allow simple
+/// HTML support in Codename One. This version includes only the basics supported by MIDP
+/// e.g. resources and jar file URL's such as jar:// and res://
+///
+/// @author Shai Almog
 public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandler {
     private static Resources resFile;
     private boolean trackVisitedURLs;
     private Vector visitedURLs;
 
-    /**
-     * Allows URL's referring to a res:// local resource to default to this file
-     *
-     * @return the resFile
-     */
+    /// Allows URL's referring to a res:// local resource to default to this file
+    ///
+    /// #### Returns
+    ///
+    /// the resFile
     public static Resources getResFile() {
         return resFile;
     }
 
-    /**
-     * Allows URL's referring to a local:// local resource to default to this file
-     *
-     * @param res the resource
-     */
+    /// Allows URL's referring to a local:// local resource to default to this file
+    ///
+    /// #### Parameters
+    ///
+    /// - `res`: the resource
     public static void setResFile(Resources res) {
         resFile = res;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
         resourceRequested(docInfo, callback);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public InputStream resourceRequested(DocumentInfo docInfo) {
         return null;
     }
 
-    /**
-     * This method can be invoked to indicate a URL was visited fro tracking
-     *
-     * @param url the url
-     */
+    /// This method can be invoked to indicate a URL was visited fro tracking
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url
     protected void visitingURL(String url) {
         if (trackVisitedURLs) {
             if (visitedURLs == null) {
@@ -96,12 +90,15 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
         }
     }
 
-    /**
-     * Returns true if the URL was visited, requires trackVisitedURLs to be true
-     *
-     * @param url the url
-     * @return true if it was visited
-     */
+    /// Returns true if the URL was visited, requires trackVisitedURLs to be true
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url
+    ///
+    /// #### Returns
+    ///
+    /// true if it was visited
     public boolean wasURLVisited(String url) {
         return visitedURLs != null && visitedURLs.contains(url);
     }
@@ -158,20 +155,20 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
         return null;
     }
 
-    /**
-     * Allows tracking whether a URL was visited or not
-     *
-     * @return the trackVisitedURLs
-     */
+    /// Allows tracking whether a URL was visited or not
+    ///
+    /// #### Returns
+    ///
+    /// the trackVisitedURLs
     public boolean isTrackVisitedURLs() {
         return trackVisitedURLs;
     }
 
-    /**
-     * Allows tracking whether a URL was visited or not
-     *
-     * @param trackVisitedURLs the trackVisitedURLs to set
-     */
+    /// Allows tracking whether a URL was visited or not
+    ///
+    /// #### Parameters
+    ///
+    /// - `trackVisitedURLs`: the trackVisitedURLs to set
     public void setTrackVisitedURLs(boolean trackVisitedURLs) {
         this.trackVisitedURLs = trackVisitedURLs;
         visitedURLs = null;

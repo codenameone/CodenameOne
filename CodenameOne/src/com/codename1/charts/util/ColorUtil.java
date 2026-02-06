@@ -23,9 +23,7 @@
 
 package com.codename1.charts.util;
 
-/**
- * @author shannah
- */
+/// @author shannah
 public abstract class ColorUtil {
     public static final int LTGRAY = IColor.LightGray.argb;
     public static final int BLUE = IColor.Blue.argb;
@@ -88,9 +86,9 @@ public abstract class ColorUtil {
      */
 
 
-    /**
-     * @see Graphics
-     */
+    /// #### See also
+    ///
+    /// - Graphics
     private static class IColor
             implements Cloneable {
 

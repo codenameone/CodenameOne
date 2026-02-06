@@ -34,54 +34,52 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-/**
- * A utility class to simplify Geofencing in Codename One.  Using this class to manage
- * an app's Geofences works around the 20-region limit on iOS and 100-region limit on Android, so that
- * your app can monitor an unlimited number of Geofences simulataneously.
- *
- * <h3>How it Works</h3>
- * <p>GeofenceManager maintains a "bubble" region around the current device location.  You may register
- * as many regions as you like to be monitored with GeofenceManager, but it will only register the regions
- * that intersect the current "bubble" region.  When you exit the bubble region, the GeofenceManager will clear all of the
- * previously registered regions, create a new bubble, and then register only those regions that intersect this
- * new bubble.</p>
- *
- * <p>GeofenceManager uses {@link Storage} to maintain its own active list of regions.</p>
- *
- * <h3>Limitations</h3>
- * <p>GeofenceManager will only register 19 regions at a time, so if more than 19 regions intersect the current "bubble"
- * region, some of them won't make the cut.  You can set the radius of the "bubble" region using {@link #setBubbleRadius(int) }
- * to increase or decrease the "bubble" region area, so that no regions are left behind.</p>
- *
- * <p>Although you can set any positive radius value you like, a typical Android or iOS device has a minimum effective
- * radius of about 100m.</p>
- *
- * <p>Note: If your app uses GeofenceManager, you shouldn't also add your own Geofences manually using {@link LocationManager#addGeoFencing(java.lang.Class, com.codename1.location.Geofence) }
- * as your manual regions may conflict.</p>
- *
- * <h3>Usage</h3>
- * <p>
- * {@code
- * GeofenceManager mgr = GeofenceManager.getInstance();
- * mgr.setListenerClass(MyGeofenceListener.class);
- * mgr.add(geofence1, geofence2, geofence3);
- * mgr.update(10000);
- * }
- * <p>
- * And the MyGeofenceListener class should be an instance of Geofence.
- *
- * <h3>Reloading Geofences Upon Exiting Bubble</h3>
- *
- * <p>While there is no absolute limit on the number of regions that you can register in GeofenceManager
- * simulataneously, since it is actually storing the list of Geofences in Storage, there is a practical limit.  E.g.
- * It probably wouldn't perform well if you stored several thousand at a time.  If you want to monitor large quantifies
- * of regions (thousands, or millions), you can simply respond to the {@link GeofenceListener#onExit(java.lang.String) } event
- * for the "bubble" region, and "reload" the GeofenceManager with new regions related to the device's current location.
- * You might load the new locations from a web-service, for example.  Use the {@link #isBubble(java.lang.String)} method
- * to check if the {@literal id} parameter is for the bubble region, and act accordintly.</p>
- *
- * @author shannah
- */
+/// A utility class to simplify Geofencing in Codename One.  Using this class to manage
+/// an app's Geofences works around the 20-region limit on iOS and 100-region limit on Android, so that
+/// your app can monitor an unlimited number of Geofences simulataneously.
+///
+/// How it Works
+///
+/// GeofenceManager maintains a "bubble" region around the current device location.  You may register
+/// as many regions as you like to be monitored with GeofenceManager, but it will only register the regions
+/// that intersect the current "bubble" region.  When you exit the bubble region, the GeofenceManager will clear all of the
+/// previously registered regions, create a new bubble, and then register only those regions that intersect this
+/// new bubble.
+///
+/// GeofenceManager uses `Storage` to maintain its own active list of regions.
+///
+/// Limitations
+///
+/// GeofenceManager will only register 19 regions at a time, so if more than 19 regions intersect the current "bubble"
+/// region, some of them won't make the cut.  You can set the radius of the "bubble" region using `#setBubbleRadius(int)`
+/// to increase or decrease the "bubble" region area, so that no regions are left behind.
+///
+/// Although you can set any positive radius value you like, a typical Android or iOS device has a minimum effective
+/// radius of about 100m.
+///
+/// Note: If your app uses GeofenceManager, you shouldn't also add your own Geofences manually using `com.codename1.location.Geofence)`
+/// as your manual regions may conflict.
+///
+/// Usage
+///
+/// `GeofenceManager mgr = GeofenceManager.getInstance();
+/// mgr.setListenerClass(MyGeofenceListener.class);
+/// mgr.add(geofence1, geofence2, geofence3);
+/// mgr.update(10000);`
+///
+/// And the MyGeofenceListener class should be an instance of Geofence.
+///
+/// Reloading Geofences Upon Exiting Bubble
+///
+/// While there is no absolute limit on the number of regions that you can register in GeofenceManager
+/// simulataneously, since it is actually storing the list of Geofences in Storage, there is a practical limit.  E.g.
+/// It probably wouldn't perform well if you stored several thousand at a time.  If you want to monitor large quantifies
+/// of regions (thousands, or millions), you can simply respond to the `GeofenceListener#onExit(java.lang.String)` event
+/// for the "bubble" region, and "reload" the GeofenceManager with new regions related to the device's current location.
+/// You might load the new locations from a web-service, for example.  Use the `#isBubble(java.lang.String)` method
+/// to check if the id parameter is for the bubble region, and act accordintly.
+///
+/// @author shannah
 public final class GeofenceManager implements Iterable<Geofence> {
     //private GeoStreamerAsyncDataSource dataSource;
     private static final String STORAGE_KEY = "$AsyncGeoStreamer.geofences$";
@@ -90,35 +88,23 @@ public final class GeofenceManager implements Iterable<Geofence> {
     private static final String EXPIRATIONS_KEY = "$AsyncGeoStreamer.expirations";
     private static final String LISTENER_CLASS_KEY = "$AsyncGeoStreamer.listenerClass";
     private static final String BUBBLE_GEOFENCE_ID = "$AsyncGeoStreamer.bubble";
-    /**
-     * Default timeout for getting location.
-     */
+    /// Default timeout for getting location.
     private static final int defaultTimeout = 10000;
     private static int MAX_ACTIVE_GEOFENCES = 19;
     private static GeofenceManager instance;
     // Reference to the last bubble set.
     Geofence lastBubble;
-    /**
-     * The radius of the bubble region (in metres)
-     */
+    /// The radius of the bubble region (in metres)
     private int bubbleRadius = 1000;
-    /**
-     * The bubble region expiraton time (duration).  Default -1 means no expiration.
-     */
+    /// The bubble region expiraton time (duration).  Default -1 means no expiration.
     private long bubbleExpiration = -1L;
-    /**
-     * The Class that should be instantiated to handle Geofence events.
-     */
+    /// The Class that should be instantiated to handle Geofence events.
     private Class<GeofenceListener> listenerClass;
-    /**
-     * Maintains list of currently registered geofence IDs.  Only the ones
-     * that are actually currently registered with the OS.
-     */
+    /// Maintains list of currently registered geofence IDs.  Only the ones
+    /// that are actually currently registered with the OS.
     private List<String> activeKeys;
     private Map<String, Long> expiryTimes;
-    /**
-     * Map of all currently registered fences.
-     */
+    /// Map of all currently registered fences.
     private Map<String, Geofence> fences;
     private Map<String, Geofence> activeFences;
 
@@ -131,11 +117,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
         update(defaultTimeout, true);
     }
 
-    /**
-     * Obtains reference to the singleton GeofenceManager
-     *
-     * @return
-     */
+    /// Obtains reference to the singleton GeofenceManager
     public static GeofenceManager getInstance() {
         GeofenceManager result = instance;
         if (result == null) {
@@ -219,58 +201,57 @@ public final class GeofenceManager implements Iterable<Geofence> {
         }
     }
 
-    /**
-     * Gets the radius of the "bubble" region, in metres.
-     *
-     * @return the bubbleRadius
-     */
+    /// Gets the radius of the "bubble" region, in metres.
+    ///
+    /// #### Returns
+    ///
+    /// the bubbleRadius
     public int getBubbleRadius() {
         return bubbleRadius;
     }
 
-    /**
-     * Sets the radius of the "bubble" regin, in metres.  Default value is {@literal 1000}.
-     *
-     * @param bubbleRadius the bubbleRadius to set
-     */
+    /// Sets the radius of the "bubble" regin, in metres.  Default value is 1000.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bubbleRadius`: the bubbleRadius to set
     public void setBubbleRadius(int bubbleRadius) {
         this.bubbleRadius = bubbleRadius;
     }
 
-    /**
-     * Gets the expiration duration (in milliseconds) of the bubble region.
-     *
-     * @return the bubbleExpiration
-     */
+    /// Gets the expiration duration (in milliseconds) of the bubble region.
+    ///
+    /// #### Returns
+    ///
+    /// the bubbleExpiration
     public long getBubbleExpiration() {
         return bubbleExpiration;
     }
 
-    /**
-     * Sets the expiration duration (in milliseconds) of the bubble region.  Default is {@literal -1}
-     * meaning "No expiration".
-     *
-     * @param bubbleExpiration the bubbleExpiration to set
-     */
+    /// Sets the expiration duration (in milliseconds) of the bubble region.  Default is -1
+    /// meaning "No expiration".
+    ///
+    /// #### Parameters
+    ///
+    /// - `bubbleExpiration`: the bubbleExpiration to set
     public void setBubbleExpiration(long bubbleExpiration) {
         this.bubbleExpiration = bubbleExpiration;
     }
 
-    /**
-     * Checks if the given ID is for the "bubble" region.
-     *
-     * @param id An ID to check.
-     * @return True if {@literal id} is for the "bubble" region.
-     */
+    /// Checks if the given ID is for the "bubble" region.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: An ID to check.
+    ///
+    /// #### Returns
+    ///
+    /// True if id is for the "bubble" region.
     public boolean isBubble(String id) {
         return BUBBLE_GEOFENCE_ID.equals(id);
     }
 
-    /**
-     * Gets the currently registered Listener class.
-     *
-     * @return
-     */
+    /// Gets the currently registered Listener class.
     public synchronized Class<? extends GeofenceListener> getListenerClass() {
         if (listenerClass == null) {
             String className = (String) Storage.getInstance().readObject(LISTENER_CLASS_KEY);
@@ -285,11 +266,11 @@ public final class GeofenceManager implements Iterable<Geofence> {
         return listenerClass;
     }
 
-    /**
-     * Sets the GeofenceListener class that should receive Geofence events.
-     *
-     * @param c
-     */
+    /// Sets the GeofenceListener class that should receive Geofence events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`
     public synchronized void setListenerClass(Class<? extends GeofenceListener> c) {
         listenerClass = (Class) c;
         if (c == null) {
@@ -299,9 +280,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
         }
     }
 
-    /**
-     * @return
-     */
+    ///
     private GeofenceListener getListener() {
         Class<? extends GeofenceListener> c = getListenerClass();
         if (c != null) {
@@ -314,11 +293,11 @@ public final class GeofenceManager implements Iterable<Geofence> {
         return null;
     }
 
-    /**
-     * Adds a set of regions to be monitored by GeofenceManager.
-     *
-     * @param geofence
-     */
+    /// Adds a set of regions to be monitored by GeofenceManager.
+    ///
+    /// #### Parameters
+    ///
+    /// - `geofence`
     public synchronized void add(Geofence... geofence) {
         Map<String, Geofence> fences = getFences(false);
         for (Geofence f : geofence) {
@@ -329,11 +308,11 @@ public final class GeofenceManager implements Iterable<Geofence> {
     }
 
 
-    /**
-     * Adds a set of regions to be monitored by GeofenceManager.
-     *
-     * @param geofences
-     */
+    /// Adds a set of regions to be monitored by GeofenceManager.
+    ///
+    /// #### Parameters
+    ///
+    /// - `geofences`
     public synchronized void add(Collection<Geofence> geofences) {
         add(geofences.toArray(new Geofence[geofences.size()]));
     }
@@ -357,11 +336,11 @@ public final class GeofenceManager implements Iterable<Geofence> {
     }
 
 
-    /**
-     * Removes a set of regions (by ID) so that they will no longer be monitored.
-     *
-     * @param ids
-     */
+    /// Removes a set of regions (by ID) so that they will no longer be monitored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ids`
     public synchronized void remove(String... ids) {
         Map<String, Geofence> fences = getFences(false);
         for (String i : ids) {
@@ -374,47 +353,29 @@ public final class GeofenceManager implements Iterable<Geofence> {
         remove(ids.toArray(new String[ids.size()]));
     }
 
-    /**
-     * Removes all current regions.
-     */
+    /// Removes all current regions.
     public synchronized void clear() {
         Map<String, Geofence> fences = getFences(false);
         fences.clear();
         saveFences();
     }
 
-    /**
-     * Checks the number of regions that are currently being monitored.
-     *
-     * @return
-     */
+    /// Checks the number of regions that are currently being monitored.
     public synchronized int size() {
         return getFences(false).size();
     }
 
-    /**
-     * Returns the Geofences as a Map.
-     *
-     * @return
-     */
+    /// Returns the Geofences as a Map.
     public synchronized Map<String, Geofence> asMap() {
         return getFences(false);
     }
 
-    /**
-     * Returns the Geofences as a list.
-     *
-     * @return
-     */
+    /// Returns the Geofences as a list.
     public synchronized List<Geofence> asList() {
         return new ArrayList(getFences(false).values());
     }
 
-    /**
-     * Returns all Geofences sorted by distance from the current location.
-     *
-     * @return
-     */
+    /// Returns all Geofences sorted by distance from the current location.
     public synchronized List<Geofence> asSortedList() {
         List<Geofence> l = asList();
         Location curr = LocationManager.getLocationManager().getLastKnownLocation();
@@ -424,9 +385,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
         return l;
     }
 
-    /**
-     * Reloads geofences from storage.
-     */
+    /// Reloads geofences from storage.
     public synchronized void refresh() {
         getFences(true);
     }
@@ -511,23 +470,24 @@ public final class GeofenceManager implements Iterable<Geofence> {
         return l1.getDistanceTo(l2) <= radius;
     }
 
-    /**
-     * Updates the active Geofences that are being monitored on the OS.  This should be called
-     * after making changes to the set of Geofences you wish to monitor.
-     *
-     * @param timeout Timeout (in milliseconds)
-     */
+    /// Updates the active Geofences that are being monitored on the OS.  This should be called
+    /// after making changes to the set of Geofences you wish to monitor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: Timeout (in milliseconds)
     public synchronized void update(int timeout) {
         update(timeout, false);
     }
 
-    /**
-     * Updates the active Geofences that are being monitored on the OS.  This should be called
-     * after making changes to the set of Geofences you wish to monitor.
-     *
-     * @param timeout      Timeout (in milliseconds)
-     * @param forceRefresh If true, then this will force removal and re-addition of all geofences.
-     */
+    /// Updates the active Geofences that are being monitored on the OS.  This should be called
+    /// after making changes to the set of Geofences you wish to monitor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: Timeout (in milliseconds)
+    ///
+    /// - `forceRefresh`: If true, then this will force removal and re-addition of all geofences.
     public synchronized void update(int timeout, boolean forceRefresh) {
         Location here = LocationManager.getLocationManager().getCurrentLocationSync(timeout);
         update(forceRefresh, here);
@@ -608,11 +568,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
         }
     }
 
-    /**
-     * Iterates over all geofences that are being monitored.
-     *
-     * @return
-     */
+    /// Iterates over all geofences that are being monitored.
     @Override
     public Iterator<Geofence> iterator() {
         return getFences(false).values().iterator();
@@ -622,13 +578,13 @@ public final class GeofenceManager implements Iterable<Geofence> {
         update(false, location);
     }
 
-    /**
-     * The Listener class that is registered to receive Geofence events.  This is
-     * used internally by {@link GeofenceManager}.  It is only public because
-     * {@link GeofenceListener} classes must be public.
-     *
-     * @deprecated For internal use only.
-     */
+    /// The Listener class that is registered to receive Geofence events.  This is
+    /// used internally by `GeofenceManager`.  It is only public because
+    /// `GeofenceListener` classes must be public.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
     public static class Listener implements GeofenceListener, LocationListener {
 
         @Override

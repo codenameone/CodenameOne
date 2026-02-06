@@ -25,13 +25,11 @@ package com.codename1.components;
 
 import com.codename1.ui.EncodedImage;
 
-/**
- * Allows the image data to be replaced at runtime when a different image is
- * available. The only limitation is that the image width/height must be identical and
- * opacity status can't change (an opaque image can't be made translucent and visa versa).
- *
- * @author Shai Almog
- */
+/// Allows the image data to be replaced at runtime when a different image is
+/// available. The only limitation is that the image width/height must be identical and
+/// opacity status can't change (an opaque image can't be made translucent and visa versa).
+///
+/// @author Shai Almog
 public final class ReplaceableImage extends EncodedImage {
     private final boolean opaque;
     private boolean replaced;
@@ -43,56 +41,51 @@ public final class ReplaceableImage extends EncodedImage {
         opaque = placeholder.isOpaque();
     }
 
-    /**
-     * Creates an encoded image that can later be replaced with a different image
-     *
-     * @param placeholder a temporary image
-     * @return image that will be replaceable later on
-     */
+    /// Creates an encoded image that can later be replaced with a different image
+    ///
+    /// #### Parameters
+    ///
+    /// - `placeholder`: a temporary image
+    ///
+    /// #### Returns
+    ///
+    /// image that will be replaceable later on
     public static ReplaceableImage create(EncodedImage placeholder) {
         return new ReplaceableImage(placeholder);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public byte[] getImageData() {
         replaced = false;
         return data;
     }
 
-    /**
-     * Replaces the current image with the new image which must match the dimensions
-     * etc. of the previous image.
-     *
-     * @param newImage the image to apply
-     */
+    /// Replaces the current image with the new image which must match the dimensions
+    /// etc. of the previous image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `newImage`: the image to apply
     public void replace(EncodedImage newImage) {
         data = newImage.getImageData();
         super.resetCache();
         replaced = true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean animate() {
         return replaced;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isAnimation() {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /// {@inheritDoc}
     @Override
     public boolean isOpaque() {
         return opaque;
