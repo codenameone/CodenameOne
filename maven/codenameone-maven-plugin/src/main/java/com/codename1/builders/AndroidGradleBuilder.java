@@ -1736,7 +1736,8 @@ public class AndroidGradleBuilder extends Executor {
                     replaceInFile(androidBrowserComponentCallback, "//import android.webkit.JavascriptInterface;", "import android.webkit.JavascriptInterface;");
                     replaceInFile(androidBrowserComponentCallback, "//@JavascriptInterface", "@JavascriptInterface");
                 } catch (Exception e) {
-                    //swallow this and continue.
+                    // Swallow this and continue.
+                    log("Non-fatal exception encountered when processing AndroidBrowserComponentCallback.java: " + e);
                 }
             }
         }

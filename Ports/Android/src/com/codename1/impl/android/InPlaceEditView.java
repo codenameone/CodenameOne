@@ -68,6 +68,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
+import com.codename1.io.Util;
 import com.codename1.ui.Accessor;
 
 import com.codename1.ui.Component;
@@ -1335,10 +1336,7 @@ public class InPlaceEditView extends FrameLayout{
 
             new Thread(new Runnable() {
                 public void run() {
-                    try {
-                        Thread.sleep(100);
-
-                    } catch (Exception ex){}
+                    Util.sleep(100);
                     if (thisCount != trySetEditModeCount-1) {
                         return;
                     }

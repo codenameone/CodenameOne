@@ -43,6 +43,7 @@ import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.impl.android.PlayServices;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -129,10 +130,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     @Override
     public Location getLastKnownLocation() {
         while (!getmGoogleApiClient().isConnected()) {
-            try {
-                Thread.sleep(300);
-            } catch (Exception ex) {
-            }
+            Util.sleep(300);
         }
         //android.location.Location location = LocationServices.FusedLocationApi.getLastLocation(getmGoogleApiClient());
         android.location.Location location = PlayServices.getInstance().getLastKnownLocation(getmGoogleApiClient());
@@ -152,10 +150,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 //wait until the client is connected, otherwise the call to
                 //requestLocationUpdates will fail
                 while (!getmGoogleApiClient().isConnected()) {
-                    try {
-                        Thread.sleep(300);
-                    } catch (Exception ex) {
-                    }
+                    Util.sleep(300);
                 }
                 Handler mHandler = new Handler(Looper.getMainLooper());
                 mHandler.post(new Runnable() {
@@ -273,10 +268,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
             public void run() {
                 //mGoogleApiClient must be connected
                 while (!getmGoogleApiClient().isConnected()) {
-                    try {
-                        Thread.sleep(300);
-                    } catch (Exception ex) {
-                    }
+                    Util.sleep(300);
                 }
                 Handler mHandler = new Handler(Looper.getMainLooper());
                 mHandler.post(new Runnable() {
@@ -325,10 +317,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 //wait until the client is connected, otherwise the call to
                 //requestLocationUpdates will fail
                 while (!getmGoogleApiClient().isConnected()) {
-                    try {
-                        Thread.sleep(300);
-                    } catch (Exception ex) {
-                    }
+                    Util.sleep(300);
                 }
                 Handler mHandler = new Handler(Looper.getMainLooper());
                 mHandler.post(new Runnable() {
@@ -386,10 +375,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
             public void run() {
                 //mGoogleApiClient must be connected
                 while (!getmGoogleApiClient().isConnected()) {
-                    try {
-                        Thread.sleep(300);
-                    } catch (Exception ex) {
-                    }
+                    Util.sleep(300);
                 }
                 Handler mHandler = new Handler(Looper.getMainLooper());
                 mHandler.post(new Runnable() {
@@ -528,10 +514,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 //requestLocationUpdates will fail
                 //com.codename1.io.Log.p("PLACES add "+gf.getId()+" 1");
                 while (!getmGoogleApiClient().isConnected()) {
-                    try {
-                        Thread.sleep(300);
-                    } catch (Exception ex) {
-                    }
+                    Util.sleep(300);
                 }
                 //com.codename1.io.Log.p("PLACES add "+gf.getId()+" 2");
                 Handler mHandler = new Handler(Looper.getMainLooper());
@@ -609,10 +592,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 //requestLocationUpdates will fail
                 //com.codename1.io.Log.p("PLACES remove "+id);
                 while (!getmGoogleApiClient().isConnected()) {
-                    try {
-                        Thread.sleep(300);
-                    } catch (Exception ex) {
-                    }
+                    Util.sleep(300);
                 }
                 //com.codename1.io.Log.p("PLACES remove "+id+" 2");
                 Handler mHandler = new Handler(Looper.getMainLooper());
