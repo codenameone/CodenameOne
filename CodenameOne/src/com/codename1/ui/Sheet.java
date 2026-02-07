@@ -942,7 +942,7 @@ public class Sheet extends Container {
     private void ensureSheetBlocker(Container cnt, Container sheetLayer) {
         Component blocker = (Component) cnt.getClientProperty(SHEET_BLOCKER_PROPERTY);
         if (Form.activePeerCount <= 0) {
-            if (blocker != null && blocker.getParent() == cnt) {
+            if (blocker != null && blocker.getParent() == cnt) { //NOPMD CompareObjectsWithEquals
                 cnt.removeComponent(blocker);
             }
             return;
@@ -951,7 +951,7 @@ public class Sheet extends Container {
             blocker = new SheetBlocker();
             cnt.putClientProperty(SHEET_BLOCKER_PROPERTY, blocker);
         }
-        if (blocker.getParent() != cnt) {
+        if (blocker.getParent() != cnt) { //NOPMD CompareObjectsWithEquals
             int sheetLayerIndex = cnt.getComponentIndex(sheetLayer);
             if (sheetLayerIndex > -1) {
                 cnt.addComponent(sheetLayerIndex, blocker);
