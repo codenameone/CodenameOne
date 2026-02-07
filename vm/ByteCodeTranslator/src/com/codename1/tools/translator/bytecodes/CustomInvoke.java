@@ -38,11 +38,11 @@ import org.objectweb.asm.Opcodes;
  */
 public class CustomInvoke extends Instruction {
     private String owner;
-    private String name;
-    private String desc;
-    private boolean itf;
+    private final String name;
+    private final String desc;
+    private final boolean itf;
     private String[] literalArgs;
-    private int origOpcode;
+    private final int origOpcode;
     private String targetObjectLiteral;
     private boolean noReturn;
     
@@ -86,7 +86,7 @@ public class CustomInvoke extends Instruction {
     public String getMethodUsed() {
         return desc + "." + name;
     }
-    public String getMethodUsedName() { return(name); }
+
     public String getSignature() { return(desc); }
     
     @Override
@@ -113,8 +113,8 @@ public class CustomInvoke extends Instruction {
             }
         }
         bld.append("__");
-        ArrayList<String> args = new ArrayList<String>();
-        String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);        
+        ArrayList<String> args = new ArrayList<>();
+        BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         String str = bld.toString();
         BytecodeMethod.addVirtualMethodsInvoked(str);
     }
@@ -136,14 +136,13 @@ public class CustomInvoke extends Instruction {
     }
     
     public boolean methodHasReturnValue() {
-        return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<String>()) != null;
+        return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<>()) != null;
     }
     
     public String getReturnValue() {
-        ArrayList<String> args = new ArrayList<String>();
+        ArrayList<String> args = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
-        String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sb, args);
-        return returnVal;
+        return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sb, args);
     }
     
     
@@ -190,7 +189,7 @@ public class CustomInvoke extends Instruction {
         }
         
         if(origOpcode == Opcodes.INVOKESTATIC) {
-            // find the actual class of the static method to workaround javac not defining it correctly
+            // find the actual class of the static method to work around javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
             owner = findActualOwner(bc);
         }
@@ -210,7 +209,7 @@ public class CustomInvoke extends Instruction {
             }
         }
         bld.append("__");
-        ArrayList<String> args = new ArrayList<String>();
+        ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
             BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
@@ -219,39 +218,24 @@ public class CustomInvoke extends Instruction {
         if (numLiteralArgs > 0) {
             b.append("/* CustomInvoke */");
         }
-        boolean noPop = false;
         b.append(bld);
         
         b.append("(threadStateData");
-        
-        
-        
+
         if(origOpcode != Opcodes.INVOKESTATIC) {
             if (targetObjectLiteral == null) {
-                //b.append(", SP[-");
-                //b.append(args.size() + 1 - numLiteralArgs);
-                //b.append("].data.o");
                 return false;
             } else {
                 b.append(", ").append(targetObjectLiteral);
-                numLiteralArgs++;
             }
         }
-        //int offset = args.size();
-        //int numArgs = offset;
         int argIndex=0;
-        for(String a : args) {
-            
+        for(String ignored : args) {
             b.append(", ");
             if (literalArgs != null && literalArgs[argIndex] != null) {
                 b.append(literalArgs[argIndex]);
             } else {
                 return false;
-                //b.append("SP[-");
-                //b.append(offset);
-                //b.append("].data.");
-                //b.append(a);
-                //offset--;
             }
             argIndex++;
         }
@@ -262,7 +246,6 @@ public class CustomInvoke extends Instruction {
         b.append(")");
         
         return true;
-        
     }
     
     
@@ -308,13 +291,10 @@ public class CustomInvoke extends Instruction {
         }
         
         if(origOpcode == Opcodes.INVOKESTATIC) {
-            // find the actual class of the static method to workaround javac not defining it correctly
+            // find the actual class of the static method to work around javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
             owner = findActualOwner(bc);
         }
-        //if(owner.replace('/', '_').replace('$', '_').equals("java_lang_System_1") && name.equals("sleep")) {
-        //    System.out.println("Break");
-        //}
         if (owner.startsWith("[")) {
             bld.append("java_lang_Object");
         } else{
@@ -331,7 +311,7 @@ public class CustomInvoke extends Instruction {
             }
         }
         bld.append("__");
-        ArrayList<String> args = new ArrayList<String>();
+        ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         int numLiteralArgs = this.getNumLiteralArgs();
         if (numLiteralArgs > 0) {
@@ -368,8 +348,6 @@ public class CustomInvoke extends Instruction {
                 noPop = true;
                 b.append("(");
             } else {
-                //b.append("POP_MANY_AND_");
-                //b.append(returnVal);
                 b.append("{ ");
                 b.append(returnVal);
                 b.append(" tmpResult = ");
@@ -386,7 +364,7 @@ public class CustomInvoke extends Instruction {
                 b.append(args.size() + 1 - numLiteralArgs);
                 b.append("].data.o");
             } else {
-                b.append(", "+targetObjectLiteral);
+                b.append(", ").append(targetObjectLiteral);
                 numLiteralArgs++;
             }
         }

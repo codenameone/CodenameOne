@@ -111,7 +111,7 @@ public class Contact {
     /// #### Parameters
     ///
     /// - `addresses`: @param addresses the Hashtable contains key/value pairs where
-    /// the key is a String which represents the type of the Address, types can
+    /// the key is a String that represents the type of the Address, types can
     /// be: "home", "work", "other" the value is an Address Object.
     public void setAddresses(Hashtable addresses) {
         this.addresses = addresses;

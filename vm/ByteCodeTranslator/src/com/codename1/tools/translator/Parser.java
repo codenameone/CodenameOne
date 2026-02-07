@@ -24,6 +24,8 @@
 package com.codename1.tools.translator;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 
 import org.objectweb.asm.AnnotationVisitor;
@@ -49,8 +51,8 @@ public class Parser extends ClassVisitor {
     private ByteCodeClass cls;
     private String clsName;
     private static String[] nativeSources;
-    private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
-    private static MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
+    private static List<ByteCodeClass> classes = new ArrayList<>();
+    private static final MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
     public static void cleanup() {
         nativeSources = null;
@@ -64,10 +66,7 @@ public class Parser extends ClassVisitor {
             System.out.println("Parsing: " + sourceFile.getAbsolutePath());
         }
         BytecodeMethod.setDependencyGraph(dependencyGraph);
-        ClassReader r = new ClassReader(new FileInputStream(sourceFile));
-        /*if(ByteCodeTranslator.verbose) {
-            System.out.println("Class: " + r.getClassName() + " derives from: " + r.getSuperName() + " interfaces: " + Arrays.asList(r.getInterfaces()));
-        }*/
+        ClassReader r = new ClassReader(Files.newInputStream(sourceFile.toPath()));
         Parser p = new Parser();
         
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
@@ -106,7 +105,7 @@ public class Parser extends ClassVisitor {
         }
     }
 
-    private static ArrayList<String> constantPool = new ArrayList<String>();
+    private static final ArrayList<String> constantPool = new ArrayList<>();
     
     public static ByteCodeClass getClassObject(String name) {
         for(ByteCodeClass cls : classes) {
@@ -134,7 +133,7 @@ public class Parser extends ClassVisitor {
     private static void generateClassAndMethodIndexHeader(File outputDirectory) throws Exception {
         int classOffset = 0;
         int methodOffset = 0;
-        ArrayList<BytecodeMethod> methods = new ArrayList<BytecodeMethod>();
+        ArrayList<BytecodeMethod> methods = new ArrayList<>();
         for(ByteCodeClass bc : classes) {
             bc.setClassOffset(classOffset);
             classOffset++;
@@ -161,7 +160,6 @@ public class Parser extends ClassVisitor {
             }
             first = false;
             bldM.append(addToConstantPool(bc.getClsName().replace('_', '.')));
-            bldM.append("");
         }
         bldM.append("};\n\n");
         
@@ -203,13 +201,6 @@ public class Parser extends ClassVisitor {
             bld.append(arrayId);
             bld.append("\n");
             arrayId++;
-
-            /*bld.append("#define cn1_array_4_id_");
-            bld.append(bc.getClsName());
-            bld.append(" ");
-            bld.append(arrayId);
-            bld.append("\n");
-            arrayId++;*/
         }
 
         bld.append("\n\n");
@@ -225,16 +216,12 @@ public class Parser extends ClassVisitor {
             }
             first = false;
             bldM.append(addToConstantPool(m.getMethodName()));
-            bldM.append("");
         }
         bldM.append("};\n\n");
         
-        ArrayList<Integer> instances = new ArrayList<Integer>();
+        ArrayList<Integer> instances = new ArrayList<>();
         int counter = 0;
         for(ByteCodeClass bc : classes) {
-            /*bld.append("extern int classInstanceOfArr");
-            bld.append(counter);
-            bld.append("[];\n");*/
             bldM.append("int classInstanceOfArr");
             bldM.append(counter);
             bldM.append("[] = {");
@@ -253,8 +240,8 @@ public class Parser extends ClassVisitor {
         bldM.append(classes.size());
         bldM.append("] = {");
         first = true;
-        counter = 0;
-        for(ByteCodeClass bc : classes) {
+        int classCount = classes.size();
+        for(counter = 0 ; counter < classCount ; counter++) {
             if(first) {
                 bldM.append("\n    ");
             } else {
@@ -263,7 +250,6 @@ public class Parser extends ClassVisitor {
             first = false;
             bldM.append("classInstanceOfArr");
             bldM.append(counter);
-            counter++;
         }
         bldM.append("};\n\n");
         
@@ -330,10 +316,10 @@ public class Parser extends ClassVisitor {
         bld.append("\n\n#endif // __CN1_CLASS_METHOD_INDEX_H__\n");        
         
         FileOutputStream fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.h"));
-        fos.write(bld.toString().getBytes("UTF-8"));
+        fos.write(bld.toString().getBytes(StandardCharsets.UTF_8));
         fos.close();
         fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.m"));
-        fos.write(bldM.toString().getBytes("UTF-8"));
+        fos.write(bldM.toString().getBytes(StandardCharsets.UTF_8));
         fos.close();
     }
     
@@ -386,16 +372,16 @@ public class Parser extends ClassVisitor {
         String file = "Unknown File";
         try {
             for(ByteCodeClass bc : classes) {
-                // special case for object
+                // special case for an object
                 if(bc.getClsName().equals("java_lang_Object")) {
                     continue;
                 }
                 file = bc.getClsName();
                 bc.setBaseClassObject(getClassByName(bc.getBaseClass()));
-                List<ByteCodeClass> lst = new ArrayList<ByteCodeClass>();
+                List<ByteCodeClass> lst = new ArrayList<>();
                 for(String s : bc.getBaseInterfaces()) {
-					ByteCodeClass bcode=getClassByName(s);
-					if(bcode==null){
+					ByteCodeClass byteCode = getClassByName(s);
+					if(byteCode == null){
 					  System.out.println("Error while working with the class: " + s+" file:"+file+" no class definition");
 					} else {
 						lst.add(getClassByName(s));
@@ -416,7 +402,7 @@ public class Parser extends ClassVisitor {
 
             // load the native sources (including user native code)
             // We need to load native sources before we clear any unmarked classes
-            // because native source may be the only thing referencing a class,
+            // because a native source may be the only thing referencing a class,
             // and the class may be purged before it even has a shot.
             readNativeFiles(outputDirectory);
 
@@ -425,9 +411,9 @@ public class Parser extends ClassVisitor {
                 bc.updateAllDependencies();
             }
             ByteCodeClass.markDependencies(classes, nativeSources);
-            Set<ByteCodeClass> unmarked = new HashSet<ByteCodeClass>(classes);
+            Set<ByteCodeClass> unmarked = new HashSet<>(classes);
             classes = ByteCodeClass.clearUnmarked(classes);
-            unmarked.removeAll(classes);
+            classes.forEach(unmarked::remove);
             int neliminated = 0;
             for (ByteCodeClass removedClass : unmarked) {
                 removedClass.setEliminated(true);
@@ -441,7 +427,7 @@ public class Parser extends ClassVisitor {
                 neliminated += eliminateUnusedMethods();
                 Date later = new Date();
                 long dif = later.getTime()-now.getTime();
-                System.out.println("unusued Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
+                System.out.println("unused Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
             }
 
             generateClassAndMethodIndexHeader(outputDirectory);
@@ -454,30 +440,25 @@ public class Parser extends ClassVisitor {
                 writeFile(bc, outputDirectory, cos);
             }
             if (cos != null) cos.realClose();
-
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
             t.printStackTrace();
             if(t instanceof Exception) {
                 throw (Exception)t;
             }
-            if(t instanceof RuntimeException) {
-                throw (RuntimeException)t;
-            }
         }
         finally { cleanup(); }
     }
     
     private static void readNativeFiles(File outputDirectory) throws IOException {
-        File[] mFiles = outputDirectory.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File file) {
-                return file.getName().endsWith(".m") || file.getName().endsWith("." + ByteCodeTranslator.output.extension());
-            }
-        });
+        File[] mFiles = outputDirectory.listFiles(file ->
+                file.getName().endsWith(".m") || file.getName().endsWith("." + ByteCodeTranslator.output.extension()));
+        if(mFiles == null) {
+            return;
+        }
         nativeSources = new String[mFiles.length];
         int size = 0;
-        System.out.println(""+mFiles.length +" native files");
+        System.out.println(mFiles.length + " native files");
         for(int iter = 0 ; iter < mFiles.length ; iter++) { 
         	FileInputStream fi = new FileInputStream(mFiles[iter]);
             DataInputStream di = new DataInputStream(fi);
@@ -486,10 +467,9 @@ public class Parser extends ClassVisitor {
             byte[] dat = new byte[len];
             di.readFully(dat);
             fi.close();
-            nativeSources[iter] = new String(dat, "UTF-8");
+            nativeSources[iter] = new String(dat, StandardCharsets.UTF_8);
         }
         System.out.println("Native files total "+(size/1024)+"K");
-        
     }
     
     private static int eliminateUnusedMethods() {
@@ -584,20 +564,12 @@ public class Parser extends ClassVisitor {
 
             ByteCodeClass.markDependencies(classes, nativeSources);
             List<ByteCodeClass> tmp = ByteCodeClass.clearUnmarked(classes);
-            /*if(ByteCodeTranslator.verbose) {
-            System.out.println("Classes removed from: " + classCount + " to " + classes.size());
-            for(ByteCodeClass bc : classes) {
-            if(!tmp.contains(bc)) {
-            System.out.println("Removed class: " + bc.getClsName());
-            }
-            }
-            }*/
 
             // 2nd pass to mark classes as eliminated so that we can propagate down to each
             // method of the class to mark it eliminated so that virtual methods
             // aren't included later on when writing virtual methods
-            Set<ByteCodeClass> removedClasses = new HashSet<ByteCodeClass>(classes);
-            removedClasses.removeAll(tmp);
+            Set<ByteCodeClass> removedClasses = new HashSet<>(classes);
+            tmp.forEach(removedClasses::remove);
             int nfound = 0;
             for (ByteCodeClass cls : removedClasses) {
                 nfound += cls.setEliminated(true);
@@ -635,7 +607,7 @@ public class Parser extends ClassVisitor {
         OutputStream outMain =
                 writeBufferInstead != null && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS ?
                         writeBufferInstead :
-                        new FileOutputStream(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()));
+                        Files.newOutputStream(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()).toPath());
 
         if (outMain instanceof ConcatenatingFileOutputStream) {
             ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
@@ -668,8 +640,7 @@ public class Parser extends ClassVisitor {
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
         BytecodeMethod mtd = new BytecodeMethod(clsName, access, name, desc, signature, exceptions);
         cls.addMethod(mtd);
-        JSRInlinerAdapter a = new JSRInlinerAdapter(new MethodVisitorWrapper(super.visitMethod(access, name, desc, signature, exceptions), mtd), access, name, desc, signature, exceptions);
-        return a; 
+        return new JSRInlinerAdapter(new MethodVisitorWrapper(super.visitMethod(access, name, desc, signature, exceptions), mtd), access, name, desc, signature, exceptions);
     }
 
     @Override
@@ -743,7 +714,7 @@ public class Parser extends ClassVisitor {
     }    
     
     class MethodVisitorWrapper extends MethodVisitor {
-        private BytecodeMethod mtd;
+        private final BytecodeMethod mtd;
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
             super(Opcodes.ASM9, mv);
             this.mtd = mtd;
@@ -907,12 +878,11 @@ public class Parser extends ClassVisitor {
                 // 5. Implement the interface method
                 Type samMethodType = (Type) bsmArgs[0];
                 Handle implMethod = (Handle) bsmArgs[1];
-                Type instantiatedMethodType = (Type) bsmArgs[2];
 
-                String samMethodName = name; // Name from invokedynamic
+                // Name from invokedynamic
                 String samMethodDesc = samMethodType.getDescriptor(); // Signature from BSM arg 0
 
-                BytecodeMethod interfaceMethod = new BytecodeMethod(lambdaClassName, Opcodes.ACC_PUBLIC, samMethodName, samMethodDesc, null, null);
+                BytecodeMethod interfaceMethod = new BytecodeMethod(lambdaClassName, Opcodes.ACC_PUBLIC, name, samMethodDesc, null, null);
                 lambdaClass.addMethod(interfaceMethod);
 
                 // Method Body:
@@ -950,9 +920,12 @@ public class Parser extends ClassVisitor {
                     case Opcodes.H_INVOKESTATIC: invokeOpcode = Opcodes.INVOKESTATIC; break;
                     case Opcodes.H_INVOKEVIRTUAL: invokeOpcode = Opcodes.INVOKEVIRTUAL; break;
                     case Opcodes.H_INVOKEINTERFACE: invokeOpcode = Opcodes.INVOKEINTERFACE; break;
-                    case Opcodes.H_INVOKESPECIAL: invokeOpcode = Opcodes.INVOKESPECIAL; break;
-                    case Opcodes.H_NEWINVOKESPECIAL: invokeOpcode = Opcodes.INVOKESPECIAL; break;
-                    default: invokeOpcode = Opcodes.INVOKESTATIC; // Fallback
+                    case Opcodes.H_INVOKESPECIAL:
+                    case Opcodes.H_NEWINVOKESPECIAL:
+                        invokeOpcode = Opcodes.INVOKESPECIAL; break;
+                    default:
+                        invokeOpcode = Opcodes.INVOKESTATIC;
+                        break;// Fallback
                 }
 
                 if (isCtorRef) {
@@ -969,7 +942,7 @@ public class Parser extends ClassVisitor {
 
                 // 6. Add static factory method
                 String factoryMethodName = "lambda$factory";
-                String factoryDesc = desc; // The desc of invokedynamic is (CapturedArgs)Interface.
+                // The desc of invokedynamic is (CapturedArgs)Interface.
 
                 // We want factory to be (CapturedArgs)LambdaClass (to match NEW output but wrapped)
                 // Actually, replacing invokedynamic with INVOKESTATIC means the return type on stack should match
@@ -1014,11 +987,6 @@ public class Parser extends ClassVisitor {
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             mtd.addInvoke(opcode, owner, name, desc, itf);
             super.visitMethodInsn(opcode, owner, name, desc, itf); 
-        }
-
-        @Override
-        public void visitMethodInsn(int opcode, String owner, String name, String desc) {
-            super.visitMethodInsn(opcode, owner, name, desc); 
         }
 
         @Override
@@ -1098,7 +1066,7 @@ public class Parser extends ClassVisitor {
         
     }
     
-    class FieldVisitorWrapper extends FieldVisitor {
+    static class FieldVisitorWrapper extends FieldVisitor {
 
         public FieldVisitorWrapper(FieldVisitor fv) {
             super(Opcodes.ASM9, fv);
@@ -1126,7 +1094,7 @@ public class Parser extends ClassVisitor {
         
     }
     
-    class AnnotationVisitorWrapper extends AnnotationVisitor {
+    static class AnnotationVisitorWrapper extends AnnotationVisitor {
 
         public AnnotationVisitorWrapper(AnnotationVisitor av) {
             super(Opcodes.ASM9, av);
