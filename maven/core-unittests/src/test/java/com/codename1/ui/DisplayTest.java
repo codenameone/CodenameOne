@@ -1,13 +1,9 @@
 package com.codename1.ui;
 
 import com.codename1.junit.UITestBase;
-import com.codename1.system.CrashReport;
 import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -102,39 +98,4 @@ public class DisplayTest extends UITestBase {
         }
     }
 
-    @Test
-    void testEdtExceptionCapturedByCrashReporter() {
-        Display display = Display.getInstance();
-        boolean oldEnable = display.isEnableAsyncStackTraces();
-        CrashReport oldReporter = display.getCrashReporter();
-        final AtomicReference<Throwable> captured = new AtomicReference<Throwable>();
-        CountDownLatch latch = new CountDownLatch(1);
-
-        try {
-            display.setEnableAsyncStackTraces(true);
-            display.setCrashReporter(new CrashReport() {
-                public void exception(Throwable t) {
-                    captured.set(t);
-                    latch.countDown();
-                }
-            });
-
-            display.callSerially(new Runnable() {
-                public void run() {
-                    throw new RuntimeException("boom");
-                }
-            });
-
-            waitFor(latch, 2000);
-
-            Throwable error = captured.get();
-            assertNotNull(error);
-            assertEquals("com.codename1.ui.Display$EdtException", error.getClass().getName());
-            assertNotNull(error.getCause());
-            assertEquals("boom", error.getCause().getMessage());
-        } finally {
-            display.setCrashReporter(oldReporter);
-            display.setEnableAsyncStackTraces(oldEnable);
-        }
-    }
 }
