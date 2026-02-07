@@ -14,6 +14,8 @@ import org.apache.tools.zip.ZipUtil;
 
 import java.io.*;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 
 /**
@@ -275,16 +277,19 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
                 props.load(new StringReader(properties));
 
 
-                if (codenameoneSettingsProperties == null || !codenameoneSettingsProperties.exists()) {
+                if (!codenameoneSettingsProperties.exists()) {
                     throw new MojoExecutionException("Cannot find codenameone_settings.properties");
                 }
                 SortedProperties cn1Props = new SortedProperties();
-                cn1Props.load(new FileReader(codenameoneSettingsProperties));
+                try(Reader t = new InputStreamReader(Files.newInputStream(codenameoneSettingsProperties.toPath()), StandardCharsets.UTF_8)) {
+                    cn1Props.load(t);
+                }
                 cn1Props.putAll(props);
 
                 getLog().info("Injecting properties:\n" + props+"\n into "+codenameoneSettingsProperties);
-                cn1Props.store(new FileWriter(codenameoneSettingsProperties), "Injected properties from template");
-
+                try(Writer w = new OutputStreamWriter(Files.newOutputStream(codenameoneSettingsProperties.toPath()), StandardCharsets.UTF_8)) {
+                    cn1Props.store(w, "Injected properties from template");
+                }
             }
 
             String css = extractCSS(contents);

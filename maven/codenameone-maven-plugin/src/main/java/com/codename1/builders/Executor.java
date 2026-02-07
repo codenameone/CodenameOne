@@ -32,22 +32,21 @@ import java.awt.image.BufferedImage;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.lang.reflect.Method;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -55,17 +54,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.CtConstructor;
-import javassist.CtMethod;
 import javax.imageio.ImageIO;
 
 import org.apache.maven.plugin.logging.Log;
@@ -90,12 +83,9 @@ public abstract class Executor {
     public static final boolean is_windows = File.separatorChar == '\\';
     protected File tmpDir;
     StringBuilder message = new StringBuilder();
-    private String buildId;
     private boolean canceled;
-    private Class[] nativeInterfaces;
-    private String buildKey;
+    private Class<?>[] nativeInterfaces;
     private boolean unitTestMode;
-    private String platform;
     static boolean IS_MAC;
     protected final Map<String,String> defaultEnvironment = new HashMap<String,String>();
 
@@ -129,15 +119,6 @@ public abstract class Executor {
     }
 
     public void setId(String buildId) {
-        this.buildId = buildId;
-    }
-
-    public void setPlatform(String p) {
-        this.platform = p;
-    }
-
-    public static void disableDelete() {
-        disableDelete = true;
     }
 
     public void cleanup() {
@@ -170,21 +151,19 @@ public abstract class Executor {
         byte[] data = new byte[(int) sourceFile.length()];
         dis.readFully(data);
         dis.close();
-        FileWriter fios = new FileWriter(sourceFile);
-        String str = new String(data);
-        str = str.replace(marker, newValue);
-        fios.write(str);
-        fios.close();
+        try(Writer fios = new OutputStreamWriter(Files.newOutputStream(sourceFile.toPath()), StandardCharsets.UTF_8)) {
+            String str = new String(data, StandardCharsets.UTF_8);
+            str = str.replace(marker, newValue);
+            fios.write(str);
+        }
     }
 
     public String readFileToString(File sourceFile) throws IOException {
-        DataInputStream dis = new DataInputStream(new FileInputStream(sourceFile));
+        DataInputStream dis = new DataInputStream(Files.newInputStream(sourceFile.toPath()));
         byte[] data = new byte[(int) sourceFile.length()];
         dis.readFully(data);
         dis.close();
-        //FileWriter fios = new FileWriter(sourceFile);
-        String str = new String(data);
-        return str;
+        return new String(data, StandardCharsets.UTF_8);
     }
 
     public boolean findInFile(File sourceFile, String marker) throws IOException {
@@ -192,12 +171,8 @@ public abstract class Executor {
         byte[] data = new byte[(int) sourceFile.length()];
         dis.readFully(data);
         dis.close();
-        //FileWriter fios = new FileWriter(sourceFile);
-        String str = new String(data);
+        String str = new String(data, StandardCharsets.UTF_8);
         return str.contains(marker);
-        //str = str.replace(marker, newValue);
-        //fios.write(str);
-        //fios.close();
     }
 
     public void replaceAllInFile(File sourceFile, String marker, String newValue) throws IOException {
@@ -205,11 +180,11 @@ public abstract class Executor {
         byte[] data = new byte[(int) sourceFile.length()];
         dis.readFully(data);
         dis.close();
-        FileWriter fios = new FileWriter(sourceFile);
-        String str = new String(data);
-        str = str.replaceAll(marker, newValue);
-        fios.write(str);
-        fios.close();
+        try(Writer fios = new OutputStreamWriter(Files.newOutputStream(sourceFile.toPath()), StandardCharsets.UTF_8)) {
+            String str = new String(data, StandardCharsets.UTF_8);
+            str = str.replaceAll(marker, newValue);
+            fios.write(str);
+        }
     }
 
     File includeSources(BuildRequest request) throws Exception {
@@ -748,7 +723,7 @@ public abstract class Executor {
                 javaImplSourceFile += "}\n";
 
                 FileOutputStream out = new FileOutputStream(javaFile);
-                out.write(javaImplSourceFile.getBytes());
+                out.write(javaImplSourceFile.getBytes(StandardCharsets.UTF_8));
                 out.close();
             }
         }
@@ -1436,13 +1411,9 @@ public abstract class Executor {
             name = name.substring(0, name.lastIndexOf("/"));
             if (name.contains("/")) {
                 name = name.substring(name.lastIndexOf("/"));
-                if (name.equalsIgnoreCase("xml")) {
-                    putInXMLDir = true;
-                }
-            } else {
-                if (name.equalsIgnoreCase("xml")) {
-                    putInXMLDir = true;
-                }
+            }
+            if (name.equalsIgnoreCase("xml")) {
+                putInXMLDir = true;
             }
             name = entry.getName();
             name = name.substring(name.lastIndexOf("/") + 1, name.length());
@@ -1622,7 +1593,7 @@ public abstract class Executor {
                         byte[] buffer = new byte[8192];
                         int i = stream.read(buffer);
                         while (i > -1) {
-                            String str = new String(buffer, 0, i);
+                            String str = new String(buffer, 0, i, StandardCharsets.UTF_8);
                             log(str, false);
                             outputMessage.append(str);
                             i = stream.read(buffer);
@@ -1757,32 +1728,19 @@ public abstract class Executor {
 
     static void addDir(File baseDir, File dirObj, ZipOutputStream out, String... exclude) throws IOException {
         File[] files = dirObj.listFiles();
+        if(files == null) {
+            return;
+        }
         byte[] tmpBuf = new byte[8192];
 
         for (int i = 0; i < files.length; i++) {
             if (files[i].isDirectory()) {
-                boolean found = false;
-                if (exclude != null) {
-                    List<String> excludeNames = new ArrayList<String>();
-
-                    for (String ex : exclude) {
-                        if (ex.indexOf("/") > -1) {
-                            // We only check for excludes at this level
-                        } else {
-                            excludeNames.add(ex);
-                        }
-                    }
-                    for (String ex : excludeNames) {
-                        if (files[i].getName().equalsIgnoreCase(ex)) {
-                            found = true;
-                        }
-                    }
-                }
+                boolean found = isFound(exclude, files, i);
                 if (!found) {
-                    List<String> newExcludes = new ArrayList<String>();
+                    List<String> newExcludes = new ArrayList<>();
                     if (exclude != null) {
                         for (String ex : exclude) {
-                            if (ex.indexOf("/") > -1) {
+                            if (ex.contains("/")) {
                                 newExcludes.add(ex.substring(ex.indexOf("/")+1));
                             }
                         }
@@ -1801,6 +1759,25 @@ public abstract class Executor {
             out.closeEntry();
             in.close();
         }
+    }
+
+    private static boolean isFound(String[] exclude, File[] files, int i) {
+        if (exclude != null) {
+            List<String> excludeNames = new ArrayList<>();
+
+            for (String ex : exclude) {
+                if (!ex.contains("/")) {
+                    // We only check for excludes at this level
+                    excludeNames.add(ex);
+                }
+            }
+            for (String ex : excludeNames) {
+                if (files[i].getName().equalsIgnoreCase(ex)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     protected BufferedImage getScaledUnevenInstance(BufferedImage img,
@@ -1841,7 +1818,7 @@ public abstract class Executor {
     protected BufferedImage getScaledInstance(BufferedImage img,
                                               int targetWidth,
                                               int targetHeight) {
-        BufferedImage ret = (BufferedImage) img;
+        BufferedImage ret = img;
         int w, h;
         // Use multi-step technique: start with original size, then
         // scale down in multiple passes with drawImage()
@@ -1885,83 +1862,6 @@ public abstract class Executor {
         return ret;
     }
 
-    /**
-     * @return the buildKey
-     */
-    public String getBuildKey() {
-        return buildKey;
-    }
-
-    /**
-     * @param buildKey the buildKey to set
-     */
-    public void setBuildKey(String buildKey) {
-        this.buildKey = buildKey;
-    }
-
-
-
-    protected boolean deriveGlobalInstrumentClasspath() {
-        return false;
-    }
-
-    private void instrument(String classpath, File directory, File root, List<String> methodNames) throws Exception {
-        for (File f : directory.listFiles()) {
-            if (f.isDirectory()) {
-                instrument(classpath, f, root, methodNames);
-                continue;
-            }
-            if (f.getName().endsWith(".class") && !f.getName().endsWith("CodenameOneThread.class")) {
-                ClassPool pool = new ClassPool(deriveGlobalInstrumentClasspath());
-                pool.appendClassPath(root.getAbsolutePath());
-                if (classpath != null) {
-                    pool.appendClassPath(classpath);
-                }
-                String name = f.getAbsolutePath().substring(root.getAbsolutePath().length() + 1);
-                name = name.substring(0, name.length() - 6);
-                name = name.replace(File.separatorChar, '.');//.replace('$', '.');
-                DataInputStream fi = new DataInputStream(new FileInputStream(f));
-                CtClass cls = pool.makeClass(fi);//pool.get(name);
-                fi.close();
-                CtClass runtimeException = pool.get("java.lang.RuntimeException");
-
-                methodNames.add(name);
-                CtMethod[] mtds = cls.getDeclaredMethods();
-                for (CtMethod mtd : mtds) {
-                    if (!mtd.isEmpty()) {
-                        if (mtd.getMethodInfo().getCodeAttribute() != null) {
-                            methodNames.add(mtd.getName());
-                            int mid = methodNames.size();
-                            mtd.insertBefore("{ com.codename1.impl.CodenameOneThread.push(" + mid + "); }");
-                            mtd.insertAfter("{ com.codename1.impl.CodenameOneThread.pop(); }", true);
-                            mtd.addCatch("{ com.codename1.impl.CodenameOneThread.storeStack($e, " + mid + "); throw $e; }", runtimeException);
-                            for (CtClass ex : mtd.getExceptionTypes()) {
-                                mtd.addCatch("{ com.codename1.impl.CodenameOneThread.storeStack($e, " + mid + "); throw $e; }", ex);
-                            }
-                        }
-                    }
-                }
-                CtConstructor[] cons = cls.getDeclaredConstructors();
-                for (CtConstructor con : cons) {
-                    if (!con.isEmpty()) {
-                        if (con.getMethodInfo().getCodeAttribute() != null) {
-                            methodNames.add(con.getName());
-                            int mid = methodNames.size();
-                            con.insertBefore("{ com.codename1.impl.CodenameOneThread.push(" + mid + "); }");
-                            con.insertAfter("{ com.codename1.impl.CodenameOneThread.pop(); }", true);
-                            con.addCatch("{ com.codename1.impl.CodenameOneThread.storeStack($e, " + mid + "); throw $e; }", runtimeException);
-                            for (CtClass ex : con.getExceptionTypes()) {
-                                con.addCatch("{ com.codename1.impl.CodenameOneThread.storeStack($e, " + mid + "); throw $e; }", ex);
-                            }
-                        }
-                    }
-                }
-                FileOutputStream fo = new FileOutputStream(f);
-                fo.write(cls.toBytecode());
-                fo.close();
-            }
-        }
-    }
 
     public File getResourceAsFile(String res, String extension) throws IOException {
 
@@ -1982,20 +1882,7 @@ public abstract class Executor {
     public InputStream getResourceAsStream(String res) {
 
 
-        InputStream s = Executor.class.getResourceAsStream(res);
-        if(s != null) {
-            return s;
-        }
-
-        return null;
-    }
-
-    /**
-     * Gets a potentially versioned file
-     */
-    public File getFileObject(File f) {
-        return f;
-
+        return Executor.class.getResourceAsStream(res);
     }
 
     protected boolean isUnitTestMode() {
@@ -2046,7 +1933,7 @@ public abstract class Executor {
                     + "    }\n\n\n"
                     + "    public void destroy() {\n"
                     + "    }\n\n\n"
-                    + "}\n").getBytes());
+                    + "}\n").getBytes(StandardCharsets.UTF_8));
             fo.close();
         }
     }
@@ -2060,34 +1947,19 @@ public abstract class Executor {
     }
 
     public String xorEncode(String s) {
-        try {
 
-            if(s == null) {
-                return null;
-            }
-            byte[] dat = s.getBytes("UTF-8");
-            for(int iter = 0 ; iter < dat.length ; iter++) {
-                dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
-            }
-            return Base64.encodeNoNewline(dat);
-        } catch(UnsupportedEncodingException err) {
-            // will never happen damn stupid exception
-            err.printStackTrace();
+        if(s == null) {
             return null;
         }
-    }
-
-    private ClassLoader getCodenameOneJarClassLoader() throws IOException {
-        if (codenameOneJar == null) {
-            throw new IllegalStateException("Must set codenameOneJar in Executor");
+        byte[] dat = s.getBytes(StandardCharsets.UTF_8);
+        for(int iter = 0 ; iter < dat.length ; iter++) {
+            dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
         }
-        return new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()});
+        return Base64.encodeNoNewline(dat);
     }
 
     /**
      * Loads global local builder properties from user's home directory.
-     * @return
-     * @throws IOException
      */
     protected Properties getLocalBuilderProperties() {
         if (localBuilderProperties == null) {
@@ -2101,11 +1973,8 @@ public abstract class Executor {
 
             }
             try {
-                FileInputStream fis = new FileInputStream(propertiesFile);
-                try {
+                try (FileInputStream fis = new FileInputStream(propertiesFile)) {
                     localBuilderProperties.load(fis);
-                } finally {
-                    fis.close();
                 }
             } catch (IOException ex) {
                 throw new RuntimeException("Failed to load local properties", ex);

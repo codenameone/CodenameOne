@@ -10,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.UUID;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -186,7 +187,7 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
                     "\" resFile=\"" + xmlize(projectResourceFile.toURI().toURL().toExternalForm()) +
                     "\" outputFile=\"" + xmlize(outputFile.toURI().toURL().toExternalForm()) +
                     "\" running=\"" + xmlize(runningFile.toURI().toURL().toExternalForm()) +
-                    "\" />\n").getBytes());
+                    "\" />\n").getBytes(StandardCharsets.UTF_8));
             fos.close();
             launchGuiBuilderApp();
 
@@ -204,7 +205,7 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
                                 fis.read(data);
                                 fis.close();
                                 lastModified = outputFile.lastModified();
-                                String d = new String(data);
+                                String d = new String(data, StandardCharsets.UTF_8);
                                 if(d.endsWith("DataChangeEvent")) {
                                     gotoSourceFileLine(javaSourceFile, "void " + d, "\n    public void " + d + "(com.codename1.ui.Component cmp, int type, int index) {\n    }\n");
                                 } else {

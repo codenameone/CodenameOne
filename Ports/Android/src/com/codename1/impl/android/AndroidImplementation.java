@@ -81,6 +81,7 @@ import com.codename1.ui.util.Resources;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Vector;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -563,11 +564,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public String getStackTrace(Thread parentThread, Throwable t) {
         System.out.println("CN1SS:ERR:Invoking getStackTrace in AndroidImplementation");
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        PrintWriter w = new PrintWriter(bos);
+        PrintWriter w = new PrintWriter(new OutputStreamWriter(bos, StandardCharsets.UTF_8));
         t.printStackTrace(w);
         w.close();
         System.out.println("CN1SS:ERR:AndroidImplementation getStackTrace completed");
-        return bos.toString();
+        return new String(bos.toByteArray(), StandardCharsets.UTF_8);
     }
 
     public static void initPushContent(String message, String image, String messageType, String category, Context context) {
@@ -6538,7 +6539,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         BufferedReader bufReader = null;
 
         try {
-            bufReader = new BufferedReader(new FileReader("/proc/mounts"));
+            bufReader = new BufferedReader(new InputStreamReader(new FileInputStream("/proc/mounts"), StandardCharsets.UTF_8));
             ArrayList<String> list = new ArrayList<String>();
             String line;
 

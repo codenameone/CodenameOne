@@ -613,17 +613,17 @@ public class Parser extends ClassVisitor {
             ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
         }
         if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CSHARP) {
-            outMain.write(cls.generateCSharpCode().getBytes());
+            outMain.write(cls.generateCSharpCode().getBytes(StandardCharsets.UTF_8));
             outMain.close();
         } else {
-            outMain.write(cls.generateCCode(classes).getBytes());
+            outMain.write(cls.generateCCode(classes).getBytes(StandardCharsets.UTF_8));
             outMain.close();
 
             // we also need to write the header file for C outputs
             String headerName = cls.getClsName() + ".h";
-            FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName));
-            outHeader.write(cls.generateCHeader().getBytes());
-            outHeader.close();
+            try(FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName))) {
+                outHeader.write(cls.generateCHeader().getBytes(StandardCharsets.UTF_8));
+            }
         }
     }
     

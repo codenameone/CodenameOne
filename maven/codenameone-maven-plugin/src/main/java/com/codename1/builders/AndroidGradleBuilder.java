@@ -45,7 +45,9 @@ import java.io.*;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 
+import java.nio.file.Files;
 import java.util.ArrayList;
 
 import java.util.HashMap;
@@ -78,8 +80,6 @@ import org.xeustechnologies.jtar.TarOutputStream;
 public class AndroidGradleBuilder extends Executor {
 
     private float MIN_GRADLE_VERSION=6;
-
-    private float MIN_JDK_VERSION=8;
 
     private String gradleDistributionUrl = "https://services.gradle.org/distributions/gradle-6.8.3-bin.zip";
 
@@ -404,7 +404,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean shouldIncludeGoogleImpl;
 
     static {
-        isMac = System.getProperty("os.name").toLowerCase().indexOf("mac") > -1;
+        isMac = System.getProperty("os.name").toLowerCase().contains("mac");
     }
 
     public void setAndroidPortSrcJar(File androidPortSrcJar) {
@@ -429,8 +429,7 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     private String getGradleVersion(String gradleExe) throws Exception {
-        Map<String,String> env = defaultEnvironment;
-        env.put("JAVA_HOME", getGradleJavaHome());
+        defaultEnvironment.put("JAVA_HOME", getGradleJavaHome());
 
         String result = execString(new File(System.getProperty("user.dir")), gradleExe, "--version");
         Scanner scanner = new Scanner(result);
@@ -689,7 +688,7 @@ public class AndroidGradleBuilder extends Executor {
 
         buildToolsVersionInt = maxBuildToolsVersionInt;
 
-        this.buildToolsVersion = request.getArg("android.buildToolsVersion", ""+maxBuildToolsVersion);
+        this.buildToolsVersion = request.getArg("android.buildToolsVersion", maxBuildToolsVersion);
         String buildToolsVersionIntStr = this.buildToolsVersion;
         if (buildToolsVersionIntStr.indexOf(".") > 1) {
             buildToolsVersionIntStr = buildToolsVersionIntStr.substring(0, buildToolsVersionIntStr.indexOf("."));
@@ -1549,7 +1548,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "    }\n"
                     + "}";
             try {
-                createFile(headphonesFile, stubSourceCode.getBytes());
+                createFile(headphonesFile, stubSourceCode.getBytes(StandardCharsets.UTF_8));
             } catch (IOException ex) {
                 throw new BuildException("Failed to create HeadSetReceiver class", ex);
             }
@@ -1817,10 +1816,9 @@ public class AndroidGradleBuilder extends Executor {
                 + "</resources>";
 
         try {
-            OutputStream stringsSourceStream = new FileOutputStream(stringsFile);
-            stringsSourceStream.write(stringsFileContent.getBytes());
+            OutputStream stringsSourceStream = Files.newOutputStream(stringsFile.toPath());
+            stringsSourceStream.write(stringsFileContent.getBytes(StandardCharsets.UTF_8));
             stringsSourceStream.close();
-
 
             String locales = request.getArg("android.locales", null);
             if (locales != null && locales.length() > 0) {
@@ -1828,8 +1826,8 @@ public class AndroidGradleBuilder extends Executor {
                     File currentValuesDir = new File(valsDir.getParent(), "values-" + loc);
                     currentValuesDir.mkdirs();
                     File currentStringsFile = new File(currentValuesDir, "strings.xml");
-                    stringsSourceStream = new FileOutputStream(currentStringsFile);
-                    stringsSourceStream.write(stringsFileContent.getBytes());
+                    stringsSourceStream = Files.newOutputStream(currentStringsFile.toPath());
+                    stringsSourceStream.write(stringsFileContent.getBytes(StandardCharsets.UTF_8));
                     stringsSourceStream.close();
                 }
             }
@@ -1880,11 +1878,11 @@ public class AndroidGradleBuilder extends Executor {
 
         try {
             OutputStream stylesSourceStream = new FileOutputStream(stylesFile);
-            stylesSourceStream.write(stylesFileContent.getBytes());
+            stylesSourceStream.write(stylesFileContent.getBytes(StandardCharsets.UTF_8));
             stylesSourceStream.close();
 
             String theme = request.getArg("android.theme", "Light");
-            if (theme.length() > 0 && theme.equalsIgnoreCase("Dark")) {
+            if (theme.equalsIgnoreCase("Dark")) {
                 theme = "";
             } else {
                 theme = "." + theme;
@@ -1905,7 +1903,7 @@ public class AndroidGradleBuilder extends Executor {
 
 
             OutputStream styles11SourceStream = new FileOutputStream(styles11File);
-            styles11SourceStream.write(styles11FileContent.getBytes());
+            styles11SourceStream.write(styles11FileContent.getBytes(StandardCharsets.UTF_8));
             styles11SourceStream.close();
 
             File styles21File = new File(vals21Dir, "styles.xml");
@@ -1924,7 +1922,7 @@ public class AndroidGradleBuilder extends Executor {
 
 
             OutputStream styles21SourceStream = new FileOutputStream(styles21File);
-            styles21SourceStream.write(styles21FileContent.getBytes());
+            styles21SourceStream.write(styles21FileContent.getBytes(StandardCharsets.UTF_8));
             styles21SourceStream.close();
         } catch (IOException ex) {
             error("Failed to generate style files", ex);
@@ -1942,7 +1940,7 @@ public class AndroidGradleBuilder extends Executor {
                     + mopubBannerXML
                     + "</RelativeLayout>\n";
             OutputStream layoutSourceStream = new FileOutputStream(layoutFile);
-            layoutSourceStream.write(layoutFileContent.getBytes());
+            layoutSourceStream.write(layoutFileContent.getBytes(StandardCharsets.UTF_8));
             layoutSourceStream.close();
 
             String customLayout = request.getArg("android.cusom_layout1", null);
@@ -1950,7 +1948,7 @@ public class AndroidGradleBuilder extends Executor {
             while (customLayout != null) {
                 File customFile = new File(layoutDir, "cusom_layout" + counter + ".xml");
                 layoutSourceStream = new FileOutputStream(customFile);
-                layoutSourceStream.write(customLayout.getBytes());
+                layoutSourceStream.write(customLayout.getBytes(StandardCharsets.UTF_8));
                 layoutSourceStream.close();
 
                 counter++;
@@ -1979,7 +1977,7 @@ public class AndroidGradleBuilder extends Executor {
                 try {
                     JSONParser parser = new JSONParser();
 
-                    Map<String, Object> parsedJson = parser.parseJSON(new FileReader(googleServicesJson));
+                    Map<String, Object> parsedJson = parser.parseJSON(new InputStreamReader(new FileInputStream(googleServicesJson), StandardCharsets.UTF_8));
 
                     Map projectInfo = (Map) parsedJson.get("project_info");
                     gcmSenderId = (String) projectInfo.get("project_number");
@@ -2279,7 +2277,7 @@ public class AndroidGradleBuilder extends Executor {
             try {
                 OutputStream filePathsStream = new FileOutputStream(filePathsFile);
 
-                filePathsStream.write(filePathsContent.getBytes());
+                filePathsStream.write(filePathsContent.getBytes(StandardCharsets.UTF_8));
                 filePathsStream.close();
             } catch (IOException ex) {
                 throw new BuildException("Failed to write file path providers file", ex);
@@ -2384,7 +2382,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "</manifest>\n";
         try {
             OutputStream manifestSourceStream = new FileOutputStream(manifestFile);
-            manifestSourceStream.write(manifestSource.getBytes());
+            manifestSourceStream.write(manifestSource.getBytes(StandardCharsets.UTF_8));
             manifestSourceStream.close();
         } catch (IOException ex) {
             throw new BuildException("Failed to write manifest file", ex);
@@ -2629,7 +2627,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "\n\n"
                     + "public class " + request.getMainClass() + "Stub extends " + request.getArg("android.customActivity", "CodenameOneActivity") + "{\n";
             stubSourceCode += decodeFunction();
-            stubSourceCode += "    public static final String BUILD_KEY = \"" + xorEncode(getBuildKey()) + "\";\n"
+            stubSourceCode += "    public static final String BUILD_KEY = \"LOCAL_BUILD\";\n"
                     + "    public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\";\n"
                     + "    public static final String BUILT_BY_USER = \"" + xorEncode(request.getUserName()) + "\";\n"
                     + "    public static final String LICENSE_KEY = \"" + xorEncode(licenseKey) + "\";\n"
@@ -2973,7 +2971,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "     public static final String C2DM_MESSAGE_EXTRA = \"message\";\n"
                     + "     public static final String C2DM_MESSAGE_IMAGE = \"image\";\n"
                     + "     public static final String C2DM_MESSAGE_CATEGORY = \"category\";\n"
-                    + "     public static final String BUILD_KEY = \"" + xorEncode(getBuildKey()) + "\"\n;"
+                    + "     public static final String BUILD_KEY = \"LOCAL_BUILD\"\n;"
                     + "     public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\"\n;"
                     + "     public static final String BUILT_BY_USER = \"" + xorEncode(request.getUserName()) + "\"\n;"
                     + "	private static String KEY = \"c2dmPref\";\n"
@@ -3210,11 +3208,11 @@ public class AndroidGradleBuilder extends Executor {
             if (pushPermission) {
                 try {
                     OutputStream pushSourceStream = new FileOutputStream(pushFileSourceFile);
-                    pushSourceStream.write(pushReceiverSourceCode.getBytes());
+                    pushSourceStream.write(pushReceiverSourceCode.getBytes(StandardCharsets.UTF_8));
                     pushSourceStream.close();
 
                     OutputStream pushServiceSourceStream = new FileOutputStream(pushServiceFileSourceFile);
-                    pushServiceSourceStream.write(pushServiceSourceCode.getBytes());
+                    pushServiceSourceStream.write(pushServiceSourceCode.getBytes(StandardCharsets.UTF_8));
                     pushServiceSourceStream.close();
                 } catch (IOException ex) {
                     throw new BuildException("Failed to generate push file", ex);
@@ -3260,7 +3258,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         try {
             OutputStream stubSourceStream = new FileOutputStream(stubFileSourceFile);
-            stubSourceStream.write(stubSourceCode.getBytes());
+            stubSourceStream.write(stubSourceCode.getBytes(StandardCharsets.UTF_8));
             stubSourceStream.close();
         } catch (IOException ex) {
             throw new BuildException("Failed to write stub source file", ex);
@@ -3374,7 +3372,7 @@ public class AndroidGradleBuilder extends Executor {
         proguardConfigOverrideFile.delete();
         if (request.getArg("android.enableProguard", "true").equals("true")) {
             try {
-                createFile(proguardConfigOverrideFile, proguardConfigOverride.getBytes());
+                createFile(proguardConfigOverrideFile, proguardConfigOverride.getBytes(StandardCharsets.UTF_8));
             } catch (IOException ex) {
                 throw new BuildException("Failed to create proguard config file", ex);
             }
@@ -3748,7 +3746,7 @@ public class AndroidGradleBuilder extends Executor {
 
         try {
             OutputStream gradleStream = new FileOutputStream(gradleFile);
-            gradleStream.write(gradleProps.getBytes());
+            gradleStream.write(gradleProps.getBytes(StandardCharsets.UTF_8));
             gradleStream.close();
         } catch (IOException ex) {
             throw new BuildException("Failed to write gradle properties to "+gradleFile, ex);
@@ -3782,7 +3780,7 @@ public class AndroidGradleBuilder extends Executor {
         File rootGradleFile = new File(studioProjectDir, "build.gradle");
         try {
             OutputStream gradleStream = new FileOutputStream(rootGradleFile);
-            gradleStream.write(rootGradleProps.getBytes());
+            gradleStream.write(rootGradleProps.getBytes(StandardCharsets.UTF_8));
             gradleStream.close();
         } catch (IOException ex) {
             throw new BuildException("Failed to write root gradle properties to "+rootGradleFile, ex);
@@ -3986,7 +3984,7 @@ public class AndroidGradleBuilder extends Executor {
                         destFile = new File(d, "local.properties");
                         destFile.getParentFile().mkdirs();
                         FileOutputStream fos = new FileOutputStream(destFile);
-                        fos.write(sdkPathProperties.getBytes());
+                        fos.write(sdkPathProperties.getBytes(StandardCharsets.UTF_8));
                         fos.close();
                         addedSDKDir = true;
                     }
@@ -4002,7 +4000,7 @@ public class AndroidGradleBuilder extends Executor {
                     destFile = new File(dir, entry.getName());
                     destFile.getParentFile().mkdirs();
                     FileOutputStream fos = new FileOutputStream(destFile);
-                    fos.write(sdkPathProperties.getBytes());
+                    fos.write(sdkPathProperties.getBytes(StandardCharsets.UTF_8));
                     fos.close();
                     continue;
                 }
@@ -4053,7 +4051,7 @@ public class AndroidGradleBuilder extends Executor {
             FileOutputStream projectProps = new FileOutputStream(new File(dir, "project.properties"));
             String props = "android.library=true\n"
                     + "target=android-14";
-            projectProps.write(props.getBytes());
+            projectProps.write(props.getBytes(StandardCharsets.UTF_8));
             projectProps.close();
 
         } catch (Exception e) {
@@ -4432,10 +4430,9 @@ public class AndroidGradleBuilder extends Executor {
     private void replaceInFile(File file, Map<String,String> replacements) throws IOException {
         String contents = readFileToString(file);
         contents = replace(contents, replacements);
-        FileWriter fios = new FileWriter(file);
+        Writer fios = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8);
         fios.write(contents);
         fios.close();
-
     }
     private  Map<String,String> androidXArtifactMapping;
     private  Map<String,String> loadAndroidXArtifactMapping() throws IOException {

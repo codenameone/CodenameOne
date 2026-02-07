@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +33,7 @@ public class FridaDetectionUtil {
     public static boolean isFridaProcessRunning() {
         try {
             Process process = Runtime.getRuntime().exec("ps");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
             String line;
             while ((line = reader.readLine()) != null) {
                 for (String processName : FRIDA_PROCESSES) {
@@ -54,7 +55,7 @@ public class FridaDetectionUtil {
         BufferedReader reader = null;
         try {
             FileInputStream fis = new FileInputStream(new File("/proc/self/maps"));
-            reader = new BufferedReader(new InputStreamReader(fis));
+            reader = new BufferedReader(new InputStreamReader(fis, StandardCharsets.UTF_8));
             String line;
             while ((line = reader.readLine()) != null) {
                 for (String lib : FRIDA_LIBRARIES) {
