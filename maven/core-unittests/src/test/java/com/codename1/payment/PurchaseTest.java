@@ -9,6 +9,7 @@ import com.codename1.ui.Display;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -240,6 +241,36 @@ class PurchaseTest extends UITestBase {
         List<Receipt> pending = purchase.getPendingPurchases();
         assertEquals(1, pending.size());
         assertEquals("silver", pending.get(0).getSku());
+    }
+
+    @Test
+    void testSynchronizeReceiptsSyncWaitsForAsyncFetch() {
+        final Receipt asyncReceipt = createReceipt("async", new Date(1000L), new Date(5000L));
+        ReceiptStore store = new ReceiptStore() {
+            public void fetchReceipts(final SuccessCallback<Receipt[]> callback) {
+                new Thread(new Runnable() {
+                    public void run() {
+                        try {
+                            Thread.sleep(50L);
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                        }
+                        callback.onSucess(new Receipt[]{asyncReceipt});
+                    }
+                }, "ReceiptFetch").start();
+            }
+
+            public void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback) {
+                callback.onSucess(Boolean.TRUE);
+            }
+        };
+        purchase.setReceiptStore(store);
+
+        boolean success = purchase.synchronizeReceiptsSync(0);
+        assertTrue(success);
+        List<Receipt> receipts = purchase.getReceipts();
+        assertEquals(1, receipts.size());
+        assertEquals("async", receipts.get(0).getSku());
     }
 
     private static class TestReceiptStore implements ReceiptStore {

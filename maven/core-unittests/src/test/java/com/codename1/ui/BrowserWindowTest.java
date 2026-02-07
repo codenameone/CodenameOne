@@ -5,11 +5,8 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
-import java.util.Hashtable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -65,5 +62,35 @@ public class BrowserWindowTest extends UITestBase {
         BrowserWindow.EvalRequest request = new BrowserWindow.EvalRequest();
         request.setJS("alert('Hello');");
         assertEquals("alert('Hello');", request.getJS());
+    }
+
+    @FormTest
+    void fallbackWindowUsesBrowserForm() {
+        implementation.setNativeBrowserWindow(null);
+
+        Form backForm = Display.getInstance().getCurrent();
+        assertNotNull(backForm);
+
+        BrowserWindow window = new BrowserWindow("https://example.com/start");
+        AtomicInteger closeCount = new AtomicInteger();
+        window.addCloseListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                closeCount.incrementAndGet();
+            }
+        });
+
+        window.show();
+        Form browserForm = Display.getInstance().getCurrent();
+        assertNotSame(backForm, browserForm);
+
+        window.setTitle("Docs");
+        assertEquals("Docs", browserForm.getTitle());
+
+        window.close();
+        assertEquals(1, closeCount.get());
+        assertSame(backForm, Display.getInstance().getCurrent());
+
+        window.close();
+        assertEquals(1, closeCount.get());
     }
 }
