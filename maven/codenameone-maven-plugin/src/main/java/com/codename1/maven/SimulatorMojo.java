@@ -200,8 +200,6 @@ private static final String GROUP_ID="com.codenameone";
     private Path prepareClasspath(Java java) {
         Log log = getLog();
         log.debug("Preparing classpath for Simulator");
-        List<String> paths = new ArrayList<>();
-        //StringBuilder classpath = new StringBuilder();
         Path classpath = java.createClasspath();
         if (System.getProperty("cef.dir") != null) {
             Variable v = new Variable();
@@ -242,15 +240,7 @@ private static final String GROUP_ID="com.codenameone";
             if (getProjectInternalTmpJar() != null && getProjectInternalTmpJar().exists()) {
                 classpath.add(new Path(antProject, getProjectInternalTmpJar().getAbsolutePath()));
             }
-            
-            //classpath.append(file.getPath());
-            //paths.add(file.getAbsolutePath());
         }
-        //if (classpath.length() > 0) {
-        //    classpath.append(':');
-        //}
-        //classpath.append(classFiles.getPath());
-        //paths.add(classFiles.getAbsolutePath());
         classpath.add(new Path(antProject, project.getBuild().getOutputDirectory()));
         log.debug("Using the following classpath for Stubber: " + classpath);
         return classpath;

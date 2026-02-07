@@ -39,9 +39,9 @@ import org.objectweb.asm.Opcodes;
  */
 public class Invoke extends Instruction {
     private String owner;
-    private String name;
-    private String desc;
-    private boolean itf;
+    private final String name;
+    private final String desc;
+    private final boolean itf;
     private char[] stackInputTypes;
     private char[] stackOutputTypes;
     
@@ -111,8 +111,8 @@ public class Invoke extends Instruction {
             }
         }
         bld.append("__");
-        ArrayList<String> args = new ArrayList<String>();
-        String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);        
+        ArrayList<String> args = new ArrayList<>();
+        BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         String str = bld.toString();
         BytecodeMethod.addVirtualMethodsInvoked(str);
     }
@@ -150,7 +150,7 @@ public class Invoke extends Instruction {
             b.append("    ");
 
             // Well, it is actually legal to call private methods with invoke virtual, and kotlin
-            // generates such calls.  But ParparVM strips out these virtual method definitions
+            // generates such calls.  But ParparVM strips out these virtual method definitions,
             // so we need to check if the method is private, and remove the virtual invocation 
             // if it is.
             boolean isVirtual = true;
@@ -173,16 +173,13 @@ public class Invoke extends Instruction {
         }
         
         if(opcode == Opcodes.INVOKESTATIC) {
-            // find the actual class of the static method to workaround javac not defining it correctly
+            // find the actual class of the static method to work around javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
             owner = findActualOwner(bc);
         }
-        //if(owner.replace('/', '_').replace('$', '_').equals("java_lang_System_1") && name.equals("sleep")) {
-        //    System.out.println("Break");
-        //}
         if (owner.startsWith("[")) {
             // Kotlin seems to generate calls to toString() on arrays using the array class
-            // as owner.  We'll just change this to java_lang_Object instead.
+            // as an owner.  We'll just change this to java_lang_Object instead.
             bld.append("java_lang_Object");
         } else{
             bld.append(owner.replace('/', '_').replace('$', '_'));
@@ -198,7 +195,7 @@ public class Invoke extends Instruction {
             }
         }
         bld.append("__");
-        ArrayList<String> args = new ArrayList<String>();
+        ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
             BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
@@ -207,7 +204,7 @@ public class Invoke extends Instruction {
         if(returnVal == null) {
             b.append(bld);
         } else {
-            if(args.size() == 0 && opcode == Opcodes.INVOKESTATIC) {
+            if(args.isEmpty() && opcode == Opcodes.INVOKESTATIC) {
                 // special case for static method
                 if(returnVal.equals("JAVA_OBJECT")) {
                     b.append("PUSH_OBJ");
@@ -234,8 +231,6 @@ public class Invoke extends Instruction {
                 noPop = true;
                 b.append("(");
             } else {
-                //b.append("POP_MANY_AND_");
-                //b.append(returnVal);
                 b.append("{ ");
                 b.append(returnVal);
                 b.append(" tmpResult = ");
@@ -253,18 +248,13 @@ public class Invoke extends Instruction {
         }
         int offset = args.size();
         //int numArgs = offset;
-        int argIndex=0;
         for(String a : args) {
-            
             b.append(", ");
-            
             b.append("SP[-");
             b.append(offset);
             b.append("].data.");
             b.append(a);
             offset--;
-            
-            argIndex++;
         }
         if(noPop) {
             b.append("));\n");
@@ -273,7 +263,7 @@ public class Invoke extends Instruction {
         if(returnVal != null) {
             b.append(");\n");
             if(opcode != Opcodes.INVOKESTATIC) {
-                if(args.size() > 0) {
+                if(!args.isEmpty()) {
                     b.append("    SP-=");
                     b.append(args.size());
                     b.append(";\n");
@@ -306,14 +296,7 @@ public class Invoke extends Instruction {
                     }
                 }
             }
-            
-            /*if(opcode != Opcodes.INVOKESTATIC) {
-                b.append(args.size() + 1);
-            } else {
-                b.append(args.size());
-            }
-            b.append(");\n");      */
-            
+
             return;
         }
         b.append("); ");
@@ -324,9 +307,6 @@ public class Invoke extends Instruction {
             val = args.size();
         }
         if(val > 0) {
-            /*b.append("popMany(threadStateData, ");            
-            b.append(val);
-            b.append(", stack, &stackPointer); \n"); */
             b.append("    SP-= ");
             b.append(val);
             b.append(";\n");
@@ -364,7 +344,7 @@ public class Invoke extends Instruction {
     @Override
     public char[] getStackOutputTypes() {
         if (stackOutputTypes == null) {
-            String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<String>());
+            String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<>());
             if (returnVal == null) {
                 stackOutputTypes = new char[0];
             } else {

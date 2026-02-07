@@ -303,7 +303,6 @@ public class CodenameOneView {
         if (InPlaceEditView.isEditing()) {
             final Form f = this.implementation.getCurrentForm();
             ActionListener sizeChanged = new ActionListener() {
-
                 @Override
                 public void actionPerformed(ActionEvent evt) {
                     CodenameOneView.this.implementation.getActivity().runOnUiThread(new Runnable() {
@@ -311,8 +310,6 @@ public class CodenameOneView {
                         @Override
                         public void run() {
                             InPlaceEditView.reLayoutEdit();
-                            InPlaceEditView.scrollActiveTextfieldToVisible();
-                            
                         }
                     });
                     f.removeSizeChangedListener(this);

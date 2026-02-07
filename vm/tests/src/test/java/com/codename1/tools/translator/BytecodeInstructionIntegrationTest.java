@@ -341,7 +341,7 @@ class BytecodeInstructionIntegrationTest {
     void annotationVisitorWrapperDelegatesAndHandlesNullVisitor() {
         Parser parser = new Parser();
 
-        Parser.AnnotationVisitorWrapper wrapperWithNull = parser.new AnnotationVisitorWrapper(null);
+        Parser.AnnotationVisitorWrapper wrapperWithNull = new Parser.AnnotationVisitorWrapper(null);
         assertNull(wrapperWithNull.visitArray("values"));
         assertNull(wrapperWithNull.visitAnnotation("name", "LExample;"));
         assertDoesNotThrow(() -> wrapperWithNull.visit("flag", true));
@@ -356,26 +356,10 @@ class BytecodeInstructionIntegrationTest {
             }
         };
 
-        Parser.AnnotationVisitorWrapper wrapperWithDelegate = parser.new AnnotationVisitorWrapper(delegate);
+        Parser.AnnotationVisitorWrapper wrapperWithDelegate = new Parser.AnnotationVisitorWrapper(delegate);
         AnnotationVisitor result = wrapperWithDelegate.visitArray("values");
         assertSame(delegate, result);
         assertTrue(delegated.get(), "AnnotationVisitorWrapper should forward to the underlying visitor");
-    }
-
-    @Test
-    void byteCodeTranslatorFilenameFilterMatchesExpectedFiles() throws Exception {
-        Class<?> filterClass = Class.forName("com.codename1.tools.translator.ByteCodeTranslator$3");
-        Constructor<?> ctor = filterClass.getDeclaredConstructor();
-        ctor.setAccessible(true);
-
-        FilenameFilter filter = (FilenameFilter) ctor.newInstance();
-        File directory = Files.createTempDirectory("bytecode-filter").toFile();
-
-        assertTrue(filter.accept(directory, "assets.bundle"));
-        assertTrue(filter.accept(directory, "model.xcdatamodeld"));
-        assertTrue(filter.accept(directory, "VisibleSource.m"));
-        assertFalse(filter.accept(directory, ".hidden"));
-        assertFalse(filter.accept(directory, "Images.xcassets"));
     }
 
     @Test

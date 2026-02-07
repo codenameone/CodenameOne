@@ -328,10 +328,8 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
     }
 
     private File generateBaseArchetype(String string, File templateFile) throws TemplateParseException, IOException {
-        Dependency out = new Dependency();
         String archetype = extractSectionFrom(string, "archetype");
         Properties props = new Properties();
-
 
         props.load(new StringReader(archetype));
         String[] requiredProperties = new String[]{
@@ -342,7 +340,6 @@ public class GenerateArchetypeFromTemplateMojo extends AbstractCN1Mojo {
                 throw new TemplateParseException("archetype property "+key+" required and missing.  Make sure it is defined in the [archetype] section of the template");
             }
         }
-
 
         File dest = new File(outputDir, props.getProperty("artifactId"));
         if (dest.exists()) {

@@ -6655,7 +6655,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (includeAddress) {
             // This is a hack to make sure that 
             // Address and its methods aren't stripped out by the BytecodeCompiler
-            Address tmp = new Address();
+            if (System.currentTimeMillis() == 0) {
+                Address tmp = new Address();
+                tmp.setCountry("");
+                tmp.setLocality("");
+                tmp.setRegion("");
+                tmp.setPostalCode("");
+                tmp.setStreetAddress("");
+                c.getAddresses().put("", tmp);
+            }
         }
 
         c.setEmails(new Hashtable());
@@ -6670,50 +6678,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
         }
         return getContactById(id, true, true, true, true, true);
-        
-        /*c.setId("" + id);
-        long person = nativeInstance.getPersonWithRecordID(recId);
-        String fname = nativeInstance.getPersonFirstName(person);
-        c.setFirstName(fname);
-        String sname = nativeInstance.getPersonSurnameName(person);
-        c.setFamilyName(sname);
-        if(c.getFirstName() != null) {
-            StringBuilder s = new StringBuilder();
-            if(fname != null && fname.length() > 0) {
-                if(sname != null && sname.length() > 0) {
-                    c.setDisplayName(fname + " " + sname);
-                } else {
-                    c.setDisplayName(fname);
-                }
-            } else {
-                if(sname != null && sname.length() > 0) {
-                    c.setDisplayName(sname);
-                }
-            }
-        }
-        c.setPrimaryEmail(nativeInstance.getPersonEmail(person));
-        
-        int phones = nativeInstance.getPersonPhoneCount(person);
-        Hashtable h = new Hashtable();
-        for(int iter = 0 ; iter < phones ; iter++) {
-            String t = nativeInstance.getPersonPhoneType(person, iter);
-            if(t == null) {
-                t = "work";
-            }
-            String phone = nativeInstance.getPersonPhone(person, iter);
-            if(phone != null) {
-                h.put(t, phone);
-            }
-        }
-        c.setPhoneNumbers(h);
-        
-        c.setPrimaryPhoneNumber(nativeInstance.getPersonPrimaryPhone(person));
-        
-        //h = new Hashtable();
-        //h.put("Work", h);
-        c.setAddresses(h);
-        nativeInstance.releasePeer(person);
-        return c;*/
     }
     
     @Override

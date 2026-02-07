@@ -522,7 +522,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     msg += "&category="+java.net.URLEncoder.encode(category, "UTF-8");
                 }
                 if (image != null) {
-                    image += "&image="+java.net.URLEncoder.encode(image, "UTF-8");
+                    msg += "&image="+java.net.URLEncoder.encode(image, "UTF-8");
                 }
                 os.writeUTF(msg);
                         
@@ -1591,9 +1591,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void editString(final Component cmp, int maxSize, final int constraint, String text, int keyCode) {
-        if (keyCode > 0 && getKeyboardType() == Display.KEYBOARD_TYPE_QWERTY) {
-            text += (char) keyCode;
-        }
         InPlaceEditView.edit(this, cmp, constraint);
     }
 
@@ -3933,7 +3930,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             );
                             
                             final com.codename1.media.AudioBuffer audioBuffer = com.codename1.media.MediaManager.getAudioBuffer(path, true, 64);
-                            final boolean[] stop = new boolean[1];
 
                             record[0] = new AbstractMedia() {
                                 private int lastTime;
@@ -8122,11 +8118,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
 
     private String getImageFilePath(Uri uri) {
-
-        File file = new File(uri.getPath());
         String scheme = uri.getScheme();
-        //String[] filePaths = file.getPath().split(":");
-        //String image_id = filePath[filePath.length - 1];
         String[] filePathColumn = {MediaStore.Images.Media.DATA};
         Cursor cursor = getContext().getContentResolver().query(
                 android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -8151,8 +8143,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (filePath == null || "content".equals(scheme)) {
             //if the file is not on the filesystem download it and save it
             //locally
+            InputStream inputStream = null;
+            OutputStream tmp = null;
             try {
-                InputStream inputStream = getContext().getContentResolver().openInputStream(uri);
+                inputStream = getContext().getContentResolver().openInputStream(uri);
                 if (inputStream != null) {
                     String name = new File(uri.toString()).getName();//getContentName(getContext().getContentResolver(), uri);
                     if (name != null) {
@@ -8163,27 +8157,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         filePath = homePath
                                 + getFileSystemSeparator() + name;
                         File f = new File(removeFilePrefix(filePath));
-                        OutputStream tmp = createFileOuputStream(f);
-                        byte[] buffer = new byte[1024];
-                        int read = -1;
-                        while ((read = inputStream.read(buffer)) > -1) {
-                            tmp.write(buffer, 0, read);
-                        }
-                        tmp.close();
-                        inputStream.close();
+                        tmp = createFileOuputStream(f);
+                        Util.copy(inputStream, tmp);
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                com.codename1.io.Log.e(e);
+            } finally {
+                Util.cleanup(tmp);
+                Util.cleanup(inputStream);
             }
         }
-        //long len = new com.codename1.io.File(filePath).length();
         return filePath;
     }
-    
-    
-    
-    
+
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
 

@@ -904,7 +904,6 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         File androidToolsDir = new File(androidSDKDir, "tools");
-        File androidCommand = new File(androidToolsDir, "android" + bat);
         File projectDir = new File(tmpFile, request.getMainClass());
         gradleProjectDirectory = projectDir;
 
