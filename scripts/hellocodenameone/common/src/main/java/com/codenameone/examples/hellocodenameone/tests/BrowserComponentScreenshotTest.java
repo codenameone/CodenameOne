@@ -2,6 +2,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.SuccessCallback;
@@ -13,6 +14,7 @@ public class BrowserComponentScreenshotTest extends BaseTest {
     private Form form;
     private boolean jsReady;
     private boolean jsCheckPending;
+    private boolean sheetShown;
 
     @Override
     public boolean runTest() throws Exception {
@@ -56,6 +58,11 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             return;
         }
 
+        if (!sheetShown) {
+            sheetShown = true;
+            Sheet sheet = new Sheet(null, "Browser Sheet");
+            sheet.show();
+        }
         UITimer.timer(2000, false, form, readyRunnable);
         readyRunnable = null;
     }
