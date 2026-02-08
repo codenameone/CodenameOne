@@ -1,0 +1,2239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InPlaceEditView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">InPlaceEditView.java</span></div><h1>InPlaceEditView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.res.Configuration;
+import android.content.res.Resources;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.ResultReceiver;
+import android.text.Selection;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.text.TextWatcher;
+import android.text.method.DigitsKeyListener;
+import android.text.method.KeyListener;
+import android.text.method.PasswordTransformationMethod;
+import android.util.Log;
+import android.util.SparseArray;
+import android.util.SparseIntArray;
+import android.util.TypedValue;
+import android.view.ActionMode;
+import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.view.ViewTreeObserver;
+import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+
+import com.codename1.io.Util;
+import com.codename1.ui.Accessor;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Form;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+//import java.util.Timer;
+//import java.util.TimerTask;
+//import java.util.logging.Level;
+//import java.util.logging.Logger;
+
+/**
+ *
+ * @author lior.gonnen
+ *
+ */
+public class InPlaceEditView extends FrameLayout{
+
+    private static final String TAG = &quot;InPlaceEditView&quot;;
+    public static final int REASON_UNDEFINED = 0;
+    public static final int REASON_IME_ACTION = 1;
+    public static final int REASON_TOUCH_OUTSIDE = 2;
+    public static final int REASON_SYSTEM_KEY = 3;
+
+    // The native Android edit-box to place over Codename One's edit-component
+<span class="fc" id="L108">    private EditView mEditText = null;</span>
+<span class="fc" id="L109">    private EditView mLastEditText = null;</span>
+    // The Codename One edit-component we're editing
+    // The EditText's layout parameters
+    private FrameLayout.LayoutParams mEditLayoutParams;
+    // Reference to the system's input method manager
+    private InputMethodManager mInputManager;
+    // True while editing is in progress
+<span class="fc" id="L116">    private static boolean mIsEditing = false;</span>
+<span class="fc" id="L117">    private static Object editingLock = new Object();</span>
+<span class="fc" id="L118">    private static boolean waitingForSynchronousEditingCompletion = false;</span>
+    // Maps Codename One's input-types to Android input-types
+<span class="fc" id="L120">    private SparseIntArray mInputTypeMap = new SparseIntArray(10);</span>
+    // Receives results from the InputMethodManager after calling show/hide soft-keyboard methods
+    private ResultReceiver mResultReceiver;
+<span class="fc" id="L123">    private int mLastEndEditReason = REASON_UNDEFINED;</span>
+    private Resources mResources;
+    // Only a single instance of this class can exist
+<span class="fc" id="L126">    private static InPlaceEditView sInstance = null;</span>
+<span class="fc" id="L127">    private static TextArea nextTextArea = null;</span>
+    private AndroidImplementation impl;
+    private static long closedTime;
+<span class="fc" id="L130">    private static boolean showVKB = false;</span>
+<span class="fc" id="L131">    private static boolean isClosing = false;</span>
+
+    // Flag to indicate that the text editor is currently hidden - but an async edit
+    // is still in progress.  This flag is only relevant in async edit mode.
+<span class="fc" id="L135">    private boolean textEditorHidden = false;</span>
+
+    private static boolean resizeMode;
+
+    // Used to buffer input while the native editor is being initialized
+    // This is necessary because initialization may require us to
+    // asynchronously run code on the EDT to obtain the current text area
+    // text, and then again asynchronously on the UI thread to set the
+    // text, and, in the mean time, the user may have typed some text.
+    private List&lt;TextChange&gt; inputBuffer;
+    private static Runnable afterClose;
+
+
+    /**
+     * Private constructor
+     * To use this class, call the static 'edit' method.
+     * @param impl The current running activity
+     */
+    private InPlaceEditView(final AndroidImplementation impl) {
+<span class="fc" id="L154">        super(impl.getActivity());</span>
+<span class="fc" id="L155">        this.impl = impl;</span>
+<span class="fc" id="L156">        mResources = impl.getActivity().getResources();</span>
+<span class="fc" id="L157">        mResultReceiver = new DebugResultReceiver(getHandler());</span>
+<span class="fc" id="L158">        mInputManager = (InputMethodManager) impl.getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);</span>
+
+        // We place this view as an overlay that takes up the entire screen
+<span class="fc" id="L161">        setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));</span>
+<span class="fc" id="L162">        setFocusableInTouchMode(true);</span>
+<span class="fc" id="L163">        initInputTypeMap();</span>
+<span class="fc" id="L164">        setBackgroundDrawable(null);</span>
+
+<span class="fc" id="L166">    }</span>
+
+
+
+
+
+
+    /**
+     * Prepare an int-to-int map that maps Codename One input-types to
+     * Android input types
+     */
+    private void initInputTypeMap() {
+<span class="fc" id="L178">        mInputTypeMap.append(TextArea.ANY, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);</span>
+<span class="fc" id="L179">        mInputTypeMap.append(TextArea.DECIMAL, InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);</span>
+<span class="fc" id="L180">        mInputTypeMap.append(TextArea.EMAILADDR, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);</span>
+<span class="fc" id="L181">        mInputTypeMap.append(TextArea.INITIAL_CAPS_SENTENCE, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);</span>
+<span class="fc" id="L182">        mInputTypeMap.append(TextArea.INITIAL_CAPS_WORD, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);</span>
+<span class="fc" id="L183">        mInputTypeMap.append(TextArea.UPPERCASE, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);</span>
+<span class="fc" id="L184">        mInputTypeMap.append(TextArea.NON_PREDICTIVE, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);</span>
+<span class="fc" id="L185">        mInputTypeMap.append(TextArea.NUMERIC, InputType.TYPE_CLASS_NUMBER);</span>
+<span class="fc" id="L186">        mInputTypeMap.append(TextArea.PASSWORD, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);</span>
+<span class="fc" id="L187">        mInputTypeMap.append(TextArea.PHONENUMBER, InputType.TYPE_CLASS_PHONE);</span>
+<span class="fc" id="L188">        mInputTypeMap.append(TextArea.URL, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);</span>
+        
+<span class="fc" id="L190">    }</span>
+
+    private boolean hasConstraint(int inputType, int constraint) {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        return ((inputType &amp; constraint) == constraint);</span>
+    }
+    private boolean isNonPredictive(int inputType) {
+<span class="nc bnc" id="L196" title="All 4 branches missed.">        return hasConstraint(inputType, TextArea.NON_PREDICTIVE) || hasConstraint(inputType, TextArea.SENSITIVE);</span>
+    }
+    
+    private int makeNonPredictive(int codenameOneInputType, int inputType) {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (isNonPredictive(codenameOneInputType)) {</span>
+<span class="nc" id="L201">            inputType = inputType | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            if (!hasConstraint(codenameOneInputType, TextArea.PASSWORD)) {</span>
+<span class="nc" id="L203">                inputType = inputType | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD;</span>
+            }
+        }
+<span class="nc" id="L206">        return inputType;</span>
+    }
+    
+    /**
+     * Get the Android equivalent input type for a given Codename One input-type
+     * @param codenameOneInputType One of the com.codename1.ui.TextArea input type constants
+     * @return The Android equivalent of the given input type
+     */
+    private int getAndroidInputType(int codenameOneInputType) {
+<span class="fc" id="L215">        return getAndroidInputType(codenameOneInputType, false);</span>
+    }
+    private int getAndroidInputType(int codenameOneInputType, boolean multiline) {
+<span class="fc" id="L218">        int type = mInputTypeMap.get(codenameOneInputType, -1);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (type == -1) {</span>
+            
+<span class="nc bnc" id="L221" title="All 4 branches missed.">            if (!multiline &amp;&amp; hasConstraint(codenameOneInputType, TextArea.NUMERIC)) {</span>
+<span class="nc" id="L222">                type = InputType.TYPE_CLASS_NUMBER;</span>
+<span class="nc bnc" id="L223" title="All 4 branches missed.">            } else if (!multiline &amp;&amp; hasConstraint(codenameOneInputType, TextArea.DECIMAL)) {</span>
+<span class="nc" id="L224">                type = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">            } else if (!multiline &amp;&amp; hasConstraint(codenameOneInputType, TextArea.EMAILADDR)) {</span>
+<span class="nc" id="L226">                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);</span>
+                
+<span class="nc bnc" id="L228" title="All 2 branches missed.">            } else if (hasConstraint(codenameOneInputType, TextArea.INITIAL_CAPS_SENTENCE)) {</span>
+<span class="nc" id="L229">                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);</span>
+                
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            } else if (hasConstraint(codenameOneInputType, TextArea.INITIAL_CAPS_WORD)) {</span>
+<span class="nc" id="L232">                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);</span>
+
+<span class="nc bnc" id="L234" title="All 4 branches missed.">            } else if (!multiline &amp;&amp; hasConstraint(codenameOneInputType, TextArea.PASSWORD)) {</span>
+<span class="nc" id="L235">                type = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">            } else if (!multiline &amp;&amp; hasConstraint(codenameOneInputType, TextArea.PHONENUMBER)) {</span>
+<span class="nc" id="L237">                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_PHONE);</span>
+<span class="nc bnc" id="L238" title="All 4 branches missed.">            } else if (!multiline &amp;&amp; hasConstraint(codenameOneInputType, TextArea.URL)) {</span>
+<span class="nc" id="L239">                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);</span>
+            } else {
+<span class="nc" id="L241">                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT);</span>
+            }
+        }
+
+        // If we're editing standard text, disable auto complete.
+        // The name of the flag is a little misleading. From the docs:
+        // the text editor is performing auto-completion of the text being entered
+        // based on its own semantics, which it will present to the user as they type.
+        // This generally means that the input method should not be showing candidates itself,
+        // but can expect for the editor to supply its own completions/candidates from
+        // InputMethodSession.displayCompletions().
+<span class="pc bpc" id="L252" title="2 of 4 branches missed.">        if ((type &amp; InputType.TYPE_CLASS_TEXT) != 0 &amp;&amp; (type &amp; InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) == 0) {</span>
+<span class="fc" id="L253">            type |= InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE;</span>
+        }
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (multiline) {</span>
+<span class="nc" id="L256">            type |= InputType.TYPE_TEXT_FLAG_MULTI_LINE;</span>
+        }
+<span class="fc" id="L258">        return type;</span>
+    }
+
+
+
+    /**
+     * Shows the native text editor for the async editing session that is currently in progress.
+     * This is only used when in async edit mode.
+     */
+    static void showActiveTextEditorAgain() {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (sInstance != null) {</span>
+<span class="nc" id="L269">            sInstance.showTextEditorAgain();</span>
+        }
+<span class="nc" id="L271">    }</span>
+
+
+    /**
+     * Allows the implementation to refresh the text field
+     */
+    protected final void repaintTextEditor(final boolean focus) {
+<span class="nc" id="L278">        Display.getInstance().callSerially(new Runnable() {</span>
+            public void run() {
+<span class="nc bnc" id="L280" title="All 4 branches missed.">                if (mEditText != null &amp;&amp; mEditText.mTextArea != null) {</span>
+<span class="nc" id="L281">                    mEditText.mTextArea.repaint();</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                    if (focus) {</span>
+<span class="nc" id="L283">                        mEditText.mTextArea.requestFocus();</span>
+                    }
+                }
+<span class="nc" id="L286">            }</span>
+        });
+<span class="nc" id="L288">    }</span>
+
+
+    /**
+     * Shows the native text field again after it has been hidden in async edit mode.
+     */
+    private void showTextEditorAgain() {
+<span class="nc bnc" id="L295" title="All 4 branches missed.">        if (!mIsEditing || !isTextEditorHidden()) {</span>
+<span class="nc" id="L296">            return;</span>
+        }
+<span class="nc" id="L298">        textEditorHidden = false;</span>
+<span class="nc" id="L299">        final TextArea ta = mEditText.mTextArea;</span>
+
+        // Set the input buffer to catch keyboard input occurring between now
+        // and when we have updated the native editor's text to match the
+        // current state of the textarea.
+        // This is necessary in case the textarea's text has been programmatically
+        // changed since the native aread was hidden.
+<span class="nc" id="L306">        synchronized (this) {</span>
+<span class="nc" id="L307">            inputBuffer = new ArrayList&lt;TextChange&gt;();</span>
+<span class="nc" id="L308">        }</span>
+
+        // We are probably not on the EDT.  We need to be on the EDT to
+        // safely get text from the textarea for synchronization.
+<span class="nc" id="L312">        Display.getInstance().callSerially(new Runnable() {</span>
+            public void run() {
+
+                // Double check that the state is still correct.. i.e. we are editing
+                // and the editing text area hasn't changed since we issued this call.
+<span class="nc bnc" id="L317" title="All 6 branches missed.">                if (mIsEditing &amp;&amp; mEditText != null &amp;&amp; mEditText.mTextArea == ta) {</span>
+<span class="nc" id="L318">                    final String text = ta.getText();</span>
+<span class="nc" id="L319">                    final int cursorPos = ta.getCursorPosition();</span>
+                    // Now that we have our text from the CN1 text area, we need to be on the
+                    // Android UI thread in order to set the text of the native text editor.
+<span class="nc" id="L322">                    impl.getActivity().runOnUiThread(new Runnable() {</span>
+                        public void run() {
+
+                            // Double check that the state is still correct.  I.e. we are editing
+                            // and the editing text area hasn't changed since we issued this call.
+<span class="nc bnc" id="L327" title="All 6 branches missed.">                            if (mIsEditing &amp;&amp; mEditText != null &amp;&amp; mEditText.mTextArea == ta) {</span>
+
+
+                                // We will synchronize here mainly for the benefit of the inputBuffer
+                                // so that we don't find it in an inconsistent state.
+<span class="nc" id="L332">                                synchronized (InPlaceEditView.this) {</span>
+
+                                    // Let's record the cursor positions of the native
+                                    // text editor in case we need to use them after synchronizing
+                                    // with the CN1 textarea.
+<span class="nc" id="L337">                                    int start = cursorPos;</span>
+<span class="nc" id="L338">                                    int end = cursorPos;</span>
+
+                                    /*
+                                    if (!inputBuffer.isEmpty()) {
+                                        // If the input buffer isn't empty, then our start
+                                        // and end positions will be &quot;wonky&quot;
+                                        start = end = inputBuffer.get(0).atPos;
+
+                                        // If the first change was a delete, then the atPos
+                                        // will point to the beginning of the deleted section
+                                        // so we need to adjust the end point to be *after*
+                                        // the deleted section to begin.
+                                        if (inputBuffer.get(0).deleteLength &gt; 0) {
+                                            end = start = end + inputBuffer.get(0).deleteLength;
+                                        }
+                                    }
+                                    */
+
+
+<span class="nc" id="L357">                                    StringBuilder buf = new StringBuilder();</span>
+<span class="nc" id="L358">                                    buf.append(text);</span>
+
+
+                                    // Loop through any pending changes in the input buffer
+                                    // (I.e. key strokes that have occurred since we initiated
+                                    // this async callback hell!!)
+<span class="nc" id="L364">                                    List&lt;TextChange&gt; tinput = inputBuffer;</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                                    if(tinput != null) {</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">                                        for (TextChange change : tinput) {</span>
+
+                                            // This change is &quot;added&quot; text.  Try to add it
+                                            // at the correct cursor position.  if not, add it at the
+                                            // end.
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                                            if (change.textToAppend != null) {</span>
+<span class="nc bnc" id="L372" title="All 4 branches missed.">                                                if (end &gt;= 0 &amp;&amp; end &lt;= buf.length()) {</span>
+<span class="nc" id="L373">                                                    buf.insert(end, change.textToAppend);</span>
+<span class="nc" id="L374">                                                    end += change.textToAppend.length();</span>
+<span class="nc" id="L375">                                                    start = end;</span>
+                                                } else {
+<span class="nc" id="L377">                                                    buf.append(change.textToAppend);</span>
+<span class="nc" id="L378">                                                    end = buf.length();</span>
+<span class="nc" id="L379">                                                    start = end;</span>
+                                                }
+
+                                            }
+
+                                            // The change is &quot;deleted&quot; text.
+<span class="nc bnc" id="L385" title="All 2 branches missed.">                                            else if (change.deleteLength &gt; 0) {</span>
+<span class="nc bnc" id="L386" title="All 4 branches missed.">                                                if (end &gt;= change.deleteLength &amp;&amp; end &lt;= buf.length()) {</span>
+<span class="nc" id="L387">                                                    buf.delete(end - change.deleteLength, end);</span>
+<span class="nc" id="L388">                                                    end -= change.deleteLength;</span>
+<span class="nc" id="L389">                                                    start = end;</span>
+<span class="nc bnc" id="L390" title="All 4 branches missed.">                                                } else if (end &gt; 0 &amp;&amp; end &lt; change.deleteLength) {</span>
+<span class="nc" id="L391">                                                    buf.delete(0, end);</span>
+<span class="nc" id="L392">                                                    end = 0;</span>
+<span class="nc" id="L393">                                                    start = end;</span>
+                                                }
+                                            }
+<span class="nc" id="L396">                                        }</span>
+                                    }
+
+                                    // Important:  Clear the input buffer so that the TextWatcher
+                                    // knows to stop filling it up.  We only need the inputBuffer
+                                    // to keep input between the original showTextEditorAgain() call
+                                    // and here.
+<span class="nc" id="L403">                                    inputBuffer = null;</span>
+<span class="nc" id="L404">                                    mEditText.setText(buf.toString());</span>
+<span class="nc bnc" id="L405" title="All 4 branches missed.">                                    if (start &lt; 0 || start &gt; mEditText.getText().length()) {</span>
+<span class="nc" id="L406">                                        start = mEditText.getText().length();</span>
+                                    }
+<span class="nc bnc" id="L408" title="All 4 branches missed.">                                    if (end &lt; 0 || end &gt; mEditText.getText().length()) {</span>
+<span class="nc" id="L409">                                        end = mEditText.getText().length();</span>
+                                    }
+
+                                    // Update the caret in the edit text field so we can continue.
+<span class="nc" id="L413">                                    mEditText.setSelection(start, end);</span>
+
+<span class="nc" id="L415">                                }</span>
+                            }
+<span class="nc" id="L417">                        }</span>
+                    });
+                }
+
+<span class="nc" id="L421">            }</span>
+        });
+<span class="nc" id="L423">        reLayoutEdit(true);</span>
+<span class="nc" id="L424">        repaintTextEditor(true);</span>
+<span class="nc" id="L425">    }</span>
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+<span class="fc" id="L429">        super.onSizeChanged(w, h, oldw, oldh);</span>
+<span class="fc" id="L430">    }</span>
+
+    @Override
+    protected void onConfigurationChanged(Configuration newConfig) {
+<span class="nc" id="L434">        super.onConfigurationChanged(newConfig);</span>
+<span class="nc" id="L435">        endEdit(true);</span>
+<span class="nc" id="L436">    }</span>
+
+    /**
+     * Hides the native text editor while keeping the active async edit session going.
+     * This will effectively hide the native text editor, and show the light-weight text area
+     * with cursor still in the correct position.
+     *
+     * &lt;p&gt;This is just a static wrapper around {@link #hideTextEditor()}&lt;/p&gt;
+     */
+    static void hideActiveTextEditor() {
+<span class="nc bnc" id="L446" title="All 2 branches missed.">        if (sInstance != null) {</span>
+<span class="nc" id="L447">            sInstance.hideTextEditor();</span>
+        }
+<span class="nc" id="L449">    }</span>
+
+    /**
+     * Hides the native text editor while keeping the active async edit session going.
+     * This will effectively hide the native text editor, and show the light-weight text area
+     * with cursor still in the correct position.
+     */
+    private void hideTextEditor() {
+<span class="nc bnc" id="L457" title="All 6 branches missed.">        if (!mIsEditing || textEditorHidden || mEditText == null) {</span>
+<span class="nc" id="L458">            return;</span>
+        }
+<span class="nc" id="L460">        textEditorHidden = true;</span>
+<span class="nc" id="L461">        final TextArea ta = mEditText.mTextArea;</span>
+
+        // Since this may be called off the UI thread, we need to issue async request on UI thread
+        // to hide the text area.
+<span class="nc" id="L465">        impl.getActivity().runOnUiThread(new Runnable() {</span>
+            public void run() {
+<span class="nc bnc" id="L467" title="All 4 branches missed.">                if (mEditText != null &amp;&amp; mEditText.mTextArea == ta) {</span>
+
+                    // Note:  Setting visibility to GONE doesn't work here because the TextWatcher
+                    // will stop receiving input from the keyboard, so we don't have a way to
+                    // reactivate the text editor when the user starts typing again.  Using the margin
+                    // to move it off screen keeps the text editor active.
+<span class="nc" id="L473">                    mEditLayoutParams.setMargins(-Display.getInstance().getDisplayWidth(), 0, 0, 0);</span>
+<span class="nc" id="L474">                    InPlaceEditView.this.requestLayout();</span>
+<span class="nc" id="L475">                    final int cursorPos = mEditText.getSelectionStart();</span>
+
+                    // Since we are going to be displaying the CN1 text area now, we need to update
+                    // the cursor.  That needs to happen on the EDT.
+<span class="nc" id="L479">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        public void run() {
+<span class="nc bnc" id="L481" title="All 8 branches missed.">                            if (mEditText != null &amp;&amp; mEditText.mTextArea == ta &amp;&amp; mIsEditing &amp;&amp; textEditorHidden) {</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">                                if (ta instanceof TextField) {</span>
+<span class="nc" id="L483">                                    ((TextField)ta).setCursorPosition(cursorPos);</span>
+                                }
+                            }
+<span class="nc" id="L486">                        }</span>
+                    });
+                }
+<span class="nc" id="L489">            }</span>
+        });
+
+
+        // Repaint the CN1 text area on the EDT.  This is necessary because while the native editor
+        // was shown, the cn1 text area paints only its background.  Now that the editor is hidden
+        // it should paint its foreground also.
+<span class="nc" id="L496">        Display.getInstance().callSerially(new Runnable() {</span>
+            public void run() {
+<span class="nc bnc" id="L498" title="All 4 branches missed.">                if (mEditText != null &amp;&amp; mEditText.mTextArea != null) {</span>
+<span class="nc" id="L499">                    mEditText.mTextArea.repaint();</span>
+                }
+<span class="nc" id="L501">            }</span>
+        });
+
+        //repaintTextEditor(true);
+
+<span class="nc" id="L506">    }</span>
+
+
+    /**
+     * Checks if the native text editor is currently hidden.  Only relevant in async edit mode.
+     *
+     * &lt;p&gt;This is just a static wrapper around {@link #isTextEditorHidden()}&lt;/p&gt;
+     * @return
+     */
+    static boolean isActiveTextEditorHidden() {
+<span class="fc bfc" id="L516" title="All 2 branches covered.">        if (sInstance != null) {</span>
+<span class="fc" id="L517">            return sInstance.isTextEditorHidden();</span>
+        }
+<span class="fc" id="L519">        return true;</span>
+    }
+
+    /**
+     * Checks if the native text editor is currently hidden.  Only relevant in async edit mode.
+     * @return
+     */
+    private boolean isTextEditorHidden() {
+<span class="fc" id="L527">        return textEditorHidden;</span>
+    }
+
+    /*
+    static void handleActiveTouchEventIfHidden(MotionEvent event) {
+        if (sInstance != null &amp;&amp; mIsEditing &amp;&amp; isActiveTextEditorHidden()) {
+            sInstance.onTouchEvent(event);
+        }
+    }
+    */
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+<span class="nc bnc" id="L539" title="All 2 branches missed.">        if (!impl.isAsyncEditMode()) {</span>
+<span class="nc" id="L540">            boolean leaveVKBOpen = false;</span>
+<span class="nc bnc" id="L541" title="All 6 branches missed.">            if (mEditText != null &amp;&amp; mEditText.mTextArea != null &amp;&amp; mEditText.mTextArea.getComponentForm() != null) {</span>
+<span class="nc" id="L542">                Component c = mEditText.mTextArea.getComponentForm().getResponderAt((int) event.getX(), (int) event.getY());</span>
+<span class="nc bnc" id="L543" title="All 6 branches missed.">                if ( mEditText.mTextArea.getClientProperty(&quot;leaveVKBOpen&quot;) != null</span>
+<span class="nc bnc" id="L544" title="All 4 branches missed.">                        || (c != null &amp;&amp; c instanceof TextArea &amp;&amp; ((TextArea) c).isEditable() &amp;&amp; ((TextArea) c).isEnabled())) {</span>
+<span class="nc" id="L545">                    leaveVKBOpen = true;</span>
+                }
+            }
+            // When the user touches the screen outside the text-area, finish editing
+<span class="nc" id="L549">            endEditing(REASON_TOUCH_OUTSIDE, leaveVKBOpen, 0);</span>
+<span class="nc" id="L550">        } else {</span>
+<span class="nc" id="L551">            final int evtX = (int) event.getX();</span>
+<span class="nc" id="L552">            final int evtY = (int) event.getY();</span>
+<span class="nc" id="L553">            Display.getInstance().callSerially(new Runnable() {</span>
+                public void run() {
+<span class="nc bnc" id="L555" title="All 4 branches missed.">                    if (mEditText != null &amp;&amp; mEditText.mTextArea != null) {</span>
+<span class="nc" id="L556">                        TextArea tx = mEditText.mTextArea;</span>
+<span class="nc" id="L557">                        int x = tx.getAbsoluteX() + tx.getScrollX();</span>
+<span class="nc" id="L558">                        int y = tx.getAbsoluteY() + tx.getScrollY();</span>
+<span class="nc" id="L559">                        int w = tx.getWidth();</span>
+<span class="nc" id="L560">                        int h = tx.getHeight();</span>
+<span class="nc bnc" id="L561" title="All 8 branches missed.">                        if (!(x &lt;= evtX &amp;&amp; y &lt;= evtY &amp;&amp; x + w &gt;= evtX &amp;&amp; y + h &gt;= evtY)) {</span>
+<span class="nc" id="L562">                            hideTextEditor();</span>
+                        } else {
+<span class="nc" id="L564">                            showTextEditorAgain();</span>
+                        }
+
+                    }
+<span class="nc" id="L568">                }</span>
+            });
+
+        }
+
+        // Return false so that the event will propagate to the underlying view
+        // We don't want to consume this event
+<span class="nc" id="L575">        return false;</span>
+    }
+
+    /**
+     * Show or hide the virtual keyboard if necessary
+     * @param show Show the keyboard if true, hide it otherwise
+     */
+    private void showVirtualKeyboard(boolean show) {
+<span class="fc" id="L583">        show = Boolean.parseBoolean(Display.getInstance().getProperty(&quot;showVkb&quot;, &quot;&quot; + show));</span>
+<span class="fc" id="L584">        Log.i(TAG, &quot;showVirtualKeyboard show=&quot; + show);</span>
+        
+<span class="fc" id="L586">        boolean result = false;</span>
+<span class="fc bfc" id="L587" title="All 2 branches covered.">        if (show) {</span>
+            // If we're in landscape, Android will not show the soft
+            // keyboard unless SHOW_FORCED is requested
+<span class="fc" id="L590">            Configuration config = mResources.getConfiguration();</span>
+
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            boolean isLandscape = (config.orientation == Configuration.ORIENTATION_LANDSCAPE);</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">            int showFlags = isLandscape ? InputMethodManager.SHOW_FORCED : InputMethodManager.SHOW_IMPLICIT;</span>
+
+<span class="fc" id="L595">            mInputManager.restartInput(mEditText);</span>
+<span class="fc" id="L596">            result = mInputManager.showSoftInput(mEditText, showFlags, mResultReceiver);</span>
+<span class="fc" id="L597">        } else {</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">            if(mEditText == null){</span>
+<span class="nc bnc" id="L599" title="All 2 branches missed.">                if(showVKB){</span>
+<span class="nc" id="L600">                    mInputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);</span>
+                }
+            }else{
+<span class="fc" id="L603">                result = mInputManager.hideSoftInputFromWindow(mEditText.getWindowToken(), 0, mResultReceiver);</span>
+            }
+<span class="fc" id="L605">            closedTime = System.currentTimeMillis();</span>
+        }
+<span class="fc" id="L607">        showVKB = show;</span>
+
+<span class="fc" id="L609">        final boolean showKeyboard = showVKB;</span>
+        //final ActionListener listener = Display.getInstance().getVirtualKeyboardListener();
+        //if(listener != null){
+<span class="fc" id="L612">        Thread t = new Thread(new Runnable() {</span>
+
+            @Override
+            public void run() {
+
+                //this is ugly but there is no real API to know if the
+                //keyboard is opened or closed
+                try {
+<span class="fc" id="L620">                    Thread.sleep(600);</span>
+<span class="nc" id="L621">                } catch (InterruptedException ex) {</span>
+<span class="fc" id="L622">                }</span>
+<span class="fc" id="L623">                Display.getInstance().fireVirtualKeyboardEvent(showKeyboard);</span>
+
+<span class="fc" id="L625">            }</span>
+        });
+<span class="fc" id="L627">        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);</span>
+<span class="fc" id="L628">        t.start();</span>
+        //}
+
+<span class="fc" id="L631">        Log.d(TAG, &quot;InputMethodManager returned &quot; + Boolean.toString(result).toUpperCase());</span>
+<span class="fc" id="L632">    }</span>
+
+    /**
+     * Returns true if the keyboard is currently on screen.
+     */
+    public static boolean isKeyboardShowing(){
+        //There is no android API to know if the keyboard is currently showing
+        //This method will return false after 2 seconds since the keyboard was
+        //requested to be closed
+<span class="pc bpc" id="L641" title="2 of 4 branches missed.">        return showVKB || (System.currentTimeMillis() - closedTime) &lt; 2000;</span>
+    }
+
+    static class TextAreaData {
+        final int absoluteY;
+        final int absoluteX;
+        final int paddingTop;
+        final int paddingLeft;
+        final int paddingRight;
+        final int paddingBottom;
+        final int scrollX;
+        final int scrollY;
+        final int verticalAlignment;
+        final int height;
+        final int width;
+        final int fontHeight;
+        final TextArea textArea;
+        final Component nextDown;
+        final boolean isRTL;
+        final boolean isSingleLineTextArea;
+        final String hint;
+        final boolean nativeHintBool;
+        final Object nativeFont;
+        final int fgColor;
+        final int maxSize;
+
+        final boolean isTextField;
+
+        int getAbsoluteY() {
+<span class="fc" id="L670">            return absoluteY;</span>
+        }
+
+        int getAbsoluteX() {
+<span class="fc" id="L674">            return absoluteX;</span>
+        }
+
+        int getScrollX() {
+<span class="fc" id="L678">            return scrollX;</span>
+        }
+
+        int getScrollY() {
+<span class="fc" id="L682">            return scrollY;</span>
+        }
+
+        int getHeight() {
+<span class="fc" id="L686">            return height;</span>
+        }
+
+        int getWidth() {
+<span class="fc" id="L690">            return width;</span>
+        }
+
+        int getVerticalAlignment() {
+<span class="fc" id="L694">            return verticalAlignment;</span>
+        }
+
+        boolean isRTL() {
+<span class="fc" id="L698">            return isRTL;</span>
+        }
+
+        boolean isSingleLineTextArea() {
+<span class="fc" id="L702">            return isSingleLineTextArea;</span>
+        }
+
+        Object getClientProperty(String key) {
+<span class="fc" id="L706">            return textArea.getClientProperty(key);</span>
+        }
+
+        void putClientProperty(String key, Object value) {
+<span class="nc" id="L710">            textArea.putClientProperty(key, value);</span>
+<span class="nc" id="L711">        }</span>
+
+        Object getDoneListener() {
+<span class="fc" id="L714">            return ((TextArea)textArea).getDoneListener();</span>
+        }
+
+        String getHint() {
+<span class="nc" id="L718">            return hint;</span>
+        }
+
+
+
+<span class="fc" id="L723">        TextAreaData(TextArea ta) {</span>
+
+<span class="fc" id="L725">            absoluteX = ta.getAbsoluteX();</span>
+<span class="fc" id="L726">            absoluteY = ta.getAbsoluteY();</span>
+<span class="fc" id="L727">            scrollX = ta.getScrollX();</span>
+<span class="fc" id="L728">            scrollY = ta.getScrollY();</span>
+<span class="fc" id="L729">            Style s = ta.getStyle();</span>
+<span class="fc" id="L730">            paddingTop = s.getPaddingTop();</span>
+<span class="fc" id="L731">            paddingLeft = s.getPaddingLeft(ta.isRTL());</span>
+<span class="fc" id="L732">            paddingRight = s.getPaddingRight(ta.isRTL());</span>
+<span class="fc" id="L733">            paddingBottom = s.getPaddingBottom();</span>
+<span class="fc" id="L734">            isTextField = (ta instanceof TextField);</span>
+<span class="fc" id="L735">            verticalAlignment = ta.getVerticalAlignment();</span>
+<span class="fc" id="L736">            height = ta.getHeight();</span>
+<span class="fc" id="L737">            width = ta.getWidth();</span>
+<span class="fc" id="L738">            fontHeight = s.getFont().getHeight();</span>
+<span class="fc" id="L739">            textArea = ta;</span>
+<span class="fc" id="L740">            isRTL = ta.isRTL();</span>
+<span class="fc" id="L741">            nextDown = textArea.getComponentForm().getNextComponent(textArea);</span>
+<span class="fc" id="L742">            isSingleLineTextArea = textArea.isSingleLineTextArea();</span>
+<span class="fc" id="L743">            hint = ta.getHint();</span>
+<span class="fc" id="L744">            nativeHintBool = textArea.getUIManager().isThemeConstant(&quot;nativeHintBool&quot;, false);</span>
+<span class="fc" id="L745">            nativeFont = s.getFont().getNativeFont();</span>
+<span class="fc" id="L746">            fgColor = s.getFgColor();</span>
+<span class="fc" id="L747">            maxSize = ta.getMaxSize();</span>
+<span class="fc" id="L748">        }</span>
+
+    }
+    
+    // Timers for manually blinking cursor on Android 4.4
+    //private Timer cursorTimer;
+    //private TimerTask cursorTimerTask;
+    private KeyListener defaultKeyListener;
+<span class="fc" id="L756">    private int defaultMaxLines=-2;</span>
+    private int defaultInputType;
+    private int defaultIMEOptions;
+
+    /**
+     * Start editing the given text-area
+     * This method is executed on the UI thread, so UI manipulation is safe here.
+     * @param activity Current running activity
+     * @param textArea The TextAreaData instance that wraps the CN1 TextArea that our internal EditText needs to overlap.  We use
+     *                 a TextAreaData so that the text area properties can be accessed off the EDT safely.
+     * @param codenameOneInputType One of the input type constants in com.codename1.ui.TextArea
+     * @param initialText The text that appears in the Codename One text are before the call to startEditing
+     * @param isEditedFieldSwitch if true, then special case for async edit mode - the native editing is already active, no need to show
+     *                            native field, just change the connected field
+     */
+    private synchronized void startEditing(Activity activity, TextAreaData textArea, String initialText, int codenameOneInputType, final boolean isEditedFieldSwitch) {
+<span class="fc" id="L772">        int txty = lastTextAreaY = textArea.getAbsoluteY() + textArea.getScrollY();</span>
+<span class="fc" id="L773">        int txtx = lastTextAreaX = textArea.getAbsoluteX() + textArea.getScrollX();</span>
+<span class="fc" id="L774">        lastTextAreaWidth = textArea.getWidth();</span>
+<span class="fc" id="L775">        lastTextAreaHeight = textArea.getHeight();</span>
+<span class="fc" id="L776">        int paddingTop = 0;</span>
+<span class="fc" id="L777">        int paddingLeft = textArea.paddingLeft;</span>
+<span class="fc" id="L778">        int paddingRight = textArea.paddingRight;</span>
+<span class="fc" id="L779">        int paddingBottom = textArea.paddingBottom;</span>
+        
+        // An ugly hack to smooth over an apparent race condition where
+        // the lightweight textarea is not repainted after the native text field
+        // becomes visible - resulting in the hint still appearing while typing.
+        // https://github.com/codenameone/CodenameOne/issues/2629
+        // We just blindly repaint the textfield every 50ms for half a second
+        // to make sure it gets a repaint properly.
+<span class="fc" id="L787">        final TextArea fTextArea = textArea.textArea;</span>
+<span class="fc" id="L788">        new Thread(new Runnable() {</span>
+            public void run() {
+<span class="fc bfc" id="L790" title="All 2 branches covered.">                for (int i=0; i&lt; 10; i++) {</span>
+<span class="fc" id="L791">                    com.codename1.io.Util.sleep(50);</span>
+<span class="fc" id="L792">                    com.codename1.ui.CN.callSerially(new Runnable() {</span>
+                        public void run() {
+<span class="fc" id="L794">                            fTextArea.repaint();</span>
+<span class="fc" id="L795">                        }</span>
+                    });
+                }
+<span class="fc" id="L798">            }</span>
+<span class="fc" id="L799">        }).start();</span>
+<span class="pc bpc" id="L800" title="1 of 2 branches missed.">        if (textArea.isTextField) {</span>
+<span class="pc bpc" id="L801" title="2 of 3 branches missed.">            switch (textArea.getVerticalAlignment()) {</span>
+                case Component.BOTTOM:
+<span class="nc" id="L803">                    paddingTop = textArea.getHeight() - textArea.paddingBottom - textArea.fontHeight;</span>
+<span class="nc" id="L804">                    break;</span>
+                case Component.CENTER:
+<span class="nc" id="L806">                    paddingTop = textArea.getHeight() / 2 - textArea.fontHeight / 2;</span>
+<span class="nc" id="L807">                    break;</span>
+                default:
+<span class="fc" id="L809">                    paddingTop = textArea.paddingTop;</span>
+<span class="fc" id="L810">                    break;</span>
+            }
+        } else {
+<span class="nc" id="L813">            paddingTop = textArea.paddingTop;</span>
+        }
+<span class="fc" id="L815">        int id = activity.getResources().getIdentifier(&quot;cn1Style&quot;, &quot;attr&quot;, activity.getApplicationInfo().packageName);</span>
+<span class="pc bpc" id="L816" title="1 of 2 branches missed.">        if (!isEditedFieldSwitch) {</span>
+<span class="fc" id="L817">            mEditText = new EditView(activity, textArea.textArea, this, id);</span>
+<span class="fc" id="L818">            defaultInputType = mEditText.getInputType();</span>
+<span class="fc" id="L819">            defaultIMEOptions = mEditText.getImeOptions();</span>
+        } else {
+<span class="nc" id="L821">            mEditText.switchToTextArea(textArea.textArea);</span>
+        }
+    
+<span class="pc bpc" id="L824" title="2 of 4 branches missed.">        if(textArea.getClientProperty(&quot;blockCopyPaste&quot;) != null || Display.getInstance().getProperty(&quot;blockCopyPaste&quot;, &quot;false&quot;).equals(&quot;true&quot;)) {</span>
+            // The code below is taken from this stackoverflow answer: http://stackoverflow.com/a/22756538/756809
+<span class="nc bnc" id="L826" title="All 2 branches missed.">            if (android.os.Build.VERSION.SDK_INT &lt; 11) {</span>
+<span class="nc" id="L827">                mEditText.setOnCreateContextMenuListener(new OnCreateContextMenuListener() {</span>
+                    @Override
+                    public void onCreateContextMenu(ContextMenu menu, View v,
+                            ContextMenuInfo menuInfo) {
+<span class="nc" id="L831">                        menu.clear();</span>
+<span class="nc" id="L832">                    }</span>
+                });
+            } else {
+<span class="nc" id="L835">                mEditText.setCustomSelectionActionModeCallback(new ActionMode.Callback() {</span>
+                    public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+<span class="nc" id="L837">                        return false;</span>
+                    }
+
+                    public void onDestroyActionMode(ActionMode mode) {
+<span class="nc" id="L841">                    }</span>
+
+                    public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+<span class="nc" id="L844">                        return false;</span>
+                    }
+
+                    public boolean onActionItemClicked(ActionMode mode,
+                            MenuItem item) {
+<span class="nc" id="L849">                        return false;</span>
+                    }
+                });
+            }            
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">        } else if (isEditedFieldSwitch) {</span>
+            //reset copy-paste protection
+<span class="nc bnc" id="L855" title="All 2 branches missed.">            if (android.os.Build.VERSION.SDK_INT &lt; 11) {</span>
+<span class="nc" id="L856">                mEditText.setOnCreateContextMenuListener(null);</span>
+            } else {
+<span class="nc" id="L858">                mEditText.setCustomSelectionActionModeCallback(null);</span>
+            }
+	}
+<span class="pc bpc" id="L861" title="1 of 2 branches missed.">        if (!isEditedFieldSwitch) {</span>
+<span class="fc" id="L862">            mEditText.addTextChangedListener(mEditText.mTextWatcher);</span>
+        }
+<span class="fc" id="L864">        mEditText.setBackgroundDrawable(null);</span>
+
+<span class="fc" id="L866">        mEditText.setFocusableInTouchMode(true);</span>
+<span class="fc" id="L867">        mEditLayoutParams = new FrameLayout.LayoutParams(0, 0);</span>
+        // Set the appropriate gravity so that the left and top margins will be
+        // taken into account
+<span class="fc" id="L870">        mEditLayoutParams.gravity = Gravity.LEFT | Gravity.TOP;</span>
+<span class="fc" id="L871">        mEditLayoutParams.setMargins(txtx, txty, 0, 0);</span>
+<span class="fc" id="L872">        mEditLayoutParams.width = textArea.getWidth();</span>
+<span class="fc" id="L873">        mEditLayoutParams.height = textArea.getHeight();</span>
+
+<span class="fc" id="L875">        mEditText.setLayoutParams(mEditLayoutParams);</span>
+
+<span class="pc bpc" id="L877" title="1 of 2 branches missed.">        if(textArea.isRTL()){</span>
+<span class="nc" id="L878">            mEditText.setGravity(Gravity.RIGHT | Gravity.TOP);</span>
+        }else{
+<span class="fc" id="L880">            mEditText.setGravity(Gravity.LEFT | Gravity.TOP);</span>
+        }
+
+<span class="fc" id="L883">        mEditText.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);</span>
+
+<span class="fc" id="L885">        Component nextDown = textArea.nextDown;</span>
+<span class="fc" id="L886">        boolean imeOptionTaken = true;</span>
+<span class="fc" id="L887">        int ime = EditorInfo.IME_FLAG_NO_EXTRACT_UI;</span>
+<span class="pc bpc" id="L888" title="3 of 4 branches missed.">        if (textArea.isSingleLineTextArea() || textArea.getDoneListener() != null) {</span>
+
+<span class="pc bpc" id="L890" title="1 of 2 branches missed.">            if(textArea.getClientProperty(&quot;searchField&quot;) != null) {</span>
+<span class="nc" id="L891">                mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_SEARCH);</span>
+            } else {
+<span class="pc bpc" id="L893" title="1 of 2 branches missed.">                if(textArea.getClientProperty(&quot;sendButton&quot;) != null) {</span>
+<span class="nc" id="L894">                    mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_SEND);</span>
+                } else {
+<span class="pc bpc" id="L896" title="1 of 2 branches missed.">                    if(textArea.getClientProperty(&quot;goButton&quot;) != null) {</span>
+<span class="nc" id="L897">                        mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_GO);</span>
+                    } else {
+<span class="pc bpc" id="L899" title="1 of 2 branches missed.">                        if(textArea.getDoneListener() != null){</span>
+<span class="nc" id="L900">                            mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);</span>
+<span class="pc bpc" id="L901" title="1 of 2 branches missed.">                        } else if (nextDown != null) {</span>
+<span class="nc" id="L902">                            mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_NEXT);</span>
+                        } else {
+<span class="fc" id="L904">                            mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);</span>
+<span class="fc" id="L905">                            imeOptionTaken = false;</span>
+                        }
+                    }
+                }
+            }
+        }
+
+        
+<span class="fc" id="L913">        mEditText.setSingleLine(textArea.isSingleLineTextArea());</span>
+<span class="fc" id="L914">        mEditText.setAdapter((ArrayAdapter&lt;String&gt;) null);</span>
+<span class="fc" id="L915">        mEditText.setText(initialText);</span>
+<span class="pc bpc" id="L916" title="5 of 6 branches missed.">        if(!textArea.isSingleLineTextArea() &amp;&amp; textArea.textArea.isGrowByContent() &amp;&amp; textArea.textArea.getGrowLimit() &gt; -1){</span>
+<span class="nc" id="L917">            defaultMaxLines = mEditText.getMaxLines();</span>
+<span class="nc" id="L918">            mEditText.setMaxLines(textArea.textArea.getGrowLimit());</span>
+        }
+
+<span class="pc bpc" id="L921" title="3 of 4 branches missed.">        if(textArea.nativeHintBool &amp;&amp; textArea.getHint() != null) {</span>
+<span class="nc" id="L922">            mEditText.setHint(textArea.getHint());</span>
+        }
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">        if (!isEditedFieldSwitch) {</span>
+<span class="fc" id="L925">            addView(mEditText, mEditLayoutParams);</span>
+        }
+<span class="fc" id="L927">        invalidate();</span>
+<span class="fc" id="L928">        setVisibility(VISIBLE);</span>
+<span class="fc" id="L929">        bringToFront();</span>
+
+<span class="fc" id="L931">        mEditText.requestFocus();</span>
+
+<span class="fc" id="L933">        Object nativeFont = textArea.nativeFont;</span>
+<span class="pc bpc" id="L934" title="1 of 2 branches missed.">        if (nativeFont == null) {</span>
+<span class="nc" id="L935">            nativeFont = impl.getDefaultFont();</span>
+        }
+<span class="fc" id="L937">        Paint p = (Paint) ((AndroidImplementation.NativeFont) nativeFont).font;</span>
+<span class="fc" id="L938">        mEditText.setTypeface(p.getTypeface());</span>
+<span class="fc" id="L939">        mEditText.setTextScaleX(p.getTextScaleX());</span>
+<span class="fc" id="L940">        mEditText.setTextSize(TypedValue.COMPLEX_UNIT_PX, p.getTextSize());</span>
+
+<span class="fc" id="L942">        int fgColor = textArea.fgColor;</span>
+<span class="fc" id="L943">        mEditText.setTextColor(Color.rgb(fgColor &gt;&gt; 16, (fgColor &amp; 0x00ff00) &gt;&gt; 8, (fgColor &amp; 0x0000ff)));</span>
+<span class="fc" id="L944">        boolean password = false;</span>
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">        if((codenameOneInputType &amp; TextArea.PASSWORD) == TextArea.PASSWORD){</span>
+<span class="nc" id="L946">            codenameOneInputType = codenameOneInputType ^ TextArea.PASSWORD;</span>
+<span class="nc" id="L947">            password = true;</span>
+        }
+
+<span class="pc bpc" id="L950" title="1 of 2 branches missed.">        if (textArea.isSingleLineTextArea()) {</span>
+<span class="fc" id="L951">            mEditText.setInputType(getAndroidInputType(codenameOneInputType));</span>
+            //if not ime was explicity requested and this is a single line textfield of type ANY add the emoji keyboard.
+<span class="pc bpc" id="L953" title="2 of 4 branches missed.">            if(!imeOptionTaken &amp;&amp; codenameOneInputType == TextArea.ANY){</span>
+<span class="fc" id="L954">                mEditText.setInputType(getAndroidInputType(codenameOneInputType) | InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE);</span>
+            }
+<span class="pc bpc" id="L956" title="3 of 4 branches missed.">            if(Display.getInstance().getProperty(&quot;andAddComma&quot;, &quot;false&quot;).equals(&quot;true&quot;) &amp;&amp;</span>
+                    (codenameOneInputType &amp; TextArea.DECIMAL) == TextArea.DECIMAL) {
+<span class="nc" id="L958">                defaultKeyListener = mEditText.getKeyListener();</span>
+<span class="nc" id="L959">                mEditText.setKeyListener(DigitsKeyListener.getInstance(&quot;0123456789.,&quot;));</span>
+            }
+        } else {
+<span class="nc bnc" id="L962" title="All 2 branches missed.">            if (textArea.getDoneListener() != null) {</span>
+<span class="nc" id="L963">                mEditText.setHorizontallyScrolling(false);</span>
+<span class="nc" id="L964">                mEditText.setMaxLines(Integer.MAX_VALUE);</span>
+<span class="nc" id="L965">                mEditText.setInputType(InputType.TYPE_TEXT_FLAG_MULTI_LINE);</span>
+<span class="nc" id="L966">                mEditText.setMaxWidth(textArea.getWidth());</span>
+<span class="nc" id="L967">                mEditText.setMaxHeight(textArea.getHeight());</span>
+<span class="nc" id="L968">                mEditText.setHorizontalScrollBarEnabled(false);</span>
+<span class="nc" id="L969">                mEditText.getLayoutParams().width = textArea.getWidth();</span>
+<span class="nc" id="L970">                mEditText.getLayoutParams().height = textArea.getHeight();</span>
+            } else {
+<span class="nc" id="L972">                mEditText.setInputType(getAndroidInputType(codenameOneInputType, true));</span>
+            }
+        }
+<span class="pc bpc" id="L975" title="1 of 2 branches missed.">        if (password) {</span>
+<span class="nc" id="L976">            int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);</span>
+<span class="nc bnc" id="L977" title="All 2 branches missed.">            if((type &amp; InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) == InputType.TYPE_TEXT_FLAG_CAP_SENTENCES){</span>
+<span class="nc" id="L978">                type = type ^ InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;</span>
+            }
+            //turn off suggestions for passwords
+<span class="nc" id="L981">            mEditText.setInputType(type | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);</span>
+<span class="nc" id="L982">            mEditText.setTransformationMethod(new MyPasswordTransformationMethod());</span>
+        }
+
+<span class="fc" id="L985">        int maxLength = textArea.maxSize;</span>
+<span class="fc" id="L986">        InputFilter[] FilterArray = new InputFilter[1];</span>
+<span class="fc" id="L987">        FilterArray[0] = new InputFilter.LengthFilter(maxLength);</span>
+<span class="fc" id="L988">        mEditText.setFilters(FilterArray);</span>
+<span class="fc" id="L989">        mEditText.setSelection(mEditText.getText().length());</span>
+<span class="fc" id="L990">        showVirtualKeyboard(true);</span>
+<span class="pc bpc" id="L991" title="1 of 2 branches missed.">        if (Boolean.FALSE.equals(textArea.getClientProperty(&quot;android.cursorVisible&quot;))) {</span>
+            // This provides an imperfect workaround for this issue:
+            // https://github.com/codenameone/CodenameOne/issues/2317
+            // Blinking cursor causes text to disappear on some versions of android
+            // Can't seem to find how to detect whether device is affected, so
+            // just providing a client property to disable the blinking cursor
+            // on a particular text field.
+<span class="nc" id="L998">            mEditText.setCursorVisible(false);</span>
+        }
+
+        // Set to true if TextField should be selected automatically on focus
+<span class="pc bpc" id="L1002" title="1 of 2 branches missed.">        if (Boolean.TRUE.equals(textArea.getClientProperty(&quot;autoSelectOnFocus&quot;))) {</span>
+<span class="nc" id="L1003">            Editable spannable = mEditText.getText();</span>
+<span class="nc" id="L1004">            Selection.setSelection(spannable, 0, spannable.length());</span>
+        }
+	    
+        /*
+        // Leaving this hack here for posterity.  It seems that this manually
+        // blinking cursor causes the paste menu to disappear
+        // https://github.com/codenameone/CodenameOne/issues/2147
+        // Removing the hack below, fixes this issue.  And in the test device
+        // I'm using the blinking of text doesn't seem to occur, so perhaps
+        // it was fixed via other means.  Test device:
+        // Name: Samsung Galaxy S3 (T-Mobile)
+        //    OS: 4.3
+        //    Manufacturer: Samsung
+        //    Model: 4.3
+        //    Chipset: armeabi-v7a 1512MHz
+        //    Memory: 16000000000
+        //    Heap: 256000000
+        //    Display: 720 x 1280
+        //
+        // UPDATE Feb. 13, 2018:
+        // This issue seems to be still present in some devices, but it isn't clear even
+        // how to detect it.
+        // Issue reported and reproduced here https://github.com/codenameone/CodenameOne/issues/2317
+        // Issue has been observed in a Virtual Box installation with 5.1.1, but
+        // cannot be reproduced in a Nexus 5 running 5.1.1.
+        // 
+        if (Build.VERSION.SDK_INT &lt; 21) {
+            // HACK!!!  On Android 4.4, it seems that the natural blinking cursor
+            // causes text to disappear when it blinks.  Manually blinking the
+            // cursor seems to work around this issue, so that's what we do here.
+            // This issue is described here: http://stackoverflow.com/questions/41305052/textfields-content-disappears-during-typing?noredirect=1#comment69977316_41305052
+            mEditText.setCursorVisible(false);
+            final boolean[] cursorVisible = new boolean[]{false};
+            if (cursorTimer != null) {
+                cursorTimer.cancel();
+            }
+            cursorTimer = new Timer();
+            cursorTimerTask = new TimerTask() {
+                public void run() {
+                    AndroidNativeUtil.getActivity().runOnUiThread(new Runnable() {
+                        public void run() {
+                            EditView v = mEditText;
+                            if (v != null) {
+                                cursorVisible[0] = !cursorVisible[0];
+                                v.setCursorVisible(cursorVisible[0]);
+                            }
+                        }
+                    });
+
+                }
+            };
+            cursorTimer.schedule(cursorTimerTask, 100, 500);
+        }
+        */
+<span class="fc" id="L1058">    }</span>
+
+    /**
+     * Calculate the font height in pixels according to the text area
+     * @param style The Codename One text-area to get the font height from
+     * @return The font height in pixels, or -1 if a font height could not be determined.
+     */
+    private int getFontHeight(Style style) {
+<span class="nc bnc" id="L1066" title="All 2 branches missed.">        if (style == null) {</span>
+<span class="nc" id="L1067">            return -1;</span>
+        }
+
+<span class="nc" id="L1070">        Font font = style.getFont();</span>
+<span class="nc bnc" id="L1071" title="All 2 branches missed.">        if (font == null) {</span>
+<span class="nc" id="L1072">            return -1;</span>
+        }
+
+<span class="nc" id="L1075">        return font.getHeight();</span>
+    }
+
+    static boolean activeEditorContains(int x, int y) {
+<span class="nc bnc" id="L1079" title="All 4 branches missed.">        return sInstance != null &amp;&amp; sInstance.editorContains(x, y);</span>
+    }
+
+    private boolean editorContains(int x, int y) {
+<span class="nc bnc" id="L1083" title="All 8 branches missed.">        return mIsEditing &amp;&amp; mEditText != null &amp;&amp; mEditText.mTextArea != null &amp;&amp; mEditText.mTextArea.contains(x, y);</span>
+    }
+
+    private Component getNextComponent(Component curr) {
+<span class="fc" id="L1087">        Form f = curr.getComponentForm();</span>
+<span class="pc bpc" id="L1088" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L1089">            return f.getNextComponent(curr);</span>
+        }
+<span class="nc" id="L1091">        return null;</span>
+    }
+
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, int actionCode) {
+<span class="nc" id="L1095">        endEditing(reason, forceVKBOpen, false, actionCode);</span>
+<span class="nc" id="L1096">    }</span>
+
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose, int actionCode) {
+<span class="fc" id="L1099">	endEditing(reason, forceVKBOpen, forceVKBClose, actionCode, -1);</span>
+<span class="fc" id="L1100">    }</span>
+
+    /**
+     * Finish the in-place editing of the given text area, release the edit lock, and allow the synchronous call
+     * to 'edit' to return.
+     */
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose, int actionCode, int keyEvent) {
+        //if (cursorTimer != null) {
+        //    cursorTimer.cancel();
+        //}
+<span class="fc" id="L1110">        System.out.println(&quot;-------In endEditing&quot;);</span>
+<span class="pc bpc" id="L1111" title="2 of 4 branches missed.">        if (!mIsEditing || mEditText == null) {</span>
+<span class="nc" id="L1112">            return;</span>
+        }
+        // SJH: Setting visibility GONE causes a size change event to be fired even when the
+        // input mode is adjustPan.  This causes problems and glitches with the layout because we
+        // have to guess if a resize even is accurate or not.
+        //setVisibility(GONE);
+<span class="fc" id="L1118">        mLastEndEditReason = reason;</span>
+
+        // If the IME action is set to NEXT, do not hide the virtual keyboard
+<span class="pc bpc" id="L1121" title="1 of 2 branches missed.">        boolean isNextActionFlagSet = ((mEditText.getImeOptions() &amp; 0xf) == EditorInfo.IME_ACTION_NEXT);</span>
+
+
+
+<span class="fc" id="L1125">        boolean leaveKeyboardShowing = impl.isAsyncEditMode();</span>
+<span class="fc" id="L1126">        System.out.println(&quot;Next flag: &quot;+isNextActionFlagSet);</span>
+<span class="fc" id="L1127">        System.out.println(&quot;Next cmp: &quot;+getNextComponent(mEditText.mTextArea));</span>
+<span class="fc" id="L1128">        System.out.println(&quot;Reason : &quot;+reason+&quot; IME Action: &quot;+REASON_IME_ACTION);</span>
+<span class="pc bpc" id="L1129" title="3 of 4 branches missed.">        if (reason == REASON_IME_ACTION &amp;&amp; isNextActionFlagSet) {</span>
+<span class="nc bnc" id="L1130" title="All 2 branches missed.">            if (getNextComponent(mEditText.mTextArea) instanceof TextArea) {</span>
+<span class="nc" id="L1131">                leaveKeyboardShowing = true;</span>
+            } else {
+<span class="nc" id="L1133">                leaveKeyboardShowing = false;</span>
+            }
+
+        }
+<span class="pc bpc" id="L1137" title="1 of 2 branches missed.">        if (forceVKBOpen) {</span>
+<span class="nc" id="L1138">            leaveKeyboardShowing = true;</span>
+        }
+<span class="fc bfc" id="L1140" title="All 2 branches covered.">        if (forceVKBClose) {</span>
+<span class="fc" id="L1141">            leaveKeyboardShowing = false;</span>
+        }
+<span class="fc" id="L1143">        System.out.println(&quot;-----LEAVE KEYBOARD SHOWING: &quot;+leaveKeyboardShowing);</span>
+<span class="pc bpc" id="L1144" title="4 of 10 branches missed.">        if (!leaveKeyboardShowing || actionCode == EditorInfo.IME_ACTION_DONE || actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {</span>
+<span class="fc" id="L1145">            System.out.println(&quot;Hiding virtual keyboard&quot;);</span>
+<span class="fc" id="L1146">            showVirtualKeyboard(false);</span>
+        }
+<span class="fc" id="L1148">        int imo = mEditText.getImeOptions() &amp; 0xf; // Get rid of flags</span>
+<span class="pc bpc" id="L1149" title="1 of 2 branches missed.">        if (reason == REASON_IME_ACTION</span>
+<span class="pc bpc" id="L1150" title="7 of 10 branches missed.">                &amp;&amp; ((TextArea) mEditText.mTextArea).getDoneListener() != null</span>
+                &amp;&amp; (actionCode == EditorInfo.IME_ACTION_DONE)|| actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
+<span class="nc" id="L1152">            ((TextArea) mEditText.mTextArea).fireDoneEvent(keyEvent);</span>
+        }
+        
+        // Call this in onComplete instead
+        //mIsEditing = false;
+<span class="fc" id="L1157">        mLastEditText = mEditText;</span>
+<span class="fc" id="L1158">        removeView(mEditText);</span>
+<span class="fc" id="L1159">        Component editingComponent = mEditText.mTextArea;</span>
+<span class="fc" id="L1160">        mEditText.removeTextChangedListener(mEditText.mTextWatcher);</span>
+<span class="fc" id="L1161">        mEditText = null;</span>
+
+<span class="pc bpc" id="L1163" title="1 of 2 branches missed.">        if (impl.isAsyncEditMode()) {</span>
+<span class="fc" id="L1164">            Runnable onComplete = (Runnable)editingComponent.getClientProperty(&quot;android.onAsyncEditingComplete&quot;);</span>
+<span class="fc" id="L1165">            editingComponent.putClientProperty(&quot;android.onAsyncEditingComplete&quot;, null);</span>
+<span class="pc bpc" id="L1166" title="1 of 2 branches missed.">            if (onComplete != null) {</span>
+<span class="fc" id="L1167">                Display.getInstance().callSerially(onComplete);</span>
+            }
+        }
+
+<span class="fc" id="L1171">        waitingForSynchronousEditingCompletion = false;</span>
+<span class="fc" id="L1172">    }</span>
+
+    /**
+     * This method waits until the user leaves the EditText
+     * It must not access sInstance since it might not have been created yet.
+     */
+    private static void waitForEditCompletion() {
+<span class="nc" id="L1179">        Display.getInstance().invokeAndBlock(new Runnable() {</span>
+
+            public void run() {
+<span class="nc bnc" id="L1182" title="All 2 branches missed.">                while (waitingForSynchronousEditingCompletion){</span>
+                    try {
+<span class="nc" id="L1184">                        Thread.sleep(50);</span>
+<span class="nc" id="L1185">                    } catch (Throwable e) {</span>
+<span class="nc" id="L1186">                    }</span>
+                };
+<span class="nc" id="L1188">            }</span>
+        });
+<span class="nc" id="L1190">        Log.d(TAG, &quot;waitForEditCompletion - Waiting for lock&quot;);</span>
+<span class="nc" id="L1191">    }</span>
+
+    /**
+     * This method will be called by our EditText control when the action
+     * key (Enter/Go/Send) on the soft keyboard will be pressed.
+     * @param actionCode
+     * @return task to run after call to super.onEditorAction. Returns null if action was consumed (tapped Next in async mode) and super.onEditorAction do not have to be called.
+     */
+    Runnable onEditorAction(int actionCode) {
+<span class="nc" id="L1200">        actionCode = actionCode &amp; 0xf;</span>
+<span class="nc" id="L1201">        final int fActionCode = actionCode;</span>
+<span class="nc" id="L1202">        boolean hasNext = false;</span>
+<span class="nc" id="L1203">        Component next = null;</span>
+<span class="nc bnc" id="L1204" title="All 4 branches missed.">        if (EditorInfo.IME_ACTION_NEXT == actionCode &amp;&amp; mEditText != null &amp;&amp;</span>
+<span class="nc bnc" id="L1205" title="All 2 branches missed.">                mEditText.mTextArea != null) {</span>
+<span class="nc" id="L1206">            next = mEditText.mTextArea.getComponentForm().getNextComponent(mEditText.mTextArea);</span>
+<span class="nc bnc" id="L1207" title="All 2 branches missed.">            if (next != null) {</span>
+<span class="nc" id="L1208">                hasNext = true;</span>
+            }
+            
+<span class="nc bnc" id="L1211" title="All 4 branches missed.">            if (next != null &amp;&amp; next instanceof TextArea) {</span>
+<span class="nc" id="L1212">                nextTextArea = (TextArea) next;</span>
+            }
+        }
+<span class="nc bnc" id="L1215" title="All 6 branches missed.">        if (hasNext &amp;&amp; nextTextArea != null &amp;&amp; impl.isAsyncEditMode()) {</span>
+            //in async edit mode go right to next field edit to avoid hiding and showing again the native edit text
+<span class="nc" id="L1217">            final TextArea theNext = nextTextArea;</span>
+<span class="nc" id="L1218">            nextTextArea = null;</span>
+<span class="nc" id="L1219">            mLastEditText = mEditText;</span>
+<span class="nc" id="L1220">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1223">                    edit(sInstance.impl, theNext, theNext.getConstraint());</span>
+<span class="nc" id="L1224">                }</span>
+            });
+<span class="nc" id="L1226">            return null;</span>
+        
+        } else {
+<span class="nc" id="L1229">            final Component fNext = next;</span>
+<span class="nc" id="L1230">            final boolean fHasNext = hasNext;</span>
+<span class="nc" id="L1231">            return new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="nc" id="L1235">                    endEditing(REASON_IME_ACTION, false, fActionCode);</span>
+<span class="nc bnc" id="L1236" title="All 4 branches missed.">                    if (fHasNext &amp;&amp; fNext != null) {</span>
+<span class="nc" id="L1237">                        Display.getInstance().callSerially(new Runnable() {</span>
+                            public void run() {
+<span class="nc" id="L1239">				final Form f = fNext.getComponentForm();</span>
+<span class="nc bnc" id="L1240" title="All 2 branches missed.">                                if (f == null) {</span>
+<span class="nc" id="L1241">                                    return;</span>
+                                }
+<span class="nc" id="L1243">                                f.addSizeChangedListener(new ActionListener() {</span>
+                                    @Override
+                                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1246">                                        f.removeSizeChangedListener(this);</span>
+<span class="nc" id="L1247">                                        fNext.requestFocus();</span>
+<span class="nc" id="L1248">                                        fNext.startEditingAsync();</span>
+<span class="nc" id="L1249">                                    }</span>
+                                });
+<span class="nc bnc" id="L1251" title="All 2 branches missed.">				if(EditorInfo.IME_ACTION_NEXT == fActionCode)</span>
+<span class="nc" id="L1252">                                    fNext.requestFocus();</span>
+<span class="nc" id="L1253">                            }</span>
+                        });
+                    }
+                    
+<span class="nc" id="L1257">                }</span>
+            };
+        }
+    }
+
+<span class="fc" id="L1262">    private static int trySetEditModeCount=0;</span>
+
+    private static void trySetEditMode(final boolean resize) {
+<span class="nc" id="L1265">        trySetEditMode(resize, 10);</span>
+<span class="nc" id="L1266">    }</span>
+
+    private static com.codename1.ui.geom.Rectangle getVisibleRect(Component c) {
+<span class="nc" id="L1269">        com.codename1.ui.geom.Rectangle r = new com.codename1.ui.geom.Rectangle(c.getAbsoluteX() + c.getScrollX(), c.getAbsoluteY() + c.getScrollY(), c.getWidth(), c.getHeight());</span>
+<span class="nc bnc" id="L1270" title="All 2 branches missed.">        while ((c = c.getParent()) != null) {</span>
+<span class="nc" id="L1271">            com.codename1.ui.geom.Rectangle.intersection(r.getX(), r.getY(), r.getWidth(), r.getHeight(),</span>
+<span class="nc" id="L1272">                    c.getAbsoluteX() + c.getScrollX(), c.getAbsoluteY() + c.getScrollY(), c.getWidth(), c.getHeight(),</span>
+                    r);
+
+        }
+<span class="nc" id="L1276">        return r;</span>
+
+    }
+
+    /**
+     * Wrap the setEditMode method so that it is &quot;safe&quot; to set to resize edit mode.
+     * This will try to set to the &quot;resize&quot; edit mode, and will spawn a thread
+     * to check 200 ms later to make sure that the text area is not covered by the
+     * keyboard.  If it is covered by the keyboard, it will switch to pan edit mode.
+     * This is preferable since resize edit mode works better in general so we'd like
+     * to use resize whenever possible.
+     *
+     * This change is to minimize the number of occurrences of this bug:
+     * https://github.com/codenameone/CodenameOne/issues/1827
+     *
+     * Some attempts were made to fix this bug directly by wrapping the textarea
+     * inside a ScrollView, but it caused some issues when the user tries to make text selections
+     * on the textview content - which causes Android to implicitly *change* to resize edit mode
+     * without actually letting us know.  This gist shows that attempt:
+     * https://gist.github.com/shannah/471033878e53c1fc297680fa85f6fd20
+     *
+     *
+     * @param resize
+     */
+    private static void trySetEditMode(final boolean resize, final int retriesRemaining) {
+<span class="nc bnc" id="L1301" title="All 2 branches missed.">        if (trySetEditModeCount &gt; 100) {</span>
+<span class="nc" id="L1302">            trySetEditModeCount = 0;</span>
+        }
+<span class="nc" id="L1304">        final int thisCount = trySetEditModeCount++;</span>
+<span class="nc bnc" id="L1305" title="All 2 branches missed.">        if (resize != resizeMode) {</span>
+<span class="nc" id="L1306">            setEditMode(resize);</span>
+        }
+<span class="nc bnc" id="L1308" title="All 2 branches missed.">        if (resize) {</span>
+            // We would like to set pan mode, but we must do this with some protections
+            // since pan mode might cover the text area
+
+<span class="nc" id="L1312">            new Thread(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L1314">                    Util.sleep(100);</span>
+<span class="nc bnc" id="L1315" title="All 2 branches missed.">                    if (thisCount != trySetEditModeCount-1) {</span>
+<span class="nc" id="L1316">                        return;</span>
+                    }
+<span class="nc" id="L1318">                    AndroidNativeUtil.getActivity().runOnUiThread(new Runnable() {</span>
+                        public void run() {
+<span class="nc bnc" id="L1320" title="All 2 branches missed.">                            if (thisCount != trySetEditModeCount-1) {</span>
+<span class="nc" id="L1321">                                return;</span>
+                            }
+<span class="nc bnc" id="L1323" title="All 6 branches missed.">                            if (sInstance == null || sInstance.mEditText == null || sInstance.mEditText.mTextArea == null) {</span>
+<span class="nc" id="L1324">                                return;</span>
+                            }
+<span class="nc" id="L1326">                            com.codename1.ui.Font font = sInstance.mEditText.mTextArea.getStyle().getFont();</span>
+<span class="nc bnc" id="L1327" title="All 4 branches missed.">                            float fontSize = (font != null || font.getPixelSize() == 0) ? font.getPixelSize() : Display.getInstance().convertToPixels(4);</span>
+<span class="nc" id="L1328">                            com.codename1.ui.geom.Rectangle visibleRect = getVisibleRect(sInstance.mEditText.mTextArea);</span>
+<span class="nc" id="L1329">                            Rect r = new Rect();</span>
+<span class="nc" id="L1330">                            AndroidImplementation.getInstance().relativeLayout.getGlobalVisibleRect(r);</span>
+<span class="nc" id="L1331">                            int rootViewHeight = r.height();</span>
+<span class="nc" id="L1332">                            int txtY = sInstance.mEditText.mTextArea.getAbsoluteY() + sInstance.mEditText.mTextArea.getScrollY();</span>
+<span class="nc bnc" id="L1333" title="All 4 branches missed.">                            if (txtY &gt; rootViewHeight - 20 || visibleRect.getHeight() &lt; fontSize) {</span>
+                                // We're off the page
+                                //System.out.println(&quot;SETTING TO PAN MODE_______&quot;);
+<span class="nc" id="L1336">                                setEditMode(false);</span>
+
+                            } else {
+<span class="nc bnc" id="L1339" title="All 2 branches missed.">                                if (retriesRemaining &gt; 0) {</span>
+<span class="nc" id="L1340">                                    trySetEditMode(resize, retriesRemaining-1);</span>
+                                }
+                            }
+<span class="nc" id="L1343">                        }</span>
+
+                    });
+
+<span class="nc" id="L1347">                }</span>
+<span class="nc" id="L1348">            }).start();</span>
+        }
+<span class="nc" id="L1350">    }</span>
+
+    private static void setEditMode(final boolean resize) {
+<span class="fc" id="L1353">        resizeMode = resize;</span>
+
+<span class="fc" id="L1355">        final Activity activity = sInstance.impl.getActivity();</span>
+<span class="fc" id="L1356">        final Window window = activity.getWindow();</span>
+
+<span class="pc bpc" id="L1358" title="1 of 2 branches missed.">        if (resize) {</span>
+<span class="nc bnc" id="L1359" title="All 4 branches missed.">            if (Build.VERSION.SDK_INT &gt;= 34 &amp;&amp; isImmersive(window)) {</span>
+                // On Android 14+, adjustResize doesn't work with immersive layouts
+<span class="nc" id="L1361">                window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);</span>
+<span class="nc" id="L1362">                View rootView = window.getDecorView().findViewById(android.R.id.content);</span>
+<span class="nc" id="L1363">                applyImeInsetPaddingReflection(rootView);</span>
+<span class="nc" id="L1364">            } else {</span>
+                // Old behavior works fine
+<span class="nc" id="L1366">                window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);</span>
+            }
+        } else {
+<span class="fc" id="L1369">            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);</span>
+        }
+<span class="fc" id="L1371">    }</span>
+
+    private static boolean isImmersive(Window window) {
+<span class="nc" id="L1374">        return AndroidImplementation.isImmersive(window);</span>
+    }
+
+    private static void applyImeInsetPaddingReflection(View rootView) {
+        try {
+<span class="nc" id="L1379">            rootView.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {</span>
+                @Override
+                public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                    try {
+<span class="nc" id="L1383">                        Class&lt;?&gt; typeClass = Class.forName(&quot;android.view.WindowInsets$Type&quot;);</span>
+<span class="nc" id="L1384">                        Class&lt;?&gt; insetsClass = Class.forName(&quot;android.view.WindowInsets&quot;);</span>
+<span class="nc" id="L1385">                        int imeType = ((Integer) typeClass.getMethod(&quot;ime&quot;).invoke(null)).intValue();</span>
+
+<span class="nc" id="L1387">                        Object imeInsets = insetsClass.getMethod(&quot;getInsets&quot;, int.class).invoke(insets, imeType);</span>
+<span class="nc" id="L1388">                        Class&lt;?&gt; insetsRectClass = imeInsets.getClass();</span>
+
+<span class="nc" id="L1390">                        int bottom = ((Integer) insetsRectClass.getField(&quot;bottom&quot;).get(imeInsets)).intValue();</span>
+<span class="nc" id="L1391">                        boolean isVisible = ((Boolean) insetsClass.getMethod(&quot;isVisible&quot;, int.class).invoke(insets, imeType)).booleanValue();</span>
+
+<span class="nc bnc" id="L1393" title="All 2 branches missed.">                        v.setPadding(0, 0, 0, isVisible ? bottom : 0);</span>
+<span class="nc" id="L1394">                    } catch (Throwable e) {</span>
+<span class="nc" id="L1395">                        e.printStackTrace();</span>
+<span class="nc" id="L1396">                    }</span>
+<span class="nc" id="L1397">                    return insets;</span>
+                }
+            });
+
+<span class="nc" id="L1401">            rootView.requestApplyInsets();</span>
+
+<span class="nc" id="L1403">        } catch (Throwable e) {</span>
+<span class="nc" id="L1404">            e.printStackTrace();</span>
+<span class="nc" id="L1405">        }</span>
+<span class="nc" id="L1406">    }</span>
+
+    public static boolean isInputResize(){
+<span class="nc" id="L1409">        return resizeMode;</span>
+    }
+
+    /**
+     * Returns true if an edit is currently in progress, false otherwise
+     */
+    public static boolean isEditing() {
+<span class="fc bfc" id="L1416" title="All 2 branches covered.">        return (sInstance == null) ? false : sInstance.mIsEditing;</span>
+    }
+
+    public static int lastEditEndReason() {
+<span class="nc bnc" id="L1420" title="All 2 branches missed.">        return (sInstance == null) ? REASON_UNDEFINED : sInstance.mLastEndEditReason;</span>
+    }
+
+    public static void endEdit() {
+<span class="fc" id="L1424">        endEdit(false);</span>
+<span class="fc" id="L1425">    }</span>
+    // Called on Android UI thread.
+    public static void endEdit(boolean forceVKBClose) {
+<span class="pc bpc" id="L1428" title="1 of 2 branches missed.">        if (sInstance != null) {</span>
+<span class="nc" id="L1429">            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose, 0);</span>
+            // No longer need these because end editing will allow the onComplete handler to
+            // be called which will trigger a releaseEdit
+            //ViewParent p = sInstance.getParent();
+            //if (p != null) {
+            //    ((ViewGroup) p).removeView(sInstance);
+            //}
+            //sInstance = null;
+        }
+<span class="fc" id="L1438">    }</span>
+
+    public static void stopEdit() {
+<span class="nc" id="L1441">        stopEdit(false);</span>
+<span class="nc" id="L1442">    }</span>
+
+    public static void stopEdit(boolean forceVKBClose) {
+<span class="pc bpc" id="L1445" title="1 of 2 branches missed.">        if (sInstance != null) {</span>
+<span class="fc" id="L1446">            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose, 0);</span>
+        }
+<span class="fc" id="L1448">    }</span>
+
+    private static void releaseEdit() {
+<span class="fc bfc" id="L1451" title="All 2 branches covered.">        if (sInstance != null) {</span>
+<span class="fc" id="L1452">            ViewParent p = sInstance.getParent();</span>
+<span class="pc bpc" id="L1453" title="1 of 2 branches missed.">            if (p != null) {</span>
+<span class="fc" id="L1454">                ((ViewGroup) p).removeView(sInstance);</span>
+            }
+<span class="fc" id="L1456">            sInstance = null;</span>
+        }
+<span class="fc" id="L1458">    }</span>
+
+    private static int lastTextAreaX, lastTextAreaY, lastTextAreaWidth, lastTextAreaHeight;
+
+    /*
+    public static void reLayoutEdit() {
+        if (sInstance != null &amp;&amp; sInstance.mEditText != null) {
+
+            TextArea txt = sInstance.mEditText.mTextArea;
+            if (txt != null) {
+                int txty = txt.getAbsoluteY() + txt.getScrollY();
+                int txtx = txt.getAbsoluteX() + txt.getScrollX();
+                int w = txt.getWidth();
+                int h = txt.getHeight();
+
+                sInstance.mEditLayoutParams.setMargins(txtx, txty, 0, 0);
+                sInstance.mEditLayoutParams.width = w;
+                sInstance.mEditLayoutParams.height = h;
+                sInstance.mEditText.requestLayout();
+                sInstance.invalidate();
+                sInstance.setVisibility(VISIBLE);
+                sInstance.bringToFront();
+            }
+        }
+
+    }*/
+
+    public static void reLayoutEdit() {
+<span class="fc" id="L1486">        reLayoutEdit(false);</span>
+<span class="fc" id="L1487">    }</span>
+
+    public static void reLayoutEdit(boolean force) {
+
+<span class="pc bpc" id="L1491" title="2 of 8 branches missed.">        if (mIsEditing &amp;&amp; !isActiveTextEditorHidden() &amp;&amp; sInstance != null &amp;&amp; sInstance.mEditText != null) {</span>
+<span class="fc" id="L1492">            final TextArea txt = sInstance.mEditText.mTextArea;</span>
+<span class="pc bpc" id="L1493" title="2 of 4 branches missed.">            if (!force &amp;&amp; lastTextAreaX == txt.getAbsoluteX() + txt.getScrollX() &amp;&amp;</span>
+<span class="pc bpc" id="L1494" title="1 of 2 branches missed.">                    lastTextAreaY == txt.getAbsoluteY() + txt.getScrollY() &amp;&amp;</span>
+<span class="pc bpc" id="L1495" title="1 of 2 branches missed.">                    lastTextAreaWidth == txt.getWidth() &amp;&amp;</span>
+<span class="pc bpc" id="L1496" title="1 of 2 branches missed.">                    lastTextAreaHeight == txt.getHeight()) {</span>
+<span class="fc" id="L1497">                return;</span>
+            }
+<span class="nc" id="L1499">            Display.getInstance().callSerially(new Runnable() {</span>
+                public void run() {
+<span class="nc bnc" id="L1501" title="All 8 branches missed.">                    if (mIsEditing &amp;&amp; !isActiveTextEditorHidden() &amp;&amp; sInstance != null &amp;&amp; sInstance.mEditText != null) {</span>
+
+<span class="nc bnc" id="L1503" title="All 2 branches missed.">                        if (txt != null) {</span>
+
+<span class="nc bnc" id="L1505" title="All 2 branches missed.">                            if (sInstance.mEditText.mTextArea != txt) {</span>
+                                //has changed in between, skip or would change location back to old field
+<span class="nc" id="L1507">                                return;</span>
+                            }
+
+<span class="nc" id="L1510">                            final int txty = lastTextAreaY = txt.getAbsoluteY() + txt.getScrollY();</span>
+<span class="nc" id="L1511">                            final int txtx = lastTextAreaX = txt.getAbsoluteX() + txt.getScrollX();</span>
+<span class="nc" id="L1512">                            final int w = lastTextAreaWidth = txt.getWidth();</span>
+<span class="nc" id="L1513">                            final int h = lastTextAreaHeight = txt.getHeight();</span>
+
+
+<span class="nc" id="L1516">                            final InPlaceEditView instance = sInstance;</span>
+<span class="nc bnc" id="L1517" title="All 2 branches missed.">                            if (instance != null) {</span>
+<span class="nc" id="L1518">                                instance.impl.getActivity().runOnUiThread(new Runnable() {</span>
+                                    public void run() {
+<span class="nc bnc" id="L1520" title="All 8 branches missed.">                                    if (mIsEditing &amp;&amp; !isActiveTextEditorHidden() &amp;&amp; sInstance != null &amp;&amp; sInstance.mEditText != null) {</span>
+
+<span class="nc bnc" id="L1522" title="All 2 branches missed.">                                        if (sInstance.mEditText.mTextArea != txt) {</span>
+                                            //has changed in between, skip or would change location back to old field
+<span class="nc" id="L1524">                                            return;</span>
+                                        }
+
+<span class="nc" id="L1527">                                        sInstance.mEditLayoutParams.setMargins(txtx, txty, 0, 0);</span>
+<span class="nc" id="L1528">                                        sInstance.mEditLayoutParams.width = w;</span>
+<span class="nc" id="L1529">                                        sInstance.mEditLayoutParams.height = h;</span>
+<span class="nc bnc" id="L1530" title="All 4 branches missed.">                                        if (!txt.isSingleLineTextArea() &amp;&amp; txt.getDoneListener() != null) {</span>
+<span class="nc" id="L1531">                                            sInstance.mEditText.getLayoutParams().width = w;</span>
+<span class="nc" id="L1532">                                            sInstance.mEditText.getLayoutParams().height = h;</span>
+<span class="nc" id="L1533">                                            sInstance.mEditText.setMaxWidth(w);</span>
+<span class="nc" id="L1534">                                            sInstance.mEditText.setMaxHeight(h);</span>
+<span class="nc" id="L1535">                                            sInstance.setHorizontalScrollBarEnabled(false);</span>
+<span class="nc" id="L1536">                                            sInstance.mEditText.setHorizontallyScrolling(false);</span>
+                                        }
+
+
+
+<span class="nc" id="L1541">                                        sInstance.mEditText.requestLayout();</span>
+<span class="nc" id="L1542">                                        sInstance.invalidate();</span>
+<span class="nc bnc" id="L1543" title="All 2 branches missed.">                                        if (sInstance.getVisibility() != VISIBLE) {</span>
+<span class="nc" id="L1544">                                            sInstance.setVisibility(VISIBLE);</span>
+                                        }
+<span class="nc" id="L1546">                                        sInstance.bringToFront();</span>
+                                    }
+<span class="nc" id="L1548">                                }</span>
+                            });
+                            }
+                        }
+                    }
+<span class="nc" id="L1553">                }</span>
+            });
+        }
+<span class="fc" id="L1556">    }</span>
+
+    private static TextArea getCurrentTextArea() {
+<span class="nc" id="L1559">        InPlaceEditView ev = sInstance;</span>
+<span class="nc bnc" id="L1560" title="All 2 branches missed.">        EditView editView = ev != null ? ev.mEditText : null;</span>
+<span class="nc bnc" id="L1561" title="All 2 branches missed.">        return editView != null ? editView.mTextArea : null;</span>
+    }
+    
+    private static EditView getCurrentEditView() {
+<span class="nc" id="L1565">        InPlaceEditView ev = sInstance;</span>
+<span class="nc bnc" id="L1566" title="All 2 branches missed.">        return ev != null ? ev.mEditText : null;</span>
+    }
+    
+    /**
+     * Entry point for using this class
+     * @param impl The current running activity
+     * @param component Any subclass of com.codename1.ui.TextArea
+     * @param inputType One of the TextArea's input-type constants
+     */
+    public static void edit(final AndroidImplementation impl, final Component component, final int inputType) {
+<span class="pc bpc" id="L1576" title="1 of 2 branches missed.">        if (impl.getActivity() == null) {</span>
+<span class="nc" id="L1577">            throw new IllegalArgumentException(&quot;activity is null&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1580" title="1 of 2 branches missed.">        if (component == null) {</span>
+<span class="nc" id="L1581">            throw new IllegalArgumentException(&quot;component is null&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1584" title="1 of 2 branches missed.">        if (!(component instanceof TextArea)) {</span>
+<span class="nc" id="L1585">            throw new IllegalArgumentException(&quot;component must be instance of TextArea&quot;);</span>
+        }
+
+
+
+<span class="fc" id="L1590">        final TextArea textArea = (TextArea) component;</span>
+<span class="fc" id="L1591">        textArea.registerAsInputDevice();</span>
+<span class="fc" id="L1592">        final String initialText = textArea.getText();</span>
+<span class="fc" id="L1593">        textArea.putClientProperty(&quot;InPlaceEditView.initialText&quot;, initialText);</span>
+        
+        // The very first time we try to edit a string, let's determine if the
+        // system default is to do async editing.  If the system default
+        // is not yet set, we set it here, and it will be used as the default from now on
+        //  We do this because the nativeInstance.isAsyncEditMode() value changes
+        // to reflect the currently edited field so it isn't a good way to keep a
+        // system default.
+<span class="fc" id="L1601">        String defaultAsyncEditingSetting = Display.getInstance().getProperty(&quot;android.VKBAlwaysOpen&quot;, null);</span>
+<span class="fc bfc" id="L1602" title="All 2 branches covered.">        if (defaultAsyncEditingSetting == null) {</span>
+<span class="pc bpc" id="L1603" title="1 of 2 branches missed.">            defaultAsyncEditingSetting = impl.isAsyncEditMode() ? &quot;true&quot; : &quot;false&quot;;</span>
+<span class="fc" id="L1604">            Display.getInstance().setProperty(&quot;android.VKBAlwaysOpen&quot;, defaultAsyncEditingSetting);</span>
+
+        }
+<span class="pc bpc" id="L1607" title="1 of 2 branches missed.">        boolean asyncEdit = &quot;true&quot;.equals(defaultAsyncEditingSetting) ? true : false;</span>
+
+        // Check if the form has any setting for asyncEditing that should override
+        // the application defaults.
+<span class="fc" id="L1611">        final Form parentForm = component.getComponentForm();</span>
+<span class="pc bpc" id="L1612" title="1 of 2 branches missed.">        if (parentForm == null) {</span>
+<span class="nc" id="L1613">            com.codename1.io.Log.p(&quot;Attempt to edit text area that is not on a form.  This is not supported&quot;);</span>
+<span class="nc" id="L1614">            return;</span>
+        }
+<span class="pc bpc" id="L1616" title="1 of 2 branches missed.">        if (parentForm.getClientProperty(&quot;asyncEditing&quot;) != null) {</span>
+<span class="nc" id="L1617">            Object async = parentForm.getClientProperty(&quot;asyncEditing&quot;);</span>
+<span class="nc bnc" id="L1618" title="All 2 branches missed.">            if (async instanceof Boolean) {</span>
+<span class="nc" id="L1619">                asyncEdit = ((Boolean)async).booleanValue();</span>
+                //Log.p(&quot;Form overriding asyncEdit due to asyncEditing client property: &quot;+asyncEdit);
+            }
+        }
+
+<span class="pc bpc" id="L1624" title="1 of 2 branches missed.">        if (parentForm.getClientProperty(&quot;android.asyncEditing&quot;) != null) {</span>
+<span class="nc" id="L1625">            Object async = parentForm.getClientProperty(&quot;android.asyncEditing&quot;);</span>
+<span class="nc bnc" id="L1626" title="All 2 branches missed.">            if (async instanceof Boolean) {</span>
+<span class="nc" id="L1627">                asyncEdit = ((Boolean)async).booleanValue();</span>
+                //Log.p(&quot;Form overriding asyncEdit due to ios.asyncEditing client property: &quot;+asyncEdit);
+            }
+
+        }
+
+<span class="pc bpc" id="L1633" title="1 of 2 branches missed.">        if (parentForm.isFormBottomPaddingEditingMode()) {</span>
+<span class="nc" id="L1634">            asyncEdit = true;</span>
+        }
+
+
+        // If the field itself explicitly sets async editing behaviour
+        // then this will override all other settings.
+<span class="pc bpc" id="L1640" title="1 of 2 branches missed.">        if (component.getClientProperty(&quot;asyncEditing&quot;) != null) {</span>
+<span class="nc" id="L1641">            Object async = component.getClientProperty(&quot;asyncEditing&quot;);</span>
+<span class="nc bnc" id="L1642" title="All 2 branches missed.">            if (async instanceof Boolean) {</span>
+<span class="nc" id="L1643">                asyncEdit = ((Boolean)async).booleanValue();</span>
+                //Log.p(&quot;Overriding asyncEdit due to field asyncEditing client property: &quot;+asyncEdit);
+            }
+        }
+
+<span class="pc bpc" id="L1648" title="1 of 2 branches missed.">        if (component.getClientProperty(&quot;android.asyncEditing&quot;) != null) {</span>
+<span class="nc" id="L1649">            Object async = component.getClientProperty(&quot;android.asyncEditing&quot;);</span>
+<span class="nc bnc" id="L1650" title="All 2 branches missed.">            if (async instanceof Boolean) {</span>
+<span class="nc" id="L1651">                asyncEdit = ((Boolean)async).booleanValue();</span>
+                //Log.p(&quot;Overriding asyncEdit due to field ios.asyncEditing client property: &quot;+asyncEdit);
+            }
+
+        }
+
+<span class="fc" id="L1657">        final boolean resizeEditMode = &quot;resize&quot;.equalsIgnoreCase(String.valueOf(component.getClientProperty(&quot;android.editMode&quot;)));</span>
+<span class="fc" id="L1658">        final boolean panEditMode = &quot;pan&quot;.equalsIgnoreCase(String.valueOf(component.getClientProperty(&quot;android.editMode&quot;)));</span>
+        
+        
+        //if true, then in async mode we are currently editing and are switching to another field
+        final boolean isEditedFieldSwitch;
+
+        // If we are already editing, we need to finish that up before we proceed to edit the next field.
+<span class="fc" id="L1665">        synchronized(editingLock) {</span>
+<span class="fc bfc" id="L1666" title="All 2 branches covered.">            if (mIsEditing) {</span>
+
+<span class="pc bpc" id="L1668" title="1 of 2 branches missed.">                if (impl.isAsyncEditMode()) {</span>
+                    // Using isEditedFieldSwitch was causing issues with cursors not showing up.
+                    // https://github.com/codenameone/CodenameOne/issues/2353
+                    // https://stackoverflow.com/questions/49004370/focus-behaviour-in-textarea-in-cn1
+                    // Disabling this feature by default now, but can be re-enabled by setting
+                    // Display.getInstance().setProperty(&quot;android.reuseTextEditorOnSwitch&quot;, &quot;true&quot;);
+                    // This editedFieldSwitch feature was added a while back to improve experience on older
+                    // Android devices where the field switching was going too slow. 
+                    // https://github.com/codenameone/CodenameOne/issues/2012
+                    // This issue was resolved in this commit (https://github.com/jaanushansen/CodenameOne/commit/f3e53a80704149e4d7cde276d01c1368bcdcfe2c)
+                    // which was submitted as part of a pull request.  This fix has been the source of several
+                    // regressions, mostly related to properties not being propagated properly when a text field is changed
+                    // However, this issue (with the cursor not showing up), doesn't appear to have a simple solution
+                    // so, I'm disabling this feature for now.
+<span class="fc" id="L1682">                    isEditedFieldSwitch = &quot;true&quot;.equals(Display.getInstance().getProperty(&quot;android.reuseTextEditorOnSwitch&quot;, &quot;false&quot;));</span>
+<span class="fc" id="L1683">                    final String[] out = new String[1];</span>
+<span class="fc" id="L1684">                    TextArea prevTextArea = null;</span>
+<span class="pc bpc" id="L1685" title="2 of 4 branches missed.">                    if(sInstance != null &amp;&amp; sInstance.mLastEditText != null) {</span>
+<span class="fc" id="L1686">                        prevTextArea = sInstance.mLastEditText.getTextArea();</span>
+                    }
+
+<span class="pc bpc" id="L1689" title="1 of 2 branches missed.">                    if (prevTextArea != null) {</span>
+<span class="fc" id="L1690">                        final TextArea fPrevTextArea = prevTextArea;</span>
+<span class="fc" id="L1691">                        final String retVal = sInstance.mLastEditText.getText().toString();</span>
+<span class="fc" id="L1692">                        Display.getInstance().callSerially(new Runnable() {</span>
+                            public void run() {
+<span class="fc" id="L1694">                                Display.getInstance().onEditingComplete(fPrevTextArea, retVal);</span>
+<span class="fc" id="L1695">                                textArea.requestFocus();</span>
+<span class="fc" id="L1696">                            }</span>
+                        });
+                    }
+
+
+<span class="fc" id="L1701">                    InPlaceEditView.setEditedTextField(textArea);</span>
+
+<span class="fc" id="L1703">                    nextTextArea = null;</span>
+<span class="fc" id="L1704">                } else {</span>
+<span class="nc" id="L1705">                    isEditedFieldSwitch = false;</span>
+
+<span class="nc" id="L1707">                    final InPlaceEditView instance = sInstance;</span>
+<span class="nc bnc" id="L1708" title="All 6 branches missed.">                    if (instance != null &amp;&amp; instance.mEditText != null &amp;&amp; instance.mEditText.mTextArea == textArea) {</span>
+<span class="nc" id="L1709">                        instance.showTextEditorAgain();</span>
+<span class="nc" id="L1710">                        return;</span>
+                    }
+<span class="nc bnc" id="L1712" title="All 6 branches missed.">                    if (!isClosing &amp;&amp; sInstance != null &amp;&amp; sInstance.mEditText != null) {</span>
+<span class="nc" id="L1713">                        isClosing = true;</span>
+
+<span class="nc" id="L1715">                        impl.getActivity().runOnUiThread(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="nc" id="L1718">                                instance.endEditing(REASON_UNDEFINED, true, 0);</span>
+<span class="nc" id="L1719">                            }</span>
+                        });
+                    }
+
+<span class="nc" id="L1723">                    afterClose = new Runnable() {</span>
+
+                        @Override
+                        public void run() {
+<span class="nc" id="L1727">                            impl.callHideTextEditor();</span>
+<span class="nc" id="L1728">                            Display.getInstance().editString(component, textArea.getMaxSize(), inputType, textArea.getText());</span>
+<span class="nc" id="L1729">                        }</span>
+
+                    };
+<span class="nc" id="L1732">                    return;</span>
+                }
+            } else {
+<span class="fc" id="L1735">                isEditedFieldSwitch = false;</span>
+            }
+<span class="fc" id="L1737">            mIsEditing = true;</span>
+<span class="fc" id="L1738">            isClosing = false;</span>
+<span class="fc" id="L1739">            afterClose = null;</span>
+<span class="fc" id="L1740">        }</span>
+
+<span class="fc" id="L1742">        impl.setAsyncEditMode(asyncEdit);</span>
+
+        //textArea.setPreferredSize(prefSize);
+<span class="pc bpc" id="L1745" title="3 of 4 branches missed.">        if (!impl.isAsyncEditMode() &amp;&amp; textArea instanceof TextField) {</span>
+<span class="nc" id="L1746">            ((TextField) textArea).setEditable(false);</span>
+        }
+
+<span class="fc" id="L1749">        final boolean scrollableParent = isScrollableParent(textArea);</span>
+        // We wrap the text area so that we can safely pass data across to the
+        // android UI thread.
+<span class="fc" id="L1752">        final TextAreaData textAreaData = new TextAreaData(textArea);</span>
+
+<span class="fc" id="L1754">        impl.getActivity().runOnUiThread(new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="pc bpc" id="L1758" title="1 of 2 branches missed.">		if (!isEditedFieldSwitch) {</span>
+<span class="fc" id="L1759">                    releaseEdit();</span>
+
+<span class="pc bpc" id="L1761" title="1 of 2 branches missed.">                    if (sInstance == null) {</span>
+<span class="fc" id="L1762">                        sInstance = new InPlaceEditView(impl);</span>
+<span class="fc" id="L1763">                        impl.relativeLayout.addView(sInstance);</span>
+                    }
+
+                    // Let's try something new here
+                    // We'll ALWAYS try resize edit mode (since it just works better)
+                    // But we'll detect whether the field is still covered by the keyboard
+                    // and switch to pan mode if necessary.
+
+
+
+		}
+
+<span class="pc bpc" id="L1775" title="1 of 2 branches missed.">		        if (panEditMode) {</span>
+<span class="nc" id="L1776">		            setEditMode(false);</span>
+<span class="pc bpc" id="L1777" title="1 of 2 branches missed.">                } else if (resizeEditMode) {</span>
+<span class="nc" id="L1778">		            setEditMode(true);</span>
+<span class="pc bpc" id="L1779" title="1 of 2 branches missed.">                } else if( parentForm.isFormBottomPaddingEditingMode()) {</span>
+<span class="nc" id="L1780">                    setEditMode(true);</span>
+<span class="pc bpc" id="L1781" title="1 of 2 branches missed.">                } else if (scrollableParent) {</span>
+<span class="fc" id="L1782">                    setEditMode(false);</span>
+                }else{
+<span class="nc" id="L1784">                    trySetEditMode(true);</span>
+                }
+<span class="fc" id="L1786">                sInstance.startEditing(impl.getActivity(), textAreaData, initialText, inputType, isEditedFieldSwitch);</span>
+<span class="fc" id="L1787">            }</span>
+        });
+
+<span class="fc" id="L1790">        final String[] out = new String[1];</span>
+
+        // In case the contents of the text area are changed while editing is in progress
+        // we should propagate the changes to the native text field.
+<span class="fc" id="L1794">        final DataChangedListener textAreaDataChanged = new DataChangedListener() {</span>
+            @Override
+            public void dataChanged(int type, int index) {
+<span class="nc bnc" id="L1797" title="All 2 branches missed.">                if (suppressDataChangedEvent) {</span>
+                    // We ignore changed events that were actually initiated by
+                    // the user typing in the text field.  
+                    // https://github.com/codenameone/CodenameOne/issues/3343
+<span class="nc" id="L1801">                    return;</span>
+                }
+<span class="nc" id="L1803">                TextArea currTextArea = getCurrentTextArea();</span>
+<span class="nc bnc" id="L1804" title="All 2 branches missed.">                if (currTextArea != textArea) {</span>
+                    // This is not the active text area anymore
+<span class="nc" id="L1806">                    textArea.removeDataChangedListener(this);</span>
+<span class="nc" id="L1807">                    return;</span>
+                }
+<span class="nc" id="L1809">                final String newText = textArea.getText();</span>
+<span class="nc" id="L1810">                EditView currEditView = getCurrentEditView();</span>
+<span class="nc bnc" id="L1811" title="All 4 branches missed.">                if (currEditView == null || currEditView.mTextArea != textArea) {</span>
+<span class="nc" id="L1812">                    textArea.removeDataChangedListener(this);</span>
+<span class="nc" id="L1813">                    return;</span>
+                }
+                
+<span class="nc" id="L1816">                String existingText = currEditView.getText().toString();</span>
+                // We use the com.codename1.compat version
+                // because Objects.equals was not available until API 19
+<span class="nc bnc" id="L1819" title="All 2 branches missed.">                if (!com.codename1.compat.java.util.Objects.equals(newText, existingText)) {</span>
+<span class="nc" id="L1820">                    impl.getActivity().runOnUiThread(new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L1822">                            TextArea currTextArea = getCurrentTextArea();</span>
+<span class="nc" id="L1823">                            EditView currEditView = getCurrentEditView();</span>
+<span class="nc bnc" id="L1824" title="All 6 branches missed.">                            if (currTextArea != textArea || currEditView == null || currEditView.mTextArea != textArea) {</span>
+<span class="nc" id="L1825">                                return;</span>
+                            }
+<span class="nc" id="L1827">                            String existingText = currEditView.getText().toString();</span>
+                            // We use the com.codename1.compat version
+                            // because Objects.equals was not available until API 19
+<span class="nc bnc" id="L1830" title="All 2 branches missed.">                            if (!com.codename1.compat.java.util.Objects.equals(newText, existingText)) {</span>
+                                // We need to suppress the Android text change events
+                                // to prevent weird things from happening.  E.g. https://github.com/codenameone/CodenameOne/issues/3349
+<span class="nc" id="L1833">                                suppressTextChangeEvent = true;</span>
+<span class="nc" id="L1834">                                currEditView.setText(newText);</span>
+<span class="nc" id="L1835">                                suppressTextChangeEvent = false;</span>
+                            }
+                            
+<span class="nc" id="L1838">                        }</span>
+                    });
+                }
+                
+<span class="nc" id="L1842">            }</span>
+        };
+<span class="fc" id="L1844">        textArea.addDataChangedListener(textAreaDataChanged);</span>
+
+        // In order to reuse the code the runs after edit completion, we will wrap it in a runnable
+        // For sync edit mode, we will just run onComplete.run() at the end of this method.  For
+        // Async mode we add the Runnable to the textarea as a client property, then run it
+        // when editing eventually completes.
+<span class="fc" id="L1850">        Runnable onComplete = new Runnable() {</span>
+            public void run() {
+<span class="fc" id="L1852">                textArea.removeDataChangedListener(textAreaDataChanged);</span>
+<span class="pc bpc" id="L1853" title="3 of 4 branches missed.">                if (!impl.isAsyncEditMode() &amp;&amp; textArea instanceof TextField) {</span>
+<span class="nc" id="L1854">                    ((TextField) textArea).setEditable(true);</span>
+                }
+<span class="fc" id="L1856">                textArea.setPreferredSize(null);</span>
+
+<span class="pc bpc" id="L1858" title="3 of 6 branches missed.">                if(sInstance != null &amp;&amp; sInstance.mLastEditText != null &amp;&amp; sInstance.mLastEditText.mTextArea == textArea){</span>
+<span class="fc" id="L1859">                    String retVal = sInstance.mLastEditText.getText().toString();</span>
+
+<span class="pc bpc" id="L1861" title="1 of 2 branches missed.">                    if (!impl.isAsyncEditMode()) {</span>
+<span class="nc" id="L1862">                        sInstance.mLastEditText = null;</span>
+<span class="nc" id="L1863">                        impl.getActivity().runOnUiThread(new Runnable() {</span>
+
+                            public void run() {
+<span class="nc" id="L1866">                                releaseEdit();</span>
+<span class="nc" id="L1867">                            }</span>
+                        });
+                    }
+<span class="fc" id="L1870">                    out[0] = retVal;</span>
+<span class="fc" id="L1871">                }else{</span>
+<span class="nc" id="L1872">                    out[0] = initialText;</span>
+                }
+
+<span class="fc" id="L1875">                Display.getInstance().onEditingComplete(component, out[0]);</span>
+<span class="pc bpc" id="L1876" title="1 of 2 branches missed.">                if (impl.isAsyncEditMode()) {</span>
+<span class="fc" id="L1877">                    impl.callHideTextEditor();</span>
+                } else {
+
+
+                    // the call to releaseEdit above should remove the native text editor and
+                    // set sInstance to null
+                    // We would like to wait for that to happen before we release our isEditing
+                    // lock.
+<span class="nc bnc" id="L1885" title="All 2 branches missed.">                    if (sInstance != null) {</span>
+<span class="nc" id="L1886">                        Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                            public void run() {
+<span class="nc bnc" id="L1888" title="All 2 branches missed.">                                while (sInstance != null) {</span>
+<span class="nc" id="L1889">                                    com.codename1.io.Util.sleep(5);</span>
+                                }
+<span class="nc" id="L1891">                            }</span>
+
+                        });
+                    }
+                }
+
+
+                // Release the editing flag
+<span class="fc" id="L1899">                synchronized (editingLock) {</span>
+<span class="fc" id="L1900">                    mIsEditing = false;</span>
+<span class="fc" id="L1901">                }</span>
+
+                // If anyone attempted to call edit() while we were still editing,
+                // the last such attempt will have been added to the afterClose handler
+                // as a runnable ... this should take priority over the &quot;nextTextArea&quot; setting
+<span class="pc bpc" id="L1906" title="1 of 2 branches missed.">                if (afterClose != null) {</span>
+<span class="nc" id="L1907">                    Display.getInstance().callSerially(afterClose);</span>
+<span class="pc bpc" id="L1908" title="1 of 2 branches missed.">                } else if (nextTextArea != null) {</span>
+<span class="nc" id="L1909">                    final TextArea next = nextTextArea;</span>
+<span class="nc" id="L1910">                    nextTextArea = null;</span>
+<span class="nc" id="L1911">                    next.requestFocus();</span>
+<span class="nc" id="L1912">                    Display.getInstance().callSerially(new Runnable() {</span>
+
+                        public void run() {
+<span class="nc" id="L1915">                            Display.getInstance().editString(next,</span>
+<span class="nc" id="L1916">                                    next.getMaxSize(),</span>
+<span class="nc" id="L1917">                                    next.getConstraint(),</span>
+<span class="nc" id="L1918">                                    next.getText());</span>
+<span class="nc" id="L1919">                        }</span>
+                    });
+                }
+
+<span class="fc" id="L1923">            }</span>
+        };
+<span class="fc" id="L1925">        textArea.requestFocus();</span>
+<span class="fc" id="L1926">        textArea.repaint();</span>
+<span class="pc bpc" id="L1927" title="1 of 2 branches missed.">        if (impl.isAsyncEditMode()) {</span>
+<span class="fc" id="L1928">            component.putClientProperty(&quot;android.onAsyncEditingComplete&quot;, onComplete);</span>
+<span class="fc" id="L1929">            return;</span>
+        }
+
+        // Make this call synchronous
+        // We set this flag so that waitForEditCompletion can block on it.
+        // The flag will be released inside the endEditing method which will
+        // allow the method to proceed.
+<span class="nc" id="L1936">        waitingForSynchronousEditingCompletion = true;</span>
+<span class="nc" id="L1937">        waitForEditCompletion();</span>
+
+<span class="nc" id="L1939">        onComplete.run();</span>
+<span class="nc" id="L1940">    }</span>
+
+    public static void setEditedTextField(final TextArea textarea) {
+<span class="fc" id="L1943">        Display display = Display.getInstance();</span>
+<span class="fc" id="L1944">        Runnable task = new Runnable(){</span>
+            public void run() {
+<span class="fc" id="L1946">                AndroidImplementation.getInstance().setFocusedEditingText(textarea);</span>
+<span class="fc" id="L1947">            }</span>
+        };
+<span class="pc bpc" id="L1949" title="1 of 2 branches missed.">        if (display.isEdt()) {</span>
+<span class="fc" id="L1950">            task.run();</span>
+        } else {
+<span class="nc" id="L1952">            display.callSeriallyAndWait(task);</span>
+        }
+<span class="fc" id="L1954">    }</span>
+
+    private static boolean isScrollableParent(Component c){
+<span class="fc" id="L1957">        Container p = c.getParent();</span>
+<span class="fc" id="L1958">        Font f = c.getStyle().getFont();</span>
+<span class="pc bpc" id="L1959" title="1 of 2 branches missed.">        float pixelSize = f == null ? Display.getInstance().convertToPixels(4) : f.getPixelSize();</span>
+<span class="pc bpc" id="L1960" title="1 of 2 branches missed.">        while( p != null){</span>
+
+<span class="pc bpc" id="L1962" title="2 of 4 branches missed.">            if(Accessor.scrollableYFlag(p) &amp;&amp; p.getAbsoluteY() + p.getScrollY() &lt; Display.getInstance().getDisplayHeight() / 2 - pixelSize * 2){</span>
+<span class="fc" id="L1963">                return true;</span>
+            }
+<span class="nc" id="L1965">            p = p.getParent();</span>
+        }
+<span class="nc" id="L1967">        return false;</span>
+    }
+
+    private class DebugResultReceiver extends ResultReceiver {
+
+        private static final String TAG = &quot;InPlaceEditView.ResultReceiver&quot;;
+<span class="fc" id="L1973">        private SparseArray&lt;String&gt; mResultToStringMap = new SparseArray&lt;String&gt;();</span>
+
+<span class="fc" id="L1975">        public DebugResultReceiver(Handler handler) {</span>
+<span class="fc" id="L1976">            super(handler);</span>
+<span class="fc" id="L1977">            mResultToStringMap.append(InputMethodManager.RESULT_HIDDEN, &quot;RESULT_HIDDEN&quot;);</span>
+<span class="fc" id="L1978">            mResultToStringMap.append(InputMethodManager.RESULT_SHOWN, &quot;RESULT_SHOWN&quot;);</span>
+<span class="fc" id="L1979">            mResultToStringMap.append(InputMethodManager.RESULT_UNCHANGED_HIDDEN, &quot;RESULT_UNCHANGED_HIDDEN&quot;);</span>
+<span class="fc" id="L1980">            mResultToStringMap.append(InputMethodManager.RESULT_UNCHANGED_SHOWN, &quot;RESULT_UNCHANGED_SHOWN&quot;);</span>
+<span class="fc" id="L1981">        }</span>
+
+        protected void onReceiveResult(int resultCode, Bundle resultData) {
+<span class="fc" id="L1984">            String resultStr = mResultToStringMap.get(resultCode, &quot;Unknown&quot;);</span>
+
+<span class="fc" id="L1986">            Log.i(TAG, &quot;resultCode = &quot; + resultStr);</span>
+<span class="fc" id="L1987">        }</span>
+    }
+
+<span class="fc" id="L1990">    private class TextChange {</span>
+        String textToAppend;
+        int atPos;
+        int deleteLength;
+
+
+    }
+
+    // flag to suppress CN1 data changed events.  This is used to prevent the 
+    // data changed listener from processing changes to the text that were initiated
+    // by the user typing.  
+    // Necessary to fix https://github.com/codenameone/CodenameOne/issues/3343
+    private static boolean suppressDataChangedEvent;
+    
+    // flag to suppress (native android) text change events.  This is used
+    // to prevent the beforeTextChanged() and afterTextChanged() methods from
+    // executing on changes that we initiated programmatically. 
+    // It fixes https://github.com/codenameone/CodenameOne/issues/3349
+    private static boolean suppressTextChangeEvent;
+
+    class EditView extends AutoCompleteTextView {
+
+        private InPlaceEditView mInPlaceEditView;
+<span class="fc" id="L2013">        private TextArea mTextArea = null;</span>
+
+        TextArea getTextArea() {
+<span class="fc" id="L2016">            return mTextArea;</span>
+        }
+<span class="fc" id="L2018">        private ResetableTextWatcher mTextWatcher = new ResetableTextWatcher() {</span>
+
+<span class="fc" id="L2020">            private boolean started = false;</span>
+            private TextChange currChange;
+            private int lastInsertStartPos;
+            private int lastInsertBeforeCount;
+            private int lastInsertAfterCount;
+
+            /**
+             * Reset status after connected textarea change.
+             */
+            @Override
+            public void reset() {
+<span class="nc" id="L2031">                started = false;</span>
+<span class="nc" id="L2032">            }</span>
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+<span class="fc" id="L2036">            }</span>
+
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+<span class="pc bpc" id="L2040" title="1 of 2 branches missed.">                if (suppressTextChangeEvent) {</span>
+                    // If this change was initiated programmatically in a datachanged event
+                    // then we don't want to process the change here as it causes weird things to happen.
+                    // E.g https://github.com/codenameone/CodenameOne/issues/3349
+<span class="nc" id="L2044">                    return;</span>
+                }
+                // We use this hook to catch keyboard strokes in async edit mode while the
+                // edit text field is hidden.
+<span class="fc" id="L2048">                currChange = new TextChange();</span>
+<span class="fc" id="L2049">                currChange.atPos = start;</span>
+<span class="fc" id="L2050">                lastInsertAfterCount = after;</span>
+<span class="fc" id="L2051">                lastInsertBeforeCount = count;</span>
+<span class="fc" id="L2052">                lastInsertStartPos = start;</span>
+<span class="pc bpc" id="L2053" title="3 of 6 branches missed.">                if (mIsEditing &amp;&amp; impl.isAsyncEditMode() &amp;&amp; isTextEditorHidden()) {</span>
+
+                    // If the text editor is hidden, and the user starts typing in the
+                    // keyboard (because we're in async edit mode), then we need to
+                    // trigger the native editor to display again.
+<span class="nc" id="L2058">                    showTextEditorAgain();</span>
+                }
+<span class="fc" id="L2060">            }</span>
+
+            @Override
+            public void afterTextChanged(final Editable s) {
+<span class="pc bpc" id="L2064" title="1 of 2 branches missed.">                if (suppressTextChangeEvent) {</span>
+                    // If this change was initiated programmatically in a datachanged event
+                    // then we don't want to process the change here as it causes weird things to happen.
+                    // E.g https://github.com/codenameone/CodenameOne/issues/3349
+<span class="nc" id="L2068">                    return;</span>
+                }
+<span class="pc bpc" id="L2070" title="2 of 4 branches missed.">                if (isEditing() &amp;&amp; mTextArea != null) {</span>
+                    try {
+<span class="fc" id="L2072">                        final String actualString = s.toString();</span>
+                        //make sure to start send events to the cn1 textfield only
+                        //when the first string equals to the initial text
+<span class="pc bpc" id="L2075" title="1 of 2 branches missed.">                        if (!started) {</span>
+<span class="fc bfc" id="L2076" title="All 2 branches covered.">                            if (mTextArea.getText().equals(actualString)) {</span>
+<span class="fc" id="L2077">                                started = true;</span>
+                            }
+<span class="fc" id="L2079">                            return;</span>
+                        }
+
+<span class="nc" id="L2082">                        synchronized (InPlaceEditView.this) {</span>
+
+                            // In Async Edit mode, we may have just triggered a &quot;showTextEditorAgain&quot; in the
+                            // beforeTextChanged event.  However this will trigger some async stuff on the
+                            // EDT and the UI thread to initialize the native editor with the contents
+                            // of the CN1 TextArea.  That created an inputBuffer to catch key strokes in
+                            // the mean time so that they will be added correctly to the
+                            // native editor when it is ready.
+<span class="nc bnc" id="L2090" title="All 2 branches missed.">                            if (inputBuffer != null) {</span>
+<span class="nc bnc" id="L2091" title="All 2 branches missed.">                                if (lastInsertBeforeCount &gt; lastInsertAfterCount) {</span>
+<span class="nc" id="L2092">                                    currChange.deleteLength = lastInsertBeforeCount - lastInsertAfterCount;</span>
+<span class="nc" id="L2093">                                    inputBuffer.add(currChange);</span>
+<span class="nc" id="L2094">                                    currChange = null;</span>
+<span class="nc bnc" id="L2095" title="All 2 branches missed.">                                } else if (lastInsertBeforeCount &lt; lastInsertAfterCount) {</span>
+<span class="nc" id="L2096">                                    currChange.textToAppend = actualString.substring(lastInsertStartPos, actualString.length() - lastInsertAfterCount + 1);</span>
+<span class="nc" id="L2097">                                    inputBuffer.add(currChange);</span>
+<span class="nc" id="L2098">                                    currChange = null;</span>
+                                }
+                            }
+<span class="nc" id="L2101">                        }</span>
+
+<span class="nc" id="L2103">                        Display.getInstance().callSerially(new Runnable() {</span>
+
+                            @Override
+                            public void run() {
+<span class="nc bnc" id="L2107" title="All 2 branches missed.">                                if (!actualString.equals(mTextArea.getText())) {</span>
+                                    // Prevent data change event
+                                    // https://github.com/codenameone/CodenameOne/issues/3343
+<span class="nc" id="L2110">                                    suppressDataChangedEvent = true; </span>
+                                       
+<span class="nc" id="L2112">                                    mTextArea.setText(actualString);</span>
+<span class="nc" id="L2113">                                    suppressDataChangedEvent = false;</span>
+                                }
+<span class="nc" id="L2115">                            }</span>
+                        });
+<span class="nc" id="L2117">                    } catch (Exception e) {</span>
+<span class="nc" id="L2118">                        Log.e(TAG, e.toString() + &quot; &quot; + Log.getStackTraceString(e));</span>
+<span class="nc" id="L2119">                    }</span>
+                }
+<span class="nc" id="L2121">            }</span>
+        };
+
+        /**
+         * Constructor
+         * @param context
+         * @param inPlaceEditView
+         */
+<span class="fc" id="L2129">        public EditView(Context context, TextArea textArea, InPlaceEditView inPlaceEditView, int style) {</span>
+<span class="fc" id="L2130">            super(context, null, style);</span>
+<span class="fc" id="L2131">            mInPlaceEditView = inPlaceEditView;</span>
+<span class="fc" id="L2132">            mTextArea = textArea;</span>
+<span class="fc" id="L2133">            setBackgroundColor(Color.TRANSPARENT);</span>
+<span class="fc" id="L2134">        }</span>
+
+		/**
+		 * Connects to other textArea.
+		 */
+        public void switchToTextArea(TextArea other) {
+<span class="nc" id="L2140">            mTextWatcher.reset();</span>
+<span class="nc bnc" id="L2141" title="All 4 branches missed.">            if (this.mTextArea != null &amp;&amp; this.mTextArea != other) {</span>
+<span class="nc" id="L2142">                Display.getInstance().onEditingComplete(this.mTextArea, this.mTextArea.getText());</span>
+            }
+            
+<span class="nc" id="L2145">            this.mTextArea = other;</span>
+<span class="nc" id="L2146">            this.setInputType(defaultInputType);</span>
+<span class="nc" id="L2147">            this.setImeOptions(defaultIMEOptions);</span>
+<span class="nc bnc" id="L2148" title="All 2 branches missed.">            if (defaultKeyListener != null) {</span>
+<span class="nc" id="L2149">                setKeyListener(defaultKeyListener);</span>
+            }
+<span class="nc" id="L2151">            setTransformationMethod(null);</span>
+<span class="nc bnc" id="L2152" title="All 2 branches missed.">            if (defaultMaxLines != -2) {</span>
+<span class="nc" id="L2153">                setMaxLines(defaultMaxLines);</span>
+            }
+<span class="nc" id="L2155">        }</span>
+
+        @Override
+        public void onEditorAction(int actionCode) {
+<span class="nc" id="L2159">			Runnable task = mInPlaceEditView.onEditorAction(actionCode);</span>
+<span class="nc bnc" id="L2160" title="All 2 branches missed.">            if (task != null) {</span>
+<span class="nc" id="L2161">            super.onEditorAction(actionCode);</span>
+<span class="nc" id="L2162">                task.run();</span>
+            }
+<span class="nc" id="L2164">        }</span>
+
+        @Override
+        public boolean onKeyPreIme(int keyCode, KeyEvent event) {
+<span class="nc bnc" id="L2168" title="All 2 branches missed.">            if (keyCode == KeyEvent.KEYCODE_BACK) {</span>
+<span class="nc" id="L2169">                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);</span>
+<span class="nc" id="L2170">                return true;</span>
+            }
+<span class="nc" id="L2172">            return super.onKeyPreIme(keyCode, event);</span>
+        }
+
+
+        @Override
+        public boolean onKeyDown(int keyCode, KeyEvent event) {
+            // If the user presses the back button, or the menu button
+            // we must terminate editing, to allow EDT to handle events
+            // again
+<span class="nc bnc" id="L2181" title="All 5 branches missed.">            switch(keyCode) {</span>
+                case KeyEvent.KEYCODE_BACK:
+                case KeyEvent.KEYCODE_MENU:
+<span class="nc" id="L2184">                    endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);</span>
+<span class="nc" id="L2185">                    break;</span>
+		case KeyEvent.KEYCODE_ENTER:
+<span class="nc bnc" id="L2187" title="All 4 branches missed.">                    if (mEditText.mTextArea != null &amp;&amp; mEditText.mTextArea.isSingleLineTextArea())</span>
+<span class="nc" id="L2188">                        onEditorAction(EditorInfo.IME_ACTION_DONE);</span>
+                    break;
+                case KeyEvent.KEYCODE_ESCAPE:
+<span class="nc" id="L2191">                    endEditing(InPlaceEditView.REASON_IME_ACTION, false, true, EditorInfo.IME_ACTION_DONE, keyCode);</span>
+<span class="nc" id="L2192">                    break;</span>
+                case KeyEvent.KEYCODE_TAB:
+<span class="nc" id="L2194">                    onEditorAction(EditorInfo.IME_ACTION_NEXT);</span>
+                    break;
+            }
+
+<span class="nc" id="L2198">            return super.onKeyDown(keyCode, event);</span>
+        }
+
+
+
+    }
+
+<span class="nc" id="L2205">    public class MyPasswordTransformationMethod extends PasswordTransformationMethod {</span>
+
+        @Override
+        public CharSequence getTransformation(CharSequence source, View view) {
+<span class="nc" id="L2209">            return new PasswordCharSequence(source);</span>
+        }
+
+        private class PasswordCharSequence implements CharSequence {
+
+            private CharSequence mSource;
+
+<span class="nc" id="L2216">            public PasswordCharSequence(CharSequence source) {</span>
+<span class="nc" id="L2217">                mSource = source; // Store char sequence</span>
+<span class="nc" id="L2218">            }</span>
+
+            public char charAt(int index) {
+<span class="nc" id="L2221">                return '\u25CF'; // This is the important part</span>
+            }
+
+            public int length() {
+<span class="nc" id="L2225">                return mSource.length(); // Return default</span>
+            }
+
+            public CharSequence subSequence(int start, int end) {
+<span class="nc" id="L2229">                return mSource.subSequence(start, end); // Return default</span>
+            }
+        }
+    };
+}
+interface ResetableTextWatcher extends TextWatcher {
+
+    public void reset();
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

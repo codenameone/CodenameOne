@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CN1Matrix4f.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">CN1Matrix4f.java</span></div><h1>CN1Matrix4f.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.opengl.Matrix;
+import java.util.Arrays;
+
+
+
+/**
+ * Encapsulates a 4x4 transformation matrix that can be used to apply 3D transformations
+ * to a {@link com.codename1.ui.Graphics} context. This can also be used for 2D transformations,
+ * by only using the upper left 3x3 grid of the matrix.
+ * 
+ * &lt;h4&gt;Internal Representation&lt;/h4&gt;
+ * 
+ * &lt;p&gt;Although matrix data can be set in several different formats (See {@link #setData}), the internal representation
+ * is always that of a 4x4 matrix stored in a 16-element {@literal float} array in &lt;a target=&quot;_blank&quot; href=&quot;http://en.wikipedia.org/wiki/Row-major_order&quot;&gt;row-major order&lt;/a&gt;.
+ * If you are working with 2D transformations only, then the upper left sub-matrix will contain
+ * your 3x3 affine transformation, and the 4th row and 4th columns will be zeroes, except in the lower-right most
+ * column, which will be a {@literal 1}.&lt;/p&gt;
+ * 
+ * @author shannah
+ * @see com.codename1.ui.Graphics#setTransform
+ * @see com.codename1.ui.Graphics#getTransform
+ */
+public final class CN1Matrix4f {
+    
+    public static final int TYPE_UNKNOWN = -1;
+    public static final int TYPE_IDENTITY = 0;
+    public static final int TYPE_TRANSLATION = 1;
+    public static final int TYPE_ROTATION = 2;
+    public static final int TYPE_SCALE = 3;
+    
+    
+    public static final int M00=0;
+    public static final int M01=4;
+    public static final int M02=8;
+    public static final int M03=12;
+    public static final int M10=1;
+    public static final int M11=5;
+    public static final int M12=9;
+    public static final int M13=13;
+    public static final int M20=2;
+    public static final int M21=6;
+    public static final int M22=10;
+    public static final int M23=14;
+    public static final int M30=3;
+    public static final int M31=7;
+    public static final int M32=11;
+    public static final int M33=15;
+
+    public final float[] data;
+<span class="fc" id="L74">    private int type = TYPE_UNKNOWN;</span>
+    private Factory factory;
+
+<span class="fc" id="L77">    public static class Factory {</span>
+
+<span class="fc" id="L79">        private float[] sTemp = new float[32];</span>
+<span class="fc" id="L80">        private static ThreadLocal&lt;Factory&gt; defaultFactory = new ThreadLocal&lt;Factory&gt;() {</span>
+            @Override
+            protected Factory initialValue() {
+<span class="fc" id="L83">                return new Factory();</span>
+            }
+        };
+
+        public static Factory getDefault() {
+<span class="fc" id="L88">            return defaultFactory.get();</span>
+        }
+
+        public CN1Matrix4f makeMatrix(float[] data) {
+<span class="fc" id="L92">            CN1Matrix4f m = new CN1Matrix4f(data);</span>
+<span class="fc" id="L93">            m.factory = this;</span>
+<span class="fc" id="L94">            return m;</span>
+        }
+
+        public CN1Matrix4f makeIdentity() {
+<span class="nc" id="L98">            CN1Matrix4f out = makeMatrix(null);</span>
+<span class="nc" id="L99">            out.factory = this;</span>
+<span class="nc" id="L100">            out.type = TYPE_IDENTITY;</span>
+<span class="nc" id="L101">            return out;</span>
+        }
+
+        public CN1Matrix4f makeRotation(float angle, float x, float y, float z) {
+<span class="fc" id="L105">            float[] m = new float[16];</span>
+<span class="fc" id="L106">            Matrix.setRotateM(m, 0, (float) (angle * 180f / Math.PI), x, y, z);</span>
+<span class="fc" id="L107">            CN1Matrix4f out = makeMatrix(m);</span>
+<span class="fc" id="L108">            out.factory = this;</span>
+<span class="fc" id="L109">            out.type = TYPE_ROTATION;</span>
+<span class="fc" id="L110">            return out;</span>
+        }
+        
+        
+
+        public CN1Matrix4f makeTranslation(float x, float y, float z) {
+<span class="nc" id="L116">            CN1Matrix4f m = makeIdentity();</span>
+<span class="nc" id="L117">            Matrix.translateM(m.data, 0, x, y, z);</span>
+<span class="nc" id="L118">            m.factory = this;</span>
+<span class="nc" id="L119">            m.type = TYPE_TRANSLATION;</span>
+<span class="nc" id="L120">            return m;</span>
+        }
+
+        public CN1Matrix4f makePerspective(float fovy, float aspect, float zNear, float zFar) {
+<span class="fc" id="L124">            float[] m = new float[16];</span>
+<span class="fc" id="L125">            Matrix.perspectiveM(m, 0, (float) (fovy * 180f / Math.PI), aspect, zNear, zFar);</span>
+<span class="fc" id="L126">            CN1Matrix4f out =  new CN1Matrix4f(m);</span>
+<span class="fc" id="L127">            out.factory = this;</span>
+<span class="fc" id="L128">            return out;</span>
+        }
+
+        public CN1Matrix4f makeOrtho(float left, float right, float bottom, float top,
+                float near, float far) {
+<span class="nc" id="L133">            float[] m = new float[16];</span>
+<span class="nc" id="L134">            Matrix.orthoM(m, 0, left, right, bottom, top, near, far);</span>
+<span class="nc" id="L135">            CN1Matrix4f out = new CN1Matrix4f(m);</span>
+<span class="nc" id="L136">            out.factory = this;</span>
+<span class="nc" id="L137">            return out;</span>
+        }
+
+        public CN1Matrix4f makeCamera(float eyeX, float eyeY, float eyeZ,
+                float centerX, float centerY, float centerZ, float upX, float upY,
+                float upZ) {
+
+<span class="fc" id="L144">            float[] m = new float[16];</span>
+<span class="fc" id="L145">            Matrix.setLookAtM(m, 0, eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);</span>
+<span class="fc" id="L146">            CN1Matrix4f out =  new CN1Matrix4f(m);</span>
+<span class="fc" id="L147">            out.factory = this;</span>
+<span class="fc" id="L148">            return out;</span>
+        }
+    }
+
+    public boolean equals(CN1Matrix4f matrix){
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if ( matrix == null ){</span>
+<span class="nc" id="L154">            return false;</span>
+        }
+<span class="fc" id="L156">        return Arrays.equals(data, matrix.data);</span>
+    }
+    
+    public static CN1Matrix4f make(float[] data) {
+<span class="fc" id="L160">        return Factory.getDefault().makeMatrix(data);</span>
+    }
+
+    public static CN1Matrix4f makeIdentity() {
+<span class="fc" id="L164">        return Factory.getDefault().makeMatrix(null);</span>
+    }
+    
+    public static CN1Matrix4f makeTranslation(float x, float y, float z){
+<span class="nc" id="L168">        return Factory.getDefault().makeTranslation(x, y, z);</span>
+    }
+
+    public static CN1Matrix4f makeRotation(float angle, float x, float y, float z) {
+<span class="fc" id="L172">        return Factory.getDefault().makeRotation(angle, x, y, z);</span>
+    }
+
+    public static CN1Matrix4f makeOrtho(float left, float right, float bottom, float top,
+            float near, float far) {
+
+<span class="nc" id="L178">        return Factory.getDefault().makeOrtho(left, right, bottom, top, near, far);</span>
+    }
+
+    public static CN1Matrix4f makePerspective(float fovy, float aspect, float zNear, float zFar) {
+<span class="fc" id="L182">        return Factory.getDefault().makePerspective(fovy, aspect, zNear, zFar);</span>
+    }
+
+    public static CN1Matrix4f makeCamera(float eyeX, float eyeY, float eyeZ,
+            float centerX, float centerY, float centerZ, float upX, float upY,
+            float upZ) {
+<span class="fc" id="L188">        return Factory.getDefault().makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);</span>
+    }
+
+    public void rotate(float a, float x, float y, float z) {
+
+<span class="fc" id="L193">        Matrix.setRotateM(factory.sTemp, 0, (float) (a * 180f / Math.PI), x, y, z);</span>
+<span class="fc" id="L194">        Matrix.multiplyMM(factory.sTemp, 16, data, 0, factory.sTemp, 0);</span>
+<span class="fc" id="L195">        System.arraycopy(factory.sTemp, 16, data, 0, 16);</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if ( type == TYPE_IDENTITY ){</span>
+<span class="nc" id="L197">            type = TYPE_ROTATION;</span>
+        } else {
+<span class="fc" id="L199">            type = TYPE_UNKNOWN;</span>
+        }
+<span class="fc" id="L201">    }</span>
+
+    public void translate(float x, float y, float z) {
+<span class="fc" id="L204">        Matrix.translateM(data, 0, x, y, z);</span>
+<span class="pc bpc" id="L205" title="1 of 4 branches missed.">        if ( type == TYPE_IDENTITY || type == TYPE_TRANSLATION ){</span>
+<span class="fc" id="L206">            type = TYPE_TRANSLATION;</span>
+        } else {
+<span class="fc" id="L208">            type = TYPE_UNKNOWN;</span>
+        }
+<span class="fc" id="L210">    }</span>
+
+    public void scale(float x, float y, float z) {
+<span class="fc" id="L213">        Matrix.scaleM(data, 0, x, y, z);</span>
+<span class="pc bpc" id="L214" title="1 of 4 branches missed.">        if ( type == TYPE_IDENTITY || type == TYPE_SCALE ){</span>
+<span class="fc" id="L215">            type = TYPE_SCALE;</span>
+        } else {
+<span class="fc" id="L217">            type = TYPE_UNKNOWN;</span>
+        }
+<span class="fc" id="L219">    }</span>
+
+    public void setPerspective(float fovy, float aspect, float zNear, float zFar) {
+<span class="nc" id="L222">        Matrix.perspectiveM(data, 0, (float) (fovy * 180f / Math.PI), aspect, zNear, zFar);</span>
+<span class="nc" id="L223">        type = TYPE_UNKNOWN;</span>
+<span class="nc" id="L224">    }</span>
+
+    public void setOrtho(float left, float right, float bottom, float top,
+            float near, float far) {
+<span class="nc" id="L228">        Matrix.orthoM(data, 0, left, right, bottom, top, near, far);</span>
+<span class="nc" id="L229">        type = TYPE_UNKNOWN;</span>
+<span class="nc" id="L230">    }</span>
+
+    public void setCamera(float eyeX, float eyeY, float eyeZ,
+            float centerX, float centerY, float centerZ, float upX, float upY,
+            float upZ) {
+<span class="nc" id="L235">        Matrix.setLookAtM(data, 0, eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);</span>
+<span class="nc" id="L236">        type = TYPE_UNKNOWN;</span>
+<span class="nc" id="L237">    }</span>
+
+    public void setIdentity() {
+<span class="fc" id="L240">        reset();</span>
+<span class="fc" id="L241">    }</span>
+
+    
+    
+    public void transformCoord(float[] pIn, float[] pOut) {
+        //Log.p(&quot;Transforming &quot;+pIn[0]+&quot;,&quot;+pIn[1]);
+        //Log.p(&quot;Transform is &quot;+this);
+<span class="nc" id="L248">        int len = Math.min(pIn.length, 3);</span>
+<span class="nc" id="L249">        factory.sTemp[2] = 0;</span>
+        
+<span class="nc" id="L251">        System.arraycopy(pIn, 0, factory.sTemp, 0, len);</span>
+<span class="nc" id="L252">        factory.sTemp[3] = 1f;</span>
+        
+<span class="nc" id="L254">        Matrix.multiplyMV(factory.sTemp, 4, data, 0, factory.sTemp, 0);</span>
+<span class="nc" id="L255">        float w = factory.sTemp[7];</span>
+<span class="nc bnc" id="L256" title="All 4 branches missed.">        if ( w != 1 &amp;&amp; w != 0 ){</span>
+            
+<span class="nc bnc" id="L258" title="All 2 branches missed.">            for ( int i=4; i&lt;7; i++){</span>
+<span class="nc" id="L259">                factory.sTemp[i] = factory.sTemp[i]/w;</span>
+            }
+        }
+       
+        //len = pOut.length;
+<span class="nc" id="L264">        System.arraycopy(factory.sTemp, 4, pOut, 0, len);</span>
+       
+
+<span class="nc" id="L267">    }</span>
+    
+    
+
+    public String toString() {
+        //StringBuilder sb = new StringBuilder();
+<span class="nc" id="L273">        return &quot;[[&quot; + data[0] + &quot;,&quot; + data[4] + &quot;,&quot; + data[8] + &quot;,&quot; + data[12] + &quot;]\n&quot;</span>
+                + &quot;[&quot; + data[1] + &quot;,&quot; + data[5] + &quot;,&quot; + data[9] + &quot;,&quot; + data[13] + &quot;]\n&quot;
+                + &quot;[&quot; + data[2] + &quot;,&quot; + data[6] + &quot;,&quot; + data[10] + &quot;,&quot; + data[14] + &quot;]\n&quot;
+                + &quot;[&quot; + data[3] + &quot;,&quot; + data[7] + &quot;,&quot; + data[11] + &quot;,&quot; + data[15] + &quot;]&quot;;
+
+    }
+
+    public boolean isIdentity() {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="nc bnc" id="L282" title="All 4 branches missed.">            if (i % 5 == 0 &amp;&amp; data[i] != 1f) {</span>
+<span class="nc" id="L283">                return false;</span>
+<span class="nc bnc" id="L284" title="All 4 branches missed.">            } else if (i % 5 != 0 &amp;&amp; data[i] != 0f) {</span>
+<span class="nc" id="L285">                return false;</span>
+            }
+        }
+<span class="nc" id="L288">        return true;</span>
+    }
+
+    public boolean invert() {
+<span class="nc" id="L292">        boolean res = Matrix.invertM(factory.sTemp, 0, data, 0);</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (!res) {</span>
+<span class="nc" id="L294">            return res;</span>
+        } else {
+<span class="nc" id="L296">            System.arraycopy(factory.sTemp, 0, data, 0, 16);</span>
+<span class="nc" id="L297">            return res;</span>
+        }
+
+    }
+
+    /**
+     * Constructor. Copies data from the provided data array. See
+     * {@link #setData} documentation for information acceptable formats for the
+     * {@literal m} array.
+     *
+     * @param m An array containing data for the matrix. This can be in several
+     * different formats. See {@link #setData} for a list of acceptable formats.
+     *
+     * @see #setData
+     */
+<span class="fc" id="L312">    private CN1Matrix4f(float[] m) {</span>
+        //Log.p(&quot;Creating new matrix&quot;);
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (m == null) {</span>
+<span class="fc" id="L315">            m = new float[]{1f};</span>
+        }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (m.length == 16) {</span>
+<span class="fc" id="L318">            data = m;</span>
+        } else {
+<span class="fc" id="L320">            data = new float[16];</span>
+<span class="fc" id="L321">            setData(m);</span>
+        }
+        //Log.p(&quot;Exiting CN1Matrix4f constructor&quot;);
+<span class="fc" id="L324">    }</span>
+
+    public void concatenate(CN1Matrix4f m){
+        //Matrix.setRotateM(factory.sTemp, 0, (float) (a * 180f / Math.PI), x, y, z);
+<span class="fc" id="L328">        Matrix.multiplyMM(factory.sTemp, 16, data, 0, m.data, 0);</span>
+<span class="fc" id="L329">        System.arraycopy(factory.sTemp, 16, data, 0, 16);</span>
+<span class="fc" id="L330">        type = TYPE_UNKNOWN;</span>
+<span class="fc" id="L331">    }</span>
+    /**
+     * Resets the transformation to the identify matrix
+     */
+    public void reset() {
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L337">            data[i] = 0;</span>
+        }
+<span class="fc" id="L339">        data[0] = data[5] = data[10] = data[15] = 1;</span>
+<span class="fc" id="L340">        type = TYPE_IDENTITY;</span>
+
+<span class="fc" id="L342">    }</span>
+
+    /**
+     * Obtains a reference to the 4x4 matrix cell data in &lt;a target=&quot;_blank&quot;
+     * href=&quot;http://en.wikipedia.org/wiki/Row-major_order&quot;&gt;row-major order&lt;/a&gt;.
+     *
+     * @return A 16-element{@literal float} array representing the 4x4 matrix
+     * data in row-major order.
+     */
+    public float[] getData() {
+<span class="fc" id="L352">        return data;</span>
+    }
+
+    /**
+     * Sets the matrix data. This will accept the data in several different
+     * formats to facilitate the creation of common matrix use-cases.
+     * &lt;h5&gt;Acceptable Formats&lt;/h5&gt;
+     *
+     * &lt;table&gt;
+     * &lt;tr&gt;&lt;th&gt;Array
+     * Length&lt;/th&gt;&lt;th&gt;Interpretation&lt;/th&gt;&lt;th&gt;Example&lt;/th&gt;&lt;th&gt;Resulting 4x4
+     * CN1Matrix4f&lt;/th&gt;&lt;/tr&gt;
+     * &lt;tr&gt;
+     * &lt;td&gt;1&lt;/td&gt;
+     * &lt;td&gt;Apply both {@literal x} and {@literal y} scaling with a single
+     * value.&lt;/td&gt;
+     * &lt;td&gt;{@code setData(new float[]{2f});}&lt;/td&gt;
+     * &lt;td&gt;&lt;pre&gt;{@literal
+     *  [2,0,0,0],
+     * [0,2,0,0],
+     * [0,0,1,0],
+     * [0,0,0,1]}&lt;/pre&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     * &lt;tr&gt;
+     * &lt;td&gt;2&lt;/td&gt;
+     * &lt;td&gt;Applies {@literal x} and {@literal y} scaling. First element is
+     * {@literal x} scale. Second element is {@literal y} scale.&lt;/td&gt;
+     * &lt;td&gt;{@code setData(new float[]{2f, 3f});}&lt;/td&gt;
+     * &lt;td&gt;&lt;pre&gt;{@literal
+     *  [2,0,0,0],
+     * [0,3,0,0],
+     * [0,0,1,0],
+     * [0,0,0,1]}&lt;/pre&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     * &lt;tr&gt;
+     * &lt;td&gt;4&lt;/td&gt;
+     * &lt;td&gt;Recognized as a 2x2 2D transformation matrix.&lt;/td&gt;
+     * &lt;td&gt;{@code setData(new float[]{1f, 2f, 3f, 4f});}&lt;/td&gt;
+     * &lt;td&gt;&lt;pre&gt;{@literal
+     *  [1,2,0,0],
+     * [3,4,0,0],
+     * [0,0,1,0],
+     * [0,0,0,1]}&lt;/pre&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     * &lt;tr&gt;
+     * &lt;td&gt;6&lt;/td&gt;
+     * &lt;td&gt;An affine transformation.&lt;/td&gt;
+     * &lt;td&gt;{@code setData(new float[]{1f, 2f, 3f, 4f, 5f, 6f});}&lt;/td&gt;
+     * &lt;td&gt;&lt;pre&gt;{@literal
+     *  [1,2,3,0],
+     * [4,5,6,0],
+     * [0,0,1,0],
+     * [0,0,0,1]}&lt;/pre&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     * &lt;tr&gt;
+     * &lt;td&gt;9&lt;/td&gt;
+     * &lt;td&gt;A 3x3 matrix.&lt;/td&gt;
+     * &lt;td&gt;{@code setData(new float[]{1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f});}&lt;/td&gt;
+     * &lt;td&gt;&lt;pre&gt;{@literal
+     *  [1,2,3,0],
+     * [4,5,6,0],
+     * [7,8,9,0],
+     * [0,0,0,1]}&lt;/pre&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     * &lt;tr&gt;
+     * &lt;td&gt;12&lt;/td&gt;
+     * &lt;td&gt;The top 3 rows of the 4x4 matrix. This is all the information
+     * necessary for a 3D transformation since the last row is always
+     * [0,0,0,1].&lt;/td&gt;
+     * &lt;td&gt;{@code setData(new float[]{1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f});}&lt;/td&gt;
+     * &lt;td&gt;&lt;pre&gt;{@literal
+     *  [ 1, 2, 3, 4],
+     * [ 5, 6, 7, 8],
+     * [ 9, 10,11,12],
+     * [ 0, 0, 0, 1]}&lt;/pre&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     * &lt;tr&gt;
+     * &lt;td&gt;16&lt;/td&gt;
+     * &lt;td&gt;A 4x4 transformation matrix.&lt;/td&gt;
+     * &lt;td&gt;{@code setData(new float[]{1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f, 13f, 14f, 15f, 16f});}&lt;/td&gt;
+     * &lt;td&gt;&lt;pre&gt;{@literal
+     *  [ 1, 2, 3, 4],
+     * [ 5, 6, 7, 8],
+     * [ 9,10,11,12],
+     * [13,14,15,16]}&lt;/pre&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     * &lt;/table&gt;
+     *
+     * @param m The data to populate the matrix. This will always replace the
+     * matrix data in full.
+     */
+    public void setData(float[] m) {
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L445">            reset();</span>
+<span class="nc" id="L446">            return;</span>
+        }
+<span class="pc bpc" id="L448" title="6 of 8 branches missed.">        switch (m.length) {</span>
+            case 1:
+<span class="fc" id="L450">                reset();</span>
+<span class="fc" id="L451">                data[0] = m[0];</span>
+<span class="fc" id="L452">                data[5] = m[0];</span>
+
+<span class="fc" id="L454">                break;</span>
+
+            case 2:
+<span class="nc" id="L457">                reset();</span>
+<span class="nc" id="L458">                data[0] = m[0];</span>
+<span class="nc" id="L459">                data[5] = m[1];</span>
+
+<span class="nc" id="L461">                break;</span>
+            case 4:
+                // This is just a 2D transformation
+<span class="nc" id="L464">                reset();</span>
+<span class="nc" id="L465">                data[0] = m[0];</span>
+<span class="nc" id="L466">                data[1] = m[1];</span>
+<span class="nc" id="L467">                data[4] = m[2];</span>
+<span class="nc" id="L468">                data[5] = m[3];</span>
+
+<span class="nc" id="L470">                break;</span>
+            case 6:
+<span class="nc" id="L472">                reset();</span>
+<span class="nc" id="L473">                data[0] = m[0];</span>
+<span class="nc" id="L474">                data[1] = m[1];</span>
+<span class="nc" id="L475">                data[2] = m[2];</span>
+<span class="nc" id="L476">                data[4] = m[3];</span>
+<span class="nc" id="L477">                data[5] = m[4];</span>
+<span class="nc" id="L478">                data[6] = m[5];</span>
+
+<span class="nc" id="L480">                break;</span>
+            case 9:
+<span class="nc" id="L482">                reset();</span>
+<span class="nc" id="L483">                data[0] = m[0];</span>
+<span class="nc" id="L484">                data[1] = m[1];</span>
+<span class="nc" id="L485">                data[2] = m[2];</span>
+<span class="nc" id="L486">                data[4] = m[3];</span>
+<span class="nc" id="L487">                data[5] = m[4];</span>
+<span class="nc" id="L488">                data[6] = m[5];</span>
+<span class="nc" id="L489">                data[8] = m[6];</span>
+<span class="nc" id="L490">                data[9] = m[7];</span>
+<span class="nc" id="L491">                data[10] = m[8];</span>
+
+<span class="nc" id="L493">                break;</span>
+            case 12:
+<span class="nc" id="L495">                reset();</span>
+<span class="nc" id="L496">                System.arraycopy(m, 0, data, 0, 12);</span>
+
+<span class="nc" id="L498">                break;</span>
+            case 16:
+<span class="fc" id="L500">                System.arraycopy(m, 0, data, 0, 16);</span>
+<span class="fc" id="L501">                break;</span>
+            default:
+<span class="nc" id="L503">                throw new IllegalArgumentException(&quot;Transforms must be array of length 1, 2, 4, 6, 9, 12, or 16&quot;);</span>
+        }
+<span class="fc" id="L505">    }</span>
+
+    public CN1Matrix4f copy() {
+<span class="nc" id="L508">        float[] data = new float[16];</span>
+<span class="nc" id="L509">        System.arraycopy(this.data, 0, data, 0, 16);</span>
+<span class="nc" id="L510">        return CN1Matrix4f.make(data);</span>
+    }
+
+  
+    
+  
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

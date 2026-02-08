@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalNotificationPublisher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">LocalNotificationPublisher.java</span></div><h1>LocalNotificationPublisher.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Bundle;
+import androidx.core.app.NotificationCompat;
+import android.util.Log;
+
+import com.codename1.background.BackgroundFetch;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.Display;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ *
+ * @author Chen
+ */
+<span class="nc" id="L49">public class LocalNotificationPublisher extends BroadcastReceiver {</span>
+
+<span class="nc" id="L51">    public static String NOTIFICATION = &quot;notification&quot;;</span>
+<span class="nc" id="L52">    public static String NOTIFICATION_INTENT = &quot;notification-intent&quot;;</span>
+<span class="nc" id="L53">    public static String BACKGROUND_FETCH_INTENT = &quot;background-fetch-intent&quot;;</span>
+
+    public void onReceive(Context context, Intent intent) {
+        //Fire the notification to the display
+<span class="nc" id="L57">        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);</span>
+        
+<span class="nc" id="L59">        Bundle extras=intent.getExtras();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if(extras == null) {</span>
+<span class="nc" id="L61">            return;</span>
+        }
+<span class="nc" id="L63">        PendingIntent content = extras.getParcelable(NOTIFICATION_INTENT);</span>
+<span class="nc" id="L64">        Bundle b = extras.getParcelable(NOTIFICATION);</span>
+<span class="nc" id="L65">        LocalNotification notif = AndroidImplementation.createNotificationFromBundle(b);</span>
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (AndroidImplementation.BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {</span>
+<span class="nc" id="L68">            PendingIntent backgroundFetchIntent = extras.getParcelable(BACKGROUND_FETCH_INTENT);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            if (backgroundFetchIntent != null) {</span>
+                try {
+<span class="nc" id="L71">                    backgroundFetchIntent.send();</span>
+<span class="nc" id="L72">                } catch (Exception ex) {</span>
+<span class="nc" id="L73">                    Log.e(&quot;Codename One&quot;, &quot;Failed to send BackgroundFetchHandler intent&quot;, ex);</span>
+<span class="nc" id="L74">                }</span>
+            } else {
+<span class="nc" id="L76">                Log.d(&quot;Codename One&quot;, &quot;BackgroundFetch intent was null&quot;);</span>
+            }
+<span class="nc" id="L78">        } else {</span>
+<span class="nc" id="L79">            Notification notification = createAndroidNotification(context, notif, content);</span>
+<span class="nc" id="L80">            notification.when = System.currentTimeMillis();</span>
+            try{
+<span class="nc" id="L82">                int notifId = Integer.parseInt(notif.getId());</span>
+<span class="nc" id="L83">                notificationManager.notify(&quot;CN1&quot;, notifId, notification);                </span>
+<span class="nc" id="L84">            }catch(Exception e){</span>
+                //that was a mistake, the first param is the tag not the id
+<span class="nc" id="L86">                notificationManager.notify(notif.getId(), 0, notification);</span>
+<span class="nc" id="L87">            }</span>
+        }
+<span class="nc" id="L89">    }</span>
+
+    private Notification createAndroidNotification(Context context, LocalNotification localNotif, PendingIntent content) {
+<span class="nc" id="L92">        Context ctx = context;</span>
+<span class="nc" id="L93">        int smallIcon = ctx.getResources().getIdentifier(&quot;ic_stat_notify&quot;, &quot;drawable&quot;, ctx.getApplicationInfo().packageName);</span>
+<span class="nc" id="L94">        int icon = ctx.getResources().getIdentifier(&quot;icon&quot;, &quot;drawable&quot;, ctx.getApplicationInfo().packageName);</span>
+        
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (smallIcon == 0) {</span>
+<span class="nc" id="L97">            smallIcon = icon;</span>
+        } else {
+<span class="nc" id="L99">            icon = smallIcon;</span>
+        }
+
+<span class="nc" id="L102">        NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx);</span>
+<span class="nc" id="L103">        builder.setContentTitle(localNotif.getAlertTitle());</span>
+<span class="nc" id="L104">        builder.setContentText(localNotif.getAlertBody());</span>
+<span class="nc" id="L105">        builder.setAutoCancel(true);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (localNotif.getBadgeNumber() &gt;= 0) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (android.os.Build.VERSION.SDK_INT &gt;= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {</span>
+<span class="nc" id="L108">                builder.setNumber(localNotif.getBadgeNumber());</span>
+            }
+        }
+<span class="nc" id="L111">        String image = localNotif.getAlertImage();</span>
+<span class="nc bnc" id="L112" title="All 4 branches missed.">        if (image != null &amp;&amp; image.length() &gt; 0) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (image.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L114">                image = image.substring(1);</span>
+            }
+            InputStream in;
+            try {
+<span class="nc" id="L118">                in = context.getAssets().open(image);</span>
+<span class="nc" id="L119">                BitmapFactory.Options opts = new BitmapFactory.Options();</span>
+<span class="nc" id="L120">                opts.inPreferredConfig = Bitmap.Config.ARGB_8888;</span>
+<span class="nc" id="L121">                Bitmap im = BitmapFactory.decodeStream(in, null, opts);</span>
+<span class="nc" id="L122">                builder.setStyle(new NotificationCompat.BigPictureStyle().bigPicture(im));</span>
+<span class="nc" id="L123">            } catch (IOException ex) {</span>
+<span class="nc" id="L124">                Logger.getLogger(LocalNotificationPublisher.class.getName()).log(Level.SEVERE, null, ex);</span>
+<span class="nc" id="L125">            }</span>
+
+        }
+<span class="nc" id="L128">        builder.setSmallIcon(smallIcon);</span>
+<span class="nc" id="L129">        builder.setContentIntent(content);</span>
+<span class="nc" id="L130">        AndroidImplementation.setNotificationChannel((NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE), builder, context);</span>
+<span class="nc" id="L131">        String sound = localNotif.getAlertSound();</span>
+<span class="nc bnc" id="L132" title="All 4 branches missed.">        if (sound != null &amp;&amp; sound.length() &gt; 0) {</span>
+<span class="nc" id="L133">            sound = sound.toLowerCase();</span>
+<span class="nc" id="L134">            builder.setSound(android.net.Uri.parse(&quot;android.resource://&quot;+ctx.getApplicationInfo().packageName+&quot;/raw&quot;+sound.substring(0, sound.indexOf(&quot;.&quot;))));</span>
+        }
+<span class="nc" id="L136">        Notification n = builder.build();</span>
+<span class="nc" id="L137">        n.icon = icon;</span>
+<span class="nc bnc" id="L138" title="All 4 branches missed.">        if (sound == null || sound.length() == 0) {</span>
+<span class="nc" id="L139">            n.defaults |= Notification.DEFAULT_SOUND;</span>
+        }
+<span class="nc" id="L141">        return n;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

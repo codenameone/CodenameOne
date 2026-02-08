@@ -1,0 +1,697 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidContactsManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidContactsManager.java</span></div><h1>AndroidContactsManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+//import android.app.Activity;
+import android.content.*;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.RemoteException;
+import android.provider.Contacts;
+import android.provider.ContactsContract;
+import com.codename1.contacts.Address;
+import com.codename1.contacts.Contact;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ *
+ * @author Chen
+ */
+public class AndroidContactsManager {
+
+<span class="nc" id="L55">    private static AndroidContactsManager instance = new AndroidContactsManager();</span>
+
+    private AndroidContactsManager() {
+    }
+
+    public static AndroidContactsManager getInstance() {
+<span class="nc" id="L61">        return instance;</span>
+    }
+
+    public String[] getContacts(Context context, boolean withNumbers) {
+<span class="nc" id="L65">        Vector ids = new Vector();</span>
+
+<span class="nc" id="L67">        String selection = null;</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (withNumbers) {</span>
+<span class="nc" id="L69">            selection = ContactsContract.Contacts.HAS_PHONE_NUMBER + &quot;=1&quot;;</span>
+        }
+
+<span class="nc" id="L72">        Cursor cursor = context.getContentResolver().query(ContactsContract.Contacts.CONTENT_URI, null, selection, null, ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + &quot; ASC&quot;);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        while (cursor.moveToNext()) {</span>
+<span class="nc" id="L74">            String contactId = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));</span>
+<span class="nc" id="L75">            ids.add(contactId);</span>
+<span class="nc" id="L76">        }</span>
+<span class="nc" id="L77">        cursor.close();</span>
+
+<span class="nc" id="L79">        String[] contacts = new String[ids.size()];</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        for (int i = 0; i &lt; ids.size(); i++) {</span>
+<span class="nc" id="L81">            String id = (String) ids.elementAt(i);</span>
+<span class="nc" id="L82">            contacts[i] = id;</span>
+        }
+<span class="nc" id="L84">        return contacts;</span>
+    }
+    
+    public Contact getContact(Context activity, String id) {
+<span class="nc" id="L88">        return getContact(activity, id, true, true, true, true, true);</span>
+    }
+
+    public static InputStream loadContactPhoto(ContentResolver cr, long id, long photo_id) {
+
+<span class="nc" id="L93">        Uri uri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, id);</span>
+<span class="nc" id="L94">        InputStream input = ContactsContract.Contacts.openContactPhotoInputStream(cr, uri);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (input != null) {</span>
+<span class="nc" id="L96">            return input;</span>
+        }
+
+<span class="nc" id="L99">        byte[] photoBytes = null;</span>
+
+<span class="nc" id="L101">        Uri photoUri = ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, photo_id);</span>
+
+<span class="nc" id="L103">        Cursor c = null;</span>
+
+        try {
+<span class="nc" id="L106">            c = cr.query(photoUri, new String[]{ContactsContract.CommonDataKinds.Photo.PHOTO}, null, null, null);</span>
+<span class="nc bnc" id="L107" title="All 4 branches missed.">            if (c != null &amp;&amp; c.moveToFirst()) {</span>
+<span class="nc" id="L108">                photoBytes = c.getBlob(0);</span>
+            }
+
+<span class="nc" id="L111">        } catch (Exception e) {</span>
+<span class="nc" id="L112">            Logger.getLogger(AndroidContactsManager.class.getName()).log(Level.SEVERE, null, e);</span>
+
+        } finally {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L116">                c.close();</span>
+            }
+        }
+
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (photoBytes != null) {</span>
+<span class="nc" id="L121">            return new ByteArrayInputStream(photoBytes);</span>
+        }
+
+<span class="nc" id="L124">        return null;</span>
+    }
+
+    public String createContact(final Context activity, String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
+        
+<span class="nc" id="L129">        String contactId = null;</span>
+        
+<span class="nc" id="L131">        String displayName = firstName + &quot; &quot; + familyName;</span>
+
+<span class="nc" id="L133">        final ArrayList&lt;ContentProviderOperation&gt; ops = new ArrayList&lt;ContentProviderOperation&gt;();</span>
+
+<span class="nc" id="L135">        ops.add(ContentProviderOperation.newInsert(</span>
+<span class="nc" id="L136">                ContactsContract.RawContacts.CONTENT_URI).withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null).withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null).build());</span>
+
+        //------------------------------------------------------ Names
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (firstName != null) {</span>
+<span class="nc" id="L140">            ops.add(ContentProviderOperation.newInsert(</span>
+<span class="nc" id="L141">                    ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,</span>
+<span class="nc" id="L142">                    ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE).withValue(</span>
+                    ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME,
+<span class="nc" id="L144">                    firstName).build());</span>
+        }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (familyName != null) {</span>
+<span class="nc" id="L147">            ops.add(ContentProviderOperation.newInsert(</span>
+<span class="nc" id="L148">                    ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,</span>
+<span class="nc" id="L149">                    ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE).withValue(</span>
+                    ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME,
+<span class="nc" id="L151">                    familyName).build());</span>
+        }
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (displayName != null) {</span>
+<span class="nc" id="L154">            ops.add(ContentProviderOperation.newInsert(</span>
+<span class="nc" id="L155">                    ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,</span>
+<span class="nc" id="L156">                    ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE).withValue(</span>
+                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME,
+<span class="nc" id="L158">                    displayName).build());</span>
+        }
+
+        //------------------------------------------------------ Mobile Number                     
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (cellPhone != null) {</span>
+<span class="nc" id="L163">            ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,</span>
+<span class="nc" id="L164">                    ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, cellPhone).withValue(ContactsContract.CommonDataKinds.Phone.TYPE,</span>
+<span class="nc" id="L165">                    ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).build());</span>
+        }
+
+        //------------------------------------------------------ Home Numbers
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (homePhone != null) {</span>
+<span class="nc" id="L170">            ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,</span>
+<span class="nc" id="L171">                    ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, homePhone).withValue(ContactsContract.CommonDataKinds.Phone.TYPE,</span>
+<span class="nc" id="L172">                    ContactsContract.CommonDataKinds.Phone.TYPE_HOME).build());</span>
+        }
+
+        //------------------------------------------------------ Work Numbers
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (officePhone != null) {</span>
+<span class="nc" id="L177">            ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,</span>
+<span class="nc" id="L178">                    ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, officePhone).withValue(ContactsContract.CommonDataKinds.Phone.TYPE,</span>
+<span class="nc" id="L179">                    ContactsContract.CommonDataKinds.Phone.TYPE_WORK).build());</span>
+        }
+
+        //------------------------------------------------------ Email
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (email != null) {</span>
+<span class="nc" id="L184">            ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).withValue(ContactsContract.Data.MIMETYPE,</span>
+<span class="nc" id="L185">                    ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Email.DATA, email).withValue(ContactsContract.CommonDataKinds.Email.TYPE, ContactsContract.CommonDataKinds.Email.TYPE_WORK).build());</span>
+        }
+
+        ContentProviderResult[] res;
+        try {
+<span class="nc" id="L190">            res = activity.getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);</span>
+<span class="nc bnc" id="L191" title="All 4 branches missed.">            if (res != null &amp;&amp; res[0] != null) {</span>
+<span class="nc" id="L192">                contactId = res[0].uri.getPath().substring(14);</span>
+            }
+<span class="nc" id="L194">        } catch (Exception e) {</span>
+<span class="nc" id="L195">            e.printStackTrace();</span>
+<span class="nc" id="L196">        }</span>
+
+<span class="nc" id="L198">        return contactId;</span>
+    }
+    
+    public boolean deleteContact(Context activity, String id) {
+        try {
+<span class="nc" id="L203">            final ArrayList ops = new ArrayList();</span>
+<span class="nc" id="L204">            final ContentResolver cr = activity.getContentResolver();</span>
+<span class="nc" id="L205">            ops.add(ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI).withSelection(</span>
+                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID
+                    + &quot; = ?&quot;,
+<span class="nc" id="L208">                    new String[]{id}).build());</span>
+<span class="nc" id="L209">            cr.applyBatch(ContactsContract.AUTHORITY, ops);</span>
+<span class="nc" id="L210">            ops.clear();</span>
+<span class="nc" id="L211">        } catch (Exception ex) {</span>
+<span class="nc" id="L212">            return false;</span>
+<span class="nc" id="L213">        }</span>
+<span class="nc" id="L214">        return true;</span>
+    }
+
+    public Contact getContact(Context activity, String id, boolean includesFullName, 
+            boolean includesPicture, boolean includesNumbers, boolean includesEmail, 
+            boolean includeAddress) {
+<span class="nc" id="L220">        Contact retVal = new Contact();</span>
+<span class="nc" id="L221">        retVal.setId(id);</span>
+
+<span class="nc" id="L223">        ContentResolver cr = activity.getContentResolver();</span>
+ 
+<span class="nc" id="L225">        String[] projection = new String[] {ContactsContract.Contacts.DISPLAY_NAME,</span>
+                ContactsContract.Contacts.PHOTO_ID, 
+                ContactsContract.Contacts.HAS_PHONE_NUMBER};
+        
+<span class="nc" id="L229">        Cursor result = cr.query(ContactsContract.Contacts.CONTENT_URI, projection,</span>
+                ContactsContract.Contacts._ID + &quot; = ?&quot;,
+                new String[]{id}, null);
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (result.moveToFirst()) {</span>
+<span class="nc" id="L233">            String name = result.getString(result.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));</span>
+<span class="nc" id="L234">            retVal.setDisplayName(name);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            if(includesPicture){</span>
+<span class="nc" id="L236">                String photoID = result.getString(result.getColumnIndex(ContactsContract.Contacts.PHOTO_ID));</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                if (photoID != null) {</span>
+<span class="nc" id="L238">                    InputStream input = loadContactPhoto(cr, Long.parseLong(id), Long.parseLong(photoID));</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">                    if (input != null) {</span>
+                        try {
+<span class="nc" id="L241">                            retVal.setPhoto(Image.createImage(input));</span>
+<span class="nc" id="L242">                        } catch (IOException ex) {</span>
+<span class="nc" id="L243">                            Logger.getLogger(AndroidContactsManager.class.getName()).log(Level.SEVERE, null, ex);</span>
+<span class="nc" id="L244">                        }</span>
+                    }
+                }
+            }
+        }
+        
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        if(includesNumbers){</span>
+<span class="nc" id="L251">            Hashtable phones = new Hashtable();</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (Integer.parseInt(result.getString(</span>
+<span class="nc" id="L253">                    result.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) &gt; 0) {</span>
+                //String[] whereParameters = new String[]{id, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE};
+<span class="nc" id="L255">                projection = new String[] {ContactsContract.CommonDataKinds.Phone.TYPE,</span>
+                        ContactsContract.CommonDataKinds.Phone.NUMBER, 
+                        ContactsContract.CommonDataKinds.Phone.IS_PRIMARY};
+                
+<span class="nc" id="L259">                Cursor pCur = cr.query(</span>
+                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                        projection,
+                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID + &quot; = ?&quot;,
+                        new String[]{id}, null);
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                while (pCur.moveToNext()) {</span>
+<span class="nc" id="L265">                    String type = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE));</span>
+<span class="nc" id="L266">                    String phone = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                    boolean isPrimary = pCur.getInt(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.IS_PRIMARY)) != 0;</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                    if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_HOME).equals(type)) {</span>
+<span class="nc" id="L269">                        type = &quot;home&quot;;</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                    } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).equals(type)) {</span>
+<span class="nc" id="L271">                        type = &quot;mobile&quot;;</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                    } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_WORK).equals(type)) {</span>
+<span class="nc" id="L273">                        type = &quot;work&quot;;</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                    } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_FAX_HOME).equals(type)) {</span>
+<span class="nc" id="L275">                        type = &quot;fax&quot;;</span>
+                    } else {
+<span class="nc" id="L277">                        type = &quot;other&quot;;</span>
+                    }
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                    if (isPrimary) {</span>
+<span class="nc" id="L280">                        retVal.setPrimaryPhoneNumber(phone);</span>
+                    }
+<span class="nc" id="L282">                    phones.put(type, phone);</span>
+<span class="nc" id="L283">                }</span>
+<span class="nc" id="L284">                retVal.setPhoneNumbers(phones);</span>
+<span class="nc" id="L285">                pCur.close();</span>
+            }
+        }
+        
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if(includesEmail){</span>
+<span class="nc" id="L290">            Hashtable emails = new Hashtable();</span>
+<span class="nc" id="L291">            projection = new String[] {ContactsContract.CommonDataKinds.Email.DATA,</span>
+                    ContactsContract.CommonDataKinds.Email.TYPE, 
+                    ContactsContract.CommonDataKinds.Email.IS_PRIMARY};
+            
+<span class="nc" id="L295">            Cursor emailCur = cr.query(</span>
+                    ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+                    projection,
+                    ContactsContract.CommonDataKinds.Email.CONTACT_ID + &quot; = ?&quot;,
+                    new String[]{id}, null);
+<span class="nc bnc" id="L300" title="All 2 branches missed.">            while (emailCur.moveToNext()) {</span>
+                // This would allow you get several email addresses
+                // if the email addresses were stored in an array
+<span class="nc" id="L303">                String email = emailCur.getString(</span>
+<span class="nc" id="L304">                        emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.DATA));</span>
+<span class="nc" id="L305">                String type = emailCur.getString(</span>
+<span class="nc" id="L306">                        emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.TYPE));</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                boolean isPrimary = emailCur.getInt(emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.IS_PRIMARY)) != 0;</span>
+
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_HOME).equals(type)) {</span>
+<span class="nc" id="L310">                    type = &quot;home&quot;;</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_MOBILE).equals(type)) {</span>
+<span class="nc" id="L312">                    type = &quot;mobile&quot;;</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_WORK).equals(type)) {</span>
+<span class="nc" id="L314">                    type = &quot;work&quot;;</span>
+                } else {
+<span class="nc" id="L316">                    type = &quot;other&quot;;</span>
+                }
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                if (isPrimary) {</span>
+<span class="nc" id="L319">                    retVal.setPrimaryEmail(email);</span>
+                }
+<span class="nc" id="L321">                emails.put(type, email);</span>
+<span class="nc" id="L322">            }</span>
+<span class="nc" id="L323">            retVal.setEmails(emails);</span>
+<span class="nc" id="L324">            emailCur.close();</span>
+        }
+
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        if(includesFullName){</span>
+<span class="nc" id="L328">            String birthWhere = ContactsContract.Data.CONTACT_ID + &quot; = ? AND &quot;</span>
+                    + ContactsContract.Data.MIMETYPE + &quot;= ? AND &quot;
+                    + ContactsContract.CommonDataKinds.Event.TYPE + &quot;=&quot;
+                    + ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY;
+<span class="nc" id="L332">            String[] birthWhereParams = new String[]{id,</span>
+                ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE
+            };
+
+<span class="nc" id="L336">            Cursor birthCur = cr.query(ContactsContract.Data.CONTENT_URI, null, birthWhere, birthWhereParams, null);</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            if (birthCur.moveToFirst()) {</span>
+<span class="nc" id="L338">                String birth = birthCur.getString(birthCur.getColumnIndex(ContactsContract.CommonDataKinds.Event.START_DATE));</span>
+<span class="nc" id="L339">                Date bd = null;</span>
+                try {
+<span class="nc" id="L341">                    bd = new SimpleDateFormat(&quot;yyyy-MM-dd&quot;).parse(birth);</span>
+<span class="nc" id="L342">                    retVal.setBirthday(bd.getTime());</span>
+<span class="nc" id="L343">                } catch (ParseException ex) {</span>
+<span class="nc" id="L344">                }</span>
+            }
+<span class="nc" id="L346">            birthCur.close();</span>
+        
+<span class="nc" id="L348">            String nameWhere = ContactsContract.Data.CONTACT_ID + &quot; = ? AND &quot; + ContactsContract.Data.MIMETYPE + &quot; = ?&quot;;</span>
+<span class="nc" id="L349">            String[] nameWhereParams = new String[]{id,</span>
+                ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE};
+<span class="nc" id="L351">            projection = new String[] {ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME,</span>
+                    ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME, 
+                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME};
+            
+<span class="nc" id="L355">            Cursor nameCursor = cr.query(ContactsContract.Data.CONTENT_URI, projection,</span>
+                    nameWhere,
+                    nameWhereParams, ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME);
+
+<span class="nc bnc" id="L359" title="All 2 branches missed.">            while (nameCursor.moveToNext()) {</span>
+
+<span class="nc" id="L361">                String given = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME));</span>
+<span class="nc" id="L362">                String family = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME));</span>
+<span class="nc" id="L363">                String display = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME));</span>
+<span class="nc" id="L364">                retVal.setFirstName(given);</span>
+<span class="nc" id="L365">                retVal.setFamilyName(family);</span>
+<span class="nc" id="L366">                retVal.setDisplayName(display);</span>
+
+<span class="nc" id="L368">            }</span>
+<span class="nc" id="L369">            nameCursor.close();</span>
+<span class="nc" id="L370">            String noteWhere = ContactsContract.Data.CONTACT_ID + &quot; = ? AND &quot; + ContactsContract.Data.MIMETYPE + &quot; = ?&quot;;</span>
+<span class="nc" id="L371">            String[] noteWhereParams = new String[]{id,</span>
+                ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE};
+<span class="nc" id="L373">            projection = new String[] {ContactsContract.CommonDataKinds.Note.NOTE};</span>
+<span class="nc" id="L374">            Cursor noteCur = cr.query(ContactsContract.Data.CONTENT_URI, projection, noteWhere, noteWhereParams, null);</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">            if (noteCur.moveToFirst()) {</span>
+<span class="nc" id="L376">                String note = noteCur.getString(noteCur.getColumnIndex(ContactsContract.CommonDataKinds.Note.NOTE));</span>
+<span class="nc" id="L377">                retVal.setNote(note);</span>
+            }
+<span class="nc" id="L379">            noteCur.close();</span>
+        }
+        
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        if(includeAddress){</span>
+<span class="nc" id="L383">            Hashtable addresses = new Hashtable();</span>
+<span class="nc" id="L384">            String addrWhere = ContactsContract.Data.CONTACT_ID + &quot; = ? AND &quot; + ContactsContract.Data.MIMETYPE + &quot; = ?&quot;;</span>
+<span class="nc" id="L385">            String[] addrWhereParams = new String[]{id,</span>
+                ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE};
+<span class="nc" id="L387">            projection = new String[] {ContactsContract.CommonDataKinds.StructuredPostal.POBOX, </span>
+            ContactsContract.CommonDataKinds.StructuredPostal.STREET, 
+            ContactsContract.CommonDataKinds.StructuredPostal.CITY,
+            ContactsContract.CommonDataKinds.StructuredPostal.REGION,
+            ContactsContract.CommonDataKinds.StructuredPostal.POSTCODE,
+            ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY,
+            ContactsContract.CommonDataKinds.StructuredPostal.TYPE};
+<span class="nc" id="L394">            Cursor addrCur = cr.query(ContactsContract.Data.CONTENT_URI,</span>
+                    projection, addrWhere, addrWhereParams, null);
+<span class="nc bnc" id="L396" title="All 2 branches missed.">            while (addrCur.moveToNext()) {</span>
+<span class="nc" id="L397">                Address address = new Address();</span>
+<span class="nc" id="L398">                String poBox = addrCur.getString(</span>
+<span class="nc" id="L399">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.POBOX));</span>
+<span class="nc" id="L400">                String street = addrCur.getString(</span>
+<span class="nc" id="L401">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.STREET));</span>
+<span class="nc" id="L402">                String city = addrCur.getString(</span>
+<span class="nc" id="L403">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.CITY));</span>
+<span class="nc" id="L404">                String state = addrCur.getString(</span>
+<span class="nc" id="L405">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.REGION));</span>
+<span class="nc" id="L406">                String postalCode = addrCur.getString(</span>
+<span class="nc" id="L407">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.POSTCODE));</span>
+<span class="nc" id="L408">                String country = addrCur.getString(</span>
+<span class="nc" id="L409">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY));</span>
+<span class="nc" id="L410">                String type = addrCur.getString(</span>
+<span class="nc" id="L411">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.TYPE));</span>
+<span class="nc" id="L412">                address.setCountry(country);</span>
+<span class="nc" id="L413">                address.setLocality(city);</span>
+<span class="nc" id="L414">                address.setPostalCode(postalCode);</span>
+<span class="nc" id="L415">                address.setRegion(state);</span>
+<span class="nc" id="L416">                address.setStreetAddress(street);</span>
+
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                if (String.valueOf(ContactsContract.CommonDataKinds.StructuredPostal.TYPE_HOME).equals(type)) {</span>
+<span class="nc" id="L419">                    type = &quot;home&quot;;</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.StructuredPostal.TYPE_WORK).equals(type)) {</span>
+<span class="nc" id="L421">                    type = &quot;work&quot;;</span>
+                } else {
+<span class="nc" id="L423">                    type = &quot;other&quot;;</span>
+                }
+
+<span class="nc" id="L426">                addresses.put(type, address);</span>
+<span class="nc" id="L427">            }</span>
+<span class="nc" id="L428">            retVal.setAddresses(addresses);</span>
+<span class="nc" id="L429">            addrCur.close();</span>
+        }
+<span class="nc" id="L431">        result.close();</span>
+
+<span class="nc" id="L433">        return retVal;</span>
+    }
+    
+    public Contact[] getAllContacts(Context activity, boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+<span class="nc" id="L437">        HashMap&lt;String,Contact&gt; contacts = new HashMap&lt;String, Contact&gt;();</span>
+<span class="nc" id="L438">        ArrayList sortedContacts = new ArrayList();</span>
+        
+<span class="nc" id="L440">        String selection = null;</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">        if (withNumbers) {</span>
+<span class="nc" id="L442">            selection = ContactsContract.Contacts.HAS_PHONE_NUMBER + &quot;=1&quot;;</span>
+        }
+
+<span class="nc" id="L445">        String[] projection = new String[] {ContactsContract.Contacts._ID,</span>
+                ContactsContract.Contacts.DISPLAY_NAME,
+                ContactsContract.Contacts.PHOTO_ID, 
+                ContactsContract.Contacts.HAS_PHONE_NUMBER};
+
+<span class="nc" id="L450">        ContentResolver contentResolver = activity.getContentResolver();</span>
+<span class="nc" id="L451">        Cursor cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI, projection, selection, null, &quot;upper(&quot; + ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + &quot;) ASC&quot;);</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">        while (cursor.moveToNext()) {</span>
+<span class="nc" id="L453">            String contactId = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));</span>
+<span class="nc" id="L454">            Contact contact = new Contact();</span>
+<span class="nc" id="L455">            contact.setId(contactId);</span>
+<span class="nc" id="L456">            contact.setEmails(new Hashtable());</span>
+            //the contacts hash is for faster lookups and the sortedContacts will keep the order sorted
+<span class="nc" id="L458">            Contact old = contacts.put(contactId, contact);</span>
+<span class="nc" id="L459">            sortedContacts.add(contact);</span>
+            
+<span class="nc" id="L461">            String name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));</span>
+<span class="nc" id="L462">            contact.setDisplayName(name);</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">            if(includesPicture){</span>
+<span class="nc" id="L464">                String photoID = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.PHOTO_ID));</span>
+<span class="nc bnc" id="L465" title="All 2 branches missed.">                if (photoID != null) {</span>
+<span class="nc" id="L466">                    InputStream input = loadContactPhoto(contentResolver, Long.parseLong(contactId), Long.parseLong(photoID));</span>
+<span class="nc bnc" id="L467" title="All 2 branches missed.">                    if (input != null) {</span>
+                        try {
+<span class="nc" id="L469">                            contact.setPhoto(Image.createImage(input));</span>
+<span class="nc" id="L470">                        } catch (IOException ex) {</span>
+<span class="nc" id="L471">                            Logger.getLogger(AndroidContactsManager.class.getName()).log(Level.SEVERE, null, ex);</span>
+<span class="nc" id="L472">                        }</span>
+                    }
+                }
+            }
+<span class="nc" id="L476">        }</span>
+<span class="nc" id="L477">        cursor.close();</span>
+
+<span class="nc bnc" id="L479" title="All 2 branches missed.">        if(includesNumbers){</span>
+<span class="nc" id="L480">            projection = new String[] {</span>
+                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+                    ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER, 
+                    ContactsContract.CommonDataKinds.Phone.IS_PRIMARY};
+
+<span class="nc" id="L486">            Cursor pCur = contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,</span>
+                    projection, null, null, null);
+<span class="nc bnc" id="L488" title="All 2 branches missed.">            while (pCur.moveToNext()) {</span>
+<span class="nc" id="L489">                String id = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID));</span>
+<span class="nc" id="L490">                Contact contact = contacts.get(id);</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">                if (contact == null) {</span>
+<span class="nc" id="L492">                    continue;</span>
+                }
+<span class="nc" id="L494">                Hashtable phones = contact.getPhoneNumbers();</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">                if (phones == null) {</span>
+<span class="nc" id="L496">                    phones = new Hashtable();</span>
+<span class="nc" id="L497">                    contact.setPhoneNumbers(phones);</span>
+                }
+<span class="nc" id="L499">                String type = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE));</span>
+<span class="nc" id="L500">                String phone = pCur.getString(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                boolean isPrimary = pCur.getInt(pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.IS_PRIMARY)) != 0;</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">                if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_HOME).equals(type)) {</span>
+<span class="nc" id="L503">                    type = &quot;home&quot;;</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).equals(type)) {</span>
+<span class="nc" id="L505">                    type = &quot;mobile&quot;;</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_WORK).equals(type)) {</span>
+<span class="nc" id="L507">                    type = &quot;work&quot;;</span>
+<span class="nc bnc" id="L508" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.Phone.TYPE_FAX_HOME).equals(type)) {</span>
+<span class="nc" id="L509">                    type = &quot;fax&quot;;</span>
+                } else {
+<span class="nc" id="L511">                    type = &quot;other&quot;;</span>
+                }
+<span class="nc bnc" id="L513" title="All 2 branches missed.">                if (isPrimary) {</span>
+<span class="nc" id="L514">                    contact.setPrimaryPhoneNumber(phone);</span>
+                }
+<span class="nc" id="L516">                phones.put(type, phone);</span>
+<span class="nc" id="L517">            }</span>
+<span class="nc" id="L518">            pCur.close();</span>
+        }
+
+<span class="nc bnc" id="L521" title="All 2 branches missed.">        if(includesEmail){</span>
+<span class="nc" id="L522">            projection = new String[] {</span>
+                    ContactsContract.CommonDataKinds.Email.CONTACT_ID,
+                    ContactsContract.CommonDataKinds.Email.DATA,
+                    ContactsContract.CommonDataKinds.Email.TYPE, 
+                    ContactsContract.CommonDataKinds.Email.IS_PRIMARY};
+
+<span class="nc" id="L528">            Cursor emailCur = contentResolver.query(</span>
+                    ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+                    projection,
+                    null, null, null);
+<span class="nc bnc" id="L532" title="All 2 branches missed.">            while (emailCur.moveToNext()) {</span>
+<span class="nc" id="L533">                String id = emailCur.getString(emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.CONTACT_ID));</span>
+<span class="nc" id="L534">                Contact contact = contacts.get(id);</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">                if (contact == null) {</span>
+<span class="nc" id="L536">                    continue;</span>
+                }
+<span class="nc" id="L538">                Hashtable emails = contact.getEmails();</span>
+<span class="nc bnc" id="L539" title="All 2 branches missed.">                if (emails == null) {</span>
+<span class="nc" id="L540">                    emails = new Hashtable();</span>
+<span class="nc" id="L541">                    contact.setEmails(emails);</span>
+                }
+                // This would allow you get several email addresses
+                // if the email addresses were stored in an array
+<span class="nc" id="L545">                String email = emailCur.getString(</span>
+<span class="nc" id="L546">                        emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.DATA));</span>
+<span class="nc" id="L547">                String type = emailCur.getString(</span>
+<span class="nc" id="L548">                        emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.TYPE));</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">                boolean isPrimary = emailCur.getInt(emailCur.getColumnIndex(ContactsContract.CommonDataKinds.Email.IS_PRIMARY)) != 0;</span>
+
+<span class="nc bnc" id="L551" title="All 2 branches missed.">                if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_HOME).equals(type)) {</span>
+<span class="nc" id="L552">                    type = &quot;home&quot;;</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_MOBILE).equals(type)) {</span>
+<span class="nc" id="L554">                    type = &quot;mobile&quot;;</span>
+<span class="nc bnc" id="L555" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.Email.TYPE_WORK).equals(type)) {</span>
+<span class="nc" id="L556">                    type = &quot;work&quot;;</span>
+                } else {
+<span class="nc" id="L558">                    type = &quot;other&quot;;</span>
+                }
+<span class="nc bnc" id="L560" title="All 2 branches missed.">                if (isPrimary) {</span>
+<span class="nc" id="L561">                    contact.setPrimaryEmail(email);</span>
+                }
+<span class="nc" id="L563">                emails.put(type, email);</span>
+<span class="nc" id="L564">            }</span>
+<span class="nc" id="L565">            emailCur.close();</span>
+        }
+
+<span class="nc bnc" id="L568" title="All 2 branches missed.">        if(includesFullName){</span>
+<span class="nc" id="L569">            String birthWhere = ContactsContract.Data.MIMETYPE + &quot;= ? AND &quot;</span>
+                    + ContactsContract.CommonDataKinds.Event.TYPE + &quot;=&quot;
+                    + ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY;
+<span class="nc" id="L572">            String[] birthWhereParams = new String[]{ ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE };</span>
+
+<span class="nc" id="L574">            Cursor birthCur = contentResolver.query(ContactsContract.Data.CONTENT_URI, null, birthWhere, birthWhereParams, null);</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">            while (birthCur.moveToNext()) {</span>
+<span class="nc" id="L576">                String id = birthCur.getString(birthCur.getColumnIndex(ContactsContract.CommonDataKinds.Event.CONTACT_ID));</span>
+<span class="nc" id="L577">                Contact contact = contacts.get(id);</span>
+<span class="nc bnc" id="L578" title="All 2 branches missed.">                if (contact == null) {</span>
+<span class="nc" id="L579">                    continue;</span>
+                }
+<span class="nc" id="L581">                String birth = birthCur.getString(birthCur.getColumnIndex(ContactsContract.CommonDataKinds.Event.START_DATE));</span>
+<span class="nc" id="L582">                Date bd = null;</span>
+                try {
+<span class="nc" id="L584">                    bd = new SimpleDateFormat(&quot;yyyy-MM-dd&quot;).parse(birth);</span>
+<span class="nc" id="L585">                    contact.setBirthday(bd.getTime());</span>
+<span class="nc" id="L586">                } catch (ParseException ex) {</span>
+<span class="nc" id="L587">                }</span>
+<span class="nc" id="L588">            }</span>
+<span class="nc" id="L589">            birthCur.close();</span>
+
+<span class="nc" id="L591">            String nameWhere = ContactsContract.Data.MIMETYPE + &quot; = ?&quot;;</span>
+<span class="nc" id="L592">            String[] nameWhereParams = new String[]{ ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE};</span>
+<span class="nc" id="L593">            projection = new String[] {</span>
+                    ContactsContract.CommonDataKinds.StructuredName.CONTACT_ID, 
+                    ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME,
+                    ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME, 
+                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME};
+
+<span class="nc" id="L599">            Cursor nameCursor = contentResolver.query(ContactsContract.Data.CONTENT_URI, projection,</span>
+                    nameWhere,
+                    nameWhereParams, ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME);
+
+<span class="nc bnc" id="L603" title="All 2 branches missed.">            while (nameCursor.moveToNext()) {</span>
+<span class="nc" id="L604">                String id = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.CONTACT_ID));</span>
+<span class="nc" id="L605">                Contact contact = contacts.get(id);</span>
+<span class="nc bnc" id="L606" title="All 2 branches missed.">                if (contact == null) {</span>
+<span class="nc" id="L607">                    continue;</span>
+                }
+<span class="nc" id="L609">                String given = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME));</span>
+<span class="nc" id="L610">                String family = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME));</span>
+<span class="nc" id="L611">                String display = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME));</span>
+<span class="nc bnc" id="L612" title="All 2 branches missed.">                if (given != null) contact.setFirstName(given);</span>
+<span class="nc bnc" id="L613" title="All 2 branches missed.">                if (family != null) contact.setFamilyName(family);</span>
+<span class="nc bnc" id="L614" title="All 2 branches missed.">                if (display != null) contact.setDisplayName(display);</span>
+<span class="nc" id="L615">            }</span>
+<span class="nc" id="L616">            nameCursor.close();</span>
+<span class="nc" id="L617">            String noteWhere = ContactsContract.Data.MIMETYPE + &quot; = ?&quot;;</span>
+<span class="nc" id="L618">            String[] noteWhereParams = new String[]{ ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE };</span>
+<span class="nc" id="L619">            projection = new String[] {ContactsContract.CommonDataKinds.Note.CONTACT_ID, ContactsContract.CommonDataKinds.Note.NOTE};</span>
+<span class="nc" id="L620">            Cursor noteCur = contentResolver.query(ContactsContract.Data.CONTENT_URI, projection, noteWhere, noteWhereParams, null);</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">            while (noteCur.moveToNext()) {</span>
+<span class="nc" id="L622">                String id = noteCur.getString(noteCur.getColumnIndex(ContactsContract.CommonDataKinds.Note.CONTACT_ID));</span>
+<span class="nc" id="L623">                Contact contact = contacts.get(id);</span>
+<span class="nc bnc" id="L624" title="All 2 branches missed.">                if (contact == null) {</span>
+<span class="nc" id="L625">                    continue;</span>
+                }
+<span class="nc" id="L627">                String note = noteCur.getString(noteCur.getColumnIndex(ContactsContract.CommonDataKinds.Note.NOTE));</span>
+<span class="nc" id="L628">                contact.setNote(note);</span>
+<span class="nc" id="L629">            }</span>
+<span class="nc" id="L630">            noteCur.close();</span>
+        }
+
+<span class="nc bnc" id="L633" title="All 2 branches missed.">        if(includeAddress){</span>
+<span class="nc" id="L634">            String addrWhere = ContactsContract.Data.MIMETYPE + &quot; = ?&quot;;</span>
+<span class="nc" id="L635">            String[] addrWhereParams = new String[]{ ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE };</span>
+<span class="nc" id="L636">            projection = new String[] {</span>
+                    ContactsContract.CommonDataKinds.StructuredPostal.CONTACT_ID,
+                    ContactsContract.CommonDataKinds.StructuredPostal.POBOX, 
+                    ContactsContract.CommonDataKinds.StructuredPostal.STREET, 
+                    ContactsContract.CommonDataKinds.StructuredPostal.CITY,
+                    ContactsContract.CommonDataKinds.StructuredPostal.REGION,
+                    ContactsContract.CommonDataKinds.StructuredPostal.POSTCODE,
+                    ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY,
+                    ContactsContract.CommonDataKinds.StructuredPostal.TYPE};
+<span class="nc" id="L645">            Cursor addrCur = contentResolver.query(ContactsContract.Data.CONTENT_URI, projection, addrWhere, addrWhereParams, null);</span>
+<span class="nc bnc" id="L646" title="All 2 branches missed.">            while (addrCur.moveToNext()) {</span>
+<span class="nc" id="L647">                String id = addrCur.getString(addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.CONTACT_ID));</span>
+<span class="nc" id="L648">                Contact contact = contacts.get(id);</span>
+<span class="nc bnc" id="L649" title="All 2 branches missed.">                if (contact == null) {</span>
+<span class="nc" id="L650">                    continue;</span>
+                }
+<span class="nc" id="L652">                Hashtable addresses = contact.getAddresses();</span>
+<span class="nc bnc" id="L653" title="All 2 branches missed.">                if (addresses == null) {</span>
+<span class="nc" id="L654">                    addresses = new Hashtable();</span>
+<span class="nc" id="L655">                    contact.setAddresses(addresses);</span>
+                }
+
+<span class="nc" id="L658">                Address address = new Address();</span>
+//              String poBox = addrCur.getString(
+//                      addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.POBOX));
+<span class="nc" id="L661">                String street = addrCur.getString(</span>
+<span class="nc" id="L662">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.STREET));</span>
+<span class="nc" id="L663">                String city = addrCur.getString(</span>
+<span class="nc" id="L664">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.CITY));</span>
+<span class="nc" id="L665">                String state = addrCur.getString(</span>
+<span class="nc" id="L666">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.REGION));</span>
+<span class="nc" id="L667">                String postalCode = addrCur.getString(</span>
+<span class="nc" id="L668">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.POSTCODE));</span>
+<span class="nc" id="L669">                String country = addrCur.getString(</span>
+<span class="nc" id="L670">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY));</span>
+<span class="nc" id="L671">                String type = addrCur.getString(</span>
+<span class="nc" id="L672">                        addrCur.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.TYPE));</span>
+<span class="nc" id="L673">                address.setCountry(country);</span>
+<span class="nc" id="L674">                address.setLocality(city);</span>
+<span class="nc" id="L675">                address.setPostalCode(postalCode);</span>
+<span class="nc" id="L676">                address.setRegion(state);</span>
+<span class="nc" id="L677">                address.setStreetAddress(street);</span>
+
+<span class="nc bnc" id="L679" title="All 2 branches missed.">                if (String.valueOf(ContactsContract.CommonDataKinds.StructuredPostal.TYPE_HOME).equals(type)) {</span>
+<span class="nc" id="L680">                    type = &quot;home&quot;;</span>
+<span class="nc bnc" id="L681" title="All 2 branches missed.">                } else if (String.valueOf(ContactsContract.CommonDataKinds.StructuredPostal.TYPE_WORK).equals(type)) {</span>
+<span class="nc" id="L682">                    type = &quot;work&quot;;</span>
+                } else {
+<span class="nc" id="L684">                    type = &quot;other&quot;;</span>
+                }
+
+<span class="nc" id="L687">                addresses.put(type, address);</span>
+<span class="nc" id="L688">                contact.setAddresses(addresses);</span>
+<span class="nc" id="L689">            }</span>
+<span class="nc" id="L690">            addrCur.close();</span>
+        }
+<span class="nc" id="L692">        Contact[] contactsArray = new Contact[sortedContacts.size()];</span>
+<span class="nc" id="L693">        sortedContacts.toArray(contactsArray);</span>
+<span class="nc" id="L694">        return contactsArray;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

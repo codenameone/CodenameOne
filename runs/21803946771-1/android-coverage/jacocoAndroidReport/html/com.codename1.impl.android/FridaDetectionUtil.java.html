@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FridaDetectionUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">FridaDetectionUtil.java</span></div><h1>FridaDetectionUtil.java</h1><pre class="source lang-java linenums">package com.codename1.impl.android;
+
+import android.content.Context;
+import android.util.Log;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+<span class="nc" id="L15">public class FridaDetectionUtil {</span>
+
+    private static final String TAG = &quot;Codename One&quot;;
+
+    // List of common Frida process names
+<span class="nc" id="L20">    private static final String[] FRIDA_PROCESSES = {</span>
+            &quot;frida-server&quot;,
+            &quot;frida-agent&quot;,
+            &quot;frida-injector&quot;,
+            &quot;frida&quot;
+    };
+
+    // List of common Frida libraries
+<span class="nc" id="L28">    private static final String[] FRIDA_LIBRARIES = {</span>
+            &quot;libfrida-gadget.so&quot;
+    };
+
+    // Check for known Frida processes
+    public static boolean isFridaProcessRunning() {
+        try {
+<span class="nc" id="L35">            Process process = Runtime.getRuntime().exec(&quot;ps&quot;);</span>
+<span class="nc" id="L36">            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));</span>
+            String line;
+<span class="nc bnc" id="L38" title="All 2 branches missed.">            while ((line = reader.readLine()) != null) {</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">                for (String processName : FRIDA_PROCESSES) {</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">                    if (line.contains(processName)) {</span>
+<span class="nc" id="L41">                        Log.e(TAG, &quot;Frida process detected: &quot; + processName);</span>
+<span class="nc" id="L42">                        return true;</span>
+                    }
+                }
+            }
+<span class="nc" id="L46">            reader.close();</span>
+<span class="nc" id="L47">        } catch (Exception e) {</span>
+<span class="nc" id="L48">            Log.e(TAG, &quot;Error checking for Frida processes: &quot; + e.getMessage());</span>
+<span class="nc" id="L49">        }</span>
+<span class="nc" id="L50">        return false;</span>
+    }
+
+    // Check for Frida libraries loaded in the app
+    public static boolean isFridaLibraryLoaded() {
+<span class="nc" id="L55">        BufferedReader reader = null;</span>
+        try {
+<span class="nc" id="L57">            FileInputStream fis = new FileInputStream(new File(&quot;/proc/self/maps&quot;));</span>
+<span class="nc" id="L58">            reader = new BufferedReader(new InputStreamReader(fis, StandardCharsets.UTF_8));</span>
+            String line;
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            while ((line = reader.readLine()) != null) {</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                for (String lib : FRIDA_LIBRARIES) {</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                    if (line.contains(lib)) {</span>
+<span class="nc" id="L63">                        Log.e(TAG, &quot;Frida library loaded: &quot; + lib);</span>
+<span class="nc" id="L64">                        return true;</span>
+                    }
+                }
+            }
+<span class="nc" id="L68">        } catch (Exception e) {</span>
+<span class="nc" id="L69">            Log.e(TAG, &quot;Error checking for Frida libraries: &quot; + e.getMessage());</span>
+        } finally {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (reader != null) {</span>
+                try {
+<span class="nc" id="L73">                    reader.close();</span>
+<span class="nc" id="L74">                } catch (Exception e) {</span>
+<span class="nc" id="L75">                    Log.e(TAG, &quot;Error closing reader: &quot; + e.getMessage());</span>
+<span class="nc" id="L76">                }</span>
+            }
+        }
+<span class="nc" id="L79">        return false;</span>
+    }
+
+    // Check for suspicious system properties
+    public static boolean isFridaPropertySet() {
+        try {
+<span class="nc" id="L85">            List&lt;String&gt; suspiciousProperties = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L86">            suspiciousProperties.add(getSystemProperty(&quot;ro.debuggable&quot;));</span>
+
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            for (String property : suspiciousProperties) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (&quot;1&quot;.equals(property)) {</span>
+<span class="nc" id="L90">                    Log.e(TAG, &quot;Suspicious system property detected: &quot; + property);</span>
+<span class="nc" id="L91">                    return true;</span>
+                }
+<span class="nc" id="L93">            }</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            if (&quot;0&quot;.equals(getSystemProperty(&quot;ro.secure&quot;))) {</span>
+<span class="nc" id="L95">                Log.e(TAG, &quot;Suspicious system property detected: ro.secure=0&quot;);</span>
+<span class="nc" id="L96">                return true;</span>
+            }
+<span class="nc" id="L98">        } catch (Exception e) {</span>
+<span class="nc" id="L99">            Log.e(TAG, &quot;Error checking for Frida properties: &quot; + e.getMessage());</span>
+<span class="nc" id="L100">        }</span>
+<span class="nc" id="L101">        return false;</span>
+    }
+
+    // Get the value of a system property
+    private static String getSystemProperty(String propName) {
+        try {
+<span class="nc" id="L107">            Class clazz = Class.forName(&quot;android.os.SystemProperties&quot;);</span>
+<span class="nc" id="L108">            Method method = clazz.getMethod(&quot;get&quot;, new Class[] { String.class });</span>
+<span class="nc" id="L109">            return (String) method.invoke(null, new Object[] { propName });</span>
+<span class="nc" id="L110">        } catch (Exception e) {</span>
+<span class="nc" id="L111">            Log.e(TAG, &quot;Error getting system property: &quot; + e.getMessage());</span>
+<span class="nc" id="L112">            return null;</span>
+        }
+    }
+
+    // Check for Frida-specific classes
+    public static boolean isFridaClassDetected() {
+        try {
+<span class="nc" id="L119">            Class clazz = Class.forName(&quot;re.frida.ServerManager&quot;);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            if (clazz != null) {</span>
+<span class="nc" id="L121">                Log.e(TAG, &quot;Frida class detected: re.frida.ServerManager&quot;);</span>
+<span class="nc" id="L122">                return true;</span>
+            }
+<span class="nc" id="L124">        } catch (ClassNotFoundException e) {</span>
+            // Expected if Frida is not present
+<span class="nc" id="L126">        }</span>
+<span class="nc" id="L127">        return false;</span>
+    }
+
+    // Comprehensive method to run all checks
+    public static boolean isFridaDetected() {
+<span class="nc bnc" id="L132" title="All 8 branches missed.">        return isFridaProcessRunning() || isFridaLibraryLoaded() || isFridaPropertySet() || isFridaClassDetected();</span>
+    }
+
+    // Run the detection checks and log the result
+    public static void runFridaDetection(Context context) {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (isFridaDetected()) {</span>
+<span class="nc" id="L138">            Log.e(TAG, &quot;Frida detected! Exiting app.&quot;);</span>
+<span class="nc" id="L139">            System.exit(0);</span>
+        } else {
+<span class="nc" id="L141">            Log.i(TAG, &quot;No Frida detection evidence found.&quot;);</span>
+        }
+<span class="nc" id="L143">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
