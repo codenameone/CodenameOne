@@ -97,4 +97,5 @@ public class DisplayTest extends UITestBase {
             display.setEnableAsyncStackTraces(oldEnable);
         }
     }
+
 }
