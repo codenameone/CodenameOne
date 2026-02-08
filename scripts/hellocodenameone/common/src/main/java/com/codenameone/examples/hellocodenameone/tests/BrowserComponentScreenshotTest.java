@@ -58,13 +58,16 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             return;
         }
 
-        if (!sheetShown) {
-            sheetShown = true;
-            Sheet sheet = new Sheet(null, "Browser Sheet");
-            sheet.show();
-        }
-        UITimer.timer(2000, false, form, readyRunnable);
+        Runnable run = readyRunnable;
         readyRunnable = null;
+        UITimer.timer(300, false, form, () -> {
+            if (!sheetShown) {
+                sheetShown = true;
+                Sheet sheet = new Sheet(null, "Browser Sheet");
+                sheet.show(0);
+            }
+            UITimer.timer(700, false, form, run);
+        });
     }
 
     private static String buildHtml() {

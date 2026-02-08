@@ -23,10 +23,8 @@
 package com.codename1.ui;
 
 import com.codename1.ui.ComponentSelector.ComponentClosure;
-import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -37,7 +35,6 @@ import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
-import com.codename1.util.SuccessCallback;
 
 import static com.codename1.ui.ComponentSelector.$;
 
@@ -122,9 +119,6 @@ public class Sheet extends Container {
     private static final int W = 3;
     private static final int C = 4;
     private static final int DEFAULT_TRANSITION_DURATION = 300;
-    private static final String SHEET_BLOCKER_PROPERTY = "cn1$sheetBlocker";
-    private static final String SHEET_BACKGROUND_PAINTER_PROPERTY = "cn1$sheetBackgroundPainter";
-    private static final String SHEET_LAYER_PROPERTY = "cn1$sheetLayer";
     private final Sheet parentSheet;
     private final Label title = new Label();
     private final EventDispatcher closeListeners = new EventDispatcher();
@@ -464,29 +458,15 @@ public class Sheet extends Container {
             remove();
         }
         Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
-        if (!(cnt.getLayout() instanceof LayeredLayout)) {
-            cnt.setLayout(new LayeredLayout());
+        if (!(cnt.getLayout() instanceof BorderLayout)) {
+            cnt.setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
+
+            cnt.getStyle().setBgPainter(new ShowPainter());
+
             cnt.revalidate();
+
         }
-        SheetBackgroundPainter backgroundPainter = getSheetBackgroundPainter(cnt);
-        cnt.getStyle().setBgPainter(backgroundPainter);
-        if (Form.activePeerCount > 0) {
-            Display.getInstance().screenshot(new SuccessCallback<Image>() {
-                @Override
-                public void onSucess(Image value) {
-                    if (Sheet.getCurrentSheet() != Sheet.this) { //NOPMD CompareObjectsWithEquals
-                        return;
-                    }
-                    if (value != null) {
-                        backgroundPainter.setScreenshot(value);
-                    }
-                    f.setLightweightMode(true);
-                    cnt.repaint();
-                }
-            });
-        }
-        Container sheetLayer = getSheetLayer(cnt);
-        if (sheetLayer.getComponentCount() > 0) {
+        if (cnt.getComponentCount() > 0) {
             $(".Sheet", cnt).each(new ComponentClosure() {
                 @Override
                 public void call(Component c) {
@@ -522,17 +502,17 @@ public class Sheet extends Container {
                 }
 
             });
-            Component existing = sheetLayer.getComponentAt(0);
-            sheetLayer.replace(existing, this, null);
-            sheetLayer.animateLayout(duration);
+            Component existing = cnt.getComponentAt(0);
+            cnt.replace(existing, this, null);
+            cnt.animateLayout(duration);
         } else {
-            sheetLayer.add(getPosition(), this);
+            cnt.add(getPosition(), this);
 
-            this.setWidth(getPreferredW(sheetLayer));
-            this.setHeight(getPreferredH(sheetLayer));
-            this.setX(getHiddenX(sheetLayer));
-            this.setY(getHiddenY(sheetLayer));
-            sheetLayer.animateLayout(duration);
+            this.setWidth(getPreferredW(cnt));
+            this.setHeight(getPreferredH(cnt));
+            this.setX(getHiddenX(cnt));
+            this.setY(getHiddenY(cnt));
+            cnt.animateLayout(duration);
         }
     }
 
@@ -808,23 +788,15 @@ public class Sheet extends Container {
 
     private void hide(int duration) {
         final Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
-        final Container sheetLayer = getSheetLayer(cnt);
-        setX(getHiddenX(sheetLayer));
-        setY(getHiddenY(sheetLayer));
-        sheetLayer.animateUnlayout(duration, 255, new Runnable() {
+        setX(getHiddenX(cnt));
+        setY(getHiddenY(cnt));
+        cnt.animateUnlayout(duration, 255, new Runnable() {
             @Override
             public void run() {
                 Container parent = cnt.getParent();
 
                 if (parent != null && parent.getComponentForm() != null) {
                     cnt.remove();
-                    SheetBackgroundPainter backgroundPainter = getSheetBackgroundPainter(cnt);
-                    if (backgroundPainter != null) {
-                        backgroundPainter.setScreenshot(null);
-                    }
-                    if (Form.activePeerCount > 0) {
-                        parent.getComponentForm().setLightweightMode(false);
-                    }
                     parent.getComponentForm().revalidateLater();
                     fireCloseEvent(true);
 
@@ -948,64 +920,10 @@ public class Sheet extends Container {
 
     }
 
-    private Container getSheetLayer(Container cnt) {
-        Container sheetLayer = (Container) cnt.getClientProperty(SHEET_LAYER_PROPERTY);
-        if (sheetLayer == null) {
-            sheetLayer = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
-            sheetLayer.setName("SheetLayer");
-            cnt.putClientProperty(SHEET_LAYER_PROPERTY, sheetLayer);
-            ensureSheetBlocker(cnt, sheetLayer);
-            cnt.add(sheetLayer);
-        } else {
-            ensureSheetBlocker(cnt, sheetLayer);
-        }
-        return sheetLayer;
-    }
 
-    private void ensureSheetBlocker(Container cnt, Container sheetLayer) {
-        Component blocker = (Component) cnt.getClientProperty(SHEET_BLOCKER_PROPERTY);
-        if (Form.activePeerCount <= 0) {
-            if (blocker != null && blocker.getParent() == cnt) { //NOPMD CompareObjectsWithEquals
-                cnt.removeComponent(blocker);
-            }
-            return;
-        }
-        if (blocker == null) {
-            blocker = new SheetBlocker();
-            cnt.putClientProperty(SHEET_BLOCKER_PROPERTY, blocker);
-        }
-        if (blocker.getParent() != cnt) { //NOPMD CompareObjectsWithEquals
-            int sheetLayerIndex = cnt.getComponentIndex(sheetLayer);
-            if (sheetLayerIndex > -1) {
-                cnt.addComponent(sheetLayerIndex, blocker);
-            } else {
-                cnt.addComponent(0, blocker);
-            }
-        }
-    }
-
-
-    private SheetBackgroundPainter getSheetBackgroundPainter(Container cnt) {
-        SheetBackgroundPainter painter = (SheetBackgroundPainter) cnt.getClientProperty(SHEET_BACKGROUND_PAINTER_PROPERTY);
-        if (painter == null) {
-            painter = new SheetBackgroundPainter();
-            cnt.putClientProperty(SHEET_BACKGROUND_PAINTER_PROPERTY, painter);
-        }
-        return painter;
-    }
-
-    private static class SheetBackgroundPainter implements Painter {
-        private Image screenshot;
-
-        void setScreenshot(Image screenshot) {
-            this.screenshot = screenshot;
-        }
-
+    private static class ShowPainter implements Painter {
         @Override
         public void paint(Graphics g, Rectangle rect) {
-            if (screenshot != null) {
-                g.drawImage(screenshot, rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
-            }
             int alph = g.getAlpha();
             g.setAlpha((int) (alph * 30 / 100.0));
             g.setColor(0x0);
@@ -1013,17 +931,5 @@ public class Sheet extends Container {
             g.setAlpha(alph);
         }
 
-    }
-
-    private static class SheetBlocker extends Container {
-        SheetBlocker() {
-            setGrabsPointerEvents(true);
-            setUIID("SheetBlocker");
-        }
-
-        @Override
-        protected Dimension calcPreferredSize() {
-            return new Dimension(CN.getDisplayWidth(), CN.getDisplayHeight());
-        }
     }
 }
