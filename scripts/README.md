@@ -31,6 +31,11 @@ workflows to build and validate Codename One ports.
   workflow.
 - `device-runner-app/` – Java sources for the shared sample application and its
   DeviceRunner UI tests.
+- `website/` – Hugo website helpers for the WordPress migration content under
+  `docs/website`.
+  - `website/preview.sh` – runs the Hugo dev server for local previews.
+  - `website/build.sh` – generates the static site output in
+    `docs/website/public`.
 
 These scripts are designed so that shell logic focuses on orchestration, while
 small Java utilities encapsulate the heavier data processing steps. This

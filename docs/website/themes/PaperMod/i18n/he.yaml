@@ -1,0 +1,33 @@
+- id: prev_page
+  translation: "הקודם"
+
+- id: next_page
+  translation: "הבא"
+
+- id: read_time
+  translation:
+    one: "דקה אחת"
+    other: "{{ .Count }} דקות"
+
+- id: words
+  translation:
+    one: "מילה אחת"
+    other: "{{ .Count }} מילים"
+
+- id: toc
+  translation: "תוכן עניינים"
+
+- id: translations
+  translation: "תרגומים"
+
+- id: home
+  translation: "בית"
+
+- id: edit_post
+  translation: "ערוך"
+
+- id: code_copy
+  translation: "העתק"
+
+- id: code_copied
+  translation: "הועתק!"

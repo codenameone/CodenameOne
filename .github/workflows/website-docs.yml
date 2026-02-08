@@ -1,0 +1,41 @@
+name: Build Hugo Website
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'docs/website/**'
+      - 'scripts/website/**'
+      - '.github/workflows/website-docs.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'docs/website/**'
+      - 'scripts/website/**'
+      - '.github/workflows/website-docs.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: 'latest'
+          extended: true
+
+      - name: Build website
+        run: |
+          set -euo pipefail
+          scripts/website/build.sh
+
+      - name: Upload built site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-preview
+          path: docs/website/public
+          if-no-files-found: error

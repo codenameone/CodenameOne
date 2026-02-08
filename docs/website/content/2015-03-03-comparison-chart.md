@@ -1,0 +1,154 @@
+---
+title: "Comparison Chart"
+date: 2015-03-03
+slug: "comparison-chart"
+---
+
+# Comparison Chart
+
+Detailed Comparison & FAQs
+
+1. [Home](/)
+2. [About](/about.html)
+3. Comparison Chart
+
+We charge for all our products and services using PayPal (which accepts credit cards), we also accept SWIFT money transfers for annual subscriptions of pro level or higher. If you require specific invoicing types please use our [contact form](/contact-us.html) with your details.
+
+Codename One provides a 30 day money back guarantee with no questions asked for all purchases made via paypal, please use our [contact form](/contact-us.html) if you are unsatisfied in any way with your purchased subscription.
+
+Please notice that all standard licenses are individual (per developer seat) and are non-transferable.
+
+### Free
+
+$0/mo
+
+- Community Support
+- Royalty Free
+- iOS Builds
+- Android Builds
+- Windows Phone Builds
+- Blackberry Builds
+
+Sign Up
+
+### Basic
+
+$19/mo
+
+- Unlimited Build Credits
+- 50mb build Size
+- Access To Native Sources
+
+Sign Up
+
+### Professional
+
+$849 Annually
+
+$79/mo
+
+- Push Notification
+- Online Training
+- On Device Unit Tests
+- Concurrent Builds
+- Versioning
+- Live Preview
+- Crash Reporting
+- E-Mail Support
+- Native Desktop Apps
+
+Sign Up
+
+### Enterprise
+
+$3,799 Annually
+
+$399/mo
+
+- High Priority Builds
+- JavaScript App Generation
+- Continuous Integration
+- Office Hours/Phone Support
+- Optional SLA
+
+Sign Up
+
+## What's The Benefit Of A Pro Subscription?
+
+We created videos detailing some of the benefits of a pro subscription. The biggest benefit is the extensive email support however these features are also very useful:
+
+- Push notification
+- Codename One LIVE!
+- Versioning
+- Cloud storage/files
+- Crash protection
+- Use source download
+- Native Desktop apps for Mac OS X and Windows
+
+## FAQ's
+
+Can I build more than one app?
+
+There are no limits on the number of apps or number of users! Our pricing is per developer seat.
+
+How many licenses do I need?
+
+One per every developer on your team that is working with Codename One.
+
+Can I purchase a basic license for one developer in my team and an enterprise license for another? Can I mix license grades?
+
+No. All licenses within the organization must be of the same subscription level and every developer needs a license. We find that additional developers start routing support requests through the paid account making the complexity of supporting the enterprise/pro account within the org much higher.
+
+If we end development with Codename One but still have an app in the store do we still need to pay?
+
+Only if you use push services/crash protection or other cloud features. If you don't use the runtime cloud services the application will work without the cloud regardless of your subscription status. Notice that the developer documentation highlights such services as cloud services and they are always limited to pro subscriptions or higher.
+
+Can I use Codename One for free on a commercial project?
+
+Yes. To avoid abuse free users are limited to 100 build credits every month. Paid users have no such restriction. Enterprise/Pro developers are allowed to send multiple builds concurrently without any limitations. Builds are prioritized based on subscription level, some of the build servers are dedicated strictly for Enterprise/Pro subscription hence providing them with better service/speed.
+
+Can I build to all devices for free?
+
+Yes. Up to 100 credits per month with an iOS build taking up 8 credits due to the cost of running Mac servers in the cloud and the longer build times.
+
+What is the size limitation?
+
+Free users have a 1MB limit on the size of the JAR file sent to the build server
+
+What about academic licenses?
+
+The base version of Codename One was designed to be sufficient for the needs of academic/research work so there is no need for academic specific licenses.
+
+What are the quotas for push services?
+
+Pro users are limited to 1M messages per month which cannot exceed, 50,000 messages per day and 3,000 messages per hour. Enterprise are limited to 10M messages per month 500,000 per day and 30,000 per hour. If you need more than that you can use multiple enterprise accounts or contact us.
+
+Can I build offline?
+
+Codename One is an open source project and that includes all the pieces including the native device ports. However, as a policy the Codename One team doesn't provide help in compiling these sources since the complexity of supporting this process is excessive. For enterprise class account we provide technical support for such issues but no explicit or easy to use tools! This service is provided not as a practical day to day tool but rather to provide the sense of a safety net. Codename One also supports a corporate server setups which effectively install a company wide private cloud within the organization, this is a more practical approach than building offline since it combines the simplicity of the cloud without the corporate complexities. See the corporate section below for more information on that offering.
+
+Can I download the sources generated by the server?
+
+Only paid subscribers can download the sources generated by the server. However, sources are only generated for Android/iOS & Windows Phone. On J2ME/Blackberry there are no sources generated and the work is performed entirely on the bytecode level.
+
+Can I use Codename One to build desktop apps?
+
+Yes, however they will look like a tablet application and act very much like it in terms of scrolling behavior. You will need a pro account to build native desktop apps.
+
+Would desktop apps be "really" native?
+
+They are Java applications wrapped with a native installer/wrapper. They feel like a mobile application within a desktop which is a reasonable user experience for some cases e.g. Windows tablets.
+
+Why do I need a pro account for a desktop app?
+
+The bundled JRE significantly increases the size of the build and the space/bandwidth it takes for our servers to process such a build. This is a heavy cost which is why we are only enabling this as a pro feature at this time.
+
+## Corporate Server
+
+The corporate offering provides customers with the ability to install a Codename One build cloud within their corporate firewall. This provides the corporations sys-admins the ability to guarantee security thru existing means. Since the servers are installed on premise the pricing is for the server offering only and one year of updates. In a corporate setting support is priced separately since no limitation is made on the number of developers although it isn't a requirement to purchase support. The starting price for the corporate server before support costs is $19,900 annually.
+
+Support is provided for the process of administering and installing the corporate server both by phone & email with on-site support available at additional pay.
+
+The corporate solution requires that your company perform the setup and installation of at least 4 separate servers with a complex configuration process. This requires a trained system administrator to perform the setup based on instructions from Codename One.
+
+If you think the corporate server is right for you please fill out the form here.
