@@ -23,6 +23,7 @@
 package com.codename1.ui;
 
 import com.codename1.ui.ComponentSelector.ComponentClosure;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -36,6 +37,7 @@ import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.SuccessCallback;
 
 import static com.codename1.ui.ComponentSelector.$;
 
@@ -121,6 +123,7 @@ public class Sheet extends Container {
     private static final int C = 4;
     private static final int DEFAULT_TRANSITION_DURATION = 300;
     private static final String SHEET_BLOCKER_PROPERTY = "cn1$sheetBlocker";
+    private static final String SHEET_BACKGROUND_PAINTER_PROPERTY = "cn1$sheetBackgroundPainter";
     private static final String SHEET_LAYER_PROPERTY = "cn1$sheetLayer";
     private final Sheet parentSheet;
     private final Label title = new Label();
@@ -448,9 +451,6 @@ public class Sheet extends Container {
         // END Deal with iPhoneX notch
 
         Form f = CN.getCurrentForm();
-        if (Form.activePeerCount > 0) {
-            f.setLightweightMode(true);
-        }
         if (f.getAnimationManager().isAnimating()) {
             f.getAnimationManager().flushAnimation(new Runnable() {
                 @Override
@@ -466,11 +466,24 @@ public class Sheet extends Container {
         Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
         if (!(cnt.getLayout() instanceof LayeredLayout)) {
             cnt.setLayout(new LayeredLayout());
-
-            cnt.getStyle().setBgPainter(new ShowPainter());
-
             cnt.revalidate();
-
+        }
+        SheetBackgroundPainter backgroundPainter = getSheetBackgroundPainter(cnt);
+        cnt.getStyle().setBgPainter(backgroundPainter);
+        if (Form.activePeerCount > 0) {
+            Display.getInstance().screenshot(new SuccessCallback<Image>() {
+                @Override
+                public void onSucess(Image value) {
+                    if (Sheet.getCurrentSheet() != Sheet.this) { //NOPMD CompareObjectsWithEquals
+                        return;
+                    }
+                    if (value != null) {
+                        backgroundPainter.setScreenshot(value);
+                    }
+                    f.setLightweightMode(true);
+                    cnt.repaint();
+                }
+            });
         }
         Container sheetLayer = getSheetLayer(cnt);
         if (sheetLayer.getComponentCount() > 0) {
@@ -805,6 +818,10 @@ public class Sheet extends Container {
 
                 if (parent != null && parent.getComponentForm() != null) {
                     cnt.remove();
+                    SheetBackgroundPainter backgroundPainter = getSheetBackgroundPainter(cnt);
+                    if (backgroundPainter != null) {
+                        backgroundPainter.setScreenshot(null);
+                    }
                     if (Form.activePeerCount > 0) {
                         parent.getComponentForm().setLightweightMode(false);
                     }
@@ -968,9 +985,27 @@ public class Sheet extends Container {
     }
 
 
-    private static class ShowPainter implements Painter {
+    private SheetBackgroundPainter getSheetBackgroundPainter(Container cnt) {
+        SheetBackgroundPainter painter = (SheetBackgroundPainter) cnt.getClientProperty(SHEET_BACKGROUND_PAINTER_PROPERTY);
+        if (painter == null) {
+            painter = new SheetBackgroundPainter();
+            cnt.putClientProperty(SHEET_BACKGROUND_PAINTER_PROPERTY, painter);
+        }
+        return painter;
+    }
+
+    private static class SheetBackgroundPainter implements Painter {
+        private Image screenshot;
+
+        void setScreenshot(Image screenshot) {
+            this.screenshot = screenshot;
+        }
+
         @Override
         public void paint(Graphics g, Rectangle rect) {
+            if (screenshot != null) {
+                g.drawImage(screenshot, rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+            }
             int alph = g.getAlpha();
             g.setAlpha((int) (alph * 30 / 100.0));
             g.setColor(0x0);
