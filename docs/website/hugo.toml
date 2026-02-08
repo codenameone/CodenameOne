@@ -1,4 +1,159 @@
-baseURL = 'https://example.org/'
+baseURL = 'https://www.codenameone.com/'
 languageCode = 'en-us'
-title = 'My New Hugo Site'
+title = 'Codename One'
 theme = "PaperMod"
+
+[params]
+defaultTheme = "dark"
+disableThemeToggle = true
+mainSections = ["blog"]
+
+[params.label]
+text = "CODENAME ONE"
+icon = "/uploads/Codename-One-White-Logo.png"
+iconHeight = 34
+
+[menu]
+[[menu.main]]
+identifier = "developers"
+name = "DEVELOPERS"
+url = "#"
+weight = 10
+
+[[menu.main]]
+parent = "developers"
+name = "Getting Started"
+url = "/getting-started/"
+weight = 11
+
+[[menu.main]]
+parent = "developers"
+name = "Docs"
+url = "/introduction/"
+weight = 12
+
+[[menu.main]]
+parent = "developers"
+name = "Demos"
+url = "/demos/"
+weight = 13
+
+[[menu.main]]
+parent = "developers"
+name = "Plugins"
+url = "/cn1libs/"
+weight = 14
+
+[[menu.main]]
+parent = "developers"
+name = "Dashboard"
+url = "https://cloud.codenameone.com/secure/index.html"
+weight = 15
+
+[[menu.main]]
+identifier = "resources"
+name = "RESOURCES"
+url = "#"
+weight = 20
+
+[[menu.main]]
+parent = "resources"
+name = "Academy/Training"
+url = "/training/"
+weight = 21
+
+[[menu.main]]
+parent = "resources"
+name = "Tutorials"
+url = "/how-do-i/"
+weight = 22
+
+[[menu.main]]
+parent = "resources"
+name = "Videos"
+url = "/videos/"
+weight = 23
+
+[[menu.main]]
+parent = "resources"
+name = "Compare"
+url = "/compare/"
+weight = 24
+
+[[menu.main]]
+parent = "resources"
+name = "Search"
+url = "/search/"
+weight = 25
+
+[[menu.main]]
+parent = "resources"
+name = "Blog"
+url = "/blog/"
+weight = 26
+
+[[menu.main]]
+identifier = "community"
+name = "COMMUNITY"
+url = "#"
+weight = 30
+
+[[menu.main]]
+parent = "community"
+name = "GitHub"
+url = "https://github.com/codenameone/CodenameOne"
+weight = 31
+
+[[menu.main]]
+parent = "community"
+name = "Stack Overflow"
+url = "https://stackoverflow.com/questions/tagged/codenameone"
+weight = 32
+
+[[menu.main]]
+parent = "community"
+name = "Reddit"
+url = "https://www.reddit.com/r/codenameone/"
+weight = 33
+
+[[menu.main]]
+parent = "community"
+name = "Forum/Help"
+url = "/discussion-forum/"
+weight = 34
+
+[[menu.main]]
+identifier = "pricing"
+name = "PRICING"
+url = "/pricing/"
+weight = 40
+
+[[menu.main]]
+identifier = "support"
+name = "SUPPORT"
+url = "#"
+weight = 50
+
+[[menu.main]]
+parent = "support"
+name = "Services"
+url = "/services/"
+weight = 51
+
+[[menu.main]]
+parent = "support"
+name = "FAQ"
+url = "/faq/"
+weight = 52
+
+[[menu.main]]
+parent = "support"
+name = "Contact Us"
+url = "/contact-us/"
+weight = 53
+
+[[menu.main]]
+identifier = "dashboard"
+name = "Dashboard"
+url = "https://cloud.codenameone.com/secure/index.html"
+weight = 90
