@@ -2617,6 +2617,9 @@ public final class Util {
     public static String xorDecode(String s) {
         try {
             byte[] dat = Base64.decode(s.getBytes("UTF-8"));
+            if (dat == null) {
+                return "";
+            }
             for (int iter = 0; iter < dat.length; iter++) {
                 dat[iter] = (byte) (dat[iter] ^ (iter % 254 + 1));
             }

@@ -29,6 +29,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -263,10 +264,10 @@ public class StubGenerator {
 
         iosHFile.getParentFile().mkdirs();
         FileOutputStream fo = new FileOutputStream(iosHFile);
-        fo.write(h.getBytes());
+        fo.write(h.getBytes(StandardCharsets.UTF_8));
         fo.close();
         fo = new FileOutputStream(iosMFile);
-        fo.write(m.getBytes());
+        fo.write(m.getBytes(StandardCharsets.UTF_8));
         fo.close();
     }
 
@@ -434,9 +435,9 @@ public class StubGenerator {
         }
         t += "}\n";
         dest.getParentFile().mkdirs();
-        FileOutputStream fo = new FileOutputStream(dest);
-        fo.write(t.getBytes());
-        fo.close();
+        try(FileOutputStream fo = new FileOutputStream(dest)) {
+            fo.write(t.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     private void generateCSFile(File dest, String peerComponentType) throws IOException {
@@ -502,7 +503,7 @@ public class StubGenerator {
         t += "}\r\n}\r\n";
         dest.getParentFile().mkdirs();
         FileOutputStream fo = new FileOutputStream(dest);
-        fo.write(t.getBytes());
+        fo.write(t.getBytes(StandardCharsets.UTF_8));
         fo.close();
     }
 
@@ -585,7 +586,7 @@ public class StubGenerator {
         t += "= o;\n\n" +
                 "})(cn1_get_native_interfaces());\n";
         FileOutputStream fo = new FileOutputStream(jsFile);
-        fo.write(t.getBytes());
+        fo.write(t.getBytes(StandardCharsets.UTF_8));
         fo.close();
     }
 }

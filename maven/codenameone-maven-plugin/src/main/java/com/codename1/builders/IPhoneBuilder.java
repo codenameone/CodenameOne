@@ -35,6 +35,7 @@ import java.io.*;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
@@ -141,7 +142,7 @@ public class IPhoneBuilder extends Executor {
         ProcessBuilder pb = new ProcessBuilder("otool", "-lv", file.getAbsolutePath());
         Process p = pb.start();
         InputStream is = p.getInputStream();
-        Scanner scanner = new Scanner(is);
+        Scanner scanner = new Scanner(is, "UTF-8");
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
             if (line.contains("LC_VERSION_MIN_")) {
@@ -1021,7 +1022,7 @@ public class IPhoneBuilder extends Executor {
                     + "    }\n"
                     + "}\n";
 
-            stubSourceStream.write(stubSourceCode.getBytes());
+            stubSourceStream.write(stubSourceCode.getBytes(StandardCharsets.UTF_8));
         } catch (IOException ex) {
             throw new BuildException("Failed to write stub source", ex);
         }
@@ -1163,16 +1164,14 @@ public class IPhoneBuilder extends Executor {
                 
                 
                 try (FileOutputStream out = new FileOutputStream(javaFile)) {
-                    out.write(javaImplSourceFile.getBytes());
-                    out.close();
+                    out.write(javaImplSourceFile.getBytes(StandardCharsets.UTF_8));
                 } catch (IOException ex) {
                     throw new BuildException("Error while generating native interface stub for "+currentNative, ex);
                 }
                 File mFile = new File(resDir, "native_" + currentNative.getName().replace('.', '_') + "ImplCodenameOne.m");
 
                 try (FileOutputStream out = new FileOutputStream(mFile)) {
-                    out.write(mSourceFile.getBytes());
-                    out.close();
+                    out.write(mSourceFile.getBytes(StandardCharsets.UTF_8));
                 } catch (IOException ex) {
                     throw new BuildException("Error while generating native interface stub for "+currentNative, ex);
                 }
@@ -1229,22 +1228,22 @@ public class IPhoneBuilder extends Executor {
                 byte[] data = new byte[(int) appDelH.length()];
                 dis.readFully(data);
                 dis.close();
-                FileWriter fios = new FileWriter(appDelH);
-                String str = new String(data);
-                str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS", "#define CN1_INCLUDE_NOTIFICATIONS");
-                fios.write(str);
-                fios.close();
+                try(Writer fios = new OutputStreamWriter(Files.newOutputStream(appDelH.toPath()), StandardCharsets.UTF_8)) {
+                    String str = new String(data, StandardCharsets.UTF_8);
+                    str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS", "#define CN1_INCLUDE_NOTIFICATIONS");
+                    fios.write(str);
+                }
 
                 File iosNative = new File(buildinRes, "IOSNative.m");
-                dis = new DataInputStream(new FileInputStream(iosNative));
+                dis = new DataInputStream(Files.newInputStream(iosNative.toPath()));
                 data = new byte[(int) iosNative.length()];
                 dis.readFully(data);
                 dis.close();
-                fios = new FileWriter(iosNative);
-                str = new String(data);
-                str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS2", "#define CN1_INCLUDE_NOTIFICATIONS2");
-                fios.write(str);
-                fios.close();
+                try (Writer fios = new OutputStreamWriter(Files.newOutputStream(iosNative.toPath()), StandardCharsets.UTF_8)) {
+                    String str = new String(data, StandardCharsets.UTF_8);
+                    str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS2", "#define CN1_INCLUDE_NOTIFICATIONS2");
+                    fios.write(str);
+                }
             } catch (IOException ex) {
                 log("Failed to Update Objective-C source files to activate notifications flag");
                 throw new BuildException("Failed to update Objective-C source files to activate notifications flag", ex);
@@ -1255,26 +1254,27 @@ public class IPhoneBuilder extends Executor {
             try {
                 // special workaround for issue Apple is having with push notification missing from
                 // the entitlements
-                DataInputStream dis = new DataInputStream(new FileInputStream(glAppDelegate));
                 byte[] data = new byte[(int) glAppDelegate.length()];
-                dis.readFully(data);
-                dis.close();
-                FileWriter fios = new FileWriter(glAppDelegate);
-                String str = new String(data);
-                str = str.replace("#define INCLUDE_CN1_PUSH", "");
-                fios.write(str);
-                fios.close();
+                try(DataInputStream dis = new DataInputStream(Files.newInputStream(glAppDelegate.toPath()))) {
+                    dis.readFully(data);
+                }
+
+                try(Writer fios = new OutputStreamWriter(Files.newOutputStream(glAppDelegate.toPath()), StandardCharsets.UTF_8)) {
+                    String str = new String(data, StandardCharsets.UTF_8);
+                    str = str.replace("#define INCLUDE_CN1_PUSH", "");
+                    fios.write(str);
+                }
 
                 File iosNative = new File(buildinRes, "IOSNative.m");
-                dis = new DataInputStream(new FileInputStream(iosNative));
-                data = new byte[(int) iosNative.length()];
-                dis.readFully(data);
-                dis.close();
-                fios = new FileWriter(iosNative);
-                str = new String(data);
-                str = str.replace("#define INCLUDE_CN1_PUSH2", "//#define INCLUDE_CN1_PUSH2");
-                fios.write(str);
-                fios.close();
+                try(DataInputStream dis = new DataInputStream(Files.newInputStream(iosNative.toPath()))) {
+                    data = new byte[(int) iosNative.length()];
+                    dis.readFully(data);
+                }
+                try (Writer fios = new OutputStreamWriter(Files.newOutputStream(iosNative.toPath()), StandardCharsets.UTF_8)) {
+                    String str = new String(data, StandardCharsets.UTF_8);
+                    str = str.replace("#define INCLUDE_CN1_PUSH2", "//#define INCLUDE_CN1_PUSH2");
+                    fios.write(str);
+                }
             } catch (IOException ex) {
                 throw new BuildException("Failed to update Objective-C source files to activate push notification flag", ex);
             }
@@ -2423,7 +2423,8 @@ public class IPhoneBuilder extends Executor {
             }
         }
 
-        BufferedReader infoReader = new BufferedReader(new FileReader(infoPlist));
+        BufferedReader infoReader = new BufferedReader(new InputStreamReader(
+                Files.newInputStream(infoPlist.toPath()), StandardCharsets.UTF_8));
         StringBuilder b = new StringBuilder();
         String line = infoReader.readLine();
         while(line != null) {
@@ -2544,9 +2545,9 @@ public class IPhoneBuilder extends Executor {
         }
         infoReader.close();
         
-        FileOutputStream fo = new FileOutputStream(infoPlist);
-        fo.write(b.toString().getBytes());
-        fo.close();
+        try(FileOutputStream fo = new FileOutputStream(infoPlist)) {
+            fo.write(b.toString().getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     /**

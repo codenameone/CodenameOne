@@ -25,11 +25,12 @@ package com.codename1.tools.translator;
 
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -522,7 +523,7 @@ public class ByteCodeTranslator {
     private static void writeCmakeProject(File projectRoot, File srcRoot, String appName) throws IOException {
         File cmakeLists = new File(projectRoot, "CMakeLists.txt");
         String srcRootPath = srcRoot.getAbsolutePath();
-        try (FileWriter writer = new FileWriter(cmakeLists)) {
+        try (Writer writer = new OutputStreamWriter(Files.newOutputStream(cmakeLists.toPath()), StandardCharsets.UTF_8)) {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             writer.append("project(").append(appName).append(" LANGUAGES C)\n");
             writer.append("set(CMAKE_C_STANDARD 99)\n");
@@ -596,14 +597,14 @@ public class ByteCodeTranslator {
     //
     private static StringBuilder readFileAsStringBuilder(File sourceFile) throws IOException
     {
-        DataInputStream dis = new DataInputStream(Files.newInputStream(sourceFile.toPath()));
-        byte[] data = new byte[(int)sourceFile.length()];
-        dis.readFully(data);
-        dis.close();
-        return new StringBuilder(new String(data));
+        try(DataInputStream dis = new DataInputStream(Files.newInputStream(sourceFile.toPath()))) {
+            byte[] data = new byte[(int) sourceFile.length()];
+            dis.readFully(data);
+            return new StringBuilder(new String(data, StandardCharsets.UTF_8));
+        }
     }
     //
-    // rewrite 4/2017 by ddyer to use more appropriate data
+    // Use more appropriate data
     // structures, minimizing gc thrashing.  This avoids a big
     // spike in memory and gc usage (and corresponding build 
     // failures due to OutOfMemoryError) at the very end of the build 
@@ -612,6 +613,7 @@ public class ByteCodeTranslator {
     private static void replaceInFile(File sourceFile, String... values) throws IOException {
         StringBuilder str = readFileAsStringBuilder(sourceFile);
         int totchanges = 0;
+
     	// perform the mutations on stringbuilder, which ought to implement
         // these operations efficiently.
         for (int iter = 0; iter < values.length; iter += 2) {
@@ -625,13 +627,14 @@ public class ByteCodeTranslator {
                 totchanges++;
             }
         }
+
         //
         // don't start the output file until all the processing is done
         //
         System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
-        FileWriter fios = new FileWriter(sourceFile);
-        fios.write(str.toString());
-        fios.close();
+        try(Writer fios = new OutputStreamWriter(Files.newOutputStream(sourceFile.toPath()), StandardCharsets.UTF_8)) {
+            fios.write(str.toString());
+        }
     }
     
 

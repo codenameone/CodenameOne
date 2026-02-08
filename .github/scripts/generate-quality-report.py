@@ -815,6 +815,7 @@ def main() -> None:
         cross_project_rules = {
             "DE_MIGHT_IGNORE",
             "BC_IMPOSSIBLE_CAST",
+            "DM_DEFAULT_ENCODING"
         }
         cross_project_violations: List[Tuple[str, Finding]] = []
         for label, report in spotbugs_reports.items():

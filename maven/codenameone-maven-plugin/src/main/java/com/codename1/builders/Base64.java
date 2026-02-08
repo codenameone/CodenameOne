@@ -15,15 +15,14 @@
  *  limitations under the License.
  */
 
-/**
-* @author Alexander Y. Kleymenov
-*/
-
 package com.codename1.builders;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * This class implements Base64 encoding/decoding functionality
  * as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
+ * @author Alexander Y. Kleymenov
  */
 public class Base64 {
     
@@ -63,7 +62,7 @@ public class Base64 {
         // index in the input array
         int in_index = 0;
         // holds the value of the input character
-        int bits = 0;
+        int bits;
         // holds the value of the input quantum
         int quantum = 0;
         for (int i=0; i<len; i++) {
@@ -142,8 +141,6 @@ public class Base64 {
             if (((index - crlr)%76 == 0) && (index != 0)) {
                 out[index++] = '\n';
                 crlr++;
-                //out[index++] = '\r';
-                //crlr++;
             }
         }
         switch (in.length % 3) {
@@ -161,7 +158,7 @@ public class Base64 {
                 out[index++] = '=';
                 break;
         }
-        return new String(out, 0, index);
+        return new String(out, 0, index, StandardCharsets.UTF_8);
     }
 
     public static String encodeNoNewline(byte[] in) {
@@ -193,7 +190,7 @@ public class Base64 {
                 out[index++] = '=';
                 break;
         }
-        return new String(out, 0, index);
+        return new String(out, 0, index, StandardCharsets.UTF_8);
     }
 }
 

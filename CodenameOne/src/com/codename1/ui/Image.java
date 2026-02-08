@@ -426,25 +426,25 @@ public class Image implements ActionSource {
     /// SuccessCallback callback = (String capturedPhoto) -> {
     ///     String rotatedPhoto = FileSystemStorage.getInstance().getAppHomePath() + "rotatedPhoto.jpg";
     ///     if (capturedPhoto != null) {
-    /// 		try {
-    /// 		    // note: we set a maxSize to perform a faster rotation
-    /// 		    int maxSize = CN.convertToPixels(50);
-    /// 		    Image img = Image.exifRotation(capturedPhoto, rotatedPhoto, maxSize);
-    /// 		    imageLbl.setIcon(img);
-    /// 		    hi.revalidate();
-    /// 		} catch (IOException ex) {
-    /// 		    Log.e(ex);
-    /// 		}
+    ///         try {
+    ///             // note: we set a maxSize to perform a faster rotation
+    ///             int maxSize = CN.convertToPixels(50);
+    ///             Image img = Image.exifRotation(capturedPhoto, rotatedPhoto, maxSize);
+    ///             imageLbl.setIcon(img);
+    ///             hi.revalidate();
+    ///         } catch (IOException ex) {
+    ///             Log.e(ex);
+    ///         }
     ///     };
     /// };
     /// cameraBtn.addActionListener(a -> Capture.capturePhoto(l -> {
     ///     if (l != null && l.getSource() != null) {
-    /// 		callback.onSucess((String) l.getSource());
+    ///         callback.onSucess((String) l.getSource());
     ///     }
     /// }));
     /// galleryBtn.addActionListener(a -> CN.openGallery(l -> {
     ///     if (l != null && l.getSource() != null) {
-    /// 		callback.onSucess((String) l.getSource());
+    ///         callback.onSucess((String) l.getSource());
     ///     }
     /// }, CN.GALLERY_IMAGE));
     /// ```
@@ -492,25 +492,25 @@ public class Image implements ActionSource {
     /// SuccessCallback callback = (String capturedPhoto) -> {
     ///     String rotatedPhoto = FileSystemStorage.getInstance().getAppHomePath() + "rotatedPhoto.jpg";
     ///     if (capturedPhoto != null) {
-    /// 		try {
-    /// 		    // note: we set a maxSize to perform a faster rotation
-    /// 		    int maxSize = CN.convertToPixels(50);
-    /// 		    Image img = Image.exifRotation(capturedPhoto, rotatedPhoto, maxSize);
-    /// 		    imageLbl.setIcon(img);
-    /// 		    hi.revalidate();
-    /// 		} catch (IOException ex) {
-    /// 		    Log.e(ex);
-    /// 		}
+    ///         try {
+    ///             // note: we set a maxSize to perform a faster rotation
+    ///             int maxSize = CN.convertToPixels(50);
+    ///             Image img = Image.exifRotation(capturedPhoto, rotatedPhoto, maxSize);
+    ///             imageLbl.setIcon(img);
+    ///             hi.revalidate();
+    ///         } catch (IOException ex) {
+    ///             Log.e(ex);
+    ///         }
     ///     };
     /// };
     /// cameraBtn.addActionListener(a -> Capture.capturePhoto(l -> {
     ///     if (l != null && l.getSource() != null) {
-    /// 		callback.onSucess((String) l.getSource());
+    ///         callback.onSucess((String) l.getSource());
     ///     }
     /// }));
     /// galleryBtn.addActionListener(a -> CN.openGallery(l -> {
     ///     if (l != null && l.getSource() != null) {
-    /// 		callback.onSucess((String) l.getSource());
+    ///         callback.onSucess((String) l.getSource());
     ///     }
     /// }, CN.GALLERY_IMAGE));
     /// ```
@@ -567,25 +567,25 @@ public class Image implements ActionSource {
     /// SuccessCallback callback = (String capturedPhoto) -> {
     ///     String rotatedPhoto = FileSystemStorage.getInstance().getAppHomePath() + "rotatedPhoto.jpg";
     ///     if (capturedPhoto != null) {
-    /// 		try {
-    /// 		    // note: we set a maxSize to perform a faster rotation
-    /// 		    int maxSize = CN.convertToPixels(50);
-    /// 		    Image img = Image.exifRotation(capturedPhoto, rotatedPhoto, maxSize);
-    /// 		    imageLbl.setIcon(img);
-    /// 		    hi.revalidate();
-    /// 		} catch (IOException ex) {
-    /// 		    Log.e(ex);
-    /// 		}
+    ///         try {
+    ///             // note: we set a maxSize to perform a faster rotation
+    ///             int maxSize = CN.convertToPixels(50);
+    ///             Image img = Image.exifRotation(capturedPhoto, rotatedPhoto, maxSize);
+    ///             imageLbl.setIcon(img);
+    ///             hi.revalidate();
+    ///         } catch (IOException ex) {
+    ///             Log.e(ex);
+    ///         }
     ///     };
     /// };
     /// cameraBtn.addActionListener(a -> Capture.capturePhoto(l -> {
     ///     if (l != null && l.getSource() != null) {
-    /// 		callback.onSucess((String) l.getSource());
+    ///         callback.onSucess((String) l.getSource());
     ///     }
     /// }));
     /// galleryBtn.addActionListener(a -> CN.openGallery(l -> {
     ///     if (l != null && l.getSource() != null) {
-    /// 		callback.onSucess((String) l.getSource());
+    ///         callback.onSucess((String) l.getSource());
     ///     }
     /// }, CN.GALLERY_IMAGE));
     /// ```

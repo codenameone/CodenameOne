@@ -19,6 +19,7 @@ import org.apache.tools.ant.types.ZipFileSet;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 
@@ -538,7 +539,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     int no = out.available();
                     if (no > 0) {
                         int n = out.read(buffer, 0, Math.min(no, buffer.length));
-                        getLog().info(new String(buffer, 0, n));
+                        getLog().info(new String(buffer, 0, n, StandardCharsets.UTF_8));
                     }
 
 
@@ -674,7 +675,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         Process p = pb.start();
         int res = p.waitFor();
-        //error occured
+        //error occurred
         if(res > 0){
             StringBuilder msg = new StringBuilder();
             final InputStream input = p.getInputStream();
@@ -683,19 +684,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             byte[] buffer = new byte[8192];
             int i = input.read(buffer);
             while (i > -1) {
-                String str = new String(buffer, 0, i);
+                String str = new String(buffer, 0, i, StandardCharsets.UTF_8);
                 System.out.print(str);
                 msg.append(str);
                 i = stream.read(buffer);
             }
             i = stream.read(buffer);
             while (i > -1) {
-                String str = new String(buffer, 0, i);
+                String str = new String(buffer, 0, i, StandardCharsets.UTF_8);
                 System.out.print(str);
                 msg.append(str);
                 i = stream.read(buffer);
             }
-
 
             return null;
         }
@@ -745,8 +745,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         e.setBuildDirectory(buildDirectory);
 
         e.setCodenameOneJar(codenameOneJar);
-
-        e.setPlatform("android");
 
         BuildRequest r = new BuildRequest();
         r.setDisplayName(props.getProperty("codename1.displayName"));
@@ -967,8 +965,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         e.setBuildDirectory(buildDirectory);
 
         e.setCodenameOneJar(codenameOneJar);
-
-        e.setPlatform("ios");
 
         BuildRequest r = new BuildRequest();
         r.setAppid(props.getProperty("codename1.ios.appid"));
