@@ -19,15 +19,15 @@ build gorgeous native apps in NetBeans. 
 
 ## Select Your IDE:
 
-![](images/intellij-idea-1-logo-png-transparent.png)
+![](/uploads/intellij-idea-1-logo-png-transparent.png)
 
 ### IntelliJ/IDEA
 
-![](images/eclipse-11-logo-png-transparent-1.png)
+![](/uploads/eclipse-11-logo-png-transparent-1.png)
 
 ### Eclipse
 
-![](images/netbeans.png)
+![](/uploads/netbeans.png)
 
 ### NetBeans
 

@@ -16,7 +16,7 @@ Quick introduction to builtin tools in the Codename One simulator
 
 ## Using The Network Monitor
 
-![](images/performance--network-monitor-1.png)
+![](/uploads/performance--network-monitor-1.png)
 
 While the Network Monitor Eric wrote about is a quite powerful tool, it does have some complexities and doesn't display all the internal post operations for some cases. To solve that issue we created a network monitor tool which is integrated with the simulator and provides a one click tool to view network activity easily. The tool is really simple to use, just open it from the Simulator window and it will load with all instances of the simulator until its explicitly closed.
 
@@ -24,7 +24,7 @@ You can view all the details you would expect about every network request/respon
 
 ## Using The Performance Monitor
 
-![](images/performance--network-monitor-2.png)
+![](/uploads/performance--network-monitor-2.png)
 
 NetBeans ships with a powerful profiler and there are quite a few excellent profilers that can give you allot of information about application execution. However, while a profiler will inform you of slow methods it will not inform you of slow components. Since the Codename One code is very generic you will see performance issues as slow EDT/Components within the profiler even if only one specific component is slow.
 

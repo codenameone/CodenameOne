@@ -16,16 +16,16 @@ Just type "Codename" in "Eclipse Marketplace" to install Codename One see [this 
 
 ## Startup Eclipse and click Help->Install New Software. You should get this dialog:
 
-![Eclipse Install](images/eclipse_install_1.png)
+![Eclipse Install](/uploads/eclipse_install_1.png)
 
 ## Click The Add Button On The Right Side And Fill Out The Entries
 
 ### Enter 'CodenameOne' for the Name and 'http://www.codenameone.com/files/eclipse/site.xml' for the Location.
 
-![Eclipse Install](images/eclipse_install_2.png)
+![Eclipse Install](/uploads/eclipse_install_2.png)
 
 ## Select The Entries & Follow The Wizard To Install
 
-![Eclipse Install](images/eclipse_install_3.png)
+![Eclipse Install](/uploads/eclipse_install_3.png)
 
 [Continue to Next Step](/download.html#step2)

@@ -12,7 +12,7 @@ Quick tutorial covering the builtin parsers in Codename One
 2. Developers
 3. Parsing: JSON, XML & CSV
 
-![](images/parsing-json-xml--csv.png)
+![](/uploads/parsing-json-xml--csv.png)
 
 Codename One has several builtin parsers for JSON, XML & CSV formats which you can use to parse data from the internet or data that is shipping with your product. E.g. use the CSV data to setup default values for your application.
 

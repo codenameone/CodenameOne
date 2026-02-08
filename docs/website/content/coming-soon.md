@@ -4,7 +4,7 @@ date: 2020-09-24
 slug: "coming-soon"
 ---
 
-![](images/footer-logo-1.png)
+![](/uploads/footer-logo-1.png)
 
 ## Coming Soon...
 

@@ -10,7 +10,7 @@ slug: "componentsource"
 2. [About](/about.html)
 3. ComponentSource
 
-![](images/component_source_logo.jpg)
+![](/uploads/component_source_logo.jpg)
 
 As Official Distributors, ComponentSource offers convenient, one-stop shopping from 250+ Software Publishers specializing in Application Development & Operations.
 

@@ -9,7 +9,7 @@ slug: "developing-in-codename-one"
 
 ## Developing In Codename One
 
-The first steps, guides, tutorials and resources you need. ![](images/Group-2270.svg)
+The first steps, guides, tutorials and resources you need. ![](/uploads/Group-2270.svg)
 
 ## Documentation  
 & Demo Source Code
@@ -24,12 +24,12 @@ The first steps, guides, tutorials and resources you need. ![](images/Group-2270
 
 - [ How Do I?](https://codenameone.com/how-do-i.html)
 
-![](images/Group-2257.svg)
+![](/uploads/Group-2257.svg)
 
 ## The Codename One  
 Tutorials & Courses
 
-[![](images/Group-2197.svg)](https://youtu.be/rl6z7DD2-vg)
+[![](/uploads/Group-2197.svg)](https://youtu.be/rl6z7DD2-vg)
 
 ### [Hello World Tutorial](https://youtu.be/rl6z7DD2-vg)
 
@@ -59,4 +59,4 @@ An exhaustive list of the tutorials/ references both written and in video form t
 
 The Codename One blog posts tutorials on a regular basis and you can follow those right in this tag
 
-![](images/Group-2164.svg)
+![](/uploads/Group-2164.svg)

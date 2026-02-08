@@ -10,7 +10,7 @@ slug: "affiliate-program"
   
 Then read on: this program is for you!
 
-[Become an affiliate](https://www.codenameone.com/affiliate-register.html) ![Codename One - Affiliate Program](images/Affiliate-300x300.png)
+[Become an affiliate](https://www.codenameone.com/affiliate-register.html) ![Codename One - Affiliate Program](/uploads/Affiliate-300x300.png)
 
 # How it works
 

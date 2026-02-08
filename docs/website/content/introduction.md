@@ -9,7 +9,7 @@ slug: "introduction"
 
 ## Introduction
 
-Part of what makes Codename One unique is its architecture. You write your app in Java or Kotlin, using the Codename One cross-platform, extensible class library, which includes a rich set of UI widgets, and APIs for nearly everything a mobile app could need. Location APIs, Contacts, Maps, Audio/Video, and more. ![](images/Group-2326.svg) ![Codename One Architecture](images/Group-1851.png)
+Part of what makes Codename One unique is its architecture. You write your app in Java or Kotlin, using the Codename One cross-platform, extensible class library, which includes a rich set of UI widgets, and APIs for nearly everything a mobile app could need. Location APIs, Contacts, Maps, Audio/Video, and more. ![](/uploads/Group-2326.svg) ![Codename One Architecture](/uploads/Group-1851.png)
 
 ## Full Access to Native  
 Platform and Libraries
@@ -18,7 +18,7 @@ Codename One also allows you full access to each platform’s native APIs via na
 
 Then you just fill in those stubs with your native code. Using native interfaces, you can even integrate native UI widgets into your app seamlessly.
 
-[Learn more about Native Interfaces](https://codenameone.com/how_di_i/access-native-device-functionality-invoke-native-interfaces.html) ![](images/Group-1691.svg)
+[Learn more about Native Interfaces](https://codenameone.com/how_di_i/access-native-device-functionality-invoke-native-interfaces.html) ![](/uploads/Group-1691.svg)
 
 ## Codename One Runtime
 
@@ -32,7 +32,7 @@ This includes a subset of the JavaSE 8 classes (e.g. java.util, java.lang, java.
 
 ## The native layer
 
-This layer, written in the platform’s native language (Objective-C on iOS, Java on Android, C# for UWP, etc..), is the glue that allows the Codename One class library to access native APIs. ![](images/Group-2273.png)
+This layer, written in the platform’s native language (Objective-C on iOS, Java on Android, C# for UWP, etc..), is the glue that allows the Codename One class library to access native APIs. ![](/uploads/Group-2273.png)
 
 ## 3rd-Party Libraries
 
@@ -40,17 +40,17 @@ You can also make use of 3rd-party native libraries via Native interfaces. You c
 
 There is already a wide assortment of cn1libs developed by both Codename One and third-party developers. Some notable “cn1libs” include Google Maps support, Websocket Support, and Parse support.
 
-[Learn More about CN1libs](https://codenameone.com/cn1libs.html) iOS Architecture ![](images/Group-1563.svg) Android Architecture
+[Learn More about CN1libs](https://codenameone.com/cn1libs.html) iOS Architecture ![](/uploads/Group-1563.svg) Android Architecture
 
-[![](images/android-architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/android-architecture-.svg)
+[![](/uploads/android-architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/android-architecture-.svg)
 
 UWP Architecture
 
-[![](images/UWP-Architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/UWP-Architecture-.svg)
+[![](/uploads/UWP-Architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/UWP-Architecture-.svg)
 
 Javascript Port Architecture
 
-[![](images/Javascript-Port-Architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/Javascript-Port-Architecture-.svg)
+[![](/uploads/Javascript-Port-Architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/Javascript-Port-Architecture-.svg)
 
 ## Compiled to Native
 

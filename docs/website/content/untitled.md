@@ -18,7 +18,7 @@ To learn more about the cn1lib format you can check out the Codename One Develop
 
 You can install any one of the extensions listed here by launching the Codename One settings and selecting to install an extension button:
 
-![Extension Section](images/extensions-section.png)
+![Extension Section](/uploads/extensions-section.png)
 
 Notice that this list is generated from [this github repository](https://github.com/codenameone/CodenameOneLibs) you can submit your own cn1lib easily to the list thru a pull request as explained there.
 

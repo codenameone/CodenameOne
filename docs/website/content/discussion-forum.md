@@ -36,4 +36,4 @@ slug: "discussion-forum"
 
 ## OTHER RESOURCES
 
- [![](images/JavaCodeGeek_Badge.png)](http://www.javacodegeeks.com/)[![](images/dzone_mvb_button.jpg) ](https://www.dzone.com/)[STACKOVERFLOW](https://stackoverflow.com/tags/codenameone)
+ [![](/uploads/JavaCodeGeek_Badge.png)](http://www.javacodegeeks.com/)[![](/uploads/dzone_mvb_button.jpg) ](https://www.dzone.com/)[STACKOVERFLOW](https://stackoverflow.com/tags/codenameone)

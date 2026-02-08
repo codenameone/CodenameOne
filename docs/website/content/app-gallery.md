@@ -12,4 +12,4 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 Ut elit tellus, luctus nec ullamcorper mattis,  
 pulvinar dapibus leo.
 
-Go Back to Home page ![](images/footer-logo.png)
+Go Back to Home page ![](/uploads/footer-logo.png)

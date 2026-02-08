@@ -14,8 +14,8 @@ The instructions assume NetBeans 7.x or newer is installed correctly
 
 ## Select The Tools->Plugins Menu Option & Select the "Available Plugins" Tab
 
-![](images/netbeans-plugin-installation-1.png)  
-![](images/netbeans-plugin-installation-2.png)
+![](/uploads/netbeans-plugin-installation-1.png)  
+![](/uploads/netbeans-plugin-installation-2.png)
 
   
   
@@ -23,7 +23,7 @@ The instructions assume NetBeans 7.x or newer is installed correctly
 
 ## Select The CodenameOne Plugin and click install
 
-![](images/netbeans-plugin-installation-3.png)
+![](/uploads/netbeans-plugin-installation-3.png)
 
   
   
@@ -31,8 +31,8 @@ The instructions assume NetBeans 7.x or newer is installed correctly
 
 ## Follow The Wizard To Install The Plugin
 
-![](images/netbeans-plugin-installation-4.png)  
-![](images/netbeans-plugin-installation-5.png)
+![](/uploads/netbeans-plugin-installation-4.png)  
+![](/uploads/netbeans-plugin-installation-5.png)
 
   
   

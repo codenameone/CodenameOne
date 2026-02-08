@@ -66,37 +66,37 @@ a
 
 ### output
 
-![](images/Group-1106-svg.png)
+![](/uploads/Group-1106-svg.png)
 
 ### UWP App
 
 (.appx)
 
-![](images/Group-1181-svg.png)
+![](/uploads/Group-1181-svg.png)
 
 ### Windows App
 
 (.exe)
 
-![](images/3JtKV36@2x.png)
+![](/uploads/3JtKV36@2x.png)
 
 ### Mac app
 
 (.app)
 
-![](images/Group-1188-svg.png)
+![](/uploads/Group-1188-svg.png)
 
 ### Progressive Web App
 
 (.war or .html)
 
-![](images/Group-1118-svg.png)
+![](/uploads/Group-1118-svg.png)
 
 ### Android App
 
 (.apk)
 
-![](images/iTunes-ipa-4@2x.png)
+![](/uploads/iTunes-ipa-4@2x.png)
 
 ### iOS App
 
@@ -106,19 +106,19 @@ a a a a
 
 ### distribution
 
-![](images/g18086_1_-svg.png)
+![](/uploads/g18086_1_-svg.png)
 
 Windows App Store
 
-![](images/layer1_2_-svg.png)
+![](/uploads/layer1_2_-svg.png)
 
 Mac App Store
 
-![](images/Group-725-svg.png)
+![](/uploads/Group-725-svg.png)
 
 Google Play Store
 
-![](images/layer1_2_-1-svg.png)
+![](/uploads/layer1_2_-1-svg.png)
 
 iOS App Store
 

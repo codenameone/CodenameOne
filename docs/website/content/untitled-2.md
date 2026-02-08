@@ -29,7 +29,7 @@ Annual Professional Subscription
 Annual Enterprise Subscription
 
 If you wish to cancel your subscription you can do so at any time through the PayPal interface  
-[![](images/btn_unsubscribe_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_subscr-find&alias=FM42CH7XVHZP4)  
+[![](/uploads/btn_unsubscribe_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_subscr-find&alias=FM42CH7XVHZP4)  
 notice you can use any credit card with PayPal!  
 
 Subscription plans prevent free users from abusing the servers by sending too many build requests and weighing down the servers.  

@@ -15,7 +15,7 @@ To properly evaluate a cross-platform framework, we often look at our existing e
 
 The set of options below present some of insights about how we match up to other cross-platform solutions in the market today. But first lets start up with some of the Codename One benefits.
 
-![Comparing Cross-Platform Frameworks](images/Competition_Monochromatic.png)
+![Comparing Cross-Platform Frameworks](/uploads/Competition_Monochromatic.png)
 
 ### Codename One is..
 

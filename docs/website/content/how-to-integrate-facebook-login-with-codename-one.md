@@ -31,7 +31,7 @@ iOS Settings:
 
 The settings page should look like this:
 
-![](images/facebook_settings.png)
+![](/uploads/facebook_settings.png)
 
 In your CodenameOne app do the following: Add facebook.appId build hint to your project properties and in your code do the following:
 
