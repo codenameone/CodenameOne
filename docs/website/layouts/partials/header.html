@@ -44,31 +44,8 @@
         <div class="logo">
             {{- $label_text := (site.Params.label.text | default site.Title) }}
             {{- if site.Title }}
-            <a href="{{ "" | absLangURL }}" accesskey="h" title="{{ $label_text }} (Alt + H)">
-                {{- if site.Params.label.icon }}
-                {{- $img := resources.Get site.Params.label.icon }}
-                {{- if $img }}
-                    {{- $processableFormats := (slice "jpg" "jpeg" "png" "tif" "bmp" "gif") -}}
-                    {{- if hugo.IsExtended -}}
-                        {{- $processableFormats = $processableFormats | append "webp" -}}
-                    {{- end -}}
-                    {{- $prod := (hugo.IsProduction | or (eq site.Params.env "production")) }}
-                    {{- if and (in $processableFormats $img.MediaType.SubType) (eq $prod true)}}
-                        {{- if site.Params.label.iconHeight }}
-                            {{- $img = $img.Resize (printf "x%d" site.Params.label.iconHeight) }}
-                        {{ else }}
-                            {{- $img = $img.Resize "x30" }}
-                        {{- end }}
-                    {{- end }}
-                    <img src="{{ $img.Permalink }}" alt="" aria-label="logo"
-                        height="{{- site.Params.label.iconHeight | default "30" -}}">
-                {{- else }}
-                <img src="{{- site.Params.label.icon | absURL -}}" alt="" aria-label="logo"
-                    height="{{- site.Params.label.iconHeight | default "30" -}}">
-                {{- end -}}
-                {{- else if hasPrefix site.Params.label.iconSVG "<svg" }}
-                    {{ site.Params.label.iconSVG | safeHTML }}
-                {{- end -}}
+            <a href="/" accesskey="h" title="{{ $label_text }} (Alt + H)">
+                <img class="cn1-brand-logo" src="/uploads/Codename-One-White-Logo.png" alt="{{ $label_text }}">
                 {{- $label_text -}}
             </a>
             {{- end }}
@@ -153,6 +130,11 @@
                 {{- end }}
                 {{- end }}
             </ul>
+        </div>
+        <div class="cn1-theme-controls">
+            <button class="cn1-theme-toggle-btn" type="button" data-cn1-theme-toggle>
+                <i class="fas fa-adjust" aria-hidden="true"></i>
+            </button>
         </div>
         {{- range site.Menus.main }}
         {{- if eq .Identifier "dashboard" }}

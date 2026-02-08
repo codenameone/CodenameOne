@@ -19,7 +19,8 @@
             </ul>
         </div>
         <div class="cn1-bottom-links__brand">
-            <img src="/uploads/footer-logo-1.png" alt="Codename One">
+            <img class="cn1-footer-logo cn1-footer-logo--dark" src="/uploads/footer-logo-1.png" alt="Codename One">
+            <img class="cn1-footer-logo cn1-footer-logo--light" src="/uploads/footer-logo.png" alt="Codename One">
             <p>Reinventing mobile development.</p>
         </div>
         <div class="cn1-bottom-links__stats">
@@ -96,15 +97,18 @@
 
 {{- if (not site.Params.disableThemeToggle) }}
 <script>
-    document.getElementById("theme-toggle").addEventListener("click", () => {
-        if (document.body.className.includes("dark")) {
-            document.body.classList.remove('dark');
-            localStorage.setItem("pref-theme", 'light');
-        } else {
-            document.body.classList.add('dark');
-            localStorage.setItem("pref-theme", 'dark');
-        }
-    })
+    const themeToggle = document.getElementById("theme-toggle");
+    if (themeToggle) {
+        themeToggle.addEventListener("click", () => {
+            if (document.body.className.includes("dark")) {
+                document.body.classList.remove('dark');
+                localStorage.setItem("pref-theme", 'light');
+            } else {
+                document.body.classList.add('dark');
+                localStorage.setItem("pref-theme", 'dark');
+            }
+        });
+    }
 
 </script>
 {{- end }}

@@ -1,10 +1,42 @@
 .cn1-gs-page {
+    --cn1-gs-bg: #dfe2ea;
+    --cn1-gs-card-bg: #f6f7fa;
+    --cn1-gs-card-border: #d5d9e1;
+    --cn1-gs-text: #0e1b49;
+    --cn1-gs-muted: #4d5160;
+    --cn1-gs-crumb: #9ba2b5;
+    --cn1-gs-accent: #2c57e6;
+    --cn1-gs-separator: #e1e3e8;
+    --cn1-gs-cta-bg: #a6cd2b;
+    --cn1-gs-cta-bg-hover: #b6dd36;
+    --cn1-gs-cta-text: #34403b;
+    --cn1-gs-media-bg: #ffffff;
     background: #dfe2ea;
     color: #0e1b49;
     padding: 22px 0 84px;
     width: 100vw;
     margin-left: calc(50% - 50vw);
     margin-right: calc(50% - 50vw);
+}
+
+body.dark .cn1-gs-page {
+    --cn1-gs-bg: #0a1438;
+    --cn1-gs-card-bg: #131e4b;
+    --cn1-gs-card-border: #2a3a77;
+    --cn1-gs-text: #e7ecff;
+    --cn1-gs-muted: #c2cdee;
+    --cn1-gs-crumb: #9cb2eb;
+    --cn1-gs-accent: #7fa5ff;
+    --cn1-gs-separator: #2a3a77;
+    --cn1-gs-cta-bg: #9dc62a;
+    --cn1-gs-cta-bg-hover: #b0d83e;
+    --cn1-gs-cta-text: #1f2d52;
+    --cn1-gs-media-bg: #0f1a46;
+}
+
+.cn1-gs-page {
+    background: var(--cn1-gs-bg);
+    color: var(--cn1-gs-text);
 }
 
 .cn1-gs-hero {
@@ -26,18 +58,18 @@
 
 .cn1-gs-breadcrumbs a,
 .cn1-gs-breadcrumbs span {
-    color: #9ba2b5;
+    color: var(--cn1-gs-crumb);
     font-size: 14px;
     font-weight: 500;
 }
 
 .cn1-gs-breadcrumbs a:hover {
-    color: #2c57e6;
+    color: var(--cn1-gs-accent);
 }
 
 .cn1-gs-hero h1 {
     margin: 0;
-    color: #2c57e6;
+    color: var(--cn1-gs-accent);
     font-family: "Poppins", sans-serif;
     font-size: 40px;
     line-height: 1.05;
@@ -46,7 +78,7 @@
 
 .cn1-gs-hero p {
     margin-top: 14px;
-    color: #4d5160;
+    color: var(--cn1-gs-muted);
     font-family: "Poppins", sans-serif;
     font-size: 14px;
     font-weight: 600;
@@ -67,15 +99,15 @@
 .cn1-gs-step-card {
     max-width: 1580px;
     margin: 0 auto 44px;
-    background: #f6f7fa;
-    border: 1px solid #d5d9e1;
+    background: var(--cn1-gs-card-bg);
+    border: 1px solid var(--cn1-gs-card-border);
     border-radius: 10px;
     padding: 56px 72px 48px;
 }
 
 .cn1-gs-step-label {
     margin: 0 0 12px;
-    color: #2c57e6;
+    color: var(--cn1-gs-accent);
     font-family: "Poppins", sans-serif;
     font-size: 13px;
     font-weight: 700;
@@ -84,13 +116,13 @@
 
 .cn1-gs-step-card h2 {
     margin: 0;
-    color: #0e1b49;
+    color: var(--cn1-gs-text);
     font-family: "Poppins", sans-serif;
     font-size: 28px;
     font-weight: 600;
     line-height: 1.14;
     padding-bottom: 20px;
-    border-bottom: 2px solid #e1e3e8;
+    border-bottom: 2px solid var(--cn1-gs-separator);
 }
 
 .cn1-gs-step-row {
@@ -103,7 +135,7 @@
 
 .cn1-gs-step-row p {
     margin: 0;
-    color: #4d5160;
+    color: var(--cn1-gs-muted);
     font-family: "Poppins", sans-serif;
     font-size: 15px;
     line-height: 1.45;
@@ -112,8 +144,8 @@
 
 .cn1-gs-cta {
     display: inline-block;
-    background: #a6cd2b;
-    color: #34403b;
+    background: var(--cn1-gs-cta-bg);
+    color: var(--cn1-gs-cta-text);
     padding: 12px 30px;
     border-radius: 8px;
     font-family: "Poppins", sans-serif;
@@ -124,7 +156,7 @@
 }
 
 .cn1-gs-cta:hover {
-    background: #b6dd36;
+    background: var(--cn1-gs-cta-bg-hover);
 }
 
 .cn1-gs-video {
@@ -149,7 +181,7 @@
 
 .cn1-gs-build-copy p {
     margin: 0;
-    color: #0e1b49;
+    color: var(--cn1-gs-text);
     font-family: "Poppins", sans-serif;
     font-size: 22px;
     line-height: 1.28;
@@ -160,14 +192,14 @@
     width: 100%;
     max-height: 175px;
     object-fit: contain;
-    background: #fff;
+    background: var(--cn1-gs-media-bg);
     border-radius: 8px;
     display: block;
 }
 
 .cn1-gs-resource-card p {
     margin: 16px 0 0;
-    color: #4d5160;
+    color: var(--cn1-gs-muted);
     font-family: "Poppins", sans-serif;
     font-size: 14px;
     line-height: 1.45;
@@ -180,18 +212,18 @@
     display: inline-flex;
     align-items: center;
     gap: 12px;
-    color: #4d5160;
+    color: var(--cn1-gs-muted);
     font-family: "Poppins", sans-serif;
     font-size: 14px;
     font-weight: 600;
     text-decoration: none;
-    border-top: 2px solid #e1e3e8;
+    border-top: 2px solid var(--cn1-gs-separator);
     padding-top: 14px;
 }
 
 .cn1-gs-resource-card > a:hover,
 .cn1-gs-links a:hover {
-    color: #2c57e6;
+    color: var(--cn1-gs-accent);
 }
 
 .cn1-gs-links {

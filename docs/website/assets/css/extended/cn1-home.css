@@ -1,6 +1,71 @@
+:root,
+body {
+    --cn1-home-bg: #f1f4fc;
+    --cn1-home-text: #0d1847;
+    --cn1-home-muted: #55607f;
+    --cn1-home-header-bg: #eef1f7;
+    --cn1-home-header-border: rgba(17, 33, 84, 0.1);
+    --cn1-home-strip-bg: #1d5ff0;
+    --cn1-home-strip-text: #eef4ff;
+    --cn1-home-nav-text: #0d1847;
+    --cn1-home-submenu-bg: #dbe3f7;
+    --cn1-home-submenu-border: #c3cde6;
+    --cn1-home-submenu-text: #0d1847;
+    --cn1-home-dashboard-border: #2f56d8;
+    --cn1-home-card-bg: #e7ecfb;
+    --cn1-home-card-border: #2b66ea;
+    --cn1-home-card-text: #1b274e;
+    --cn1-home-section-title: #2856dc;
+    --cn1-home-footer-bg: #f1f4fc;
+    --cn1-home-footer-text: #55607f;
+}
+
+body.cn1-homepage {
+    --cn1-home-bg: #f1f4fc;
+    --cn1-home-text: #0d1847;
+    --cn1-home-muted: #55607f;
+    --cn1-home-header-bg: #eef1f7;
+    --cn1-home-header-border: rgba(17, 33, 84, 0.1);
+    --cn1-home-strip-bg: #1d5ff0;
+    --cn1-home-strip-text: #eef4ff;
+    --cn1-home-nav-text: #0d1847;
+    --cn1-home-submenu-bg: #dbe3f7;
+    --cn1-home-submenu-border: #c3cde6;
+    --cn1-home-submenu-text: #0d1847;
+    --cn1-home-dashboard-border: #2f56d8;
+    --cn1-home-card-bg: #e7ecfb;
+    --cn1-home-card-border: #2b66ea;
+    --cn1-home-card-text: #1b274e;
+    --cn1-home-section-title: #2856dc;
+    --cn1-home-footer-bg: #f1f4fc;
+    --cn1-home-footer-text: #55607f;
+}
+
+body.dark,
+body.dark.cn1-homepage {
+    --cn1-home-bg: #020d44;
+    --cn1-home-text: #ffffff;
+    --cn1-home-muted: #dbe4ff;
+    --cn1-home-header-bg: #020d44;
+    --cn1-home-header-border: rgba(255, 255, 255, 0.08);
+    --cn1-home-strip-bg: #1062df;
+    --cn1-home-strip-text: #e8f0ff;
+    --cn1-home-nav-text: #ffffff;
+    --cn1-home-submenu-bg: #c8cedd;
+    --cn1-home-submenu-border: #b1b9cc;
+    --cn1-home-submenu-text: #0d1847;
+    --cn1-home-dashboard-border: #d9e3ff;
+    --cn1-home-card-bg: #374261;
+    --cn1-home-card-border: #1f6dff;
+    --cn1-home-card-text: #dbe4ff;
+    --cn1-home-section-title: #a8beff;
+    --cn1-home-footer-bg: #020d44;
+    --cn1-home-footer-text: #9eb5ff;
+}
+
 .cn1-homepage {
-    background: #020d44;
-    color: #fff;
+    background: var(--cn1-home-bg);
+    color: var(--cn1-home-text);
     font-family: "Poppins", sans-serif;
 }
 
@@ -13,25 +78,25 @@
     position: sticky;
     top: 0;
     z-index: 50;
-    background: #020d44;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--cn1-home-header-bg);
+    border-bottom: 1px solid var(--cn1-home-header-border);
     padding-top: 40px;
 }
 
 .cn1-homepage .header::before {
     content: "Open Source & Free";
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
     height: 40px;
-    background: #1062df;
+    background: var(--cn1-home-strip-bg);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 18px;
     font-weight: 700;
-    color: #e8f0ff;
+    color: var(--cn1-home-strip-text);
 }
 
 .cn1-homepage .nav {
@@ -67,8 +132,19 @@
     border-radius: 0;
 }
 
+.cn1-brand-logo {
+    height: 34px;
+    width: auto;
+    display: block;
+}
+
+body:not(.dark) .cn1-brand-logo {
+    /* Make the white header logo visible on light header backgrounds */
+    filter: brightness(0) saturate(100%);
+}
+
 .cn1-homepage #menu a {
-    color: #fff;
+    color: var(--cn1-home-nav-text);
     font-size: 18px;
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -98,7 +174,7 @@
 
 .cn1-homepage #menu > li > a,
 .cn1-homepage #menu > li > details > summary {
-    color: #fff;
+    color: var(--cn1-home-nav-text);
     font-size: 18px;
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -129,7 +205,7 @@
     margin: 0;
     padding: 0;
     min-width: 300px;
-    background: #c8cedd;
+    background: var(--cn1-home-submenu-bg);
     border-radius: 0 0 14px 14px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
     position: absolute;
@@ -139,11 +215,11 @@
 }
 
 .cn1-homepage #menu .sub-menu li + li {
-    border-top: 1px solid #b1b9cc;
+    border-top: 1px solid var(--cn1-home-submenu-border);
 }
 
 .cn1-homepage #menu .sub-menu a {
-    color: #0d1847;
+    color: var(--cn1-home-submenu-text);
     padding: 22px 26px;
     line-height: 1.25;
     font-size: 17px;
@@ -164,12 +240,12 @@
 }
 
 .cn1-homepage .cn1-dashboard-link {
-    border: 2px solid #d9e3ff;
+    border: 2px solid var(--cn1-home-dashboard-border);
     border-radius: 12px;
     padding: 0 28px;
     line-height: 46px;
     margin-top: 18px;
-    color: #fff;
+    color: var(--cn1-home-nav-text);
     font-size: 18px;
     font-weight: 700;
     text-decoration: none;
@@ -180,25 +256,25 @@
     position: sticky;
     top: 0;
     z-index: 50;
-    background: #020d44;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--cn1-home-header-bg);
+    border-bottom: 1px solid var(--cn1-home-header-border);
     padding-top: 40px;
 }
 
 .cn1-header::before {
     content: "Open Source & Free";
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
     height: 40px;
-    background: #1062df;
+    background: var(--cn1-home-strip-bg);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 18px;
     font-weight: 700;
-    color: #e8f0ff;
+    color: var(--cn1-home-strip-text);
 }
 
 .cn1-header .nav {
@@ -208,6 +284,7 @@
     max-width: 1320px;
     min-height: 84px;
     line-height: 84px;
+    transition: min-height 180ms ease, line-height 180ms ease;
 }
 
 .cn1-header .logo a {
@@ -228,6 +305,7 @@
     transform: none;
     margin-inline-end: 0;
     border-radius: 0;
+    transition: height 180ms ease;
 }
 
 .cn1-header #menu {
@@ -250,7 +328,7 @@
 
 .cn1-header #menu > li > a,
 .cn1-header #menu > li > .cn1-menu-trigger {
-    color: #fff;
+    color: var(--cn1-home-nav-text);
     font-size: 18px;
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -266,7 +344,7 @@
     padding: 0;
     font: inherit;
     font-size: 18px;
-    color: #fff;
+    color: var(--cn1-home-nav-text);
     cursor: pointer;
 }
 
@@ -281,7 +359,7 @@
     margin: 0;
     padding: 0;
     min-width: 300px;
-    background: #c8cedd;
+    background: var(--cn1-home-submenu-bg);
     border-radius: 0 0 14px 14px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
     position: absolute;
@@ -291,11 +369,11 @@
 }
 
 .cn1-header #menu .sub-menu li + li {
-    border-top: 1px solid #b1b9cc;
+    border-top: 1px solid var(--cn1-home-submenu-border);
 }
 
 .cn1-header #menu .sub-menu a {
-    color: #0d1847;
+    color: var(--cn1-home-submenu-text);
     padding: 22px 26px;
     line-height: 1.25;
     font-size: 17px;
@@ -321,16 +399,65 @@
 }
 
 .cn1-header .cn1-dashboard-link {
-    border: 2px solid #d9e3ff;
+    border: 2px solid var(--cn1-home-dashboard-border);
     border-radius: 12px;
     padding: 0 28px;
     line-height: 46px;
     margin-top: 18px;
-    color: #fff;
+    color: var(--cn1-home-nav-text);
     font-size: 18px;
     font-weight: 700;
     text-decoration: none;
     margin-inline-start: 24px;
+    transition: line-height 180ms ease, font-size 180ms ease, margin-top 180ms ease, padding 180ms ease;
+}
+
+.cn1-theme-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    margin-inline-start: 14px;
+}
+
+.cn1-theme-toggle-btn {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--cn1-home-nav-text);
+    border-radius: 0;
+    padding: 4px 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.cn1-theme-toggle-btn:hover {
+    color: #8fb1ff;
+}
+
+.cn1-header.cn1-header--compact .nav {
+    min-height: 66px;
+    line-height: 66px;
+}
+
+.cn1-header.cn1-header--compact .logo a img,
+.cn1-header.cn1-header--compact .logo a svg {
+    height: 28px;
+}
+
+.cn1-header.cn1-header--compact #menu > li > a,
+.cn1-header.cn1-header--compact #menu > li > .cn1-menu-trigger {
+    line-height: 66px;
+}
+
+.cn1-header.cn1-header--compact .cn1-dashboard-link {
+    margin-top: 10px;
+    line-height: 40px;
+    font-size: 16px;
+    padding: 0 22px;
 }
 
 .cn1-hero,
@@ -713,8 +840,8 @@
 
 .footer,
 .cn1-site-footer {
-    background: #020d44;
-    color: #9eb5ff;
+    background: var(--cn1-home-footer-bg);
+    color: var(--cn1-home-footer-text);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -1228,11 +1355,27 @@
 .cn1-bottom-links__brand {
     text-align: center;
     align-self: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-.cn1-bottom-links__brand img {
+.cn1-bottom-links__brand .cn1-footer-logo {
     width: 205px;
     max-width: 100%;
+}
+
+.cn1-footer-logo--light {
+    display: none;
+}
+
+body:not(.dark) .cn1-footer-logo--dark {
+    display: none;
+}
+
+body:not(.dark) .cn1-footer-logo--light {
+    display: block;
 }
 
 .cn1-bottom-links__brand p {
@@ -1299,6 +1442,90 @@
     color: #9fbeff;
 }
 
+body:not(.dark).cn1-homepage .cn1-hero__title,
+body:not(.dark).cn1-homepage .cn1-hero__copy,
+body:not(.dark).cn1-homepage .cn1-hero__trust,
+body:not(.dark).cn1-homepage .cn1-band h2,
+body:not(.dark).cn1-homepage .cn1-why h2,
+body:not(.dark).cn1-homepage .cn1-how h2,
+body:not(.dark).cn1-homepage .cn1-made h2,
+body:not(.dark).cn1-homepage .cn1-loved h2,
+body:not(.dark).cn1-homepage .cn1-blog h2,
+body:not(.dark).cn1-homepage .cn1-newsletter h2 {
+    color: #1e3fba;
+}
+
+body:not(.dark).cn1-homepage .cn1-hero__eyebrow {
+    color: #516084;
+}
+
+body:not(.dark).cn1-homepage .cn1-cards .cn1-card,
+body:not(.dark).cn1-homepage .cn1-cta-row article,
+body:not(.dark).cn1-homepage .cn1-blog__grid article {
+    background: var(--cn1-home-card-bg);
+    border-color: var(--cn1-home-card-border);
+}
+
+body:not(.dark).cn1-homepage .cn1-card h3,
+body:not(.dark).cn1-homepage .cn1-card p,
+body:not(.dark).cn1-homepage .cn1-card a,
+body:not(.dark).cn1-homepage .cn1-why__grid article h3,
+body:not(.dark).cn1-homepage .cn1-why__grid article p,
+body:not(.dark).cn1-homepage .cn1-how__intro,
+body:not(.dark).cn1-homepage .cn1-how__list h3,
+body:not(.dark).cn1-homepage .cn1-made .cn1-carousel__slide h3,
+body:not(.dark).cn1-homepage .cn1-made .cn1-carousel__slide p,
+body:not(.dark).cn1-homepage .cn1-loved__grid .cn1-carousel__slide h3,
+body:not(.dark).cn1-homepage .cn1-loved__grid .cn1-carousel__slide p,
+body:not(.dark).cn1-homepage .cn1-blog__grid h3,
+body:not(.dark).cn1-homepage .cn1-blog__grid h3 a,
+body:not(.dark).cn1-homepage .cn1-cta-row article h3 {
+    color: var(--cn1-home-card-text);
+}
+
+body:not(.dark).cn1-homepage .cn1-btn--primary,
+body:not(.dark).cn1-homepage .cn1-dashboard-link {
+    color: #173287;
+}
+
+body:not(.dark).cn1-homepage .cn1-bottom-links__col a,
+body:not(.dark).cn1-homepage .cn1-footer-meta p {
+    color: #65739a;
+}
+
+body:not(.dark).cn1-homepage .cn1-loved__grid .cn1-carousel__slide blockquote {
+    color: #1b274e;
+    background: #e7ecfb;
+    border-color: #2b66ea;
+}
+
+body:not(.dark).cn1-homepage .cn1-loved__grid .cn1-carousel__slide blockquote span + span {
+    color: #4a5f97;
+}
+
+body:not(.dark).cn1-homepage .cn1-loved__grid .cn1-carousel__slide blockquote::after {
+    background: #e7ecfb;
+    border-right-color: #2b66ea;
+    border-bottom-color: #2b66ea;
+}
+
+body:not(.dark).cn1-homepage .cn1-cta-row article a {
+    color: #173287;
+    border-color: #173287;
+}
+
+body:not(.dark).cn1-homepage .cn1-bottom-links__stats strong {
+    color: #1b274e;
+}
+
+body:not(.dark).cn1-homepage .cn1-bottom-links__stats span {
+    color: #4f648f;
+}
+
+body:not(.dark) .cn1-theme-toggle-btn {
+    color: #173287;
+}
+
 @media (max-width: 1400px) {
     .cn1-homepage .header::before {
         font-size: 18px;
@@ -1319,6 +1546,10 @@
 
     .cn1-header .logo a img,
     .cn1-header .logo a svg {
+        height: 30px;
+    }
+
+    .cn1-brand-logo {
         height: 30px;
     }
 
@@ -1446,6 +1677,10 @@
 
     .cn1-header .logo a img,
     .cn1-header .logo a svg {
+        height: 26px;
+    }
+
+    .cn1-brand-logo {
         height: 26px;
     }
 
@@ -1635,6 +1870,20 @@
         display: block !important;
     }
 
+    .cn1-theme-controls {
+        width: 100%;
+        justify-content: center;
+        padding: 10px 12px 4px;
+        border-top: 1px solid #b1b9cc;
+        margin-inline-start: 0;
+        background: #d8ddea;
+    }
+
+    .cn1-theme-toggle-btn {
+        color: #173287;
+        font-size: 22px;
+    }
+
     .cn1-hero,
     .cn1-band,
     .cn1-cards,
@@ -1723,7 +1972,7 @@
         text-align: left;
     }
 
-    .cn1-bottom-links__brand img {
+    .cn1-bottom-links__brand .cn1-footer-logo {
         display: none;
     }
 
