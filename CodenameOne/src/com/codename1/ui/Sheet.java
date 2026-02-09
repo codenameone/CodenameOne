@@ -114,6 +114,7 @@ import static com.codename1.ui.ComponentSelector.$;
 /// 7.0
 public class Sheet extends Container {
     private static final Object SHEET_BOUNDS_LOCK = new Object();
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private static volatile SheetBounds[] sheetBounds = new SheetBounds[0];
     private static final int N = 0;
     private static final int S = 1;
