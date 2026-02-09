@@ -29,7 +29,7 @@ weight = 11
 [[menu.main]]
 parent = "developers"
 name = "Docs"
-url = "/introduction/"
+url = "/developing-in-codename-one/"
 weight = 12
 
 [[menu.main]]
