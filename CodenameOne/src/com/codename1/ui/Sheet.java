@@ -113,6 +113,8 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// 7.0
 public class Sheet extends Container {
+    private static final Object SHEET_BOUNDS_LOCK = new Object();
+    private static volatile SheetBounds[] sheetBounds = new SheetBounds[0];
     private static final int N = 0;
     private static final int S = 1;
     private static final int E = 2;
@@ -175,6 +177,100 @@ public class Sheet extends Container {
     /// These are set the first time the sheet is shown and used as the base for safe area calculations.
     private int[] originalPadding = null;
     private Form form;
+    private boolean trackSheetBounds;
+
+    private static final class SheetBounds {
+        private final Sheet sheet;
+        private final int x;
+        private final int y;
+        private final int width;
+        private final int height;
+
+        private SheetBounds(Sheet sheet, int x, int y, int width, int height) {
+            this.sheet = sheet;
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+
+        private boolean contains(int px, int py) {
+            return px >= x && py >= y && px < x + width && py < y + height;
+        }
+    }
+
+    public static boolean isSheetVisibleAt(int x, int y) {
+        SheetBounds[] boundsSnapshot = sheetBounds;
+        for (SheetBounds bounds : boundsSnapshot) {
+            if (bounds.contains(x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void updateSheetBounds(Sheet sheet, int x, int y, int width, int height) {
+        synchronized (SHEET_BOUNDS_LOCK) {
+            SheetBounds[] current = sheetBounds;
+            SheetBounds[] updated = new SheetBounds[current.length];
+            boolean replaced = false;
+            int index = 0;
+            for (SheetBounds bounds : current) {
+                if (bounds.sheet == sheet) {
+                    updated[index++] = new SheetBounds(sheet, x, y, width, height);
+                    replaced = true;
+                } else {
+                    updated[index++] = bounds;
+                }
+            }
+            if (!replaced) {
+                updated = new SheetBounds[current.length + 1];
+                System.arraycopy(current, 0, updated, 0, current.length);
+                updated[current.length] = new SheetBounds(sheet, x, y, width, height);
+            }
+            sheetBounds = updated;
+        }
+    }
+
+    private static void removeSheetBounds(Sheet sheet) {
+        synchronized (SHEET_BOUNDS_LOCK) {
+            SheetBounds[] current = sheetBounds;
+            int matches = 0;
+            for (SheetBounds bounds : current) {
+                if (bounds.sheet == sheet) {
+                    matches++;
+                }
+            }
+            if (matches == 0) {
+                return;
+            }
+            SheetBounds[] updated = new SheetBounds[current.length - matches];
+            int index = 0;
+            for (SheetBounds bounds : current) {
+                if (bounds.sheet != sheet) {
+                    updated[index++] = bounds;
+                }
+            }
+            sheetBounds = updated;
+        }
+    }
+
+    private void updateTrackedBounds() {
+        if (!trackSheetBounds) {
+            return;
+        }
+        updateSheetBounds(this, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+    }
+
+    private void startTrackingBounds() {
+        trackSheetBounds = true;
+        updateTrackedBounds();
+    }
+
+    private void stopTrackingBounds() {
+        trackSheetBounds = false;
+        removeSheetBounds(this);
+    }
 
     /// Creates a new sheet with the specified parent and title.
     ///
@@ -466,6 +562,7 @@ public class Sheet extends Container {
             cnt.revalidate();
 
         }
+        startTrackingBounds();
         if (cnt.getComponentCount() > 0) {
             $(".Sheet", cnt).each(new ComponentClosure() {
                 @Override
@@ -503,6 +600,9 @@ public class Sheet extends Container {
 
             });
             Component existing = cnt.getComponentAt(0);
+            if (existing instanceof Sheet) {
+                ((Sheet) existing).stopTrackingBounds();
+            }
             cnt.replace(existing, this, null);
             cnt.animateLayout(duration);
         } else {
@@ -799,6 +899,7 @@ public class Sheet extends Container {
                     cnt.remove();
                     parent.getComponentForm().revalidateLater();
                     fireCloseEvent(true);
+                    stopTrackingBounds();
 
 
                 }
@@ -806,6 +907,30 @@ public class Sheet extends Container {
             }
         });
 
+    }
+
+    @Override
+    public void setX(int x) {
+        super.setX(x);
+        updateTrackedBounds();
+    }
+
+    @Override
+    public void setY(int y) {
+        super.setY(y);
+        updateTrackedBounds();
+    }
+
+    @Override
+    public void setWidth(int width) {
+        super.setWidth(width);
+        updateTrackedBounds();
+    }
+
+    @Override
+    public void setHeight(int height) {
+        super.setHeight(height);
+        updateTrackedBounds();
     }
 
     /// Gets the parent sheet or null if there is none.
