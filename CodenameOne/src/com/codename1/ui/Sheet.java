@@ -114,8 +114,7 @@ import static com.codename1.ui.ComponentSelector.$;
 /// 7.0
 public class Sheet extends Container {
     private static final Object SHEET_BOUNDS_LOCK = new Object();
-    @SuppressWarnings("PMD.AvoidUsingVolatile")
-    private static volatile SheetBounds[] sheetBounds = new SheetBounds[0];
+    private static SheetEntry[] sheetEntries = new SheetEntry[0];
     private static final int N = 0;
     private static final int S = 1;
     private static final int E = 2;
@@ -178,31 +177,24 @@ public class Sheet extends Container {
     /// These are set the first time the sheet is shown and used as the base for safe area calculations.
     private int[] originalPadding = null;
     private Form form;
+    private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
+    private SheetEntry sheetEntry;
 
-    private static final class SheetBounds {
+    private static final class SheetEntry {
         private final Sheet sheet;
-        private final int x;
-        private final int y;
-        private final int width;
-        private final int height;
+        private final Rectangle bounds;
 
-        private SheetBounds(Sheet sheet, int x, int y, int width, int height) {
+        private SheetEntry(Sheet sheet, Rectangle bounds) {
             this.sheet = sheet;
-            this.x = x;
-            this.y = y;
-            this.width = width;
-            this.height = height;
-        }
-
-        private boolean contains(int px, int py) {
-            return px >= x && py >= y && px < x + width && py < y + height;
+            this.bounds = bounds;
         }
     }
 
     public static boolean isSheetVisibleAt(int x, int y) {
-        SheetBounds[] boundsSnapshot = sheetBounds;
-        for (SheetBounds bounds : boundsSnapshot) {
+        SheetEntry[] entriesSnapshot = sheetEntries;
+        for (SheetEntry entry : entriesSnapshot) {
+            Rectangle bounds = entry.bounds;
             if (bounds.contains(x, y)) {
                 return true;
             }
@@ -210,49 +202,36 @@ public class Sheet extends Container {
         return false;
     }
 
-    private static void updateSheetBounds(Sheet sheet, int x, int y, int width, int height) {
+    private static void addSheetEntry(SheetEntry entry) {
         synchronized (SHEET_BOUNDS_LOCK) {
-            SheetBounds[] current = sheetBounds;
-            SheetBounds[] updated = new SheetBounds[current.length];
-            boolean replaced = false;
-            int index = 0;
-            for (SheetBounds bounds : current) {
-                if (bounds.sheet == sheet) {
-                    updated[index++] = new SheetBounds(sheet, x, y, width, height);
-                    replaced = true;
-                } else {
-                    updated[index++] = bounds;
-                }
-            }
-            if (!replaced) {
-                updated = new SheetBounds[current.length + 1];
-                System.arraycopy(current, 0, updated, 0, current.length);
-                updated[current.length] = new SheetBounds(sheet, x, y, width, height);
-            }
-            sheetBounds = updated;
+            SheetEntry[] current = sheetEntries;
+            SheetEntry[] updated = new SheetEntry[current.length + 1];
+            System.arraycopy(current, 0, updated, 0, current.length);
+            updated[current.length] = entry;
+            sheetEntries = updated;
         }
     }
 
-    private static void removeSheetBounds(Sheet sheet) {
+    private static void removeSheetEntry(SheetEntry entry) {
         synchronized (SHEET_BOUNDS_LOCK) {
-            SheetBounds[] current = sheetBounds;
+            SheetEntry[] current = sheetEntries;
             int matches = 0;
-            for (SheetBounds bounds : current) {
-                if (bounds.sheet == sheet) {
+            for (SheetEntry existing : current) {
+                if (existing == entry) {
                     matches++;
                 }
             }
             if (matches == 0) {
                 return;
             }
-            SheetBounds[] updated = new SheetBounds[current.length - matches];
+            SheetEntry[] updated = new SheetEntry[current.length - matches];
             int index = 0;
-            for (SheetBounds bounds : current) {
-                if (bounds.sheet != sheet) {
-                    updated[index++] = bounds;
+            for (SheetEntry existing : current) {
+                if (existing != entry) {
+                    updated[index++] = existing;
                 }
             }
-            sheetBounds = updated;
+            sheetEntries = updated;
         }
     }
 
@@ -260,17 +239,22 @@ public class Sheet extends Container {
         if (!trackSheetBounds) {
             return;
         }
-        updateSheetBounds(this, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+        sheetBounds.setBounds(getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
     }
 
     private void startTrackingBounds() {
         trackSheetBounds = true;
+        sheetEntry = new SheetEntry(this, sheetBounds);
+        addSheetEntry(sheetEntry);
         updateTrackedBounds();
     }
 
     private void stopTrackingBounds() {
         trackSheetBounds = false;
-        removeSheetBounds(this);
+        if (sheetEntry != null) {
+            removeSheetEntry(sheetEntry);
+            sheetEntry = null;
+        }
     }
 
     /// Creates a new sheet with the specified parent and title.
