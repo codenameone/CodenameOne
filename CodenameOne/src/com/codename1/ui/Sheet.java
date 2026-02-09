@@ -114,7 +114,7 @@ import static com.codename1.ui.ComponentSelector.$;
 /// 7.0
 public class Sheet extends Container {
     private static final Object SHEET_BOUNDS_LOCK = new Object();
-    private static SheetEntry[] sheetEntries = new SheetEntry[0];
+    private static Rectangle[] sheetBoundsList = new Rectangle[0];
     private static final int N = 0;
     private static final int S = 1;
     private static final int E = 2;
@@ -179,22 +179,11 @@ public class Sheet extends Container {
     private Form form;
     private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
-    private SheetEntry sheetEntry;
-
-    private static final class SheetEntry {
-        private final Sheet sheet;
-        private final Rectangle bounds;
-
-        private SheetEntry(Sheet sheet, Rectangle bounds) {
-            this.sheet = sheet;
-            this.bounds = bounds;
-        }
-    }
+    private Rectangle sheetEntry;
 
     public static boolean isSheetVisibleAt(int x, int y) {
-        SheetEntry[] entriesSnapshot = sheetEntries;
-        for (SheetEntry entry : entriesSnapshot) {
-            Rectangle bounds = entry.bounds;
+        Rectangle[] boundsSnapshot = sheetBoundsList;
+        for (Rectangle bounds : boundsSnapshot) {
             if (bounds.contains(x, y)) {
                 return true;
             }
@@ -202,36 +191,36 @@ public class Sheet extends Container {
         return false;
     }
 
-    private static void addSheetEntry(SheetEntry entry) {
+    private static void addSheetEntry(Rectangle bounds) {
         synchronized (SHEET_BOUNDS_LOCK) {
-            SheetEntry[] current = sheetEntries;
-            SheetEntry[] updated = new SheetEntry[current.length + 1];
+            Rectangle[] current = sheetBoundsList;
+            Rectangle[] updated = new Rectangle[current.length + 1];
             System.arraycopy(current, 0, updated, 0, current.length);
-            updated[current.length] = entry;
-            sheetEntries = updated;
+            updated[current.length] = bounds;
+            sheetBoundsList = updated;
         }
     }
 
-    private static void removeSheetEntry(SheetEntry entry) {
+    private static void removeSheetEntry(Rectangle bounds) {
         synchronized (SHEET_BOUNDS_LOCK) {
-            SheetEntry[] current = sheetEntries;
+            Rectangle[] current = sheetBoundsList;
             int matches = 0;
-            for (SheetEntry existing : current) {
-                if (existing == entry) {
+            for (Rectangle existing : current) {
+                if (existing == bounds) {
                     matches++;
                 }
             }
             if (matches == 0) {
                 return;
             }
-            SheetEntry[] updated = new SheetEntry[current.length - matches];
+            Rectangle[] updated = new Rectangle[current.length - matches];
             int index = 0;
-            for (SheetEntry existing : current) {
-                if (existing != entry) {
+            for (Rectangle existing : current) {
+                if (existing != bounds) {
                     updated[index++] = existing;
                 }
             }
-            sheetEntries = updated;
+            sheetBoundsList = updated;
         }
     }
 
@@ -244,7 +233,7 @@ public class Sheet extends Container {
 
     private void startTrackingBounds() {
         trackSheetBounds = true;
-        sheetEntry = new SheetEntry(this, sheetBounds);
+        sheetEntry = sheetBounds;
         addSheetEntry(sheetEntry);
         updateTrackedBounds();
     }
