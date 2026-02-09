@@ -1,6 +1,7 @@
 {{- define "main" }}
 
-<article class="post-single{{ with (or .Slug .File.TranslationBaseName) }} post-single--{{ . | urlize }}{{ end }}">
+{{- $isDemo := and .File (hasPrefix .File.TranslationBaseName "demo-") -}}
+<article class="post-single{{ if $isDemo }} post-single--demo{{ end }}{{ with (or .Slug .File.TranslationBaseName) }} post-single--{{ . | urlize }}{{ end }}">
   {{- $hasHeroImage := .Params.hero_image }}
   <header class="post-header{{ if $hasHeroImage }} post-header--with-hero{{ end }}">
     {{- if $hasHeroImage }}
@@ -68,12 +69,99 @@
   {{- partial "toc.html" . }}
   {{- end }}
 
+  {{- if $isDemo -}}
+  {{- $copy := dict
+    "ubereats-clone" "A polished food-delivery app template with onboarding, cart, checkout, and profile flows."
+    "chat-app" "A full-featured chat UI kit with avatars, message states, and extensible action components."
+    "uberclone" "A ride-booking style demo with maps, location flows, and modern transportation UI patterns."
+    "kitchen-sink" "The classic Codename One showcase app covering layouts, themes, effects, and platform features."
+    "pheonix-ui-port-of-psd-design-to-cross-platform-native-mobile-app" "A pixel-accurate cross-platform port of a custom PSD mobile design."
+    "swiftnotes-port-of-native-android-app-to-codename-one-iphone-ios-windows-and-javascript-targets" "A practical port of a native Android app to Codename One across iOS, desktop, and web targets."
+    "msuikit-psd-template-port-to-cross-platform-pixel-perfect-codename-one-app-for-android-iphone-ios-etc" "A Material-inspired UI kit ported from PSD assets to a cross-platform Codename One app."
+    "clean-modern-port-of-psd-design-to-cross-platform-native-mobile-app" "A modern mobile design system translated to a production-grade cross-platform native app."
+    "camera-demo" "A minimal demo of camera capture APIs for photos and media capture workflows."
+    "chrome" "A retro-inspired utility app demo featuring custom styling, tabs, and rich UI interactions."
+    "propertycross-demo" "A JSON-driven property browser demo with caching, image loading, and infinite scrolling."
+    "ratatouilles-restaurant" "A restaurant experience demo with animated transitions and image-driven UI composition."
+    "google-maps-demo" "A focused sample demonstrating native maps integration and map interaction APIs."
+    "dr-sbaitso" "A conversational AI-style therapist demo using chat bubbles, media, and speech capabilities."
+    "solitaire-klondike" "A complete card-game demo showcasing animation, layout timing, and gesture interactions."
+    "poker-demo" "A poker table demo highlighting game-style animations and layered visual composition."
+    "charts-demo" "A comprehensive charts sample covering multiple graph types and visual data rendering."
+    "clock-demo" "An analog clock demo built with graphics APIs and custom shape rendering."
+    "geoviz-demo" "A geographic visualization demo for region-based data analysis and map overlays."
+    "sql-playground-sql-tutorial-in-the-browser-iphone-ios-android-windows" "An interactive SQL playground demo that runs on web and device targets."
+  -}}
+  {{- $summary := .Description | default "" | plainify | trim " \n\r\t" -}}
+  {{- with index $copy .Slug -}}
+    {{- $summary = . -}}
+  {{- end -}}
+  {{- if not $summary -}}
+    {{- $summary = .RawContent | replaceRE "(?s)\\n##.*$" "" | plainify | trim " \n\r\t" -}}
+  {{- end -}}
+  {{- if not (findRE "[[:alnum:]]" $summary) -}}
+    {{- $summary = "Explore this Codename One demo, including screenshots, source code links, and downloadable builds." -}}
+  {{- end -}}
+  {{- $summary = truncate 220 $summary -}}
+
+  {{- $slides := .Params.images | default (slice) -}}
+  {{- if and (eq (len $slides) 0) .Params.thumbnail -}}
+    {{- $slides = slice .Params.thumbnail -}}
+  {{- end -}}
+  {{- if eq (len $slides) 0 -}}
+    {{- $slides = slice "/uploads/mobile-app.png" -}}
+  {{- end -}}
+
+  <div class="cn1-demo-top">
+    <section class="cn1-demo-page-block">
+      <p class="cn1-demo-eyebrow">Codename One Demo</p>
+      <h2>{{ .Title }}</h2>
+      <p class="cn1-demo-summary">{{ $summary }}</p>
+      <div class="cn1-demo-actions">
+        {{- with .Params.links.source -}}<a class="cn1-demo-pill cn1-demo-pill--ghost" href="{{ . }}" target="_blank" rel="noopener">Source</a>{{- end -}}
+        {{- with .Params.links.tutorial -}}<a class="cn1-demo-pill cn1-demo-pill--ghost" href="{{ . }}" target="_blank" rel="noopener">Tutorial</a>{{- end -}}
+      </div>
+    </section>
+
+    <section class="cn1-demo-carousel" data-cn1-demo-carousel>
+      <button type="button" class="cn1-demo-carousel__nav" data-cn1-demo-prev aria-label="Previous image">
+        <i class="fas fa-chevron-left" aria-hidden="true"></i>
+      </button>
+      <div class="cn1-demo-carousel__viewport">
+        <div class="cn1-demo-carousel__track" data-cn1-demo-track>
+          {{- range $slides -}}
+          <figure class="cn1-demo-carousel__slide" data-cn1-demo-slide>
+            <img src="{{ . }}" alt="{{ $.Title }}" loading="lazy">
+          </figure>
+          {{- end -}}
+        </div>
+      </div>
+      <button type="button" class="cn1-demo-carousel__nav" data-cn1-demo-next aria-label="Next image">
+        <i class="fas fa-chevron-right" aria-hidden="true"></i>
+      </button>
+      <div class="cn1-demo-carousel__dots">
+        {{- range $i, $_ := $slides -}}
+        <button type="button" data-cn1-demo-dot aria-label="Go to image {{ add $i 1 }}"></button>
+        {{- end -}}
+      </div>
+    </section>
+  </div>
+
   {{- if .Content }}
-  <div class="post-content">
+  <section class="post-content cn1-demo-details">
     {{- if not (.Param "disableAnchoredHeadings") }}
     {{- partial "anchored_headings.html" .Content -}}
     {{- else }}{{ .Content }}{{ end }}
-  </div>
+  </section>
+  {{- end }}
+  {{- else -}}
+    {{- if .Content }}
+    <div class="post-content">
+      {{- if not (.Param "disableAnchoredHeadings") }}
+      {{- partial "anchored_headings.html" .Content -}}
+      {{- else }}{{ .Content }}{{ end }}
+    </div>
+    {{- end }}
   {{- end }}
 
   <footer class="post-footer">
