@@ -4466,6 +4466,32 @@ public final class Display extends CN1Constants {
         impl.dial(phoneNumber);
     }
 
+    /// Indicates whether this platform can attempt to detect active phone-call interruptions.
+    ///
+    /// A `true` result means the platform provides a best-effort heuristic only.
+    /// It does **not** guarantee exact telephony state.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if call detection is implemented on this platform.
+    public boolean isCallDetectionSupported() {
+        return impl.isCallDetectionSupported();
+    }
+
+    /// Best-effort check for whether the platform currently believes an active phone call
+    /// is interrupting the app.
+    ///
+    /// This API is intentionally heuristic. It can produce false positives
+    /// (e.g. non-call interruptions like Control Center or app-switching) and false negatives.
+    /// Use it for UX hints and telemetry, not as a security or business-critical gate.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the platform currently believes a call interruption is active.
+    public boolean isInCall() {
+        return impl.isInCall();
+    }
+
     /// Indicates the level of SMS support in the platform as one of:
     /// `#SMS_NOT_SUPPORTED` (for desktop, tablet etc.),
     /// `#SMS_SEAMLESS` (no UI interaction), `#SMS_INTERACTIVE` (with compose UI),
