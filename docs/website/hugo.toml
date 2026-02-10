@@ -82,6 +82,12 @@ weight = 24
 
 [[menu.main]]
 parent = "resources"
+name = "FAQ"
+url = "/faq/"
+weight = 25
+
+[[menu.main]]
+parent = "resources"
 name = "Blog"
 url = "/blog/"
 weight = 26
@@ -127,30 +133,6 @@ identifier = "pricing"
 name = "PRICING"
 url = "/pricing/"
 weight = 40
-
-[[menu.main]]
-identifier = "support"
-name = "SUPPORT"
-url = "#"
-weight = 50
-
-[[menu.main]]
-parent = "support"
-name = "Services"
-url = "/services/"
-weight = 51
-
-[[menu.main]]
-parent = "support"
-name = "FAQ"
-url = "/faq/"
-weight = 52
-
-[[menu.main]]
-parent = "support"
-name = "Contact Us"
-url = "/contact-us/"
-weight = 53
 
 [[menu.main]]
 identifier = "dashboard"
