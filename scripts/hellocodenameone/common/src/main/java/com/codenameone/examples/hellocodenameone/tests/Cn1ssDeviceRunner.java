@@ -74,6 +74,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BytecodeTranslatorRegressionTest(),
             new BackgroundThreadUiAccessTest(),
             new VPNDetectionAPITest(),
+            new CallDetectionAPITest(),
             new AccessibilityTest()));
 
     public static void addTest(BaseTest test) {

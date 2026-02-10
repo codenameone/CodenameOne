@@ -75,6 +75,19 @@ public class DisplayTest extends UITestBase {
     }
 
     @Test
+    void testCallDetectionDelegatesToImplementation() {
+        Display display = Display.getInstance();
+
+        implementation.setCallState(true, true);
+        assertTrue(display.isCallDetectionSupported());
+        assertTrue(display.isInCall());
+
+        implementation.setCallState(false, false);
+        assertFalse(display.isCallDetectionSupported());
+        assertFalse(display.isInCall());
+    }
+
+    @Test
     void testDebugRunnable() {
         Display display = Display.getInstance();
         boolean oldEnable = display.isEnableAsyncStackTraces();

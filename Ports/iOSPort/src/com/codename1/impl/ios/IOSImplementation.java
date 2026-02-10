@@ -145,6 +145,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private String userAgent;
     private TextureCache textureCache = new TextureCache();
     private static boolean dropEvents;
+    private static boolean callInterruptionActive;
     
     private NativePathRenderer globalPathRenderer;
     private NativePathStroker globalPathStroker;
@@ -6700,6 +6701,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isCallDetectionSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isInCall() {
+        return callInterruptionActive;
+    }
+
+    @Override
     public boolean canDial() {
         boolean s = super.canDial(); 
         return s && nativeInstance.canExecute("tel://911");
@@ -8497,6 +8508,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public static void applicationWillResignActive() {
         minimized = true;
+        callInterruptionActive = true;
         if(instance.life != null) {
             instance.life.applicationWillResignActive();
         }
@@ -8667,6 +8679,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * here you can undo many of the changes made on entering the background.
      */
     public static void applicationDidBecomeActive() {
+        callInterruptionActive = false;
         ArrayList<Runnable> callbacks = null;
         synchronized(instance.onActiveListeners) {
             instance.isActive = true;

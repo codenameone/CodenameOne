@@ -117,6 +117,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private String currentAccessPoint;
     private boolean vpnDetectionSupported;
     private boolean vpnActive;
+    private boolean callDetectionSupported;
+    private boolean inCall;
     private LocationManager locationManager;
     private L10NManager localizationManager;
     private ImageIO imageIO;
@@ -1063,6 +1065,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         currentAccessPoint = null;
         vpnDetectionSupported = false;
         vpnActive = false;
+        callDetectionSupported = false;
+        inCall = false;
         startRemoteControlInvocations = 0;
         stopRemoteControlInvocations = 0;
         nativeTitle = false;
@@ -1154,6 +1158,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void setVPNState(boolean detectionSupported, boolean active) {
         this.vpnDetectionSupported = detectionSupported;
         this.vpnActive = active;
+    }
+
+    public void setCallState(boolean detectionSupported, boolean active) {
+        this.callDetectionSupported = detectionSupported;
+        this.inCall = active;
     }
 
     @Override
@@ -2741,6 +2750,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public boolean isVPNActive() {
         return vpnActive;
+    }
+
+    @Override
+    public boolean isCallDetectionSupported() {
+        return callDetectionSupported;
+    }
+
+    @Override
+    public boolean isInCall() {
+        return inCall;
     }
 
     @Override

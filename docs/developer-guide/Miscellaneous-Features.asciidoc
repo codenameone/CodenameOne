@@ -70,6 +70,24 @@ You can dial the phone by using:
 Display.getInstance().dial("+999999999");
 ----
 
+==== Call Detection
+
+Codename One includes a generic call detection API via `Display.isCallDetectionSupported()` and `Display.isInCall()`.
+
+This API is intentionally *best effort* and should only be used as a UX hint (for example, to defer a non-critical animation while the app is interrupted).
+
+On iOS, `isInCall()` is inferred from app interruption lifecycle events, which means it can report `true` for non-call interruptions (e.g. Control Center, app switching, permission sheets), and some call flows may still be missed.
+
+On Android, call detection is currently unsupported because robust detection would require invasive telephony permissions that are intentionally avoided.
+
+[source,java]
+----
+Display display = Display.getInstance();
+if (display.isCallDetectionSupported() && display.isInCall()) {
+    Log.p("Call interruption is currently active (heuristic)");
+}
+----
+
 ==== E-Mail
 
 You can send an email via the platforms native email client with code such as this:

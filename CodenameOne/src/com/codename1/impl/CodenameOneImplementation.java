@@ -6769,6 +6769,34 @@ public abstract class CodenameOneImplementation {
     public void dial(String phoneNumber) {
     }
 
+    /// Indicates whether this platform can attempt to detect when an active phone
+    /// call is interrupting the app.
+    ///
+    /// The default implementation returns `false`. Platforms with a best-effort
+    /// call interruption heuristic should override this method and `#isInCall()`.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if call detection is implemented on this platform.
+    public boolean isCallDetectionSupported() {
+        return false;
+    }
+
+    /// Best-effort check for whether the platform believes a phone call is active.
+    ///
+    /// This API is intentionally heuristic and should **not** be treated as a
+    /// reliable telephony state machine. Depending on platform restrictions it may
+    /// report false positives (e.g. other interruptions that temporarily move the
+    /// app out of the foreground) and false negatives (e.g. calls that are never
+    /// surfaced to the app lifecycle).
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the platform currently believes a phone call interruption is active.
+    public boolean isInCall() {
+        return false;
+    }
+
     /// Sends a SMS message to the given phone number
     ///
     /// #### Parameters
