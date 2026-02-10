@@ -29,6 +29,15 @@ else
   echo "Warning: python3 not found; skipping cn1libs refresh." >&2
 fi
 
+# Generate static output once so lunr index can be created before live preview.
+"${HUGO_BIN}" --destination "${WEBSITE_DIR}/public" >/dev/null 2>&1 || true
+
+if command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+  "${PYTHON_BIN}" "${WEBSITE_DIR}/scripts/generate_lunr_index.py" >/dev/null 2>&1 || true
+else
+  echo "Warning: python3 not found; search index may be stale in preview." >&2
+fi
+
 "${HUGO_BIN}" server \
   --bind "${HUGO_BIND}" \
   --port "${HUGO_PORT}" \

@@ -37,3 +37,9 @@ HUGO_ENV="${HUGO_ENVIRONMENT}" "${HUGO_BIN}" \
   --cleanDestinationDir \
   --gc \
   ${MINIFY_FLAG}
+
+if command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+  "${PYTHON_BIN}" "${WEBSITE_DIR}/scripts/generate_lunr_index.py"
+else
+  echo "Warning: python3 not found; skipping lunr index generation." >&2
+fi

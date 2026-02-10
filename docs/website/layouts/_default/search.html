@@ -1,0 +1,146 @@
+{{- define "main" -}}
+<article class="post-single cn1-search-page">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    <div class="post-description">Search docs, tutorials, demos, blog posts, and reference content.</div>
+  </header>
+
+  <section class="cn1-search-shell">
+    <label class="cn1-search-label" for="cn1-search-input">Search</label>
+    <input id="cn1-search-input" class="cn1-search-input" type="search" placeholder="Try: native interfaces, CSS, iOS, push notifications" autocomplete="off" />
+    <p class="cn1-search-status" id="cn1-search-status">Loading search index…</p>
+    <div class="cn1-search-results" id="cn1-search-results"></div>
+  </section>
+</article>
+
+<script src="https://cdn.jsdelivr.net/npm/lunr/lunr.min.js"></script>
+<script>
+(() => {
+  const input = document.getElementById("cn1-search-input");
+  const status = document.getElementById("cn1-search-status");
+  const resultsEl = document.getElementById("cn1-search-results");
+
+  if (!input || !status || !resultsEl) {
+    return;
+  }
+
+  let docs = [];
+  let docsById = new Map();
+  let idx = null;
+
+  const escapeHtml = (value) => String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+  const makeSnippet = (content, query) => {
+    if (!content) return "";
+    const q = query.trim().toLowerCase();
+    if (!q) return content.slice(0, 180) + (content.length > 180 ? "…" : "");
+
+    const pos = content.toLowerCase().indexOf(q);
+    if (pos === -1) {
+      return content.slice(0, 180) + (content.length > 180 ? "…" : "");
+    }
+
+    const start = Math.max(0, pos - 80);
+    const end = Math.min(content.length, pos + q.length + 80);
+    let snippet = content.slice(start, end);
+    if (start > 0) snippet = "…" + snippet;
+    if (end < content.length) snippet += "…";
+    return snippet;
+  };
+
+  const renderResults = (matches, query) => {
+    if (!query.trim()) {
+      resultsEl.innerHTML = "";
+      status.textContent = "Type to search the site.";
+      return;
+    }
+
+    if (!matches.length) {
+      resultsEl.innerHTML = "";
+      status.textContent = "No results found.";
+      return;
+    }
+
+    status.textContent = `${matches.length} result${matches.length === 1 ? "" : "s"}`;
+
+    const html = matches.slice(0, 25).map((match) => {
+      const doc = docsById.get(match.ref);
+      if (!doc) return "";
+      const snippet = makeSnippet(doc.content || "", query);
+      return `
+        <article class="cn1-search-result">
+          <h2><a href="${escapeHtml(doc.url)}">${escapeHtml(doc.title)}</a></h2>
+          <p>${escapeHtml(snippet)}</p>
+          <a class="cn1-search-result__url" href="${escapeHtml(doc.url)}">${escapeHtml(doc.url)}</a>
+        </article>
+      `;
+    }).join("\n");
+
+    resultsEl.innerHTML = html;
+  };
+
+  const runSearch = () => {
+    if (!idx) {
+      status.textContent = "Search index unavailable.";
+      return;
+    }
+
+    const query = input.value;
+    if (!query.trim()) {
+      renderResults([], query);
+      return;
+    }
+
+    let results = [];
+    try {
+      results = idx.search(`${query}* ${query}~1`);
+    } catch (_) {
+      try {
+        results = idx.search(query);
+      } catch (__){
+        results = [];
+      }
+    }
+
+    renderResults(results, query);
+  };
+
+  fetch("/lunr-index.json", { cache: "no-store" })
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then((payload) => {
+      docs = Array.isArray(payload.docs) ? payload.docs : [];
+      docsById = new Map(docs.map((d) => [String(d.id), d]));
+
+      if (!window.lunr || !docs.length) {
+        status.textContent = docs.length ? "Lunr failed to load." : "Search index is empty.";
+        return;
+      }
+
+      idx = lunr(function () {
+        this.ref("id");
+        this.field("title", { boost: 10 });
+        this.field("content");
+
+        docs.forEach((doc) => this.add(doc));
+      });
+
+      status.textContent = "Type to search the site.";
+      input.addEventListener("input", runSearch);
+      input.focus();
+    })
+    .catch((err) => {
+      status.textContent = "Search index is not available yet. Run website build to generate lunr-index.json.";
+      console.error("Search index load failed:", err);
+    });
+})();
+</script>
+{{- end -}}

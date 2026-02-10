@@ -82,15 +82,15 @@ weight = 24
 
 [[menu.main]]
 parent = "resources"
-name = "Search"
-url = "/search/"
-weight = 25
-
-[[menu.main]]
-parent = "resources"
 name = "Blog"
 url = "/blog/"
 weight = 26
+
+[[menu.main]]
+identifier = "search"
+name = "Search"
+url = "/search/"
+weight = 80
 
 [[menu.main]]
 identifier = "community"

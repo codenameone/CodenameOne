@@ -122,9 +122,15 @@
                         {{- end }}
                     </ul>
                     {{- else }}
+                    {{- if eq .Identifier "search" }}
+                    <a class="cn1-menu-search-link" href="{{ .URL | absLangURL }}" aria-label="Search">
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                    </a>
+                    {{- else }}
                     <a href="{{ .URL | absLangURL }}">
                         <span>{{- .Name -}}</span>
                     </a>
+                    {{- end }}
                     {{- end }}
                 </li>
                 {{- end }}
