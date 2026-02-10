@@ -113,7 +113,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// 7.0
 public class Sheet extends Container {
-    private static final Object SHEET_BOUNDS_LOCK = new Object();
     private static Rectangle[] sheetBoundsList = new Rectangle[0];
     private static final int N = 0;
     private static final int S = 1;
@@ -192,36 +191,32 @@ public class Sheet extends Container {
     }
 
     private static void addSheetEntry(Rectangle bounds) {
-        synchronized (SHEET_BOUNDS_LOCK) {
-            Rectangle[] current = sheetBoundsList;
-            Rectangle[] updated = new Rectangle[current.length + 1];
-            System.arraycopy(current, 0, updated, 0, current.length);
-            updated[current.length] = bounds;
-            sheetBoundsList = updated;
-        }
+        Rectangle[] current = sheetBoundsList;
+        Rectangle[] updated = new Rectangle[current.length + 1];
+        System.arraycopy(current, 0, updated, 0, current.length);
+        updated[current.length] = bounds;
+        sheetBoundsList = updated;
     }
 
     private static void removeSheetEntry(Rectangle bounds) {
-        synchronized (SHEET_BOUNDS_LOCK) {
-            Rectangle[] current = sheetBoundsList;
-            int matches = 0;
-            for (Rectangle existing : current) {
-                if (existing == bounds) {
-                    matches++;
-                }
+        Rectangle[] current = sheetBoundsList;
+        int matches = 0;
+        for (Rectangle existing : current) {
+            if (existing == bounds) { // NOPMD CompareObjectsWithEquals
+                matches++;
             }
-            if (matches == 0) {
-                return;
-            }
-            Rectangle[] updated = new Rectangle[current.length - matches];
-            int index = 0;
-            for (Rectangle existing : current) {
-                if (existing != bounds) {
-                    updated[index++] = existing;
-                }
-            }
-            sheetBoundsList = updated;
         }
+        if (matches == 0) {
+            return;
+        }
+        Rectangle[] updated = new Rectangle[current.length - matches];
+        int index = 0;
+        for (Rectangle existing : current) {
+            if (existing != bounds) { // NOPMD CompareObjectsWithEquals
+                updated[index++] = existing;
+            }
+        }
+        sheetBoundsList = updated;
     }
 
     private void updateTrackedBounds() {
