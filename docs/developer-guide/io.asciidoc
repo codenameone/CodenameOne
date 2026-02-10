@@ -459,6 +459,31 @@ There is one exception to this rule which is the `postResponse()` method designe
 
 IMPORTANT: Never change the UI from a `ConnectionRequest` callback. You can either use a listener on the `ConnectionRequest`, use `postResponse()` (which is the only exception to this rule) or wrap your UI code with `callSerially`.
 
+==== VPN Detection (Best Effort)
+
+`NetworkManager` includes two APIs for querying VPN state:
+
+[source,java]
+----
+NetworkManager nm = NetworkManager.getInstance();
+if (nm.isVPNDetectionSupported()) {
+    boolean vpnActive = nm.isVPNActive();
+}
+----
+
+IMPORTANT: This is a heuristic signal, not a security control.
+
+Both Android and iOS implementations rely on platform networking metadata and
+interface-name patterns (e.g. `tun`, `ppp`, `utun`, `ipsec`). This means the
+result can be wrong in either direction:
+
+* False negatives: Some VPNs may hide or avoid these patterns.
+* False positives: Other virtual/tunnel interfaces may look like VPNs.
+
+Use this API only for UX or diagnostics (e.g. warnings, telemetry, or logging),
+not for access control or fraud prevention by itself.
+
+
 ==== Arguments, Headers & Methods
 
 HTTP/S is a complex protocol that expects complex encoded data for its requests. Codename One tries to simplify and abstract most of these complexities behind common sense API's while still providing the full low level access you would expect from such an API.

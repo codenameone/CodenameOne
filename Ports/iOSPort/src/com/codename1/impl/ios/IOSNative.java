@@ -290,7 +290,8 @@ public final class IOSNative {
 
     native boolean isDarkMode();
     native boolean isDarkModeDetectionSupported();
-    
+    native boolean isVPNActive();
+
     native int fileCountInDir(String dir);
     native void listFilesInDir(String dir, String[] files);
     native void createDirectory(String dir);

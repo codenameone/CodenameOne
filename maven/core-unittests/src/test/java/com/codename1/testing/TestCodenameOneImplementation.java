@@ -115,6 +115,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, Integer> accessPointTypes = new HashMap<>();
     private final Map<String, String> accessPointNames = new HashMap<>();
     private String currentAccessPoint;
+    private boolean vpnDetectionSupported;
+    private boolean vpnActive;
     private LocationManager locationManager;
     private L10NManager localizationManager;
     private ImageIO imageIO;
@@ -1059,6 +1061,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         accessPointTypes.clear();
         accessPointNames.clear();
         currentAccessPoint = null;
+        vpnDetectionSupported = false;
+        vpnActive = false;
         startRemoteControlInvocations = 0;
         stopRemoteControlInvocations = 0;
         nativeTitle = false;
@@ -1144,6 +1148,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (names != null) {
             this.accessPointNames.putAll(names);
         }
+    }
+
+
+    public void setVPNState(boolean detectionSupported, boolean active) {
+        this.vpnDetectionSupported = detectionSupported;
+        this.vpnActive = active;
     }
 
     @Override
@@ -2721,6 +2731,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
         return dipCount;
+    }
+
+    @Override
+    public boolean isVPNDetectionSupported() {
+        return vpnDetectionSupported;
+    }
+
+    @Override
+    public boolean isVPNActive() {
+        return vpnActive;
     }
 
     @Override

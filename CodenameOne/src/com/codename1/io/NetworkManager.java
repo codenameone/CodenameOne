@@ -823,6 +823,28 @@ public final class NetworkManager {
         Util.getImplementation().setCurrentAccessPoint(id);
     }
 
+    /// Indicates whether the current platform supports best-effort VPN detection.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if `#isVPNActive()` is implemented on this platform.
+    public boolean isVPNDetectionSupported() {
+        return Util.getImplementation().isVPNDetectionSupported();
+    }
+
+    /// Best-effort check for whether a VPN appears to be active.
+    ///
+    /// This value should be treated as advisory only. Platform APIs and
+    /// interface-name heuristics can miss some VPN configurations and may also
+    /// report non-VPN tunnels as VPNs.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if a VPN appears to be active on the current connection.
+    public boolean isVPNActive() {
+        return Util.getImplementation().isVPNActive();
+    }
+
     class NetworkThread implements Runnable {
         boolean stopped = false;
         private ConnectionRequest currentRequest;

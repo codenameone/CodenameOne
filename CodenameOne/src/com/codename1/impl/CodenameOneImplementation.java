@@ -6281,6 +6281,31 @@ public abstract class CodenameOneImplementation {
     public void setCurrentAccessPoint(String id) {
     }
 
+    /// Indicates whether this platform can attempt to detect active VPN usage.
+    ///
+    /// The default implementation returns `false`. Platforms that provide a
+    /// best-effort VPN heuristic should override this method and `#isVPNActive()`.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if VPN detection is implemented on this platform.
+    public boolean isVPNDetectionSupported() {
+        return false;
+    }
+
+    /// Best-effort check for whether a VPN appears to be active.
+    ///
+    /// This API is intentionally heuristic and should **not** be used as a
+    /// security boundary. False positives and false negatives are both possible,
+    /// and some VPN products may avoid detection completely.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the platform believes a VPN may be active.
+    public boolean isVPNActive() {
+        return false;
+    }
+
     /// For some reason the standard code for writing UTF8 output in a server request
     /// doesn't work as expected on SE/CDC stacks.
     ///
