@@ -1223,6 +1223,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isVPNDetectionSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isVPNActive() {
+        return nativeInstance.isVPNActive();
+    }
+
+    @Override
     public boolean isLargerTextEnabled() {
         return nativeInstance.isLargerTextEnabled();
     }

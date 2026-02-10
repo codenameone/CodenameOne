@@ -160,6 +160,17 @@ class NetworkManagerTest extends com.codename1.junit.UITestBase {
     }
 
     @Test
+    void vpnDelegatesToImplementation() {
+        implementation.setVPNState(true, true);
+        assertTrue(manager.isVPNDetectionSupported());
+        assertTrue(manager.isVPNActive());
+
+        implementation.setVPNState(false, false);
+        assertFalse(manager.isVPNDetectionSupported());
+        assertFalse(manager.isVPNActive());
+    }
+
+    @Test
     void apDelegatesToImplementation() {
         implementation.setAccessPoints(new String[]{"wifi"},
                 Collections.singletonMap("wifi", NetworkManager.ACCESS_POINT_TYPE_WLAN),

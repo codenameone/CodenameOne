@@ -52,6 +52,8 @@
 #import <CoreLocation/CoreLocation.h>
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Foundation/Foundation.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 #import <MessageUI/MFMailComposeViewController.h>
 #import <AddressBookUI/AddressBookUI.h>
 #import <MessageUI/MFMessageComposeViewController.h>
@@ -4251,6 +4253,36 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkModeDetectionSupported___R_b
     } else {
         return JAVA_FALSE;
     }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVPNActive___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    struct ifaddrs *interfaces = NULL;
+    if (getifaddrs(&interfaces) != 0) {
+        return JAVA_FALSE;
+    }
+    JAVA_BOOLEAN found = JAVA_FALSE;
+    struct ifaddrs *ifa = interfaces;
+    while (ifa != NULL) {
+        if (ifa->ifa_name == NULL || ifa->ifa_addr == NULL) {
+            ifa = ifa->ifa_next;
+            continue;
+        }
+        if (!(ifa->ifa_flags & IFF_UP) || (ifa->ifa_flags & IFF_LOOPBACK)) {
+            ifa = ifa->ifa_next;
+            continue;
+        }
+        NSString *name = [NSString stringWithUTF8String:ifa->ifa_name];
+        if (name != nil) {
+            NSString *lowerName = [name lowercaseString];
+            if ([lowerName hasPrefix:@"utun"] || [lowerName hasPrefix:@"tap"] || [lowerName hasPrefix:@"tun"] || [lowerName hasPrefix:@"ppp"] || [lowerName hasPrefix:@"ipsec"]) {
+                found = JAVA_TRUE;
+                break;
+            }
+        }
+        ifa = ifa->ifa_next;
+    }
+    freeifaddrs(interfaces);
+    return found;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

@@ -9606,6 +9606,46 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return apName;
     }
 
+    @Override
+    public boolean isVPNDetectionSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isVPNActive() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                android.net.Network network = cm.getActiveNetwork();
+                if (network != null) {
+                    android.net.NetworkCapabilities capabilities = cm.getNetworkCapabilities(network);
+                    if (capabilities != null && capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) {
+                        return true;
+                    }
+                }
+            }
+
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces != null && interfaces.hasMoreElements()) {
+                NetworkInterface current = interfaces.nextElement();
+                if (!current.isUp() || current.isLoopback()) {
+                    continue;
+                }
+                String name = current.getName();
+                if (name == null) {
+                    continue;
+                }
+                name = name.toLowerCase(Locale.US);
+                if (name.startsWith("tun") || name.startsWith("ppp") || name.startsWith("tap") || name.startsWith("ipsec")) {
+                    return true;
+                }
+            }
+        } catch (Throwable t) {
+            Log.d("Codename One", "VPN detection failed", t);
+        }
+        return false;
+    }
+
     /**
      * @inheritDoc
      */
