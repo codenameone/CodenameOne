@@ -1,0 +1,325 @@
+.cn1-pricing-page {
+  max-width: 1200px;
+  color: #f5f8ff;
+}
+
+body:not(.dark) .cn1-pricing-page {
+  color: #1a2c57;
+}
+
+.cn1-pricing-header {
+  text-align: center;
+}
+
+.cn1-pricing-subtitle {
+  margin: 0.35rem 0 0;
+  color: #afc1ff;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.cn1-pricing-note {
+  margin: 0.45rem 0 0;
+  color: rgba(245, 248, 255, 0.78);
+  font-size: 0.92rem;
+}
+
+body:not(.dark) .cn1-pricing-subtitle {
+  color: #1d52ff;
+}
+
+body:not(.dark) .cn1-pricing-note {
+  color: #536184;
+}
+
+.cn1-pricing-toggle {
+  margin: 1.35rem auto 1rem;
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+}
+
+body:not(.dark) .cn1-pricing-toggle {
+  background: transparent;
+}
+
+.cn1-pricing-toggle__label {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #afc1ff;
+  font-weight: 600;
+}
+
+body:not(.dark) .cn1-pricing-toggle__label {
+  color: #1d52ff;
+}
+
+.cn1-pricing-toggle__switch {
+  display: inline-flex;
+  border: 1px solid rgba(175, 193, 255, 0.35);
+  border-radius: 2px;
+  padding: 0.2rem;
+  background: rgba(8, 17, 55, 0.25);
+}
+
+body:not(.dark) .cn1-pricing-toggle__switch {
+  background: #fff;
+  border-color: #d0dcff;
+}
+
+.cn1-pricing-toggle__switch button {
+  border: 0;
+  background: transparent;
+  color: rgba(245, 248, 255, 0.78);
+  font-family: "Poppins", sans-serif;
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+body:not(.dark) .cn1-pricing-toggle__switch button {
+  color: #4d5b85;
+}
+
+.cn1-pricing-toggle__switch button.is-active {
+  background: #1d52ff;
+  color: #f5f8ff;
+}
+
+.cn1-pricing-toggle__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(245, 248, 255, 0.72);
+  text-align: center;
+}
+
+body:not(.dark) .cn1-pricing-toggle__hint {
+  color: #627199;
+}
+
+.cn1-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  align-items: stretch;
+}
+
+.cn1-price-card {
+  border: 1px solid rgba(29, 82, 255, 0.45);
+  border-radius: 2px;
+  background: rgba(62, 74, 112, 0.38);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+body:not(.dark) .cn1-price-card {
+  background: #f5f8ff;
+  border-color: #d8e2ff;
+}
+
+.cn1-price-card--featured {
+  border-color: #1d52ff;
+  box-shadow: 0 12px 30px rgba(5, 15, 54, 0.25);
+}
+
+body:not(.dark) .cn1-price-card--featured {
+  box-shadow: 0 10px 24px rgba(19, 70, 209, 0.12);
+}
+
+.cn1-price-card header {
+  margin-bottom: 0.8rem;
+}
+
+.cn1-price-card__badge {
+  margin: 0 0 0.35rem;
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: #1d52ff;
+  color: #f5f8ff;
+  border-radius: 2px;
+  padding: 0.2rem 0.45rem;
+}
+
+.cn1-price-card__tier {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f5f8ff;
+}
+
+body:not(.dark) .cn1-price-card__tier {
+  color: #102154;
+}
+
+.cn1-price-card__price {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: rgba(245, 248, 255, 0.9);
+}
+
+.cn1-price-card__price span {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #f5f8ff;
+}
+
+body:not(.dark) .cn1-price-card__price,
+body:not(.dark) .cn1-price-card__price span {
+  color: #132b63;
+}
+
+.cn1-price-card__bill {
+  margin: 0.2rem 0 0;
+  color: #afc1ff;
+  font-size: 0.78rem;
+  min-height: 2.1em;
+}
+
+body:not(.dark) .cn1-price-card__bill {
+  color: #2e55c4;
+}
+
+.cn1-price-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.2rem 0 0.95rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cn1-price-card li {
+  position: relative;
+  padding-left: 1rem;
+  color: rgba(245, 248, 255, 0.9);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.cn1-price-card li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: #1d52ff;
+}
+
+body:not(.dark) .cn1-price-card li {
+  color: #2d3c66;
+}
+
+.cn1-price-card__cta {
+  margin-top: auto;
+  text-align: center;
+  text-decoration: none;
+  border: 1px solid rgba(245, 248, 255, 0.75);
+  color: #f5f8ff;
+  border-radius: 2px;
+  padding: 0.55rem 0.7rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  font-family: "Poppins", sans-serif;
+  line-height: 1.2;
+}
+
+.cn1-price-card__cta:hover {
+  background: rgba(29, 82, 255, 0.2);
+  border-color: #1d52ff;
+}
+
+body:not(.dark) .cn1-price-card__cta {
+  color: #16316c;
+  border-color: #bfd0ff;
+}
+
+body:not(.dark) .cn1-price-card__cta:hover {
+  background: #edf2ff;
+}
+
+.cn1-pricing-faq {
+  margin-top: 2rem;
+  padding: 0.2rem 0 0;
+}
+
+body:not(.dark) .cn1-pricing-faq {
+  background: transparent;
+}
+
+.cn1-pricing-faq h2,
+.cn1-pricing-faq h3 {
+  margin-top: 1rem;
+}
+
+body:not(.dark) .cn1-pricing-faq h2,
+body:not(.dark) .cn1-pricing-faq h3,
+body:not(.dark) .cn1-pricing-faq p,
+body:not(.dark) .cn1-pricing-faq li,
+body:not(.dark) .cn1-pricing-faq strong {
+  color: #203362;
+}
+
+body:not(.dark) .cn1-pricing-faq a {
+  color: #1d52ff;
+}
+
+.cn1-pricing-page .cn1-loved {
+  margin-top: 2rem;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+body:not(.dark) .cn1-pricing-page .cn1-loved h2 {
+  color: #1d52ff;
+}
+
+body:not(.dark) .cn1-pricing-page .cn1-loved__grid > img {
+  opacity: 1;
+  filter: none;
+}
+
+body:not(.dark) .cn1-pricing-page .cn1-loved__grid .cn1-carousel__slide blockquote {
+  color: #1b274e;
+  background: #e7ecfb;
+  border-color: #2b66ea;
+}
+
+body:not(.dark) .cn1-pricing-page .cn1-loved__grid .cn1-carousel__slide blockquote span + span {
+  color: #4a5f97;
+}
+
+body:not(.dark) .cn1-pricing-page .cn1-loved__grid .cn1-carousel__slide blockquote::after {
+  background: #e7ecfb;
+  border-right-color: #2b66ea;
+  border-bottom-color: #2b66ea;
+}
+
+body:not(.dark) .cn1-pricing-page .cn1-loved__grid .cn1-carousel__slide h3,
+body:not(.dark) .cn1-pricing-page .cn1-loved__grid .cn1-carousel__slide p {
+  color: #1b274e;
+}
+
+@media (max-width: 1120px) {
+  .cn1-pricing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .cn1-pricing-grid {
+    grid-template-columns: 1fr;
+  }
+}

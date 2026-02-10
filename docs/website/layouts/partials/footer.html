@@ -47,9 +47,11 @@
 {{- $cn1Site := resources.Get "js/cn1-site.js" | minify | fingerprint }}
 {{- $cn1Home := resources.Get "js/cn1-home.js" | minify | fingerprint }}
 {{- $cn1Demo := resources.Get "js/cn1-demo.js" | minify | fingerprint }}
+{{- $cn1Pricing := resources.Get "js/cn1-pricing.js" | minify | fingerprint }}
 <script defer src="{{ $cn1Site.RelPermalink }}" integrity="{{ $cn1Site.Data.Integrity }}"></script>
 <script defer src="{{ $cn1Home.RelPermalink }}" integrity="{{ $cn1Home.Data.Integrity }}"></script>
 <script defer src="{{ $cn1Demo.RelPermalink }}" integrity="{{ $cn1Demo.Data.Integrity }}"></script>
+<script defer src="{{ $cn1Pricing.RelPermalink }}" integrity="{{ $cn1Pricing.Data.Integrity }}"></script>
 
 <script>
     let menu = document.getElementById('menu')

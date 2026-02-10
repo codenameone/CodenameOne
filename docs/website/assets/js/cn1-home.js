@@ -1,35 +1,37 @@
 (() => {
-  if (!document.querySelector(".cn1-hero")) return;
-  document.body.classList.add("cn1-homepage");
+  const isHome = !!document.querySelector(".cn1-hero");
+  if (isHome) {
+    document.body.classList.add("cn1-homepage");
 
-  const accordions = document.querySelectorAll(".cn1-accordion");
-  accordions.forEach((accordion) => {
-    const items = Array.from(accordion.querySelectorAll(".cn1-acc-item"));
-    const setState = (item, open) => {
-      const trigger = item.querySelector(".cn1-acc-trigger");
-      const panel = item.querySelector(".cn1-acc-panel");
-      if (!trigger || !panel) return;
-      item.classList.toggle("is-open", open);
-      trigger.setAttribute("aria-expanded", open ? "true" : "false");
-      panel.style.maxHeight = open ? panel.scrollHeight + "px" : "0px";
-      const icon = trigger.querySelector(".cn1-acc-caret i");
-      if (icon) {
-        icon.classList.toggle("fa-chevron-down", open);
-        icon.classList.toggle("fa-chevron-right", !open);
-      }
-    };
+    const accordions = document.querySelectorAll(".cn1-accordion");
+    accordions.forEach((accordion) => {
+      const items = Array.from(accordion.querySelectorAll(".cn1-acc-item"));
+      const setState = (item, open) => {
+        const trigger = item.querySelector(".cn1-acc-trigger");
+        const panel = item.querySelector(".cn1-acc-panel");
+        if (!trigger || !panel) return;
+        item.classList.toggle("is-open", open);
+        trigger.setAttribute("aria-expanded", open ? "true" : "false");
+        panel.style.maxHeight = open ? panel.scrollHeight + "px" : "0px";
+        const icon = trigger.querySelector(".cn1-acc-caret i");
+        if (icon) {
+          icon.classList.toggle("fa-chevron-down", open);
+          icon.classList.toggle("fa-chevron-right", !open);
+        }
+      };
 
-    items.forEach((item) => setState(item, item.classList.contains("is-open")));
-    accordion.addEventListener("click", (event) => {
-      const trigger = event.target.closest(".cn1-acc-trigger");
-      if (!trigger) return;
-      const item = trigger.closest(".cn1-acc-item");
-      if (!item) return;
-      const willOpen = !item.classList.contains("is-open");
-      items.forEach((it) => setState(it, false));
-      setState(item, willOpen);
+      items.forEach((item) => setState(item, item.classList.contains("is-open")));
+      accordion.addEventListener("click", (event) => {
+        const trigger = event.target.closest(".cn1-acc-trigger");
+        if (!trigger) return;
+        const item = trigger.closest(".cn1-acc-item");
+        if (!item) return;
+        const willOpen = !item.classList.contains("is-open");
+        items.forEach((it) => setState(it, false));
+        setState(item, willOpen);
+      });
     });
-  });
+  }
 
   const carousels = document.querySelectorAll(".cn1-carousel[data-carousel]");
   carousels.forEach((carousel) => {
