@@ -59,6 +59,17 @@ body.dark .post-single .post-content h6 {
     color: #f5f8ff;
 }
 
+.post-single .post-content .cn1-embed {
+    margin: 16px 0 24px;
+}
+
+.post-single .post-content .cn1-embed iframe {
+    width: 100%;
+    max-width: 100%;
+    min-height: 360px;
+    border: 0;
+}
+
 .post-single .post-content h1 {
     font-size: 35px;
 }

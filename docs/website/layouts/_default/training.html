@@ -1,0 +1,91 @@
+{{- define "main" -}}
+<article class="post-single cn1-course-hub cn1-training-gateway">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    {{ with .Description }}<div class="post-description">{{ . }}</div>{{ end }}
+  </header>
+
+  <div class="post-content cn1-course-hub__intro">
+    {{- if not (.Param "disableAnchoredHeadings") -}}
+      {{- partial "anchored_headings.html" .Content -}}
+    {{- else -}}
+      {{- .Content -}}
+    {{- end -}}
+  </div>
+
+  <section class="cn1-course-overview">
+    <div class="cn1-course-overview__bar">
+      <p><strong>3</strong> courses • <strong>201</strong> lessons • self-paced</p>
+      <a class="cn1-course-overview__start" href="/course-01-java-for-mobile-devices/">Start Learning</a>
+    </div>
+
+    <div class="cn1-course-overview__grid">
+      <section class="cn1-course-module-card cn1-training-path-card">
+        <header>
+          <p class="cn1-course-module-card__eyebrow">Path 1</p>
+          <h2>Java for Mobile Devices</h2>
+          <p>14 lessons · fundamentals</p>
+        </header>
+        <p>Start here to learn the core Codename One concepts, UI basics, storage, threading, and native interfaces.</p>
+        <div class="cn1-training-path-card__actions">
+          <a href="/course-01-java-for-mobile-devices/">Open Course</a>
+        </div>
+      </section>
+
+      <section class="cn1-course-module-card cn1-training-path-card">
+        <header>
+          <p class="cn1-course-module-card__eyebrow">Path 2</p>
+          <h2>Deep Dive Mobile Development</h2>
+          <p>44 lessons · intermediate</p>
+        </header>
+        <p>Dive deeper into CSS, custom web services, architecture, native interfaces, maps, security, and performance tuning.</p>
+        <div class="cn1-training-path-card__actions">
+          <a href="/course-02-deep-dive-mobile-development-with-codename-one/">Open Course</a>
+        </div>
+      </section>
+
+      <section class="cn1-course-module-card cn1-training-path-card">
+        <header>
+          <p class="cn1-course-module-card__eyebrow">Path 3</p>
+          <h2>Full-Stack Mobile Apps in Java</h2>
+          <p>143 lessons · advanced</p>
+        </header>
+        <p>Build real-world end-to-end apps with backend services, deployment flows, app templates, and production-focused practices.</p>
+        <div class="cn1-training-path-card__actions">
+          <a href="/course-03-build-real-world-full-stack-mobile-apps-java/">Open Course</a>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="cn1-course-overview cn1-training-support">
+    <div class="cn1-course-overview__grid">
+      <section class="cn1-course-module-card">
+        <header>
+          <p class="cn1-course-module-card__eyebrow">Need Help</p>
+          <h2>Community & Docs</h2>
+        </header>
+        <ol>
+          <li><a href="/introduction/">Documentation</a></li>
+          <li><a href="/demos/">Demo Apps</a></li>
+          <li><a href="/discussion-forum/">Discussion Forum</a></li>
+          <li><a href="https://stackoverflow.com/questions/tagged/codenameone">Stack Overflow</a></li>
+        </ol>
+      </section>
+
+      <section class="cn1-course-module-card">
+        <header>
+          <p class="cn1-course-module-card__eyebrow">Next Step</p>
+          <h2>Build a Production App</h2>
+        </header>
+        <p>After completing the learning paths, move to practical templates and polished demo projects to accelerate your release cycle.</p>
+        <div class="cn1-training-path-card__actions">
+          <a href="/demos/">Explore Demos</a>
+          <a href="/getting-started/">Getting Started</a>
+        </div>
+      </section>
+    </div>
+  </section>
+</article>
+{{- end -}}
