@@ -35,6 +35,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -574,6 +575,11 @@ public class CodenameOneView {
             componentAt = null;
         }
         boolean isPeer = (componentAt instanceof PeerComponent);
+        if (isPeer) {
+            int primaryX = x == null ? (int) event.getX() : x[0];
+            int primaryY = y == null ? (int) event.getY() : y[0];
+            isPeer = !Sheet.isSheetVisibleAt(primaryX, primaryY);
+        }
         boolean consumeEvent = !isPeer || cn1GrabbedPointer;
     
         switch (event.getAction()) {

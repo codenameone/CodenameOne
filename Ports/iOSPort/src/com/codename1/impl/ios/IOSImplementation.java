@@ -36,6 +36,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.geom.Dimension;
@@ -1157,7 +1158,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         Form f = Display.getInstance().getCurrent();
         if (f != null) {
             Component cmp = f.getResponderAt(x, y);
-            return cmp == null || !(cmp instanceof PeerComponent);
+            if (cmp == null || !(cmp instanceof PeerComponent)) {
+                return true;
+            }
+            return Sheet.isSheetVisibleAt(x, y);
         }
         return true;
     }

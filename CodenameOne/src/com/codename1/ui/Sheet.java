@@ -113,6 +113,7 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// 7.0
 public class Sheet extends Container {
+    private static Rectangle[] sheetBoundsList = new Rectangle[0];
     private static final int N = 0;
     private static final int S = 1;
     private static final int E = 2;
@@ -175,6 +176,70 @@ public class Sheet extends Container {
     /// These are set the first time the sheet is shown and used as the base for safe area calculations.
     private int[] originalPadding = null;
     private Form form;
+    private final Rectangle sheetBounds = new Rectangle();
+    private boolean trackSheetBounds;
+    private Rectangle sheetEntry;
+
+    public static boolean isSheetVisibleAt(int x, int y) {
+        Rectangle[] boundsSnapshot = sheetBoundsList;
+        for (Rectangle bounds : boundsSnapshot) {
+            if (bounds.contains(x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void addSheetEntry(Rectangle bounds) {
+        Rectangle[] current = sheetBoundsList;
+        Rectangle[] updated = new Rectangle[current.length + 1];
+        System.arraycopy(current, 0, updated, 0, current.length);
+        updated[current.length] = bounds;
+        sheetBoundsList = updated;
+    }
+
+    private static void removeSheetEntry(Rectangle bounds) {
+        Rectangle[] current = sheetBoundsList;
+        int matches = 0;
+        for (Rectangle existing : current) {
+            if (existing == bounds) { // NOPMD CompareObjectsWithEquals
+                matches++;
+            }
+        }
+        if (matches == 0) {
+            return;
+        }
+        Rectangle[] updated = new Rectangle[current.length - matches];
+        int index = 0;
+        for (Rectangle existing : current) {
+            if (existing != bounds) { // NOPMD CompareObjectsWithEquals
+                updated[index++] = existing;
+            }
+        }
+        sheetBoundsList = updated;
+    }
+
+    private void updateTrackedBounds() {
+        if (!trackSheetBounds) {
+            return;
+        }
+        sheetBounds.setBounds(getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+    }
+
+    private void startTrackingBounds() {
+        trackSheetBounds = true;
+        sheetEntry = sheetBounds;
+        addSheetEntry(sheetEntry);
+        updateTrackedBounds();
+    }
+
+    private void stopTrackingBounds() {
+        trackSheetBounds = false;
+        if (sheetEntry != null) {
+            removeSheetEntry(sheetEntry);
+            sheetEntry = null;
+        }
+    }
 
     /// Creates a new sheet with the specified parent and title.
     ///
@@ -466,6 +531,7 @@ public class Sheet extends Container {
             cnt.revalidate();
 
         }
+        startTrackingBounds();
         if (cnt.getComponentCount() > 0) {
             $(".Sheet", cnt).each(new ComponentClosure() {
                 @Override
@@ -503,6 +569,9 @@ public class Sheet extends Container {
 
             });
             Component existing = cnt.getComponentAt(0);
+            if (existing instanceof Sheet) {
+                ((Sheet) existing).stopTrackingBounds();
+            }
             cnt.replace(existing, this, null);
             cnt.animateLayout(duration);
         } else {
@@ -799,6 +868,7 @@ public class Sheet extends Container {
                     cnt.remove();
                     parent.getComponentForm().revalidateLater();
                     fireCloseEvent(true);
+                    stopTrackingBounds();
 
 
                 }
@@ -806,6 +876,30 @@ public class Sheet extends Container {
             }
         });
 
+    }
+
+    @Override
+    public void setX(int x) {
+        super.setX(x);
+        updateTrackedBounds();
+    }
+
+    @Override
+    public void setY(int y) {
+        super.setY(y);
+        updateTrackedBounds();
+    }
+
+    @Override
+    public void setWidth(int width) {
+        super.setWidth(width);
+        updateTrackedBounds();
+    }
+
+    @Override
+    public void setHeight(int height) {
+        super.setHeight(height);
+        updateTrackedBounds();
     }
 
     /// Gets the parent sheet or null if there is none.
