@@ -1,0 +1,689 @@
+{
+  "source_url": "https://raw.githubusercontent.com/codenameone/CodenameOneLibs/refs/heads/master/CN1Libs.xml",
+  "generated_at_utc": "2026-02-10T09:32:57.367615+00:00",
+  "status": "ok",
+  "error": "",
+  "count": 85,
+  "libs": [
+    {
+      "name": "Admob Fullscreen Ads",
+      "url": "https://github.com/codenameone/admobfullscreen-codenameone",
+      "description": "Admob Fullscreen Ads library, supports iOS and Android",
+      "author": "",
+      "version": "6",
+      "category": ""
+    },
+    {
+      "name": "admob-fullscreen-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "LATEST",
+      "category": "pom"
+    },
+    {
+      "name": "AnimatedGifSupport",
+      "url": "https://github.com/codenameone/AnimatedGifSupport",
+      "description": "Support for Animated GIFs",
+      "author": "",
+      "version": "3",
+      "category": ""
+    },
+    {
+      "name": "app-tracking-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "1.0",
+      "category": "pom"
+    },
+    {
+      "name": "Apple AppTrackingTransparency library",
+      "url": "https://github.com/shannah/cn1-app-tracking",
+      "description": "Thin wrapper around the iOS AppTrackingTransparency API.",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "bluetoothle-codenameone",
+      "url": "https://github.com/codenameone/bluetoothle-codenameone",
+      "description": "Bluetooth LE Library for Codename One apps",
+      "author": "",
+      "version": "11",
+      "category": ""
+    },
+    {
+      "name": "BouncyCastle SDK",
+      "url": "https://github.com/chen-fishbein/bouncy-castle-codenameone-lib",
+      "description": "Bouncy Castle Crypto API for Codename One",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "BraintreeCodenameOne",
+      "url": "https://github.com/codenameone/BraintreeCodenameOne",
+      "description": "Provides Braintree (PayPal) API support for Codename One apps",
+      "author": "",
+      "version": "5",
+      "category": ""
+    },
+    {
+      "name": "Calendar Library",
+      "url": "https://github.com/chen-fishbein/codenameone-calendar",
+      "description": "Allows Codename One applications to use the device calendar.",
+      "author": "",
+      "version": "4",
+      "category": ""
+    },
+    {
+      "name": "Camera Kit",
+      "url": "https://github.com/codenameone/CameraKitCodenameOne/tree/master",
+      "description": "Low level camera access API",
+      "author": "",
+      "version": "9",
+      "category": ""
+    },
+    {
+      "name": "Circle Progress",
+      "url": "https://github.com/chen-fishbein/CN1CircleProgress",
+      "description": "Circle Progress Components",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "CN1 Native Controls",
+      "url": "https://github.com/shannah/cn1-native-controls",
+      "description": "Includes a native select widget that is useful in the Javascript port. May be expanded to include other native widgets.",
+      "author": "",
+      "version": "4",
+      "category": ""
+    },
+    {
+      "name": "cn1-codescan-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "LATEST",
+      "category": "pom"
+    },
+    {
+      "name": "cn1-filechooser",
+      "url": "https://github.com/shannah/cn1-filechooser",
+      "description": "Adds support for a native file chooser for opening files of any specified set of extensions and/or mimetypes.",
+      "author": "",
+      "version": "9",
+      "category": ""
+    },
+    {
+      "name": "CN1-Helper",
+      "url": "https://github.com/diamondobama/cn1-Helper",
+      "description": "A Helper library for basic styling with code in Codename One. This eliminates the need to have endless UIID in your GUI builder",
+      "author": "",
+      "version": "4",
+      "category": ""
+    },
+    {
+      "name": "CN1-Stream",
+      "url": "https://github.com/diamonddevgroup/CN1-Stream",
+      "description": "Stream API from Java 8 rewritten on iterators for Codename One.",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "CN1FontBox",
+      "url": "https://github.com/shannah/CN1FontBox",
+      "description": "Codename One Port of FontBox. Provides TTF font support with added features like stroking, filling, scaling, transforming, etc...",
+      "author": "",
+      "version": "5",
+      "category": ""
+    },
+    {
+      "name": "CN1Image Map component",
+      "url": "https://github.com/shannah/CN1ImageMap",
+      "description": "An image map component for rendering an image with clickable areas.",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "CN1JailbreakDetect",
+      "url": "https://github.com/shannah/CN1JailbreakDetect",
+      "description": "Detect if device is rooted/jailbroken",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "CN1Xataface",
+      "url": "https://github.com/shannah/cn1-xataface",
+      "description": "Web service client for connecting to a MySQL back-end.",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "Codename One Asciidoctor",
+      "url": "https://github.com/shannah/CN1Asciidoctor",
+      "description": "Asciidoc to HTML5 converter for Codename One",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Codename One Cloudinary Support",
+      "url": "https://github.com/shannah/cloudinary-codenameone",
+      "description": "This library adds support for the Cloudinary image management service to Codename One apps. The library itself is a direct port of the Cloudinary Java SDK.",
+      "author": "",
+      "version": "3",
+      "category": ""
+    },
+    {
+      "name": "Codename One CodeScanner Library",
+      "url": "https://github.com/codenameone/cn1-codescan",
+      "description": "This library provides code scanning (QR code and Bar code) support for Codename One",
+      "author": "",
+      "version": "10",
+      "category": ""
+    },
+    {
+      "name": "Codename One Data Access Library",
+      "url": "https://github.com/shannah/cn1-data-access-lib",
+      "description": "Provides a Data access layer for SQLite databases in Codename One.",
+      "author": "",
+      "version": "4",
+      "category": ""
+    },
+    {
+      "name": "Codename One Freshdesk SDK",
+      "url": "http://shannah.github.io/cn1-freshdesk/",
+      "description": "Codename One support for Freshdesk.\\nThis library wraps the native iOS and Android SDKs to provide a single cross-platform Java API\\n that can be used in a Codename One project.",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Codename One GeoViz Library",
+      "url": "https://github.com/shannah/CN1GeoViz",
+      "description": "This library provides support for loading GeoJSON data in a Codename One application. It also provides a component to render the GeoJSON data.",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Codename One Google Native Maps Support",
+      "url": "https://github.com/codenameone/codenameone-google-maps",
+      "description": "Allows Codename One developers to embed native Google Maps on iOS, Android, and Javascript. Uses Google maps in BrowserComponent on simulator and falls back to Codename One\\n MapComponent on UWP.",
+      "author": "",
+      "version": "49",
+      "category": ""
+    },
+    {
+      "name": "Codename One HTML Parser",
+      "url": "https://github.com/shannah/CN1HTMLParser",
+      "description": "A library for parsing HTML to standard XML DOM",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Codename One JSON Library",
+      "url": "https://github.com/shannah/CN1JSON",
+      "description": "A library to read and write JSON in Codename One",
+      "author": "",
+      "version": "5",
+      "category": ""
+    },
+    {
+      "name": "Codename One Media Utilies",
+      "url": "https://github.com/shannah/CN1MediaTools",
+      "description": "Utility classes for working with media",
+      "author": "",
+      "version": "3",
+      "category": ""
+    },
+    {
+      "name": "Codename One MP3 Encoder",
+      "url": "https://github.com/shannah/CN1MP3Encoder",
+      "description": "Adds support for recording MP3 audio in simulator",
+      "author": "",
+      "version": "16",
+      "category": ""
+    },
+    {
+      "name": "Codename One Offline Maps Library",
+      "url": "https://github.com/shannah/CN1OfflineMaps",
+      "description": "MapProvider that works with the Codename One MapComponent class to provide support for offline maps",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Codename One Pubnub SDK",
+      "url": "https://www.pubnub.com/docs/codenameone-java/data-streams-publish-and-subscribe",
+      "description": "Pubnub SDK for Codename One Apps",
+      "author": "",
+      "version": "3",
+      "category": ""
+    },
+    {
+      "name": "Codename One Tar Library",
+      "url": "https://github.com/shannah/CN1JTar",
+      "description": "A library for reading and writing TAR files in Codename One",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "Codename One WebSockets Library",
+      "url": "https://github.com/shannah/cn1-websockets",
+      "description": "This library adds WebSocket client support for Codename One apps.",
+      "author": "",
+      "version": "23",
+      "category": ""
+    },
+    {
+      "name": "Codename One XMLView Library",
+      "url": "https://github.com/shannah/cn1-xmlview",
+      "description": "A codename one UI component for rendering XML.",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "Codename Sockets Library",
+      "url": "https://github.com/shannah/CN1Sockets",
+      "description": "This library was started as an attempt to add sockets support to Codename One. \\nSupports iOS, Android, Blackberry, JavaSE and J2ME.",
+      "author": "",
+      "version": "5",
+      "category": ""
+    },
+    {
+      "name": "codenameone-connectivity",
+      "url": "https://github.com/littlemonkeyltd/codenameone-connectivity",
+      "description": "Simple library for getting basic connection information on codename one",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "CodeRAD",
+      "url": "https://github.com/shannah/CodeRAD",
+      "description": "MVC, Rapid Application Development library",
+      "author": "",
+      "version": "13",
+      "category": ""
+    },
+    {
+      "name": "comScore Analytics",
+      "url": "https://github.com/diamonddevgroup/comScore-CodenameOne",
+      "description": "comScore mobile metrix / analytics support for Codename One",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Core2d",
+      "url": "https://github.com/chen-fishbein/core2d-cn1lib",
+      "description": "2d gaming library",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "Crisp Codename One SDK",
+      "url": "https://github.com/codenameone/CrispCodenameOneSDK",
+      "description": "Integrate Crisp chat and CRM into your app",
+      "author": "",
+      "version": "6",
+      "category": ""
+    },
+    {
+      "name": "data-access-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "LATEST",
+      "category": "pom"
+    },
+    {
+      "name": "Device",
+      "url": "https://github.com/diamonddevgroup/CN1-Device",
+      "description": "A small library to get the market (consumer-friendly) name, model, and manufacturer of devices.",
+      "author": "",
+      "version": "7",
+      "category": ""
+    },
+    {
+      "name": "Drag and Drop from the native desktop OS",
+      "url": "https://github.com/shannah/cn1-native-data-transfer",
+      "description": "Allows the desktop/JavaScript versions to receive files dropped into them",
+      "author": "",
+      "version": "3",
+      "category": ""
+    },
+    {
+      "name": "Dropbox SDK",
+      "url": "https://github.com/chen-fishbein/dropbox-codenameone-sdk",
+      "description": "Dropbox SDK for Codename One Apps",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Embedded Webserver Library",
+      "url": "https://github.com/shannah/CN1Webserver",
+      "description": "Add an embedded web server to Codename One apps.",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "filechooser-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "LATEST",
+      "category": "pom"
+    },
+    {
+      "name": "fingerprint-scanner-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "LATEST",
+      "category": "pom"
+    },
+    {
+      "name": "FingerprintScanner",
+      "url": "https://github.com/codenameone/FingerprintScanner",
+      "description": "Fingerprint/TouchID support",
+      "author": "",
+      "version": "18",
+      "category": ""
+    },
+    {
+      "name": "Flurry Library",
+      "url": "https://github.com/chen-fishbein/flurry-codenameone",
+      "description": "This plugin supports flurry analytics and Interstitial Ads (Full Screen Ads) \\nThe library is implemented for Android and iOS.",
+      "author": "",
+      "version": "3",
+      "category": ""
+    },
+    {
+      "name": "Form to crop and resize your images",
+      "url": "https://github.com/javieranton-zz/PhotoCropper",
+      "description": "Crop and resize your images whatsapp style. Ensures final cropped images have equal width and heights. Resizes to your desired dimensions. Allows for a minimum image size",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "Generic Webservice Client",
+      "url": "https://github.com/shannah/cn1-generic-webservice-client",
+      "description": "Web service client for connecting to a RESTful web service.",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Google Analytics",
+      "url": "https://github.com/Pmovil/cn1libs-native-ga",
+      "description": "Native Google Analytics Library",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "googlemaps-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "LATEST",
+      "category": "pom"
+    },
+    {
+      "name": "Intercom Support",
+      "url": "https://github.com/codenameone/IntercomSupport/",
+      "description": "Adds support for integrating intercom.io for customer support and cross screen insight",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "IRBlaster",
+      "url": "https://github.com/shannah/IRBlaster",
+      "description": "Provides API to use the IR (Infrared) Emitter on Selected Devices",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Japanese text-to-speech (TTS)",
+      "url": "https://github.com/jsfan3/nihonjindes-cn1lib-tts",
+      "description": "Offline Japanese text-to-speech (TTS) for Codename One on Android using Open JTalk with a fine-tuned Mei voice",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Kotlin support for Codename One",
+      "url": "https://github.com/shannah/codenameone-kotlin",
+      "description": "Adds support for Kotlin in Codename One apps. (Requires IntelliJ IDEA)",
+      "author": "",
+      "version": "4",
+      "category": ""
+    },
+    {
+      "name": "Linguist",
+      "url": "https://github.com/ericlight/CN1Linguist",
+      "description": "Use this library to internationalize/localize your application quickly. It must be use with the CodenameOne Linguist desktop software.",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Multipart Upload text file request and track upload progress",
+      "url": "https://github.com/javieranton-zz/ProgressUploader",
+      "description": "This lib will work as is but it's more of an example of how this can be achieved so that you can implement your own code. For example you might want to upload non-text (binary) files instead of text files. Or you might wat to upload files + parameters (there is a commented example in the code)",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Native Logs Reader",
+      "url": "https://github.com/jsfan3/CN1Libs-NativeLogsReader",
+      "description": "A small library to get easily the native logs of Android and iOS.",
+      "author": "",
+      "version": "3",
+      "category": ""
+    },
+    {
+      "name": "Objective-C Bridge",
+      "url": "https://github.com/shannah/CN1ObjCBridge",
+      "description": "Access Objective-C SDKs directly from Java",
+      "author": "",
+      "version": "5",
+      "category": ""
+    },
+    {
+      "name": "Parse4CN1",
+      "url": "https://github.com/sidiabale/parse4cn1",
+      "description": "Parse4CN1 - Codename One Library for Parse. Currrent version matches release v3.1.1",
+      "author": "",
+      "version": "3110",
+      "category": ""
+    },
+    {
+      "name": "QR Code generator",
+      "url": "https://github.com/rwanghk/QRMaker",
+      "description": "A partial port of Zxing for j2me to CN1 for generating QR code",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "QRScanner",
+      "url": "https://github.com/codenameone/QRScanner",
+      "description": "CN1Lib scanning barcodes and QR codes in Codename One apps on Android and iOS.",
+      "author": "",
+      "version": "12",
+      "category": ""
+    },
+    {
+      "name": "qrscanner-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "LATEST",
+      "category": "pom"
+    },
+    {
+      "name": "RAD Chat Room",
+      "url": "https://github.com/shannah/RADChatRoom",
+      "description": "A full featured Chat Room UI Component",
+      "author": "",
+      "version": "9",
+      "category": ""
+    },
+    {
+      "name": "SalesForce SDK",
+      "url": "https://www.codenameone.com/blog/combining-salesforce-and-codename-one.html",
+      "description": "SalesForce SDK for Codename One",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Scandit Codescanner",
+      "url": "https://github.com/shannah/cn1-codescan-scandit",
+      "description": "This library provides code scanning (QR code and Bar code) using the Scandit SDK. NOTE: This library requires you to install the iOS and Android native SDKs into your app separately. See installation instructions on website.",
+      "author": "",
+      "version": "5",
+      "category": ""
+    },
+    {
+      "name": "sensors-codenameone",
+      "url": "https://github.com/chen-fishbein/sensors-codenameone",
+      "description": "Sensors library for Codename One, implemented on Android and iOS",
+      "author": "",
+      "version": "3",
+      "category": ""
+    },
+    {
+      "name": "Server data caching library",
+      "url": "https://github.com/jegesh/cn1-object-cacher",
+      "description": "Easily enable and control device cache for remote data",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Shared Files Library",
+      "url": "https://github.com/shannah/CodeRAD",
+      "description": "API to access shared files. (Currently Android only)",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "sharedfiles-lib",
+      "url": "",
+      "description": "",
+      "author": "",
+      "version": "LATEST",
+      "category": "pom"
+    },
+    {
+      "name": "Sign-in with Apple Support",
+      "url": "https://github.com/shannah/cn1-applesignin",
+      "description": "Add sign-in with apple support",
+      "author": "",
+      "version": "4",
+      "category": ""
+    },
+    {
+      "name": "SMSActivation",
+      "url": "https://github.com/codenameone/SMSActivation/",
+      "description": "Implements the full activation via SMS user signup process",
+      "author": "",
+      "version": "9",
+      "category": ""
+    },
+    {
+      "name": "SMSInterceptor",
+      "url": "https://github.com/diamonddevgroup/SMSInterceptor",
+      "description": "Intercept incoming SMS on supported platforms in Codename One apps",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "SpatiaLite Database",
+      "url": "https://github.com/shannah/cn1-spatialite",
+      "description": "Provides SpatiaLite database support for Codename One.",
+      "author": "",
+      "version": "5",
+      "category": ""
+    },
+    {
+      "name": "SSL Certificate Fingerprint",
+      "url": "https://github.com/codenameone/SSLCertificateFingerprint/tree/master",
+      "description": "Checks that the certificate of a server matches a specific value",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "StartApp Fullscreen Ads",
+      "url": "https://github.com/chen-fishbein/startapp-codenameone",
+      "description": "StartApp Fullscreen Ads library, supports iOS and Android",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Telephony",
+      "url": "https://github.com/Pmovil/Telephony",
+      "description": "Simcard information support for codename one applications\\nThis library can retrieve MCC, MNC, ISO country code and carrier name information from the simcard\\nCurrently supported in Android and iOS.",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Video Optimizer",
+      "url": "https://github.com/jsfan3/CN1Libs-VideoOptimizer/",
+      "description": "It allows to get info about a video (duration, bitrate, size), get a preview image of a video and optimize a video for fast upload. It can also be used to check if a given file is a supported video.",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "Wowza Live Streaming Events",
+      "url": "https://github.com/jsfan3/CN1Libs-WowzaLiveStreaming/",
+      "description": "The purpose of this CN1Lib is to add live streaming capabilities to iOS and Android Codename One apps, hiding all the complexities and reducing the effort.",
+      "author": "",
+      "version": "1",
+      "category": ""
+    },
+    {
+      "name": "Zip Support",
+      "url": "https://github.com/codenameone/ZipSupport",
+      "description": "This is a Codename One library for Zip support based on the code from the zipme project",
+      "author": "",
+      "version": "2",
+      "category": ""
+    },
+    {
+      "name": "ZXing Library",
+      "url": "https://github.com/rwanghk/ZXing-CN1",
+      "description": "A port of ZXing Barcode scanner / generator to CN1",
+      "author": "",
+      "version": "1",
+      "category": ""
+    }
+  ]
+}
