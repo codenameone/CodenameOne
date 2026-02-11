@@ -563,22 +563,35 @@ There are no explicit code changes needed for this functionality to "just work".
 
 TIP: Some behaviors that never occurred on Android but were perfectly legal in the past might start occurring with the switch to the new API. E.g. the location manager might be null and your app must always be ready to deal with such a situation
 
-When permission is requested a user will be seamlessly prompted/warned, Codename One has builtin text to control such prompts but you might want to customize the text. You can customize permission text via the `Display` properties e.g. to customize the text of the contacts permission we can do something such as:
+When permission is requested a user will be seamlessly prompted/warned. You can customize the permission text via `Display` properties. E.g. to customize the rationale text of the contacts permission:
 
 [source,java]
 ----
 include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/PermissionSnippets.java[tag=permissionPrompt,indent=0]
 ----
 
-This is optional as there is a default value defined. You can define this once in the `init(Object)` method but for some extreme cases permission might be needed for different things e.g. you might ask for this permission with one reason at one point in the app and with a different reason at another point in the app.
+The Android port also checks `UIManager.localize()` for localized values before falling back to `Display` properties. You can provide localized strings for the permission body and dialog buttons/title using keys based on the permission name:
 
-The following permission keys are supported: "android.permission.READ_PHONE_STATE"
-`android.permission.WRITE_EXTERNAL_STORAGE`,
-`android.permission.ACCESS_FINE_LOCATION`,
-`android.permission.SEND_SMS`,
-`android.permission.READ_CONTACTS`,
-`android.permission.WRITE_CONTACTS`,
-`android.permission.RECORD_AUDIO`.
+[source,java]
+----
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/PermissionSnippets.java[tag=permissionPromptLocalization,indent=0]
+----
+
+For example, if the permission key is `android.permission.READ_CONTACTS`, you can localize these keys:
+
+* `android.permission.READ_CONTACTS` (dialog body)
+* `android.permission.READ_CONTACTS.title`
+* `android.permission.READ_CONTACTS.askAgain`
+* `android.permission.READ_CONTACTS.dontAsk`
+
+The same pattern applies to other permissions. `android.permission.ACCESS_BACKGROUND_LOCATION` also supports:
+`android.permission.ACCESS_BACKGROUND_LOCATION.settings`,
+`android.permission.ACCESS_BACKGROUND_LOCATION.cancel`,
+`android.permission.ACCESS_BACKGROUND_LOCATION.explanation_title`,
+`android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body`, and
+`android.permission.ACCESS_BACKGROUND_LOCATION.ok`.
+
+This is optional as there is a default value defined. You can define this once in the `init(Object)` method but for some extreme cases permission might be needed for different things e.g. you might ask for this permission with one reason at one point in the app and with a different reason at another point in the app.
 
 ===== Simulating Prompts
 
@@ -604,6 +617,15 @@ include::../demos/android/src/main/java/com/codenameone/developerguide/advancedt
 ----
 
 This will prompt the user with the native UI and later on with the fallback option as described above. Notice that the `checkForPermission` method is a blocking method and it will return when there is a final conclusion on the subject. It uses `invokeAndBlock` and can be safely invoked on the event dispatch thread without concern.
+
+By default, fallback prompts are displayed using Codename One's `Dialog.show(...)`. If you are writing native Android code and need to use your own prompt implementation, you can install a custom callback:
+
+[source,java]
+----
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/PermissionSnippets.java[tag=androidPermissionPromptCallback,indent=0]
+----
+
+Pass `null` to `AndroidNativeUtil.setPermissionPromptCallback()` to restore the default behavior.
 
 === On Device Debugging
 
