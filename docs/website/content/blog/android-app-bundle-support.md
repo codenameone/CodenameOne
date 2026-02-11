@@ -13,11 +13,9 @@ description: We have added Android App Bundle support which will become the requ
 
 We have added Android App Bundle support which will become the required format for submitting apps to Google Play.
 
-![](https://www.codenameone.com/wp-content/uploads/2021/05/Google-App-Bundle-Support.jpg)
+A few months ago, we added Android App Bundle support and forgot to tell anyone... These things sometimes happen in a fast-moving startup… Well, better late than never.
 
-A few months ago, we added Android App Bundle support and forgot to tell anyone… These things happen sometimes in a fast moving startup… Well, better late than never.
-
-To try the App Bundle support use the build hint: android.appBundle=true
+To try the App Bundle support, use the build hint: android.appBundle=true
 
 This will produce the regular APK and the app bundle file which you should be able to upload to Google.
 

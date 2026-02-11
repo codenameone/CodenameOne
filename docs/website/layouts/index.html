@@ -291,60 +291,72 @@
 {{ partial "cn1-social-proof.html" . }}
 
 <section class="cn1-blog">
-  <h2>Blog</h2>
+  {{- $blogSection := site.GetPage "section" "blog" -}}
+  <h2>{{ if $blogSection }}<a href="{{ $blogSection.RelPermalink }}">Blog</a>{{ else }}Blog{{ end }}</h2>
   <div class="cn1-carousel" data-carousel>
     <div class="cn1-carousel__viewport">
       <div class="cn1-carousel__track">
+        {{- $posts := first 9 (sort (where site.RegularPages "Section" "blog") "Date" "desc") -}}
+        {{- $chunkSize := 3 -}}
+        {{- $total := len $posts -}}
+        {{- if gt $total 0 -}}
+          {{- range $i, $post := $posts -}}
+            {{- if eq (mod $i $chunkSize) 0 -}}
+        <div class="cn1-carousel__slide {{ if eq $i 0 }}is-active{{ end }}">
+          <div class="cn1-blog__grid">
+            {{- end -}}
+            {{- $thumb := "" -}}
+            {{- with $post.Params.cover.image -}}
+              {{- $thumb = . -}}
+            {{- else -}}
+              {{- with $post.Params.thumbnail -}}
+                {{- $thumb = . -}}
+              {{- else -}}
+                {{- with $post.Params.image -}}
+                  {{- $thumb = . -}}
+                {{- else -}}
+                  {{- with $post.Params.images -}}
+                    {{- $thumb = index . 0 -}}
+                  {{- end -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
+            {{- if not $thumb -}}
+              {{- $imgMatch := findRESubmatch `!\[[^\]]*\]\(([^ )]+)` $post.RawContent 1 -}}
+              {{- if gt (len $imgMatch) 0 -}}
+                {{- $thumb = index (index $imgMatch 0) 1 -}}
+              {{- end -}}
+            {{- end -}}
+            {{- if not $thumb -}}
+              {{- $thumb = "/uploads/CN1-Hero-illustration-1-1024x787.png" -}}
+            {{- end -}}
+            <article>
+              <a href="{{ $post.RelPermalink }}"><img src="{{ $thumb }}" alt="{{ $post.Title }}"></a>
+              <div>
+                <h3><a href="{{ $post.RelPermalink }}">{{ $post.Title }}</a></h3>
+                <p><i class="far fa-clock"></i> {{ $post.Date | time.Format "January 2, 2006" }}</p>
+              </div>
+            </article>
+            {{- $endOfChunk := eq (mod (add $i 1) $chunkSize) 0 -}}
+            {{- $isLast := eq (add $i 1) $total -}}
+            {{- if or $endOfChunk $isLast -}}
+          </div>
+        </div>
+            {{- end -}}
+          {{- end -}}
+        {{- else -}}
         <div class="cn1-carousel__slide is-active">
           <div class="cn1-blog__grid">
             <article>
-              <a href="https://www.codenameone.com/blog/how-to-build-ios-apps-with-java.html"><img src="/uploads/Android-Architecture.png" alt="Android Push Changes"></a>
+              <a href="/blog/"><img src="/uploads/CN1-Hero-illustration-1-1024x787.png" alt="Codename One Blog"></a>
               <div>
-                <h3><a href="https://www.codenameone.com/blog/how-to-build-ios-apps-with-java.html">Android Push Changes</a></h3>
-                <p><i class="far fa-clock"></i> June 8, 2024</p>
-              </div>
-            </article>
-            <article>
-              <a href="https://www.codenameone.com/blog/new-property-sheet-and-javadocs.html"><img src="/uploads/Property-Sheet-and-JavaDocs-Codename-One.jpg" alt="Codename One Shared Files Library"></a>
-              <div>
-                <h3><a href="https://www.codenameone.com/blog/new-property-sheet-and-javadocs.html">Codename One Shared Files Library</a></h3>
-                <p><i class="far fa-clock"></i> July 26, 2023</p>
-              </div>
-            </article>
-            <article>
-              <a href="https://www.codenameone.com/blog/how-to-build-ios-apps-with-java.html"><img src="/uploads/Build-iOS-apps-with-Java.png" alt="How to Build iOS Apps with Java"></a>
-              <div>
-                <h3><a href="https://www.codenameone.com/blog/how-to-build-ios-apps-with-java.html">How to Build iOS Apps with Java</a></h3>
-                <p><i class="far fa-clock"></i> June 24, 2022</p>
+                <h3><a href="/blog/">Blog posts are coming soon</a></h3>
+                <p><i class="far fa-clock"></i> Stay tuned</p>
               </div>
             </article>
           </div>
         </div>
-        <div class="cn1-carousel__slide">
-          <div class="cn1-blog__grid">
-            <article>
-              <a href="https://www.codenameone.com/blog/async-debugging-with-intellij-idea.html"><img src="/uploads/Async-Debugging-with-IntelliJ-IDEA-Codename-One.jpg" alt="Async Debugging with IntelliJ IDEA"></a>
-              <div>
-                <h3><a href="https://www.codenameone.com/blog/async-debugging-with-intellij-idea.html">Async Debugging with IntelliJ IDEA</a></h3>
-                <p><i class="far fa-clock"></i> April 11, 2022</p>
-              </div>
-            </article>
-            <article>
-              <a href="https://www.codenameone.com/blog/new-property-sheet-and-javadocs.html"><img src="/uploads/Property-Sheet-and-JavaDocs-Codename-One.jpg" alt="New Property Sheet and JavaDocs"></a>
-              <div>
-                <h3><a href="https://www.codenameone.com/blog/new-property-sheet-and-javadocs.html">New Property Sheet and JavaDocs</a></h3>
-                <p><i class="far fa-clock"></i> April 6, 2022</p>
-              </div>
-            </article>
-            <article>
-              <a href="https://www.codenameone.com/blog/creating-new-projects-with-old-templates.html"><img src="/uploads/Creating-New-Projects-with-Old-Templates-Codename-One.jpg" alt="Creating New Projects with Old Templates"></a>
-              <div>
-                <h3><a href="https://www.codenameone.com/blog/creating-new-projects-with-old-templates.html">Creating New Projects with Old Templates</a></h3>
-                <p><i class="far fa-clock"></i> March 29, 2022</p>
-              </div>
-            </article>
-          </div>
-        </div>
+        {{- end -}}
       </div>
     </div>
     <div class="cn1-carousel__dots" aria-label="Blog pages"></div>
