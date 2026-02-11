@@ -2,75 +2,151 @@
 title: "Development Environment"
 date: 2020-08-31
 slug: "development-environment"
+description: "Build Codename One apps in your IDE of choice with a modern workflow for simulation, debugging, and native app builds."
+ShowToc: true
 ---
 
-- Home
-- Development Environment
+Build Codename One apps in the IDE you already know. Keep a single workflow from first prototype to native app delivery.
 
-## Development Environment
+![Development Environment Overview](/uploads/Group-2326.svg)
 
-Use your favourite IDE with Codename One to maximize Productivity
+## Why this workflow works
 
-## The Codename One development  
-environment is your IDE.
+{{< rawhtml >}}
+<div class="cn1-dev-value-grid" aria-label="Development workflow benefits">
+  <article class="cn1-dev-value-item">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="4" y="5" width="16" height="5" rx="1.5"></rect>
+      <rect x="6" y="11" width="12" height="4" rx="1.2"></rect>
+      <rect x="8" y="16" width="8" height="3" rx="1"></rect>
+    </svg>
+    <h3>One Codebase</h3>
+    <p>Develop once in Java and deliver across mobile, desktop, and web targets.</p>
+  </article>
+  <article class="cn1-dev-value-item">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M8 4h8"></path>
+      <path d="M10 4v6l-3.5 5.5A2 2 0 0 0 8.2 19h7.6a2 2 0 0 0 1.7-3.5L14 10V4"></path>
+      <path d="M9.2 14.5h5.6"></path>
+      <path d="M10.2 16.5h3.6"></path>
+    </svg>
+    <h3>Fast Iteration</h3>
+    <p>Use simulator, debugger, and live styling loops to shorten feedback time.</p>
+  </article>
+  <article class="cn1-dev-value-item">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M13 4c4 1 6 4 7 7l-4 1-4-4 1-4z"></path>
+      <path d="M12 8 7 13"></path>
+      <path d="M7 13c-1.5 0-3 1-3 3v2h2c2 0 3-1.5 3-3"></path>
+      <circle cx="15.8" cy="8.2" r="1.2"></circle>
+    </svg>
+    <h3>Native Delivery</h3>
+    <p>Generate Android and iOS native apps from one project and one team flow.</p>
+  </article>
+</div>
+{{< /rawhtml >}}
 
-The plugin provides all of the tools that you need to  
-build gorgeous native apps in NetBeans. 
+## Supported IDEs
 
-## Select Your IDE:
+{{< rawhtml >}}
+<div class="cn1-ide-strip" aria-label="Supported IDEs">
+  <div class="cn1-ide-item">
+    <img src="/uploads/intellij-idea-1-logo-png-transparent@2x.png" alt="IntelliJ IDEA" loading="lazy">
+    <span>IntelliJ IDEA</span>
+  </div>
+  <div class="cn1-ide-item">
+    <img src="/uploads/vscode.png" alt="VS Code" loading="lazy">
+    <span>VS Code</span>
+  </div>
+  <div class="cn1-ide-item">
+    <img src="/uploads/eclipse-11-logo-png-transparent@2x.png" alt="Eclipse" loading="lazy">
+    <span>Eclipse</span>
+  </div>
+  <div class="cn1-ide-item">
+    <img src="/uploads/netbeans.png" alt="NetBeans" loading="lazy">
+    <span>NetBeans</span>
+  </div>
+</div>
+{{< /rawhtml >}}
 
-![](/uploads/intellij-idea-1-logo-png-transparent.png)
+## From first project to native app
 
-### IntelliJ/IDEA
+{{< rawhtml >}}
+<div class="cn1-flow-stack">
+  <section class="cn1-step-card">
+    <div class="cn1-step-copy">
+      <span class="cn1-step-kicker">Step 1</span>
+      <h3>Create the project</h3>
+      <p>Scaffold a new project using the Codename One Initializr.</p>
+    </div>
+    <div class="cn1-step-media">
+      <img src="/blog/moving-to-maven/codenameone-initializr-screenshot.png" alt="Create project" loading="lazy">
+    </div>
+  </section>
 
-![](/uploads/eclipse-11-logo-png-transparent-1.png)
+  <section class="cn1-step-card cn1-step-card--reverse">
+    <div class="cn1-step-copy">
+      <span class="cn1-step-kicker">Step 2</span>
+      <h3>Run in simulator</h3>
+      <p>Test forms, flows, and behavior early so design and logic stay aligned throughout development.</p>
+    </div>
+    <div class="cn1-step-media">
+      <img src="/uploads/Simulator-Skins.png" alt="Run in simulator" loading="lazy">
+    </div>
+  </section>
 
-### Eclipse
+  <section class="cn1-step-card">
+    <div class="cn1-step-copy">
+      <span class="cn1-step-kicker">Step 3</span>
+      <h3>Debug and refine</h3>
+      <p>Trace issues in your IDE and validate fixes quickly to keep development velocity high.</p>
+    </div>
+    <div class="cn1-step-media">
+      <img src="/uploads/NetBeans-ApplyCodeChanges.png" alt="Debug and refine" loading="lazy">
+    </div>
+  </section>
 
-![](/uploads/netbeans.png)
+  <section class="cn1-step-card cn1-step-card--reverse">
+    <div class="cn1-step-copy">
+      <span class="cn1-step-kicker">Step 4</span>
+      <h3>Build native apps</h3>
+      <p>Package and ship platform-native deliverables for Android and iOS from the same project.</p>
+    </div>
+    <div class="cn1-step-media">
+      <img src="/uploads/advanced_build.png" alt="Build native apps" loading="lazy">
+    </div>
+  </section>
+</div>
+{{< /rawhtml >}}
 
-### NetBeans
+## Design and polish
 
-### New Project Wizard
+{{< rawhtml >}}
+<div class="cn1-highlight-pair">
+  <div class="cn1-highlight-copy">
+    <h4>GUI Builder</h4>
+    <p>Compose screens visually where it accelerates delivery, then continue refining behavior in code.</p>
+  </div>
+  <div class="cn1-highlight-media">
+    <img src="/uploads/GUIBuilder.png" alt="GUI Builder" loading="lazy">
+  </div>
+</div>
 
-Use the “Codename One Application” project type in  
-the new project wizard. Select from existing app  
-templates to give you a jump start on your beautiful  
-native app. Or select a bare-bones starting point with a  
-simple “Hello World” message.
+<div class="cn1-highlight-pair">
+  <div class="cn1-highlight-copy">
+    <h4>CSS Live Update</h4>
+    <p>Update styles and immediately validate visual changes in the simulator to speed up polish and theming work.</p>
+  </div>
+  <div class="cn1-highlight-media">
+    <img src="/uploads/Netbeans-CSS-LiveUpdate-0.5PTS-24fps.png" alt="CSS Live Update" loading="lazy">
+  </div>
+</div>
+{{< /rawhtml >}}
 
-### Test In the Simulator
+## Continue Exploring
 
-Press “Run” to launch your app in the Codename One simulator. Select from a comprehensive list of skins to see how your app will look on the actual device.
-
-[Learn More](https://beta.codenameone.com/codename-one-simulator.html) 
-
-### Debug Your App
-
-Press “Debug” to launch your app in the Codename One simulator, and debug it right inside NetBeans . Add break-points and make live code changes that apply immediately inside the simulator.
-
-[Learn More](https://beta.codenameone.com/codename-one-simulator.html) 
-
-### Build Your App
-
-Press “Send iOS Appstore Build” to send your app to our cloud build servers, where they will compile it down to native code using the official platform tool-chains, and give you back an appstore-ready app. The “Codename One” menu includes build targets for all major mobile platforms, and even a few that aren’t mobile.
-
-[Learn More](https://beta.codenameone.com/codename-one-simulator.html) 
-
-### Install Add-Ons
-
-Browse through the add-ons directory to find a wide assortment of plugins developed by both Codename One and third-party developers. Some notable “cn1libs” include Google Maps support, Websocket Support, and Parse support.
-
-[Learn More](https://beta.codenameone.com/codename-one-simulator.html) 
-
-### Design Views in the GUI Builder
-
-Use the GUI builder to help you layout complex views in your app via drag and drop. Set the style and positioning of your components to be exactly the way you want them.
-
-[Learn More](https://beta.codenameone.com/codename-one-simulator.html) 
-
-### CSS Live Update
-
-Use CSS to define styles such as borders, fonts, colors, padding, and margin. Make a change to your app’s stylesheet and watch as the app instantly updates in the simulator.
-
-[Learn More](https://beta.codenameone.com/codename-one-simulator.html)
+- [Getting Started](/getting-started/)
+- [Developing in Codename One](/developing-in-codename-one/)
+- [Codename One Simulator](/codename-one-simulator/)
+- [Browse CN1libs](/cn1libs/)
+- [Developer Guide](/developer-guide.html)
