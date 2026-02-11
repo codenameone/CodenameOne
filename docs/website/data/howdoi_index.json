@@ -1,0 +1,345 @@
+[
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-create-a-9-piece-image-border.html",
+    "title": "CUSTOMIZE COMPONENT BORDERS AND BACKGROUNDS",
+    "excerpt": "The 9-piece image border is a cornerstone tool for theme design",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/10/Mask-Group-7.png",
+    "categories": [
+      "basic",
+      "ui"
+    ],
+    "slug": "how-do-i-create-a-9-piece-image-border",
+    "youtube_id": "ACsZ8qiwR8Q"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-create-a-basic-hello-world-application-send-it-to-my-device-using-intellij-idea.html",
+    "title": "CREATE A BASIC HELLO WORLD APPLICATION & SEND IT TO MY DEVICE USING INTELLIJ/IDEA",
+    "excerpt": "Getting started guide for IntelliJ developers",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-1-1.jpg",
+    "categories": [
+      "basic",
+      "ui"
+    ],
+    "slug": "how-do-i-create-a-basic-hello-world-application-send-it-to-my-device-using-intellij-idea",
+    "youtube_id": "oR3KHYf5OrY"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-create-a-simple-theme.html",
+    "title": "CREATE A SIMPLE THEME",
+    "excerpt": "Create or customize a theme for your application",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-2-1.jpg",
+    "categories": [
+      "basic",
+      "featured",
+      "ui"
+    ],
+    "slug": "how-do-i-create-a-simple-theme",
+    "youtube_id": "cxllJwt10VU"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage.html",
+    "title": "WORK WITH MULTI IMAGES AND DEVICE DENSITIES",
+    "excerpt": "Understand the complexity of phone/tablet images",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-3-1.jpg",
+    "categories": [
+      "basic",
+      "ui"
+    ],
+    "slug": "how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage",
+    "youtube_id": "sK-u1TBWFX8"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-get-repeatable-builds-build-against-a-consistent-version-of-codename-one-use-the-versioning-feature.html",
+    "title": "GET REPEATABLE BUILDS? BUILD AGAINST A CONSISTENT VERSION OF CODENAME ONE? USE THE VERSIONING FEATURE?",
+    "excerpt": "Versioning allows us to build against a point release and get stability/consistency over time",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-4-1.jpg",
+    "categories": [
+      "pro"
+    ],
+    "slug": "how-do-i-get-repeatable-builds-build-against-a-consistent-version-of-codename-one-use-the-versioning-feature",
+    "youtube_id": "w7xvlw3rI6Y"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-positioning-components-using-layout-managers.html",
+    "title": "LAYOUT BASICS",
+    "excerpt": "Determine where components are placed especially when dealing with varied screen sizes/orientations",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-5-1.jpg",
+    "categories": [
+      "basic",
+      "featured",
+      "ui"
+    ],
+    "slug": "how-do-i-positioning-components-using-layout-managers",
+    "youtube_id": "4D_KUa2qv2o"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-push-notification-send-server-push-messages.html",
+    "title": "USE PUSH NOTIFICATION SEND SERVER PUSH MESSAGES?",
+    "excerpt": "Codename One unifies the push architecture for the various platforms under a single API",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-6-1.jpg",
+    "categories": [
+      "pro"
+    ],
+    "slug": "how-do-i-use-push-notification-send-server-push-messages",
+    "youtube_id": "8wzBpEp81Kc"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc.html",
+    "title": "USE THE INCLUDE SOURCES FEATURE TO DEBUG THE NATIVE CODE ON IOS/ANDROID ETC.",
+    "excerpt": "The source is useful for debugging on device, looking under the hood and writing native interfaces",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-7-1.jpg",
+    "categories": [
+      "pro"
+    ],
+    "slug": "how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc",
+    "youtube_id": "6oTy-LcTm0s"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-create-gorgeous-sidemenu.html",
+    "title": "CREATE A GORGEOUS SIDEMENU",
+    "excerpt": "Great UI needs great navigational interface",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-8-1.jpg",
+    "categories": [
+      "basic",
+      "featured",
+      "ui"
+    ],
+    "slug": "how-do-i-create-gorgeous-sidemenu",
+    "youtube_id": "99DAeP9LG6c"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-desktop-javascript-ports.html",
+    "title": "USE THE DESKTOP AND JAVASCRIPT PORTS",
+    "excerpt": "Build apps that run in PC\u2019s and Macs",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-9-1.jpg",
+    "categories": [
+      "pro"
+    ],
+    "slug": "how-do-i-use-desktop-javascript-ports",
+    "youtube_id": "hCjmHoktlrU"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-access-native-device-functionality-invoke-native-interfaces.html",
+    "title": "ACCESS NATIVE DEVICE FUNCTIONALITY? INVOKE NATIVE INTERFACES?",
+    "excerpt": "How to integrate native iOS, Android etc. functionality into your Codename One app without sacrificing the portability of the whole app",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-10-1.jpg",
+    "categories": [
+      "advanced"
+    ],
+    "slug": "how-do-i-access-native-device-functionality-invoke-native-interfaces",
+    "youtube_id": "2xKvvv7XoVQ"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-create-a-list-of-items-the-easy-way.html",
+    "title": "CREATE A LIST OF ITEMS",
+    "excerpt": "Infinite lists of items are powerful tools",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-11-1.jpg",
+    "categories": [
+      "basic",
+      "ui"
+    ],
+    "slug": "how-do-i-create-a-list-of-items-the-easy-way",
+    "youtube_id": "0m7Bay4g93k"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html",
+    "title": "LOCALIZE/TRANSLATE MY APPLICATION? APPLY I18N/L10N (INTERNATIONALIZATION/LOCALIZATION) TO MY APP?",
+    "excerpt": "Codename One features seamless localization and BiDi RTL support",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-12-1.jpg",
+    "categories": [
+      "basic",
+      "ui"
+    ],
+    "slug": "how-do-i-localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app",
+    "youtube_id": "32mkZymqa6E"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-crash-protection-get-device-logs.html",
+    "title": "USE CRASH PROTECTION? GET DEVICE LOGS?",
+    "excerpt": "Track down issues that occur on the device or in production using these tools",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-13-1.jpg",
+    "categories": [
+      "pro"
+    ],
+    "slug": "how-do-i-use-crash-protection-get-device-logs",
+    "youtube_id": "C3PLjAWQ-XA"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-debug-on-an-android-device.html",
+    "title": "DEBUG A CODENAME ONE APPLICATION ON AN ANDROID DEVICE",
+    "excerpt": "Debugging on a device using the Android Studio IDE",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-14.jpg",
+    "categories": [
+      "advanced",
+      "debugging"
+    ],
+    "slug": "how-do-i-debug-on-an-android-device",
+    "youtube_id": "008AK1GfHA8"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-cloud-connect.html",
+    "title": "USE CLOUD CONNECT",
+    "excerpt": "Instantly preview your work on multiple devices",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-15.jpg",
+    "categories": [
+      "basic",
+      "io"
+    ],
+    "slug": "how-do-i-use-cloud-connect",
+    "youtube_id": "NVPIXnkoxv0"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-http-sockets-webservices-websockets.html",
+    "title": "USE HTTP, SOCKETS, WEBSERVICES AND WEBSOCKETS",
+    "excerpt": "Networking options explained",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-17.jpg",
+    "categories": [
+      "basic",
+      "io"
+    ],
+    "slug": "how-do-i-use-http-sockets-webservices-websockets",
+    "youtube_id": "-M957AAi-vk"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-offline-build.html",
+    "title": "USE OFFLINE BUILD",
+    "excerpt": "Build without the cloud build servers",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-18.jpg",
+    "categories": [
+      "pro"
+    ],
+    "slug": "how-do-i-use-offline-build",
+    "youtube_id": "IqsUSCgSVTo"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-properties-to-speed-development.html",
+    "title": "USE PROPERTIES TO SPEED DEVELOPMENT",
+    "excerpt": "Simplify UI, Database/Storage and Parsing code",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-19.jpg",
+    "categories": [
+      "basic",
+      "io",
+      "ui"
+    ],
+    "slug": "how-do-i-use-properties-to-speed-development",
+    "youtube_id": "77N2t2n8rbQ"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-use-storage-file-system-sql.html",
+    "title": "USE STORAGE, FILE SYSTEM AND SQL",
+    "excerpt": "retain application data in Codename One",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-20.jpg",
+    "categories": [
+      "basic",
+      "io"
+    ],
+    "slug": "how-do-i-use-storage-file-system-sql",
+    "youtube_id": "_EXEN52wQvs"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-create-a-basic-hello-world-application-send-it-to-my-device-using-eclipse.html",
+    "title": "CREATE A BASIC HELLO WORLD APPLICATION & SEND IT TO MY DEVICE USING ECLIPSE",
+    "excerpt": "Getting started guide for Eclipse developers",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-21.jpg",
+    "categories": [
+      "basic",
+      "ui"
+    ],
+    "slug": "how-do-i-create-a-basic-hello-world-application-send-it-to-my-device-using-eclipse",
+    "youtube_id": "fmNpMFLwABA"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-create-a-basic-hello-world-application-send-it-to-my-device-using-netbeans.html",
+    "title": "CREATE A BASIC HELLO WORLD APPLICATION & SEND IT TO MY DEVICE USING NETBEANS",
+    "excerpt": "Getting started guide for NetBeans developers",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-21.jpg",
+    "categories": [
+      "basic",
+      "featured",
+      "ui"
+    ],
+    "slug": "how-do-i-create-a-basic-hello-world-application-send-it-to-my-device-using-netbeans",
+    "youtube_id": "73d65cvyQv4"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-debug-into-codename-one-source-modify-it-contribute-it-back.html",
+    "title": "DEBUG INTO CODENAME ONE SOURCE, MODIFY IT & CONTRIBUTE IT BACK",
+    "excerpt": "Use the sources on github, to improve your app, learn & contribute",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-22.jpg",
+    "categories": [
+      "advanced",
+      "debugging"
+    ],
+    "slug": "how-do-i-debug-into-codename-one-source-modify-it-contribute-it-back",
+    "youtube_id": "2nD75pODPWk"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-access-remote-webservices-perform-operations-on-the-server.html",
+    "title": "ACCESS REMOTE WEBSERVICES? PERFORM OPERATIONS ON THE SERVER?",
+    "excerpt": "Invoke server functionality from the client side using the Codename One webservice wizard",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-23.jpg",
+    "categories": [
+      "io"
+    ],
+    "slug": "how-do-i-access-remote-webservices-perform-operations-on-the-server",
+    "youtube_id": "sUhpCwd0YJg"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-create-an-ios-provisioning-profile.html",
+    "title": "CREATE AN IOS PROVISIONING PROFILE",
+    "excerpt": "Signing & provisioning on iOS is a bit painful, hopefully this will aleviate some of the pain",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-24.jpg",
+    "categories": [
+      "featured",
+      "signing"
+    ],
+    "slug": "how-do-i-create-an-ios-provisioning-profile",
+    "youtube_id": "OWHizrNyizQ"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools.html",
+    "title": "FIND PROBLEMS IN MY APPLICATION, USING THE CODENAME ONE TOOLS AND THE STANDARD IDE TOOLS",
+    "excerpt": "Review of the simulator tools for network monitoring, performance monitoring etc.",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-25.jpg",
+    "categories": [
+      "basic",
+      "debugging"
+    ],
+    "slug": "how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools",
+    "youtube_id": "1wHGnmO-vtE"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-handle-eventsnavigation-in-the-gui-builder-populate-the-form-from-code.html",
+    "title": "HANDLE EVENTS/NAVIGATION IN THE GUI BUILDER & POPULATE THE FORM FROM CODE",
+    "excerpt": "Event/variable handling in the Codename One GUI builder is a bit different from typical desktop development",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-26.jpg",
+    "categories": [
+      "basic",
+      "ui"
+    ],
+    "slug": "how-do-i-handle-eventsnavigation-in-the-gui-builder-populate-the-form-from-code",
+    "youtube_id": "3IC2qZ3wUO4"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-improve-application-performance-or-track-down-performance-issues.html",
+    "title": "IMPROVE APPLICATION PERFORMANCE OR TRACK DOWN PERFORMANCE ISSUES",
+    "excerpt": "Covers the basics of \u201cwhat is slow\u201d and how to find out what is bogging down your app",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-28.jpg",
+    "categories": [
+      "basic"
+    ],
+    "slug": "how-do-i-improve-application-performance-or-track-down-performance-issues",
+    "youtube_id": "set12jVQl_A"
+  },
+  {
+    "url": "https://www.codenameone.com/how_di_i/how-do-i-take-a-picture-with-the-camera.html",
+    "title": "TAKE A PICTURE WITH THE CAMERA",
+    "excerpt": "Using the capture API to take a picture",
+    "thumb_url": "https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-29.jpg",
+    "categories": [
+      "basic"
+    ],
+    "slug": "how-do-i-take-a-picture-with-the-camera",
+    "youtube_id": "nF4eqzVcsic"
+  }
+]

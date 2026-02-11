@@ -15,6 +15,16 @@
 /category / 301!
 /category/* / 301!
 
+# How-Do-I legacy URL migrations
+/how-do-i.html/ /how-do-i/ 301!
+/how-do-i.html /how-do-i/ 301!
+/how_di_i/ /how-do-i/ 301!
+/how_di_i /how-do-i/ 301!
+/how_di_i/:slug.html /how-do-i/:slug/ 301!
+/how_di_i/:slug /how-do-i/:slug/ 301!
+/how-do-i---:slug.html /how-do-i/:slug/ 301!
+/how-do-i---:slug /how-do-i/:slug/ 301!
+
 # BEGIN: WP sitemap migration redirects (generated)
 /about-us.html/ /about-us/ 301!
 /academy-affiliate-program.html/ /academy-affiliate-program/ 301!

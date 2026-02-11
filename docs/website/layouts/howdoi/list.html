@@ -1,0 +1,40 @@
+{{ define "main" }}
+{{ $items := (where .Site.RegularPages "Type" "howdoi") }}
+<main class="cn1-howdoi-index">
+    <header class="post-header">
+        <p class="cn1-howdoi-index__eyebrow">Tutorial Library</p>
+        <h1 class="post-title">{{ .Title }}</h1>
+        <p class="post-description">Every How-Do-I tutorial on one page. Jump directly to the topic you need and start building.</p>
+        <p class="cn1-howdoi-index__count">{{ len $items }} tutorials</p>
+    </header>
+    {{ with .Content }}<div class="content">{{ . }}</div>{{ end }}
+
+    <div class="cn1-howdoi-grid">
+        {{ range $items.ByTitle }}
+        {{ $slug := or .Slug .File.TranslationBaseName }}
+        {{ $thumb := .Params.thumbnail }}
+        {{ $thumbJpg := printf "static/howdoi/%s/thumb.jpg" $slug }}
+        {{ $thumbPng := printf "static/howdoi/%s/thumb.png" $slug }}
+        {{ if fileExists $thumbJpg }}
+            {{ $thumb = printf "/howdoi/%s/thumb.jpg" $slug }}
+        {{ else if fileExists $thumbPng }}
+            {{ $thumb = printf "/howdoi/%s/thumb.png" $slug }}
+        {{ end }}
+        <article class="cn1-howdoi-card">
+            <a class="cn1-howdoi-card__thumb" href="{{ .RelPermalink }}">
+                {{ if $thumb }}<img src="{{ $thumb }}" alt="{{ .Title }}" loading="lazy">{{ end }}
+                <span class="cn1-howdoi-card__play"><i class="fas fa-play" aria-hidden="true"></i></span>
+            </a>
+            <div class="cn1-howdoi-card__body">
+                <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+                {{ with .Params.description }}<p>{{ . }}</p>{{ end }}
+                <div class="cn1-howdoi-card__meta">
+                    {{ with .Params.tags }}<span class="cn1-howdoi-card__tag">{{ index . 0 }}</span>{{ end }}
+                    {{ with .Params.youtube_id }}<span class="cn1-howdoi-card__video">Video</span>{{ end }}
+                </div>
+            </div>
+        </article>
+        {{ end }}
+    </div>
+</main>
+{{ end }}

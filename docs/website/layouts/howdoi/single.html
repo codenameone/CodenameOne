@@ -1,0 +1,49 @@
+{{- define "main" }}
+{{- $slug := or .Slug .File.TranslationBaseName }}
+{{- $thumb := .Params.thumbnail }}
+{{- $thumbJpg := printf "static/howdoi/%s/thumb.jpg" $slug }}
+{{- $thumbPng := printf "static/howdoi/%s/thumb.png" $slug }}
+{{- if fileExists $thumbJpg }}
+  {{- $thumb = printf "/howdoi/%s/thumb.jpg" $slug }}
+{{- else if fileExists $thumbPng }}
+  {{- $thumb = printf "/howdoi/%s/thumb.png" $slug }}
+{{- end }}
+<article class="post-single cn1-howdoi-single">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <p class="cn1-howdoi-single__eyebrow">How-Do-I Tutorial</p>
+    <h1 class="post-title">{{ .Title }}</h1>
+    {{ with .Description }}<div class="post-description">{{ . }}</div>{{ end }}
+  </header>
+
+  <div class="cn1-howdoi-single__layout">
+    <aside class="cn1-howdoi-single__aside">
+      {{ with $thumb }}<img src="{{ . }}" alt="{{ $.Title }}" loading="lazy">{{ end }}
+      {{ with .Params.youtube_id }}
+      <a class="cn1-howdoi-single__watch" href="https://www.youtube.com/watch?v={{ . }}" target="_blank" rel="noopener">
+        <i class="fab fa-youtube" aria-hidden="true"></i>
+        Watch on YouTube
+      </a>
+      {{ end }}
+      <a class="cn1-howdoi-single__back" href="/how-do-i/">All tutorials</a>
+      {{ with .Params.tags }}
+      <div class="cn1-howdoi-single__tags">
+        {{ range . }}<span>{{ . }}</span>{{ end }}
+      </div>
+      {{ end }}
+    </aside>
+
+    <section class="post-content cn1-howdoi-single__content">
+      {{- if not (.Param "disableAnchoredHeadings") }}
+      {{- partial "anchored_headings.html" .Content -}}
+      {{- else }}{{ .Content }}{{ end }}
+    </section>
+  </div>
+
+  <footer class="post-footer">
+    {{- if (.Param "comments") }}
+    {{- partial "comments.html" . }}
+    {{- end }}
+  </footer>
+</article>
+{{- end }}

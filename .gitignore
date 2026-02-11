@@ -88,3 +88,6 @@ dependency-reduced-pom.xml
 /docs/website/hugo_stats.json
 /docs/website/resources/
 /docs/website/public/
+/docs/website/.cache/
+/docs/website/.venv/
+/docs/website/.venv-pagefind/

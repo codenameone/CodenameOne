@@ -1,0 +1,256 @@
+.cn1-howdoi-index {
+  --cn1-howdoi-bg: #eef2fb;
+  --cn1-howdoi-card: #ffffff;
+  --cn1-howdoi-border: #d6e0f6;
+  --cn1-howdoi-title: #102154;
+  --cn1-howdoi-text: #4b5f8f;
+  --cn1-howdoi-accent: #1d52ff;
+  --cn1-howdoi-chip: #edf2ff;
+  --cn1-howdoi-shadow: 0 18px 32px -24px rgba(16, 33, 84, 0.35);
+  background: var(--cn1-howdoi-bg);
+  margin: 0 calc(50% - 50vw);
+  padding: 2.5rem 0 4rem;
+}
+
+body.dark .cn1-howdoi-index {
+  --cn1-howdoi-bg: #06103a;
+  --cn1-howdoi-card: #131f54;
+  --cn1-howdoi-border: #31438c;
+  --cn1-howdoi-title: #eff4ff;
+  --cn1-howdoi-text: #b7c9ff;
+  --cn1-howdoi-accent: #95b8ff;
+  --cn1-howdoi-chip: rgba(255, 255, 255, 0.1);
+  --cn1-howdoi-shadow: 0 18px 32px -24px rgba(4, 9, 28, 0.72);
+}
+
+.cn1-howdoi-index .post-header,
+.cn1-howdoi-grid {
+  max-width: 1240px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+.cn1-howdoi-index .post-header {
+  margin-bottom: 1.4rem;
+}
+
+.cn1-howdoi-index__eyebrow {
+  margin: 0 0 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cn1-howdoi-accent);
+}
+
+.cn1-howdoi-index .post-title {
+  margin: 0;
+  color: var(--cn1-howdoi-title);
+}
+
+.cn1-howdoi-index .post-description,
+.cn1-howdoi-index .content {
+  color: var(--cn1-howdoi-text);
+}
+
+.cn1-howdoi-index__count {
+  margin: 0.8rem 0 0;
+  font-weight: 600;
+  color: var(--cn1-howdoi-accent);
+}
+
+.cn1-howdoi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.cn1-howdoi-card {
+  border: 1px solid var(--cn1-howdoi-border);
+  background: var(--cn1-howdoi-card);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--cn1-howdoi-shadow);
+}
+
+.cn1-howdoi-card__thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.cn1-howdoi-card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.25s ease;
+}
+
+.cn1-howdoi-card:hover .cn1-howdoi-card__thumb img {
+  transform: scale(1.03);
+}
+
+.cn1-howdoi-card__play {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.85rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  background: rgba(15, 29, 76, 0.82);
+  color: #fff;
+}
+
+.cn1-howdoi-card__body {
+  padding: 0.95rem 1rem 1rem;
+}
+
+.cn1-howdoi-card__body h2 {
+  margin: 0;
+  font-size: 1.03rem;
+  line-height: 1.3;
+}
+
+.cn1-howdoi-card__body h2 a {
+  color: var(--cn1-howdoi-title);
+}
+
+.cn1-howdoi-card__body p {
+  margin: 0.5rem 0 0;
+  color: var(--cn1-howdoi-text);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.cn1-howdoi-card__meta {
+  margin-top: 0.8rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.cn1-howdoi-card__meta span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: var(--cn1-howdoi-chip);
+  color: var(--cn1-howdoi-title);
+}
+
+.cn1-howdoi-single {
+  --cn1-howdoi-panel: rgba(29, 82, 255, 0.08);
+  --cn1-howdoi-panel-border: rgba(29, 82, 255, 0.25);
+}
+
+body.dark .cn1-howdoi-single {
+  --cn1-howdoi-panel: rgba(175, 193, 255, 0.1);
+  --cn1-howdoi-panel-border: rgba(175, 193, 255, 0.25);
+}
+
+.cn1-howdoi-single .post-header {
+  margin-bottom: 1rem;
+}
+
+.cn1-howdoi-single__eyebrow {
+  margin: 0.1rem 0 0.5rem;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--cn1-howdoi-accent, #1d52ff);
+}
+
+.cn1-howdoi-single__layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1.1rem;
+  align-items: start;
+}
+
+.cn1-howdoi-single__aside {
+  position: sticky;
+  top: 6.5rem;
+  border: 1px solid var(--cn1-howdoi-panel-border);
+  background: var(--cn1-howdoi-panel);
+  border-radius: 14px;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cn1-howdoi-single__aside img {
+  width: 100%;
+  border-radius: 10px;
+}
+
+.cn1-howdoi-single__watch,
+.cn1-howdoi-single__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.52rem 0.7rem;
+  border-radius: 9px;
+  border: 1px solid var(--cn1-howdoi-panel-border);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cn1-howdoi-single__watch {
+  background: var(--cn1-howdoi-accent, #1d52ff);
+  color: #fff;
+  border-color: transparent;
+}
+
+.cn1-howdoi-single__watch:hover {
+  filter: brightness(1.05);
+}
+
+.cn1-howdoi-single__back {
+  color: inherit;
+}
+
+.cn1-howdoi-single__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cn1-howdoi-single__tags span {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--cn1-howdoi-panel-border);
+}
+
+.cn1-howdoi-single__content {
+  border: 1px solid var(--cn1-howdoi-panel-border);
+  background: var(--cn1-howdoi-panel);
+  border-radius: 14px;
+  padding: 1.2rem 1.25rem;
+}
+
+.cn1-howdoi-single__content h4 {
+  margin-top: 0.8rem;
+}
+
+@media (max-width: 960px) {
+  .cn1-howdoi-single__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cn1-howdoi-single__aside {
+    position: static;
+  }
+}
