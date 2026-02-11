@@ -7,6 +7,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.MultiButton;
 import com.codename1.impl.android.AndroidNativeUtil;
+import com.codename1.impl.android.PermissionPromptCallback;
 
 /**
  * Snippets related to Android runtime permissions.
@@ -52,4 +53,33 @@ public class PermissionSnippets {
         // you have the permission, do what you need
         // end::androidCheckForPermission[]
     }
+
+
+    public void customizePermissionPromptLocalization() {
+        // tag::permissionPromptLocalization[]
+        com.codename1.ui.plaf.UIManager.getInstance().setBundle(new java.util.Hashtable<String, String>() {{
+            put("android.permission.READ_CONTACTS", "Localized rationale for contacts");
+            put("android.permission.READ_CONTACTS.title", "Localized permission title");
+            put("android.permission.READ_CONTACTS.askAgain", "Localized ask again");
+            put("android.permission.READ_CONTACTS.dontAsk", "Localized don't ask");
+        }});
+        // end::permissionPromptLocalization[]
+    }
+
+    public void installNativePermissionPromptCallback() {
+        // tag::androidPermissionPromptCallback[]
+        AndroidNativeUtil.setPermissionPromptCallback(new PermissionPromptCallback() {
+            @Override
+            public boolean showPermissionPrompt(String permission, String title, String body, String positiveButtonText, String negativeButtonText) {
+                return com.codename1.ui.Dialog.show(title, body, positiveButtonText, negativeButtonText);
+            }
+
+            @Override
+            public void showPermissionMessage(String permission, String title, String body, String okButtonText) {
+                com.codename1.ui.Dialog.show(title, body, okButtonText, null);
+            }
+        });
+        // end::androidPermissionPromptCallback[]
+    }
+
 }

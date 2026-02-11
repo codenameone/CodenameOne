@@ -297,6 +297,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     private static Context context;
+    private static PermissionPromptCallback permissionPromptCallback;
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
     int lastDirectionalKeyEventReceivedByWrapper;
@@ -10933,6 +10934,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return checkForPermission(permission, description, false);
     }
 
+    public static void setPermissionPromptCallback(PermissionPromptCallback callback) {
+        permissionPromptCallback = callback;
+    }
+
+    public static PermissionPromptCallback getPermissionPromptCallback() {
+        return permissionPromptCallback;
+    }
+
+    private static String getPermissionText(String key, String defaultValue) {
+        return UIManager.getInstance().localize(key, Display.getInstance().getProperty(key, defaultValue));
+    }
+
+    private static boolean showPermissionPrompt(String permission, String title, String body, String positiveButtonText, String negativeButtonText) {
+        if (permissionPromptCallback != null) {
+            return permissionPromptCallback.showPermissionPrompt(permission, title, body, positiveButtonText, negativeButtonText);
+        }
+        return Dialog.show(title, body, positiveButtonText, negativeButtonText);
+    }
+
+    private static void showPermissionMessage(String permission, String title, String body, String okButtonText) {
+        if (permissionPromptCallback != null) {
+            permissionPromptCallback.showPermissionMessage(permission, title, body, okButtonText);
+            return;
+        }
+        Dialog.show(title, body, okButtonText, null);
+    }
+
     /**
      * Return a list of all of the permissions that have been requested by the app (granted or no).
      * This can be used to see which permissions are included in the manifest file.
@@ -10971,29 +10999,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return false;
             }
 
-            String prompt = Display.getInstance().getProperty(permission, description);
-            String title = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.title", "Requires permission");
-            String settingsBtn = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.settings", "Settings");
-            String cancelBtn = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.cancel", "Cancel");
+            String prompt = getPermissionText(permission, description);
+            String title = getPermissionText("android.permission.ACCESS_BACKGROUND_LOCATION.title", "Requires permission");
+            String settingsBtn = getPermissionText("android.permission.ACCESS_BACKGROUND_LOCATION.settings", "Settings");
+            String cancelBtn = getPermissionText("android.permission.ACCESS_BACKGROUND_LOCATION.cancel", "Cancel");
 
-            if(Dialog.show(title, prompt, settingsBtn, cancelBtn)){
+            if(showPermissionPrompt(permission, title, prompt, settingsBtn, cancelBtn)){
                 Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                 Uri uri = Uri.fromParts("package", getContext().getPackageName(), null);
                 intent.setData(uri);
                 getActivity().startActivity(intent);
 
-                String explanationTitle = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_title", "Permission Required");
-                String explanationBody = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body", "Please enable 'Allow all the time' in the settings, then press OK.");
-                String okBtn = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.ok", "OK");
+                String explanationTitle = getPermissionText("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_title", "Permission Required");
+                String explanationBody = getPermissionText("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body", "Please enable 'Allow all the time' in the settings, then press OK.");
+                String okBtn = getPermissionText("android.permission.ACCESS_BACKGROUND_LOCATION.ok", "OK");
 
-                Dialog.show(explanationTitle, explanationBody, okBtn, null);
+                showPermissionMessage(permission, explanationTitle, explanationBody, okBtn);
                 return android.support.v4.content.ContextCompat.checkSelfPermission(getActivity(), permission) == PackageManager.PERMISSION_GRANTED;
             } else {
                 return false;
             }
         }
 
-        String prompt = Display.getInstance().getProperty(permission, description);
+        String prompt = getPermissionText(permission, description);
 
         if (android.support.v4.content.ContextCompat.checkSelfPermission(getContext(),
                 permission)
@@ -11008,7 +11036,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     permission)) {
 
                 // Show an expanation to the user *asynchronously* -- don't block
-                if(Dialog.show("Requires permission", prompt, "Ask again", "Don't Ask")){
+                String title = getPermissionText(permission + ".title", "Requires permission");
+                String askAgain = getPermissionText(permission + ".askAgain", "Ask again");
+                String dontAsk = getPermissionText(permission + ".dontAsk", "Don't Ask");
+                if(showPermissionPrompt(permission, title, prompt, askAgain, dontAsk)){
                     return checkForPermission(permission, description, true);
                 }else {
                     return false;

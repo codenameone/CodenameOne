@@ -198,6 +198,16 @@ public class AndroidNativeUtil {
     public static interface BitmapViewRenderer {
         public Bitmap renderViewOnBitmap(View v, int w, int h);
     }
+
+    /**
+     * Sets a callback used to customize permission rationale dialogs.
+     * Passing {@code null} restores the default Codename One Dialog behavior.
+     *
+     * @param callback callback implementation or {@code null}
+     */
+    public static void setPermissionPromptCallback(final PermissionPromptCallback callback) {
+        AndroidImplementation.setPermissionPromptCallback(callback);
+    }
     
     /**
      * Check for a dangerous permission, if the permission is already granted return true, 
