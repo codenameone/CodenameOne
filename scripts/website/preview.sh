@@ -14,6 +14,7 @@ HUGO_BIN="${HUGO_BIN:-hugo}"
 HUGO_PORT="${HUGO_PORT:-1313}"
 HUGO_BIND="${HUGO_BIND:-127.0.0.1}"
 HUGO_BASEURL="${HUGO_BASEURL:-http://${HUGO_BIND}:${HUGO_PORT}/}"
+HUGO_STATIC_BASEURL="${HUGO_STATIC_BASEURL:-https://www.codenameone.com/}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
@@ -30,7 +31,9 @@ else
 fi
 
 # Generate static output once so lunr index can be created before live preview.
-"${HUGO_BIN}" --destination "${WEBSITE_DIR}/public" >/dev/null 2>&1 || true
+"${HUGO_BIN}" \
+  --baseURL "${HUGO_STATIC_BASEURL}" \
+  --destination "${WEBSITE_DIR}/public" >/dev/null 2>&1 || true
 
 if command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
   "${PYTHON_BIN}" "${WEBSITE_DIR}/scripts/generate_lunr_index.py" >/dev/null 2>&1 || true

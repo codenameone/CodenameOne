@@ -13,6 +13,7 @@ fi
 HUGO_BIN="${HUGO_BIN:-hugo}"
 HUGO_ENVIRONMENT="${HUGO_ENVIRONMENT:-production}"
 HUGO_MINIFY="${HUGO_MINIFY:-true}"
+HUGO_BASEURL="${HUGO_BASEURL:-https://www.codenameone.com/}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
@@ -36,6 +37,7 @@ fi
 HUGO_ENV="${HUGO_ENVIRONMENT}" "${HUGO_BIN}" \
   --cleanDestinationDir \
   --gc \
+  --baseURL "${HUGO_BASEURL}" \
   ${MINIFY_FLAG}
 
 if command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
