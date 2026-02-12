@@ -202,6 +202,10 @@ public class LocalNotification {
     ///
     /// The ID can also be used to cancel the notification later using `com.codename1.ui.Display#cancelLocalNotification(java.lang.String)`
     ///
+    /// **Platform note (iOS):** Notification IDs map to `UNNotificationRequest` identifiers.
+    /// Scheduling another local notification with the same ID replaces the existing pending notification
+    /// rather than adding a second one.
+    ///
     /// #### Returns
     ///
     /// the id
@@ -215,6 +219,10 @@ public class LocalNotification {
     /// from storage or some other mechanism.
     ///
     /// The ID can also be used to cancel the notification later using `com.codename1.ui.Display#cancelLocalNotification(java.lang.String)`
+    ///
+    /// **Platform note (iOS):** Notification IDs map to `UNNotificationRequest` identifiers.
+    /// Scheduling another local notification with the same ID replaces the existing pending notification
+    /// rather than adding a second one.
     ///
     /// #### Parameters
     ///
