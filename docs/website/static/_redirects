@@ -54,6 +54,18 @@
 /how-do-i---:slug.html /how-do-i/:slug/ 301!
 /how-do-i---:slug /how-do-i/:slug/ 301!
 
+# Legacy video pages
+/videos-old /videos/ 301!
+/videos-old/ /videos/ 301!
+/videos-old.html /videos/ 301!
+/videos-old.html/ /videos/ 301!
+/videos.html /videos/ 301!
+/videos.html/ /videos/ 301!
+/video /videos/ 301!
+/video/ /videos/ 301!
+/video.html /videos/ 301!
+/video.html/ /videos/ 301!
+
 # BEGIN: WP sitemap migration redirects (generated)
 /about-us.html/ /about-us/ 301!
 /academy-affiliate-program.html/ / 301!
@@ -974,8 +986,6 @@
 /training.html/ /training/ 301!
 /untitled-2.html/ /untitled-2/ 301!
 /untitled.html/ /untitled/ 301!
-/videos-old.html/ /videos-old/ 301!
-/videos.html/ /videos/ 301!
 /vserv-mobi-ads.html/ /vserv-mobi-ads/ 301!
 /your-messages-was-sent.html/ /your-messages-was-sent/ 301!
 # END: WP sitemap migration redirects (generated)

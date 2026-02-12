@@ -2,11 +2,8 @@
 title: "Videos"
 date: 2020-09-12
 slug: "videos"
+layout: "videos"
+description: "Talks, webinars, and walkthroughs for building production-grade cross-platform apps with Codename One."
 ---
 
-- Home
-- Videos
-
-## Videos
-
-Videos & courses of interest. Check out the How Do I? section for more!\[show\_shortcode\_video\]
+Watch Codename One videos, webinars, and conference talks.
