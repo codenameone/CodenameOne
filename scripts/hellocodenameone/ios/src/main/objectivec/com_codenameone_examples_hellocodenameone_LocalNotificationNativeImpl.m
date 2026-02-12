@@ -7,16 +7,18 @@
     if (notificationId == nil) {
         return 0;
     }
-    UIApplication *app = [UIApplication sharedApplication];
-    NSArray *scheduledNotifications = [app scheduledLocalNotifications];
-    NSInteger matches = 0;
-    for (UILocalNotification *notification in scheduledNotifications) {
-        NSDictionary *userInfo = notification.userInfo;
-        NSString *scheduledId = [NSString stringWithFormat:@"%@", [userInfo valueForKey:@"__ios_id__"]];
-        if ([notificationId isEqualToString:scheduledId]) {
-            matches++;
+    __block NSInteger matches = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        UIApplication *app = [UIApplication sharedApplication];
+        NSArray *scheduledNotifications = [app scheduledLocalNotifications];
+        for (UILocalNotification *notification in scheduledNotifications) {
+            NSDictionary *userInfo = notification.userInfo;
+            NSString *scheduledId = [NSString stringWithFormat:@"%@", [userInfo valueForKey:@"__ios_id__"]];
+            if ([notificationId isEqualToString:scheduledId]) {
+                matches++;
+            }
         }
-    }
+    });
     return (int)matches;
 }
 

@@ -9204,9 +9204,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
    
     public void scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) {
-        
+        String id = n.getId();
+        if (id != null) {
+            nativeInstance.cancelLocalNotification(id);
+        }
+
         nativeInstance.sendLocalNotification(
-                n.getId(),
+                id,
                 n.getAlertTitle(),
                 n.getAlertBody(),
                 n.getAlertSound(),

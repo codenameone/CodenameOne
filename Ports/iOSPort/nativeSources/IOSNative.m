@@ -9733,7 +9733,6 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType, JAVA_BOOLEAN foreground
                                                                                                                                                                      ) {
 #ifdef CN1_INCLUDE_NOTIFICATIONS2
-    NSString *nsNotificationId = notificationId != JAVA_NULL ? toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) : nil;
     NSString * title = [NSString string];
     NSString * body = [NSString string];
     NSString *tmpStr;
@@ -9760,9 +9759,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     body = tmpStr;
     
     NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
-    if (nsNotificationId != nil) {
-        [dict setObject: nsNotificationId forKey: @"__ios_id__"];
-    }
+    [dict setObject: toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) forKey: @"__ios_id__"];
     if (foreground) {
         [dict setObject: @"true" forKey: @"foreground"];
     }
@@ -9799,9 +9796,8 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
             UNTimeIntervalNotificationTrigger *trigger = [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:fireDate/1000 - [[NSDate date] timeIntervalSince1970] + 1 repeats:NO];
             
             // Create the request object.
-            NSString *requestIdentifier = nsNotificationId != nil ? nsNotificationId : [[NSUUID UUID] UUIDString];
             UNNotificationRequest* request = [UNNotificationRequest
-                   requestWithIdentifier:requestIdentifier content:content trigger:trigger];
+                   requestWithIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) content:content trigger:trigger];
            
            
              
@@ -9870,17 +9866,6 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
                     [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
                 }
 #endif
-                if (nsNotificationId != nil) {
-                    UIApplication *app = [UIApplication sharedApplication];
-                    NSArray *scheduledNotifications = [app scheduledLocalNotifications];
-                    for (UILocalNotification *scheduled in scheduledNotifications) {
-                        NSDictionary *userInfo = scheduled.userInfo;
-                        NSString *scheduledId = [NSString stringWithFormat:@"%@", [userInfo valueForKey:@"__ios_id__"]];
-                        if ([nsNotificationId isEqualToString:scheduledId]) {
-                            [app cancelLocalNotification:scheduled];
-                        }
-                    }
-                }
                 [[UIApplication sharedApplication] scheduleLocalNotification: notification];
             });
     }
