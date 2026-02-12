@@ -54,23 +54,23 @@ Here is how we can combine all of these together:
   
   
 
-##  Tip 1 – Creating Engagement Opportunities for the User  
+## Tip 1 – Creating Engagement Opportunities for the User  
 
 This is a key component in creating the engagement loop. You app needs to have elements that allow users to invest time and get more out of the app. One easy example for this is profile building. In apps that provide social interaction, investing time in your profile is not a required step but the more a user invests time in it, the better his experience will be. Same goes for apps that allow you to import your friends from other social networks. The more time you invest, the more engaging the app is likely to be for you.
 
-##  Tip 2 – Encouraging Your Users to Invest the Time through Achievements  
+## Tip 2 – Encouraging Your Users to Invest the Time through Achievements  
 
 While the user does get value from investing his time, he doesn’t get it right away. This is part of the reason why it’s important to provide a more instant gratification even for an action that is good for the user. NOTE – it’s important not to provide short term rewards for actions that will end up hurting the user – this can backfire and produce a negative result. Easy elements that can be added to encourage users are progress bar for completing his user profile or awards for connecting and inviting friends.
 
-##  Tip 3 – Guide Users about the Value They Can Receive  
+## Tip 3 – Guide Users about the Value They Can Receive  
 
 Once your app users invested time and unlocked more value. You can add responsive UX that guides them about opportunities to get more value as they appear. This could be anything from friend recommendations to relaying on the app for day to day tasks. If we take one example, a task management app can encourage users to connect the app with the calendar app through achievements and awards. Once the calendar app is connected, the task management app can recommend the user to add tasks after a meeting.
 
-##  Tip 4 – Getting Rid of Clutter via Smart Unlocking  
+## Tip 4 – Getting Rid of Clutter via Smart Unlocking  
 
 While great apps allow users to get tremendous value, they also need to be very simple. The conflict here is that the more functionality you add to the app the more it is becoming more complicated. Luckily, gamification does provide a solution. Provided that you are already maintaining some score about the user, you can gradually unlock features based on his score or level. This approach allows you to keep the first experience simple and gradually add more value later on.
 
-##  Tip 5 – Reward your Key Users  
+## Tip 5 – Reward your Key Users  
 
 Every successful app has users that evangelize the app and explain others how to get value from it. While you can design a great UX with guidance and tutorials, nothing beats a friend explaining the user how to use the app and showing him the end result. This is not about getting buzz by soliciting likes on Facebook. This is about finding the few that are really excited about the app and gamifying their evangelism activity. You could have awards such as the Educator, the Trainer and you could reward users for repeatedly mentioning your app.
 

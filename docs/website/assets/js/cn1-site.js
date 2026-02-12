@@ -1,4 +1,10 @@
 (() => {
+  const path = window.location.pathname || "";
+  const isBlogPath = path === "/blog/" || path.startsWith("/blog/");
+  if (isBlogPath) {
+    document.body.classList.add("cn1-blog-post");
+  }
+
   const mobileMq = window.matchMedia("(max-width: 980px)");
   const header = document.querySelector(".cn1-header");
   if (header) {
@@ -130,4 +136,5 @@
         triggers[0].getAttribute("data-cn1-tab-trigger")
     );
   });
+
 })();

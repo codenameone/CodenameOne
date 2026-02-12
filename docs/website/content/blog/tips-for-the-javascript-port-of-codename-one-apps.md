@@ -289,7 +289,7 @@ complete(true) indicates that the user decided to play the audio. complete(false
 
 In this example we used a modal dialog to prompt the user, but you can use any UI mechanism you like for prompting the user. A Sheet, an interaction dialog, or a separate Form. You just need to remember to call complete() on the promise after the user has made their choice. If you forget to call complete() it could lock up the app.
 
-## IMPORTANT:
+## Important
 
 > Calling complete(true) directly without actually displaying a dialog to the user won’t work. It is the "click" that satisfies the browsers "media engagement index" restrictions so that it will allow the app to play audio. The user can click anywhere in the app; but they need to click. If you call complete(true) without the user clicking, then the app will try to play the audio and just fail.
 

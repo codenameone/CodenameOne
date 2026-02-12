@@ -127,7 +127,7 @@ The party and trip after the conference are also cool things but I couldn’t go
 
 * * *
 
-##  The Sessions  
+## The Sessions  
   
 
 There were many great sessions and speakers this year, I can’t possibly cover everything and I was running around so much I barely had time to see it all (despite the overflow room which is the greatest concept in any Java conference!).  

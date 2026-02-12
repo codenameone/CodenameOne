@@ -1,0 +1,99 @@
+.cn1-blog-post .post-content {
+  max-width: 100%;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.cn1-blog-post .post-content > p,
+.cn1-blog-post .post-content > ul,
+.cn1-blog-post .post-content > ol,
+.cn1-blog-post .post-content > blockquote,
+.cn1-blog-post .post-content > pre,
+.cn1-blog-post .post-content > table,
+.cn1-blog-post .post-content > .highlight {
+  margin-block: 1.1em;
+}
+
+.cn1-blog-post .post-content h2,
+.cn1-blog-post .post-content h3,
+.cn1-blog-post .post-content h4,
+.cn1-blog-post .post-content h5 {
+  margin-top: 1.4em;
+  margin-bottom: 0.55em;
+  line-height: 1.28;
+  letter-spacing: normal;
+  text-wrap: balance;
+}
+
+.cn1-blog-post .post-content h2 {
+  font-size: 30px;
+}
+
+.cn1-blog-post .post-content h3 {
+  font-size: 24px;
+}
+
+.cn1-blog-post .post-content h4 {
+  font-size: 20px;
+}
+
+.cn1-blog-post .post-content h5 {
+  font-size: 18px;
+}
+
+.cn1-blog-post .post-content ul,
+.cn1-blog-post .post-content ol {
+  padding-inline-start: 1.2em;
+}
+
+.cn1-blog-post .post-content li + li {
+  margin-top: 0.35em;
+}
+
+.cn1-blog-post .post-content blockquote {
+  border-left: 3px solid rgba(28, 81, 255, 0.55);
+  padding: 10px 14px;
+  background: rgba(28, 81, 255, 0.06);
+  border-radius: 8px;
+}
+
+body.dark .cn1-blog-post .post-content blockquote {
+  border-left-color: rgba(175, 193, 255, 0.65);
+  background: rgba(175, 193, 255, 0.09);
+}
+
+.cn1-blog-post .post-content table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.cn1-blog-post .post-content table th,
+.cn1-blog-post .post-content table td {
+  border: 1px solid rgba(28, 81, 255, 0.18);
+  padding: 8px 10px;
+}
+
+body.dark .cn1-blog-post .post-content table th,
+body.dark .cn1-blog-post .post-content table td {
+  border-color: rgba(175, 193, 255, 0.25);
+}
+
+@media (max-width: 900px) {
+  .cn1-blog-post .post-content {
+    font-size: 16px;
+  }
+
+  .cn1-blog-post .post-content h2 {
+    font-size: 26px;
+  }
+
+  .cn1-blog-post .post-content h3 {
+    font-size: 22px;
+  }
+
+  .cn1-blog-post .post-content h4 {
+    font-size: 19px;
+  }
+}

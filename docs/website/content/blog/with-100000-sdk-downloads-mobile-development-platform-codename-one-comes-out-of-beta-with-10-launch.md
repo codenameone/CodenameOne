@@ -78,7 +78,7 @@ Codename One is available for download free of charge.
   
   
 
-##  About Codename One  
+## About Codename One  
 
 Codename One, named by Forbes as “one of the 10 greatest industry disrupting startups of 2012,” is an Israel-based technology company that has created a powerful cross-platform software development kit for mobile applications. The technology enables developers to create native applications across multiple operating systems using a single code base. Codename One was founded by renowned software engineers Shai Almog and Chen Fishbein in 2012.  
   

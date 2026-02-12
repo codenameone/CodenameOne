@@ -68,7 +68,7 @@ We included an entirely optional survey and 99% of submitters answered questions
 
 * * *
 
-##  Results  
+## Results  
   
 
   
@@ -146,7 +146,7 @@ We probably should have phrased a few different questions to get refined answers
 
 * * *
 
-##  Final thoughts  
+## Final thoughts  
   
 
 I hope you found these results useful and illuminating. For the next contest/survey we will run we picked up the following lessons: 

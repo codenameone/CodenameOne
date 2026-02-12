@@ -54,7 +54,7 @@ Right now a lot of the internal data such as the actual screen designs is still 
 
 * * *
 
-##  Improved iOS Settings & New Features  
+## Improved iOS Settings & New Features  
   
 
   

@@ -29,7 +29,7 @@ While investigating the possibilities within Codename One, I made a discovery th
 This is an ideal combination that provides simple and effective customer management on all mobile devices.  
 **
 
-##  SalesForce, a complete platform  
+## SalesForce, a complete platform  
 
   
   
@@ -52,7 +52,7 @@ SalesForce can therefore easily form a set of custom data hosted in the Cloud. M
 
 Personally recommend the REST architecture mainly for bandwidth reasons, even though it is more restrictive in terms of implementation and use.
 
-##  SalesForce One and Codename: a winning combination  
+## SalesForce One and Codename: a winning combination  
 
 [  
 ![Picture](/blog/combining-salesforce-and-codename-one/combining-salesforce-and-codename-one-3.png)  
@@ -62,7 +62,7 @@ In order to make ​​a Codename One application communicate with SalesForce, I
 
 My starting point was the official documentation of the REST API: I soon managed to authenticate and execute a query to retrieve a list of distant objects.
 
-##  What’s next?  
+## What’s next?  
 
 Still, I could not stop there so I decided to use the opportunity to try the new library support that was recently introduced to Codename One and create a SalesForce library. There is still a lot of work to be done, there are bugs and only a small part of the API is exposed in the library. I will try to tackle these issues one at a time and I will keep you informed of my progress. If you are interested, the code is available on Google Code under the name:  
 [  

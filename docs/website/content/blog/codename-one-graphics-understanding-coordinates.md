@@ -17,7 +17,7 @@ Codename One provides a rich set of drawing primitives in its Graphics class. It
 
 Take, for example, the Graphics.drawRect(int x,int y, int width, int height) method. If you are coming to Codename One with fresh eyes, you can probably figure out that this method will draw a width x height rectangle at the coordinate (x,y). However you would probably also want to know exactly what the axes of the coordinate system are. E.g. where is (0,0), and in which directions do x and y get larger.
 
-####  The Coordinate System
+#### The Coordinate System
 
 The Codename One coordinate system follows the example of Swing (and many other – but not all- graphics libraries) and places the origin in the upper left corner of the screen. X-values grow to the right, and Y-values grow downward as illustrated below:
 

@@ -51,7 +51,7 @@ I think this is a very interesting idea and direction, one of the things I’d r
 
 * * *
 
-##  Java One  
+## Java One  
   
 
 We are here in the lovely city of San Francisco and having a blast, we have a pretty amazing announcement to make but until the contract is signed we’ll keep that low key.  

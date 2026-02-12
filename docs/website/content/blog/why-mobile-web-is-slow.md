@@ -81,7 +81,7 @@ To make matters worse, many small things such as complex repeat patterns, transl
 
 * * *
 
-##  Why Java Is Fast & Objective-C Is Slow  
+## Why Java Is Fast & Objective-C Is Slow  
   
 
 The rest of the article talks a lot about native code and how fast it is, unfortunately it ignores some basic facts that are pretty important while repeating some things that aren’t quite accurate. 
