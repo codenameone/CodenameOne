@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.Log;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.system.NativeLookup;
 import com.codename1.ui.Display;
@@ -36,12 +37,21 @@ public class LocalNotificationIdOverrideTest extends BaseTest {
         Display.getInstance().scheduleLocalNotification(second, System.currentTimeMillis() + 120000, LocalNotification.REPEAT_NONE);
 
         UITimer.timer(1000, false, Display.getInstance().getCurrent(), () -> {
-            int pendingWithSameId = nativeInterface.countPendingNotificationsWithId(notificationId);
-            Display.getInstance().cancelLocalNotification(notificationId);
-            if (pendingWithSameId != 1) {
-                fail("Expected a single pending notification for id '" + notificationId + "' but found " + pendingWithSameId);
-            } else {
-                done();
+            try {
+                int pendingWithSameId = nativeInterface.countPendingNotificationsWithId(notificationId);
+                Display.getInstance().cancelLocalNotification(notificationId);
+                if (pendingWithSameId < 0) {
+                    fail("Native notification count returned an error for id '" + notificationId + "': " + pendingWithSameId);
+                    return;
+                }
+                if (pendingWithSameId != 1) {
+                    fail("Expected a single pending notification for id '" + notificationId + "' but found " + pendingWithSameId);
+                } else {
+                    done();
+                }
+            } catch (Throwable t) {
+                Log.e(t);
+                fail("Native notification count failed with exception: " + t.getMessage());
             }
         });
 
