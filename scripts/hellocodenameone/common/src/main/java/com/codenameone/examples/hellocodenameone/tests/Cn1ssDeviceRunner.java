@@ -155,7 +155,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             Thread current = Thread.currentThread();
             for (java.util.Map.Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
                 Thread t = e.getKey();
-                log("CN1SS:THREAD:name=" + t.getName() + " id=" + t.getId() + " state=" + t.getState() + " daemon=" + t.isDaemon() + " current=" + (t == current));
+                log("CN1SS:THREAD:name=" + t.getName() + " id=" + t.getId() + " state=" + t.getState() + " current=" + (t == current));
                 for (StackTraceElement ste : e.getValue()) {
                     log("CN1SS:STACK:" + ste);
                 }
