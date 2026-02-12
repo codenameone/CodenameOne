@@ -15,6 +15,8 @@
                 <li><a href="/privacy/">Privacy Policy</a></li>
                 <li><a href="/terms/">Terms of Service</a></li>
                 <li><a href="/site-map/">Site Map</a></li>
+                <li><a href="#" data-cn1-enable-chat>Enable Chat</a></li>
+                <li><a href="#" data-cn1-manage-chat>Manage Chat Consent</a></li>
             </ul>
         </div>
         <div class="cn1-bottom-links__brand">
@@ -34,6 +36,19 @@
 </footer>
 {{- end }}
 
+<aside class="cn1-cookie-banner" data-cn1-cookie-banner hidden>
+    <p>
+        We use only Crisp chat cookies to keep support conversations working across pages. We don't use analytics or
+        tracking tools. See <a href="https://help.crisp.chat/en/article/crisp-chatbox-cookie-ip-policy-1147xor/" target="_blank" rel="noopener">Crisp cookie policy</a>
+        and our <a href="/privacy/">privacy policy</a>. You can change this choice later from the footer links:
+        <strong>Enable Chat</strong> or <strong>Manage Chat Consent</strong>.
+    </p>
+    <div class="cn1-cookie-banner__actions">
+        <button type="button" data-cn1-cookie-decline>Decline Chat</button>
+        <button type="button" data-cn1-cookie-accept>Enable Chat</button>
+    </div>
+</aside>
+
 {{- if (not site.Params.disableScrollToTop) }}
 <a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
@@ -47,10 +62,12 @@
 {{- $cn1Home := resources.Get "js/cn1-home.js" | minify | fingerprint }}
 {{- $cn1Demo := resources.Get "js/cn1-demo.js" | minify | fingerprint }}
 {{- $cn1Pricing := resources.Get "js/cn1-pricing.js" | minify | fingerprint }}
+{{- $cn1Crisp := resources.Get "js/cn1-crisp.js" | minify | fingerprint }}
 <script defer src="{{ $cn1Site.RelPermalink }}" integrity="{{ $cn1Site.Data.Integrity }}"></script>
 <script defer src="{{ $cn1Home.RelPermalink }}" integrity="{{ $cn1Home.Data.Integrity }}"></script>
 <script defer src="{{ $cn1Demo.RelPermalink }}" integrity="{{ $cn1Demo.Data.Integrity }}"></script>
 <script defer src="{{ $cn1Pricing.RelPermalink }}" integrity="{{ $cn1Pricing.Data.Integrity }}"></script>
+<script defer src="{{ $cn1Crisp.RelPermalink }}" integrity="{{ $cn1Crisp.Data.Integrity }}"></script>
 
 <script>
     let menu = document.getElementById('menu')
