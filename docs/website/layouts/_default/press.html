@@ -1,0 +1,102 @@
+{{- define "main" -}}
+{{- $press := site.Data.press -}}
+<article class="post-single post-single--press">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title">{{ .Title }}</h1>
+    {{ with .Description }}
+    <p class="post-description">{{ . }}</p>
+    {{ end }}
+
+    <div class="cn1-press-tabs" data-cn1-tabs>
+      <button class="cn1-press-tabs__btn is-active" type="button" data-cn1-tab-trigger="articles">Articles</button>
+      <button class="cn1-press-tabs__btn" type="button" data-cn1-tab-trigger="releases">Press Releases</button>
+      <button class="cn1-press-tabs__btn" type="button" data-cn1-tab-trigger="kit">Press Kit</button>
+    </div>
+  </header>
+
+  <section class="cn1-press-panel is-active" data-cn1-tab-panel="articles">
+    <div class="cn1-press-list">
+      {{- range $press.articles }}
+      <article class="cn1-press-item">
+        <div class="cn1-press-item__logo-wrap">
+          {{- if .logo }}
+          <img class="cn1-press-item__logo" src="{{ .logo }}" alt="{{ .source }} logo" loading="lazy">
+          {{- end }}
+        </div>
+        <div class="cn1-press-item__body">
+          {{- range .quotes }}
+          <p class="cn1-press-item__quote">{{ . }}</p>
+          {{- end }}
+          {{- with .headline }}
+          <p class="cn1-press-item__headline">{{ . }}</p>
+          {{- end }}
+          {{- with .source }}
+          <p class="cn1-press-item__source">- {{ . }}</p>
+          {{- end }}
+          {{- if .links }}
+          <div class="cn1-press-item__links">
+            {{- range .links }}
+            <a href="{{ .url }}" target="_blank" rel="noopener" aria-label="{{ .label }}">
+              <i class="fas fa-link" aria-hidden="true"></i>
+              <span>{{ .label }}</span>
+            </a>
+            {{- end }}
+          </div>
+          {{- end }}
+        </div>
+      </article>
+      {{- end }}
+    </div>
+  </section>
+
+  <section class="cn1-press-panel" data-cn1-tab-panel="releases" hidden>
+    <div class="cn1-release-list">
+      {{- range $press.press_releases }}
+      <article class="cn1-release-item">
+        <a class="cn1-release-item__icon" href="{{ .url }}" target="_blank" rel="noopener" aria-label="Download PDF">
+          <img src="/uploads/pdf-icon.png" alt="PDF" loading="lazy">
+        </a>
+        <div class="cn1-release-item__body">
+          <h3><a href="{{ .url }}" target="_blank" rel="noopener">{{ .title }}</a></h3>
+          <p><i class="far fa-calendar-alt" aria-hidden="true"></i> {{ .date }}</p>
+        </div>
+      </article>
+      {{- end }}
+    </div>
+  </section>
+
+  <section class="cn1-press-panel" data-cn1-tab-panel="kit" hidden>
+    <div class="cn1-press-kit">
+      <h2>Resources for Advocacy &amp; Press</h2>
+      <p>{{ $press.press_kit.description }}</p>
+
+      <div class="cn1-press-kit__grid">
+        <div class="cn1-press-kit__label">Name</div>
+        <div class="cn1-press-kit__value">{{ $press.press_kit.name }}</div>
+
+        <div class="cn1-press-kit__label">Initial Release</div>
+        <div class="cn1-press-kit__value">{{ $press.press_kit.initial_release }}</div>
+
+        <div class="cn1-press-kit__label">Founding Team</div>
+        <div class="cn1-press-kit__value">
+          {{- range $press.press_kit.founding_team }}
+          <p>{{ . }}</p>
+          {{- end }}
+        </div>
+
+        <div class="cn1-press-kit__label">Summary</div>
+        <div class="cn1-press-kit__value">{{ $press.press_kit.summary }}</div>
+
+        <div class="cn1-press-kit__label">Logos</div>
+        <div class="cn1-press-kit__value">
+          <a class="cn1-press-kit__download" href="{{ $press.press_kit.logo_download_url }}" target="_blank" rel="noopener">
+            <i class="fas fa-cloud-download-alt" aria-hidden="true"></i>
+            Download Codename One logo pack
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</article>
+{{- end -}}

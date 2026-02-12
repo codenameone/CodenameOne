@@ -15,6 +15,35 @@
 /category / 301!
 /category/* / 301!
 
+# Affiliate program retired
+/academy-affiliate-program/ / 301!
+/academy-affiliate-program / 301!
+/academy-affiliate-program.html / 301!
+/affiliate-dashboard/ / 301!
+/affiliate-dashboard / 301!
+/affiliate-dashboard.html / 301!
+/affiliate-dashboard.html/ / 301!
+/affiliate-login/ / 301!
+/affiliate-login / 301!
+/affiliate-login.html / 301!
+/affiliate-login.html/ / 301!
+/affiliate-program/ / 301!
+/affiliate-program / 301!
+/affiliate-program.html / 301!
+/affiliate-program.html/ / 301!
+/affiliate-register/ / 301!
+/affiliate-register / 301!
+/affiliate-register.html / 301!
+/affiliate-register.html/ / 301!
+/affiliate-terms/ / 301!
+/affiliate-terms / 301!
+/affiliate-terms.html / 301!
+/affiliate-terms.html/ / 301!
+/blog/codename-one-affiliate-program/ / 301!
+/blog/codename-one-affiliate-program / 301!
+/blog/codename-one-affiliate-program.html / 301!
+/blog/codename-one-affiliate-program.html/ / 301!
+
 # How-Do-I legacy URL migrations
 /how-do-i.html/ /how-do-i/ 301!
 /how-do-i.html /how-do-i/ 301!
@@ -27,14 +56,9 @@
 
 # BEGIN: WP sitemap migration redirects (generated)
 /about-us.html/ /about-us/ 301!
-/academy-affiliate-program.html/ /academy-affiliate-program/ 301!
+/academy-affiliate-program.html/ / 301!
 /accepting-payments-with-zooz.html/ /accepting-payments-with-zooz/ 301!
 /advanced-build.html/ /advanced-build/ 301!
-/affiliate-dashboard.html/ /affiliate-dashboard/ 301!
-/affiliate-login.html/ /affiliate-login/ 301!
-/affiliate-program.html/ /affiliate-program/ 301!
-/affiliate-register.html/ /affiliate-register/ 301!
-/affiliate-terms.html/ /affiliate-terms/ 301!
 /api.html/ /api/ 301!
 /app-gallery.html/ /app-gallery/ 301!
 /architecture-of-the-gui-builder.html/ /architecture-of-the-gui-builder/ 301!
@@ -167,7 +191,6 @@
 /blog/codename-one-4-0-taxi-live.html/ /blog/codename-one-4-0-taxi-live/ 301!
 /blog/codename-one-5-0-social-live.html/ /blog/codename-one-5-0-social-live/ 301!
 /blog/codename-one-6-0-chat-live.html/ /blog/codename-one-6-0-chat-live/ 301!
-/blog/codename-one-affiliate-program.html/ /blog/codename-one-affiliate-program/ 301!
 /blog/codename-one-article-in-sdj.html/ /blog/codename-one-article-in-sdj/ 301!
 /blog/codename-one-benchmarked-with-amazing-results.html/ /blog/codename-one-benchmarked-with-amazing-results/ 301!
 /blog/codename-one-charts.html/ /blog/codename-one-charts/ 301!

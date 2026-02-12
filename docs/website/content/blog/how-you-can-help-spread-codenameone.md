@@ -33,7 +33,6 @@ If you have accounts in any of those networks listed below, we’d appreciate th
   * __ Follow & engage on [social media](https://linktr.ee/codenameone)
   * __ Download, rate & review our [app](https://play.google.com/store/apps/details?id=com.codename1.build.app)
   * __ Enroll & share our courses on [Codename One Academy](https://codenameone.teachable.com/)
-  * __ Join our [affiliate program](https://www.codenameone.com/affiliate-program.html) and earn recurring commissions
 
 ### What Else?
 

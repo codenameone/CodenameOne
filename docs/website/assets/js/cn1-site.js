@@ -93,4 +93,41 @@
   } else if (scheme.addListener) {
     scheme.addListener(updateThemeUi);
   }
+
+  document.querySelectorAll("[data-cn1-tabs]").forEach((tabs) => {
+    const triggers = Array.from(tabs.querySelectorAll("[data-cn1-tab-trigger]"));
+    if (!triggers.length) return;
+    const scope = tabs.closest("article, section, main, body") || document;
+    const panels = triggers
+      .map((trigger) =>
+        scope.querySelector(
+          `[data-cn1-tab-panel="${trigger.getAttribute("data-cn1-tab-trigger")}"]`
+        )
+      )
+      .filter(Boolean);
+
+    const setActive = (name) => {
+      triggers.forEach((trigger) => {
+        const active = trigger.getAttribute("data-cn1-tab-trigger") === name;
+        trigger.classList.toggle("is-active", active);
+      });
+      panels.forEach((panel) => {
+        const active = panel.getAttribute("data-cn1-tab-panel") === name;
+        panel.classList.toggle("is-active", active);
+        panel.hidden = !active;
+      });
+    };
+
+    triggers.forEach((trigger) => {
+      trigger.addEventListener("click", () => {
+        setActive(trigger.getAttribute("data-cn1-tab-trigger"));
+      });
+    });
+
+    const initial = tabs.querySelector("[data-cn1-tab-trigger].is-active");
+    setActive(
+      (initial && initial.getAttribute("data-cn1-tab-trigger")) ||
+        triggers[0].getAttribute("data-cn1-tab-trigger")
+    );
+  });
 })();
