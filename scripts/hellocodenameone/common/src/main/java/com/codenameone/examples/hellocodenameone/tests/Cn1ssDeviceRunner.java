@@ -151,17 +151,17 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     private static void dumpDiagnostics(String reason) {
         try {
-            log("CN1SS:ERR:capturing java thread dump reason=" + reason);
             Thread current = Thread.currentThread();
-            for (java.util.Map.Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
-                Thread t = e.getKey();
-                log("CN1SS:THREAD:name=" + t.getName() + " id=" + t.getId() + " state=" + t.getState() + " current=" + (t == current));
-                for (StackTraceElement ste : e.getValue()) {
-                    log("CN1SS:STACK:" + ste);
+            log("CN1SS:ERR:capturing java stack reason=" + reason + " thread=" + current.getName());
+            String stack = Display.getInstance().getStackTrace(current, new RuntimeException("CN1SS diagnostics: " + reason));
+            for (String s : StringUtil.tokenize(stack, '\n')) {
+                if (s.length() > 400) {
+                    s = s.substring(0, 400);
                 }
+                log("CN1SS:STACK:" + s);
             }
         } catch (Throwable t) {
-            log("CN1SS:ERR:failed to capture java thread dump=" + t);
+            log("CN1SS:ERR:failed to capture java stack=" + t);
         }
 
         try {
