@@ -29,13 +29,13 @@ interface Cn1ssDeviceRunnerHelper {
         }
     }
 
-    static void emitCurrentFormScreenshot(String testName) {
+    static boolean emitCurrentFormScreenshot(String testName) {
         String safeName = sanitizeTestName(testName);
         Form current = Display.getInstance().getCurrent();
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
             println("CN1SS:END:" + safeName);
-            return;
+            return false;
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
@@ -43,14 +43,14 @@ interface Cn1ssDeviceRunnerHelper {
         if (screenshot == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Unable to capture screenshot");
             println("CN1SS:END:" + safeName);
-            return;
+            return false;
         }
         try {
             ImageIO io = ImageIO.getImageIO();
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
                 println("CN1SS:END:" + safeName);
-                return;
+                return false;
             }
             if(Display.getInstance().isSimulator()) {
                 io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
@@ -67,10 +67,12 @@ interface Cn1ssDeviceRunnerHelper {
             } else {
                 println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
             }
+            return true;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
             Log.e(ex);
             println("CN1SS:END:" + safeName);
+            return false;
         } finally {
             screenshot.dispose();
         }

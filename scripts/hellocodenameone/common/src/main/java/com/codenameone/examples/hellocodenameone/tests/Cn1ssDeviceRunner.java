@@ -83,6 +83,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     public void runSuite() {
+        boolean suiteFailed = false;
         CN.callSerially(() -> {
             Display.getInstance().addEdtErrorHandler(e -> {
                 log("CN1SS:ERR:exception caught in EDT " + e.getSource());
@@ -105,6 +106,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 } catch (Throwable t) {
                     log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
                     t.printStackTrace();
+                    testClass.fail("Unhandled exception: " + t.getMessage());
                 }
             });
             int timeout = 30000;
@@ -115,8 +117,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             testClass.cleanup();
             if(timeout == 0) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed due to timeout waiting for DONE");
+                suiteFailed = true;
             } else if (testClass.isFailed()) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed: " + testClass.getFailMessage());
+                suiteFailed = true;
             } else {
                 if (!testClass.shouldTakeScreenshot()) {
                     log("CN1SS:INFO:test=" + testClass + " screenshot=none");
@@ -125,7 +129,13 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             log("CN1SS:INFO:suite finished test=" + testClass);
         }
         log("CN1SS:SUITE:FINISHED");
+        if (suiteFailed) {
+            log("CN1SS:ERR:suite failed due to one or more test errors");
+        }
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
+        if (suiteFailed) {
+            throw new RuntimeException("CN1SS suite failed");
+        }
         if (CN.isSimulator()) {
             Display.getInstance().exitApplication();
         }
