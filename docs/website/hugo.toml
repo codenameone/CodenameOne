@@ -3,6 +3,12 @@ languageCode = 'en-us'
 title = 'Codename One'
 theme = "PaperMod"
 
+[outputFormats.Feed]
+mediaType = "application/rss+xml"
+baseName = "feed"
+isPlainText = false
+rel = "alternate"
+
 [params]
 defaultTheme = "dark"
 disableThemeToggle = true
