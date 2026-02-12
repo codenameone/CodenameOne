@@ -3,10 +3,12 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.io.Util;
 import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
+import com.codename1.system.NativeLookup;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.util.StringUtil;
+import com.codenameone.examples.hellocodenameone.TestDiagnosticsNative;
 import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
@@ -117,9 +119,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             testClass.cleanup();
             if(timeout == 0) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed due to timeout waiting for DONE");
+                dumpDiagnostics("timeout test=" + testClass);
                 suiteFailed = true;
             } else if (testClass.isFailed()) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed: " + testClass.getFailMessage());
+                dumpDiagnostics("failure test=" + testClass + " message=" + testClass.getFailMessage());
                 suiteFailed = true;
             } else {
                 if (!testClass.shouldTakeScreenshot()) {
@@ -143,6 +147,33 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     private static void log(String msg) {
         System.out.println(msg);
+    }
+
+    private static void dumpDiagnostics(String reason) {
+        try {
+            log("CN1SS:ERR:capturing java thread dump reason=" + reason);
+            Thread current = Thread.currentThread();
+            for (java.util.Map.Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+                Thread t = e.getKey();
+                log("CN1SS:THREAD:name=" + t.getName() + " id=" + t.getId() + " state=" + t.getState() + " daemon=" + t.isDaemon() + " current=" + (t == current));
+                for (StackTraceElement ste : e.getValue()) {
+                    log("CN1SS:STACK:" + ste);
+                }
+            }
+        } catch (Throwable t) {
+            log("CN1SS:ERR:failed to capture java thread dump=" + t);
+        }
+
+        try {
+            TestDiagnosticsNative nativeDiagnostics = NativeLookup.create(TestDiagnosticsNative.class);
+            if (nativeDiagnostics != null && nativeDiagnostics.isSupported()) {
+                nativeDiagnostics.dumpNativeThreads(reason);
+            } else {
+                log("CN1SS:INFO:native thread dump unsupported");
+            }
+        } catch (Throwable t) {
+            log("CN1SS:ERR:failed to capture native thread dump=" + t);
+        }
     }
 
     @Override
