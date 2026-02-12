@@ -111,6 +111,9 @@ interface Cn1ssDeviceRunnerHelper {
                 screenshot.dispose();
                 screenshot = null;
                 Util.sleep(250);
+            } else {
+                screenshot.dispose();
+                screenshot = null;
             }
         }
         return screenshot;

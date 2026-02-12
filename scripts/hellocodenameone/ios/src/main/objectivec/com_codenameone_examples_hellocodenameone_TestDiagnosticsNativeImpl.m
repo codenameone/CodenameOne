@@ -17,6 +17,14 @@
     }
 }
 
+-(void)failFastWithNativeThreadDump:(NSString*)reason {
+    NSString *label = reason != nil ? reason : @"unspecified";
+    NSLog(@"CN1SS:NATIVE:FAIL_FAST:BEGIN reason=%@", label);
+    [self dumpNativeThreads:label];
+    NSLog(@"CN1SS:NATIVE:FAIL_FAST:ABORT reason=%@", label);
+    abort();
+}
+
 -(BOOL)isSupported{
     return YES;
 }

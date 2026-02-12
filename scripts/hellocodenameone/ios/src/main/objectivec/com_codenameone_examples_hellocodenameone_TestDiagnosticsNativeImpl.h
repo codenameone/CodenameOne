@@ -4,6 +4,7 @@
 }
 
 -(void)dumpNativeThreads:(NSString*)reason;
+-(void)failFastWithNativeThreadDump:(NSString*)reason;
 -(BOOL)isSupported;
 
 @end

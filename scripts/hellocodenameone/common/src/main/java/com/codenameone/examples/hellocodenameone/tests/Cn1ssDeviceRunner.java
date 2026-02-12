@@ -138,6 +138,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         }
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
         if (suiteFailed) {
+            failFastWithNativeCrash("CN1SS suite failed");
             throw new RuntimeException("CN1SS suite failed");
         }
         if (CN.isSimulator()) {
@@ -173,6 +174,17 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
         } catch (Throwable t) {
             log("CN1SS:ERR:failed to capture native thread dump=" + t);
+        }
+    }
+
+    private static void failFastWithNativeCrash(String reason) {
+        try {
+            TestDiagnosticsNative nativeDiagnostics = NativeLookup.create(TestDiagnosticsNative.class);
+            if (nativeDiagnostics != null && nativeDiagnostics.isSupported()) {
+                nativeDiagnostics.failFastWithNativeThreadDump(reason);
+            }
+        } catch (Throwable t) {
+            log("CN1SS:ERR:failed to invoke native fail-fast dump=" + t);
         }
     }
 
