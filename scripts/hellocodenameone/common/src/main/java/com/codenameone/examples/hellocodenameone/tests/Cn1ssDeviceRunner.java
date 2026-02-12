@@ -86,6 +86,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     public void runSuite() {
         boolean suiteFailed = false;
+        enableNativeCrashSignalLogging();
         CN.callSerially(() -> {
             Display.getInstance().addEdtErrorHandler(e -> {
                 log("CN1SS:ERR:exception caught in EDT " + e.getSource());
@@ -185,6 +186,17 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
         } catch (Throwable t) {
             log("CN1SS:ERR:failed to invoke native fail-fast dump=" + t);
+        }
+    }
+
+    private static void enableNativeCrashSignalLogging() {
+        try {
+            TestDiagnosticsNative nativeDiagnostics = NativeLookup.create(TestDiagnosticsNative.class);
+            if (nativeDiagnostics != null && nativeDiagnostics.isSupported()) {
+                nativeDiagnostics.enableNativeCrashSignalLogging("CN1SS runSuite start");
+            }
+        } catch (Throwable t) {
+            log("CN1SS:ERR:failed to install native crash signal handlers=" + t);
         }
     }
 

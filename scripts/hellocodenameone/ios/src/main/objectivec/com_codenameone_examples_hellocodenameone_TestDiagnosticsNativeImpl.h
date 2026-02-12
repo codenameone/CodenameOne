@@ -5,6 +5,7 @@
 
 -(void)dumpNativeThreads:(NSString*)reason;
 -(void)failFastWithNativeThreadDump:(NSString*)reason;
+-(void)enableNativeCrashSignalLogging:(NSString*)reason;
 -(BOOL)isSupported;
 
 @end
