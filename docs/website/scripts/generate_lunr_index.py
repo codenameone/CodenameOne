@@ -25,8 +25,8 @@ TAG_RE = re.compile(r"<[^>]+>")
 
 
 def clean_html_text(raw: str) -> str:
-    raw = re.sub(r"<script\b[^>]*>.*?</script\s*>", " ", raw, flags=re.I | re.S)
-    raw = re.sub(r"<style\b[^>]*>.*?</style\s*>", " ", raw, flags=re.I | re.S)
+    raw = re.sub(r"<script\b[^>]*>.*?</script(?:\s+[^>]*)?>", " ", raw, flags=re.I | re.S)
+    raw = re.sub(r"<style\b[^>]*>.*?</style(?:\s+[^>]*)?>", " ", raw, flags=re.I | re.S)
     text = TAG_RE.sub(" ", raw)
     text = html.unescape(text)
     text = WS_RE.sub(" ", text).strip()
