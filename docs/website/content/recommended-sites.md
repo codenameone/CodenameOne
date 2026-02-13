@@ -12,6 +12,4 @@ Websites and service recommended by Codename One.
 
 **[• Crisp:](https://crisp.chat/en/)** Our preferred live chat and email provider.
 
-**[• Paddle:](https://paddle.com/)** Our preferred payment gateway.
-
 **[• Mac Mini Vault:](https://www.macminivault.com/)** Our preferred Mac build server.

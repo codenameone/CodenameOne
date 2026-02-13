@@ -33,7 +33,7 @@
         <li>Community support</li>
         <li>Royalty free</li>
       </ul>
-      <a class="cn1-price-card__cta" href="https://cloud.codenameone.com/secure/index.html">Sign Up</a>
+      <a class="cn1-price-card__cta" href="https://cloud.codenameone.com/secure/index.html" target="_blank" rel="noopener noreferrer">Sign Up</a>
     </article>
 
     <article class="cn1-price-card" data-plan="basic" data-monthly="29" data-annual-monthly="25" data-annual-total="300">
@@ -49,15 +49,15 @@
         <li>50 MB build JAR size</li>
         <li>Push notifications (5K/month)</li>
       </ul>
-      <button
+      <a
         class="cn1-price-card__cta"
-        type="button"
-        data-paddle-checkout
-        data-product-monthly="750561"
-        data-product-annual="750562"
-        data-success-url="https://www.codenameone.com/thank-you-basic.html">
+        data-signup-link
+        data-level="basic"
+        href="https://cloud.codenameone.com/secure/signup?level=basic&mode=monthly"
+        target="_blank"
+        rel="noopener noreferrer">
         Sign Up
-      </button>
+      </a>
     </article>
 
     <article class="cn1-price-card cn1-price-card--featured" data-plan="pro" data-monthly="99" data-annual-monthly="85" data-annual-total="1020">
@@ -76,15 +76,15 @@
         <li>Email support</li>
         <li>Concurrent builds</li>
       </ul>
-      <button
+      <a
         class="cn1-price-card__cta"
-        type="button"
-        data-paddle-checkout
-        data-product-monthly="750560"
-        data-product-annual="750559"
-        data-success-url="https://www.codenameone.com/thank-you-pro.html">
+        data-signup-link
+        data-level="pro"
+        href="https://cloud.codenameone.com/secure/signup?level=pro&mode=monthly"
+        target="_blank"
+        rel="noopener noreferrer">
         Start 14-Day Trial
-      </button>
+      </a>
     </article>
 
     <article class="cn1-price-card" data-plan="enterprise" data-monthly="499" data-annual-monthly="450" data-annual-total="5400">
@@ -103,15 +103,15 @@
         <li>Push notifications (10M/month)</li>
         <li>Phone support (office hours)</li>
       </ul>
-      <button
+      <a
         class="cn1-price-card__cta"
-        type="button"
-        data-paddle-checkout
-        data-product-monthly="750558"
-        data-product-annual="634082"
-        data-success-url="https://www.codenameone.com/thank-you-enterprise.html">
+        data-signup-link
+        data-level="enterprise"
+        href="https://cloud.codenameone.com/secure/signup?level=enterprise&mode=monthly"
+        target="_blank"
+        rel="noopener noreferrer">
         Sign Up
-      </button>
+      </a>
     </article>
   </section>
 
@@ -127,5 +127,4 @@
   </section>
   {{- end }}
 </article>
-<script src="https://cdn.paddle.com/paddle/paddle.js"></script>
 {{- end -}}

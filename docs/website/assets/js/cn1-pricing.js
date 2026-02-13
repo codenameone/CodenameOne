@@ -1,63 +1,15 @@
 (() => {
   const root = document.querySelector("[data-billing-toggle]");
-  const checkoutButtons = Array.from(document.querySelectorAll("[data-paddle-checkout]"));
-  if (!root && checkoutButtons.length === 0) return;
+  const signupLinks = Array.from(document.querySelectorAll("[data-signup-link][data-level]"));
+  if (!root && signupLinks.length === 0) return;
 
   const buttons = root ? Array.from(root.querySelectorAll("[data-billing]")) : [];
   const hint = root ? root.querySelector("[data-billing-hint]") : null;
   const cards = Array.from(document.querySelectorAll(".cn1-price-card[data-plan]"));
-  let currentMode = "monthly";
-
-  const setupPaddle = () => {
-    if (!window.Paddle || typeof window.Paddle.Setup !== "function") return false;
-    if (!window.__cn1PaddleInitialized) {
-      window.Paddle.Setup({ vendor: 122248 });
-      window.__cn1PaddleInitialized = true;
-    }
-    return true;
-  };
-
-  const resolveEmail = () => {
-    const cached = localStorage.getItem("cn1_checkout_email") || "";
-    const input = window.prompt("Enter your email for checkout:", cached);
-    if (!input) return null;
-    const email = input.trim();
-    if (!email || !email.includes("@")) {
-      window.alert("Please enter a valid email address.");
-      return null;
-    }
-    localStorage.setItem("cn1_checkout_email", email);
-    return email;
-  };
-
-  const wireCheckout = () => {
-    checkoutButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        if (!setupPaddle()) {
-          window.alert("Checkout is temporarily unavailable. Please try again in a moment.");
-          return;
-        }
-        const email = resolveEmail();
-        if (!email) return;
-
-        const product = currentMode === "annual"
-          ? button.dataset.productAnnual
-          : button.dataset.productMonthly;
-        const success = button.dataset.successUrl || "https://www.codenameone.com/pricing/";
-        if (!product) return;
-
-        window.Paddle.Checkout.open({
-          product,
-          marketingConsent: "1",
-          success,
-          email
-        });
-      });
-    });
-  };
+  const buildSignupUrl = (level, mode) =>
+    `https://cloud.codenameone.com/secure/signup?level=${encodeURIComponent(level)}&mode=${encodeURIComponent(mode)}`;
 
   const update = (mode) => {
-    currentMode = mode;
     if (root) {
       root.dataset.billingMode = mode;
     }
@@ -86,6 +38,12 @@
       }
     });
 
+    signupLinks.forEach((link) => {
+      const level = (link.dataset.level || "").toLowerCase();
+      if (!level) return;
+      link.href = buildSignupUrl(level, mode);
+    });
+
     if (hint) {
       hint.textContent = mode === "annual"
         ? "Annual billing selected. Prices shown are monthly equivalents with yearly billing."
@@ -98,5 +56,4 @@
   });
 
   update("monthly");
-  wireCheckout();
 })();

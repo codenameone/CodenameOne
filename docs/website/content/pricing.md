@@ -30,7 +30,7 @@ You can still use generated apps commercially. Paid plans mainly add higher quot
 Yes. Codename One includes a 30-day money back guarantee for paid purchases.
 
 ### What payment methods do you accept?
-Credit card, debit card, and PayPal via Paddle.
+Credit card and debit card through the Codename One secure signup flow.
 
 For annual Pro/Enterprise subscriptions, SWIFT transfer and invoicing are available. Use the site chat to request a pro-forma invoice.
 
