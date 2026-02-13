@@ -5,22 +5,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'docs/website/**'
-      - 'docs/developer-guide/**'
-      - 'CodenameOne/src/**'
-      - 'Ports/CLDC11/src/**'
-      - 'maven/javadoc-resources/**'
-      - '.github/scripts/build_javadocs.sh'
       - 'scripts/website/**'
       - '.github/workflows/website-docs.yml'
   push:
     branches: [main, master]
     paths:
       - 'docs/website/**'
-      - 'docs/developer-guide/**'
-      - 'CodenameOne/src/**'
-      - 'Ports/CLDC11/src/**'
-      - 'maven/javadoc-resources/**'
-      - '.github/scripts/build_javadocs.sh'
       - 'scripts/website/**'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
