@@ -94,4 +94,4 @@ jobs:
           command: >-
             pages deploy docs/website/public
             --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME || secrets.CLOUDFLARE_PAGES_PROJECT_NAME || secrets.CF_PAGES_PROJECT_NAME || 'codenameone' }}
-            --branch=${{ github.ref_name }}
+            --branch=${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || secrets.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
