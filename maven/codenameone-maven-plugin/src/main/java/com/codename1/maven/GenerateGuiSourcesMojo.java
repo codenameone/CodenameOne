@@ -316,7 +316,7 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
     }
 
     private static String writeXmlDocumentToString(Document xmlDocument) throws IOException {
-        TransformerFactory tf = TransformerFactory.newInstance();
+        TransformerFactory tf = createTransformerFactory();
         Transformer transformer;
         try {
             transformer = tf.newTransformer();
@@ -333,6 +333,23 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
             throw new IOException("Failed to output CodeRAD as XML document", e);
         }
 
+    }
+
+    private static TransformerFactory createTransformerFactory() {
+        try {
+            return TransformerFactory.newInstance();
+        } catch (Error ex) {
+            return createJdkTransformerFactory(ex);
+        }
+    }
+
+    private static TransformerFactory createJdkTransformerFactory(Error rootCause) {
+        try {
+            return TransformerFactory.newInstance("com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl", GenerateGuiSourcesMojo.class.getClassLoader());
+        } catch (Throwable fallbackError) {
+            rootCause.addSuppressed(fallbackError);
+            throw rootCause;
+        }
     }
 
 
