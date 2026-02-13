@@ -40,7 +40,7 @@ build_developer_guide_for_site() {
     return
   fi
 
-  if ! command -v asciidoctor >/dev/null 2>&1 || ! command -v asciidoctor-pdf >/dev/null 2>&1; then
+  if ! command -v asciidoctor >/dev/null 2>&1; then
     echo "Asciidoctor tooling is required when WEBSITE_INCLUDE_DEVGUIDE=true." >&2
     exit 1
   fi
@@ -48,12 +48,11 @@ build_developer_guide_for_site() {
   echo "Building fresh Developer Guide for website..." >&2
   local output_root="${REPO_ROOT}/build/website-developer-guide"
   local html_out="${output_root}/html"
-  local pdf_out="${output_root}/pdf"
   local manual_dir="${WEBSITE_DIR}/static/manual"
   local source_dir="${REPO_ROOT}/docs/developer-guide"
 
   rm -rf "${output_root}" "${manual_dir}"
-  mkdir -p "${html_out}" "${pdf_out}" "${manual_dir}" "${WEBSITE_DIR}/static/files"
+  mkdir -p "${html_out}" "${manual_dir}"
 
   (
     cd "${REPO_ROOT}"
@@ -62,10 +61,6 @@ build_developer_guide_for_site() {
       -o developer-guide.html \
       docs/developer-guide/developer-guide.asciidoc
 
-    asciidoctor-pdf \
-      -D "${pdf_out}" \
-      -o developer-guide.pdf \
-      docs/developer-guide/developer-guide.asciidoc
   )
 
   cp "${html_out}/developer-guide.html" "${manual_dir}/index.html"
@@ -78,8 +73,6 @@ build_developer_guide_for_site() {
       cp -R "${asset_dir}" "${manual_dir}/"
     fi
   done
-
-  cp "${pdf_out}/developer-guide.pdf" "${WEBSITE_DIR}/static/files/developer-guide.pdf"
 }
 
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then

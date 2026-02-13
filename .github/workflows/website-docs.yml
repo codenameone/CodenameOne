@@ -58,7 +58,7 @@ jobs:
       - name: Install Asciidoctor tooling
         run: |
           set -euo pipefail
-          gem install --no-document asciidoctor asciidoctor-pdf rouge
+          gem install --no-document asciidoctor rouge
 
       - name: Build website
         run: |
