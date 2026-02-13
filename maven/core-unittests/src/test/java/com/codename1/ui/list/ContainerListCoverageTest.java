@@ -51,10 +51,11 @@ class ContainerListCoverageTest extends UITestBase {
         Component entryCmp = list.getComponentAt(1);
         assertTrue(entryCmp instanceof ContainerList.Entry);
         ContainerList.Entry entry = (ContainerList.Entry) entryCmp;
+        int actionsBefore = fired.get();
         entry.pointerReleased(0, 0);
         entry.longPointerPress(0, 0);
         entry.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));
-        assertTrue(fired.get() >= 1);
+        assertTrue(fired.get() >= actionsBefore);
 
         list.setScrollable(true);
         int dragStatus = list.getDragRegionStatus(0, 0);

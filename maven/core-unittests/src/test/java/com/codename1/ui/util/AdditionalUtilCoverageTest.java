@@ -58,8 +58,10 @@ class AdditionalUtilCoverageTest extends UITestBase {
         assertEquals(2, mirroredDefault.getWidth());
         Image mirroredSpacing = Effects.reflectionImage(base, 0.5f, 200, 1);
         assertEquals(base.getHeight() + 1 + 1, mirroredSpacing.getHeight());
+        int blurInvocationsBefore = implementation.getGaussianBlurInvocations();
         Image blurred = Effects.gaussianBlurImage(base, 0.5f);
-        assertEquals(implementation.getGaussianBlurInvocations(), 1);
+        assertEquals(blurInvocationsBefore + 1, implementation.getGaussianBlurInvocations());
+        assertNotNull(blurred);
         assertTrue(Effects.isGaussianBlurSupported());
     }
 

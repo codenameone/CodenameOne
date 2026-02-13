@@ -104,6 +104,7 @@ class BorderAndPlafTest extends UITestBase {
         label.getStyle().setBgColor(0xffffff);
         label.getStyle().setBorder(border);
 
+        implementation.setShapeSupported(true);
         implementation.resetShapeTracking();
         Graphics testGraphics = Image.createImage(30, 20).getGraphics();
         border.paintBorderBackground(testGraphics, label);
