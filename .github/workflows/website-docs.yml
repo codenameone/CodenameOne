@@ -72,8 +72,13 @@ jobs:
           path: docs/website/public
           if-no-files-found: error
 
+      - name: Check Cloudflare deploy credentials
+        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && (secrets.CLOUDFLARE_API_TOKEN == '' && secrets.CF_API_TOKEN == '') }}
+        run: |
+          echo "::warning::Skipping Cloudflare Pages deploy because no API token secret is configured. Set CLOUDFLARE_API_TOKEN (preferred) or CF_API_TOKEN."
+
       - name: Deploy to Cloudflare Pages
-        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') }}
+        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && (secrets.CLOUDFLARE_API_TOKEN != '' || secrets.CF_API_TOKEN != '') }}
         uses: cloudflare/wrangler-action@v3
         env:
           # Keep these env vars explicit so Wrangler can authenticate in non-interactive CI.
