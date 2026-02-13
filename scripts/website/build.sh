@@ -15,11 +15,80 @@ HUGO_ENVIRONMENT="${HUGO_ENVIRONMENT:-production}"
 HUGO_MINIFY="${HUGO_MINIFY:-true}"
 HUGO_BASEURL="${HUGO_BASEURL:-https://www.codenameone.com/}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+WEBSITE_INCLUDE_JAVADOCS="${WEBSITE_INCLUDE_JAVADOCS:-false}"
+WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-false}"
+
+build_javadocs_for_site() {
+  if [ "${WEBSITE_INCLUDE_JAVADOCS}" != "true" ]; then
+    return
+  fi
+
+  echo "Building fresh JavaDocs for website..." >&2
+  (
+    cd "${REPO_ROOT}"
+    ./.github/scripts/build_javadocs.sh
+  )
+
+  rm -rf "${WEBSITE_DIR}/static/javadoc"
+  mkdir -p "${WEBSITE_DIR}/static/javadoc" "${WEBSITE_DIR}/static/files"
+  cp -a "${REPO_ROOT}/CodenameOne/dist/javadoc/." "${WEBSITE_DIR}/static/javadoc/"
+  cp "${REPO_ROOT}/CodenameOne/javadocs.zip" "${WEBSITE_DIR}/static/files/javadocs.zip"
+}
+
+build_developer_guide_for_site() {
+  if [ "${WEBSITE_INCLUDE_DEVGUIDE}" != "true" ]; then
+    return
+  fi
+
+  if ! command -v asciidoctor >/dev/null 2>&1 || ! command -v asciidoctor-pdf >/dev/null 2>&1; then
+    echo "Asciidoctor tooling is required when WEBSITE_INCLUDE_DEVGUIDE=true." >&2
+    exit 1
+  fi
+
+  echo "Building fresh Developer Guide for website..." >&2
+  local output_root="${REPO_ROOT}/build/website-developer-guide"
+  local html_out="${output_root}/html"
+  local pdf_out="${output_root}/pdf"
+  local manual_dir="${WEBSITE_DIR}/static/manual"
+  local source_dir="${REPO_ROOT}/docs/developer-guide"
+
+  rm -rf "${output_root}" "${manual_dir}"
+  mkdir -p "${html_out}" "${pdf_out}" "${manual_dir}" "${WEBSITE_DIR}/static/files"
+
+  (
+    cd "${REPO_ROOT}"
+    asciidoctor \
+      -D "${html_out}" \
+      -o developer-guide.html \
+      docs/developer-guide/developer-guide.asciidoc
+
+    asciidoctor-pdf \
+      -D "${pdf_out}" \
+      -o developer-guide.pdf \
+      docs/developer-guide/developer-guide.asciidoc
+  )
+
+  cp "${html_out}/developer-guide.html" "${manual_dir}/index.html"
+  cp "${html_out}/developer-guide.html" "${WEBSITE_DIR}/static/developer-guide.html"
+
+  for asset_dir in "${source_dir}"/*; do
+    local base_name
+    base_name="$(basename "${asset_dir}")"
+    if [ -d "${asset_dir}" ] && [ "${base_name}" != "sketch" ]; then
+      cp -R "${asset_dir}" "${manual_dir}/"
+    fi
+  done
+
+  cp "${pdf_out}/developer-guide.pdf" "${WEBSITE_DIR}/static/files/developer-guide.pdf"
+}
 
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
   echo "Hugo binary not found. Install Hugo (extended) and retry." >&2
   exit 1
 fi
+
+build_javadocs_for_site
+build_developer_guide_for_site
 
 cd "${WEBSITE_DIR}"
 
