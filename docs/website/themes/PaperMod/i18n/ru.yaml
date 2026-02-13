@@ -1,0 +1,39 @@
+- id: prev_page
+  translation: "Предыдущая"
+
+- id: next_page
+  translation: "Следующая"
+
+- id: read_time
+  translation:
+    zero: "0 минут"
+    one: "1 минута"
+    few: "{{ .Count }} минуты"
+    many: "{{ .Count }} минут"
+    other: "{{ .Count }} минута"
+
+- id: words
+  translation:
+    zero: "0 слов"
+    one: "1 слово"
+    few: "{{ .Count }} слова"
+    many: "{{ .Count }} слов"
+    other: "{{ .Count }} слово"
+
+- id: toc
+  translation: "Оглавление"
+
+- id: translations
+  translation: "Переводы"
+
+- id: home
+  translation: "Главная"
+
+- id: edit_post
+  translation: "Редактировать"
+
+- id: code_copy
+  translation: "копировать"
+
+- id: code_copied
+  translation: "скопировано!"

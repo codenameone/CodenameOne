@@ -1,0 +1,96 @@
+.cn1-menu-search-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  min-width: 1.25rem;
+}
+
+.cn1-search-shell {
+  border: 1px solid rgba(29, 82, 255, 0.35);
+  border-radius: 14px;
+  padding: 1rem;
+  background: rgba(68, 82, 123, 0.22);
+}
+
+body.light .cn1-search-shell {
+  background: #f5f8ff;
+  border-color: #d7e2ff;
+}
+
+.cn1-search-label {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: var(--cn1-course-link, #afc1ff);
+}
+
+.cn1-search-input {
+  width: 100%;
+  border: 1px solid rgba(175, 193, 255, 0.4);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  background: rgba(8, 17, 55, 0.5);
+  color: #f5f8ff;
+  font-family: "Poppins", sans-serif;
+  font-size: 0.98rem;
+}
+
+body.light .cn1-search-input {
+  background: #fff;
+  color: #1c2a55;
+  border-color: #c9d6ff;
+}
+
+.cn1-search-status {
+  margin: 0.7rem 0 0;
+  font-size: 0.86rem;
+  color: var(--cn1-course-soft-text, rgba(217, 228, 255, 0.85));
+}
+
+.cn1-search-results {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.cn1-search-result {
+  border: 1px solid rgba(175, 193, 255, 0.25);
+  border-radius: 10px;
+  padding: 0.75rem 0.8rem;
+  background: rgba(8, 17, 55, 0.22);
+}
+
+body.light .cn1-search-result {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: #d7e2ff;
+}
+
+.cn1-search-result h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.cn1-search-result h2 a {
+  color: var(--cn1-course-link-strong, #f5f8ff);
+  text-decoration: none;
+}
+
+.cn1-search-result h2 a:hover {
+  color: var(--cn1-course-link, #afc1ff);
+}
+
+.cn1-search-result p {
+  margin: 0.4rem 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--cn1-course-soft-text, rgba(217, 228, 255, 0.85));
+}
+
+.cn1-search-result__url {
+  font-size: 0.8rem;
+  text-decoration: none;
+  color: var(--cn1-course-link, #afc1ff);
+}

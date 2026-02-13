@@ -1,0 +1,391 @@
+{{- define "main" -}}
+<section class="cn1-hero">
+  <div class="cn1-hero__content">
+    <p class="cn1-hero__eyebrow">Write Once, Run Anywhere</p>
+    <h1 class="cn1-hero__title">Make Your Java Code Native Everywhere!</h1>
+    <p class="cn1-hero__platforms">
+      <i class="fab fa-android" aria-label="Android"></i>
+      <i class="fab fa-apple" aria-label="iOS"></i>
+      <i class="fab fa-windows" aria-label="Windows"></i>
+      <i class="fab fa-js-square" aria-label="JavaScript"></i>
+    </p>
+    <p class="cn1-hero__copy">
+      An open-source mobile first toolkit for building high quality, cross-platform native apps for Android, iOS, Desktop and Web.
+    </p>
+    <p class="cn1-hero__trust">Trusted by 40k+ developers</p>
+    <div class="cn1-hero__actions">
+      <a class="cn1-btn cn1-btn--primary" href="/getting-started/">Build an App</a>
+      <a class="cn1-btn cn1-btn--ghost" href="https://github.com/codenameone/CodenameOne">Star</a>
+    </div>
+  </div>
+  <div class="cn1-hero__art">
+    <img src="/uploads/CN1-Hero-illustration-1-1024x787.png" alt="Codename One cross-platform illustration">
+  </div>
+</section>
+
+<section class="cn1-band">
+  <h2>
+    <span>Write Once</span>
+    <span class="cn1-band__icons" aria-hidden="true">
+      <i class="fas fa-mug-hot"></i>
+    </span>
+    <span>Run Anywhere</span>
+    <span class="cn1-band__icons" aria-hidden="true">
+      <i class="fab fa-android"></i>
+      <i class="fab fa-windows"></i>
+      <i class="fab fa-apple"></i>
+      <i class="fab fa-js-square"></i>
+    </span>
+  </h2>
+</section>
+
+<section class="cn1-cards">
+  <article class="cn1-card">
+    <h3>One Codebase, Multiple Apps</h3>
+    <p>Rapid cross-platform app development using <strong>Java</strong> or <strong>Kotlin</strong> with <strong>100% code reuse</strong>. Apps are compiled down to native code for maximum performance and a smooth user experience.</p>
+    <a href="/introduction/">Learn about the Architecture</a>
+  </article>
+  <article class="cn1-card">
+    <h3>Developer-friendly Tooling</h3>
+    <p>Write, debug, and test apps all inside your IDE (<strong>IntelliJ, Eclipse, VSCode or NetBeans</strong>) using the Codename One simulator.</p>
+    <a href="/development-environment/">Learn about the Development Environment</a>
+  </article>
+  <article class="cn1-card">
+    <h3>Pixel Perfect Design</h3>
+    <p>Build beautiful UI with Codename One's rich set of widgets. Native look and feel out of the box, but fully themeable using CSS.</p>
+    <div class="cn1-card__links">
+      <a href="/demos/">Demo Showcase</a>
+      <a href="https://www.codenameone.com/javadoc/com/codename1/ui/package-summary.html">Component Gallery</a>
+    </div>
+  </article>
+</section>
+
+<section class="cn1-why">
+  <h2>Why Codename One?</h2>
+  <div class="cn1-why__grid">
+    <article>
+      <i class="fas fa-mobile-alt" aria-hidden="true"></i>
+      <h3>Native Performance</h3>
+      <p>Compiles Java or Kotlin into native code for iOS, Android, desktop and JavaScript.</p>
+    </article>
+    <article>
+      <i class="fas fa-plug" aria-hidden="true"></i>
+      <h3>Extensible</h3>
+      <p>Easily extendable with a rich ecosystem of native and generic add-on libraries developed by Codename One and the community.</p>
+    </article>
+    <article>
+      <i class="fas fa-sync-alt" aria-hidden="true"></i>
+      <h3>Hot Reload</h3>
+      <p>Changes in your Java or Kotlin code are applied immediately to your already-running app in the simulator.</p>
+    </article>
+    <article>
+      <i class="fas fa-paint-brush" aria-hidden="true"></i>
+      <h3>CSS Live Update</h3>
+      <p>When you make changes to your app CSS stylesheet, changes are reflected instantly in the simulator.</p>
+    </article>
+    <article>
+      <i class="fas fa-certificate" aria-hidden="true"></i>
+      <h3>Established and Mature</h3>
+      <p>~180M apps installed across platforms and ~40k developers. Version 1.0 was released in 2012.</p>
+    </article>
+    <article>
+      <i class="fab fa-github" aria-hidden="true"></i>
+      <h3>Free and Open Source</h3>
+      <p>The core of Codename One is free and open source (GPL + CE), so it is free to use with commercial projects.</p>
+    </article>
+  </div>
+  <p class="cn1-why__cta"><a href="/introduction/">Explore the Features</a></p>
+</section>
+
+<section class="cn1-how">
+  <h2>How it works</h2>
+  <p class="cn1-how__intro">Codename One is a toolkit that allows you to easily build beautiful cross-platform apps targeting iOS, Android, and the web using Java or Kotlin.</p>
+  <div class="cn1-how__layout">
+    <div class="cn1-how__list">
+      <h3>What Codename One is...</h3>
+      <div class="cn1-accordion">
+        <article class="cn1-acc-item is-open">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="true">
+            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
+            <span>Runtime Library</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-down"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>A cross-platform runtime library tailored to mobile app development.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
+            <span>Build Tools</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Tools that convert JVM bytecode into platform-native executables via the cloud build service.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
+            <span>Add-Ons</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>A rich ecosystem of community and official add-on libraries.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
+            <span>Widgets</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Light-weight cross-platform UI components designed for mobile apps.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
+            <span>GUI Builder</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Drag-and-drop UI builder for rapid visual layout authoring.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
+            <span>Build Server</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Build app-store ready binaries without maintaining local native toolchains.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
+            <span>Simulator</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Run and debug the app instantly from your IDE.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+    <div class="cn1-how__diagram">
+      <img src="/uploads/codename-one-architecture-1.png" alt="Codename One architecture diagram">
+    </div>
+    <div class="cn1-how__list">
+      <h3>What Codename One is NOT...</h3>
+      <div class="cn1-accordion cn1-accordion--not">
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--no"><i class="fas fa-times"></i></span>
+            <span>HTML5/Javascript</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Codename One apps compile to native targets, not just wrapped web content.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item is-open">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="true">
+            <span class="cn1-acc-icon cn1-acc-icon--no"><i class="fas fa-minus"></i></span>
+            <span>Java bindings to Native Widgets and APIs</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-down"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Unlike some other toolkits that merely provide bindings to native components and APIs, Codename One's UI component library is light-weight and truly cross-platform. This provides 100% code reuse across platforms, not only for business logic, but for the UI also.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--q"><i class="fas fa-question"></i></span>
+            <span>Can I still use native widgets in my app?</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Yes. You can mix native widgets and lightweight widgets seamlessly.</p>
+          </div>
+        </article>
+        <article class="cn1-acc-item">
+          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
+            <span class="cn1-acc-icon cn1-acc-icon--q"><i class="fas fa-question"></i></span>
+            <span>Can I access native APIs in my app?</span>
+            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
+          </button>
+          <div class="cn1-acc-panel">
+            <p>Yes. Access both system APIs and third-party native frameworks.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cn1-made">
+  <h2>Made with Codename One</h2>
+  <div class="cn1-carousel" data-carousel>
+    <button class="cn1-carousel__prev" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+    <div class="cn1-carousel__viewport">
+      <div class="cn1-carousel__track">
+        <article class="cn1-carousel__slide is-active">
+          <img src="/uploads/arrivu.png" alt="Arrivu app screenshot">
+          <h3>Arrivu</h3>
+          <p>Voice/AI technology solutions.</p>
+          <a href="https://www.arrivu.com/" aria-label="Arrivu website"><i class="fas fa-globe"></i></a>
+        </article>
+        <article class="cn1-carousel__slide">
+          <img src="/uploads/BeRider-Codename-One.png" alt="BeRider">
+          <h3>BeRider</h3>
+          <p>Shared electric scooters in Prague.</p>
+          <a href="https://play.google.com/store/apps/details?id=com.berider.app" aria-label="BeRider app"><i class="fas fa-globe"></i></a>
+        </article>
+        <article class="cn1-carousel__slide">
+          <img src="/uploads/Jubilee-Motor-Codename-One.png" alt="Jubilee Motor">
+          <h3>Jubilee Motor</h3>
+          <p>Car insurance app by Jubilee General Insurance.</p>
+          <a href="https://play.google.com/store/apps/details?id=com.jubilee" aria-label="Jubilee app"><i class="fas fa-globe"></i></a>
+        </article>
+        <article class="cn1-carousel__slide">
+          <img src="/uploads/Ordyx-Codename-One.png" alt="Ordyx POS">
+          <h3>Ordyx POS</h3>
+          <p>Restaurant point-of-sale and operations platform.</p>
+          <a href="/blog/" aria-label="Ordyx case study"><i class="fas fa-globe"></i></a>
+        </article>
+        <article class="cn1-carousel__slide">
+          <img src="/uploads/Paltel-Codename-One.png" alt="Paltel">
+          <h3>Paltel</h3>
+          <p>Telecom self-service app for customer accounts.</p>
+          <a href="/blog/" aria-label="Paltel app details"><i class="fas fa-globe"></i></a>
+        </article>
+        <article class="cn1-carousel__slide">
+          <img src="/uploads/Oxbridge-Academy-Codename-One.png" alt="Oxbridge Academy">
+          <h3>Oxbridge Academy</h3>
+          <p>Student learning and campus engagement app.</p>
+          <a href="/blog/" aria-label="Oxbridge Academy app details"><i class="fas fa-globe"></i></a>
+        </article>
+        <article class="cn1-carousel__slide">
+          <img src="/uploads/HBZ-Codename-One.png" alt="HBZ">
+          <h3>HBZ</h3>
+          <p>Community and member services mobile experience.</p>
+          <a href="/blog/" aria-label="HBZ app details"><i class="fas fa-globe"></i></a>
+        </article>
+        <article class="cn1-carousel__slide">
+          <img src="/uploads/yHomework.png" alt="yHomework">
+          <h3>yHomework</h3>
+          <p>Education app helping students track assignments.</p>
+          <a href="/blog/" aria-label="yHomework app details"><i class="fas fa-globe"></i></a>
+        </article>
+      </div>
+    </div>
+    <button class="cn1-carousel__next" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+    <div class="cn1-carousel__dots" aria-label="Made with Codename One pages"></div>
+  </div>
+</section>
+
+{{ partial "cn1-social-proof.html" . }}
+
+<section class="cn1-blog">
+  {{- $blogSection := site.GetPage "section" "blog" -}}
+  <h2>{{ if $blogSection }}<a href="{{ $blogSection.RelPermalink }}">Blog</a>{{ else }}Blog{{ end }}</h2>
+  <div class="cn1-carousel" data-carousel>
+    <div class="cn1-carousel__viewport">
+      <div class="cn1-carousel__track">
+        {{- $posts := first 9 (sort (where site.RegularPages "Section" "blog") "Date" "desc") -}}
+        {{- $chunkSize := 3 -}}
+        {{- $total := len $posts -}}
+        {{- if gt $total 0 -}}
+          {{- range $i, $post := $posts -}}
+            {{- if eq (mod $i $chunkSize) 0 -}}
+        <div class="cn1-carousel__slide {{ if eq $i 0 }}is-active{{ end }}">
+          <div class="cn1-blog__grid">
+            {{- end -}}
+            {{- $thumb := "" -}}
+            {{- with $post.Params.cover.image -}}
+              {{- $thumb = . -}}
+            {{- else -}}
+              {{- with $post.Params.thumbnail -}}
+                {{- $thumb = . -}}
+              {{- else -}}
+                {{- with $post.Params.image -}}
+                  {{- $thumb = . -}}
+                {{- else -}}
+                  {{- with $post.Params.images -}}
+                    {{- $thumb = index . 0 -}}
+                  {{- end -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
+            {{- if not $thumb -}}
+              {{- $imgMatch := findRESubmatch `!\[[^\]]*\]\(([^ )]+)` $post.RawContent 1 -}}
+              {{- if gt (len $imgMatch) 0 -}}
+                {{- $thumb = index (index $imgMatch 0) 1 -}}
+              {{- end -}}
+            {{- end -}}
+            {{- if not $thumb -}}
+              {{- $thumb = "/uploads/CN1-Hero-illustration-1-1024x787.png" -}}
+            {{- end -}}
+            <article>
+              <a href="{{ $post.RelPermalink }}"><img src="{{ $thumb }}" alt="{{ $post.Title }}"></a>
+              <div>
+                <h3><a href="{{ $post.RelPermalink }}">{{ $post.Title }}</a></h3>
+                <p><i class="far fa-clock"></i> {{ $post.Date | time.Format "January 2, 2006" }}</p>
+              </div>
+            </article>
+            {{- $endOfChunk := eq (mod (add $i 1) $chunkSize) 0 -}}
+            {{- $isLast := eq (add $i 1) $total -}}
+            {{- if or $endOfChunk $isLast -}}
+          </div>
+        </div>
+            {{- end -}}
+          {{- end -}}
+        {{- else -}}
+        <div class="cn1-carousel__slide is-active">
+          <div class="cn1-blog__grid">
+            <article>
+              <a href="/blog/"><img src="/uploads/CN1-Hero-illustration-1-1024x787.png" alt="Codename One Blog"></a>
+              <div>
+                <h3><a href="/blog/">Blog posts are coming soon</a></h3>
+                <p><i class="far fa-clock"></i> Stay tuned</p>
+              </div>
+            </article>
+          </div>
+        </div>
+        {{- end -}}
+      </div>
+    </div>
+    <div class="cn1-carousel__dots" aria-label="Blog pages"></div>
+  </div>
+</section>
+
+<section class="cn1-cta-row">
+  <article>
+    <i class="far fa-paper-plane"></i>
+    <h3>Quick Start with Codename One initializr</h3>
+    <a href="/getting-started/">Get Started</a>
+  </article>
+  <article>
+    <i class="fas fa-tools"></i>
+    <h3>Learn all about building native mobile apps using Java</h3>
+    <a href="/training/">CN1 Academy</a>
+  </article>
+</section>
+
+{{/*
+<section class="cn1-newsletter">
+  <h2>Newsletter</h2>
+  <p>Subscribe to our Newsletter to get important News &amp; Updates:</p>
+  <form action="/newsletter/" method="get">
+    <input type="email" name="email" placeholder="Enter your email" required>
+    <input type="text" name="name" placeholder="Full name">
+    <button type="submit">SUBSCRIBE</button>
+  </form>
+</section>
+*/}}
+
+{{- end -}}

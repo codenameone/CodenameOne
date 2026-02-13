@@ -1,0 +1,102 @@
+{{- define "main" }}
+<article class="post-single cn1-blog-index">
+  <header class="post-header">
+    {{- partial "breadcrumbs.html" . }}
+    <h1 class="post-title">{{ .Title }}</h1>
+    {{- if .Description }}
+    <div class="post-description">{{ .Description }}</div>
+    {{- end }}
+  </header>
+
+  {{- if .Content }}
+  <div class="post-content">
+    {{- .Content -}}
+  </div>
+  {{- end }}
+
+  {{- $posts := .RegularPages.ByDate.Reverse -}}
+  {{- $paginator := .Paginate $posts 12 -}}
+
+  <section class="cn1-blog-index__grid" aria-label="Blog posts">
+    {{- range $paginator.Pages }}
+      {{- $thumb := "" -}}
+      {{- with .Params.cover.image -}}
+        {{- $thumb = . -}}
+      {{- else -}}
+        {{- with .Params.thumbnail -}}
+          {{- $thumb = . -}}
+        {{- else -}}
+          {{- with .Params.image -}}
+            {{- $thumb = . -}}
+          {{- else -}}
+            {{- with .Params.images -}}
+              {{- $thumb = index . 0 -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if not $thumb -}}
+        {{- $imgMatch := findRESubmatch `!\[[^\]]*\]\(([^ )]+)` .RawContent 1 -}}
+        {{- if gt (len $imgMatch) 0 -}}
+          {{- $thumb = index (index $imgMatch 0) 1 -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if not $thumb -}}
+        {{- $thumb = "/uploads/CN1-Hero-illustration-1-1024x787.png" -}}
+      {{- end -}}
+    <article class="cn1-blog-index__card">
+      <a class="cn1-blog-index__thumb-link" href="{{ .RelPermalink }}">
+        <img class="cn1-blog-index__thumb" src="{{ $thumb }}" alt="{{ .Title }}" loading="lazy">
+      </a>
+      <div class="cn1-blog-index__body">
+        <h2 class="cn1-blog-index__title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+        <p class="cn1-blog-index__meta">
+          <span>{{ .Date | time.Format "January 2, 2006" }}</span>
+          <span>•</span>
+          <span>{{ .ReadingTime }} min read</span>
+        </p>
+        <p class="cn1-blog-index__summary">{{ .Summary | plainify | htmlUnescape }}{{ if .Truncated }}...{{ end }}</p>
+      </div>
+    </article>
+    {{- end }}
+  </section>
+
+  {{- if gt $paginator.TotalPages 1 }}
+  <nav class="cn1-blog-index__pagination" aria-label="Blog pagination">
+    {{- if $paginator.HasPrev }}
+    <a class="cn1-page-link cn1-page-link--edge" href="{{ $paginator.Prev.URL }}">Prev</a>
+    {{- else }}
+    <span class="cn1-page-link cn1-page-link--edge is-disabled">Prev</span>
+    {{- end }}
+
+    <div class="cn1-page-numbers">
+      {{- $.Scratch.Set "cn1PrevShownPage" 0 -}}
+      {{- range $i := seq 1 $paginator.TotalPages }}
+        {{- $delta := sub $i $paginator.PageNumber -}}
+        {{- $isEdge := or (eq $i 1) (eq $i $paginator.TotalPages) -}}
+        {{- $isNearCurrent := and (ge $delta -2) (le $delta 2) -}}
+        {{- if or $isEdge $isNearCurrent }}
+          {{- $prevShown := $.Scratch.Get "cn1PrevShownPage" -}}
+          {{- if gt (sub $i $prevShown) 1 }}
+      <span class="cn1-page-ellipsis" aria-hidden="true">…</span>
+          {{- end }}
+          {{- $pager := index $paginator.Pagers (sub $i 1) -}}
+          {{- if eq $i $paginator.PageNumber }}
+      <span class="cn1-page-link is-current" aria-current="page">{{ $i }}</span>
+          {{- else }}
+      <a class="cn1-page-link" href="{{ $pager.URL }}">{{ $i }}</a>
+          {{- end }}
+          {{- $.Scratch.Set "cn1PrevShownPage" $i -}}
+        {{- end }}
+      {{- end }}
+    </div>
+
+    {{- if $paginator.HasNext }}
+    <a class="cn1-page-link cn1-page-link--edge" href="{{ $paginator.Next.URL }}">Next</a>
+    {{- else }}
+    <span class="cn1-page-link cn1-page-link--edge is-disabled">Next</span>
+    {{- end }}
+  </nav>
+  {{- end }}
+</article>
+{{- end }}

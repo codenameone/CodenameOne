@@ -1,0 +1,91 @@
+.post-single--faq .post-header {
+  margin-bottom: 1.25rem;
+  padding: 1.25rem 1.25rem 1.1rem;
+  border: 1px solid rgba(29, 82, 255, 0.25);
+  border-radius: 14px;
+  background: linear-gradient(140deg, rgba(29, 82, 255, 0.12), rgba(29, 82, 255, 0.02));
+}
+
+body.dark .post-single--faq .post-header {
+  border-color: rgba(175, 193, 255, 0.25);
+  background: linear-gradient(140deg, rgba(36, 66, 158, 0.3), rgba(7, 20, 60, 0.35));
+}
+
+.post-single--faq .post-content > h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 4px solid #1d52ff;
+  border-radius: 10px;
+  background: rgba(29, 82, 255, 0.08);
+}
+
+body.dark .post-single--faq .post-content > h2 {
+  border-left-color: #afc1ff;
+  background: rgba(175, 193, 255, 0.12);
+}
+
+.post-single--faq .post-content > h3 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.35rem;
+  font-size: 1.2rem;
+}
+
+.post-single--faq .post-content > h3::before {
+  content: "Q";
+  display: inline-flex;
+  width: 1.35rem;
+  height: 1.35rem;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #f5f8ff;
+  background: #1d52ff;
+  vertical-align: 0.05rem;
+}
+
+body.dark .post-single--faq .post-content > h3::before {
+  color: #061033;
+  background: #afc1ff;
+}
+
+.post-single--faq .post-content > p,
+.post-single--faq .post-content > ul {
+  margin-left: 1.9rem;
+}
+
+.post-single--faq .post-content > blockquote {
+  margin: 0.9rem 0 1.2rem;
+  border-left: 4px solid #1d52ff;
+  border-radius: 10px;
+  background: rgba(29, 82, 255, 0.06);
+  padding: 0.8rem 1rem;
+}
+
+body.dark .post-single--faq .post-content > blockquote {
+  border-left-color: #afc1ff;
+  background: rgba(175, 193, 255, 0.14);
+}
+
+.post-single--faq .post-content > ul:last-child {
+  margin-left: 0;
+  padding: 1rem;
+  border: 1px solid rgba(29, 82, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(29, 82, 255, 0.05);
+}
+
+body.dark .post-single--faq .post-content > ul:last-child {
+  border-color: rgba(175, 193, 255, 0.35);
+  background: rgba(175, 193, 255, 0.08);
+}
+
+@media (max-width: 900px) {
+  .post-single--faq .post-content > p,
+  .post-single--faq .post-content > ul {
+    margin-left: 0.6rem;
+  }
+}

@@ -1,0 +1,130 @@
+{{- define "main" -}}
+<article class="post-single cn1-pricing-page">
+  <header class="post-header cn1-pricing-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    <p class="cn1-pricing-subtitle">Unlimited apps, no royalties, no hidden restrictions.</p>
+    <p class="cn1-pricing-note">30-day money back guarantee. Cancel anytime.</p>
+  </header>
+
+  <section class="cn1-pricing-toggle" data-billing-toggle>
+    <span class="cn1-pricing-toggle__label">Billing</span>
+    <div class="cn1-pricing-toggle__switch" role="tablist" aria-label="Billing interval">
+      <button type="button" class="is-active" data-billing="monthly" aria-selected="true">Monthly</button>
+      <button type="button" data-billing="annual" aria-selected="false">Annual</button>
+    </div>
+    <p class="cn1-pricing-toggle__hint" data-billing-hint>Switch to annual to reduce monthly cost and lock in lower pricing.</p>
+  </section>
+
+  <section class="cn1-pricing-grid">
+    <article class="cn1-price-card cn1-price-card--free">
+      <header>
+        <p class="cn1-price-card__tier">Free</p>
+        <p class="cn1-price-card__price"><span>$0</span>/month</p>
+        <p class="cn1-price-card__bill">Always free</p>
+      </header>
+      <ul>
+        <li>iOS builds</li>
+        <li>Android builds</li>
+        <li>Windows UWP builds</li>
+        <li>8.5 MB build JAR size</li>
+        <li>Push notifications (1K/month)</li>
+        <li>Unlimited local builds</li>
+        <li>Community support</li>
+        <li>Royalty free</li>
+      </ul>
+      <a class="cn1-price-card__cta" href="https://cloud.codenameone.com/secure/index.html" target="_blank" rel="noopener noreferrer">Sign Up</a>
+    </article>
+
+    <article class="cn1-price-card" data-plan="basic" data-monthly="29" data-annual-monthly="25" data-annual-total="300">
+      <header>
+        <p class="cn1-price-card__tier">Basic</p>
+        <p class="cn1-price-card__price"><span data-price>29</span> USD/month</p>
+        <p class="cn1-price-card__bill" data-bill>Billed monthly</p>
+      </header>
+      <ul>
+        <li>Everything in Free</li>
+        <li>Unlimited build credits</li>
+        <li>Access to native sources</li>
+        <li>50 MB build JAR size</li>
+        <li>Push notifications (5K/month)</li>
+      </ul>
+      <a
+        class="cn1-price-card__cta"
+        data-signup-link
+        data-level="basic"
+        href="https://cloud.codenameone.com/secure/signup?level=basic&mode=monthly"
+        target="_blank"
+        rel="noopener noreferrer">
+        Sign Up
+      </a>
+    </article>
+
+    <article class="cn1-price-card cn1-price-card--featured" data-plan="pro" data-monthly="99" data-annual-monthly="85" data-annual-total="1020">
+      <header>
+        <p class="cn1-price-card__badge">Most Popular</p>
+        <p class="cn1-price-card__tier">Pro</p>
+        <p class="cn1-price-card__price"><span data-price>99</span> USD/month</p>
+        <p class="cn1-price-card__bill" data-bill>Billed monthly</p>
+      </header>
+      <ul>
+        <li>Everything in Basic</li>
+        <li>Versioning (5 months)</li>
+        <li>Crash reporting</li>
+        <li>Native desktop apps</li>
+        <li>Push notifications (1M/month)</li>
+        <li>Email support</li>
+        <li>Concurrent builds</li>
+      </ul>
+      <a
+        class="cn1-price-card__cta"
+        data-signup-link
+        data-level="pro"
+        href="https://cloud.codenameone.com/secure/signup?level=pro&mode=monthly"
+        target="_blank"
+        rel="noopener noreferrer">
+        Start 14-Day Trial
+      </a>
+    </article>
+
+    <article class="cn1-price-card" data-plan="enterprise" data-monthly="499" data-annual-monthly="450" data-annual-total="5400">
+      <header>
+        <p class="cn1-price-card__tier">Enterprise</p>
+        <p class="cn1-price-card__price"><span data-price>499</span> USD/month</p>
+        <p class="cn1-price-card__bill" data-bill>Billed monthly</p>
+      </header>
+      <ul>
+        <li>Everything in Pro</li>
+        <li>JavaScript app generation</li>
+        <li>High priority builds</li>
+        <li>Versioning (18 months)</li>
+        <li>Continuous integration</li>
+        <li>On-device unit tests</li>
+        <li>Push notifications (10M/month)</li>
+        <li>Phone support (office hours)</li>
+      </ul>
+      <a
+        class="cn1-price-card__cta"
+        data-signup-link
+        data-level="enterprise"
+        href="https://cloud.codenameone.com/secure/signup?level=enterprise&mode=monthly"
+        target="_blank"
+        rel="noopener noreferrer">
+        Sign Up
+      </a>
+    </article>
+  </section>
+
+  {{ partial "cn1-social-proof.html" . }}
+
+  {{- if .Content }}
+  <section class="post-content cn1-pricing-faq">
+    {{- if not (.Param "disableAnchoredHeadings") -}}
+      {{- partial "anchored_headings.html" .Content -}}
+    {{- else -}}
+      {{- .Content -}}
+    {{- end -}}
+  </section>
+  {{- end }}
+</article>
+{{- end -}}

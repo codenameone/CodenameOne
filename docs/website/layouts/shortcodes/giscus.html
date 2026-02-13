@@ -1,0 +1,31 @@
+{{- $repo := .Get "repo" | default site.Params.giscusRepo | default "codenameone/CodenameOne" -}}
+{{- $repoID := .Get "repo_id" | default site.Params.giscusRepoID | default "MDEwOlJlcG9zaXRvcnkzMjk3MzQ2Nw==" -}}
+{{- $category := .Get "category" | default site.Params.giscusCategory | default "General" -}}
+{{- $categoryID := .Get "category_id" | default site.Params.giscusCategoryID | default "DIC_kwDOAfcim84B-_xx" -}}
+{{- $mapping := .Get "mapping" | default site.Params.giscusMapping | default "pathname" -}}
+{{- $strict := .Get "strict" | default site.Params.giscusStrict | default "0" -}}
+{{- $reactions := .Get "reactions" | default site.Params.giscusReactionsEnabled | default "1" -}}
+{{- $emitMetadata := .Get "emit_metadata" | default site.Params.giscusEmitMetadata | default "0" -}}
+{{- $inputPosition := .Get "input_position" | default site.Params.giscusInputPosition | default "top" -}}
+{{- $theme := .Get "theme" | default site.Params.giscusTheme | default "preferred_color_scheme" -}}
+{{- $lang := .Get "lang" | default site.Params.giscusLang | default "en" -}}
+
+<div class="cn1-giscus">
+  <script
+    src="https://giscus.app/client.js"
+    data-repo="{{ $repo }}"
+    data-repo-id="{{ $repoID }}"
+    data-category="{{ $category }}"
+    data-category-id="{{ $categoryID }}"
+    data-mapping="{{ $mapping }}"
+    data-strict="{{ $strict }}"
+    data-reactions-enabled="{{ $reactions }}"
+    data-emit-metadata="{{ $emitMetadata }}"
+    data-input-position="{{ $inputPosition }}"
+    data-theme="{{ $theme }}"
+    data-lang="{{ $lang }}"
+    data-loading="lazy"
+    crossorigin="anonymous"
+    async>
+  </script>
+</div>

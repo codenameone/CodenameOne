@@ -1,0 +1,84 @@
+name: Build Hugo Website
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'docs/website/**'
+      - 'docs/developer-guide/**'
+      - 'CodenameOne/src/**'
+      - 'Ports/CLDC11/src/**'
+      - 'maven/javadoc-resources/**'
+      - '.github/scripts/build_javadocs.sh'
+      - 'scripts/website/**'
+      - '.github/workflows/website-docs.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'docs/website/**'
+      - 'docs/developer-guide/**'
+      - 'CodenameOne/src/**'
+      - 'Ports/CLDC11/src/**'
+      - 'maven/javadoc-resources/**'
+      - '.github/scripts/build_javadocs.sh'
+      - 'scripts/website/**'
+      - '.github/workflows/website-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: 'latest'
+          extended: true
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Install Asciidoctor tooling
+        run: |
+          set -euo pipefail
+          gem install --no-document asciidoctor asciidoctor-pdf rouge
+
+      - name: Build website
+        run: |
+          set -euo pipefail
+          scripts/website/build.sh
+        env:
+          WEBSITE_INCLUDE_JAVADOCS: "true"
+          WEBSITE_INCLUDE_DEVGUIDE: "true"
+
+      - name: Upload built site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-preview
+          path: docs/website/public
+          if-no-files-found: error
+
+      - name: Deploy to Cloudflare Pages
+        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy docs/website/public
+            --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME || secrets.CLOUDFLARE_PAGES_PROJECT_NAME || 'codenameone' }}
+            --branch=${{ github.ref_name }}

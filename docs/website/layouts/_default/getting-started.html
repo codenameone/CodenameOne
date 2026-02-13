@@ -1,0 +1,53 @@
+{{- define "main" -}}
+<div class="cn1-gs-page">
+  <section class="cn1-gs-hero">
+    <div class="cn1-gs-hero__content">
+      <nav class="cn1-gs-breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+        <a href="/downloads/">Downloads</a>
+      </nav>
+      <h1>Getting Started</h1>
+      <p>Download, setup and get started with Codename One.</p>
+    </div>
+    <div class="cn1-gs-hero__art" aria-hidden="true">
+      <img src="/uploads/Group-2024.svg" alt="">
+    </div>
+  </section>
+
+  <section class="cn1-gs-step-card">
+    <p class="cn1-gs-step-label">STEP 1</p>
+    <h2>Create your project using Codename One initializr</h2>
+    <div class="cn1-gs-step-row">
+      <p>Codename One initializr tool allows you to create a native, cross-platform iPhone/Android app with Java or Kotlin</p>
+      <a class="cn1-gs-cta" href="https://start.codenameone.com/">Codename One initializr</a>
+    </div>
+    <div class="cn1-gs-video">
+      <iframe src="https://www.youtube.com/embed/rl6z7DD2-vg" title="Build Cross-Platform Native Mobile Apps using Java and Kotlin" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    </div>
+  </section>
+
+  <section class="cn1-gs-step-card">
+    <p class="cn1-gs-step-label">STEP 2</p>
+    <h2>Build your App!</h2>
+    <div class="cn1-gs-build-grid">
+      <div class="cn1-gs-build-copy">
+        <p>That’s it, you are all set.<br>Start building your<br>amazing app!</p>
+      </div>
+      <div class="cn1-gs-resource-card">
+        <img src="/uploads/New-Project.png" alt="Documentation resources">
+        <p>Browse the Docs &amp; tutorials</p>
+        <a href="/introduction/">Learn More <i class="fas fa-chevron-right" aria-hidden="true"></i></a>
+      </div>
+      <div class="cn1-gs-resource-card">
+        <img src="/uploads/New-Project-1.png" alt="Support channels">
+        <p>Get help on Stackoverflow, in our discussion forum, or via the support chat in the bottom-right of the site.</p>
+        <div class="cn1-gs-links">
+          <a href="https://stackoverflow.com/questions/tagged/codenameone">Stackoverflow <i class="fas fa-chevron-right" aria-hidden="true"></i></a>
+          <a href="/discussion-forum/">Discussion Forum <i class="fas fa-chevron-right" aria-hidden="true"></i></a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{{- end -}}

@@ -1,0 +1,61 @@
+{{- define "main" -}}
+{{- $data := site.Data.cn1libs -}}
+{{- $libs := $data.libs | default (slice) -}}
+{{- $count := len $libs -}}
+
+<article class="post-single cn1-course-hub cn1-libs-page">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    {{ with .Description }}<div class="post-description">{{ . }}</div>{{ end }}
+  </header>
+
+  <div class="post-content cn1-libs-page__intro">
+    {{- if not (.Param "disableAnchoredHeadings") -}}
+      {{- partial "anchored_headings.html" .Content -}}
+    {{- else -}}
+      {{- .Content -}}
+    {{- end -}}
+  </div>
+
+  <section class="cn1-course-overview cn1-libs-page__overview">
+    <div class="cn1-course-overview__bar">
+      <p><strong>{{ $count }}</strong> cn1libs indexed</p>
+      <a class="cn1-course-overview__start" href="{{ $data.source_url }}" target="_blank" rel="noopener">View XML Source</a>
+    </div>
+
+    {{ if and $data (eq $data.status "error") }}
+    <p class="cn1-libs-page__warning">
+      Could not refresh cn1libs data during this build. Showing cached/placeholder data.
+      {{ with $data.error }}<br><small>{{ . }}</small>{{ end }}
+    </p>
+    {{ end }}
+
+    {{ if gt $count 0 }}
+    <div class="cn1-libs-grid">
+      {{ range $libs }}
+      <article class="cn1-libs-card">
+        <header>
+          <h2>{{ .name }}</h2>
+          <div class="cn1-libs-card__meta">
+            {{ with .category }}<span>{{ . }}</span>{{ end }}
+            {{ with .version }}<span>v{{ . }}</span>{{ end }}
+            {{ with .author }}<span>{{ . }}</span>{{ end }}
+          </div>
+        </header>
+        {{ with .description }}<p>{{ . }}</p>{{ else }}<p>No description provided.</p>{{ end }}
+        {{ with .url }}
+        <a class="cn1-libs-card__cta" href="{{ . }}" target="_blank" rel="noopener">Open Library</a>
+        {{ end }}
+      </article>
+      {{ end }}
+    </div>
+    {{ else }}
+    <div class="cn1-libs-empty">
+      <p>No cn1libs data is currently available.</p>
+      <p>Run the website build script in an environment with internet access to refresh from the source XML.</p>
+    </div>
+    {{ end }}
+  </section>
+</article>
+{{- end -}}

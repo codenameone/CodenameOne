@@ -1,0 +1,52 @@
+{{- define "main" -}}
+{{- $courseID := .Params.course_id -}}
+{{- $lessons := sort (where (where site.RegularPages "Params.is_course_lesson" true) "Params.course_id" $courseID) "Weight" -}}
+{{- $groups := $lessons.GroupByParam "module_key" -}}
+
+<article class="post-single cn1-course-hub">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    {{ with .Description }}<div class="post-description">{{ . }}</div>{{ end }}
+  </header>
+
+  <div class="post-content cn1-course-hub__intro">
+    {{- if not (.Param "disableAnchoredHeadings") -}}
+      {{- partial "anchored_headings.html" .Content -}}
+    {{- else -}}
+      {{- .Content -}}
+    {{- end -}}
+  </div>
+
+  {{ if gt (len $lessons) 0 }}
+  <section class="cn1-course-overview">
+    <div class="cn1-course-overview__bar">
+      <p><strong>{{ len $lessons }}</strong> lessons • <strong>{{ len $groups }}</strong> modules</p>
+      <a class="cn1-course-overview__start" href="{{ (index $lessons 0).RelPermalink }}">Start Course</a>
+    </div>
+
+    <div class="cn1-course-overview__grid">
+      {{ range $groups }}
+      {{ $modulePages := sort .Pages "Params.lesson_order" }}
+      {{ $first := index $modulePages 0 }}
+      <section class="cn1-course-module-card">
+        <header>
+          <p class="cn1-course-module-card__eyebrow">Module {{ $first.Params.module_order }}</p>
+          <h2>{{ $first.Params.module_title }}</h2>
+          <p>{{ len $modulePages }} lesson{{ if ne (len $modulePages) 1 }}s{{ end }}</p>
+        </header>
+        <ol>
+          {{ range $modulePages }}
+          <li>
+            <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+            {{ with .Description }}<p>{{ . }}</p>{{ end }}
+          </li>
+          {{ end }}
+        </ol>
+      </section>
+      {{ end }}
+    </div>
+  </section>
+  {{ end }}
+</article>
+{{- end -}}

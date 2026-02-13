@@ -1,0 +1,299 @@
+{
+  "articles": [
+    {
+      "logo": "/uploads/tnw-logo.png",
+      "source": "The Next Web",
+      "quotes": [
+        "If I had to choose a startup to invest in this year, it would have to be Codename One. [...] I expect them to experience significant growth in 2013."
+      ],
+      "headline": "Write once, run everywhere: Codename One brings its mobile app development kit out of beta",
+      "links": [
+        {
+          "label": "14 Startups We Predict Will Go Even Bigger in 2013",
+          "url": "http://thenextweb.com/entrepreneur/2013/01/12/14-startups-we-predict-will-go-even-bigger-in-2013/?utm_medium=referral&utm_source=pulsenews"
+        },
+        {
+          "label": "Codename One Brings Its Mobile App Dev Kit Out of Beta",
+          "url": "http://thenextweb.com/2013/01/29/codename-one-brings-its-write-once-run-everywhere-mobile-app-development-kit-out-of-beta/?fromcat=all"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/javaworld-logo.gif",
+      "source": "JavaWorld",
+      "quotes": [
+        "Codename One is the only Java iOS tool that currently comes close to the old \"Write once, run anywhere\" mantra, and it provides the most coherent development experience."
+      ],
+      "links": [
+        {
+          "label": "Open-Source Java iPhone Tools Compared",
+          "url": "http://www.javaworld.com/javaworld/jw-03-2013/130327-open-source-java-iphone-tools-compared.html"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/forbes-logo.gif",
+      "source": "Forbes",
+      "quotes": [
+        "Codename One [...] stands to drastically change the rate and cost at which developers will churn out new mobile apps."
+      ],
+      "links": [
+        {
+          "label": "10 Greatest Industry-Disrupting Startups of 2012",
+          "url": "http://www.forbes.com/sites/ilyapozin/2012/07/19/10-greatest-industry-disrupting-startups-of-2012/"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/venturebeat-logo.png",
+      "source": "VentureBeat",
+      "quotes": [
+        "Codename One is open-source and uses special lightweight technology that eliminates fragmentation and offers developers a platform for mobile application development as easy as desktop development."
+      ],
+      "links": [
+        {
+          "label": "The 5 Fastest Growing Israeli Startups",
+          "url": "http://venturebeat.com/2012/09/27/the-5-fastest-growing-israeli-startups/"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/crn-logo.gif",
+      "source": "CRN",
+      "quotes": [
+        "Codename One is targeting the mobile device application development market with an eye toward establishing technology versatile enough to accommodate the full range of mobile platforms currently delivered through the cloud."
+      ],
+      "links": [
+        {
+          "label": "The 10 Coolest Cloud Startups of 2013 (So Far)",
+          "url": "http://www.crn.com/slide-shows/cloud/240158228/the-10-coolest-cloud-startups-of-2013-so-far.htm?pgno=4"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/infoworld-logo.png",
+      "source": "InfoWorld",
+      "quotes": [
+        "\"The Java development/debugging is done entirely locally, but when building for the device, the cloud portion does all the heavy lifting,\" says Shai Almog, CEO of Codename One."
+      ],
+      "links": [
+        {
+          "label": "Read article",
+          "url": "http://www.infoworld.com/article/2616077/mobile-application-development/new-tools-make-mobile-development-less-painful.html"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/bi-logo.png",
+      "source": "Business Insider",
+      "quotes": [
+        "As Americans continue to acquire a wide array of mobile devices, platforms like Codename One will mean big things for startups and individual developers looking for an easy way to jump in on the trend.",
+        "There haven’t been many solutions for efficient cross-platform development until now.",
+        "Codename One is a powerful tool for mobile developers worldwide and will play a central role in defragmenting the mobile apps space."
+      ]
+    },
+    {
+      "logo": "/uploads/designnews-logo.gif",
+      "source": "Design News",
+      "quotes": [
+        "The company recently released version 1.1 and offers a robust client library for app development, a designer tool, a simulation environment, and cloud-based services to help get users’ apps to the masses."
+      ],
+      "links": [
+        {
+          "label": "Read article",
+          "url": "http://www.designnews.com/author.asp?section_id=1394&doc_id=265623&itc=dn_analysis_element&dfpPParams=ind_186,industry_consumer,bid_26,aid_265623&dfpLayout=blog"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/huffpo-logo.gif",
+      "source": "The Huffington Post",
+      "quotes": [
+        "The software solves complex problems that usually face developers and entrepreneurs trying to hop on the mobile apps trend, helping developers to quickly create and distribute their apps with little headache.",
+        "Codename One has developed open-source software to save developers the time and resources it takes to get their apps launched."
+      ],
+      "links": [
+        {
+          "label": "Mobile Apps and the New Business Opportunity",
+          "url": "http://www.huffingtonpost.com/heather-huhman/mobile-apps_b_2259562.html"
+        },
+        {
+          "label": "5 Companies Transforming Mobile",
+          "url": "http://www.huffingtonpost.com/kevin-ducoff/5-companies-transforming-_b_3156935.html"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/phonearena-logo-1.png",
+      "source": "Phone Arena",
+      "quotes": [
+        "Codename One is a Java-based platform which asks developers to write the code once and then translates it into the native code of each platform, rather than HTML5."
+      ],
+      "links": [
+        {
+          "label": "Read article",
+          "url": "http://www.phonearena.com/news/Codename-One-allows-developers-to-write-once-and-make-apps-for-all-major-mobile-platforms_id39242"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/mobileenterprise-logo.jpg",
+      "source": "Mobile Enterprise",
+      "quotes": [
+        "The platform’s beta version reached 100,000 downloads this month and has already been used to build more than 1,000 mobile apps.",
+        "A new Java-based platform allows developers to create native mobile apps across multiple platforms with a single code base."
+      ],
+      "links": [
+        {
+          "label": "Mobile Development Platform Launches",
+          "url": "http://mobileenterprise.edgl.com/products/Mobile-Development-Platform-Launches84476.aspx"
+        },
+        {
+          "label": "Upstart Launches Java-Based Single-Code App Tool",
+          "url": "http://mobileenterprise.edgl.com/products/Upstart-Launches-Java-Based,-Single-Code-App-Development-Tool81203.aspx"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/appdevtrends-logo.jpg",
+      "source": "Application Development Trends",
+      "quotes": [
+        "Codename One wants the open source community to take its relatively new iOS Java VM and run with it.",
+        "Developers use Codename One to create all components from scratch instead of using native widgets, helping avoid fragmentation.",
+        "The tool is Java-based, open source and lightweight."
+      ],
+      "links": [
+        {
+          "label": "Open Source iOS Java VM",
+          "url": "https://adtmag.com/articles/2015/12/15/open-source-ios-java-vm.aspx"
+        },
+        {
+          "label": "Java SDK for Native Mobile Apps",
+          "url": "http://adtmag.com/articles/2013/01/29/java-sdk-for-native-mobile-apps.aspx"
+        },
+        {
+          "label": "Mobile Java SDK",
+          "url": "http://adtmag.com/articles/2012/09/11/mobile-java-sdk.aspx"
+        },
+        {
+          "label": "Native Java on iPhone SDK",
+          "url": "http://adtmag.com/articles/2012/07/25/native-java-on-iphone-sdk.aspx"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/infoq-logo.gif",
+      "source": "InfoQ",
+      "quotes": [
+        "The platform is in beta but already far along; developers can compile in the cloud and install finished builds directly on devices.",
+        "Codename One can target Universal Windows Platform, raising the number of targetable platforms to eight."
+      ],
+      "links": [
+        {
+          "label": "Interview: Codename One",
+          "url": "http://www.infoq.com/news/2012/09/codenameone"
+        },
+        {
+          "label": "Codename One Adds UWP Support",
+          "url": "https://www.infoq.com/news/2016/06/codename-one-uwp"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/drdobbs-logo.gif",
+      "source": "Dr. Dobbs",
+      "quotes": [
+        "Codename One is a lightweight tool capable of producing native interfaces and is highly differentiated from toolkits that rely on HTML5 or heavyweight technologies."
+      ],
+      "links": [
+        {
+          "label": "A Single Java Code Base for Cross-Platform Apps",
+          "url": "http://www.drdobbs.com/jvm/a-single-java-code-base-for-cross-platfo/240004250"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/winmonews-logo.png",
+      "source": "WiMo News",
+      "quotes": [
+        "Codename One is the first mobile software development kit that allows Java developers to create native mobile applications across multiple mobile operating systems using a single code base."
+      ],
+      "links": [
+        {
+          "label": "Read article",
+          "url": "http://wirelessandmobilenews.com/2012/08/code.html"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/dzone-logo.jpg",
+      "source": "DZone",
+      "quotes": [
+        "The Codename One founders aimed to create a more powerful, simpler solution compared to anything else on the market."
+      ],
+      "links": [
+        {
+          "label": "DZone Startup Series",
+          "url": "http://java.dzone.com/articles/dzone-startup-series-native"
+        }
+      ]
+    },
+    {
+      "logo": "/uploads/newsgeek-logo.png",
+      "source": "Newsgeek (translated)",
+      "quotes": [
+        "These tools are crucial for many developers since building once and launching across platforms is a huge advantage, especially for startups."
+      ],
+      "links": [
+        {
+          "label": "Read article",
+          "url": "http://www.newsgeek.co.il/codename-one-startup/"
+        }
+      ]
+    }
+  ],
+  "press_releases": [
+    {
+      "title": "With 200,000 SDK Downloads, Mobile Development Platform Codename One Announces Version 1.1",
+      "date": "20 May 2013",
+      "url": "https://codenameone.com/wp-content/uploads/2020/09/Elmwood_Inn__Updated_Dine_In__Editable_Copy2.pdf"
+    },
+    {
+      "title": "With 100,000 SDK Downloads, Mobile Development Platform Codename One Comes Out of Beta With 1.0 Launch",
+      "date": "28 Jan 2013",
+      "url": "https://codenameone.com/wp-content/uploads/2020/09/codename_one_1.0_press_release.pdf"
+    },
+    {
+      "title": "Vserv.mobi powers App Monetization for Codename One developers",
+      "date": "23 Aug 2012",
+      "url": "https://codenameone.com/wp-content/uploads/2020/09/vserv_press_release.pdf"
+    },
+    {
+      "title": "Former Sun Microsystems Engineers Transform App Development Industry With Groundbreaking Tool",
+      "date": "4 Jun 2012",
+      "url": "https://codenameone.com/wp-content/uploads/2020/09/codename_one_press_release-1.pdf"
+    },
+    {
+      "title": "Mobile Development Platform Codename One Announces Version 3.0",
+      "date": "27 Apr 2015",
+      "url": "https://codenameone.com/wp-content/uploads/2020/09/CodenameOne3.0PressRelease.pdf"
+    },
+    {
+      "title": "With 25m Device Installs, Mobile Development Platform Codename One Announces Version 2.0",
+      "date": "25 Dec 2013",
+      "url": "https://codenameone.com/wp-content/uploads/2020/09/codename_one_2.0_press_release.pdf"
+    }
+  ],
+  "press_kit": {
+    "description": "These resources are free to use in media/publications while maintaining Codename One copyrights. If you are speaking at a major event and want to feature Codename One, you can use these materials and contact us for brochures or handouts.",
+    "name": "Codename One",
+    "initial_release": "2012",
+    "founding_team": [
+      "CEO, co-founder: Shai Almog",
+      "CTO, co-founder: Chen Fishbein",
+      "Lead Engineer: Steve Hannah"
+    ],
+    "summary": "Codename One was founded by ex-Sun/Oracle mobile developers based on an open source project started in 2007 within Sun Microsystems. The core vision is to actualize Java's WORA (Write Once Run Anywhere) mantra in the mobile era, with tools that let Java developers build native mobile apps from a single code base.",
+    "logo_download_url": "https://www.codenameone.com/wp-content/uploads/2022/02/Codename-One-Logos.zip"
+  }
+}

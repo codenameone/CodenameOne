@@ -1,0 +1,82 @@
+{{- define "main" -}}
+<div class="cn1-demos-page">
+  <section class="cn1-demos-hero">
+    <div>
+      <p class="cn1-demos-eyebrow">Showcase</p>
+      <h1>{{ .Title }}</h1>
+      <p class="cn1-demos-subtitle">{{ .Content | plainify }}</p>
+    </div>
+  </section>
+
+  <section class="cn1-demos-grid">
+    {{- $copy := dict
+      "ubereats-clone" "A polished food-delivery app template with onboarding, cart, checkout, and profile flows."
+      "chat-app" "A full-featured chat UI kit with avatars, message states, and extensible action components."
+      "uberclone" "A ride-booking style demo with maps, location flows, and modern transportation UI patterns."
+      "kitchen-sink" "The classic Codename One showcase app covering layouts, themes, effects, and platform features."
+      "pheonix-ui-port-of-psd-design-to-cross-platform-native-mobile-app" "A pixel-accurate cross-platform port of a custom PSD mobile design."
+      "swiftnotes-port-of-native-android-app-to-codename-one-iphone-ios-windows-and-javascript-targets" "A practical port of a native Android app to Codename One across iOS, desktop, and web targets."
+      "msuikit-psd-template-port-to-cross-platform-pixel-perfect-codename-one-app-for-android-iphone-ios-etc" "A Material-inspired UI kit ported from PSD assets to a cross-platform Codename One app."
+      "clean-modern-port-of-psd-design-to-cross-platform-native-mobile-app" "A modern mobile design system translated to a production-grade cross-platform native app."
+      "camera-demo" "A minimal demo of camera capture APIs for photos and media capture workflows."
+      "chrome" "A retro-inspired utility app demo featuring custom styling, tabs, and rich UI interactions."
+      "propertycross-demo" "A JSON-driven property browser demo with caching, image loading, and infinite scrolling."
+      "ratatouilles-restaurant" "A restaurant experience demo with animated transitions and image-driven UI composition."
+      "google-maps-demo" "A focused sample demonstrating native maps integration and map interaction APIs."
+      "dr-sbaitso" "A conversational AI-style therapist demo using chat bubbles, media, and speech capabilities."
+      "solitaire-klondike" "A complete card-game demo showcasing animation, layout timing, and gesture interactions."
+      "poker-demo" "A poker table demo highlighting game-style animations and layered visual composition."
+      "charts-demo" "A comprehensive charts sample covering multiple graph types and visual data rendering."
+      "clock-demo" "An analog clock demo built with graphics APIs and custom shape rendering."
+      "geoviz-demo" "A geographic visualization demo for region-based data analysis and map overlays."
+      "sql-playground-sql-tutorial-in-the-browser-iphone-ios-android-windows" "An interactive SQL playground demo that runs on web and device targets."
+    -}}
+    {{- range sort site.RegularPages "Title" -}}
+      {{- if and .File (hasPrefix .File.TranslationBaseName "demo-") -}}
+        {{- $thumb := .Params.thumbnail | default (index .Params.images 0) | default "/uploads/mobile-app.png" -}}
+        {{- $displayTitle := .Title -}}
+        {{- if eq $displayTitle (upper $displayTitle) -}}
+          {{- $displayTitle = title (lower $displayTitle) -}}
+        {{- end -}}
+        {{- $lead := .RawContent | replaceRE "(?s)\\n##.*$" "" | plainify | trim " \n\r\t" -}}
+        {{- $summary := .Description | default "" | plainify | trim " \n\r\t" -}}
+        {{- with index $copy .Slug -}}
+          {{- $summary = . -}}
+        {{- end -}}
+        {{- if not $summary -}}
+          {{- if $lead -}}
+            {{- $summary = $lead -}}
+          {{- else -}}
+            {{- $summary = .Summary | plainify | trim " \n\r\t" -}}
+          {{- end -}}
+        {{- end -}}
+        {{- if not $summary -}}
+          {{- $summary = .Plain | trim " \n\r\t" -}}
+        {{- end -}}
+        {{- $summary = truncate 180 $summary -}}
+        {{- if not (findRE "[[:alnum:]]" $summary) -}}
+          {{- $summary = "Explore this Codename One demo, including screenshots, source code links, and downloadable builds." -}}
+        {{- end -}}
+        <article class="cn1-demo-card">
+          <a class="cn1-demo-card__thumb" href="{{ .RelPermalink }}">
+            <img src="{{ $thumb }}" alt="{{ $displayTitle }}" loading="lazy">
+          </a>
+          <div class="cn1-demo-card__body">
+            <h2><a href="{{ .RelPermalink }}">{{ $displayTitle }}</a></h2>
+            <p>{{ $summary }}</p>
+            <div class="cn1-demo-card__actions">
+              <a class="cn1-demo-pill" href="{{ .RelPermalink }}">Open Demo</a>
+              {{- with .Params.links.source -}}
+              <a class="cn1-demo-pill cn1-demo-pill--ghost" href="{{ . }}" target="_blank" rel="noopener">Source</a>
+              {{- end -}}
+              {{- with .Params.links.tutorial -}}
+              <a class="cn1-demo-pill cn1-demo-pill--ghost" href="{{ . }}" target="_blank" rel="noopener">Tutorial</a>
+              {{- end -}}
+            </div>
+          </div>
+        </article>
+      {{- end -}}
+    {{- end -}}
+  </section>
+</div>
+{{- end -}}

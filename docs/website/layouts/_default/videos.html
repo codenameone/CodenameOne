@@ -1,0 +1,54 @@
+{{- define "main" -}}
+{{- $videos := site.Data.videos -}}
+<article class="post-single post-single--videos">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title">{{ .Title }}</h1>
+    {{ with .Description }}<p class="post-description">{{ . }}</p>{{ end }}
+  </header>
+
+  <section class="cn1-videos-hero">
+    <div>
+      <p class="cn1-videos-hero__eyebrow">Video Library</p>
+      <h2>Learn by watching real builds and walkthroughs</h2>
+      <p>From conference sessions to practical webinars, this catalog covers design-to-app workflows, architecture choices, and shipping native apps with Java.</p>
+    </div>
+  </section>
+
+  <section class="cn1-videos-grid">
+    {{- range $index, $video := $videos }}
+    <article class="cn1-video-card">
+      <div class="cn1-video-card__embed">
+        {{- if eq $video.provider "youtube" -}}
+        <iframe
+          src="https://www.youtube-nocookie.com/embed/{{ $video.id }}"
+          title="{{ $video.title }}"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen>
+        </iframe>
+        {{- else if eq $video.provider "vimeo" -}}
+        <iframe
+          src="https://player.vimeo.com/video/{{ $video.id }}"
+          title="{{ $video.title }}"
+          loading="lazy"
+          allow="autoplay; fullscreen; picture-in-picture"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen>
+        </iframe>
+        {{- end -}}
+      </div>
+      <div class="cn1-video-card__meta">
+        <p class="cn1-video-card__index">Video {{ add $index 1 }}</p>
+        <h3>{{ $video.title }}</h3>
+        <a href="{{ $video.url }}" target="_blank" rel="noopener">
+          Watch on {{ if eq $video.provider "vimeo" }}Vimeo{{ else }}YouTube{{ end }}
+          <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+        </a>
+      </div>
+    </article>
+    {{- end }}
+  </section>
+</article>
+{{- end -}}

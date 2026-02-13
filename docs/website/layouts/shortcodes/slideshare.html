@@ -1,0 +1,16 @@
+{{- $key := .Get "key" -}}
+{{- if $key -}}
+<div class="cn1-embed cn1-embed--slideshare">
+  <iframe
+    src="{{ printf "https://www.slideshare.net/slideshow/embed_code/key/%s?hostedIn=slideshare&page=upload" $key | safeURL }}"
+    width="595"
+    height="485"
+    frameborder="0"
+    marginwidth="0"
+    marginheight="0"
+    scrolling="no"
+    allowfullscreen
+    loading="lazy">
+  </iframe>
+</div>
+{{- end -}}

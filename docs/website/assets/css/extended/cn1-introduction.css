@@ -1,0 +1,86 @@
+.post-single--introduction .post-content > h2 {
+  margin-top: 1.9rem;
+  margin-bottom: 0.65rem;
+  padding: 0.65rem 0.9rem;
+  border-left: 4px solid #1d52ff;
+  border-radius: 10px;
+  background: rgba(29, 82, 255, 0.08);
+}
+
+body.dark .post-single--introduction .post-content > h2 {
+  border-left-color: #afc1ff;
+  background: rgba(175, 193, 255, 0.12);
+}
+
+.post-single--introduction .post-content > h3 {
+  margin-top: 1.2rem;
+  margin-bottom: 0.45rem;
+}
+
+.post-single--introduction .post-content img[src*="Group-1851.png"] {
+  display: block;
+  width: min(820px, 100%);
+  margin: 1rem auto 1.4rem;
+}
+
+.post-single--introduction .post-content img[src*="Group-2326.svg"] {
+  width: min(420px, 100%);
+  float: right;
+  margin: 0 0 1rem 1.2rem;
+}
+
+.post-single--introduction .post-content details {
+  margin: 0.7rem 0;
+  border: 1px solid rgba(29, 82, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(29, 82, 255, 0.04);
+  overflow: hidden;
+}
+
+body.dark .post-single--introduction .post-content details {
+  border-color: rgba(175, 193, 255, 0.3);
+  background: rgba(175, 193, 255, 0.08);
+}
+
+.post-single--introduction .post-content details summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.7rem 0.95rem;
+  font-weight: 600;
+  color: #1d52ff;
+}
+
+body.dark .post-single--introduction .post-content details summary {
+  color: #afc1ff;
+}
+
+.post-single--introduction .post-content details summary::-webkit-details-marker {
+  display: none;
+}
+
+.post-single--introduction .post-content details[open] summary {
+  border-bottom: 1px solid rgba(29, 82, 255, 0.2);
+}
+
+body.dark .post-single--introduction .post-content details[open] summary {
+  border-bottom-color: rgba(175, 193, 255, 0.25);
+}
+
+.post-single--introduction .post-content details > :not(summary) {
+  padding: 0.8rem 0.95rem 0.9rem;
+  margin: 0;
+}
+
+.post-single--introduction .post-content::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+@media (max-width: 900px) {
+  .post-single--introduction .post-content img[src*="Group-2326.svg"] {
+    float: none;
+    display: block;
+    margin: 0.4rem auto 1rem;
+  }
+}

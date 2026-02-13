@@ -1,0 +1,181 @@
+{{- if not (.Param "hideFooter") }}
+<footer class="footer cn1-site-footer">
+    <div class="cn1-bottom-links">
+        <div class="cn1-bottom-links__col">
+            <h3>Important Links</h3>
+            <ul>
+                <li><a href="/search/">Search This Site</a></li>
+                <li><a href="/introduction/">Documentation</a></li>
+                <li><a href="/discussion-forum/">Support Forums</a></li>
+                <li><a href="/cn1libs/">Plugins/cn1libs</a></li>
+                <li><a href="/blog/">Blog</a></li>
+                <li><a href="/recommended-sites/">Recommended Sites</a></li>
+                <li><a href="/about-us/">About Us</a></li>
+                <li><a href="/press/">Press</a></li>
+                <li><a href="/privacy/">Privacy Policy</a></li>
+                <li><a href="/terms/">Terms of Service</a></li>
+                <li><a href="/site-map/">Site Map</a></li>
+                <li><a href="#" data-cn1-enable-chat>Enable Chat</a></li>
+                <li><a href="#" data-cn1-manage-chat>Manage Chat Consent</a></li>
+            </ul>
+        </div>
+        <div class="cn1-bottom-links__brand">
+            <img class="cn1-footer-logo cn1-footer-logo--dark" src="/uploads/footer-logo-1.png" alt="Codename One">
+            <img class="cn1-footer-logo cn1-footer-logo--light" src="/uploads/footer-logo.png" alt="Codename One">
+            <p>Reinventing mobile development.</p>
+        </div>
+        <div class="cn1-bottom-links__stats">
+            <p><strong>~ 180 M</strong><br><span>Apps Installed</span></p>
+            <p><strong>40 k+</strong><br><span>Developers</span></p>
+        </div>
+    </div>
+    <div class="cn1-footer-meta">
+        <p>Codename One LTD &copy; {{ now.Year }}. All Rights Reserved.</p>
+        <p>The Java&reg; logo and name are trademarks of Oracle corp. <a href="/terms/">Terms of Use</a></p>
+    </div>
+</footer>
+{{- end }}
+
+<aside class="cn1-cookie-banner" data-cn1-cookie-banner hidden>
+    <p>
+        We use only Crisp chat cookies to keep support conversations working across pages. We don't use analytics or
+        tracking tools. See <a href="https://help.crisp.chat/en/article/crisp-chatbox-cookie-ip-policy-1147xor/" target="_blank" rel="noopener">Crisp cookie policy</a>
+        and our <a href="/privacy/">privacy policy</a>. You can change this choice later from the footer links:
+        <strong>Enable Chat</strong> or <strong>Manage Chat Consent</strong>.
+    </p>
+    <div class="cn1-cookie-banner__actions">
+        <button type="button" data-cn1-cookie-decline>Decline Chat</button>
+        <button type="button" data-cn1-cookie-accept>Enable Chat</button>
+    </div>
+</aside>
+
+{{- if (not site.Params.disableScrollToTop) }}
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+{{- end }}
+
+{{- partial "extend_footer.html" . }}
+{{- $cn1Site := resources.Get "js/cn1-site.js" | minify | fingerprint }}
+{{- $cn1Home := resources.Get "js/cn1-home.js" | minify | fingerprint }}
+{{- $cn1Demo := resources.Get "js/cn1-demo.js" | minify | fingerprint }}
+{{- $cn1Pricing := resources.Get "js/cn1-pricing.js" | minify | fingerprint }}
+{{- $cn1Crisp := resources.Get "js/cn1-crisp.js" | minify | fingerprint }}
+<script defer src="{{ $cn1Site.RelPermalink }}" integrity="{{ $cn1Site.Data.Integrity }}"></script>
+<script defer src="{{ $cn1Home.RelPermalink }}" integrity="{{ $cn1Home.Data.Integrity }}"></script>
+<script defer src="{{ $cn1Demo.RelPermalink }}" integrity="{{ $cn1Demo.Data.Integrity }}"></script>
+<script defer src="{{ $cn1Pricing.RelPermalink }}" integrity="{{ $cn1Pricing.Data.Integrity }}"></script>
+<script defer src="{{ $cn1Crisp.RelPermalink }}" integrity="{{ $cn1Crisp.Data.Integrity }}"></script>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+
+{{- if (not site.Params.disableScrollToTop) }}
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+{{- end }}
+
+{{- if (not site.Params.disableThemeToggle) }}
+<script>
+    const themeToggle = document.getElementById("theme-toggle");
+    if (themeToggle) {
+        themeToggle.addEventListener("click", () => {
+            if (document.body.className.includes("dark")) {
+                document.body.classList.remove('dark');
+                localStorage.setItem("pref-theme", 'light');
+            } else {
+                document.body.classList.add('dark');
+                localStorage.setItem("pref-theme", 'dark');
+            }
+        });
+    }
+
+</script>
+{{- end }}
+
+{{- if (and (eq .Kind "page") (ne .Layout "archives") (ne .Layout "search") (.Param "ShowCodeCopyButtons")) }}
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = '{{- i18n "code_copy" | default "copy" }}';
+
+        function copyingDone() {
+            copybutton.innerHTML = '{{- i18n "code_copied" | default "copied!" }}';
+            setTimeout(() => {
+                copybutton.innerHTML = '{{- i18n "code_copy" | default "copy" }}';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+{{- end }}

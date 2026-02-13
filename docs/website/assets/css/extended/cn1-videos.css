@@ -1,0 +1,133 @@
+.post-single--videos {
+  font-family: "Poppins", sans-serif;
+}
+
+.post-single--videos .post-description {
+  margin: 0;
+  color: #556285;
+}
+
+body.dark .post-single--videos .post-description {
+  color: #afc1ff;
+}
+
+.cn1-videos-hero {
+  margin: 22px 0 20px;
+  padding: 18px 20px;
+  border: 1px solid rgba(28, 81, 255, 0.2);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(28, 81, 255, 0.08), rgba(28, 81, 255, 0.03));
+}
+
+body.dark .cn1-videos-hero {
+  border-color: rgba(175, 193, 255, 0.25);
+  background: linear-gradient(145deg, rgba(175, 193, 255, 0.13), rgba(175, 193, 255, 0.06));
+}
+
+.cn1-videos-hero__eyebrow {
+  margin: 0 0 6px;
+  color: #1c51ff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+body.dark .cn1-videos-hero__eyebrow {
+  color: #afc1ff;
+}
+
+.cn1-videos-hero h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.22;
+}
+
+.cn1-videos-hero p {
+  margin: 10px 0 0;
+  color: #334371;
+  line-height: 1.55;
+}
+
+body.dark .cn1-videos-hero p {
+  color: #dce5ff;
+}
+
+.cn1-videos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.cn1-video-card {
+  border: 1px solid rgba(28, 81, 255, 0.18);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+body.dark .cn1-video-card {
+  border-color: rgba(175, 193, 255, 0.2);
+  background: rgba(10, 24, 70, 0.85);
+}
+
+.cn1-video-card__embed {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  background: #121722;
+}
+
+.cn1-video-card__embed iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.cn1-video-card__meta {
+  padding: 14px 14px 16px;
+}
+
+.cn1-video-card__index {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1c51ff;
+}
+
+body.dark .cn1-video-card__index {
+  color: #afc1ff;
+}
+
+.cn1-video-card__meta h3 {
+  margin: 0 0 12px;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.cn1-video-card__meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c51ff;
+  text-decoration: none;
+}
+
+body.dark .cn1-video-card__meta a {
+  color: #afc1ff;
+}
+
+@media (max-width: 760px) {
+  .cn1-videos-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cn1-videos-hero h2 {
+    font-size: 23px;
+  }
+}

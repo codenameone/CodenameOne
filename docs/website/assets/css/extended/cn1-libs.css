@@ -1,0 +1,101 @@
+.cn1-libs-page__intro {
+  margin-bottom: 1.25rem;
+}
+
+.cn1-libs-page__warning {
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(245, 164, 72, 0.5);
+  border-radius: 10px;
+  background: rgba(245, 164, 72, 0.12);
+  color: #ffd8a6;
+}
+
+body.light .cn1-libs-page__warning {
+  background: rgba(245, 164, 72, 0.14);
+  color: #5f3f10;
+}
+
+.cn1-libs-grid {
+  margin-top: 1.1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.9rem;
+}
+
+.cn1-libs-card {
+  border: 1px solid var(--cn1-course-card-border, rgba(29, 82, 255, 0.45));
+  border-radius: 12px;
+  background: var(--cn1-course-card-bg, rgba(68, 82, 123, 0.25));
+  padding: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.cn1-libs-card h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.3;
+  color: var(--cn1-course-link-strong, #f5f8ff);
+}
+
+.cn1-libs-card__meta {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.cn1-libs-card__meta span {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--cn1-course-link-strong, #f5f8ff);
+  border: 1px solid var(--cn1-course-card-border, rgba(29, 82, 255, 0.45));
+  background: rgba(8, 17, 55, 0.22);
+}
+
+body.light .cn1-libs-card__meta span {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.cn1-libs-card p {
+  margin: 0;
+  color: var(--cn1-course-soft-text, rgba(217, 228, 255, 0.85));
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.cn1-libs-card__cta {
+  margin-top: auto;
+  display: inline-flex;
+  align-self: flex-start;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--cn1-course-link-strong, #f5f8ff);
+  border: 1px solid var(--cn1-course-card-border, rgba(29, 82, 255, 0.45));
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  background: rgba(8, 17, 55, 0.22);
+}
+
+body.light .cn1-libs-card__cta {
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.cn1-libs-card__cta:hover {
+  border-color: var(--cn1-course-link, #afc1ff);
+  color: var(--cn1-course-link, #afc1ff);
+}
+
+.cn1-libs-empty {
+  margin-top: 1rem;
+  border: 1px dashed var(--cn1-course-card-border, rgba(29, 82, 255, 0.45));
+  border-radius: 12px;
+  padding: 1rem;
+  color: var(--cn1-course-soft-text, rgba(217, 228, 255, 0.85));
+}

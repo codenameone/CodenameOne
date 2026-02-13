@@ -1,0 +1,225 @@
+.post-single--development-environment .post-content {
+  --cn1-dev-blue: #1d52ff;
+  --cn1-dev-soft: rgba(29, 82, 255, 0.08);
+  --cn1-dev-soft-border: rgba(29, 82, 255, 0.24);
+  --cn1-dev-surface: rgba(29, 82, 255, 0.03);
+}
+
+body.dark .post-single--development-environment .post-content {
+  --cn1-dev-blue: #afc1ff;
+  --cn1-dev-soft: rgba(175, 193, 255, 0.14);
+  --cn1-dev-soft-border: rgba(175, 193, 255, 0.3);
+  --cn1-dev-surface: rgba(175, 193, 255, 0.07);
+}
+
+.post-single--development-environment .post-content > p:first-of-type {
+  font-size: 1.1rem;
+  line-height: 1.72;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.post-single--development-environment .post-content img[src*="Group-2326.svg"] {
+  float: right;
+  width: min(470px, 46%);
+  margin: 0.2rem 0 1rem 1.6rem;
+}
+
+.post-single--development-environment .post-content > h2 {
+  clear: both;
+  margin-top: 2.1rem;
+  margin-bottom: 0.85rem;
+  padding: 0.58rem 0.95rem;
+  border-left: 4px solid var(--cn1-dev-blue);
+  background: var(--cn1-dev-soft);
+  color: var(--cn1-dev-blue);
+}
+
+.post-single--development-environment .post-content > h3 {
+  margin-top: 1.2rem;
+  margin-bottom: 0.45rem;
+  color: var(--cn1-dev-blue);
+}
+
+.post-single--development-environment .post-content .cn1-dev-value-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 0.8rem;
+  margin: 0.35rem 0 1.35rem;
+}
+
+.post-single--development-environment .post-content .cn1-dev-value-item {
+  background: var(--cn1-dev-surface);
+  border: 1px solid var(--cn1-dev-soft-border);
+  padding: 0.9rem;
+}
+
+.post-single--development-environment .post-content .cn1-dev-value-item svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--cn1-dev-blue);
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+}
+
+.post-single--development-environment .post-content .cn1-dev-value-item h3 {
+  margin: 0.5rem 0 0.35rem;
+  font-size: 1.06rem;
+  color: var(--cn1-dev-blue);
+}
+
+.post-single--development-environment .post-content .cn1-dev-value-item p {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.post-single--development-environment .post-content .cn1-ide-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 0.65rem;
+  margin: 0.35rem 0 1.4rem;
+}
+
+.post-single--development-environment .post-content .cn1-ide-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 56px;
+  padding: 0.45rem 0.7rem;
+  background: var(--cn1-dev-surface);
+  border: 1px solid var(--cn1-dev-soft-border);
+}
+
+.post-single--development-environment .post-content .cn1-ide-item img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.post-single--development-environment .post-content .cn1-ide-item i {
+  color: var(--cn1-dev-blue);
+  font-size: 1.2rem;
+}
+
+.post-single--development-environment .post-content .cn1-ide-item span {
+  color: var(--cn1-dev-blue);
+  font-weight: 600;
+  font-size: 0.94rem;
+}
+
+.post-single--development-environment .post-content .cn1-flow-stack {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0.35rem 0 1.35rem;
+}
+
+.post-single--development-environment .post-content .cn1-step-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.95fr) minmax(320px, 1.6fr);
+  gap: 0.95rem;
+  align-items: center;
+  background: var(--cn1-dev-surface);
+  border: 1px solid var(--cn1-dev-soft-border);
+  padding: 0.8rem;
+}
+
+.post-single--development-environment .post-content .cn1-step-card--reverse .cn1-step-copy {
+  order: 2;
+}
+
+.post-single--development-environment .post-content .cn1-step-card--reverse .cn1-step-media {
+  order: 1;
+}
+
+.post-single--development-environment .post-content .cn1-step-kicker {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  color: var(--cn1-dev-blue);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.post-single--development-environment .post-content .cn1-step-copy h3 {
+  margin: 0 0 0.38rem;
+  color: var(--cn1-dev-blue);
+  font-size: 1.22rem;
+}
+
+.post-single--development-environment .post-content .cn1-step-copy p {
+  margin: 0;
+  line-height: 1.58;
+}
+
+.post-single--development-environment .post-content .cn1-step-media img {
+  margin: 0;
+  width: 100%;
+  display: block;
+}
+
+.post-single--development-environment .post-content .cn1-highlight-pair {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(340px, 1.6fr);
+  gap: 1rem;
+  align-items: center;
+  margin: 0.2rem 0 1rem;
+  padding: 0.8rem 0.95rem;
+  background: var(--cn1-dev-soft);
+  border-left: 4px solid var(--cn1-dev-blue);
+}
+
+.post-single--development-environment .post-content .cn1-highlight-copy h4 {
+  margin: 0 0 0.4rem;
+  color: var(--cn1-dev-blue);
+  font-size: 1.16rem;
+}
+
+.post-single--development-environment .post-content .cn1-highlight-copy p {
+  margin: 0;
+}
+
+.post-single--development-environment .post-content .cn1-highlight-media img {
+  margin: 0;
+  width: 100%;
+  display: block;
+}
+
+.post-single--development-environment .post-content::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+@media (max-width: 980px) {
+  .post-single--development-environment .post-content img[src*="Group-2326.svg"] {
+    float: none;
+    width: min(440px, 100%);
+    margin: 0.45rem auto 1rem;
+    display: block;
+  }
+
+  .post-single--development-environment .post-content .cn1-dev-value-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .post-single--development-environment .post-content .cn1-ide-strip {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+
+  .post-single--development-environment .post-content .cn1-step-card,
+  .post-single--development-environment .post-content .cn1-highlight-pair {
+    grid-template-columns: 1fr;
+  }
+
+  .post-single--development-environment .post-content .cn1-step-card--reverse .cn1-step-copy,
+  .post-single--development-environment .post-content .cn1-step-card--reverse .cn1-step-media {
+    order: initial;
+  }
+}

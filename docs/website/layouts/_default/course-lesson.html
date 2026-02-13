@@ -1,0 +1,68 @@
+{{- define "main" -}}
+{{- $courseID := .Params.course_id -}}
+{{- $courseLessons := sort (where (where site.RegularPages "Params.is_course_lesson" true) "Params.course_id" $courseID) "Weight" -}}
+{{- $moduleGroups := $courseLessons.GroupByParam "module_key" -}}
+{{- $currentIndex := -1 -}}
+{{- range $i, $p := $courseLessons -}}
+  {{- if eq $p.Permalink $.Permalink -}}
+    {{- $currentIndex = $i -}}
+  {{- end -}}
+{{- end -}}
+{{- $prev := cond (gt $currentIndex 0) (index $courseLessons (sub $currentIndex 1)) nil -}}
+{{- $next := cond (lt $currentIndex (sub (len $courseLessons) 1)) (index $courseLessons (add $currentIndex 1)) nil -}}
+
+<article class="post-single cn1-course-lesson">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <p class="cn1-course-lesson__kicker">{{ .Params.course_title }} · Module {{ .Params.module_order }}</p>
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    <p class="cn1-course-lesson__meta">Lesson {{ .Params.weight }} of {{ len $courseLessons }}</p>
+  </header>
+
+  <div class="cn1-course-lesson__layout">
+    <aside class="cn1-course-lesson__sidebar">
+      <a class="cn1-course-lesson__back" href="{{ with (first 1 (where (where site.RegularPages "Params.course_id" $courseID) "Layout" "course-hub")) }}{{ (index . 0).RelPermalink }}{{ else }}/{{ end }}">Back to course</a>
+      {{ range $moduleGroups }}
+      {{ $modulePages := sort .Pages "Params.lesson_order" }}
+      {{ $first := index $modulePages 0 }}
+      <section class="cn1-course-lesson__module">
+        <h2>Module {{ $first.Params.module_order }}</h2>
+        <p>{{ $first.Params.module_title }}</p>
+        <ol>
+          {{ range $modulePages }}
+          <li>
+            <a href="{{ .RelPermalink }}"{{ if eq .Permalink $.Permalink }} class="is-active"{{ end }}>{{ .Title }}</a>
+          </li>
+          {{ end }}
+        </ol>
+      </section>
+      {{ end }}
+    </aside>
+
+    <section class="post-content cn1-course-lesson__content">
+      {{- if not (.Param "disableAnchoredHeadings") -}}
+        {{- partial "anchored_headings.html" .Content -}}
+      {{- else -}}
+        {{- .Content -}}
+      {{- end -}}
+
+      <nav class="cn1-course-lesson__pager" aria-label="Lesson navigation">
+        {{ with $prev }}
+        <a class="cn1-course-lesson__pager-link" href="{{ .RelPermalink }}">
+          <span>Previous</span>
+          <strong>{{ .Title }}</strong>
+        </a>
+        {{ else }}
+        <span></span>
+        {{ end }}
+        {{ with $next }}
+        <a class="cn1-course-lesson__pager-link cn1-course-lesson__pager-link--next" href="{{ .RelPermalink }}">
+          <span>Next</span>
+          <strong>{{ .Title }}</strong>
+        </a>
+        {{ end }}
+      </nav>
+    </section>
+  </div>
+</article>
+{{- end -}}

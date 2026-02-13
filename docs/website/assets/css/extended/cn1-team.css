@@ -1,0 +1,60 @@
+.post-single--team .post-content > h2 {
+  margin-top: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.post-single--team .post-content > h3 {
+  margin-top: 1.4rem;
+  margin-bottom: 0.55rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 4px solid #1d52ff;
+  border-radius: 10px;
+  background: rgba(29, 82, 255, 0.08);
+}
+
+body.dark .post-single--team .post-content > h3 {
+  border-left-color: #afc1ff;
+  background: rgba(175, 193, 255, 0.12);
+}
+
+.post-single--team .post-content > p > img {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(29, 82, 255, 0.4);
+  float: right;
+  margin: 0.1rem 0 0.7rem 1rem;
+}
+
+body.dark .post-single--team .post-content > p > img {
+  border-color: rgba(175, 193, 255, 0.5);
+}
+
+.post-single--team .post-content > ul {
+  margin-top: 0.55rem;
+  margin-bottom: 1.2rem;
+}
+
+.post-single--team .post-content > hr {
+  margin: 1.2rem 0 1rem;
+  border-color: rgba(29, 82, 255, 0.22);
+}
+
+body.dark .post-single--team .post-content > hr {
+  border-color: rgba(175, 193, 255, 0.25);
+}
+
+.post-single--team .post-content::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+@media (max-width: 760px) {
+  .post-single--team .post-content > p > img {
+    float: none;
+    display: block;
+    margin: 0.25rem auto 0.8rem;
+  }
+}
