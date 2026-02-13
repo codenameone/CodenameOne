@@ -32,7 +32,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
     steps:
       - name: Check out repository
@@ -76,12 +76,12 @@ jobs:
           if-no-files-found: error
 
       - name: Check Cloudflare deploy credentials
-        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && env.CLOUDFLARE_API_TOKEN == '' }}
+        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && env.CLOUDFLARE_TOKEN == '' }}
         run: |
-          echo "::warning::Skipping Cloudflare Pages deploy because no API token secret is configured. Set CLOUDFLARE_API_TOKEN (preferred) or CF_API_TOKEN."
+          echo "::warning::Skipping Cloudflare Pages deploy because no API token secret is configured. Set CLOUDFLARE_TOKEN (preferred) or CF_API_TOKEN."
 
       - name: Deploy to Cloudflare Pages
-        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && env.CLOUDFLARE_API_TOKEN != '' }}
+        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && env.CLOUDFLARE_TOKEN != '' }}
         uses: cloudflare/wrangler-action@v3
         env:
           # Keep these env vars explicit so Wrangler can authenticate in non-interactive CI.
