@@ -6,6 +6,8 @@ slug: "eclipse-plugin-installation"
 
 # Installing The Eclipse Plugin
 
+**IMPORTANT:** The IDE plugins are no longer supported. This page is here for historical purposes only. See [Getting Started](/getting-started/) for discussion of the maven build process.
+
 1. [Home](/)
 2. Developers
 3. Installing The Eclipse Plugin

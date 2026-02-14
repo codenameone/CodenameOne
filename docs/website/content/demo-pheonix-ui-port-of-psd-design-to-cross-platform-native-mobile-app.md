@@ -52,6 +52,6 @@ Blog Post: [link](https://beta.codenameone.com/template-phoenix-ui.html)
 
 Source: [link](https://github.com/codenameone/PhoenixUI)
 
-JS Port: [link](http://www.codenameone.com/demos/Pheonix/)
+JS Port: [link](/demos/Pheonix/)
 
-Android App: [link](http://www.codenameone.com/demos/Pheonix/Pheonix-release.apk)
+Android App: [link](/demos/Pheonix/Pheonix-release.apk)

@@ -12,6 +12,7 @@ on:
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
+      - '.github/workflows/website-docs.yml'
       - 'CodenameOneDesigner/**'
       - 'Ports/IOSPort/**'
   push:
@@ -25,6 +26,7 @@ on:
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
+      - '.github/workflows/website-docs.yml'
       - 'CodenameOneDesigner/**'
       - 'Ports/IOSPort/**'
 

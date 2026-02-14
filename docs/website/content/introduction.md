@@ -20,7 +20,7 @@ Codename One allows full access to each platform's native APIs via native interf
 
 You can then fill in those stubs with native code. Using native interfaces, you can even integrate native UI widgets into your app seamlessly.
 
-[Learn more about Native Interfaces](https://codenameone.com/how_di_i/access-native-device-functionality-invoke-native-interfaces.html)
+[Learn more about Native Interfaces](how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 
 ![Native Interfaces](/uploads/Group-1691.svg)
 
@@ -44,7 +44,7 @@ You can use third-party native libraries via native interfaces. You can embed na
 
 There is already a wide assortment of cn1libs developed by both Codename One and third-party developers. Notable cn1libs include Google Maps support, WebSocket support, and Parse support.
 
-[Learn More about CN1libs](https://codenameone.com/cn1libs.html)
+[Learn More about CN1libs](/cn1libs/)
 
 ## Platform Architecture (Accordion)
 
@@ -53,15 +53,15 @@ There is already a wide assortment of cn1libs developed by both Codename One and
 {{< /collapse >}}
 
 {{< collapse summary="Android Architecture" >}}
-[![Android Architecture](/uploads/android-architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/android-architecture-.svg)
+[![Android Architecture](/uploads/android-architecture-.svg)
 {{< /collapse >}}
 
 {{< collapse summary="UWP Architecture" >}}
-[![UWP Architecture](/uploads/UWP-Architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/UWP-Architecture-.svg)
+[![UWP Architecture](/uploads/UWP-Architecture-.svg)](/uploads/UWP-Architecture-.svg)
 {{< /collapse >}}
 
 {{< collapse summary="Javascript Port Architecture" >}}
-[![Javascript Port Architecture](/uploads/Javascript-Port-Architecture-.svg)](https://codenameone.com/wp-content/uploads/2020/09/Javascript-Port-Architecture-.svg)
+[![Javascript Port Architecture](/uploads/Javascript-Port-Architecture-.svg)](/uploads/Javascript-Port-Architecture-.svg)
 {{< /collapse >}}
 
 ## Compiled to Native

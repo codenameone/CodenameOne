@@ -12,7 +12,7 @@ slug: "home-test"
 
 ## Trusted by 40k+ developers
 
-[Build an App](https://codenameone.com/getting-started.html) 
+[Build an App](/getting-started/) 
 
 <iframe src="https://ghbtns.com/github-btn.html?user=codenameone&amp;repo=CodenameOne&amp;type=star=true&amp;size=large" frameborder="0" scrolling="0" width="200" height="30" title="GitHub"></iframe>
 
@@ -26,7 +26,7 @@ slug: "home-test"
 
 #### Rapid cross-platform app development using **Java** or **Kotlin** with **100% code reuse**. Apps are compiled down to native code for maximum performance and a smooth user experience.
 
-[Learn about the Architecture](https://codenameone.com/introduction.html)
+[Learn about the Architecture](/introduction/)
 
 ## Developer-friendly Tooling
 
@@ -38,7 +38,7 @@ slug: "home-test"
 
 #### Build beautiful UI with Codename One’s rich set of widgets, specifically designed for mobile apps. **Native** look and feel out of the box, but **fully themeable** using **CSS** to provide your own unique look.
 
-[Demo Showcase](https://codenameone.com/demos.html) [Component Gallery](https://www.codenameone.com/javadoc/com/codename1/ui/package-summary.html)
+[Demo Showcase](/demos/) [Component Gallery](/javadoc/com/codename1/ui/package-summary.html)
 
 ## Why Codename One?
 
@@ -66,7 +66,7 @@ When you make changes to your app’s CSS stylesheet, the changes are reflected 
 
 The core of Codename One is free and open source. GPL + CE licensed so it is free to use with commercial projects.
 
-[Explore the Features](https://codenameone.com/introduction.html)
+[Explore the Features](/introduction/)
 
 ## How it works
 
@@ -126,11 +126,11 @@ Can I access native APIs in my app?
 
 Yes, you can access both system APIs and 3rd party native frameworks and libraries.
 
-[Learn about the Architecture](https://codenameone.com/introduction.html)
+[Learn about the Architecture](/introduction/)
 
 ## Made with Codename One
 
-BeRider Shared electric scooters in Prague. Highly rated app with Google Maps integration.[](https://play.google.com/store/apps/details?id=com.berider.app)   [](https://apps.apple.com/us/app/berider-scooter-sharing/id1465804731)   ![Shared electric scooters in Prague. Highly rated app with Google Maps integration.](/uploads/BeRider-Codename-One.png) Jubilee Motor Car insurance app by Jubilee General Insurance.[](https://play.google.com/store/apps/details?id=com.jubilee)  [![Car insurance app by Jubilee General Insurance.](/uploads/Jubilee-Motor-Codename-One.png) Ordyx POS Point of Sale (POS) system.](https://play.google.com/store/apps/details?id=com.jubilee)       [](https://www.ordyx.com/)![Point of Sale (POS) system.](/uploads/Ordyx-Codename-One.png) HBZ Mobile banking app of Habib Bank AG Zurich, a Swiss multinational commercial bank based in Zurich, Switzerland.[](https://play.google.com/store/apps/details?id=com.bilogicsys.hmobile.json.main)   [](https://apps.apple.com/ae/app/hbz/id1235586645)   ![Mobile banking app of Habib Bank AG Zurich, a Swiss multinational commercial bank based in Zurich, Switzerland.](/uploads/HBZ-Codename-One.png) Ana Paltel Paltel account manager app by Palestine Telecommunications Company.[](https://play.google.com/store/apps/details?id=com.paltel.mobapp&hl=en&gl=US)   [](https://apps.apple.com/us/app/ana-paltel/id1131291631)   ![Paltel account manager app by Palestine Telecommunications Company.](/uploads/Paltel-Codename-One.png) yHomework Math solver app. Highly rated, 1M+ installs.[](https://play.google.com/store/apps/details?id=com.MathUnderground.MathSolver)   [](https://apps.apple.com/us/app/yhomework-math-solver/id604715759)   ![Math solver app. Highly rated, 1M+ installs.](/uploads/yHomework.png) Oxbridge Academy Private distance learning college based in South Africa.[](https://play.google.com/store/apps/details?id=ox.app)   [](https://apps.apple.com/za/app/oxbridge-academy-mobile-app/id964490340)   ![Private distance learning college based in South Africa.](/uploads/Oxbridge-Academy-Codename-One.png) Arrivu Voice/AI technology solutions.[](https://www.arrivu.com/) ![Voice/AI technology solutions.](/uploads/arrivu.png) Previous Next [Demo Showcase](https://codenameone.com/demos.html)
+BeRider Shared electric scooters in Prague. Highly rated app with Google Maps integration.[](https://play.google.com/store/apps/details?id=com.berider.app)   [](https://apps.apple.com/us/app/berider-scooter-sharing/id1465804731)   ![Shared electric scooters in Prague. Highly rated app with Google Maps integration.](/uploads/BeRider-Codename-One.png) Jubilee Motor Car insurance app by Jubilee General Insurance.[](https://play.google.com/store/apps/details?id=com.jubilee)  [![Car insurance app by Jubilee General Insurance.](/uploads/Jubilee-Motor-Codename-One.png) Ordyx POS Point of Sale (POS) system.](https://play.google.com/store/apps/details?id=com.jubilee)       [](https://www.ordyx.com/)![Point of Sale (POS) system.](/uploads/Ordyx-Codename-One.png) HBZ Mobile banking app of Habib Bank AG Zurich, a Swiss multinational commercial bank based in Zurich, Switzerland.[](https://play.google.com/store/apps/details?id=com.bilogicsys.hmobile.json.main)   [](https://apps.apple.com/ae/app/hbz/id1235586645)   ![Mobile banking app of Habib Bank AG Zurich, a Swiss multinational commercial bank based in Zurich, Switzerland.](/uploads/HBZ-Codename-One.png) Ana Paltel Paltel account manager app by Palestine Telecommunications Company.[](https://play.google.com/store/apps/details?id=com.paltel.mobapp&hl=en&gl=US)   [](https://apps.apple.com/us/app/ana-paltel/id1131291631)   ![Paltel account manager app by Palestine Telecommunications Company.](/uploads/Paltel-Codename-One.png) yHomework Math solver app. Highly rated, 1M+ installs.[](https://play.google.com/store/apps/details?id=com.MathUnderground.MathSolver)   [](https://apps.apple.com/us/app/yhomework-math-solver/id604715759)   ![Math solver app. Highly rated, 1M+ installs.](/uploads/yHomework.png) Oxbridge Academy Private distance learning college based in South Africa.[](https://play.google.com/store/apps/details?id=ox.app)   [](https://apps.apple.com/za/app/oxbridge-academy-mobile-app/id964490340)   ![Private distance learning college based in South Africa.](/uploads/Oxbridge-Academy-Codename-One.png) Arrivu Voice/AI technology solutions.[](https://www.arrivu.com/) ![Voice/AI technology solutions.](/uploads/arrivu.png) Previous Next [Demo Showcase](/demos/)
 
 ## Loved by Developers, Trusted by Enterprises
 

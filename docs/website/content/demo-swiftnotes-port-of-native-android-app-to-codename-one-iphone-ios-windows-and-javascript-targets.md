@@ -48,7 +48,7 @@ Notice that the JavaScript HTML5 demo is not what we have on the device where ap
 
 Source: [link](https://github.com/codenameone/SwiftnotesCN1/)
 
-JS Port: [link](http://www.codenameone.com/demos/SwiftnotesCN1/)
+JS Port: [link](/demos/SwiftnotesCN1/)
 
 Universal Windows (UWP): [link](https://www.microsoft.com/library/errorpages/smarterror.aspx?correlationId=+GXvrjf4ckKpWyk9.0.0.3)
 

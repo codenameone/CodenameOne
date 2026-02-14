@@ -35,8 +35,8 @@ Blog Post: [link](/blog/camera-demo.html)
 
 Source: [link](https://github.com/codenameone/CameraDemo)
 
-JS Port: [link](http://www.codenameone.com/demos/CameraDemo/)
+JS Port: [link](/demos/CameraDemo/)
 
-Android App: [link](http://www.codenameone.com/demos/CameraDemo/CameraDemo-release.apk)
+Android App: [link](/demos/CameraDemo/CameraDemo-release.apk)
 
 ios: [link](#)

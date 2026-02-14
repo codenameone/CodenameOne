@@ -35,8 +35,8 @@ Since Apple doesn’t allow demos on itunes and doesn’t allow installing apps 
 
 Source: [link](https://github.com/codenameone/Chrome)
 
-JS Port: [link](http://www.codenameone.com/demos/Chrome/)
+JS Port: [link](/demos/Chrome/)
 
-Android App: [link](http://www.codenameone.com/demos/Chrome/Chrome-release.apk)
+Android App: [link](/demos/Chrome/Chrome-release.apk)
 
 ios: [link](#)

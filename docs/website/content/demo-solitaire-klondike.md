@@ -38,9 +38,9 @@ Since Apple doesn’t allow demos on itunes and doesn’t allow installing apps 
 
 Source: [link](https://github.com/codenameone/codenameone-demos/tree/master/Solitaire)
 
-JS Port: [link](http://www.codenameone.com/demos/Solitaire)
+JS Port: [link](/demos/Solitaire)
 
-Mac App: [link](http://www.codenameone.com/demos/Solitaire/Solitaire.dmg)
+Mac App: [link](/demos/Solitaire/Solitaire.dmg)
 
 Android App: [link](https://play.google.com/store/apps/details?id=com.codename1.apps.solitaire)
 

@@ -47,12 +47,12 @@ Tutorial: [link](https://www.udemy.com/learn-mobile-programming-by-example-with-
 
 Source: [link](https://github.com/codenameone/PropertyCross)
 
-JS Port: [link](http://www.codenameone.com/demos/PropertyCross/)
+JS Port: [link](/demos/PropertyCross/)
 
-Windows Desktop: [link](http://www.codenameone.com/demos/PropertyCross/PropertyCross.exe)
+Windows Desktop: [link](/demos/PropertyCross/PropertyCross.exe)
 
-Mac App: [link](http://www.codenameone.com/demos/PropertyCross/PropertyCross.dmg)
+Mac App: [link](/demos/PropertyCross/PropertyCross.dmg)
 
-Android App: [link](http://www.codenameone.com/demos/PropertyCross/PropertyCross-release.apk)
+Android App: [link](/demos/PropertyCross/PropertyCross-release.apk)
 
 ios: [link](#)

@@ -55,6 +55,6 @@ Blog Post: [link](/template-clean-modern-ui-kit.html)
 
 Source: [link](https://github.com/codenameone/CleanModernUIKit)
 
-JS Port: [link](http://www.codenameone.com/demos/CleanModern/)
+JS Port: [link](/demos/CleanModern/)
 
-Android App: [link](http://www.codenameone.com/demos/CleanModern/CleanModern-release.apk)
+Android App: [link](/demos/CleanModern/CleanModern-release.apk)

@@ -224,9 +224,9 @@ compared to Codename One and has some obvious potential issues.
 
 ## Truly native cross-platform app development with Java or Kotlin for iOS, Android & Web.
 
-[ Get Started  ](https://codenameone.com/getting-started.html)
+[Get Started](/getting-started/)
 
-[ Why Codename one? ](https://codenameone.com/introduction.html)
+[Why Codename one? ](/introduction/)
 ---
 
 ## Archived Comments
