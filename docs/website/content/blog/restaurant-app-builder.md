@@ -46,23 +46,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 ### **Roman H.** — June 21, 2017 at 3:40 pm ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-21851))
 
 > Is this an open source project. Can we contribute ?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 
 ### **Shai Almog** — June 22, 2017 at 4:16 am ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-23431))
 
 > No. It was developed as part of the bootcamp where we walked thru every step of the process.  
 > It will soon be featured in the coming course material we are launching Monday
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 
 ### **Amuche Chimezie** — June 23, 2017 at 2:40 pm ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-23404))
 
 > Hi Shai, Is this available now? If so, how can one access the material?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 
 ### **Roman H.** — June 23, 2017 at 4:11 pm ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-23416))
@@ -70,8 +64,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Roman H. says:
 >
 > Please point me to a page with that course, so I can gather further info for my self.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 
 ### **Shai Almog** — June 24, 2017 at 5:13 am ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-23571))
@@ -79,8 +71,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > We will post an announcement this Monday
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 
 ### **Gareth Murfin** — July 5, 2020 at 6:33 am ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-24286))
@@ -88,8 +78,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Gareth Murfin](https://lh3.googleusercontent.com/a-/AOh14GiKSl5jm7N1Rsw8eobcYTOzEcg7dMk62FKKC_SboA) says:
 >
 > Hi Shai, could you post a link to the course that contains this app? I want to sign up 🙂 Also did you link up actual payment, can users of this app actually purchase anything with their credit card? And if not what needs to be done to complete that bit? Thanks.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 
 ### **Shai Almog** — July 6, 2020 at 5:37 am ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-24291))
@@ -99,8 +87,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > It’s here: <https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java>
 >
 > The payment is implemented on top of the braintree cn1lib <https://www.codenameone.com/blog/braintree-paypal-cn1lib.html>
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 
 ### **Gareth Murfin** — August 4, 2020 at 5:01 pm ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-24307))
@@ -108,8 +94,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Gareth Murfin](https://lh3.googleusercontent.com/a-/AOh14GiKSl5jm7N1Rsw8eobcYTOzEcg7dMk62FKKC_SboA) says:
 >
 > Thanks Shai, it’s a real shame braintree only operate in a few countries. Are there any other cn1 libs that we can use that operate all over? or even http based apis that could easily be used from other companies (requiring no lib).
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 
 ### **Shai Almog** — August 5, 2020 at 2:36 am ([permalink](https://www.codenameone.com/blog/restaurant-app-builder.html#comment-24310))
@@ -118,8 +102,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It accepts charges everywhere. However it (and stripe et. al) only work for companies in very limited locales.  
 > The workaround is to open an account in the US/EU and use that for your billing. This can be done relatively easily using foreign banks operating in your country.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frestaurant-app-builder.html)
 
 ---
 

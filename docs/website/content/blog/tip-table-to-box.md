@@ -105,8 +105,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 ### **Gareth Murfin** — December 19, 2016 at 2:39 pm ([permalink](https://www.codenameone.com/blog/tip-table-to-box.html#comment-24244))
 
 > Excellent functionality, I look forward to using this in my next apps, I am ready to swap to new gui editor now too I think :-)))) Keep up the good work.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-table-to-box.html)
 
 ---
 

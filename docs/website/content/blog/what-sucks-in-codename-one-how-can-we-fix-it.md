@@ -485,8 +485,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Fabrício Cabeça says:
 >
 > Thanks for mentioning my work with the Windows port, you can count on me in case you want to take this leap of faith. To me this is one of the biggest problems in cn1, the other one is the fast lifecycle that delivers great features but great headaches too. Versioned builds helps but even there I had issues before.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhat-sucks-in-codename-one-how-can-we-fix-it.html)
 
 
 ### **Carlos** — January 17, 2016 at 4:11 pm ([permalink](https://www.codenameone.com/blog/what-sucks-in-codename-one-how-can-we-fix-it.html#comment-22689))
@@ -498,8 +496,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Apart form that, I can’t emphathize enough how good CN1 has been for us, and how it has been a game changer for our business model. Thanks for that.
 >
 > Oh, and please, whatever you do, don’t deprecate the list rendering approach. It may be a hassle to some developers, but I like the concept and actually make use of it on some projects.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhat-sucks-in-codename-one-how-can-we-fix-it.html)
 
 
 ### **Shai Almog** — January 18, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/what-sucks-in-codename-one-how-can-we-fix-it.html#comment-22523))
@@ -511,8 +507,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We made a big mistake with the recent set of updates. We should have tiered them more slowly, added flags to disable them more easily and we shouldn’t have done them while everyone was on vacation (which seemed like a good idea when we started off).
 >
 > No worries, we are probably stuck with renderers for good. The main change we’d do is in de-emphasizing it in our docs and trying to gently nudge people to use components/containers which are pretty performant.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhat-sucks-in-codename-one-how-can-we-fix-it.html)
 
 
 ### **joaa** — April 16, 2016 at 4:29 pm ([permalink](https://www.codenameone.com/blog/what-sucks-in-codename-one-how-can-we-fix-it.html#comment-22381))
@@ -520,8 +514,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > joaa says:
 >
 > I love to be able to import my code from android studio and just continue working on it without the need to start from begining. Any comments?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhat-sucks-in-codename-one-how-can-we-fix-it.html)
 
 
 ### **Shai Almog** — April 17, 2016 at 12:10 pm ([permalink](https://www.codenameone.com/blog/what-sucks-in-codename-one-how-can-we-fix-it.html#comment-21556))
@@ -530,8 +522,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the feedback. This is a point that came out a few times before so I posted a blog entry covering this here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/why-we-dont-import-android-native-code.html>)  
 > The gist of it is “we’d like to do it but it’s damn hard so we might get to it one day…”.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhat-sucks-in-codename-one-how-can-we-fix-it.html)
 
 ---
 

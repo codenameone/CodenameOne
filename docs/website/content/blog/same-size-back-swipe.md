@@ -97,8 +97,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > You mention many nice new features in your blogs, but unfortunately sometimes, they get lost especially for new comers using your framework. Summarizing these features into your news letters are nice but still they get lost. Is it possible to have a section in the CodenameOne users manual on these critical fundamentals you talk about in your blog so it won’t be easily forgotten? You don’t have to rewrite, just a short description and a link to the blog post so we can refer to it further. 
 >
 > Thanks.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
 ### **Anonymous** — July 3, 2014 at 11:25 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21730))

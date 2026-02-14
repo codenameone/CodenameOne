@@ -73,8 +73,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > – Can we have a video recording and/or screenshot recording of the app during the tests?
 >
 > Thank you for the reply.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fupdates-holidays.html)
 
 
 ### **Shai Almog** — December 2, 2017 at 5:10 am ([permalink](https://www.codenameone.com/blog/updates-holidays.html#comment-23741))
@@ -87,8 +85,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > – By default tests are against our simulator  
 > – If you have an enterprise account you can build against physical devices and run the tests on a device farm. We don’t manage our own device farm as this can become a HUGE problem well outside of our scope. We can connect to any standard appium device farm and let you run your tests there. We shouldn’t enter that field as device farm providers provide a level of flexibility such as “Run the test on device X located on operator network Y with locale Z”. That’s a level of specialization we can’t compete with.  
 > – That’s offered by the device farm providers
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fupdates-holidays.html)
 
 ---
 

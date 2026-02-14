@@ -142,8 +142,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > Is this for premium subscribers only?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpushing-it.html)
 
 
 ### **Anonymous** — July 29, 2013 at 1:52 pm ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21680))
@@ -151,8 +149,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > Yes, I neglected to mention in the article that push is for pro users only.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpushing-it.html)
 
 
 ### **Anonymous** — August 20, 2013 at 3:45 pm ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21818))
@@ -160,8 +156,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > It was mentioned earlier that CN1 uses/used Urban Airship for push. Urban Airship supports tags to send to a subset of users. Will CN1 support tags in the future?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpushing-it.html)
 
 
 ### **Anonymous** — August 21, 2013 at 3:23 am ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21998))
@@ -171,8 +165,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We do not use Urban Airship at this time. We allow you to send a push to a specific device but we don’t have their level of refined targeting. 
 >
 > We don’t currently have any plans on supporting this or Urban Airship however, our plans are fluid and depend on the requirements of our pro/enterprise account subscribers.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpushing-it.html)
 
 
 ### **Anonymous** — August 28, 2013 at 5:27 pm ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21866))
@@ -184,8 +176,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anyone following the instructions above might find this helpful to get them added in the proper way: 
 >
 > [http://www.codenameone.com/…](<http://www.codenameone.com/advanced-build.html>)
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpushing-it.html)
 
 ---
 

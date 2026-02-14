@@ -70,8 +70,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Good job Shai! 
 >
 > </div>
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fyou-can-bet-on-it.html)
 
 
 ### **Anonymous** — March 13, 2015 at 7:05 am ([permalink](https://www.codenameone.com/blog/you-can-bet-on-it.html#comment-22321))
@@ -87,8 +85,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > All the logic is standard Codename One animations and action listeners. The dragging is just the builtin drag and drop support and the layouts are just border layout, layered layout, grid layout and BoxLayout X. Nothing unique. 
 >
 > </div>
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fyou-can-bet-on-it.html)
 
 ---
 

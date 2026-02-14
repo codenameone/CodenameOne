@@ -56,8 +56,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > That’s an interesting demo. I notice that there is no back behaviour (i.e. on Android the hardware back key exits the application, irrespective of which form you are on).
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
 
 
 ### **Anonymous** — January 6, 2015 at 7:45 am ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-22226))
@@ -65,8 +63,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > Is it possible to mix SideMenuBar with native android action bar in the same app now? For example one form i might want to use the SideMenuBar, but the next form, I might want to use the android action bar?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
 
 
 ### **Anonymous** — January 7, 2015 at 5:08 am ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-22062))
@@ -74,8 +70,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > Yes, should be possible with the Toolbar
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
 
 
 ### **Anonymous** — January 7, 2015 at 6:41 am ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-22199))
@@ -83,8 +77,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > Thanks Chen, very good work!
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
 
 
 ### **Anonymous** — January 7, 2015 at 8:43 am ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-21606))
@@ -92,8 +84,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > What a great feature. Will this be available on iOS too? And is it possible to zoom in the cat image when you tensileDrag the container down?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
 
 
 ### **Anonymous** — January 7, 2015 at 6:17 pm ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-21951))
@@ -103,8 +93,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > This feature is available to all supported platforms. 
 >
 > Zoom in should be possible, I suggest you to check out the new Flickr Demo from the project svn and have a look at the code.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
 
 
 ### **Anonymous** — January 8, 2015 at 5:52 am ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-22089))

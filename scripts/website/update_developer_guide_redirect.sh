@@ -75,12 +75,17 @@ awk -v begin="${BEGIN_MARKER}" -v end="${END_MARKER}" '
   !skip { print }
 ' "${REDIRECTS_FILE}" > "${new_redirects}"
 
+tmp_body="${tmp_dir}/_redirects.body"
+cp "${new_redirects}" "${tmp_body}"
+
 {
-  printf '\n%s\n' "${BEGIN_MARKER}"
+  printf '%s\n' "${BEGIN_MARKER}"
   printf '# Source release: %s\n' "${release_tag}"
   printf '/files/developer-guide.pdf %s 302\n' "${asset_url}"
-  printf '%s\n' "${END_MARKER}"
-} >> "${new_redirects}"
+  printf '/files/developer-guide.pdf/ %s 302\n' "${asset_url}"
+  printf '%s\n\n' "${END_MARKER}"
+  cat "${tmp_body}"
+} > "${new_redirects}"
 
 mv "${new_redirects}" "${REDIRECTS_FILE}"
 
