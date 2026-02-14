@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Could it be that java.io.StringReader was used instead of com.codename1.util .regex.StringReader?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsign-in-with-apple-support.html)
+
 
 
 ### **Steve Hannah** — April 1, 2020 at 1:52 pm ([permalink](https://www.codenameone.com/blog/sign-in-with-apple-support.html#comment-21375))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The gist of it is that the build.xml file needs to be updated, and you need to run an update libs. This won’t be needed for long as the build.xml file will come updated with the next plugin update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsign-in-with-apple-support.html)
+
 
 
 ### **Javier Anton** — April 1, 2020 at 2:40 pm ([permalink](https://www.codenameone.com/blog/sign-in-with-apple-support.html#comment-21374))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I’ll wait until the next update then as I don’t need this right now, was just toying with it in preparation of Apple making this a requirement (apparently that has been rolled back to June last I heard because of the coronavirus crisis)  
 > Thanks for this
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsign-in-with-apple-support.html)
+
 
 ---
 

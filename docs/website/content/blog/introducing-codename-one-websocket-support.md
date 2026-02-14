@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [https://stackoverflow.com/q…](<https://stackoverflow.com/questions/47876835/codename-one-how-to-correctly-add-the-pubnub-library-and-use-it/47880481#47880481>)  
 > I didn’t find information on WebSockets in the developer guide, but I found this page. Please note that the following page gives a 404 error: [https://www.codenameone.com…](<https://www.codenameone.com/blog/tags/websockets.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-websocket-support.html)
+
 
 
 ### **Shai Almog** — December 20, 2017 at 6:33 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-websocket-support.html#comment-23647))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > WebSockets is an external cn1lib so it’s not in the developer guide. I hope to add a chapter covering important cn1libs such as websockets, google maps etc. at some point in the future. Currently the best up to date docs for websocket support are here: [https://github.com/shannah/…](<https://github.com/shannah/cn1-websockets/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-websocket-support.html)
+
 
 ---
 

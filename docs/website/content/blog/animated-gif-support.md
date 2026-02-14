@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So does this mean that the image will be animated continously??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanimated-gif-support.html)
+
 
 
 ### **Shai Almog** — August 11, 2017 at 7:22 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23653))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It will loop based on the loop settings in the GIF itself. GIF’s contain a loop count. If it’s 0 it means looping forever.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanimated-gif-support.html)
+
 
 
 ### **Francesco Galgani** — August 16, 2017 at 5:19 pm ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23444))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you 🙂  
 > How are the various densities managed by animated GIFs? Is there any multi-image equivalent for GIF?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanimated-gif-support.html)
+
 
 
 ### **Shai Almog** — August 17, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-24151))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We don’t. GIF has no density support so it can only be scaled. Using an approach like multi-image with GIF would be prohibitive as the file size will balloon. GIF’s are huge enough as it is.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanimated-gif-support.html)
+
 
 
 ### **Francesco Galgani** — August 17, 2017 at 9:39 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23637))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Mmm… is there any way to get the right animated GIF size using an external service such as Cloudinary? I’ve never used it, so I don’t know if it supports animated GIFs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanimated-gif-support.html)
+
 
 
 ### **Shai Almog** — August 18, 2017 at 5:56 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23418))
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t know. I’m not familiar with that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanimated-gif-support.html)
+
 
 
 ### **Rainer** — August 23, 2017 at 7:52 pm ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-24219))
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hello! I tried the sample code with an animated gif, but nothing appears with the simulator
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanimated-gif-support.html)
+
 
 
 ### **Shai Almog** — August 24, 2017 at 9:04 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23695))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Do you see any error in the console?  
 > Have you tried with a different gif file?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanimated-gif-support.html)
+
 
 ---
 

@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Very nice Shai and hope the result of the bootcamp will be fruitful and lead to better tutorials/documentation
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-bootcamp-updates.html)
+
 
 ---
 

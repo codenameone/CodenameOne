@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Interesting post but what about offline app or online app that can work offline ? I mean, for example, exiting application in case of unsupported version will work only if device is connected …
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-cross-platform-update-available-strategy.html)
+
 
 
 ### **Shai Almog** — November 30, 2016 at 4:05 am ([permalink](https://www.codenameone.com/blog/tip-cross-platform-update-available-strategy.html#comment-23229))
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I wanted to keep the code simple so I didn’t go into the more complex situation of a “user turns on airplane mode to use the app”. I think that if a user resorts to that rather than just update the app he’ll also download an illegal APK/IPA and jailbrake his device so this ventures into another domain.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-cross-platform-update-available-strategy.html)
+
 
 ---
 

@@ -45,7 +45,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have this working, but I’m hoping to post a document to Google drive – is this supported with this login?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsign-in-with.html)
+
 
 
 ### **Shai Almog** — April 29, 2017 at 6:12 am ([permalink](https://www.codenameone.com/blog/sign-in-with.html#comment-23400))
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I think this guy on stackoverflow was trying to do the same thing with Codename One: [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/41352584/401-error-unauthorized-when-trying-to-post-to-a-public-google-sheet-using-th>)  
 > I have no idea if he succeeded or not
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsign-in-with.html)
+
 
 ---
 

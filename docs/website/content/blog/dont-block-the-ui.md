@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I will add here my 2 cents… blocking the UI of a BrowserComponent will result in the underlying JS being stopped by Safari. So it is very bad to block a Form containing a BrowserComponent on iOS  
 > It has taken me a long time to realise this… and from my own tests I can see that Apple has restricted the bg JS even more recently
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdont-block-the-ui.html)
+
 
 ---
 

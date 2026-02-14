@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good job done. Docs are now extremely good for getting sample codes. Time saver! I had to redo the downloaded images on a form to use imageviewer and I have been ignoring it for ages. The initial codes in the old docs wasn’t clear enough for me. I can now implement it with ease. Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomponent-gallery.html)
+
 
 ---
 

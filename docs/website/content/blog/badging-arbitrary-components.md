@@ -56,7 +56,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > createBadge error. Is it missing “public” statement in the method? or i´m missing something here?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbadging-arbitrary-components.html)
 
 
 ### **Shai Almog** — November 4, 2016 at 5:47 am ([permalink](https://www.codenameone.com/blog/badging-arbitrary-components.html#comment-22930))
@@ -64,8 +63,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Sorry, I neglected to mention that this is landing in the Friday release today so when you get a new update the code should compile fine. You can use Update Client Libraries later today to get the update.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbadging-arbitrary-components.html)
 
 
 ### **João Bastos** — November 4, 2016 at 8:43 am ([permalink](https://www.codenameone.com/blog/badging-arbitrary-components.html#comment-23013))
@@ -73,8 +70,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > João Bastos says:
 >
 > Ok. Thanks Shai
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbadging-arbitrary-components.html)
 
 ---
 

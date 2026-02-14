@@ -531,7 +531,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The discussion on the pros and cons could be expanded, but the considerations would still be subjective and related to their own development experience. Certainly, Codename One allows with few resources and few people to do what otherwise would require many more resources and many more people.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftop-10-best-cross-platform-app-development-frameworks-in-2024.html)
+
 
 
 ### **Vitali Kuptsov** — May 31, 2021 at 1:56 pm ([permalink](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2024.html#comment-24459))
@@ -540,7 +540,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you for your article! I wouldn’t be sure for Cordova as imo it’s not as great as it used to be due to new frameworks that really surpass it. For example, Flutter which you also mentioned. Flutter definitely wins with its HotReload and automated testing, and more native UI. I’ve read about it recently in this article [link removed], and it looks quite convincing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftop-10-best-cross-platform-app-development-frameworks-in-2024.html)
+
 
 
 ### **Shai Almog** — May 31, 2021 at 2:25 pm ([permalink](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2024.html#comment-24460))
@@ -549,7 +549,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I removed your link since it appears to be SEO related. FYI Codename One supports hit reload etc. This isn’t such a unique feature.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftop-10-best-cross-platform-app-development-frameworks-in-2024.html)
+
 
 
 ### **Muminjon Abduraimov** — August 22, 2021 at 8:40 pm ([permalink](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2024.html#comment-24475))
@@ -558,7 +558,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Delphi and C++ Builder with FireMonkey Framework should also be here! 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftop-10-best-cross-platform-app-development-frameworks-in-2024.html)
+
 
 ---
 

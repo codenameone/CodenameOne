@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, does Toolbar Command support this button icon capability?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpressed-selected-icon-font-utf-8.html)
+
 
 
 ### **Shai Almog** — May 26, 2016 at 4:10 am ([permalink](https://www.codenameone.com/blog/pressed-selected-icon-font-utf-8.html#comment-22850))
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ll add to the next update a version of setMaterialIcon that accepts a command and UIID. And we’ll also try to add a few methods to toolbar that should do effectively this e.g. addMaterialCommandToSideMenu(…)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpressed-selected-icon-font-utf-8.html)
+
 
 
 ### **Chibuike Mba** — May 26, 2016 at 7:10 am ([permalink](https://www.codenameone.com/blog/pressed-selected-icon-font-utf-8.html#comment-22723))
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > OK. Great. Will be looking forward for that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpressed-selected-icon-font-utf-8.html)
+
 
 ---
 

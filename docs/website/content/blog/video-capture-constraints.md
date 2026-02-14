@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It would be awesome if you could use this same class and ust specify an array of pngs or something to also be able to export a video.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvideo-capture-constraints.html)
+
 
 ---
 

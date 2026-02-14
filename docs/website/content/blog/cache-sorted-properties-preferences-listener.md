@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FileSystemStorage.getInstance().openOutputStream(FileSystemStorage.getInstance().getChacheDir() + “/ ” + fname);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcache-sorted-properties-preferences-listener.html)
+
 
 
 ### **Shai Almog** — December 14, 2016 at 5:12 am ([permalink](https://www.codenameone.com/blog/cache-sorted-properties-preferences-listener.html#comment-23232))
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also notice that directories in Codename One should always end with the / character so the + “/” is redundant.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcache-sorted-properties-preferences-listener.html)
+
 
 ---
 

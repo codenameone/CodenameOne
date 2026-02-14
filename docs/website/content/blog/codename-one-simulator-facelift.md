@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m running the new Simulator on a Linux OS.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **Steve Hannah** — March 22, 2022 at 6:59 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24515))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the feedback. I have moved this into an issue and am working through the points one by one. You can follow the progress at <https://github.com/codenameone/CodenameOne/issues/3566>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **Steve Hannah** — March 28, 2022 at 1:46 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24524))
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > All of these issues are resolved in the latest version (7.0.62). You can follow the specific changes in the issue tracker issue that I opened for this at <https://github.com/codenameone/CodenameOne/issues/3566>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **plumberg** — March 28, 2022 at 8:23 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24525))
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ll appreciate your help!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **plumberg** — March 28, 2022 at 8:27 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24526))
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nevermind, I just found it in the same window on the bottom.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **Steve Hannah** — March 28, 2022 at 11:06 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24527))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Due to this update, all components are very small now : <https://prnt.sc/YEkeZp_XWEdP>  
 > How to fix this please or how to get back to the older version ? We can’t even read the text.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **Steve Hannah** — March 25, 2022 at 2:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24517))
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The changes to the simulator shouldn’t have any effect on component sizes in your app. One way to confirm this is to revert the version to 7.0.58. If you change the cn1.version property to 7.0.58 in your project’s pom.xml file, does that “fix” the issue?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **Fawaz Qamhawi** — March 26, 2022 at 8:39 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24518))
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > By the way, I lost all my skins and there is no way to upload other skins as it used to be before this update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **Steve Hannah** — March 27, 2022 at 12:37 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24519))
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m not sure I understand the issue? Are you saying that your problem with styles is fixed after you recompile the CSS file?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 
 ### **Steve Hannah** — March 28, 2022 at 1:44 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24523))
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I have opened an issue in the issue tracker at <https://github.com/codenameone/CodenameOne/issues/3572>  
 > If you experience this issue, please update that issue with details to help reproduce it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-simulator-facelift.html)
+
 
 ---
 

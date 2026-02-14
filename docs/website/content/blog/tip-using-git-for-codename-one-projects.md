@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My project build just failed in `<copy todir=”bin”><fileset dir=”override”/></copy>` because of the missing `override` directory. This was my fault as I deleted all empty directories, but git doesn’t track them, so build of a cloned project will fail for the very same reason.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
+
 
 
 ### **Shai Almog** — November 5, 2018 at 5:26 am ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23901))
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is it possible your build.xml is out of date?  
 > build.xml should implicitly create that directory if it’s missing when you send a build and when you run if you use netbeans.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
+
 
 
 ### **Martin Grajcar** — November 5, 2018 at 3:19 pm ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23972))
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m using Eclipse. I wonder, how to get updates to build.xml, in case you do some important changes in the future (overwriting my edited file is no problem because of git).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
+
 
 
 ### **Shai Almog** — November 6, 2018 at 6:55 am ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23883))
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > build.xml is embedded in Codename One Settings so when you save changes there it offers to override your current version. Please file an issue on this and we’ll try to add that mkdir before that as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
+
 
 
 ### **ThomasH99** — September 19, 2021 at 2:30 pm ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-24482))
@@ -182,7 +182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, is this approach is still the right way to use Git for CN1 projects using maven? (I’m no expert on either so maybe this is a basic question 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
+
 
 ---
 

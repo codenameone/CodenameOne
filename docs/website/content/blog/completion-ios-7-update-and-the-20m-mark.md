@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > just thought you should know, that the title to this post is different, from the title on the front page of the website
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
+
 
 
 ### **Anonymous** — August 29, 2013 at 3:50 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-21788))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The dangers of Copy & Paste…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
+
 
 
 ### **Anonymous** — September 11, 2014 at 1:25 pm ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22224))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there any setModel method to pass the autocomplete data other than putting it in the contructor
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
+
 
 
 ### **Anonymous** — September 12, 2014 at 6:12 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22061))
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No but you can override the filter method to get more elaborate filtering capabilities.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
+
 
 
 ### **Anonymous** — January 27, 2015 at 6:55 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22294))
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > always saying “you can filter”. please show us one example..
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
+
 
 ---
 

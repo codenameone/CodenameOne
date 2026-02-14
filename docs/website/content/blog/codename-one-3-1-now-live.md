@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BTW, the ‘detailed list of release notes’ link is broken.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-1-now-live.html)
+
 
 
 ### **Shai Almog** — July 27, 2015 at 4:30 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-1-now-live.html#comment-22412))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, its updated now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-1-now-live.html)
+
 
 ---
 

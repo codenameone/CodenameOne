@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve just tested that a Popup Dialog works fine also with an Android skin, thank you! About the Popup Dialog, isn’t the developer guide section “Styling The Arrow Of The Popup Dialog” more valid? Should this part of the developer guide be changed? Link: [https://www.codenameone.com…](<https://www.codenameone.com/manual/components.html#_styling_the_arrow_of_the_popup_dialog>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ficon-fonts-popups-infinite-scroll.html)
+
 
 
 ### **Shai Almog** — September 15, 2019 at 3:44 am ([permalink](https://www.codenameone.com/blog/icon-fonts-popups-infinite-scroll.html#comment-23825))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, I updated that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ficon-fonts-popups-infinite-scroll.html)
+
 
 ---
 

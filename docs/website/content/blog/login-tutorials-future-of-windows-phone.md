@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I was trying to integrate google login in one of my apps but didn’t see the GoogleConnect class to be available. Does that part of code go into the native implementation for each platform?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flogin-tutorials-future-of-windows-phone.html)
+
 
 
 ### **Shai Almog** — July 10, 2015 at 2:05 pm ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-22274))
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We need to update the plugin version to include these new features. It should be out next week.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flogin-tutorials-future-of-windows-phone.html)
+
 
 
 ### **Hitesh Rawtani** — July 11, 2015 at 6:42 am ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-22082))
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great. I look forward to the update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flogin-tutorials-future-of-windows-phone.html)
+
 
 
 ### **J.C** — July 23, 2015 at 11:36 am ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-22394))
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It looks like MS is only supporting Web Apps and Xamarin for cross platform compatibility and not native Android Java Apps in Visual Studio 2015 which is a let down. This means CodenameOne will not be able to run properly on newer Win10 devices or even older devices. Not sure how good is the JavaScript version, but I think native is much better. Too bad really.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flogin-tutorials-future-of-windows-phone.html)
+
 
 
 ### **Fabrício Cabeça** — July 30, 2015 at 11:33 am ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-21602))
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I agree, that’s why I decided to write a windows port myself, it is still under heavy development but I can’t see anything that can’t be accomplished right now and uses WinRT which means it will work with the universal apps model. I don’t blame the cn1 team, Microsoft really didn’t help constantly changing frameworks and not giving basic graphics support.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flogin-tutorials-future-of-windows-phone.html)
+
 
 ---
 

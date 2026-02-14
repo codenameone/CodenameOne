@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > hello,  
 > how i can display Local Build config option in netbeans to choose Gradle Android Project to generate an Android Studio project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fyou-can-now-build-android-and-ios-apps-locally.html)
+
 
 
 ### **Shai Almog** — June 2, 2021 at 1:12 am ([permalink](https://www.codenameone.com/blog/you-can-now-build-android-and-ios-apps-locally.html#comment-24462))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to migrate the project to maven as explained here <https://www.codenameone.com/blog/moving-to-maven.html>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fyou-can-now-build-android-and-ios-apps-locally.html)
+
 
 ---
 

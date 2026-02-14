@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is a build done with the “auto” flag bigger in size? I presume it must pack both versions’ resources and then decide which one to use at runtime?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseven.html)
+
 
 
 ### **Anonymous** — October 29, 2013 at 2:36 am ([permalink](https://www.codenameone.com/blog/seven.html#comment-22000))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Keep in mind that iOS apps are bundled as app bundle directories so there is no overhead in runtime for any amount of files included in the bundle (although there is overhead for compiled code size but that’s a different story).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseven.html)
+
 
 
 ### **Anonymous** — January 23, 2014 at 11:16 am ([permalink](https://www.codenameone.com/blog/seven.html#comment-21967))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please let me know
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseven.html)
+
 
 
 ### **Anonymous** — January 23, 2014 at 4:30 pm ([permalink](https://www.codenameone.com/blog/seven.html#comment-24161))
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Theme constants are in the designer in the theme under the constants tab.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseven.html)
+
 
 ---
 

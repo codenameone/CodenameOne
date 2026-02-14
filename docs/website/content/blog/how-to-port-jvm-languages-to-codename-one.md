@@ -398,7 +398,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Incredible work. So will the gui builder spit out kotlin too ? Also I think adding swift for iOS native dev would be awesome!..
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-port-jvm-languages-to-codename-one.html)
+
 
 
 ### **Don't Bother** — July 18, 2017 at 5:07 pm ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23307))
@@ -407,7 +407,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Swift is already a native language for iOS. So I don’t really understand what you are asking for. And I have not heard about ability to complie swift to java bytecode.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-port-jvm-languages-to-codename-one.html)
+
 
 
 ### **shannah78** — July 18, 2017 at 6:35 pm ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-21522))
@@ -418,7 +418,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is not to be confused with using Swift to write native iOS code in a Codename one native interface. This is already possible (albiet a bit painful) by building a library separately using swift/xcode, and including the library in your ios/native lib – You only need to write a small amount of Objective-C to serve as the native interface itself.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-port-jvm-languages-to-codename-one.html)
+
 
 
 ### **Gareth Murfin** — July 19, 2017 at 2:19 am ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23497))
@@ -427,7 +427,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Oh thats interesting is there any links for that? I I want to write more native libs but I want to use swift.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-port-jvm-languages-to-codename-one.html)
+
 
 
 ### **Shai Almog** — July 19, 2017 at 5:08 am ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23624))
@@ -436,7 +436,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s a very different thing. The main blocker for this is integrating ARC with the GC. That should work in theory but doesn’t.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-port-jvm-languages-to-codename-one.html)
+
 
 
 ### **Adi J** — August 6, 2017 at 1:11 pm ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-21853))
@@ -445,7 +445,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > can I make app for tizen os along with android and ios by codename one.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-port-jvm-languages-to-codename-one.html)
+
 
 
 ### **Shai Almog** — August 7, 2017 at 5:23 am ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23602))
@@ -454,7 +454,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We don’t natively support tizen but we do support JavaScript in the enterprise tier which should work on Tizen.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-port-jvm-languages-to-codename-one.html)
+
 
 ---
 

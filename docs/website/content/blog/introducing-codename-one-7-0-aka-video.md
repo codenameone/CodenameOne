@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Congratulations and can’t wait to see where CN1 goes from here
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-7-0-aka-video.html)
+
 
 
 ### **IMIENS CORP** — February 9, 2021 at 8:26 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-7-0-aka-video.html#comment-24407))
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you so much, for adding WebRTC !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-7-0-aka-video.html)
+
 
 
 ### **IMIENS CORP** — February 9, 2021 at 8:33 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-7-0-aka-video.html#comment-24408))
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BTW, any examples, docs on WebRTC ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-7-0-aka-video.html)
+
 
 
 ### **Shai Almog** — February 10, 2021 at 2:06 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-7-0-aka-video.html#comment-24409))
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nothing serious yet but initial stuff is in the project page: <https://github.com/shannah/CN1WebRTC>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-7-0-aka-video.html)
+
 
 ---
 

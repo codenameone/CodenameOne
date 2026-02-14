@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [https://www.codenameone.com…](<https://www.codenameone.com/files/developer-guide.pdf>)  
 > I prefer to print by myself the book, because the shipping cost from USA to my country is very expensive (a lot more than the book itself).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmedia-controls-print-developer-guide.html)
+
 
 
 ### **Shai Almog** — October 19, 2017 at 5:56 am ([permalink](https://www.codenameone.com/blog/media-controls-print-developer-guide.html#comment-23605))
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Yes it’s the reduced size. The original was just under 1000 pages…  
 > Personally I prefer the feel of a professionally printed/bound book over A4’s. Either way we don’t make a profit over the book (it’s just printing costs) so feel free to print it yourself.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmedia-controls-print-developer-guide.html)
+
 
 ---
 

@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice work. How can this be use on form or container but preferably forms
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fperspective-transform.html)
+
 
 
 ### **Anonymous** — August 27, 2014 at 2:16 pm ([permalink](https://www.codenameone.com/blog/perspective-transform.html#comment-22079))
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It should be. Ideally we’d offer this as a custom transition.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fperspective-transform.html)
+
 
 
 ### **Anonymous** — February 18, 2015 at 6:43 pm ([permalink](https://www.codenameone.com/blog/perspective-transform.html#comment-21428))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi does this tutorial work on simulator and Android now?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fperspective-transform.html)
+
 
 
 ### **Anonymous** — February 19, 2015 at 3:53 am ([permalink](https://www.codenameone.com/blog/perspective-transform.html#comment-22310))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Android yes, simulator not quite. Its problematic since the Java2D API doesn’t include support for perspective transform.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fperspective-transform.html)
+
 
 ---
 

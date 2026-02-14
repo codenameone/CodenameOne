@@ -406,7 +406,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 1\. if i have 200 products means, do i want to add that all 200 products in iTunes connect  
 > [2.is](<http://2.is>) it possible to set the price and expiry date which i want.(bcoz if i am adding 200 products on iTunes connect i have to set the price.But in that we can able to choose the tier they mentioned.)So is it possible to set the prices
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-app-purchase-non-renewable-subscriptions.html)
+
 
 
 ### **Shai Almog** — December 8, 2017 at 6:51 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23672))
@@ -415,14 +415,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 1\. Yes.  
 > 2\. I think there is an ability to pick a price but that makes it hard with international sales and coin fluctuations so tiers might be better overall.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-app-purchase-non-renewable-subscriptions.html)
+
 
 
 ### **Julien Sosin** — February 9, 2018 at 7:21 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23896))
 
 > Hello. An user cancel his purchase but Apple didn’t send the cancellation_date when I refresh the receipts and I can’t know that the user had cancel his purchase. What can I do ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-app-purchase-non-renewable-subscriptions.html)
+
 
 
 ### **Shai Almog** — February 10, 2018 at 6:01 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23878))
@@ -430,14 +430,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > Not much. If Apple doesn’t send the cancellation it’s a problem. Generally with in-app-purchase you should only sell stuff you don’t mind losing occasionally on.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-app-purchase-non-renewable-subscriptions.html)
+
 
 
 ### **Julien Sosin** — February 10, 2018 at 8:57 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23750))
 
 > Hi Almog. I guess I should check manually :/
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-app-purchase-non-renewable-subscriptions.html)
+
 
 ---
 

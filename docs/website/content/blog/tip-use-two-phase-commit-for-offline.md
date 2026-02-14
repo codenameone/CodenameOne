@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > About the knowledge, my opinion is that the most of things expires soon… but the good ideas will never expire.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-use-two-phase-commit-for-offline.html)
+
 
 
 ### **ZombieLover** — September 4, 2018 at 10:46 am ([permalink](https://www.codenameone.com/blog/tip-use-two-phase-commit-for-offline.html#comment-24078))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Users can upload changes which basically sends the queries they executed on local db and a timestamp (send via rest API)  
 > Downloading changes then gets all the stored queries on the Server after the timestamp they last updated their local db with (which is kept in a local variable) and executes them on localDB
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-use-two-phase-commit-for-offline.html)
+
 
 ---
 

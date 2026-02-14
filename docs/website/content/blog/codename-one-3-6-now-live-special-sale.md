@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/5163d29b02233350f5955a94ac28e83a736bb8412d59921f99a513e15eac8f4a.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/e41214b31a9525e4d162cc3643b92123eeb82801b3041fa2d40ac3907705e728.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/9a05b55913ef04e354bb80535a6f1d9e97d36f0247e6e0b8be1d2d165b51252d.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/88334fc0569db5713eb867d88a7b9ed60ebe2692d00b1e352ef08bcb167b7821.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **bryan** — January 16, 2017 at 7:44 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23188))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Screenshots on the app store look quite impressive. Well done !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Shai Almog** — January 17, 2017 at 6:47 am ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23234))
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > You guys made a lot of progress since the screenshots were added here: [https://www.codenameone.com…](<https://www.codenameone.com/featured-sematime.html>)  
 > We’ll try to update to the latest screenshots!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Chidiebere Okwudire** — January 17, 2017 at 6:58 am ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-24119))
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great job guys! I’ve been out of touch lately due to other commitments but I follow the updates and look forward to when I can get busy with CodenameOne again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 2:42 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23087))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > did you generate your UI from a PSD?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Boniface N. Githinji** — January 17, 2017 at 3:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23242))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks bryan.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Boniface N. Githinji** — January 17, 2017 at 3:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23163))
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Lukman, no; did it all in Java from scratch.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Boniface N. Githinji** — January 17, 2017 at 3:20 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-22918))
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks Shai. Yes indeed. This is a great platform, we are big believers in WORA and will keep shipping all our mobile apps via CodenameOne.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 5:39 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23267))
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Fantastic…….good job man….really good job
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 6:06 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23309))
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > pleae give me your email boniface….. thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Chen Fishbein** — January 18, 2017 at 11:48 am ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23287))
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice one! well done!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 
 ### **Boniface N. Githinji** — February 16, 2017 at 1:28 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23045))
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Keep doing the good work we’ll keep evangelizing this framework here in Africa.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 ---
 

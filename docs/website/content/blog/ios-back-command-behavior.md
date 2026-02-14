@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Thank you very much for this information, this post helped me on setting correctly the back buttons for iOS and Android. Thank you for all the other news.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-back-command-behavior.html)
+
 
 ---
 

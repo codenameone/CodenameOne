@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It might work we haven’t tested that
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-improvements-build-screenshots.html)
+
 
 
 ### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](https://www.codenameone.com/blog/windows-phone-improvements-build-screenshots.html#comment-22273))
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it just QR code support or can you also scan conventional barcodes now, UPC, EAN etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-improvements-build-screenshots.html)
+
 
 ---
 

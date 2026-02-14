@@ -59,14 +59,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you Steve, this solves a lot of issues in a simple way! 😀  
 > Is it fine if it’s applied to the contentPane?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsafe-areas.html)
+
 
 
 ### **Steve Hannah** — February 10, 2020 at 1:25 pm ([permalink](https://www.codenameone.com/blog/safe-areas.html#comment-21381))
 
 > You can apply it to the content pane as long as you don’t have any components that are supposed to bleed to the edge. E.g. If you have tabs, it would look weird because the tab buttons wouldn’t be at the very bottom of the screen.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsafe-areas.html)
+
 
 
 ### **Javier Anton** — March 10, 2021 at 1:33 pm ([permalink](https://www.codenameone.com/blog/safe-areas.html#comment-24411))
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > return foundWindow;  
 > }
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsafe-areas.html)
+
 
 ---
 

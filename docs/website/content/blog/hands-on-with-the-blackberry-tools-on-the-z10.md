@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > i hope that RIM can help you more that some time in the future codename one will support B10 devices by default.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhands-on-with-the-blackberry-tools-on-the-z10.html)
+
 
 
 ### **Anonymous** — July 2, 2013 at 7:32 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21870))
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I wonder what they were thinking, making development so difficult for their OS, knowing fully well it’s not the best OS or even Hardware in the market.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhands-on-with-the-blackberry-tools-on-the-z10.html)
+
 
 
 ### **Anonymous** — July 4, 2013 at 5:19 pm ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21756))
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The current simulator is a tool for hackers only, but can you blame them? they don’t have much time and the pressure on them is huge, I hope they will improve over time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhands-on-with-the-blackberry-tools-on-the-z10.html)
+
 
 
 ### **Anonymous** — January 31, 2014 at 3:47 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21672))
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > where is the online converter can you give me a link?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhands-on-with-the-blackberry-tools-on-the-z10.html)
+
 
 
 ### **Anonymous** — January 31, 2014 at 4:39 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21954))
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > They change the URL’s all the time in the RIM site. Did you try googling?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhands-on-with-the-blackberry-tools-on-the-z10.html)
+
 
 
 ### **Anonymous** — January 31, 2014 at 5:40 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-22002))
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > yeh i think they removed it…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhands-on-with-the-blackberry-tools-on-the-z10.html)
+
 
 
 ### **Anonymous** — May 1, 2014 at 4:24 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-22086))
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Energy, thank you that we find a simple and powerfull solution to build for BB10 and thanks that rim makes it pleasant for developers to build for their OS, appreciate it. amen.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhands-on-with-the-blackberry-tools-on-the-z10.html)
+
 
 ---
 

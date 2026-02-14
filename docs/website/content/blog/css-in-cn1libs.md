@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you, however this can cause that the cn1lib CSS conflict with existing CSS. Another tip for the developer of a cn1lib could be the use of an unique prefix for every CSS included in the cn1lib. That prefix could be the name of the cn1lib, for example. Do you agree?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcss-in-cn1libs.html)
+
 
 
 ### **Shai Almog** — February 24, 2020 at 3:06 am ([permalink](https://www.codenameone.com/blog/css-in-cn1libs.html#comment-21389))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I think that just using a unique name for a CSS element should be enough for most cases although a library specific prefix would probably be healthy.  
 > I don’t think this is something we should force as we’d like the option for CSS to override global theme settings when required e.g. in the case of a theme library. E.g. a cn1lib that offers dark mode theming.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcss-in-cn1libs.html)
+
 
 ---
 

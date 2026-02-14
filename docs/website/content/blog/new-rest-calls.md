@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Have been using my CustomConnectionRequest object to achieve my aim though, but the API code above looks more concise.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-rest-calls.html)
+
 
 
 ### **Shai Almog** — February 11, 2018 at 7:30 am ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23816))
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks!  
 > Not directly. We have a get version that returns a byte array so the data will be read into a byte array and you would be able to parse it after.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-rest-calls.html)
+
 
 
 ### **Mohamed Selim** — May 1, 2018 at 2:11 am ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23855))
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hello Mr Shai,  
 > I’m a student and i’m working in project, could help me please i didn’t found the link of API Message Codename One and i didn’t know how to put web service “reponses by JSON” to use it in the form at my application in Codename One? Best Regards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-rest-calls.html)
+
 
 
 ### **Shai Almog** — May 1, 2018 at 4:29 am ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23889))
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > You can search the JavaDoc for any API you can’t find [https://www.codenameone.com…](<https://www.codenameone.com/javadoc/>)  
 > JSON is returned as a Java Map object in this API, you can just use the Map API to get JSON values. You can stop with a debugger and inspect the object to see what’s in it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-rest-calls.html)
+
 
 
 ### **Mohamed Selim** — May 1, 2018 at 1:20 pm ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23974))
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you sir, i didn’t know to use the webservice “CRUD” values from symfony to put it in CodenameOne is there any document have a good exemple for it?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-rest-calls.html)
+
 
 
 ### **Shai Almog** — May 2, 2018 at 2:28 pm ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-24327))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sorry I’ve never worked with PHP so I have no experience with that and can’t really help. However, Steve wrote about xatafaces and CRUD operations to mysql here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/connecting-to-a-mysql-database.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-rest-calls.html)
+
 
 
 ### **Tafadzwa Moyo** — February 27, 2019 at 12:01 pm ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23979))
@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > .basicAuth(urlManager.getAuthname(), manager.getVerifyDriverCode() + id)  
 > .acceptJson().getAsJsonMap().getResponseData(); `
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-rest-calls.html)
+
 
 
 ### **Shai Almog** — February 28, 2019 at 3:25 am ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23985))
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That means the web site didn’t accept your basic auth challenge or didn’t allow you to access that particular page. You can use the network monitor which sometimes provides insight into the error message and also into what didn’t work in the request.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-rest-calls.html)
+
 
 ---
 

@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > This is a great feature! Is it possible to use the rich push features with *local* notifications (described here[](<https://www.codenameone.com/blog/local-notifications.html>)? E.g. is it possible to call the `PushContent.get()` from within the callback `localNotificationReceived(String notificationId)`?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frich-push-notification-improved.html)
+
 
 
 ### **Shai Almog** — May 22, 2019 at 9:33 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24109))
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No. Unfortunately they are completely separate features that have no connection between them at this time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frich-push-notification-improved.html)
+
 
 
 ### **Ch Hjelm** — May 22, 2019 at 4:45 pm ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24097))
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s a pity, i thought local and ‘remote’ push notifications shared the same mechanics, so I hoped there was a synergy. I use local notifications for on-device popups when the app is not active, and the ‘rich’ features would be perfect to enhance that. Is it possible that the ‘rich’ features might become available for local notifications some day?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frich-push-notification-improved.html)
+
 
 
 ### **Shai Almog** — May 23, 2019 at 5:05 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24116))
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Unless an enterprise user explicitly asks for this I don’t see this happening. This was a very hard to implement RFE that took forever. We’re already backlogged with enterprise RFE’s so even if this was requested by an enterprise user it would probably take a lot of time to resolve as it’s a big task.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frich-push-notification-improved.html)
+
 
 
 ### **Rochana Sawatzky** — July 9, 2020 at 2:04 pm ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24293))
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve managed to get Push working on both Android and iOS, however my Android notifications come as silent notifications. Is there a setting where I can change them to be regular notifications?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frich-push-notification-improved.html)
+
 
 
 ### **Shai Almog** — July 10, 2020 at 4:12 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24292))
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > It seems to be an issue with Android 10: <https://support.google.com/pixelphone/thread/14478025?hl=en>  
 > We’re still not sure if this is something that we can handle/hide or if it’s something that Google must fix.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frich-push-notification-improved.html)
+
 
 
 ### **Rochana Sawatzky** — July 11, 2020 at 4:39 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24017))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good to know, thank you!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frich-push-notification-improved.html)
+
 
 ---
 

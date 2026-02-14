@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The solution to the iOS8 issue seems to be to put some random characters into the bundle ID of the plist file. As this is managed by CN1 can you enable this at your end? Its affecting me for my installs as I usually run on Linux and therefore don’t have (or want) iTunes just to install.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-8-installs-customizing-the-pull-to-refresh.html)
+
 
 
 ### **Anonymous** — October 7, 2014 at 11:24 pm ([permalink](https://www.codenameone.com/blog/ios-8-installs-customizing-the-pull-to-refresh.html#comment-22069))
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That is exactly why we have the ios.plistInject build argument.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-8-installs-customizing-the-pull-to-refresh.html)
+
 
 ---
 

@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > HI….How can I create a Mobile app using NetBeans 8 Codeone project for Mobile phone deleted file recovery program? or is there any API that I can incude in my project and complete the project…..Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-apps-with-java-for-ios-android-tutorials-resources.html)
+
 
 
 ### **Shai Almog** — November 4, 2016 at 5:51 am ([permalink](https://www.codenameone.com/blog/build-apps-with-java-for-ios-android-tutorials-resources.html#comment-22954))
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > mobile phones block low level filesystem access so an app like that will be impractical natively without rooting the device which is problematic even on Android.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-apps-with-java-for-ios-android-tutorials-resources.html)
+
 
 
 ### **Daniel Charlie** — April 21, 2017 at 10:08 am ([permalink](https://www.codenameone.com/blog/build-apps-with-java-for-ios-android-tutorials-resources.html#comment-23410))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Interesting topics. nice information helped me a lot. if it possible share some more………..
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-apps-with-java-for-ios-android-tutorials-resources.html)
+
 
 
 ### **Juan Carlos Vásquez** — October 24, 2019 at 6:26 pm ([permalink](https://www.codenameone.com/blog/build-apps-with-java-for-ios-android-tutorials-resources.html#comment-24261))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hello, can you post a tutorial on how to login to a backend server via MySQL-PHP-JSON? Thank you!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-apps-with-java-for-ios-android-tutorials-resources.html)
+
 
 ---
 

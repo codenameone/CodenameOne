@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > thanks for this great tutorial
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-mobile-dev-webinar-recap.html)
+
 
 
 ### **ugochukwu** — August 15, 2015 at 9:04 am ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-22217))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > i would like you to put create group feature in the next webinar
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-mobile-dev-webinar-recap.html)
+
 
 
 ### **Lanre Makinde** — August 17, 2015 at 10:35 pm ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-22210))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 4\. Status of chats/messsages/hybrid chats unread/unaccessed as well as a notification on of chat arrivals, etc  
 > Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-mobile-dev-webinar-recap.html)
+
 
 
 ### **kilani rabah** — February 2, 2016 at 1:13 pm ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-22600))
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BUILD SUCCESSFUL (total time: 19 seconds)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-mobile-dev-webinar-recap.html)
+
 
 
 ### **Shai Almog** — February 3, 2016 at 3:34 am ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-22539))
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The default is to create a handcoded app and if so you need to select the GUI builder option explicitly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-mobile-dev-webinar-recap.html)
+
 
 ---
 

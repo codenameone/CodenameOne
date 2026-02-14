@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > This looks great! Is there a Material Design theme available/in the works?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fround-border.html)
+
 
 
 ### **Shai Almog** — September 15, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/round-border.html#comment-24227))
@@ -217,14 +217,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks, we are working on bringing material design concepts into Codename One. E.g. yesterdays floating button post.  
 > Most of those concepts don’t really fit into the idea of a “theme” but rather widgets… If you have a specific thought or something else you want from material design let us know.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fround-border.html)
+
 
 
 ### **Chibuike Mba** — September 16, 2016 at 7:36 pm ([permalink](https://www.codenameone.com/blog/round-border.html#comment-22645))
 
 > Nice one Shai. Good job.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fround-border.html)
+
 
 ---
 

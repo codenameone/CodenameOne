@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I’ve done some tests with “android.buildToolsVersion=27” in Android 7 and Android 5 devices and I didn’t notice any difference 🙂  
 > However, I don’t understand why the target API level doesn’t restrict older devices: if the API 27 is for Android 8.1, how is it possible that the older devices are supported? Is it possible because Codename One build servers don’t generate code that is supported only by recent devices?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Shai Almog** — April 7, 2018 at 4:42 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23648))
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > However, if both the app and the device are API 23 or newer the app would install instantly and prompt for permissions in runtime.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Denis** — May 12, 2018 at 8:45 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23780))
@@ -126,7 +126,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/62af0edf5159ebad3d8a50e563768c190fbbffb7dcc7eafa527ca98370ecbed8.jpg>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/db0fa8391e530173e0dc310fc6dc110239bb8821342c652ac9907b326b25f9a9.jpg>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Shai Almog** — May 13, 2018 at 4:25 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23692))
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > what do you have within your [codenameone_settings.proper…](<http://codenameone_settings.properties>?) It looks like this isn’t passing through.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Denis** — May 13, 2018 at 6:38 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23725))
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > codename1.arg.android.buildToolsVersion=27 is there, so it looks correct as I understand, please confirm  
 > Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Shai Almog** — May 14, 2018 at 4:25 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-21475))
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > yes. But other build hints might collide with this functionality so are there other android.* build hints in the file?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Denis** — May 14, 2018 at 7:24 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23556))
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > codename1.vendor=Denis Manyukhin  
 > codename1.version=1.11
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Shai Almog** — May 15, 2018 at 4:08 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23790))
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looking again at the code I think you might need to explicitly specify android.sdkVersion=27 for this to work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Denis** — May 15, 2018 at 4:25 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23960))
@@ -227,7 +227,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > also it’s better to move [android.playService.ads](<http://android.playService.ads>) below Android build hints, is that correct ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Shai Almog** — May 15, 2018 at 4:48 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-21644))
@@ -236,7 +236,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you edit [codenameone_settings.proper…](<http://codenameone_settings.properties>) you need to prefix it with codename1.arg. I suggest using the Codename One Setting UI under “Build Hints” to edit these and not edit the file directly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Denis** — May 15, 2018 at 6:44 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23699))
@@ -248,7 +248,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > also I can’t see “[android.playService.ads](<http://android.playService.ads>)=true” in Build Hints UI, it only appears in [codenameone_settings.proper…](<http://codenameone_settings.properties>), is it ok ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Denis** — May 15, 2018 at 9:20 pm ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23716))
@@ -258,7 +258,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > have you meant android.targetSDKVersion build hint ?  
 > if not, may be it worth to set android.targetSDKVersion value explicitly ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Shai Almog** — May 16, 2018 at 5:56 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23767))
@@ -270,7 +270,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Only things with the codename1.arg. prefix will appear in the build hints UI so that flag is effectively ignored.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Denis** — May 16, 2018 at 6:16 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23693))
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > yes, android.targetSDKVersion solved the issue, no target API warnings, wondering if I shall keep android.sdkVersion and android.buildToolsVersion records in build hints
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 
 ### **Shai Almog** — May 17, 2018 at 11:05 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23931))
@@ -288,7 +288,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ll switch all of these to default to 27 probably next weekend. I want to give this enough time before we release 5.0 in July.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-build-target-27-migration.html)
+
 
 ---
 

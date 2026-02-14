@@ -321,7 +321,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good work Steve + team! Looking forward to read more of this tutorial. Perhaps bring back some of the 3D transformations we used to since the LWUIT days? Also more ports for Windows and BB would be nice.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 19, 2015 at 9:19 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-21663))
@@ -330,7 +330,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks Steve ! Good to know you are part of the cn1 team now, I always told the cn1 guys they are great but need more hands to do such a complex job. About the Shape API, I am eager to use it, but the absence of an Arc2D shape is a killer in many situations, I even wrote a nice whell-like progress component that was not accepted by Shai to be included because it relies on Graphics.drawArc, and the Bezier curves do not deliver an acceptable result in this case either. Also, I believe it should use floating point, it would deliver smoother Shapes, wouldn’t it ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 19, 2015 at 1:07 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22009))
@@ -339,7 +339,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I wasn’t involved during the LWUIT days. What 3D transformations are you referring to? We do support full 3D transformations in this pipeline via the Transform class. I’ll be going through that in a later tutorial.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 19, 2015 at 1:13 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-24175))
@@ -350,7 +350,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Changing to use floating point wouldn’t be terribly hard to do… It wouldn’t affect shapes drawn with GeneralPath (since that is already using floating point) but could potentially make things more flexible with aggregating multiple shapes and paths together. Please file an issue on this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 19, 2015 at 2:31 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22100))
@@ -359,7 +359,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FYI the old Transition3D support: [https://www.youtube.com/wat…](<https://www.youtube.com/watch?v=RzgWqOpNJIU>) its around the second minute. Keep in mind this was all running on feature phones with 2mb of RAM.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 30, 2015 at 6:51 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22342))
@@ -432,7 +432,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Still nothing! HELP!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 30, 2015 at 7:44 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22327))
@@ -447,7 +447,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://gist.github.com/sha…](<https://gist.github.com/shannah/8acf916f98b452ef5c2e>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 31, 2015 at 3:45 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-21840))
@@ -478,7 +478,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And I updated the CN1 plugin into my Eclipse just a few days ago.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 31, 2015 at 3:48 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22200))
@@ -487,7 +487,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Strange. It works fine for me. Keep in mind, nothing should show up until your second click. The first click just marks the start of the line that will be produced by your second click.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 31, 2015 at 4:23 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-21608))
@@ -498,7 +498,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Steve
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 
 ### **Anonymous** — January 31, 2015 at 6:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-21952))
@@ -507,7 +507,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That was it! Many thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics.html)
+
 
 ---
 

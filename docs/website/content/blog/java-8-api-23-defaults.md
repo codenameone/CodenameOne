@@ -39,7 +39,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I noticed an issue with BTDemo on Android 6.0.1 device (with API 23 in build hints). To get works the App the user should go under settings –> App – – > BTDemo –> Authorizations, and manually enable the position authorization.  
 > By setting API 21 under build hints, BTDemo perfectly works instead.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-api-23-defaults.html)
+
 
 ---
 

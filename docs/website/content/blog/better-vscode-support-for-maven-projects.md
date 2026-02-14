@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Under Tools there is no Update option ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-vscode-support-for-maven-projects.html)
+
 
 
 ### **Bryan Buchanan** — June 9, 2022 at 12:50 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24537))
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Oops – was looking at the wrong Tools location. All good now !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-vscode-support-for-maven-projects.html)
+
 
 
 ### **Bryan Buchanan** — June 10, 2022 at 7:53 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24539))
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Having played around with quite a few projects (after using the Maven conversion tool) I have to say the VSCode integration is excellent. Well done.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-vscode-support-for-maven-projects.html)
+
 
 
 ### **N P** — August 22, 2023 at 8:23 pm ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24568))
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > VScode is telling me “found no favorite commands” when I click on favorites
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-vscode-support-for-maven-projects.html)
+
 
 
 ### **Shai Almog** — August 23, 2023 at 2:00 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24569))
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Did you download the VSCode version of the project from start or did you get a project from a different source?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-vscode-support-for-maven-projects.html)
+
 
 
 ### **Raphael Lacuna** — September 23, 2023 at 12:02 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24575))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have the same issue, and I downloaded it from the VSCode version of the project
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-vscode-support-for-maven-projects.html)
+
 
 
 ### **Steve Hannah** — September 23, 2023 at 12:50 pm ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24576))
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You should see all of the key build and run commands there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-vscode-support-for-maven-projects.html)
+
 
 ---
 

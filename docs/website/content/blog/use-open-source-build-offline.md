@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks for making this provision available. It is a brave move and it demonstrates confidence in cn1. I personally am happy to know that the option is available but I still continue to use the build servers but I know of some users who are a bit fastidious when it comes to security requirements. An example is banks. For the purposes of such clients, does the module also include the push messaging servers?  
 > Best Regards!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuse-open-source-build-offline.html)
+
 
 
 ### **Shai Almog** — February 24, 2018 at 4:54 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-23608))
@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks!  
 > No the module stops after running on the native IDE’s. The assumption is that if you got that far implementing native push directly won’t be a big challenge. You won’t be able to use our push servers without a subscription obviously so you’d need to write your own push code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuse-open-source-build-offline.html)
+
 
 
 ### **CosmicDan** — August 5, 2018 at 12:50 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-23752))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Was excited to hear this, but then disappointed to hear it’s behind a $200 payment. It’s a bit of a steep entry requirement for an open-source developer who just wants to look for options on Android and Windows Desktop app development without financially committing to one particular system for experimentation. But I understand, Codename One is a business after all.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuse-open-source-build-offline.html)
+
 
 
 ### **Shai Almog** — August 5, 2018 at 4:54 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-24042))
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > All the material is available for free, this module just pools it into one location. Using the source code won’t make your life easier in building. You can use the build servers for free which is far easier.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuse-open-source-build-offline.html)
+
 
 
 ### **CosmicDan** — August 5, 2018 at 5:04 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-21578))
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Apologies, I misread the plan pricing thinking that I couldn’t make desktop apps with the free or cheaper tier. What that seems to be is just *native* desktop apps, which I don’t have an interest in after all – I am hoping that the CN1 UWP target UI can scale well to larger displays (tablets/laptops).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuse-open-source-build-offline.html)
+
 
 
 ### **Shai Almog** — August 6, 2018 at 4:20 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-24011))
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There is one port whose code isn’t open source and that’s the JavaScript port.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuse-open-source-build-offline.html)
+
 
 ---
 

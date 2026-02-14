@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is all great. Also I want to know when are you going to support the new Asha software platform? Or are you going to support it at all?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdrop-it-introducing-dropbox-integration.html)
+
 
 
 ### **Anonymous** — May 17, 2013 at 6:19 pm ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-21737))
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > J2ME platform is supported, what feature are you missing?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdrop-it-introducing-dropbox-integration.html)
+
 
 
 ### **Anonymous** — October 31, 2013 at 11:43 am ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-21771))
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ibrokhim
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdrop-it-introducing-dropbox-integration.html)
+
 
 
 ### **Anonymous** — January 24, 2014 at 11:44 am ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-21642))
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to upload a file as well?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdrop-it-introducing-dropbox-integration.html)
+
 
 
 ### **Anonymous** — January 24, 2014 at 3:40 pm ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-22037))
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Not at the moment although it should be doable in theory.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdrop-it-introducing-dropbox-integration.html)
+
 
 ---
 

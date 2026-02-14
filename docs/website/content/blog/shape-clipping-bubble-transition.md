@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Is this feature released in eclipse plugin?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshape-clipping-bubble-transition.html)
+
 
 
 ### **Shai Almog** — March 24, 2016 at 3:29 am ([permalink](https://www.codenameone.com/blog/shape-clipping-bubble-transition.html#comment-22781))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So it’s already in although we made some improvements to the implementation which will go in this Friday. To get this just use “Update Client Libs” in the Codename One section in the preferences.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshape-clipping-bubble-transition.html)
+
 
 
 ### **Javier Anton** — May 21, 2020 at 10:15 am ([permalink](https://www.codenameone.com/blog/shape-clipping-bubble-transition.html#comment-21406))
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Edit: solved by extending BubbleTransition and setting the transparency within
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshape-clipping-bubble-transition.html)
+
 
 
 ### **Shai Almog** — May 22, 2020 at 4:08 am ([permalink](https://www.codenameone.com/blog/shape-clipping-bubble-transition.html#comment-21405))
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you can see a bug in the code feel free to submit a pull request.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshape-clipping-bubble-transition.html)
+
 
 ---
 

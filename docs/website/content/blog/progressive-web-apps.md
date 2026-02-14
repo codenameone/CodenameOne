@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > This is very exciting. Can we know how an app’s local SqLite DB will be impacted by this? When accessed by browser, where will the DB be stored? Will it be persisted for the user’s next visit? Will it be “downloaded” and stored locally at the app location when the app is installed?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fprogressive-web-apps.html)
+
 
 
 ### **Shai Almog** — March 22, 2018 at 6:26 am ([permalink](https://www.codenameone.com/blog/progressive-web-apps.html#comment-23812))
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So it’s stored in the browser. It works for most browsers but it’s a bit problematic because it isn’t a W3C standard. Also some things can’t be implemented there such as shipping the app with a “ready made” database etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fprogressive-web-apps.html)
+
 
 ---
 

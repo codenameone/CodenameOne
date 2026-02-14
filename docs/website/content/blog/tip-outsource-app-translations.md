@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks a lot Shai. Even during your leave you try to blog.  
 > Thanks a lot for all your help!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-outsource-app-translations.html)
+
 
 ---
 

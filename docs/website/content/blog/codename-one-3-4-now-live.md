@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When I check for updates in Netbeans it says the latest version available is only 3.3.4
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-4-now-live.html)
+
 
 
 ### **Shai Almog** — May 3, 2016 at 10:57 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22461))
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We released the update last week so libraries should be up to date. The Eclipse and IDEA plugins should be at the right version, however since NetBeans goes thru manual verification by the NetBeans team it sometimes take a while for the update (which we submitted almost a week ago) to go thru that process.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-4-now-live.html)
+
 
 
 ### **Geertjan** — May 3, 2016 at 11:08 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22449))
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I just had a look in the Plugin Manager in NetBeans IDE 8.1. The latest version of Codename One available is 3.4.0.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-4-now-live.html)
+
 
 
 ### **Gareth Murfin** — May 3, 2016 at 11:24 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22493))
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great news!!! What an update, shame about the GUI builder, Im looking forward to that. I may even swap to IntelliJ plugin see what its like! Also when will cocoa pods be fully supported on iOS side ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-4-now-live.html)
+
 
 
 ### **Shai Almog** — May 3, 2016 at 11:25 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22567))
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice Geertjans comment that 3.4 is already up on NetBeans. We have a cocoa pods announcement coming soon…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-4-now-live.html)
+
 
 
 ### **Chen Fishbein** — May 3, 2016 at 12:36 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22622))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi Geertjan,  
 > I think I see an issue with the plugin center. is it possible that the plugin center won’t return the most latest plugin version if a user haven’t updated for a while? for example if a User was on version 3.3.3 and he haven’t updated the plugin for a while and in the meantime we uploaded 3.4.0 version. when he search for updates the plugin center will updated him to 3.3.4 instead of skipping that version and offering 3.4.0. is this a known issue?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-4-now-live.html)
+
 
 ---
 

@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > what about Windows Phone? will it have native maps support too?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-files.html)
+
 
 
 ### **Anonymous** — March 11, 2014 at 5:02 am ([permalink](https://www.codenameone.com/blog/cloud-files.html#comment-21658))
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That isn’t planned at the moment. On Windows Phone we will currently fallback to MapComponent. Google Maps doesn’t have a version for Windows Phone so supporting something like here maps etc. might be a pain.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-files.html)
+
 
 ---
 

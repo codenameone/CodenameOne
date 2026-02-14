@@ -45,7 +45,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Apparently the app is only available in the israel app store
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-jat-communication.html)
+
 
 
 ### **Shai Almog** — April 26, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/featured-app-jat-communication.html#comment-22485))
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks for the headsup. I didn’t notice this when I posted this, it seems they are still in tiered beta.  
 > I’ll try to update when this becomes available globally.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-jat-communication.html)
+
 
 
 ### **Fabrizio Grassi** — June 15, 2016 at 4:45 pm ([permalink](https://www.codenameone.com/blog/featured-app-jat-communication.html#comment-21513))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, I would like iJobClock to be in the a featured app list, is it possible? what should I do?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-jat-communication.html)
+
 
 ---
 

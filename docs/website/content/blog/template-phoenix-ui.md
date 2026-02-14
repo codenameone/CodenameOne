@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > That all looks good, but a more fundamental question is why do people want to use a PSD file ? I Googled using a PSD in a native Android app, and it’s not all that simple either.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Shai Almog** — November 2, 2016 at 1:34 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-22966))
@@ -187,14 +187,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > PSD is hard to adapt to any platform just like it’s hard to take any design and make it into a real product.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Tomas Fecko** — November 2, 2016 at 9:14 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-23064))
 
 > this looks great, codenameone should also use modern looking templates like this in sample projects for eclipse, intelliJ idea… My first contact with codenameone was actually through those samples in intelliJ (for some reason as an engineer, I wanted to see the code samples first). When I saw that funny looking samples, I just left, didn’t wanted to look into this any more. The stuff I’m seeing here makes me want to look at it again…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Shai Almog** — November 3, 2016 at 1:22 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-23084))
@@ -202,14 +202,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks.  
 > I agree we need to add these to the plugins, it’s always a pain to package demos into the plugins but it’s worth it. The nice thing is that this entire demo fits in under 1mb so it won’t significantly impact the plugin size.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **tomm0** — November 11, 2016 at 12:24 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-22955))
 
 > This looks awesome! Is the code available anywhere?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Shai Almog** — November 11, 2016 at 4:46 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-23014))
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s also in the latest plugin version under the demos section for NetBeans/IDEA.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **salah Alhaddabi** — December 5, 2016 at 6:52 pm ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-22982))
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks in advance for any help.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Shai Almog** — December 6, 2016 at 6:13 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-23074))
@@ -249,7 +249,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The GUI builder can do a lot but it can’t do everything on any platform/OS combination.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **salah Alhaddabi** — December 7, 2016 at 7:01 pm ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-23182))
@@ -261,7 +261,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Shai Almog** — December 8, 2016 at 6:21 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-22866))
@@ -272,7 +272,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to select a form java source file and then selecting the GUI builder.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **salah Alhaddabi** — December 8, 2016 at 6:43 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-23276))
@@ -285,7 +285,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > “Gui builder only works with GUI builder files created using the wizard”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Shai Almog** — December 9, 2016 at 7:53 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-23186))
@@ -295,7 +295,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The error message you are getting means that this is not a GUI builder form or that the .gui file matching this form is missing from the res directory.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Shai Almog** — May 2, 2017 at 5:03 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-23372))
@@ -303,14 +303,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > What’s the exception stack and what’s in the loop? Which line in your code does the stack point to?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Takwa** — May 17, 2020 at 4:07 pm ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-21404))
 
 > i tried to work with this project but thers no main classes found ..can anyone help me :/
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 
 ### **Shai Almog** — May 18, 2020 at 2:41 am ([permalink](https://www.codenameone.com/blog/template-phoenix-ui.html#comment-21396))
@@ -318,7 +318,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > This is a Codename One project not a standard command line Java project. As such the main class includes the start(), stop() etc. methods.  
 > You need to run it within an IDE with the Codename One plugin installed e.g. NetBeans where pressing play/debug “just works” and invokes init(Object), start() on launch.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-phoenix-ui.html)
+
 
 ---
 

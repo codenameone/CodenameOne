@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Why is it that sometimes when you open a webview on android and it has a form, the virtual keyboard does not open on focus of an input element even when there is no other focus component on the form. Some times it works, other times it doesn’t.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstacks-flipping-switches.html)
+
 
 
 ### **Anonymous** — August 28, 2014 at 4:13 pm ([permalink](https://www.codenameone.com/blog/stacks-flipping-switches.html#comment-22223))
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is an Android bug that we worked around once but it keeps resurfacing for some cases. We aren’t aware of a workaround for that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstacks-flipping-switches.html)
+
 
 ---
 

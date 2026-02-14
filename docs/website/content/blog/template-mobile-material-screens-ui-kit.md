@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is awesome. Clean and clear. Will try this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **Chidiebere Okwudire** — October 11, 2016 at 1:03 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-23012))
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice. Getting inspired… Can you share the URL from which you downloaded the free PSDs?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **Shai Almog** — October 11, 2016 at 1:32 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22716))
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sure: [https://colorlib.com/wp/fre…](<https://colorlib.com/wp/free-mobile-ui-kits-app-design/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **faugan** — October 12, 2016 at 3:02 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22831))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > errors, FWI i have create a new project then i copy one by one the files  
 > from the project i have downloaded from github
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **Shai Almog** — October 13, 2016 at 2:22 am ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22805))
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > You are using an old version of the Codename One libraries. You need to update to the latest.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **faugan** — October 13, 2016 at 9:30 am ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22882))
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks i updated my codename one and it works, thanks, great work guys
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **Adebisi Oladipupo** — February 20, 2017 at 10:03 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-21564))
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I downloaded this material UI Kit into INtelij but could not run it. I saw it shows errors on the java files that may be causing this. Also, I am unable to open the included forms in GUI builder probably due to the same reason. Should I be importing this project or opening it in my IDE? What settings do I need to change when trying to learn from these samples? I had this problem before with Chrome demo when I opened a downloaded copy. But the issue was corrected by creating a new project and selecting from the demo tab. However, this material UI Kit is not listed in the demo tab and I am stuck. Please help.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **Shai Almog** — February 21, 2017 at 7:06 am ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-23148))
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Make sure your plugin is up to date. You don’t need to download it as the material demo (MSUIKit) is available in the new project wizard there. You can also follow this guide on setting up a project from git: [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-setup-codename-one-demo-from-git.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **Adebisi Oladipupo** — February 21, 2017 at 1:57 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-23245))
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I suppose the samples are done in NetBeans as the sample is not in Intellij IDE. I will follow the workaround in the link you provided for my IDE. Just curious. Is the latest plugin v3.6 as that is what I have in IntelliJ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **Shai Almog** — February 22, 2017 at 7:13 am ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-23387))
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s supposed to be in IntelliJ too. Just looked in the code and it seems we have an issue there. We’ll fix it for the next update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 
 ### **Adebisi Oladipupo** — February 22, 2017 at 8:42 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-24127))
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great. That way I don’t have to switch IDE from IntelliJ. Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-mobile-material-screens-ui-kit.html)
+
 
 ---
 

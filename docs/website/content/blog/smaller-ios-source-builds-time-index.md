@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think another important feature to help developers get better access to documentation would be a search box in the blog. The blog entries contain so much invaluable information, and yet there doesn’t seem to be a way to search the blog.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsmaller-ios-source-builds-time-index.html)
+
 
 
 ### **Shai Almog** — June 23, 2015 at 2:17 pm ([permalink](https://www.codenameone.com/blog/smaller-ios-source-builds-time-index.html#comment-22127))
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We’d love to have a site wide search feature that would ideally include the javadocs, developer guide etc. unfortunately this is none trivial.  
 > Notice that you can easily search [codenameone.com](<http://codenameone.com>) by typing [site:codenameone.com](site:codenameone.com) your query into google e.g.: [https://www.google.com/sear…](<https://www.google.com/search?q=site:codenameone.com+MultiButton>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsmaller-ios-source-builds-time-index.html)
+
 
 ---
 

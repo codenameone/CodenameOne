@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I got an error when I tried to build with the new vm
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F64-bit-oss-vm.html)
+
 
 
 ### **Anonymous** — November 26, 2014 at 8:14 am ([permalink](https://www.codenameone.com/blog/64-bit-oss-vm.html#comment-22175))
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you post on the forum with more details e.g. build error log?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F64-bit-oss-vm.html)
+
 
 ---
 

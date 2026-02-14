@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > «What sort of UI or functionality are you aiming at but can’t get right?»  
 > I’m at beginning, however everything seems to me very difficult. You wrote that «We provided JavaDocs but they are too low level and assume you already know everything. We have a better developer guide but it doesn’t explain how to design a real app despite having 1000 pages of content»: it’s true. I hope that the new courses will make me able to do a real social network (like Facebook).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Dalvik** — June 19, 2017 at 12:46 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23263))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m working on a business app right now but a friend is nagging me to build an app to track the trucks for a local shipping company. I’ve done some Codename One work in the past but looking at the map API’s I’m not sure I can do that easily…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 19, 2017 at 1:15 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23522))
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I do hope this work will make the ramp up easier.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 19, 2017 at 1:18 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23341))
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Maps are indeed a bit challenging to get into but with the new z-ordering support it should be much easier…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Dalvik** — June 19, 2017 at 1:36 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23215))
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, that sounds interesting. I remember seeing something you mentioned about z-ordering in the past. I’ll take a look at that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **salah Alhaddabi** — June 19, 2017 at 1:38 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-21520))
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > real time update through web sockets, a global payment api, server push notifications, integration with Instagram, Facebook, whats app, etc…, and of course beautiful and slick design that resembles the smoothness of use of popular applications such as Yahoo Mail or [Alibaba.com](<http://Alibaba.com>)…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 19, 2017 at 2:04 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23348))
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The basic app that I already have working within the course includes payments with braintree which uses the native SDK to do so.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **mbruner63** — June 19, 2017 at 2:05 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23347))
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m developing a BLE application to support my medical hardware. UI is the most difficult thing for me.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Carlos** — June 19, 2017 at 2:23 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23251))
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And you can see cool transitions effect on modern Android apps, When swiping pictures on Whatsapp, the upcomming picture emerges from the background while sliding. I whish I could do something similar.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 19, 2017 at 4:09 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23110))
@@ -189,7 +189,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I totally agree we need better native themes especially with material design but also newer iOS elements. If you notice something specific that you feel should be modernized please just file an issue with screenshots and what you’d expect. It helps us place priorities on what we need to do otherwise we just guess about what’s important.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 19, 2017 at 4:11 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23124))
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I agree. UI is a MAJOR focus here.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Mr Emma** — June 19, 2017 at 4:30 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23467))
@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > hi am almost done with an app which users would use to save money , the feature i would say we need but couldn’t implement was being able to send notifications after the app has been closed like every other android app
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 19, 2017 at 7:09 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23506))
@@ -217,7 +217,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Did you try push notification?  
 > We cover it in the course as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Steven Mark** — June 19, 2017 at 8:02 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23609))
@@ -236,7 +236,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Still – CN1 is a great tool and I know that it is probably my lack of knowledge that is limiting me. But I am changing that!!! 🙂  
 > Keep up the great work
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 19, 2017 at 8:47 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23403))
@@ -250,7 +250,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The main app that will be a part of the launch is the restaurant ordering app which is an eCommerce app with payment powered by braintree. Uber, whatsapp and a social network/image manipulation app are definitely the types of applications we are looking to create in the course moving forward.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 19, 2017 at 8:48 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23468))
@@ -261,7 +261,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We discuss webservices and form based UI a lot in the material.  
 > What you are describing sounds a lot like an EDT issue, we discuss that a lot in the course as well. It’s a guess though as it’s hard to tell. Try turning on the EDT violation detection in the simulator menu.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Nick Koirala** — June 19, 2017 at 10:15 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23535))
@@ -281,7 +281,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Perhaps a module could be developed that allows for material design components that clearly match the standards and have them as optional – I know most of my clients on Android and iOS want clean and tidy modern looking applications but don’t have extensive design requirements beyond that, simple drop in material design components would make this a breeze in Codename One, and would produce apps for me at least that would be a step up from the current theme options without adding a lot of work to each project. Its very difficult to replicate material design appearance and interactivity using the current tools.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 20, 2017 at 3:38 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23335))
@@ -296,7 +296,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can help by filing issues, providing screenshots of how default apps look today or a component looks today and a screenshot of how you would expect it to look. There are so many tasks and issues we get thru every release that it’s really hard to keep an eye on the ball and these are probably the most important and relatively easy to address issues… But we need you to actually ask for that!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 20, 2017 at 3:40 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23274))
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I would hope you would 🙂  
 > Just keep an eye on what we do and help us improve by asking for things. If the look of specific things suck we would appreciate issues in the issue tracker to help us keep track of it: [http://github.com/codenameo…](<http://github.com/codenameone/CodenameOne/issues/>) ideally with screenshots of how the UI looks today and how it should look
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Simphiwe Twala** — June 20, 2017 at 5:09 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23487))
@@ -315,7 +315,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I would like to know if it’s possible that when I select a new theme, the old theme and it’s related images get deleted from the GUI Builder. It’s a tedious task to get to remove these manually.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 20, 2017 at 6:15 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23545))
@@ -326,7 +326,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > See [https://www.codenameone.com…](<https://www.codenameone.com/blog/shrinking-sizes-optimizing.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **bryan** — June 20, 2017 at 7:30 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23494))
@@ -335,7 +335,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In terms of the whole UI/theme thing, I think you really should make it more clear to new users that the “native theme” is NOT actually native components, but a CN1 generated “look a like”. (I know you can call native, but that’s a slightly different animal). Personally, I _like_ the fact that I can have a UI design that is invariant across platforms – I don’t really understand why people perceive that Google’s L&F of the month or Apple’s is the “one right way”, and people think that CN1 leads to a “lowest common denominator”, which it doesn’t because all the widgets are light weight anyway.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **nasznjoka** — June 20, 2017 at 7:39 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23367))
@@ -344,7 +344,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I wanted to build an app for my client. My client is a major football team and they wanted android only app but thinking ahead I rhought it would be better to do it cross platform. Then codenameone disappointed in UI so I had to go back and do a normal android app. But I’m still interested maybe you can take alook of it to see what type of UI but it’s surely material based and modern. So those are things to consider .. just like xamarin limited apis and tools for designing. My app [https://play.google.com/sto…](<https://play.google.com/store/apps/details?id=twendetech.eag.simba>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 20, 2017 at 10:53 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23622))
@@ -358,7 +358,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think we need to seriously overhaul our native themes and this is indeed a high priority moving forward.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 20, 2017 at 10:56 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23375))
@@ -369,7 +369,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I don’t see anything special that should be hard in Codename One although the default theming might now be as nice and might require a bit of design work.  
 > E.g. this app was built in Codename One and has a pretty nice UI although I can think of some things I would have done differently there too: [https://www.codenameone.com…](<https://www.codenameone.com/featured-fanzcall.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Mr Emma** — June 20, 2017 at 11:17 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23578))
@@ -378,7 +378,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Push Notification is very good but not exactly what we want, we want to run a service in the background that wait for the user to receive an sms when that is done a notification is sent by our app to the user to save money using our app. I hope you understand
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Housseini Moussa** — June 20, 2017 at 12:11 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23515))
@@ -397,7 +397,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My aim is to upload image on the server side and save the image inside my database using codenameone client.(i am using glassfish 4.1 as application server and mysql as database) . If you can provide a sample that upload image and save it inside a database with java it can be gratefull for me.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 20, 2017 at 1:19 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-21587))
@@ -406,7 +406,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Background services are an Android only feature, so is grabbing SMS’s. iOS doesn’t allow those (it has background modes which is pretty different). We have some support for that but it won’t work for your use case. You can use native interfaces to do it but it doesn’t make sense in our framework as it’s purely for Android.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 20, 2017 at 1:22 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23587))
@@ -417,7 +417,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This will be the first app I’m teaching and the second app will be the builder app. It will cover image upload and mysql but I’m using Spring Boot not glassfish.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Mr Emma** — June 20, 2017 at 3:47 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23201))
@@ -426,7 +426,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Our target users right now are android users so if you have any tutorial i would love to have a look at how to implement at least being able to send a notification to users via a background service . Thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Housseini Moussa** — June 20, 2017 at 4:32 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23599))
@@ -437,7 +437,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > the tutorial your are preparing is free or it was a paying bootcamp ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Andres Lopez** — June 20, 2017 at 6:57 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23414))
@@ -446,7 +446,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, I would like to see an example of how to make an app with a cloud backend. The project I was trying to do was an app that its content can be uploaded from a Web App (an admin) and the customers can see that info on mobile. Thanks!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 21, 2017 at 4:23 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23392))
@@ -456,7 +456,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > both of the apps at launch have a backend in the cloud. It’s unclear if you mean cloud as in server or as MBaaS like Parse. It’s something I’m thinking about discussing as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 21, 2017 at 4:24 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23430))
@@ -465,7 +465,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We have a native interfaces tutorial, you can proceed from there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 21, 2017 at 4:24 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23588))
@@ -474,7 +474,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Both
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Simphiwe Twala** — June 21, 2017 at 5:45 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-24216))
@@ -483,7 +483,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks Shai. That just simplifies my life
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Lúthien** — June 21, 2017 at 8:29 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23478))
@@ -500,7 +500,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Unless codenameone doesn’t support embedded databases (H2 / HSQLDB / SQLite / Derby) I’ll give it a try when I’m ready.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Mr Emma** — June 21, 2017 at 10:26 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23623))
@@ -509,7 +509,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you shai, and have been a FAN of yours since LWUIT
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 21, 2017 at 10:50 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23111))
@@ -518,7 +518,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sure we’ve supported SQLite since 2012 and have a few tutorials on this. There is also a section in the online course about using SQLite.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Manuel Tijerino** — June 22, 2017 at 6:02 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-21469))
@@ -527,7 +527,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, codename one is great, some new things I would like to make is augmented reality, but need support for video stream and playback at same time. I don’t know Android or IOS so I don’t understand native code implementation too well. Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 22, 2017 at 8:27 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23442))
@@ -539,7 +539,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I thought about doing something like this in one of the modules just teach how to build a cn1lib for camera. I looked at it and it’s got a lot of low level OS complexities so I have some concerns that this will become an iOS and Android internals tutorial but it might be worth hitting this if there is interest.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Manuel Tijerino** — June 22, 2017 at 9:31 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-22045))
@@ -548,7 +548,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I believe developers would love this. Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **ElArrepentido** — June 24, 2017 at 1:39 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-24207))
@@ -585,7 +585,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > complicated tools.  
 > Keep in that way!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — June 24, 2017 at 5:11 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23216))
@@ -627,7 +627,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The cn1libs are a perfect space for the community to fill in the gaps, if we try to do too much there we end up in constant maintenance mode instead of moving the product forward as a whole.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **sao** — June 24, 2017 at 6:50 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23228))
@@ -636,7 +636,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > At the moment , I am not working on any app. Though, I feel that perhaps the ones I worked on before could be improved-as regards the UI.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Thomas McNeill** — September 7, 2017 at 10:01 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23654))
@@ -645,7 +645,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I am working on apps for athletic activities that integrate with BlueTooth. I came back to testing with CN1 when the new guibuilder came out and I think I will stick with CN1 now. Guibuilder does have some issues with navigation but it is so much better. I would like to see more themes. Even a market place for themes would be nice. I would typically purchase my app themes online via themeforest. Maybe you could work with them to create a market for them or sell them directly via this site.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 
 ### **Shai Almog** — September 8, 2017 at 6:04 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23754))
@@ -656,7 +656,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think that once we improve our native themes implementing themes will become easier and we can offer a wider selection.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthats-great-looking-app.html)
+
 
 ---
 

@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [http://oss.readytalk.com/av…](<http://oss.readytalk.com/avian/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-vm.html)
+
 
 
 ### **Anonymous** — April 30, 2014 at 2:20 am ([permalink](https://www.codenameone.com/blog/new-vm.html#comment-21924))
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Steve Hannah already ported Codename One to Avian and it performed worse than XMLVM while taking up quite a bit of space. It suffers from pretty much all of the problems I illustrated above.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-vm.html)
+
 
 ---
 

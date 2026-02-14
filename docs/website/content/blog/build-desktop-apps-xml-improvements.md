@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good article but it should have been a bit more descriptive. Any suggestions for me, I do don’t have a pro account.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-desktop-apps-xml-improvements.html)
+
 
 
 ### **Anonymous** — January 28, 2014 at 5:00 pm ([permalink](https://www.codenameone.com/blog/build-desktop-apps-xml-improvements.html#comment-21991))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can handcode a desktop app by searching for instructions in the discussion forum. Pro subscription has many other benefits.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-desktop-apps-xml-improvements.html)
+
 
 
 ### **Anonymous** — January 30, 2014 at 1:08 pm ([permalink](https://www.codenameone.com/blog/build-desktop-apps-xml-improvements.html#comment-21671))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What am I missing? Why on earth would I want a desktop version of my tablet app?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-desktop-apps-xml-improvements.html)
+
 
 
 ### **Anonymous** — January 30, 2014 at 2:33 pm ([permalink](https://www.codenameone.com/blog/build-desktop-apps-xml-improvements.html#comment-21946))
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 3\. Checklist feature – some developers need a desktop app as a feature but don’t care if it feels like a mobile app.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-desktop-apps-xml-improvements.html)
+
 
 ---
 

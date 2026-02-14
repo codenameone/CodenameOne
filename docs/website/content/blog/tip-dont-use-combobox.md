@@ -157,14 +157,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > The reason why I have not stopped using the combobox is because I use a list caption-value, with repeated titles. Is there any way that you can add this functionality to the Picker and also a getSelectedIndex() and setSelectedIndex() functions?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-dont-use-combobox.html)
+
 
 
 ### **Shai Almog** — October 18, 2016 at 2:49 am ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-22855))
 
 > The picker is implemented natively so no, something like this will not be realistic in the picker. I think this falls squarely into the Button+Dialog territory
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-dont-use-combobox.html)
+
 
 
 ### **Tommy Mogaka** — October 18, 2016 at 1:39 pm ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-21657))
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > e.printStackTrace();  
 > }
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-dont-use-combobox.html)
+
 
 
 ### **Shai Almog** — October 19, 2016 at 8:20 am ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-22996))
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can use a hybrid approach of auto-complete coupled with the button dialog which would be superior although slightly more verbose.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-dont-use-combobox.html)
+
 
 
 ### **Mo** — March 8, 2017 at 8:18 pm ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23129))
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, having just experimented with the above Button & Popup, but when I use the Validator, I am unable to get the same behavior as the ComboBox on an Invalid value, can you advice on how to use the Validator with the above approach??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-dont-use-combobox.html)
+
 
 
 ### **Shai Almog** — March 9, 2017 at 7:29 am ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23152))
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > you will need to derive the validator and override getComponentValue() to return the right value for that component and super.getComponentValue() for the other components.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-dont-use-combobox.html)
+
 
 
 ### **Mo** — March 9, 2017 at 2:31 pm ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23445))
@@ -237,7 +237,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > validator.addConstraint(langField, new com.codename1.ui.validation.LengthConstraint(2, “errors.invalid”));//validate  
 > `
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-dont-use-combobox.html)
+
 
 
 ### **Shai Almog** — March 10, 2017 at 8:47 am ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23454))
@@ -246,7 +246,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Instead of doing new Validator(). Subclass it and override that method. That method retrieves the value of the component for validation, since your component is arbitrary (a button) the validator doesn’t know the actual value of the component and can’t figure out what to do in this case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-dont-use-combobox.html)
+
 
 ---
 

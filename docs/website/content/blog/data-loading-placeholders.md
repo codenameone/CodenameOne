@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you Steve!  
 > What is the utility of `CommonProgressAnimations.EmptyAnimation`?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdata-loading-placeholders.html)
+
 
 
 ### **Steve Hannah** — February 10, 2020 at 12:49 pm ([permalink](https://www.codenameone.com/blog/data-loading-placeholders.html#comment-21382))
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sometimes you may just want to hide a component until its data is properly loaded, but you don’t want to show any visual animation. That’s when EmptyAnimation is useful.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdata-loading-placeholders.html)
+
 
 ---
 

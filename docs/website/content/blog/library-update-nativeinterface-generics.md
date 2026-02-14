@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m really excited about the updates to the Android toolbar and will try it out as soon as the netbeans plugin is updated. Well done!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
+
 
 
 ### **znprojects** — March 10, 2016 at 11:33 am ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22747))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The documentation looks fantastic. I remember this being one of the things that always made me hesitant to recommend CN1 to others in the past. Seeing what’s there now, that hesitation is gone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
+
 
 
 ### **Nigel Chomba** — March 15, 2016 at 5:50 pm ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22536))
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Netbeans plug in is taking too long, cant the plugin be hosted on your site as well since you updated us netbeans has issues for now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
+
 
 
 ### **Shai Almog** — March 16, 2016 at 4:07 am ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22351))
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This isn’t a big deal since the libraries/simulator etc. are all updated instantly as we release them.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
+
 
 
 ### **Nigel Chomba** — March 16, 2016 at 12:05 pm ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22692))
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Okay thanks for the clarity.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
+
 
 ---
 

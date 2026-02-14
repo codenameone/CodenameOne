@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wim
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-pipeline-fixes.html)
+
 
 
 ### **Anonymous** — April 1, 2014 at 4:33 am ([permalink](https://www.codenameone.com/blog/new-android-pipeline-fixes.html#comment-22038))
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the reminder, we will look into that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-pipeline-fixes.html)
+
 
 
 ### **Anonymous** — April 28, 2014 at 3:50 am ([permalink](https://www.codenameone.com/blog/new-android-pipeline-fixes.html#comment-22121))
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks ABRAHAM (ABDATA SOLUTIONS)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-pipeline-fixes.html)
+
 
 
 ### **Anonymous** — April 28, 2014 at 12:26 pm ([permalink](https://www.codenameone.com/blog/new-android-pipeline-fixes.html#comment-21683))
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 2\. You can add them via the tree and you can expand the view further to add more space. Due to the architecture of the current designer its hard to allow scrolling in design mode. We have plans to replace that tool in the future.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-pipeline-fixes.html)
+
 
 ---
 

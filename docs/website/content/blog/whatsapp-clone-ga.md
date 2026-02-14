@@ -29,7 +29,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Does this clone include features that allows you to modify text into things like bold, italics, underlines, bullets and different colors etc? Also does it include Voip, sending voice notes?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhatsapp-clone-ga.html)
+
 
 
 ### **Shai Almog** — February 27, 2019 at 3:26 am ([permalink](https://www.codenameone.com/blog/whatsapp-clone-ga.html#comment-24081))
@@ -40,7 +40,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sending voip notes is something I partially implemented there but didn’t actually do, it should be relatively trivial. VoIP would require native integration, I looked at some of the available options in the field and chose to pass on this for now. There are so many options and the setup hassle would have taken up too much time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhatsapp-clone-ga.html)
+
 
 ---
 

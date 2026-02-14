@@ -616,7 +616,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Fatal error: Uncaught exception ‘Exception’ with message ‘Error connecting to the database: ‘ in C:xampphtdocssakilaxatafaceDatafaceApplication.php:608 Stack trace: #0 C:xampphtdocssakilaxatafaceDatafaceApplication.php(1081): Dataface_Application->Dataface_Application(NULL) #1 C:xampphtdocssakilaxatafacepublic-api.php(58): Dataface_Application::getInstance(NULL) #2 C:xampphtdocssakilaindex.php(4): df_init(‘C:\xampp\htdocs…’, ‘xataface’) #3 {main} thrown in C:xampphtdocssakilaxatafaceDatafaceApplication.php on line 608
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **shannah78** — December 2, 2016 at 4:23 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23230))
@@ -629,14 +629,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > grant all privileges to on sakila.* to username@localhost;  
 > flush privileges;
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Toby Mundy** — December 2, 2016 at 1:11 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-22821))
 
 > Thanks, I had not added mysql to environment PATH.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Rudy Lemaitre** — February 8, 2017 at 3:18 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-21562))
@@ -652,14 +652,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **shannah78** — February 8, 2017 at 4:43 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23147))
 
 > Did you refresh cn1libs in your project after adding the cn1-xataface.cn1lib? Note: You can also install it via Codename One settings (in extensions). But you’d still need to to the refresh cn1libs step after that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Rudy Lemaitre** — February 8, 2017 at 6:14 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-22992))
@@ -669,7 +669,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi restart Eclipse, it’s the same ?  
 > I try refresh tomorrow, thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Rudy Lemaitre** — February 9, 2017 at 8:30 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-24125))
@@ -679,7 +679,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > hello,  
 > i refresh but it’s the same [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/5abdc3982294f5748d4f7a1cd8cbf7690718029ba131d3d81f8a2b948baf094d.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Rudy Lemaitre** — February 9, 2017 at 10:44 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23167))
@@ -690,7 +690,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > i make a new install of eclispe and works now 🙂  
 > thanks 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Chris** — April 10, 2017 at 8:10 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-21570))
@@ -699,7 +699,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m new to this – do I need to install Xataface on my web server, or just as part of the app?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **shannah78** — April 11, 2017 at 3:58 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23222))
@@ -708,7 +708,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Xataface goes on your web server.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Chris** — April 11, 2017 at 4:09 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23108))
@@ -717,7 +717,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks – I use webspace from x10hosting, so presumably I can’t install Xataface on there? Or is it possible to do it when you are renting webspace?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **shannah78** — April 12, 2017 at 4:40 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23131))
@@ -726,7 +726,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes. You can use Xataface on any host that has PHP and MySQL. The instructions in this article assume you have your own server (or have shell access and server has npm installed). But you can also just upload xataface manually to your webspace. Here are some manual install instructions: [http://xataface.com/wiki/Ho…](<http://xataface.com/wiki/How_to_build_a_PHP_MySQL_Application_with_4_lines_of_code>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Brutus** — April 27, 2017 at 1:17 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23339))
@@ -735,7 +735,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi steve can you please also give an example of how to upload a file thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Shai Almog** — April 28, 2017 at 5:24 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23132))
@@ -744,7 +744,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://www.codenameone.com…](<https://www.codenameone.com/javadoc/com/codename1/io/MultipartRequest.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Pawan Jain** — September 13, 2020 at 8:01 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-24338))
@@ -767,7 +767,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, Pawan
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 
 ### **Steve Hannah** — September 16, 2020 at 9:52 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-24340))
@@ -776,7 +776,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It sounds like it is having issues refreshing the xataface cn1lib. Try again, going through the cycle of “Codename One” > “Refresh Cn1libs”. Then a clean build. Check the “lib/impl/cls” directory (which is where the cn1lib classes get extracted to when they are installed), and ensure that the specified classes are there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database.html)
+
 
 ---
 

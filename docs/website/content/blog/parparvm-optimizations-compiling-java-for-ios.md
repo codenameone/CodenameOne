@@ -159,21 +159,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Really nice !!  
 > I think it could also be noticeable on older devices …
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fparparvm-optimizations-compiling-java-for-ios.html)
+
 
 
 ### **bryan** — February 14, 2017 at 8:05 pm ([permalink](https://www.codenameone.com/blog/parparvm-optimizations-compiling-java-for-ios.html#comment-23055))
 
 > Great work Steve. CN1 is getting better and better, congrats to all.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fparparvm-optimizations-compiling-java-for-ios.html)
+
 
 
 ### **Gareth Murfin** — February 9, 2019 at 4:49 pm ([permalink](https://www.codenameone.com/blog/parparvm-optimizations-compiling-java-for-ios.html#comment-24037))
 
 > Great work Steve – certainly in the last year or so cn1 has felt way faster
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fparparvm-optimizations-compiling-java-for-ios.html)
+
 
 ---
 

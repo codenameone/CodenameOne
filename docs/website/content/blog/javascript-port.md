@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Have you got any demos that can be downloaded ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **Shai Almog** — April 23, 2015 at 10:43 am ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22019))
@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good point. We will add some demos to the website.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **glegris** — April 29, 2015 at 2:37 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22362))
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nevertheless, not sure the project is as mature as TeaVM
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **Shai Almog** — April 29, 2015 at 5:27 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-24178))
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I wasn’t familiar with that project. Interesting.  
 > Either way I think the TeaVM approach is probably superior in terms of compatibility to newer Java language features rather than CLDC limitations, good to know about it regardless…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **Thomas Yuen** — May 11, 2015 at 1:42 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22092))
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It is good to see js support but if it is only for the enterprise (the “rich”) customer, it is not so good (bad for biz)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **Shai Almog** — May 11, 2015 at 2:37 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22373))
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > More enterprise subscribers == more developers == more features and capabilities for everyone.  
 > So its great this is an enterprise only feature as it will make some developers upgrade and make us a stronger/larger company. Even if you can’t afford this particular feature I’m sure you can benefit from that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **Thomas Yuen** — May 11, 2015 at 5:02 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22238))
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > hope u hv a lot more enterprise cust than professional cust for i am abt to sub as prof. enterprise is bit too much for now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **KL** — May 14, 2015 at 2:28 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22072))
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Kindly advice.  
 > * Can I ask here? Or where should I?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **Shai Almog** — May 14, 2015 at 6:50 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-21689))
@@ -222,7 +222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > It should work exactly like it does in the simulator with the full URL’s. Keep in mind that our goal here is WORA so we want the code that works for you on the mobile native app to be the exact same code that works for the JavaScript version. You can ask here (if its relevant to the post) or in the discussion forum or in stack overflow (with the codenameone tag).  
 > You can also use pro support if you signup for pro.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **KL** — June 7, 2015 at 12:25 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22304))
@@ -233,7 +233,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Still not implemented?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **Shai Almog** — June 7, 2015 at 3:05 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-21542))
@@ -244,7 +244,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > You are aware that Codename One isn’t a JavaScript/HTML5 API right?  
 > Its a native platform that allows you to target JavaScript, not the other way around.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **KL** — June 7, 2015 at 3:33 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22314))
@@ -253,7 +253,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, I am clearer now. Have to go through the developer guide again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 
 ### **Gareth Murfin** — May 6, 2016 at 2:18 am ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22769))
@@ -262,7 +262,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just read this again, I can say that the Javascript port works unbelievably well, it’s astounding work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port.html)
+
 
 ---
 

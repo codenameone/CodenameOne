@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Do we have to add the following statement in every form as we don’t where the App will Crash or have some issue  
 > String logs = NativeLogs.getNativeLogs();
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-logging-certificate-wizard.html)
+
 
 
 ### **Francesco Galgani** — June 20, 2018 at 2:13 pm ([permalink](https://www.codenameone.com/blog/native-logging-certificate-wizard.html#comment-24000))
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For example, if all the Forms of your app are subclasses of a custom base Form, you can add a side menu command in your custom base Form to read and/or send by email the native log. In this way, you can add this functionality to all the Forms, coding it only one time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-logging-certificate-wizard.html)
+
 
 
 ### **Yaakov Gesher** — June 23, 2018 at 10:10 pm ([permalink](https://www.codenameone.com/blog/native-logging-certificate-wizard.html#comment-23947))
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just add that code in the EDT error handler, and the network event handler, and anywhere you’re working off the EDT and might run into a problem.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-logging-certificate-wizard.html)
+
 
 ---
 

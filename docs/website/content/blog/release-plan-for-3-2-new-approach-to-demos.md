@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hey I tried your solitaire app. However I have some critiques and wonder if its anything related to codenameone. The first is the card images are grainy (medium – low quality). I suppose you did this to save app size? The second is there is a line separation in the menu command after the “About”, where I think it shouldn’t be since it makes the menu command separation look untidy (looks like something broke off suddenly). The third is the background blurs (or refreshes?) when the menu command and the About dialog is disposed. The last is that when the button of the dialog is pressed in the pressed state, the highlighted area of the button way exceeds the area of the actual button. Other than these UI blips, the app seems to be pretty fast.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-plan-for-3-2-new-approach-to-demos.html)
+
 
 
 ### **Shai Almog** — October 28, 2015 at 3:29 am ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22414))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The larger button than the dialog is something I just noticed for the first time, it seems that just the edges of the button exceed. Haven’t noticed it because I normally press and release. This is a property of the Android theme and isn’t indicative of anything inherent. We do need to improve that behavior though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-plan-for-3-2-new-approach-to-demos.html)
+
 
 
 ### **Joe** — November 2, 2015 at 1:06 pm ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22129))
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I cloned the demo on my local. Looks like the project files are for NetBean Do you have the instruction of how to import the projects into Eclipse?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-plan-for-3-2-new-approach-to-demos.html)
+
 
 
 ### **Shai Almog** — November 3, 2015 at 4:29 am ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22512))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Copy the src dir and libs dir on top of their Eclipse counterparts.  
 > Copy the [codenameone_settings.proper…](<http://codenameone_settings.properties>) on top of the existing one and the icon.png.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-plan-for-3-2-new-approach-to-demos.html)
+
 
 ---
 

@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Just a thought, dont know if it already exists, but havent found it.  
 > P.S.- I know i should get my feet wet…but lets go one step at a time
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-42.html)
+
 
 
 ### **Shai Almog** — February 20, 2017 at 8:28 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-42.html#comment-22823))
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Go ahead and contribute this, it’s easy. I would recommend using a varargs argument so one can submit only some of the lines and not all 4 so it will be setTextLines(String… lines).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-42.html)
+
 
 ---
 

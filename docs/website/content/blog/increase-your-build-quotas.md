@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m free user for now, I have several developer fiends invited, where can I see my total Quotas in my account…?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fincrease-your-build-quotas.html)
+
 
 
 ### **Shai Almog** — August 21, 2018 at 8:23 am ([permalink](https://www.codenameone.com/blog/increase-your-build-quotas.html#comment-21538))
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > On the first of the month when your credits are reset you can see how many clicked and created an account based on the build credits you would have.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fincrease-your-build-quotas.html)
+
 
 ---
 

@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good read… just a quick one. much has been said on vertx on the backend, is this something you ever thought of using as opposed to springboot….
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-app-engine-spring-boot.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — July 12, 2018 at 1:18 pm ([permalink](https://www.codenameone.com/blog/migrating-app-engine-spring-boot.html#comment-23993))
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > “Higher build quotas for free users including features such as push notification etc”…  
 > Does this mean we may get push features with basic subscription at least?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-app-engine-spring-boot.html)
+
 
 
 ### **Shai Almog** — July 13, 2018 at 5:00 am ([permalink](https://www.codenameone.com/blog/migrating-app-engine-spring-boot.html#comment-23857))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Again, I’m writing this without spending one minute playing with vertx so I might be completely wrong.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-app-engine-spring-boot.html)
+
 
 
 ### **Shai Almog** — July 13, 2018 at 5:04 am ([permalink](https://www.codenameone.com/blog/migrating-app-engine-spring-boot.html#comment-23865))
@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The goal is to provide an incentive based system for promoting Codename One and increasing the quotas accordingly. I think push will still cap at some level but we haven’t decided the full details yet.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-app-engine-spring-boot.html)
+
 
 ---
 

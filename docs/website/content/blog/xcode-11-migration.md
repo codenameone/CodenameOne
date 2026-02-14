@@ -32,7 +32,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for all your hard work guys, much appreciated
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-11-migration.html)
+
 
 ---
 

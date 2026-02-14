@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > As a note to anyone using this library: Cloudinary changes spaces in filenames to underscores automatically.  
 > To avoid 404 error, Do “.image(encImage, StringUtil.replaceAll(yourImageName, ” “, “_”));”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **shannah78** — November 26, 2015 at 12:06 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22405))
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://github.com/shannah/…](<https://github.com/shannah/cn1-flickr-concentration-demo/blob/master/src/com/codename1/demos/flickrconcentration/ClassicFlickrConcentration.java#L54-L61>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **bryan** — November 26, 2015 at 6:03 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22497))
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BTW – like your posts, very helpful and informative.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **shannah78** — November 26, 2015 at 4:45 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22439))
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > UI toolkits like that are very helpful for making nice UIs in Codename One. I’m currently working on porting that particular one to a theme and UI library for codename one. The process I use is described here: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Carl-Erik Kopseng** — August 30, 2016 at 8:10 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23005))
@@ -202,7 +202,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Any tips on generating image sitemaps for cloudinary? Since there could be any number of versions of the same image, I was wondering if we should list them all or just one canonical representation.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Shai Almog** — August 31, 2016 at 4:31 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22713))
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is this related to Codename One?  
 > I don’t think this is the best venue for cloudinary tips.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Gert** — March 24, 2017 at 3:12 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23153))
@@ -229,7 +229,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Shai Almog** — March 25, 2017 at 5:48 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23047))
@@ -238,7 +238,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can transform local images with many of the API’s we have such as masking etc. for that you don’t need cloudinary though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Gert** — March 25, 2017 at 5:59 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23446))
@@ -252,7 +252,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Second, I would like to make the Windows and Mac forms to be “alwaysOnTop” and “Non-focusable” ? It is possible in Java swing, but I couldn’t find the way in this codename1. if no way, any other way to use native libraries?  
 > Best regards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Shai Almog** — March 26, 2017 at 5:08 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23389))
@@ -263,7 +263,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When you generate native interfaces it also generates one for Java SE which will execute in the desktop port and the simulator. You can implement “always on top” there. I would check the isDesktop method from Desktop to prevent that code from executing in the simulator.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Gert** — March 28, 2017 at 12:26 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23226))
@@ -278,7 +278,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Please guide me how to implement alwaysontop feature using native interface.  
 > All the best.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **shannah78** — March 28, 2017 at 4:39 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23311))
@@ -287,7 +287,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You don’t need to pass the Form to the native interface. You can get the JFrame in native (swing) code using Frame.getFrames() or Window.getWindows. [http://stackoverflow.com/a/…](<http://stackoverflow.com/a/7364729/2935174>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Gert** — March 30, 2017 at 2:27 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23463))
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks. shannah78, and shai again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Gert** — March 30, 2017 at 10:15 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23330))
@@ -318,7 +318,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Any way how to do it?  
 > Best regards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **shannah78** — March 30, 2017 at 6:06 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23271))
@@ -327,7 +327,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t know what you’re trying to do. You can still interact with CN1 from the native side. Just make sure that you only interact with Swing on Swing’s EDT, and only interact with CN1’s UI on the CN1 EDT.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 
 ### **Gert** — April 1, 2017 at 2:24 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23010))
@@ -337,7 +337,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Yes, you are right. I was thinking wrongly. There was never needed to get any Buttons in native methods.  
 > Thanks for your everything.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsizing-images-just-right-with-cloudinary.html)
+
 
 ---
 

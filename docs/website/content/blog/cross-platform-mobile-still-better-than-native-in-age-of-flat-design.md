@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I enjoyed reading the Tao of Programming you referenced in this article, having read Tao Te Ching, the tonality was similar, it was fun and educating at the same time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcross-platform-mobile-still-better-than-native-in-age-of-flat-design.html)
+
 
 
 ### **Hristo Vrigazov** — October 3, 2016 at 5:28 am ([permalink](https://www.codenameone.com/blog/cross-platform-mobile-still-better-than-native-in-age-of-flat-design.html#comment-23082))
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for awesome service and keep it up guys!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcross-platform-mobile-still-better-than-native-in-age-of-flat-design.html)
+
 
 ---
 

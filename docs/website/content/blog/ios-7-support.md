@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Emil
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-7-support.html)
+
 
 
 ### **Anonymous** — January 3, 2014 at 3:23 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21778))
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its been there for a while. Just click the More… option in the skins menu.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-7-support.html)
+
 
 
 ### **Anonymous** — January 3, 2014 at 4:02 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21809))
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I am aware that the skin is available in the simulator. I was referring to the device still using the old skin; sorry for being unclear 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-7-support.html)
+
 
 
 ### **Anonymous** — January 4, 2014 at 6:09 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21795))
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to define the build argument ios.themeMode to modern or just wait a couple of weeks till we flip the switch to make iOS 7 the default.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-7-support.html)
+
 
 ---
 

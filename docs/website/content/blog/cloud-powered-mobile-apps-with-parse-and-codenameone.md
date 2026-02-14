@@ -694,7 +694,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The combination of ACLs, CLP (class level permissions) and the new pointer permissions [http://blog.parse.com/learn…](<http://blog.parse.com/learn/secure-your-app-from-the-data-browser-with-pointer-permissions/>) is quite powerful and should be used when applicable. Applying that the CRUD, my feeling so far is that if the primary operation is “Read”, in-buit parse security measures are more than sufficient. For the “C”, “U”, and “D”, a per-case judgment is needed. Always reverting to cloud code might be a pitfall from other paradigms where such security measures as are present in Parse were missing. And it may slow down development with little or no added value. Of course, I’m neither a security expert nor a Parse expert so what am saying might not be completely correct; just food for thought 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-powered-mobile-apps-with-parse-and-codenameone.html)
+
 
 
 ### **shannah78** — September 9, 2015 at 3:57 pm ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-21560))
@@ -707,7 +707,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Basically if you are doing *any* filtering client side for the purpose of security, your app is probably vulnerable to unauthorized access. That doesn’t mean that there aren’t occasions where you can get away with direct client-side CRUD. But you have to do a lot more thinking at each step. Or one day you’ll be “that guy” .. the guy who has to explain to his boss that the database was breached and client information was stolen. Don’t be that guy!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-powered-mobile-apps-with-parse-and-codenameone.html)
+
 
 
 ### **Shai Almog** — September 9, 2015 at 4:24 pm ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22462))
@@ -721,7 +721,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Note: that was a joke, please don’t do that! 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-powered-mobile-apps-with-parse-and-codenameone.html)
+
 
 
 ### **shannah78** — September 9, 2015 at 4:54 pm ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22471))
@@ -730,7 +730,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I actually considered writing an ANT task to be able to write and deploy cloud code using TeaVM, but that would just be proof of concept. Most access point functions were trivial, and their Javascript API is quite nice to work with directly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-powered-mobile-apps-with-parse-and-codenameone.html)
+
 
 
 ### **Chidiebere Okwudire** — September 10, 2015 at 9:09 am ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22413))
@@ -739,21 +739,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > @shannah78:disqus: One thing to bear in mind is that cloud code is not a silver bullet. It still needs to be combined with ACLs and/or CLPs. For instance, in the social networking example, all the security gains of using cloud code will be almost useless if the corresponding classes are still directly readable or even worse writable(!) to the public because anyone getting hold of the Parse app keys would wreak havoc by directly accessing the classes directly. That aspect is missing in the blog post. Please consider mentioning it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-powered-mobile-apps-with-parse-and-codenameone.html)
+
 
 
 ### **shannah78** — September 11, 2015 at 5:09 am ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22298))
 
 > You’re right that is missing from the post, and class level acls are still necessary to lock down the database when cloud code is used.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-powered-mobile-apps-with-parse-and-codenameone.html)
+
 
 
 ### **SophiaVermon** — September 14, 2015 at 8:02 am ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22151))
 
 > Thanks for this detailed article with complete code and pictures, I will try to run it in my application.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-powered-mobile-apps-with-parse-and-codenameone.html)
+
 
 ---
 

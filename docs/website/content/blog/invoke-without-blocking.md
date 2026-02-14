@@ -144,8 +144,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
 > can I used this code to avoid stopping my infinite rotating image animation while I paint others components in the screen?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finvoke-without-blocking.html)
 
 
 ### **Steve Hannah** — December 5, 2019 at 6:37 pm ([permalink](https://www.codenameone.com/blog/invoke-without-blocking.html#comment-24274))
@@ -153,8 +151,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >
 > Are you referring to the InfiniteProgress.showInfiniteBlocking() method, or your own custom animation that you’ve made? In either case it probably wouldn’t be affected by this.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finvoke-without-blocking.html)
 
 ---
 

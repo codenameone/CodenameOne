@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > However from the video it looks like you need to swipe from left, to right.. But IOS 7 is default swipe from right to left, is it possible to change direction 🙂 ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — November 5, 2014 at 12:36 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-21839))
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can swipe in both directions, it was added after Chen made the video.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — November 5, 2014 at 6:53 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-21686))
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Perfect timing. We have a need for something like this to support an app feature currently in our dev queue. This will allow us to get the feature done a little quicker – thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — November 20, 2014 at 8:20 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22007))
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for doing this as you have promised. I love that feature. Will this work in list
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — November 21, 2014 at 3:23 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22291))
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This won’t work on a List because of the way the list is built.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — December 1, 2014 at 4:36 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22283))
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Where would I find the JavaDocs for this new class?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — December 2, 2014 at 5:04 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22293))
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its not yet in the javadoc but should appear in the IDE code completion with docs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — December 2, 2014 at 8:42 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22008))
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have Netbeans 8.0.2 and codename one plugin 1.0.80 but Netbeans does not recognize the SwipeableContainer. Even if I copy-paste the code and fix the imports. Do I need to manually update to get the feature?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — December 2, 2014 at 3:10 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22133))
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Go to the project properties in the Codename One section and press the update client libraries button.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — December 2, 2014 at 3:57 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22311))
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the reply. I misunderstood the instructions at first. I only right-clicked the project and selected Refresh libs. I now understand that applies to downloaded CN1 libs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — December 3, 2014 at 5:43 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22124))
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It works! This is a really great feature.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — December 5, 2014 at 7:40 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22117))
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 
 ### **Anonymous** — December 6, 2014 at 1:58 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-24164))
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > All our code is available in our google code project here: [http://code.google.com/p/co…](<http://code.google.com/p/codenameone>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fside-swipe.html)
+
 
 ---
 

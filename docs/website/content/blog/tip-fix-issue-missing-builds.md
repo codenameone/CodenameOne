@@ -54,8 +54,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I hope this finds you well. I am hoping for some pointers regarding the above “Tips”. My home directory has “UpdateStatus.properties” and “UpdateCodenameOne.jar” are these ok as is? Also, How would I go about making sure the Versions.properties aren’t under source control? Finally… how would I go about making sure the Versions.properties aren’t under source control? I am using OSX with Netbeans  
 > Thank you for your time, Codename One is a great tool!  
 > Be Safe!
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-fix-issue-missing-builds.html)
 
 
 ### **Shai Almog** — May 8, 2020 at 4:53 am ([permalink](https://www.codenameone.com/blog/tip-fix-issue-missing-builds.html#comment-21403))
@@ -66,8 +64,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Are you using source control such as git?  
 > If so they should be under .gitignore  
 > If you aren’t using source control then they aren’t under source control
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-fix-issue-missing-builds.html)
 
 ---
 

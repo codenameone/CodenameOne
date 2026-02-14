@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there a chance to get the source code from the video?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-bootcamp.html)
+
 
 
 ### **Shai Almog** — March 24, 2017 at 5:38 am ([permalink](https://www.codenameone.com/blog/why-bootcamp.html#comment-23057))
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I used the same visual effect I used here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/new-animation-manager.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-bootcamp.html)
+
 
 ---
 

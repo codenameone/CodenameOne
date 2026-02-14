@@ -33,7 +33,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you. I suppose that you suggest to replace the use of `Message.sendMessageViaCloudSync`, while we can continue to use the `Log.sendLog`, right?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsendgrid-cn1lib.html)
+
 
 
 ### **Shai Almog** — August 15, 2018 at 3:24 am ([permalink](https://www.codenameone.com/blog/sendgrid-cn1lib.html#comment-23963))
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsendgrid-cn1lib.html)
+
 
 ---
 

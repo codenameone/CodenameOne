@@ -269,7 +269,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve wrapped up the code into a cn1lib here: [https://github.com/diamondd…](<https://github.com/diamonddevgroup/SMSInterceptor>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **Diamond** — September 21, 2017 at 7:11 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23738))
@@ -278,7 +278,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have no experience with c# code, but could this be implemented for Windows phones too? I found a lead here: [https://msdn.microsoft.com/…](<https://msdn.microsoft.com/en-us/library/bb932385.aspx>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **Shai Almog** — September 21, 2017 at 8:05 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-21527))
@@ -287,7 +287,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I doubt that will work. It’s a pretty old document. You need to look for things that are relevant for UWP.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **Diamond** — September 21, 2017 at 8:28 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23747))
@@ -296,7 +296,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This looks promising [https://github.com/Microsof…](<https://github.com/Microsoft/Windows-universal-samples/tree/master/Samples/SmsSendAndReceive>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **Diamond** — September 21, 2017 at 8:43 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23628))
@@ -305,7 +305,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The full sms API can be found here [https://docs.microsoft.com/…](<https://docs.microsoft.com/en-us/uwp/api/Windows.Devices.Sms>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **George Kent** — September 21, 2017 at 9:00 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23655))
@@ -314,7 +314,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How stable and accurate is your UWP port. Is it ready for production on all your features mentioned in your dev guide?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **Shai Almog** — September 21, 2017 at 10:25 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-24136))
@@ -323,7 +323,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That could work but I wouldn’t spend time on that. Notice it says that the sample will only work on unlocked devices and “will not pass WACK”. I’m not sure about this but I recall that if you use specific Windows features your app can’t be sold in China
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **Shai Almog** — September 21, 2017 at 10:30 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23671))
@@ -332,7 +332,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s used in production. All is a tall order. It’s newer than the Android and iOS ports and not even remotely as popular so it doesn’t see nearly as much testing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **Rashedul Hasan** — August 11, 2018 at 9:29 pm ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-24024))
@@ -341,7 +341,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, thanks for the article but how do i put the java class “SMSListener” inside “native/android” directory? a bit confused!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 
 ### **Shai Almog** — August 12, 2018 at 4:37 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-24051))
@@ -351,7 +351,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > see this video on native interfaces. It should explain it clearly [https://www.codenameone.com…]([https://www.codenameone.com/how-do-i—access-native-device-functionality-invoke-native-interfaces.html](https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html))
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intercept-incoming-sms-on-android.html)
+
 
 ---
 

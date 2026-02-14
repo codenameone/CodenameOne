@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the updates.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
+
 
 
 ### **Anonymous** — November 12, 2013 at 1:09 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21765))
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > nice! when will the update be released?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
+
 
 
 ### **Anonymous** — November 12, 2013 at 3:47 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21834))
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This week, hopefully tomorrow.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
+
 
 
 ### **Anonymous** — November 20, 2013 at 5:51 am ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21777))
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > i’ve got the update but the support for adding arrays as arguments in the connection request is not there or i’m missing something?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
+
 
 
 ### **Anonymous** — November 20, 2013 at 1:00 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21794))
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m guessing you updated the plugin and not the library. Go to project properties and select update client libraries.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
+
 
 
 ### **Anonymous** — November 21, 2013 at 5:12 am ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21750))
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks! thought it was automatic when updating 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
+
 
 ---
 

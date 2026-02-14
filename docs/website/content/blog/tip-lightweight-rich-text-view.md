@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Label internalization = new Label(text);  
 > text = internalization.getText();
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
+
 
 
 ### **Shai Almog** — April 7, 2018 at 4:36 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-23796))
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can easily internationalize the body of HTML and this example using the UIManager.getInstance().localize() method.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
+
 
 
 ### **Gareth Murfin** — August 8, 2018 at 3:23 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-23650))
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great little widget, with these fixes its showing ok .
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
+
 
 
 ### **Durank** — September 30, 2020 at 12:49 pm ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24351))
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Provide and example how to applie color to specific portion of text
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
+
 
 
 ### **Shai Almog** — October 1, 2020 at 6:40 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24348))
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There’s nothing built in but it should be trivial to add that as it isn’t much different than setting bold styles. You can parse a `font` tag or a custom tag of your own and set the color any way you want. That’s the point of including the source and not building this into Codename One.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
+
 
 
 ### **Julio Valeriron Ochoa** — September 22, 2021 at 3:03 pm ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24490))
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please provide support to color and size
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
+
 
 
 ### **Lianna Casper** — September 23, 2021 at 1:54 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24493))
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > This is literally the same. Just add `int currentColor` next to currentFont. Then when a color attribute is hit set the value of the currentColor and reset it to the default when exiting the tag.  
 > Then just do an `s.setFgColor(currentColor);`.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
+
 
 ---
 

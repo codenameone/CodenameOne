@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > for orientation I am using orientation-listener in my app and also put Logger code in orientation-listener some time orientation listener is not called when I rotate screen in my android tablet
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Shai Almog** — July 20, 2016 at 4:31 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-21455))
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As the article above states, these things should be asked in StackOverflow or in a relevant blog post or in the discussion forum. I see you did the former which is great: [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/38450513/form-addorientationlistenernew-actionlistener-not-being-called-on-keyboard-op/38472353>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **madhu thestudent** — August 19, 2016 at 9:10 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-21460))
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My applicaiton need to show the notifications,So i used localnotification in codename one.But it supports only for android mobiles not for tablets,what should i do to support for tablets also?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **madhu thestudent** — August 19, 2016 at 9:15 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22862))
@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > can you please tell ,from which version of android tablets does the codename one notification support .
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Shai Almog** — August 20, 2016 at 4:21 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22794))
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m guessing you don’t have an Android tablet. You probably have a Kindle or some other clone without Google Play services. Some features aren’t available when that is missing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Peter Hric** — September 5, 2016 at 2:43 pm ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22907))
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Many thanx in advance !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Shai Almog** — September 6, 2016 at 3:53 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22897))
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Other than that everything should work fine.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Emmanuel Njoku** — September 22, 2016 at 7:51 pm ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-23158))
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at [com.codename1.ui.RunnableWr…](<http://com.codename1.ui.RunnableWrapper.run)([RunnableWrapper.java](http://RunnableWrapper.java)>:120)  
 > at [com.codename1.impl.Codename…](<http://com.codename1.impl.CodenameOneThread.run)([CodenameOneThread.java](http://CodenameOneThread.java)>:176)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Shai Almog** — September 23, 2016 at 4:35 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22923))
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It looks like you set the “execute” value in the GUI builder command to something that isn’t a URL.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Raghu vasa** — September 29, 2016 at 7:53 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-21464))
@@ -224,7 +224,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks,  
 > Raghu
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Shai Almog** — September 30, 2016 at 6:50 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22890))
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > the web login is different from the phone login. A web session you embed in the app doesn’t have the login credentials of the device since that will violate device isolation policies. Just to be clear this is a security measure from Google that we can’t control.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Aquila CodenameOne** — October 19, 2016 at 12:18 pm ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22820))
@@ -249,7 +249,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks,  
 > Sateesh.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 
 ### **Shai Almog** — October 20, 2016 at 2:11 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-23052))
@@ -259,7 +259,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > it’s in Display.getProperty()
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fclarifying-our-support.html)
+
 
 ---
 

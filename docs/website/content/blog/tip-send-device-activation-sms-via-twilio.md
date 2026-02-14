@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Awesome, I would LOVE a twilio library for cn1,to abstract away from their HELL.. ! using it right now on android, what a mess….
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-send-device-activation-sms-via-twilio.html)
+
 
 ---
 

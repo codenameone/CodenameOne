@@ -29,7 +29,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Will do you still use Gradle 4.6? This information can be useful when testing native interfaces.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-10-1-migration.html)
+
 
 
 ### **Shai Almog** — January 10, 2019 at 11:52 am ([permalink](https://www.codenameone.com/blog/xcode-10-1-migration.html#comment-23902))
@@ -38,7 +38,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Right now we won’t touch the Android side. When we do the migration to 28 we might need newer version of gradle though. We’ll post about it before that migration takes place as we’ll have specific version numbers and setting information.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-10-1-migration.html)
+
 
 
 ### **Francesco Galgani** — January 10, 2019 at 11:53 am ([permalink](https://www.codenameone.com/blog/xcode-10-1-migration.html#comment-23973))
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ok, thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-10-1-migration.html)
+
 
 ---
 

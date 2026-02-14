@@ -159,21 +159,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Great update, it is a joy to see such leaps and bounds in functionality, congrats. Keep up the good work guys!..
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Nick Koirala** — July 25, 2017 at 2:20 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23204))
 
 > I like the ripple effect but it seems like its in slow motion compared to the material design ripple effect, how is the speed controlled?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Shai Almog** — July 25, 2017 at 4:34 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23564))
 
 > Right now it’s hardcoded. I looked at several implementations and each one looked very different so I eyeballed it. I’ll try to think of the right way to customize this, can you file an RFE?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Nick Koirala** — August 10, 2017 at 3:10 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23529))
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is a change that has an effect on the UI of apps currently in development – changing the style between builds, with the default set to be the new behaviour. I don’t think that should be the way that updates like this are rolled out.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Shai Almog** — August 10, 2017 at 5:17 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23737))
@@ -217,7 +217,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We have many changes like this coming so if you have a suggestion I’m listening…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Nick Koirala** — August 10, 2017 at 6:39 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-21524))
@@ -236,7 +236,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m not sure how difficult it is to manage changes with the build process at your end – big red warnings in the console output or something. I’m thinking of the way methods are deprecated before being removed from APIs allows progress and updates while making developers be aware of the upcoming changes and giving them the opportunity to adapt on their schedules.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Shai Almog** — August 11, 2017 at 7:21 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23626))
@@ -259,7 +259,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice that when Google or Apple update their OS’s a native app that’s already on the device will break and/or change its look. With Codename One updates you will only see it for your builds not for production apps so we are better off than standard native apps in that sense.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Diamond** — August 22, 2017 at 9:13 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23677))
@@ -271,7 +271,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Like having:  
 > cmp.getAllStyles().setPaddingTop(2.6);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Shai Almog** — August 22, 2017 at 1:20 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-24210))
@@ -280,7 +280,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Right now we have only the setPadding(top, bottom, left, right) that accepts float values (not double like your code does). We don’t have the floating point equivalents for setPaddingTop/Bottom/Left/Right. Mostly due to laziness. Notice that if you want to submit a PR you will need to add new methods and can’t change the existing method signature from int to float as that will break binary compatibility.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Diamond** — August 22, 2017 at 2:10 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-21530))
@@ -289,7 +289,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve added the methods.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Thomas** — March 22, 2018 at 8:00 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23829))
@@ -298,7 +298,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there a way to use rounded borders from the new GUI builder? In the old builder there was a border wizard that allowed to create custom borders by generating a 9 components image but I could not find it in the new GUI builder and the RoundRectBorder type is not offered as an option (only the “round” border type, that seems to map to RoundBorder exists in the border editor of the new GUI builder)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 
 ### **Shai Almog** — March 23, 2018 at 2:42 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23757))
@@ -308,7 +308,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > When you edit a style in the GUI builder it’s meant more as a small override over the default theming. 9-piece borders are a bit more complex as they require image generation and this can get tricky if you have multiple variants.  
 > RoundRectBorder is relatively new and came to be in parallel to this feature. Can you please file an issue on that? It should go into the style UI too.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffactional-padding-margin-rounded-border-ripple-caps-google-connect.html)
+
 
 ---
 

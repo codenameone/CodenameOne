@@ -122,14 +122,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I really liked the new look and feel changes at least based on the screenshots, I need to adapt some of my code/themes to use this. I’m personally pretty excited about a better TDD workflow. I found this a bit hard to do up to now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-8-live.html)
+
 
 
 ### **Francesco Galgani** — November 15, 2017 at 1:58 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-8-live.html#comment-23876))
 
 > What’s code you used to generate the “Figure 2. After: Codename One 3.8 text Input (on Android)”? Is it an Instant UI generated using Properties?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-8-live.html)
+
 
 
 ### **James** — November 16, 2017 at 4:18 am ([permalink](https://www.codenameone.com/blog/codename-one-3-8-live.html#comment-23748))
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there a plugin update for Eclipse? When I run Check For Updates, it lists a 3.8 update but then fails to install and says the repository can’t be found. If I look in Eclipse Marketplace, I see 3.7 as the latest version.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-8-live.html)
+
 
 
 ### **Shai Almog** — November 16, 2017 at 5:28 am ([permalink](https://www.codenameone.com/blog/codename-one-3-8-live.html#comment-23885))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s also in the new developer guide update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-8-live.html)
+
 
 
 ### **Shai Almog** — November 16, 2017 at 5:29 am ([permalink](https://www.codenameone.com/blog/codename-one-3-8-live.html#comment-23616))
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks I do need to update the eclipse marketplace listing. It should work for the update. What’s your update URL? What’s the error? What’s your eclipse version?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-8-live.html)
+
 
 
 ### **James** — November 18, 2017 at 5:21 am ([permalink](https://www.codenameone.com/blog/codename-one-3-8-live.html#comment-23680))
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > No repository found containing: osgi.bundle,CodenameOnePlugin,3.8.0  
 > No repository found containing: org.eclipse.update.feature,CodenameOneFeature,3.8.0
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-8-live.html)
+
 
 
 ### **Shai Almog** — November 18, 2017 at 5:34 am ([permalink](https://www.codenameone.com/blog/codename-one-3-8-live.html#comment-23567))
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > If you try to install manually by using the update site: [https://www.codenameone.com…](<https://www.codenameone.com/files/eclipse/site.xml>) does it work?  
 > Do you maybe have an older Codename One update site imported from an older version of eclipse?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-8-live.html)
+
 
 ---
 

@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Where does it put the certificate? I’m moving my source to GitHub, and I naturally don’t want the certificates stored there, too. I found the iOS certificates in a folder called iosCerts, and excluded those from github, but I can’t find them for the android build. What files should I exclude?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstrong-android-certificates.html)
+
 
 
 ### **Shai Almog** — August 15, 2020 at 5:17 am ([permalink](https://www.codenameone.com/blog/strong-android-certificates.html#comment-24325))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It should be under your users home directory under the “.codenameone” directory. So no worries.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstrong-android-certificates.html)
+
 
 ---
 

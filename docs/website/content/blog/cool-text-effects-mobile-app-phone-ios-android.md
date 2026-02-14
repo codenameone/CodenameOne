@@ -164,14 +164,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > That’s very cool. Thanks once again for all your great work on CN1.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcool-text-effects-mobile-app-phone-ios-android.html)
+
 
 
 ### **Chibuike Mba** — November 11, 2016 at 9:09 am ([permalink](https://www.codenameone.com/blog/cool-text-effects-mobile-app-phone-ios-android.html#comment-21507))
 
 > Nice one Steve. Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcool-text-effects-mobile-app-phone-ios-android.html)
+
 
 ---
 

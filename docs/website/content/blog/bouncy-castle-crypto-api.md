@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > this is a very valuable addition !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbouncy-castle-crypto-api.html)
+
 
 
 ### **Anonymous** — January 15, 2014 at 9:54 pm ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-22025))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > can you please tell me, how i can get sha1 or md5 hashing of a string using this lib?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbouncy-castle-crypto-api.html)
+
 
 
 ### **Anonymous** — January 16, 2014 at 4:12 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-21919))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://www.google.com/sear…](<https://www.google.com/search?q=bouncy+castle+sha1>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbouncy-castle-crypto-api.html)
+
 
 
 ### **Anonymous** — October 26, 2014 at 6:27 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-21900))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I tried to search for AES string encription, but all examples forces me to use [java.security](<http://java.security>).* (and I already have a working class for android written purely with [java.security/javax.crypto)](<http://java.security/javax.crypto>)), I need one for Your platform to cover the iPhone), which in return results with an error during compiling (error: package [java.security](<http://java.security>) does not exist). BouncyCastle is installed. Any example written PURELY with BouncyCastle?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbouncy-castle-crypto-api.html)
+
 
 
 ### **Anonymous** — October 26, 2014 at 9:44 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-21995))
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://groups.google.com/f…](<https://groups.google.com/forum/#!searchin/codenameone-discussions/aes>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbouncy-castle-crypto-api.html)
+
 
 
 ### **Anonymous** — October 26, 2014 at 3:52 pm ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-22105))
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Actually, I did not. Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbouncy-castle-crypto-api.html)
+
 
 
 ### **Kaya TC** — March 7, 2016 at 11:21 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-22700))
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I just want to have a SHA hash =)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbouncy-castle-crypto-api.html)
+
 
 
 ### **Shai Almog** — March 8, 2016 at 3:31 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-22458))
@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I think this contains some examples which might be helpful:  
 > [http://www.programcreek.com…](<http://www.programcreek.com/java-api-examples/index.php?api=org.bouncycastle.crypto.digests.SHA1Digest>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbouncy-castle-crypto-api.html)
+
 
 ---
 

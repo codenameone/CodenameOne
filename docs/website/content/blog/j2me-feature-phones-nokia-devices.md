@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [http://www.netmarketshare.c…]([http://www.netmarketshare.com/operating-system-market-share.aspx?qprid=9&qpcustomb=1](http://www.netmarketshare.com/operating-system-market-share.aspx?qprid=9&qpcustomb=1))
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — April 24, 2013 at 6:51 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21743))
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > j2me is already dead, you would get laughed at by any serious developer if you told them you still programmed in it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — April 24, 2013 at 7:31 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21786))
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > but i would not tell them 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — April 24, 2013 at 7:39 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21781))
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > To be clear, I would never target J2ME as my main platform but if we can get there for almost free that could be interesting.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — April 24, 2013 at 7:39 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21855))
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just show the numbers and they will stop laughing, also, it is way easier to get a better spot for your app at Nokia OVI store than the others
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — April 24, 2013 at 9:37 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21906))
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think you guys are doing a marvelous job with Codename One and I really hope to see it grow and support a whole lot of different stuff there’s still left to explore. Keep up the great work!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — April 24, 2013 at 10:24 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21901))
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Isn’t it a simple case of demand? Just because a technology is good, doesn’t mean it will last forever. If the majority of the market is no longer supporting or working with J2ME, then developers will disappear and products will disappear. Of course, as the article says, there is still a market for J2ME software, the market is just a fraction of what it used to be.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — April 24, 2013 at 12:34 pm ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21754))
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Samsung is now prepared to compete with Nokia Asha in the feature phone market with the recent release of 4 new full touch devices, the Rex 60, 70, 80, and 90.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — May 1, 2013 at 6:54 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21893))
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I had to create a native app for my Nearest Locator mobile app in other to fully maximize the Asha LPS feature.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — May 16, 2013 at 9:22 pm ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21941))
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Does Codename One support the new Asha platform in Asha 501?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — May 17, 2013 at 1:45 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21748))
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes, it supports all asha series
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — September 26, 2013 at 6:58 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-24159))
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > its sad to know that j2me may soon go into oblivion. i love the m3g based 3d games which i think are simpler to make compared to open gl es which is quite popular now. I was hoping to release a good number of 3d apps based on m3g on j2me platform in Nigeria but i guess i’have to port to android os or IOS and i am not happy about that. I love m3g on j2me,i wish it was available on android or Ios instead of open gl es.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — October 9, 2013 at 11:32 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21989))
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > However, the risk is, how is J2ME being kept up to date. Who is maintaining the SDK to keep up with the moving technology.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — October 9, 2013 at 3:09 pm ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21762))
@@ -229,7 +229,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We use Java 5 (J2ME ends with JDK 1.4 subset) and we add a lot of features that don’t exist in J2ME (while still maintaining compatibility). I would not target J2ME alone but Codename One allows some developers to have their cake and eat it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 
 ### **Anonymous** — May 29, 2014 at 6:41 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21782))
@@ -238,7 +238,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > i want to be a developer and i think j2me sdk is the best app to start with i have on my tecno device(tecno t531) but i need to learn how to use it pls help me i know you are advanced programmers
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fj2me-feature-phones-nokia-devices.html)
+
 
 ---
 

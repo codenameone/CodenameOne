@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to send log to another email address than the developer’s?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhandling-the-exception.html)
+
 
 
 ### **Shai Almog** — April 6, 2016 at 2:41 am ([permalink](https://www.codenameone.com/blog/handling-the-exception.html#comment-22447))
@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > No. A lot of features are locked directly to that email account.  
 > It’s a problem to accept an email dynamically for some services as they might be handled in complex ways e.g. sending an email from a production app. So it’s important to us that one valid email is used and that an email is used per developer to avoid abuse.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhandling-the-exception.html)
+
 
 ---
 

@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Steve….Great job there…We would like to see a tutorial where you are using native interfaces
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-mobile-dev-webinar-sequel-recap.html)
+
 
 ---
 

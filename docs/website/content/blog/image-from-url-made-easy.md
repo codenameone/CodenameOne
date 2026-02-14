@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, this is just what I needed for my new project! That old ImageDownloadService worked as well, but it surely felt a bit clumsy.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — April 4, 2014 at 12:27 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22066))
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, i want to use the URLImage class in my current project but can’t seem to find it in my current version of codenameone running on netbeans 7.4. How do I incorperate it into my IDE? I tried downloading the latest plugin but it did not do the job. Any tips? As I find the ImageDownloadService confusing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — April 4, 2014 at 2:57 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21913))
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Libraries are updated by going to the project properties Codename One section and clicking the update client libs button.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — April 4, 2014 at 9:12 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22049))
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the prompt response!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — April 4, 2014 at 10:34 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21976))
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I would like to know if the images that are downloaded via the URL are stored in a directory and if so where?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — April 4, 2014 at 3:46 pm ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21992))
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > All images are placed in Storage or FileSystemStorage based on the type of URL you created under the file name you gave. Storage and file system are mapped to the .cn1 directory in your home directory for the simulator.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — June 19, 2014 at 5:47 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22114))
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — June 20, 2014 at 12:46 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21675))
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Any file type should work although if the image is rescaled using the default scaling in some cases the image will become a PNG and in others it will become a JPEG. The logic isn’t as clear as it should be.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — June 20, 2014 at 10:00 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22143))
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — June 20, 2014 at 1:53 pm ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-24238))
@@ -243,7 +243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 4000 seems like a bit much.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — June 21, 2014 at 4:20 pm ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21848))
@@ -262,7 +262,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — March 3, 2015 at 6:31 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22148))
@@ -271,7 +271,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How can I fetch changing placeholder image by downloaded image for revalidate ImageViewer?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 
 ### **Anonymous** — March 3, 2015 at 12:19 pm ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22178))
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://www.udemy.com/learn…](<https://www.udemy.com/learn-mobile-programming-by-example-with-codename-one/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fimage-from-url-made-easy.html)
+
 
 ---
 

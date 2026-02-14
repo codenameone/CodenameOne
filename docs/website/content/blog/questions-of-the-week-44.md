@@ -40,7 +40,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > But I think the lastest update I see is 3.6.0 [https://www.codenameone.com…](<https://www.codenameone.com/files/netbeans/updates.xml>) released on 2017/01/10.  
 > Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-44.html)
+
 
 
 ### **Shai Almog** — February 25, 2017 at 5:29 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-44.html#comment-21571))
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > FYI if you include URL’s they go into moderation automatically to prevent SEO spam. We approve automatically if it’s relevant.  
 > Right now we are only pushing updates to the libraries/servers. A plugin update is a bigger deal and we don’t do it as often. We aim for once a month or two.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-44.html)
+
 
 ---
 

@@ -121,15 +121,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 ### **Dalvik** — March 20, 2018 at 10:58 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-23631))
 
 > Congratulations, I hadn’t noticed half of these features as they went in 😉
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 
 ### **Bluewater** — March 22, 2018 at 6:05 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-24138))
 
 > Nice work! Were any of the deprecated APIs removed or is 4.0 fully backward compatible with 3x code?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 
 ### **Shai Almog** — March 22, 2018 at 8:43 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-23817))
@@ -138,8 +134,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks!  
 > It should be compatible. We didn’t remove any deprecated API’s but there are changes and some things can always break.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 
 ### **Ross Taylor** — March 31, 2018 at 10:31 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-23743))
@@ -147,8 +141,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Ross Taylor says:
 >
 > Towards around 1:57 – 59 of the video, I notice a slight flicker of the menu when displayed over the map. Is this a problem of the Google Map you were referring?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 
 ### **Shai Almog** — April 1, 2018 at 4:07 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-23724))
@@ -156,8 +148,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > That’s related to the incoming animation. I used a background painter in one of the elements and I think I have an issue in that.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 ---
 

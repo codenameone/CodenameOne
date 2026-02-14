@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And may I ask if “background process while app is not running” would be implemented anytime soon?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — October 28, 2015 at 3:35 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22195))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Background processes is something we slated and discussed for 3.2 and worked on a lot. The end result was just background notifications which IMO is the least important of the bunch. Hopefully this will land sooner rather than later.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Diamond** — October 28, 2015 at 4:17 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22487))
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Most of this stuff happens randomly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — October 28, 2015 at 9:47 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22180))
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > are you sure you are building with the right account? It should be logged to the console.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Gerben** — October 28, 2015 at 9:49 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-21940))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Turned out we had paypal issues and our account was terminated or something like that at the exact moment I installed 3.2. But is was unrelated.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — October 28, 2015 at 9:55 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22242))
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you get crashes or errors a log would be nice, we will add some better crash logging for the next update and hopefully start fixing these bugs quickly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Tom Arn** — October 30, 2015 at 10:03 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22266))
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Best regards  
 > Tom
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **ahmed** — October 31, 2015 at 3:52 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22386))
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The latest version i get in intellij is 3.1
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — October 31, 2015 at 4:16 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22396))
@@ -192,7 +192,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Our plugins aren’t open source and we are looking at the new GUI builder as a part of the plugin so at this time we don’t plan to open source it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — October 31, 2015 at 4:17 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22403))
@@ -202,7 +202,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We are working on a partial rewrite of the IntelliJ plugin, this is taking some time.  
 > Most features of 3.2 are available on IntelliJ via a library update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Yaakov Gesher** — November 10, 2015 at 10:07 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22393))
@@ -211,7 +211,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > After upgrading to 3.2, using the old GUI Builder, every time I make a change in a form I get a little popup saying “GUI Builder error – undoing”, but it doesn’t actually undo the changes made.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — November 11, 2015 at 4:53 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22368))
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you run the GUI builder from command line and get the logged output when you get that error?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Yaakov Gesher** — November 11, 2015 at 7:51 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22455))
@@ -229,7 +229,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What’s the command I use for that?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — November 12, 2015 at 3:09 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-21498))
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > java -jar ~/.codenameone/designer_1.jar  
 > ~ is the home directory if you are doing this in Windows and you would naturally need to reverse the slashes.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Yaakov Gesher** — November 14, 2015 at 9:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-21540))
@@ -248,7 +248,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ll email you the stack trace.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — November 15, 2015 at 4:08 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22548))
@@ -258,7 +258,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I see the issue but I don’t think its a regression since this is pretty old code. Did you change something with the TableLayout in that hierarchy?  
 > Can you change the column count to be larger or is this inaccessible in the GUI?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Yaakov Gesher** — November 21, 2015 at 8:48 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-24200))
@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yeah, I realized later that I was adding components beyond the TableLayout’s defined row count. But shouldn’t there be a more user-friendly error message?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 
 ### **Shai Almog** — November 22, 2015 at 4:37 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-21548))
@@ -278,7 +278,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s just a workaround until we provide a new version of the designer.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-2-now-live.html)
+
 
 ---
 

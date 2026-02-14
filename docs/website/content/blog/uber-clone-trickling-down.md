@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Nevertheless, I’m pretty agree that Codenameone might help to build both android and iOS app. And congrats for this clone 🙂  
 > My feeling is that to build a complex application, Codenameone still lacks robustness, for example in the management of threads .
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-trickling-down.html)
+
 
 
 ### **Shai Almog** — January 5, 2018 at 9:55 am ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23802))
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I’d appreciate a more concrete example of what you think we lack in terms of threads?  
 > I’m assuming you are looking at some of the capabilities from the newer thread API’s introduced in Java 5? These are very problematic to port and mostly useful for heavily threaded server environments. I don’t think they make a lot of sense in real world mobile apps.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-trickling-down.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — January 12, 2018 at 6:35 pm ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23575))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I am going to sign up for the course at the end of the month. I have a very weird request. Some of us cannot afford the pro subscription but badly need a JavaScript build for one of our apps. Could there be an arrangement for startups like us? We’ve been on basic subscription for over a year.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-trickling-down.html)
+
 
 
 ### **Shai Almog** — January 13, 2018 at 5:54 am ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23772))
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Financially basic subscribers cover their cost but enterprise and to a lesser degree pro subscribers keep this company running.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-trickling-down.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — January 13, 2018 at 10:43 am ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23904))
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Seems fair enough then.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-trickling-down.html)
+
 
 ---
 

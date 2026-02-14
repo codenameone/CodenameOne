@@ -52,28 +52,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > I have followed the procedure and i am not getting CodenameOne listen in available plugins. I tested the connections and tried again. It didnt work for me
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **Shai Almog** — June 15, 2016 at 4:00 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-22884))
 
 > I’m not sure what is the issue but you can download the nbm directly from [https://www.codenameone.com…](<https://www.codenameone.com/files/netbeans/com-codename1.nbm>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 18, 2018 at 2:10 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23839))
 
 > how can l update my netbeans plugin. when ever l run my project it writes it seems like you are using an old version l have tried the procedure but l can not find a way to update it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **Shai Almog** — June 19, 2018 at 5:11 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23975))
 
 > The latest version of the plugin is 4.0. Codename One Settings includes its own update system under Basic -> Update Client Libs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 19, 2018 at 6:39 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23954))
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > that is the one l downloaded but its still saying its an old version of codenameone whenever l execute a program
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 19, 2018 at 9:58 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23872))
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/bb21430ac3e275a24ef26c60e4723f887ce40cbb196eb007fd1708c295b4c385.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **Shai Almog** — June 20, 2018 at 4:15 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-21645))
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Once you send a build for the first time or update via Codename One Settings this message will go away.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 20, 2018 at 6:48 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23393))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > l have tried to update it but its not working
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **Shai Almog** — June 21, 2018 at 6:07 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23932))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What’s the error message you get when you update?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 21, 2018 at 2:14 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23939))
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/54e02b013b6716042daa28070d1d0c69de41cd71d1fd2cb9ed8eefbdd7764cc3.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/dfb3a4e2c089a32faf3698575dd9ea69565878e7e1744b738b7aae2843dff01c.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 21, 2018 at 2:15 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23916))
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > when click update project libs where l have highlighted the written words on the button will only turn grey and nothing ever happens
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **Shai Almog** — June 22, 2018 at 7:30 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23684))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > java -jar path-to-your-user-directory.codenameoneguibuilder.jar -settings path-to-cn1-project[codenameone_settings.proper…](<http://codenameone_settings.properties>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 25, 2018 at 1:42 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-24004))
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/1510937292844a99617f7bbfa8249fb141d538333721f948e5a7402fb8f00b21.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/91a002597ac16d1b473730bafe6c4a430c4db15bb31b598ef96373f51a13c779.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 25, 2018 at 1:44 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-21536))
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > l have updated using cmd but its still not updated
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **Shai Almog** — June 26, 2018 at 9:02 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23907))
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It should popup another dialog when downloading the update. Your image is cropped so I can’t see the version of Codename One Settings. Its version should be 4.2. If it isn’t that’s the problem.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 26, 2018 at 9:07 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23898))
@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > there is only version 4 on the update there is no version 4.2
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 26, 2018 at 9:11 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23970))
@@ -194,7 +194,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > those uploads
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 26, 2018 at 9:35 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23881))
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > how can l make it 4.2 its only showing 4
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **Shai Almog** — June 27, 2018 at 5:41 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23615))
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The plugin version is 4.0. The version of Codename One Settings should update after you do an update client libs to 4.2.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **linnet maruve** — June 27, 2018 at 10:15 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23633))
@@ -221,7 +221,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > when l go to basics it shows update project libs there is no update client libs. where can find that client libs
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 
 ### **Shai Almog** — June 28, 2018 at 6:09 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23660))
@@ -230,7 +230,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Project libs. This went through renames a couple of times I don’t recall the latest name.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnetbeans-plugin-update-center.html)
+
 
 ---
 

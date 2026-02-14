@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there a way to change default zoom some how? I just want to use a good modern skin without having to resize everytime.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fskin-designer.html)
+
 
 
 ### **Shai Almog** — February 6, 2018 at 7:16 am ([permalink](https://www.codenameone.com/blog/skin-designer.html#comment-23944))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Haven’t played with it for a while so I’m not sure. Do you see an exception? Notice you can just debug this as it’s a regular cn1 project. FYI next week we’ll be pushing out an update to the simulator and at that point we’ll add a lot of new skins e.g. [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/805671ba5cdb91663df059a3086359b86f489273d482ea9c10093f9979c4d310.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fskin-designer.html)
+
 
 ---
 

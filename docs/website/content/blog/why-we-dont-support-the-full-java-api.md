@@ -244,7 +244,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Please have the suggestions in [http://pastebin.com/cYcKaedD](<http://pastebin.com/cYcKaedD>)  
 > (apart from gc-related stuff which I just saw)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-we-dont-support-the-full-java-api.html)
+
 
 
 ### **Shai Almog** — September 18, 2016 at 4:03 am ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-23115))
@@ -260,7 +260,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The timezone fix is interesting, did you test it? We have a couple of timezone related issues we need to address.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-we-dont-support-the-full-java-api.html)
+
 
 
 ### **BENSALEH ZainElabidine** — May 2, 2018 at 1:00 pm ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-23980))
@@ -276,7 +276,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > this is my api in github [https://github.com/zain17/F…](<https://github.com/zain17/FOSJCryptAPI>)  
 > And thank you very much for your help 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-we-dont-support-the-full-java-api.html)
+
 
 
 ### **Shai Almog** — May 3, 2018 at 6:02 am ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-23797))
@@ -286,7 +286,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > These are available in the bouncy castle cn1lib. SecureRandom is under a different package name “javabc”.  
 > MessageDigest is problematic as I explained here: [https://stackoverflow.com/q…](<https://stackoverflow.com/questions/50135726/package-in-java-s-equivalent-in-codenameone>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-we-dont-support-the-full-java-api.html)
+
 
 
 ### **Martin Grajcar** — November 11, 2018 at 3:58 pm ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-24100))
@@ -295,7 +295,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Concerning reflection, I have some 300 generated classes, which I need to create by name (they’re used for parsing and formatting a stupid EANCOM-like format). So I generated a huge switch like `case “StupidName1”: return new StupidName1();` and a `Map<class<?>, String>` as a `Class#getSimpleName` replacement. It seems to work, at least in Android. Can I expect it to work everywhere? Should I expect problems?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-we-dont-support-the-full-java-api.html)
+
 
 
 ### **Shai Almog** — November 12, 2018 at 4:20 am ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-24002))
@@ -304,7 +304,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It should work fine in iOS too. We use that trick as well for some cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-we-dont-support-the-full-java-api.html)
+
 
 ---
 

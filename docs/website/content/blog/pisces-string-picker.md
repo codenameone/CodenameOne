@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hello, when are you releasing the upcoming update?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpisces-string-picker.html)
+
 
 
 ### **Anonymous** — January 4, 2014 at 6:07 am ([permalink](https://www.codenameone.com/blog/pisces-string-picker.html#comment-24255))
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yesterday.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpisces-string-picker.html)
+
 
 ---
 

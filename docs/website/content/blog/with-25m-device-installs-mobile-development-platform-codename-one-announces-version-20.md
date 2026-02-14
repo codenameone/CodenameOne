@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for excellent job.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwith-25m-device-installs-mobile-development-platform-codename-one-announces-version-20.html)
+
 
 ---
 

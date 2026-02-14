@@ -34,7 +34,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you, this is exactly what I need! 🙂  
 > About the Sheet in the bottom position, can it be placed at a given distance from the bottom and not exactly at the bottom like in the video? In other words, is it possible to slide up the Sheet from bottom to up, until it reaches a given distance from the bottom?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsheet-positions.html)
+
 
 
 ### **Javier Anton** — February 29, 2020 at 9:32 pm ([permalink](https://www.codenameone.com/blog/sheet-positions.html#comment-21415))
@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Will definitely use this thx
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsheet-positions.html)
+
 
 
 ### **Shai Almog** — March 1, 2020 at 2:06 am ([permalink](https://www.codenameone.com/blog/sheet-positions.html#comment-21413))
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Maybe a creative use of margin can help with that?  
 > Haven’t tried it but I think it should work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsheet-positions.html)
+
 
 ---
 

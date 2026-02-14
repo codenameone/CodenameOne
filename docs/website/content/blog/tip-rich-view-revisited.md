@@ -182,7 +182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please provide an example to use this class and its results
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-rich-view-revisited.html)
+
 
 
 ### **Shai Almog** — October 1, 2020 at 6:38 am ([permalink](https://www.codenameone.com/blog/tip-rich-view-revisited.html#comment-24352))
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > hi.add(new RichTextView(“This is plain text **this is bold** and _this is italic_ and all of this breaks lines nicely as well….”));  
 > “`
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-rich-view-revisited.html)
+
 
 
 ### **Julio Valeriron Ochoa** — September 23, 2021 at 12:51 pm ([permalink](https://www.codenameone.com/blog/tip-rich-view-revisited.html#comment-24494))
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > how can I add a tag to set color to specific text?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-rich-view-revisited.html)
+
 
 
 ### **Lianna Casper** — September 23, 2021 at 4:27 pm ([permalink](https://www.codenameone.com/blog/tip-rich-view-revisited.html#comment-24496))
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just like the a tag only instead of the href get the value of the color there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-rich-view-revisited.html)
+
 
 ---
 

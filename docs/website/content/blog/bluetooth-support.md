@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice, just built the demo and found it picking things up. Can it scan in the background and call back to the app? I.e., for discovering beacons.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbluetooth-support.html)
+
 
 ---
 

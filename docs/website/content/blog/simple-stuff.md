@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have build Mullitiline-Buttons in LWUIT with Containers and leadComponent, the solution is quite long and event handling also got also more complex.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsimple-stuff.html)
+
 
 
 ### **Anonymous** — October 22, 2013 at 3:08 am ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-24256))
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ve had SpanButton for quite a while now, I think I even blogged about it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsimple-stuff.html)
+
 
 
 ### **Anonymous** — October 31, 2013 at 5:21 pm ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-24234))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [codenameone_docs_demos_2013…](<http://codenameone_docs_demos_20130518.zip>) is the latest available on [http://www.codenameone.com/…](<http://www.codenameone.com/download.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsimple-stuff.html)
+
 
 
 ### **Anonymous** — November 1, 2013 at 4:29 am ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-21700))
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We are looking into automating the creation of this file but in the past we ran into some issues there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsimple-stuff.html)
+
 
 
 ### **Anonymous** — September 25, 2020 at 11:38 am ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-21391))
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [deleted]
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsimple-stuff.html)
+
 
 ---
 

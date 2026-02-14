@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-ios-code-callbacks.html)
+
 
 
 ### **Anonymous** — October 23, 2014 at 12:30 am ([permalink](https://www.codenameone.com/blog/native-ios-code-callbacks.html#comment-24185))
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, yes I missed that one. Sorry.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-ios-code-callbacks.html)
+
 
 
 ### **Anonymous** — December 4, 2014 at 12:27 pm ([permalink](https://www.codenameone.com/blog/native-ios-code-callbacks.html#comment-22053))
@@ -144,7 +144,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > does it mean, that sometimes we need to use CN1_THREAD_GET_STATE_PASS_ARG even when threadStateData variable is available in current context?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-ios-code-callbacks.html)
+
 
 
 ### **Anonymous** — December 5, 2014 at 3:26 am ([permalink](https://www.codenameone.com/blog/native-ios-code-callbacks.html#comment-22166))
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Obviously the former will fail if there is no threadStateData variable in the current context (e.g. if you are in a callback from native). In most cases when writing a native interface you will need to use the latter form.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-ios-code-callbacks.html)
+
 
 ---
 

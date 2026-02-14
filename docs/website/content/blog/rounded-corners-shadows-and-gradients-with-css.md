@@ -154,14 +154,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Looks like really cool stuff; hope to try this out some time. Thanks!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Franck Marchand** — February 13, 2016 at 10:51 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22222))
 
 > Hi, is it possible to do a cercle ? I try with border-radius:50% but I have a border around image, not a circle.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Shai Almog** — February 14, 2016 at 3:36 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22371))
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The closest you can get is use something a MultiImage of a circle as a background image and marking it as SCALE_TO_FIT.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Franck Marchand** — February 14, 2016 at 10:21 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22425))
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The closest I do is not really fun :).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Franck Marchand** — February 14, 2016 at 7:41 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22617))
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Shai Almog** — February 15, 2016 at 3:28 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22481))
@@ -211,7 +211,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice that the article you linked appeared here first: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Mo** — June 2, 2016 at 4:09 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22840))
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Steve, love the CSS lib, thank you, so far so good, just ran into a few issues when it comes to controlling the position and styling for the Container (Center) when setting direction ( RTL/LTR) with SpanLabel and SpanButton components(Label and Text), which do not inherits the UIID in addition to the Round1OuterShadow above, where I failed to Center, keeping inmind that, my user can switch from Arabic(RTL) to English, do I have to maintain to 2 CSS files??, any thought to the above would be much appreciated.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Shai Almog** — June 3, 2016 at 4:05 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22730))
@@ -229,7 +229,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > CSS isn’t really related to LTR. Things will flip automatically when you turn on RTL
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Akinniranye James** — September 9, 2016 at 8:55 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22881))
@@ -238,7 +238,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Css to res ,along with the the New GUI Builder (i could substitute this [https://github.com/shannah/…](<https://github.com/shannah/CN1ML-NetbeansModule>)), gave me the superpower to create my best looking cross mobile app with codenameone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Hristo Vrigazov** — September 11, 2016 at 11:32 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22752))
@@ -255,7 +255,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > UIManager.getInstance().addThemeProps(css.getThemeResourceNames()[0]);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **shannah78** — September 12, 2016 at 3:34 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23033))
@@ -264,7 +264,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks. I’ve fixed the post… it will be updated on site shortly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Hristo Vrigazov** — October 23, 2016 at 6:25 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23135))
@@ -273,7 +273,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I notice that sometimes, in very rare cases, the rounded UIID appears broken in a dialog, it is like the part above it appears under it. I cannot a find a case that does this reliably, but it is somewhat annoying. Any idea what could have caused the problem?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Shai Almog** — October 24, 2016 at 2:17 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22687))
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > What’s the generated style you have in the resource file?  
 > Can you provide screenshots?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Hristo Vrigazov** — October 27, 2016 at 1:22 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-21448))
@@ -297,7 +297,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have seen this only on CSS and not always.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Shai Almog** — October 28, 2016 at 3:44 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22904))
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That looks like a problematic cut of a 9-piece border
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Hristo Vrigazov** — November 2, 2016 at 10:15 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23073))
@@ -315,7 +315,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the guide! Is there a way to avoid this only using css, without modifiying the resulting theme.css.res file?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **shannah78** — November 3, 2016 at 12:31 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22835))
@@ -324,7 +324,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you share the CSS that you used to create this border?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Hristo Vrigazov** — November 3, 2016 at 5:31 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23180))
@@ -349,7 +349,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The UIID is Round1InnerShadow
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **shannah78** — November 3, 2016 at 5:41 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22864))
@@ -358,7 +358,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hmm.. That looks fine. Do you get the same behaviour with the Round1 UIID?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Hristo Vrigazov** — November 3, 2016 at 7:49 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22845))
@@ -369,7 +369,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I managed to pinpoint exact scenario that breaks it everytime like this. It is when I have a bigger and after it I show smaller. Not sure if this helps.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **shannah78** — November 4, 2016 at 6:48 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23184))
@@ -378,7 +378,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you file an issue in the cn1-css issue tracker, and include a minimal test case (both the java and css)? I can’t seem to reproduce this problem using your CSS and a test case that I put together.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Hristo Vrigazov** — November 9, 2016 at 5:30 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23206))
@@ -387,7 +387,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sorry, I can only reproduce it in my app for now, I can’t find a simple example that creates it. I will try to find one later
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Artur Hefczyc** — May 4, 2020 at 6:50 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-21400))
@@ -427,7 +427,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Or maybe I am doing something wrong?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 
 ### **Shai Almog** — May 5, 2020 at 5:34 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-21402))
@@ -437,7 +437,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > At this time we don’t support alphas on the gradient. It’s something we might be able to improve but it’s a bit rough to optimize since we sometimes generate image textures and customizing the alpha there is slightly harder.  
 > If it’s important to you then this is something we can improve potentially.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frounded-corners-shadows-and-gradients-with-css.html)
+
 
 ---
 

@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is good news, that the long StateMachine will be split in the future 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **bryan** — September 21, 2015 at 8:39 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22331))
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sounds interesting. I wonder what you know about FX that the rest of us don’t – I can’t see Oracle trash canning it as I’m sure they have lots of desktop code they need some UI platform for.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Shai Almog** — September 22, 2015 at 3:54 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-24199))
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I was joking with the NetBeans guys a while back saying that they should rewrite NetBeans in Codename One, I don’t think that’s a joke anymore…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **bryan** — September 22, 2015 at 6:51 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-21547))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With your new stuff, will you be supporting it on the desktop on all of Windows, Max and Linux ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Shai Almog** — September 23, 2015 at 5:09 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22427))
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We support all OS’s with the new GUI builder as we always did.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **bryan** — September 23, 2015 at 5:21 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22288))
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is getting a bit off topic as regards actually using CN1, but I’m curious how you’re going to support all the platforms. I don’t imagine you’re going to have your own low level (Glib for example on Linux) graphics implementation – I assume you’re still going to use Swing or FX but have your own widget drawing primitives – essentially what CN1 does on Android etc now ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Shai Almog** — September 23, 2015 at 11:09 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22486))
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We already have a desktop port which uses that architecture and a JavaScript port which is more complex: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/javascript-port.html>)  
 > One of our thoughts for the long term is to actually port directly to native since we already have native OpenGL code in the iOS port. Right now the benefit of doing that is very low. The core benefit is being a bit closer to the way things are on the device and being able to build a truly native app for desktop (e.g. 1mb desktop app instead of bundling the whole VM).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Chidiebere Okwudire** — October 12, 2015 at 10:13 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22494))
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Cheers
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Shai Almog** — October 12, 2015 at 12:08 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22436))
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We stopped using the GUI builder for newer demos because it made it harder for some developers to follow the process (as the result was binary and not source). We planned this rewrite for years so we intended to focus on the new GUI builder when it lands.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Chidiebere Okwudire** — December 9, 2015 at 11:26 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-21489))
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m curious about the status of the new GUI builder? Any ideas when the first stable version is due? Early next year I want to port an application to CN1 and the concepts in the new GUI builder are more suited for my use case. Of course, I know I can code the forms manually but let’s say, I’m more visually-oriented and/or lazy 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Shai Almog** — December 9, 2015 at 12:01 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22531))
@@ -237,7 +237,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The nice thing about the new GUI builder is that even if it completely breaks down you can still use the XML to recover so a disaster is less likely.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Chidiebere Okwudire** — December 9, 2015 at 8:49 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22153))
@@ -246,7 +246,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ok; thanks for the update. _When_ I start the migration, I hope I can provide some useful feedback.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Akinniranye James** — September 10, 2016 at 5:52 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-23040))
@@ -255,7 +255,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The builder is having issues with tabs. Anybody tried creating tabs?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Shai Almog** — September 11, 2016 at 6:38 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22854))
@@ -265,7 +265,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Yes, it partially works.  
 > We fixed several issues in tabs that will be included in the coming update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Akinniranye James** — September 11, 2016 at 7:06 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-21656))
@@ -274,7 +274,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Do you have any date in mind?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 
 ### **Shai Almog** — September 12, 2016 at 4:16 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22715))
@@ -283,7 +283,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We hope to have it in this Friday release.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-gui-builder.html)
+
 
 ---
 

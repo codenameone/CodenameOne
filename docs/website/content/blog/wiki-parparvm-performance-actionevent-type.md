@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Cheers
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwiki-parparvm-performance-actionevent-type.html)
+
 
 
 ### **Shai Almog** — January 14, 2016 at 8:35 am ([permalink](https://www.codenameone.com/blog/wiki-parparvm-performance-actionevent-type.html#comment-22399))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I placed a right side navigation panel very similar to the existing manual which should be pretty intuitive too.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwiki-parparvm-performance-actionevent-type.html)
+
 
 
 ### **Chidiebere Okwudire** — January 20, 2016 at 11:57 am ([permalink](https://www.codenameone.com/blog/wiki-parparvm-performance-actionevent-type.html#comment-22390))
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the clarification. Cool that the pdf is generated from the wiki. By the way, the IFTTT recipe works 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwiki-parparvm-performance-actionevent-type.html)
+
 
 ---
 

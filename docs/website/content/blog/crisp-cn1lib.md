@@ -37,7 +37,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcrisp-cn1lib.html)
+
 
 
 ### **Boniface N. Githinji** — October 26, 2018 at 3:44 pm ([permalink](https://www.codenameone.com/blog/crisp-cn1lib.html#comment-24064))
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Got it to work by overriding the ‘FloatingActionButton’ UUID. Changed BgColor to 24d07a.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcrisp-cn1lib.html)
+
 
 ---
 

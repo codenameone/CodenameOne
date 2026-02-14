@@ -39,7 +39,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When you’re testing your app on the emulator, leave the emulator open between debugging sessions so you can run your app again quickly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finstalling-on-a-windows-phone-device.html)
+
 
 ---
 

@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is something I’ve really been waiting for.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline.html)
+
 
 
 ### **Anonymous** — February 5, 2014 at 5:46 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline.html#comment-24236))
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s funny because just yesterday I thought I noticed my app was running smoother, sometimes its easy to forget you eager beavers are improving our lives secretly and remotely, I appreciate this so much. As for ever draw, Im assuming you can detect if something wont be scene and not render it, a little like a 2d game tile engine. I THINK though that this new build hint is making the native browsers I have embedded in my app flash.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline.html)
+
 
 
 ### **Anonymous** — March 12, 2014 at 1:13 pm ([permalink](https://www.codenameone.com/blog/a-new-pipeline.html#comment-21796))
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Excellent! I think the android port has been in need of a serious performance review for quite some time now. Android being the mobile platform with the most market share, it would be quite expedient if performance on this platform is focused on more intently. Looking forward to hearing more about this. Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline.html)
+
 
 ---
 

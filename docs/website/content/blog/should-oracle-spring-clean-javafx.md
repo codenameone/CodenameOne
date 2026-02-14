@@ -295,7 +295,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I chose Java becuase I trusted that platform with the “Write once, run everywhere” key feature. I just only hope not to be forced to abandon it because of Oracle foggy decisions…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Shai Almog** — November 19, 2015 at 11:43 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22569))
@@ -313,7 +313,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As a guy who built VM’s and done mobile since the 90’s Gluon really gets under my skin. They are trying to sell something that isn’t technically viable as if its a real world tool that can actually work in production. There are basic things both in Java FX and Java’s network stack that can’t be implemented correctly/efficiently in iOS e.g. [java.net](<http://java.net>).* (posix sockets don’t turn on radio), sub pixel anti-aliasing etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Andrea Liana** — November 19, 2015 at 12:02 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22317))
@@ -323,7 +323,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you four your prompt reply and clarifications.  
 > One more question… am I wasting my time and efforts on JavaFX for desktop applications?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Shai Almog** — November 19, 2015 at 12:07 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22325))
@@ -337,7 +337,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It has its faults but if you need a desktop API at this point in time and like Java then its a reasonable enough choice. As you saw from the article above, we are in the same boat. Codename One currently uses JavaFX & Swing for our desktop builds and for our mobile device simulators.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Andrea Liana** — November 19, 2015 at 12:53 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22479))
@@ -346,7 +346,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Considering that Java 9 is more concerned about solving the package hell, I hope Java 10 will be more focused on giving us developers a clear and convinced path for forging our user interfaces. Desktop or mobile….
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Michael Stover** — November 19, 2015 at 6:22 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-24163))
@@ -357,7 +357,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And I say that having despised the creation of SWT for my entire career.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **bryan** — November 19, 2015 at 11:44 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22347))
@@ -372,7 +372,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It will be interesting to see what the merging of ChromeOS/Android brings. I think some of benefits of web apps (i.e. zero footprint deployment) are disappearing with the App Store model of deployment, and given that it’s impossible to be sure any Javascript framework will be around next week let alone in 5 years.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **critic** — November 20, 2015 at 7:19 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22332))
@@ -381,7 +381,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > JavaFX API was made as heavy as Swing API was. It looks like object oriented concepts were intentionally avoided. Maybe it’s a reason why JavaFX is pretty fast. If one needs fast dynamic imaging, forget about Swing, take side of JavaFX. Not sure? Compare CPU percentage in Task Manager. But what could break any business is a tolerance to failures. When something fails in Swing, one will likely recover the application. When such accident happens with JavaFX, the best choice would better kill the application. Sounds bad for business.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Jeff Martin** — November 23, 2015 at 4:48 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22289))
@@ -390,7 +390,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Interesting post – I would be curious to hear your suggestions for specific improvements to fix JavaFX (or what a replacement would look like).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Shai Almog** — November 23, 2015 at 8:03 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-21480))
@@ -406,7 +406,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The project is generally over ambitious and tries to be “all that”. Its admirable but really hard to get a battle-cruiser of this size into production quality. Then it takes a huge amount of maintenance. This is astounding to me as the original proof of concept for JavaFX Script was the work of one guy…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Jeff Martin** — November 23, 2015 at 8:52 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22181))
@@ -415,7 +415,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Very good points – particularly in light of recent staff reductions.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Pablo Rodriguez Pina** — November 25, 2015 at 1:27 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22513))
@@ -474,7 +474,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > About the sacking of the evangelists, you probably know better Shai, but one thought that it came to my mind, is that java does seem to be picking up (i look at tiobe, not perfect, i know, but i look at it) and does have a self selling road map with modularity ahead of us. Not so sure how much evangelists were earning vs producing. But I think the features and evolution of java itself is the best form of evangelization. But yes, you probably know better what is happening over there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Shai Almog** — November 25, 2015 at 3:25 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22256))
@@ -485,7 +485,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I get what you are saying entirely and I don’t think its in conflict with what I’m saying.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **RuRu** — November 25, 2015 at 9:58 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22268))
@@ -499,7 +499,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I hope Oracle makes fixes and supports JavaFX and desktop development a bit more.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **RuRu** — November 25, 2015 at 10:03 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22388))
@@ -508,7 +508,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That would be great. Since Java is making a native Java MVC framework, for the JAVA EE (of course for the web). It could also transition to desktop with an API that allows good integration with object oriented features and great looking ui components. At least something I hope for
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Sid** — November 27, 2015 at 4:20 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22474))
@@ -517,7 +517,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Why does the Java community care so much about corporate backing? So what if Oracle has no interest in desktop Java. JavaFX is obviously better than Swing and open source too. Why can’t the community invest its efforts into making it a better product. Look at the Linux world. I don’t know of any billion dollar company that invests and promotes GNU utilities, KDE, GNOME, hundreds of distros and yet every such project has an active community around it no matter how small.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Shai Almog** — November 27, 2015 at 4:51 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22416))
@@ -534,7 +534,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’re an open source company and I’ve been running open source projects for many years so I’m a big fan of open source. But the “oh open source it and let the community take over” is one of the things that crashed Sun.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Pablo Rodriguez Pina** — November 30, 2015 at 7:49 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22489))
@@ -543,7 +543,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Pablo Rodriguez Pina** — November 30, 2015 at 7:53 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22307))
@@ -552,7 +552,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just to provide grounded evidence to Shai’s statement on open source crash, here is some archive video [https://www.youtube.com/wat…](<https://www.youtube.com/watch?v=5r3JSciJf5M>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **First Last** — March 27, 2016 at 11:02 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22719))
@@ -561,7 +561,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hahaha, the Flash to JavaFX/Swing interest chart is so dumb. Sorry but you are comparing widely known technology which is used as a runtime (and Googled for in that purpose) to a user-invisible technologies, only developers know. Hillariuos.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Shai Almog** — March 27, 2016 at 11:11 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22491))
@@ -576,7 +576,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I suggest working on your research skills and maybe making statements you wouldn’t be ashamed to make with your actual name.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Shai Almog** — September 14, 2016 at 5:19 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-23072))
@@ -587,7 +587,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FX has issues with desktop GPU’s and I doubt it has resources to deal with the huge complexity that is mobile. It is over ambitious. Being over ambitious is a problem as it creates an “all or nothing” situation. HTML/JS/CSS shares that over ambitious nature and has some failings because of that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 
 ### **Shai Almog** — September 15, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22938))
@@ -601,7 +601,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The problems I detailed with Gluon just got far worse since I wrote what I did, they are now building their own OpenJDK AoT compiler which is insane. Besides the amount of work/maintenance which is already impractical, JavaFX depends on a huge number of classes and including them will produce binaries unfit for mobile distribution as iOS requires 2-3 platforms in a fat binary…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshould-oracle-spring-clean-javafx.html)
+
 
 ---
 

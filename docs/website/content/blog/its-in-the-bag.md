@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I agree that GridBagLayout was hell to configure by hand, however I learned to like it more since the NetBeans team created their fancy customizer a few years ago… I wonder how easy/hard it would be to reuse it in CN1’s own designer ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-in-the-bag.html)
+
 
 
 ### **Anonymous** — September 5, 2013 at 3:35 pm ([permalink](https://www.codenameone.com/blog/its-in-the-bag.html#comment-21803))
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yeah, I used gridbag a lot. It might be painful, but sometimes it was the best thing to do. I tried some of the other replacements and they were even more difficult and were not hand modifiable.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-in-the-bag.html)
+
 
 ---
 

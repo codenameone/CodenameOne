@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks a lot Shi. This is a big help for today’s mobile businesses.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Tim Gallagher** — July 24, 2017 at 8:08 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23324))
@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just in time for me. Is this included in the the base library or do I need to install one of the extensions?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Shai Almog** — July 25, 2017 at 4:35 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23510))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s in the library just import
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Tim Gallagher** — July 27, 2017 at 6:30 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23736))
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > OK – I’ve looked through the REST api, and found that I need more control. I have to use Basic Authorization to log into a web service, which then supplies a token in the response header, but not a cookie, and at the same time some JSON with details of the login. Then I have to use that token on subsequent requests. I’ve looked at the ConnectionRequest class, which seems to be the best option for me, adding header params and overriding buildRequestBody() (based on these two SO items: [https://stackoverflow.com/q…](<https://stackoverflow.com/questions/39063909/how-to-post-json-to-a-rest-webservice-in-codenameone>) and [https://stackoverflow.com/q…](<https://stackoverflow.com/questions/40557730/codenameone-post-request-body>)) but I’m not sure which method, if any, I can override in order to get the header information, the token, in the response. What do you suggest?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Shai Almog** — July 28, 2017 at 5:24 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23625))
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Thomas** — March 20, 2018 at 12:35 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23968))
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > req.setPost(method.equalsIgnoreCase(“POST”) || method.equalsIgnoreCase(“PUT”) || method.equalsIgnoreCase(“PATCH”));  
 > to handle it correctly
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Shai Almog** — March 20, 2018 at 6:00 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23879))
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, can you file an issue?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Tafadzwa Moyo** — April 17, 2018 at 5:36 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23888))
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > does it work for https too?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Shai Almog** — April 18, 2018 at 5:19 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23837))
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sure.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Francesco Galgani** — May 6, 2018 at 8:21 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23813))
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Map<string, object=””> response = jsonData.getResponseData();  
 > }
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Francesco Galgani** — May 6, 2018 at 8:22 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23818))
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Disquis changed the code in my comment…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Shai Almog** — May 7, 2018 at 4:16 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23830))
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, I’ll fix that in the next site update
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Max Amende** — January 8, 2019 at 2:31 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-24095))
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > `  
 > @codenameone:disqus Do you know where my thinking error is?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Shai Almog** — January 9, 2019 at 3:36 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-24065))
@@ -222,7 +222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice you can inspect the returned Map in the debugger…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 
 ### **Max Amende** — January 9, 2019 at 5:35 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-24008))
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sorry
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fterse-rest-api.html)
+
 
 ---
 

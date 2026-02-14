@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > One request for this [codenameone_settings.proper…](<http://codenameone_settings.properties>) file: please do not automatically update the timestamp in the comment lines at the top of file, or remove comments completely. And, please keep a defined order of these properties.  
 > The constant change of this file (even there is no real content change) causes headache when team members work together with one git repo.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffail-fast-margin-padding-performance.html)
+
 
 
 ### **Shai Almog** — December 2, 2016 at 5:30 am ([permalink](https://www.codenameone.com/blog/fail-fast-margin-padding-performance.html#comment-23007))
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > That’s a great idea, it was annoying to me too but I didn’t think of a solution until you asked… The problem is that we use java.util.Properties which uses Hashtable and is effectively broken in that sense. I can probably adapt this [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/17011108/how-can-i-write-java-properties-in-a-defined-order>) to use globally and keep a consistent order.  
 > We’ll still need to update the libVersion but it would make merging easier.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffail-fast-margin-padding-performance.html)
+
 
 ---
 

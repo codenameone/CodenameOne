@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s very neat. Nice effect.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmighty-morphing-components.html)
+
 
 
 ### **Anonymous** — November 1, 2014 at 1:27 pm ([permalink](https://www.codenameone.com/blog/mighty-morphing-components.html#comment-21849))
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great one! you guys are doing a great job keeping up with everything that matters.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmighty-morphing-components.html)
+
 
 
 ### **Anonymous** — November 27, 2014 at 10:54 pm ([permalink](https://www.codenameone.com/blog/mighty-morphing-components.html#comment-22156))
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Kool
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmighty-morphing-components.html)
+
 
 ---
 

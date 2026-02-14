@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, thanks for mentioning our efforts with the Windows port, we are working hard to make it fast, stable and feature complete. We do have an internal schedule for features like in-app purchase and facebook native integration and we plan to release some of our apps using this port in the near future. Any pro/enterprise user willing to help would be most welcome.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finvite-friends-websockets-windows-phone-more.html)
+
 
 
 ### **ftp27** — August 4, 2015 at 11:25 am ([permalink](https://www.codenameone.com/blog/invite-friends-websockets-windows-phone-more.html#comment-22375))
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for WebSockets plugin!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finvite-friends-websockets-windows-phone-more.html)
+
 
 
 ### **shannah78** — August 4, 2015 at 4:38 pm ([permalink](https://www.codenameone.com/blog/invite-friends-websockets-windows-phone-more.html#comment-22305))
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Your welcome 🙂 Your original comment mentioned that you were having trouble on iOS. Did you solve this?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finvite-friends-websockets-windows-phone-more.html)
+
 
 
 ### **ftp27** — August 5, 2015 at 8:17 am ([permalink](https://www.codenameone.com/blog/invite-friends-websockets-windows-phone-more.html#comment-21544))
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes. This trouble has been associated with animate function in iOS. I replace this function to revalidate and all began worked fine. This was not associated with WebSockets.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finvite-friends-websockets-windows-phone-more.html)
+
 
 ---
 

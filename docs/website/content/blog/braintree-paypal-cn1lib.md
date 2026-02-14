@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looks good !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
+
 
 
 ### **salah Alhaddabi** — May 3, 2017 at 1:39 pm ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-23498))
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Extremely Excellent Work Shai. You guys always keep CN1 ahead of the game!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
+
 
 
 ### **Edwin Quai Hoi** — May 4, 2017 at 6:53 am ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-21432))
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > hi is there a list of existing cn1libs anywhere
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
+
 
 
 ### **Shai Almog** — May 5, 2017 at 4:44 am ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-23306))
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also mirrored to [https://www.codenameone.com…](<https://www.codenameone.com/cn1libs.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
+
 
 
 ### **salah Alhaddabi** — June 15, 2017 at 6:54 am ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-23395))
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > is the CN1 library built using PayPal Mobile SDKs ??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
+
 
 
 ### **Shai Almog** — June 16, 2017 at 6:59 am ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-24206))
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > it will fallback to paypal. The location restriction is for the payment receiver.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
+
 
 ---
 

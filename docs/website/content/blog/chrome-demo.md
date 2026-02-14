@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice demo! However I wonder why it takes a while to load the app (around 15 – 30 seconds) is it line speed (I have 10Mbps), browser (Firefox v46) or your Javascript Port itself? What happens if the app is large around 23MB? Will it affect the load time in the browser?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fchrome-demo.html)
+
 
 
 ### **Shai Almog** — May 18, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/chrome-demo.html#comment-22702))
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1.7MB is pretty small for what is effectively a full application with the JVM included but it does have a startup time overhead. This isn’t huge when compared to the many existing sites on the internet today in terms of data volume, but unlike those sites we need the whole thing to download before we can startup the VM.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fchrome-demo.html)
+
 
 
 ### **Shai Almog** — May 18, 2016 at 5:09 am ([permalink](https://www.codenameone.com/blog/chrome-demo.html#comment-22669))
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Actually looking at this again it seems our CDN does gzip the file so it’s really 300kb or so which is pretty impressive… Looking at the firefox logs I think this might be the time taking to load the javascript and the resource files which are pretty large for this application (around 1.2mb). I think a lot of the resources can be optimized to reduce startup time further.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fchrome-demo.html)
+
 
 ---
 

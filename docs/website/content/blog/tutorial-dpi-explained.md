@@ -27,7 +27,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > I think you need to step back and re-evaluate. That picture explains nothing. And I’m a professional programmer well versed in dpi and scaling issues. That’s just a lot of figures that only mean anything if you already understand it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-dpi-explained.html)
+
 
 
 ### **Shai Almog** — April 11, 2018 at 1:11 pm ([permalink](https://www.codenameone.com/blog/tutorial-dpi-explained.html#comment-23862))
@@ -37,7 +37,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks for the feedback. How would you improve that graphic?  
 > The target audience for this graphic are programmers who have no experience in mobile. I just want to help visualize the density issue, not the solutions which would require a different graphic.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-dpi-explained.html)
+
 
 ---
 

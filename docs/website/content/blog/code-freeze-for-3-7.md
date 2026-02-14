@@ -33,7 +33,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We are all with you and support your excellent vision Shai.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-3-7.html)
+
 
 
 ### **Francesco Galgani** — June 21, 2017 at 5:22 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-3-7.html#comment-23561))
@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I’ve just installed the 3.7 in Netbeans.  
 > At the moment is there any detailed announcement of the changes compared to the previous version?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-3-7.html)
+
 
 
 ### **Shai Almog** — June 22, 2017 at 4:24 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-3-7.html#comment-23546))
@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We will have a release announcement with itemized details on Tuesday the 27th.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-3-7.html)
+
 
 ---
 

@@ -38,7 +38,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Do i need to add ios.disableScreenshots in built-hints in order to enable this feature ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fblock-copy-paste-faster-performance-ios.html)
+
 
 
 ### **Shai Almog** — February 11, 2017 at 5:57 am ([permalink](https://www.codenameone.com/blog/block-copy-paste-faster-performance-ios.html#comment-23098))
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No, that has nothing to do with that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fblock-copy-paste-faster-performance-ios.html)
+
 
 ---
 

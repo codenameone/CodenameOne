@@ -54,14 +54,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I hope you can make the text black or at least add an option to it. Thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-settings-ui.html)
+
 
 
 ### **Shai Almog** — July 26, 2020 at 2:09 am ([permalink](https://www.codenameone.com/blog/new-settings-ui.html#comment-24300))
 
 > We’ll try to increase contrast here to make it more readable.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-settings-ui.html)
+
 
 ---
 

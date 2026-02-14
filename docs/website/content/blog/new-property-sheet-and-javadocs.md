@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Excellent work guys! This new feature will definitely help me troubleshoot a problem I’m having with the SpanLabel not taking the width I’m setting. For some reason it seems that I can’t resize the width through the css styling nor the setPreferredW() method on the spanlabel I made. I’m having a lot of fun learning the API, reading the developer guide, and learning from the kitchen sink example and the other samples. Every day I impressed by all the cool features. Thanks for all your hard work!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-property-sheet-and-javadocs.html)
+
 
 ---
 

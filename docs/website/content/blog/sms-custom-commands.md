@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hey Shai, great features! I just want to know if its possible to have one form to present a component in a side menu, and another form to have the native action bar to present the commands?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsms-custom-commands.html)
+
 
 
 ### **Anonymous** — November 28, 2014 at 4:18 pm ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-21504))
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This isn’t trivial since commands need to be routed in a very different way to work with the action bar.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsms-custom-commands.html)
+
 
 
 ### **Anonymous** — November 29, 2014 at 12:28 am ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-22107))
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to intercept sms in those possible platform using codenameone?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsms-custom-commands.html)
+
 
 
 ### **Anonymous** — November 29, 2014 at 3:31 am ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-22272))
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also Android is changing the way in which it intercepts SMS so its not really useful as it was before.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsms-custom-commands.html)
+
 
 ---
 

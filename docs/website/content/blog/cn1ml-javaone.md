@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is really cool Steve, congratz ! 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcn1ml-javaone.html)
+
 
 
 ### **Anonymous** — September 30, 2014 at 1:25 pm ([permalink](https://www.codenameone.com/blog/cn1ml-javaone.html#comment-22235))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcn1ml-javaone.html)
+
 
 
 ### **Anonymous** — October 19, 2014 at 10:44 am ([permalink](https://www.codenameone.com/blog/cn1ml-javaone.html#comment-24174))
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > wow steve you are a god. im getting started immediately.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcn1ml-javaone.html)
+
 
 ---
 

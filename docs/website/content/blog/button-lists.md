@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Great! However, in this example, there is an issue: the “Add Option” works fine with iOS skin, but it doesn’t work as expected on Android skin (because it’s necessary to change the layout to see the new added Button). I done tests with “[iPhoneX.skin](<http://iPhoneX.skin>)” and “[GooglePixel2.skin](<http://GooglePixel2.skin>)”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbutton-lists.html)
+
 
 
 ### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](https://www.codenameone.com/blog/button-lists.html#comment-23875))
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Why do you use the callSerially in the ActionListener of the addOption button?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbutton-lists.html)
+
 
 
 ### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](https://www.codenameone.com/blog/button-lists.html#comment-21539))
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > To create the DefaultListModel, you used a list of Strings as args. Is it possible to bind the DefaultListModel with a list of BooleanProperty as args? It could be an interesting enhancement to seamlessly map the user selections in a ButtonList with a PropertyBusinessObject.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbutton-lists.html)
+
 
 
 ### **Shai Almog** — December 8, 2018 at 1:46 pm ([permalink](https://www.codenameone.com/blog/button-lists.html#comment-24105))
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There is an issue which wasn’t noticeable to me because of the different animations for the dialog showing. We need a hi.revalidate() in the end of the callSerially invocation.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbutton-lists.html)
+
 
 ---
 

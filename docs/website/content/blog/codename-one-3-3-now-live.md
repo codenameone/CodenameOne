@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Something is obviously missing: An update on the new GUI builder which should have entered beta with release 3.3. What’s the status and why isn’t it mentioned in the feature list above?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-3-now-live.html)
+
 
 
 ### **Shai Almog** — January 27, 2016 at 12:26 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-3-now-live.html#comment-22666))
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think that once we change the documentation/videos to use the new GUI builder people will start using it and will start filing issues. This will bring it to beta-status thru inertia during the 3.3 lifespan.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-3-now-live.html)
+
 
 
 ### **Chidiebere Okwudire** — January 27, 2016 at 12:36 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-3-now-live.html#comment-22699))
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I tried creating a new project with the new GUI builder last week and after a few crashes and unclarity of how to do simple things that I can easily do with the old builder (e.g. setting components to parts of a border layout), I quit and reverted back to the old GUI builder. I’ll stick with that till further notice. I also saw a button for converting an existing project to a new GUI builder project so I guess when it’s ready, I’ll be able to migrate away from the huge state machine class.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-3-now-live.html)
+
 
 
 ### **Shai Almog** — January 27, 2016 at 12:48 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-3-now-live.html#comment-22637))
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes the migration wizard is already there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-3-now-live.html)
+
 
 ---
 

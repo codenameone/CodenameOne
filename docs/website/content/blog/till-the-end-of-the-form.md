@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 
 ### **Anonymous** — January 4, 2014 at 11:20 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21868))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Any help appreciated ….
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 
 ### **Anonymous** — January 4, 2014 at 5:00 pm ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21747))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just place the 5 entries in a container and replace the container when the button is pressed. That isn’t infinite scrolling.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 
 ### **Anonymous** — January 28, 2014 at 9:16 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-22048))
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wim
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 
 ### **Anonymous** — January 28, 2014 at 10:39 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21975))
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > PS: Passing an array with one element to addMoreComponents gives an ArrayOutOfBounds exception.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 
 ### **Anonymous** — January 28, 2014 at 5:02 pm ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21860))
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Once you do stuff off the EDT things will fail in odd and unpredictable ways, what you got working might not work on the device.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 
 ### **Anonymous** — January 29, 2014 at 4:25 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21898))
@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wim
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 
 ### **Anonymous** — August 22, 2014 at 3:11 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-22211))
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We have 100 elements in container. When user goes to the end of the list, I want to add 10 elements to the end of the list and remove first 10 elements and vice versa. I want to get constant number of elements in container.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 
 ### **Anonymous** — August 22, 2014 at 1:20 pm ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21442))
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We designed this for adding only but it should be possible to remove the first 10 elements from the container just as well. What did you try?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftill-the-end-of-the-form.html)
+
 
 ---
 

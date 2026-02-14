@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Awesome!! Finally.. Thank you Shai
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcamerakit-low-level-camera-api.html)
+
 
 
 ### **thunderkilll** — April 27, 2018 at 5:47 am ([permalink](https://www.codenameone.com/blog/camerakit-low-level-camera-api.html#comment-23805))
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > please i have question how can i change the file Path trajectory String filePath = Capture.capturePhoto();  
 > and instead the filePath = “http://localhost/images/”+imageName ;
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcamerakit-low-level-camera-api.html)
+
 
 
 ### **Shai Almog** — April 28, 2018 at 5:32 am ([permalink](https://www.codenameone.com/blog/camerakit-low-level-camera-api.html#comment-23734))
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice that you can’t copy a file everywhere in a mobile OS as devices isolate the apps from one another to prevent security exploits.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcamerakit-low-level-camera-api.html)
+
 
 ---
 

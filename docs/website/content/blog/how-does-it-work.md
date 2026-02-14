@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Thank you!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 
 ### **Jérémy MARQUER** — June 22, 2017 at 1:32 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23386))
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Maybe it could be a good idea to have an architecture course 🙂  
 > Just a word about 3.7 : I’ve installed successfully on Eclipse Luna (which was impossible with 3.6). New gui builder doesn’t seems to work. I think it should be better on Eclipse Neon.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 
 ### **Dalvik** — June 22, 2017 at 2:26 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23476))
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can’t wait 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 
 ### **Shai Almog** — June 22, 2017 at 2:52 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23507))
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The old GUI builder which we are no longer using used an architecture that made a lot of sense on J2ME devices where every class file we added impacted size/performance and we tried to save on creating new class files. The new GUI builder is far more conventional in that sense and with the 3.7 release coming Tuesday it’s getting a MAJOR facelift…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 
 ### **Manuel Tijerino** — June 22, 2017 at 9:32 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-24217))
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please let me know when these courses come out, would be very useful, thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 
 ### **Shai Almog** — June 23, 2017 at 4:36 am ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23323))
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s launching on Monday and on Tuesday we have 3.7 which is shaping up as a pretty amazing release…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 
 ### **james agada** — June 23, 2017 at 12:16 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-22074))
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > waiting of the course.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — June 23, 2017 at 11:16 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23412))
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Do you already know how much the course will cost?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 
 ### **Shai Almog** — June 24, 2017 at 5:12 am ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23452))
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ll offer multiple options
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-does-it-work.html)
+
 
 ---
 

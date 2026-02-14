@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you do some tutorials on animations?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-how-do-i-idea-launch-expanded-developer-guide.html)
+
 
 
 ### **Anonymous** — December 10, 2013 at 5:15 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21974))
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its in my todo list but its pretty low in the queue since we have quite a lot of other priorities. Animations should be very well documented in the developer guide though, what don’t you understand?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-how-do-i-idea-launch-expanded-developer-guide.html)
+
 
 
 ### **Anonymous** — December 12, 2013 at 4:37 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21669))
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Tested on Windows 7, Mac OS X Mavericks with IntelliJ-13 versions Ultimate and CE.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-how-do-i-idea-launch-expanded-developer-guide.html)
+
 
 
 ### **Anonymous** — December 12, 2013 at 4:55 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21945))
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m using IDEA on Mac (Lion) and I see the images with the latest plugin, which JDK are you using?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-how-do-i-idea-launch-expanded-developer-guide.html)
+
 
 
 ### **Anonymous** — December 12, 2013 at 6:22 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21670))
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > jdk1.7.45
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-how-do-i-idea-launch-expanded-developer-guide.html)
+
 
 
 ### **Anonymous** — December 12, 2013 at 5:38 pm ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21742))
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We are also looking into the possibility of it being related to that specific JDK.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-how-do-i-idea-launch-expanded-developer-guide.html)
+
 
 ---
 

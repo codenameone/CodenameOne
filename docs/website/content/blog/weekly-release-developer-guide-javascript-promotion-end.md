@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good to hear there’s progress on the WP port. Is it already possible to predict when we can expect the first release? 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweekly-release-developer-guide-javascript-promotion-end.html)
+
 
 
 ### **Shai Almog** — March 18, 2016 at 7:30 am ([permalink](https://www.codenameone.com/blog/weekly-release-developer-guide-javascript-promotion-end.html#comment-22661))
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We are trying to take a shortcut that would save us the need to port ParparVM to Windows, if we need to go thru that route it could take quite a while.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweekly-release-developer-guide-javascript-promotion-end.html)
+
 
 
 ### **AdAlbert** — April 3, 2016 at 7:29 am ([permalink](https://www.codenameone.com/blog/weekly-release-developer-guide-javascript-promotion-end.html#comment-22789))
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think you don’t need ParparVM for Windows port because gc is implemented internally in C# and this is main advantage od ParparVM for iOS.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweekly-release-developer-guide-javascript-promotion-end.html)
+
 
 
 ### **Shai Almog** — April 4, 2016 at 2:26 am ([permalink](https://www.codenameone.com/blog/weekly-release-developer-guide-javascript-promotion-end.html#comment-21625))
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If we would go with ParparVM (which we probably won’t as we made good progress with iKVM) we would use C and not C#. We had a horrible experience when translating Java bytecode to C#. They differ at just the right amount to make translation darn near impossible.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweekly-release-developer-guide-javascript-promotion-end.html)
+
 
 ---
 

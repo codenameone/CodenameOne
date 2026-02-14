@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > java-runtime: Compilation failure: Compilation failure:  
 > [ERROR] Source option 5 is no longer supported. Use 7 or later.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-codename-one-from-source-maven-edition.html)
+
 
 
 ### **Dave Dyer** — July 21, 2023 at 7:35 pm ([permalink](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html#comment-24564))
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > This is somehow related to the java version in use. I fixed this by  
 > downgrading my default java from java-16 to and older jdk, jdk-1.8
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-codename-one-from-source-maven-edition.html)
+
 
 ---
 

@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > These changes are in the netbeans plugin?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjson-overscroll-more.html)
+
 
 
 ### **Anonymous** — February 27, 2014 at 3:51 am ([permalink](https://www.codenameone.com/blog/json-overscroll-more.html#comment-21779))
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Not yet, soon.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjson-overscroll-more.html)
+
 
 
 ### **Anonymous** — March 24, 2014 at 12:27 pm ([permalink](https://www.codenameone.com/blog/json-overscroll-more.html#comment-21983))
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, luis already asked and you said soon. Have you got a date on that ? Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjson-overscroll-more.html)
+
 
 
 ### **Anonymous** — March 24, 2014 at 4:32 pm ([permalink](https://www.codenameone.com/blog/json-overscroll-more.html#comment-21438))
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We released the plugin almost a month ago I forgot the exact date.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjson-overscroll-more.html)
+
 
 ---
 

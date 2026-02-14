@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As a ruby developer i can say this was a really pleasant surprise. I have to say it’s great to see open minded people experimenting with technologies like this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmirah-for-codename-one.html)
+
 
 
 ### **Anonymous** — September 6, 2014 at 1:44 pm ([permalink](https://www.codenameone.com/blog/mirah-for-codename-one.html#comment-21719))
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It was always our intention to support additional languages thru Codename One. Our Java focus is mostly due to constrained resources, ideally as we grow we will see more diversity in this project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmirah-for-codename-one.html)
+
 
 
 ### **Anonymous** — September 30, 2014 at 5:40 pm ([permalink](https://www.codenameone.com/blog/mirah-for-codename-one.html#comment-24240))
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > awesome feature. Good work!!!!!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmirah-for-codename-one.html)
+
 
 ---
 

@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, would it be possible to create text input that allows for paragraph to be created and emojis to be inserted? Also allow to create a bubble to format text appropriately when needed like bullet points (if pasted from a document that does have them), telephone numbers (tapping on numbers to trigger events like calling or saving to address book) , URL links (underline them and when tapped to open web browser), i.a.w, pretty much like the way bubbles displays the text richly like existing IMs you get now?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdr-sbaitso-revisited.html)
+
 
 
 ### **Shai Almog** — June 17, 2016 at 3:44 am ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-22697))
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > However, what you are talking about is called a “rich edit component” we have a cn1lib that supports that somewhere (Steve did it) thru a web browser UI. The problem is that Android and iOS have rather bad support for that concept and it’s rather different between the OS’s.  
 > It’s something we wanted to integrate a while back but we didn’t have any actionable user demand which is really needed for such a problematic task.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdr-sbaitso-revisited.html)
+
 
 
 ### **ssybesma** — December 30, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-23137))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You have to be kidding…all it does is ask you questions about what you just said. Dr. Sbaitso actually is intelligent compared to this. He does more than just that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdr-sbaitso-revisited.html)
+
 
 
 ### **Shai Almog** — December 30, 2016 at 5:20 am ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-23256))
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Feel free to submit a pull request though, all the logic is in [AI.java](<http://AI.java>) so it should be pretty easy.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdr-sbaitso-revisited.html)
+
 
 
 ### **ssybesma** — December 30, 2016 at 6:03 am ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-23301))
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I appreciate that you were not offended and I apologize for being a bit harsh. I do look forward to the eventual release of an application that does Dr. Sbaitso one better. The voice has to be the same, though…sorry. I’m sentimental.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdr-sbaitso-revisited.html)
+
 
 
 ### **Shai Almog** — December 31, 2016 at 12:16 pm ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-23075))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If I’d spend time on this I’d work on the AI but I doubt I’ll get any time to work on that. When I initially presented the demo no one knew about the original so the points were a bit lost on them… Plus it made me feel old 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdr-sbaitso-revisited.html)
+
 
 ---
 

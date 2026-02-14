@@ -32,7 +32,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [http://wiki.ftp27host.ru/in…](<http://wiki.ftp27host.ru/index.php?title=Codename1:%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%86%D0%B8%D1%8F_%D1%80%D0%B0%D0%B7%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%87%D0%B8%D0%BA%D0%B0>)  
 > My partial translation old DevGuide into Russian 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-developer-guide.html)
+
 
 ---
 

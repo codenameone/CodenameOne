@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preferences-command-state-localization-locking.html)
+
 
 
 ### **Shai Almog** — June 1, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22739))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We also fixed the issue and added an additional version of the method that accepts font size. Should be in this Friday release.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preferences-command-state-localization-locking.html)
+
 
 
 ### **Chibuike Mba** — June 1, 2016 at 10:09 am ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22651))
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preferences-command-state-localization-locking.html)
+
 
 
 ### **Shai Almog** — June 2, 2016 at 3:35 am ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22543))
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I hope it does. If it doesn’t after this Friday release please file an issue.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preferences-command-state-localization-locking.html)
+
 
 
 ### **Chibuike Mba** — June 2, 2016 at 2:32 pm ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22738))
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > OK.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preferences-command-state-localization-locking.html)
+
 
 ---
 

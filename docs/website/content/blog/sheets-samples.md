@@ -49,14 +49,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > The “More -> Launch JS” option opens the url “http://localhost:40549/”. Do you have integrated a web server in this Codename One Samples? Just a curiosity, which server is it?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsheets-samples.html)
+
 
 
 ### **Shai Almog** — June 9, 2019 at 3:49 am ([permalink](https://www.codenameone.com/blog/sheets-samples.html#comment-21561))
 
 > It’s tomcat. The web target in the build XML file lets you do that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsheets-samples.html)
+
 
 ---
 

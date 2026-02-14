@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In the menu above just click the download link.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwith-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html)
+
 
 
 ### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-21611))
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It would be appreciable if you provide an official link to download it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwith-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html)
+
 
 
 ### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-21841))
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thumps up for the great ideas.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwith-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html)
+
 
 
 ### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-22328))
@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How will simulate Windows phone emulator in Netbeans Codename One?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwith-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html)
+
 
 
 ### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-22343))
@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There is a lumia skin with the Codename One distribution.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwith-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html)
+
 
 ---
 

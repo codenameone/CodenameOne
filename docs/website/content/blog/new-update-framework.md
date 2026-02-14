@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > published another: do I have to check manually the available updates every day or is there a  
 > way to automate this checking?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-update-framework.html)
+
 
 
 ### **Shai Almog** — February 19, 2018 at 5:57 am ([permalink](https://www.codenameone.com/blog/new-update-framework.html#comment-23788))
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > You don’t know an update is released.  
 > When a build is made in the IDE we run the update tool and it checks for you. It does this check once a day unless it’s running in “force” mode which happens when you do an update client libs. Normally, this should be seamless.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-update-framework.html)
+
 
 ---
 

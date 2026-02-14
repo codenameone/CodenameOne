@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > //Collect and store)  
 > }
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffingerprint-touchid-support.html)
+
 
 
 ### **Shai Almog** — May 5, 2017 at 4:46 am ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-23559))
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great. I don’t think that’s allowed on iOS but you can probably extend the Android code in the library to support some Android specific features and expose them in the API.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffingerprint-touchid-support.html)
+
 
 
 ### **Gareth Murfin** — July 6, 2017 at 11:36 pm ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-24135))
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Awesome, but how does it know your finger print already? from the OS?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffingerprint-touchid-support.html)
+
 
 
 ### **Shai Almog** — July 7, 2017 at 4:17 am ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-22614))
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The devices already have scanned fingerprints within. You use the OS interface to scan.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffingerprint-touchid-support.html)
+
 
 
 ### **Yishai Steinhart** — July 6, 2018 at 7:37 pm ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-23791))
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > NM
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffingerprint-touchid-support.html)
+
 
 
 ### **Shai Almog** — July 7, 2018 at 4:50 am ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-23961))
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FYI to your original question I suggest installing the cn1lib via the extension manager as you would get the latest version…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffingerprint-touchid-support.html)
+
 
 ---
 

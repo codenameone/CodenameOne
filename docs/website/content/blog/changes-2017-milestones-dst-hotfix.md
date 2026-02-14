@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > New Build still I do see there is a 1 hour delay for DST. On simulator, it was working properly but not on iOS.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fchanges-2017-milestones-dst-hotfix.html)
+
 
 
 ### **Shai Almog** — March 23, 2017 at 5:55 am ([permalink](https://www.codenameone.com/blog/changes-2017-milestones-dst-hotfix.html#comment-23221))
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We had a bug in the first fix (worked on the simulator but failed on devices) we’ve since patched it and got confirmation it works. Can you test again?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fchanges-2017-milestones-dst-hotfix.html)
+
 
 ---
 

@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, this looks really exciting! Is there also support for these plugins in the desktop Designer tool?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaker-on-device-drag-drop-gui-builder-external-3rd-party-plugins.html)
+
 
 
 ### **Anonymous** — June 3, 2013 at 1:26 pm ([permalink](https://www.codenameone.com/blog/maker-on-device-drag-drop-gui-builder-external-3rd-party-plugins.html#comment-21734))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The only issue is rewriting all the logic but that’s not too bad since the current UI is horrible.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaker-on-device-drag-drop-gui-builder-external-3rd-party-plugins.html)
+
 
 ---
 

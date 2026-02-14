@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Codename One deserves way more visibility than it has.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-you-can-help-spread-codenameone.html)
+
 
 
 ### **Jaco Dt** — February 2, 2017 at 6:07 am ([permalink](https://www.codenameone.com/blog/how-you-can-help-spread-codenameone.html#comment-23138))
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Agreed
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-you-can-help-spread-codenameone.html)
+
 
 
 ### **Francesco Galgani** — August 28, 2017 at 2:44 am ([permalink](https://www.codenameone.com/blog/how-you-can-help-spread-codenameone.html#comment-23471))
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > To spread Codename One, I’m trying to encourage the Engineering students of my university to try it. I’m also added Codename One to my curriculum. Maybe I’ll also write an article about Codename One in my blog. I think that you, Shai, are doing a very important and useful job replying to almost all help requests on Stack Overflow and in this blog: your help is encouraging me in specializing in Codename One. Of course I hope that more Codename One developers will share their knowledge on StackOverflow.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-you-can-help-spread-codenameone.html)
+
 
 ---
 

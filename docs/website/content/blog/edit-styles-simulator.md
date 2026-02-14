@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great enhancement ! 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fedit-styles-simulator.html)
+
 
 
 ### **Avelblood** — April 15, 2017 at 12:13 pm ([permalink](https://www.codenameone.com/blog/edit-styles-simulator.html#comment-21576))
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Awesome. The dream comes true =)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fedit-styles-simulator.html)
+
 
 ---
 

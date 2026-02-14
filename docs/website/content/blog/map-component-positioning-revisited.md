@@ -40,7 +40,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > However, in the past (in one of my StackOverflow questions) you suggested me to implement a new custom layout extending the abstract class Layout. I’ve done it and it solved my problem, I used your MapLayout as an example of custom external Layout. My suggestion is to add some documentation (in the developer guide and/or in a tutorial) on the basic steps to implement a simple custom layout, because your example of MapLayout is quite complex. Thank you 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmap-component-positioning-revisited.html)
+
 
 
 ### **Shai Almog** — April 11, 2018 at 7:16 am ([permalink](https://www.codenameone.com/blog/map-component-positioning-revisited.html#comment-23844))
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Unfortunately I can’t think of a layout manager that I would want to write that isn’t easier to implement with existing layout managers.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmap-component-positioning-revisited.html)
+
 
 ---
 

@@ -36,7 +36,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I didn’t find this answer by searching for my problem, but Lianna pointed it out on chat for me (Thank you!) suspecting it may be related. To make your helpful articles easier to find via Google, can you add more context to notes like this: for example, making a short list of the common problems users will experience due to this issue would have shortened my search by a day. I know you’re addressing a frustration point where users may think an app is running slow or seeing a warning, but in this case, I can’t install and test my app, and the apple error messages aren’t instructive to the cause. A google search of the error related to CodenameOne finds nothing but certificate issue posts, so in my opinion that will be more detrimental to users experience with CN1 than a warning about running slow which I think would be less intrusive. thanks for all that you do, and Hopefully this can make it easier to get CN1 devs going.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-64bit-by-default.html)
+
 
 
 ### **Shai Almog** — February 14, 2017 at 8:04 am ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23105))
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > thanks for the feedback. I wrote this post before we published the change and didn’t think about phrasing it like that but that is indeed a good point.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-64bit-by-default.html)
+
 
 
 ### **Keith Valdez Hasselstrom** — March 6, 2017 at 6:01 pm ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23419))
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I just got snagged by this. Trying to install on older IPad mini that previously worked. Maybe a little note on the dashboard would be useful. Thanks again for a great product.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-64bit-by-default.html)
+
 
 
 ### **Shai Almog** — March 7, 2017 at 6:33 am ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23343))
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There is a place to add that: the page with the green “Install” button we show on the iOS device. It’s not perfect but at least it will get noticed more.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-64bit-by-default.html)
+
 
 
 ### **Keith Valdez Hasselstrom** — March 7, 2017 at 2:20 pm ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23240))
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Perfect !! At a minimum it would be a quick reminder. Thanks again for the level of support you personally provide; for a project this size, it’s extremely impressive !!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-64bit-by-default.html)
+
 
 ---
 

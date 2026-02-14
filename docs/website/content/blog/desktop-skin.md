@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to programmatically set the size of the window at startup? That is something that I’m missing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdesktop-skin.html)
+
 
 
 ### **Shai Almog** — July 5, 2017 at 4:10 am ([permalink](https://www.codenameone.com/blog/desktop-skin.html#comment-23652))
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can use a native interface and just fine the JFrame then resize that using Swing code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdesktop-skin.html)
+
 
 
 ### **Gareth Murfin** — February 14, 2018 at 9:03 am ([permalink](https://www.codenameone.com/blog/desktop-skin.html#comment-23723))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I love the desktop skin, it would definitely be great if when you resized it then remembered the size for next time, this skin makes the emulator very usable I think, and would be far cooler if it would remember resize too.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdesktop-skin.html)
+
 
 ---
 

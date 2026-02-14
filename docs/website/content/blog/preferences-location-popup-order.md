@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Happy to read that we can now manage (without any implementation) multi account preference ! Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreferences-location-popup-order.html)
+
 
 
 ### **M Usman Nu** — February 1, 2017 at 7:27 pm ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-24121))
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If I close the application then preferences are cleared. Is there any way to make it permanent ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreferences-location-popup-order.html)
+
 
 
 ### **Shai Almog** — February 2, 2017 at 6:19 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23257))
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Use the store() method just like standard Java
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreferences-location-popup-order.html)
+
 
 
 ### **Peng** — April 13, 2017 at 9:46 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23300))
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The invocation of the Preferences.get() method during the first launch just returns NULL, during the second launch also an EOFException is logged to the console before the NULL value is returned.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreferences-location-popup-order.html)
+
 
 
 ### **Shai Almog** — April 14, 2017 at 4:36 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23154))
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You obviously can’t share a key between those two so if you need a key to exist in both you will need to transfer it thru a variable in memory as once encryption is on everything is “gone”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreferences-location-popup-order.html)
+
 
 
 ### **Peng** — April 19, 2017 at 8:11 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23474))
@@ -135,7 +135,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Based on your experience, what solution would you recommend, especially in terms of portability? Would using e.g. Properties and FileSystemStorage directly be a good idea or are there better alternatives?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreferences-location-popup-order.html)
+
 
 
 ### **Shai Almog** — April 20, 2017 at 4:45 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23512))
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Then encrypt the random key using your password and save that in FileSystemStorage. That way you just need to update one file with every change of the password…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreferences-location-popup-order.html)
+
 
 ---
 

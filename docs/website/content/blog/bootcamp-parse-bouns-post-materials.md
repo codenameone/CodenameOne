@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m definitely looking forward to the bootcamp and the extra Parse workshop! Feel free to let me know what aspects of Parse and parse4cn1 you’d like to see so that I can prepare accordingly. Just reply to this post with your ideas/questions.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbootcamp-parse-bouns-post-materials.html)
+
 
 
 ### **Andrew Nyago** — March 15, 2017 at 3:38 pm ([permalink](https://www.codenameone.com/blog/bootcamp-parse-bouns-post-materials.html#comment-23166))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > i don;t see any link to a registration page for the bootcamp.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbootcamp-parse-bouns-post-materials.html)
+
 
 
 ### **Jared Ruplinger** — March 15, 2017 at 4:15 pm ([permalink](https://www.codenameone.com/blog/bootcamp-parse-bouns-post-materials.html#comment-23280))
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [http://codenameone.teachabl…](<http://codenameone.teachable.com/p/full-stack-java-mobile-app-bootcamp>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbootcamp-parse-bouns-post-materials.html)
+
 
 
 ### **Chidiebere Okwudire** — March 15, 2017 at 5:35 pm ([permalink](https://www.codenameone.com/blog/bootcamp-parse-bouns-post-materials.html#comment-23314))
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [http://codenameone.teachabl…](<http://codenameone.teachable.com/p/full-stack-java-mobile-app-bootcamp/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbootcamp-parse-bouns-post-materials.html)
+
 
 ---
 

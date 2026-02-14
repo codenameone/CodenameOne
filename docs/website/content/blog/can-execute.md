@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wim
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcan-execute.html)
+
 
 
 ### **Anonymous** — September 18, 2014 at 3:27 pm ([permalink](https://www.codenameone.com/blog/can-execute.html#comment-22030))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Since everything in Android is an Intent there isn’t so much a list of them as much as just googling the intent for whatever you want.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcan-execute.html)
+
 
 ---
 

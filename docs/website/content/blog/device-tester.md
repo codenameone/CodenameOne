@@ -254,7 +254,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Very useful – thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdevice-tester.html)
+
 
 
 ### **bryan** — July 5, 2016 at 11:54 pm ([permalink](https://www.codenameone.com/blog/device-tester.html#comment-21515))
@@ -263,7 +263,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > as per issue 1808, Display.getInstance().sendMessage() doesn’t work on WP10.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdevice-tester.html)
+
 
 
 ### **Imriel** — July 12, 2016 at 5:59 am ([permalink](https://www.codenameone.com/blog/device-tester.html#comment-22625))
@@ -272,7 +272,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How to check with device memory?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdevice-tester.html)
+
 
 
 ### **Shai Almog** — July 13, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/device-tester.html#comment-22634))
@@ -281,7 +281,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can’t do that reliably. Devices have a mixed notion of memory segmentation and we don’t really know the available memory in some cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdevice-tester.html)
+
 
 ---
 

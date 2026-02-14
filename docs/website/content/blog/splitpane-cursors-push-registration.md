@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I like the simplified push registration with a build hint as the old way wasn’t intuitive enough for me to implement without looking it up every time. Is there a way to set then sender id programatically? One of my projects uses the process described here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/deploy-same-mobile-app-template-multiple-times.html>) and currently the gcm sender id is also set in the overridden code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsplitpane-cursors-push-registration.html)
+
 
 
 ### **Shai Almog** — May 25, 2017 at 4:28 am ([permalink](https://www.codenameone.com/blog/splitpane-cursors-push-registration.html#comment-23384))
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you do that then having the gcm value within the properties will easily allow you to adapt everywhere. The main motivation for using the build hint is chrome where is needed in a separate file whose loading we can’t control.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsplitpane-cursors-push-registration.html)
+
 
 
 ### **Raffic** — July 26, 2017 at 1:38 pm ([permalink](https://www.codenameone.com/blog/splitpane-cursors-push-registration.html#comment-23527))
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It seems the Android SDK does not support firebase Analytics. i am building an android application that uses the firebase analytics.When will the SDK be upgraded to support firebase.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsplitpane-cursors-push-registration.html)
+
 
 
 ### **Shai Almog** — July 28, 2017 at 4:28 am ([permalink](https://www.codenameone.com/blog/splitpane-cursors-push-registration.html#comment-23744))
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Articles like this don’t exactly raise the confidence level [https://medium.com/@contact…](<https://medium.com/@contact_16315/firebase-costs-increased-by-7-000-81dc0a27271d?r=r>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsplitpane-cursors-push-registration.html)
+
 
 ---
 

@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Dear Shai,  
 > I understand the problem: I have an app with high votes on Android (4.8/5) and +1000 installations, but Apple rejected the same identical app multiple times because the reviewers consider it “useless”…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-app-not-coming-ios.html)
+
 
 ---
 

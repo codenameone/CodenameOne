@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I wish I could move from one text field to another with Tab
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fscrollbars-tooltips.html)
+
 
 
 ### **Shai Almog** — July 20, 2016 at 4:27 am ([permalink](https://www.codenameone.com/blog/scrollbars-tooltips.html#comment-22741))
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This should already work in the current versions and even in the simulator.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fscrollbars-tooltips.html)
+
 
 
 ### **beck** — July 20, 2016 at 6:47 am ([permalink](https://www.codenameone.com/blog/scrollbars-tooltips.html#comment-22653))
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I dont know it is related or not but It’d be really really cool if we can see the component highlighted by border or smth when it is selected in component inspector. Sometime it takes much time to search the component in component inspector
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fscrollbars-tooltips.html)
+
 
 
 ### **Shai Almog** — July 21, 2016 at 3:49 am ([permalink](https://www.codenameone.com/blog/scrollbars-tooltips.html#comment-21516))
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We have some very interesting ideas moving forward with the simulator and the component inspector.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fscrollbars-tooltips.html)
+
 
 ---
 

@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Shai, you dont sleep??? 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-parse-back4app.html)
+
 
 
 ### **Ricardo Vicari** — March 11, 2017 at 12:53 am ([permalink](https://www.codenameone.com/blog/migrating-from-parse-back4app.html#comment-23462))
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Shai, I currently have a company that develops solutions with totalcross ([www.totalcross.com](<http://www.totalcross.com>)) but I’m thinking of migrating to codenameone, but I’m worried about performance, we have running applications that have 100, 200 thousand records with SQLite and SQLite native wheel Inside Totalcross, how does it work in cn1?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-parse-back4app.html)
+
 
 
 ### **Shai Almog** — March 11, 2017 at 6:19 am ([permalink](https://www.codenameone.com/blog/migrating-from-parse-back4app.html#comment-23329))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can also write native code to optimize cases that we might not handle efficiently enough.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-parse-back4app.html)
+
 
 ---
 

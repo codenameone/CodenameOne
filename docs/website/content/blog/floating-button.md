@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Another nice one! Does the “+” also animate to an “x” when opening the sub-menu? 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — September 14, 2016 at 3:15 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22986))
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So many good things coming out this week…i m happy… Am I the only developer who refreshes the homepage daily to check new blog posts? I find these articles and tutorials more useful.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Bayu Sanjaya** — September 14, 2016 at 7:32 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22922))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi I got this error when trying to add fab into my container (not by form.getcontentPane()).  
 > java.lang.IllegalArgumentException: Component is already contained in Container: Container[x=0 y=0 width=0 height=0, layout = LayeredLayout, scrollableX = false, scrollableY = false, components = [Container, Container]]
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — September 15, 2016 at 3:58 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22788))
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s one of the nuances I was referring to. I have some thoughts on how to do these subtle animations but I don’t think they will work nicely with the FontImage class. I want to do it in a way that is elegant.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — September 15, 2016 at 4:00 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22908))
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think I changed the sample code before posting and broke it, I’ll update the article later today. Notice that this will be available only on the Friday update. What you have right now is experimental.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — September 15, 2016 at 4:01 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22708))
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > FYI we have an RSS feed so you can just subscribe to that or use RSS to email services such as ifttt  
 > [https://www.codenameone.com…](<https://www.codenameone.com/feed.xml>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Bayu Sanjaya** — September 15, 2016 at 4:04 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22979))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi, I use a workaround for this one, I use a container for fab.bindFabToContainer(myContainer) and add it into main form. I think it’s stable enough to implement even it is still experimental. But I’m not really sure.  
 > Btw, how to change the color, i tried with UIID but the button changed into square.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — September 15, 2016 at 4:59 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22685))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve given this some thought and decided to just change the implementation so the code above “just works”. Set the background color of the UIID: FloatingActionButton
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Jérémy MARQUER** — September 15, 2016 at 7:17 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22743))
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You’re not the only one 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Andreas Grätz** — September 17, 2016 at 3:47 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23102))
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FABs are great! But what if we have more FABs as space on the screen? The list of FABs and sub-FABs isn’t scrollable. We are working on an app, which loads the business logic from an application server. We don’t now the final count of commands.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — September 18, 2016 at 4:05 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23113))
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > They consider these to be “speed dial” which means you pick the top 4 entries and anything beyond that should reside in a “…” more action. This is indeed more intuitive for such cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **disqus** — September 30, 2016 at 9:42 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23041))
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How do I add a floating button to a Gui Builder generated form? How do I add any initialization code on Gui Builder generated forms since init method is generated code and is not supposed to be edited?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — October 1, 2016 at 1:30 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22834))
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can edit the constructors just fine so code that runs before the init can go before it and code that runs after can go after the init method.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **ShmuDesign** — March 1, 2017 at 8:11 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23177))
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, this is good, but is it possible to remove the shadow or change the thickness ? Because I have a strange square ! ([http://shmu.fr/wooz/square-…](<http://shmu.fr/wooz/square-shadow.jpg>) I change the color to show what append) that problem appear only on IOS !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — March 2, 2017 at 8:35 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23224))
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > you can customize every aspect in the style including the shadow. I think the padding for the component might be too small causing the shadow to crop but if I’m wrong then it might be a clipping bug we need to fix in which case we’ll need to file an issue
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Mo** — June 24, 2017 at 10:40 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23479))
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > fab.bindFabToContainer(root, Component.RIGHT, Component.CENTER);  
 > `
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — June 25, 2017 at 4:45 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23483))
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > By convention in Codename One right becomes left in RTL mode unless you explicitly disable RTL behavior for that component. I don’t think we tested RTL on the FAB so it might be broken there. I’d expect that code to place the FAB on the left side in Codename One. I’m guessing it doesn’t? How does it look?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Mo** — June 25, 2017 at 1:28 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23508))
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, thank you for getting back to me, when changing to Arabic locale (RTL) it’s not showing at all and unlike when it’s LTR direction, keeping in mind that, the root container is correctly changing direction!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Mo** — June 25, 2017 at 11:08 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23593))
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, any thoughts as to when this will be looked at or fixed, since I am planning to utilise this component on most of my Containers ??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — June 26, 2017 at 4:37 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23562))
@@ -238,7 +238,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FYI You can also try to fix this issue yourself and submit a pull request which is excellent practice. I have a tutorial about that here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Mo** — July 2, 2017 at 10:53 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23460))
@@ -248,7 +248,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Apologies for the late reply!!,  
 > Issue filed for this at ([https://github.com/codename…](<https://github.com/codenameone/CodenameOne/issues/2148>)), and have been trying to implement the workaround suggested, sadly this caused my other component layout to miss-behave, thus, I would rather wait for the fix and hopefully not too long!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — July 3, 2017 at 3:13 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23537))
@@ -257,7 +257,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you only apply the LTR mode to the button and the layered layout (not the other components) it shouldn’t impact anything else.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Tommy Mogaka** — July 12, 2018 at 10:51 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23927))
@@ -287,7 +287,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — July 13, 2018 at 4:51 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23847))
@@ -296,7 +296,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > createSubFab returns its own FAB instance. You need to bind your listener to that instance.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Tommy Mogaka** — February 3, 2019 at 1:34 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-24015))
@@ -325,7 +325,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > }  
 > });
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — February 4, 2019 at 3:31 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-24021))
@@ -334,7 +334,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Instead of adding the action listener save the returned instance of the subfab and then add the action listener. Then customize the color on that returned instance.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Tommy Mogaka** — February 4, 2019 at 7:31 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-24027))
@@ -345,7 +345,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Could you please share some code snippet on how I can return an instance of a Subfab and how to save and style it? Many thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 
 ### **Shai Almog** — February 5, 2019 at 3:10 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-24053))
@@ -359,7 +359,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Or similar.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffloating-button.html)
+
 
 ---
 

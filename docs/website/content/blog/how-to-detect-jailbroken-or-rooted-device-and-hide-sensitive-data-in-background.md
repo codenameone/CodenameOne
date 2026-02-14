@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Very useful. There are lots of rooted users that hack in-app purchases and get things for free. I wonder how effective RootBeer is, I know there are tools available to hide the root at the moment
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html)
+
 
 
 ### **Javier Anton** — May 24, 2021 at 12:30 pm ([permalink](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html#comment-24455))
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just looked at the RootBeer code and it looks great. It even checks natively in cpp, which I read was the safest way to bypass root masks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html)
+
 
 
 ### **Javier Anton** — May 24, 2021 at 12:45 pm ([permalink](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html#comment-24456))
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there any reason RootBeer version 0.0.8 is used and not 0.0.9?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html)
+
 
 
 ### **Javier Anton** — May 24, 2021 at 2:49 pm ([permalink](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html#comment-24457))
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nevermind, I just added the native bits myself. Wish I could delete/edit my posts on here, maybe that could be enabled at some point
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html)
+
 
 ---
 

@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai Almog, you have mentioned important tips about image masking. Great job.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-understand-image-masking-performance.html)
+
 
 
 ### **AR Khan** — February 9, 2018 at 8:12 am ([permalink](https://www.codenameone.com/blog/tip-understand-image-masking-performance.html#comment-23541))
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is a very good and more necessary idea that you have explained here. thank you for this best resources
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-understand-image-masking-performance.html)
+
 
 ---
 

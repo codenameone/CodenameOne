@@ -31,7 +31,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Nice. There is some kind of dropShadow effect on the logo on the Uber icon which is not in the clone. Nice one though
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Shai Almog** — November 21, 2017 at 1:07 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23895))
@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > On iOS the background rotates in a pretty cool way (looks almost identical otherwise). I thought about doing that effect as well but if I do it I must have a drop shadow as it becomes more apparent with the rotation.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **maxii123** — November 21, 2017 at 1:15 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23540))
@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is a joke right? You’re really crowing about copying a static page?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Shai Almog** — November 21, 2017 at 1:22 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23877))
@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No. The full app with the full functionality will be out within a month. Including the map, animations etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Ross Taylor** — November 21, 2017 at 3:28 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23749))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Very nice. I like the CN1 clone better tbh. The inclusion of a drop shadow effect on logo would make it even better. Just a question, are you able to make the font size the same as the original or is this deliberately done to make it a bit bigger? I like the slightly bigger font here though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Simphiwe Twala** — November 21, 2017 at 4:05 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23629))
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wow this will help me complete my uber clone. This is really cool stuff
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Manuel Tijerino** — November 22, 2017 at 12:09 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23656))
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice Job Shai !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **3lix** — April 8, 2018 at 2:00 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23641))
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, where can I get the apk from ? Would like to load it on my phone. Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Shai Almog** — April 8, 2018 at 5:55 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23924))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The source of both server & client is available in the course [https://codenameone.teachab…](<https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Philip Welch** — June 13, 2018 at 12:01 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23992))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In the example clone app and the course, do you do any offline syncing? i.e. user changes data locally, if there’s no mobile phone data connection you save to a local database first and then sync when you get a connection again? Similarly how do you sync with data on the server – do you refresh all data or do you support some kind of incremental syncing?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Shai Almog** — June 13, 2018 at 6:23 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23846))
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Maps are literally native Google Maps. They cache and handle their own data so there is not much to do there. Once the ride was agreed upon the network is only used to send location updates so the server can track the ride for its records. This could be enhanced so if there is a disconnect the data is sent later but I didn’t address that. I don’t think it would be hard to implement.  
 > Uber is technically a pretty simple app in terms of data since most of the data is just webservices e.g. places searches, reverse geocode etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Francisco Claudio Araujo Palme** — August 5, 2018 at 6:00 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23814))
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In the course, is there a class about building a dashboard/admin like website or server?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Shai Almog** — August 6, 2018 at 4:18 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23782))
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > no. It wouldn’t teach anything of interest here. The goal of this tool is to teach how to build a full app. Not a production ready app. There is a server and building an admin console or app on top of it should be pretty easy. The course does cover building separate apps for driver/passenger so there is discussion of authority isolation and different apps/features on one server.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Gareth Murfin** — August 4, 2020 at 5:07 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-24308))
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looks awesome! Can you tell me if payment is already coded? And what does it use? Braintree again?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 
 ### **Shai Almog** — August 5, 2020 at 2:35 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-24306))
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It uses braintree
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber.html)
+
 
 ---
 

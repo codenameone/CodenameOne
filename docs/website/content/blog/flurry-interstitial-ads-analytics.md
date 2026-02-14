@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Cheers
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflurry-interstitial-ads-analytics.html)
+
 
 
 ### **Anonymous** — March 3, 2015 at 2:04 am ([permalink](https://www.codenameone.com/blog/flurry-interstitial-ads-analytics.html#comment-22295))
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With the new VM we would like to upgrade the crash reporting capability to a level that would provide you with Java thread states which is far more useful than anything Flurry has for a Java developer. But that is still a way off.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflurry-interstitial-ads-analytics.html)
+
 
 ---
 

@@ -28,7 +28,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you for the two new lessons about security. Is it possible to receive an e-mail every time that you add a new lesson in the Codename One Academy?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-crash-protection.html)
+
 
 
 ### **Francesco Galgani** — October 18, 2017 at 10:21 am ([permalink](https://www.codenameone.com/blog/tutorial-crash-protection.html#comment-23810))
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you for any clarification.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-crash-protection.html)
+
 
 
 ### **Shai Almog** — October 19, 2017 at 5:50 am ([permalink](https://www.codenameone.com/blog/tutorial-crash-protection.html#comment-23826))
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sorry I missed that. No there is no standard way to do that without bothering everyone unfortunately. I will however post with updates to the blog occasionally.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-crash-protection.html)
+
 
 
 ### **Shai Almog** — October 19, 2017 at 5:54 am ([permalink](https://www.codenameone.com/blog/tutorial-crash-protection.html#comment-23833))
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 2\. The crash reporter sends an email every couple of minutes with the content of the log. It’s an approach we have phased out as we catch errors more effectively now thanks to the new changes in the iOS VM.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-crash-protection.html)
+
 
 ---
 

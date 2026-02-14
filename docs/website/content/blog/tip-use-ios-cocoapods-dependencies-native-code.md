@@ -32,7 +32,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 1) When adding a a cocoapod library would it work on all three platforms (iOS , Android and Windows? )  
 > 2) In your previous post you had mentioned that there are over 18000 libraries. [https://www.codenameone.com…](<https://www.codenameone.com/blog/cocoapods.html>) Do they need to be converted to CN1LIBS before use (some sort of a JAVA api) ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-use-ios-cocoapods-dependencies-native-code.html)
+
 
 
 ### **Shai Almog** — February 14, 2017 at 8:02 am ([permalink](https://www.codenameone.com/blog/tip-use-ios-cocoapods-dependencies-native-code.html#comment-23351))
@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to build a cn1lib to wrap every library that’s required, e.g. Native Google Maps support transitioned to using CocoaPods instead of just bundling the maps. This was a HUGE benefit as it allowed us to keep up with the latest version from Google with no effort. But it also made the build MUCH faster as the original build size approached 50mb and would take forever to upload each time, not it can even be used by free accounts as it clocks under the free quota size.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-use-ios-cocoapods-dependencies-native-code.html)
+
 
 
 ### **3lix** — February 14, 2017 at 4:13 pm ([permalink](https://www.codenameone.com/blog/tip-use-ios-cocoapods-dependencies-native-code.html#comment-22856))
@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you for the explanation. This makes sense now
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-use-ios-cocoapods-dependencies-native-code.html)
+
 
 ---
 

@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Agree with all this. I originally used Lists with custom cell renderers, and with the deprecation of the old GUI builder, I took the opportunity to refactor my code and change all Lists to Containers. Initially my thoughts were “it can’t work as well”, but in fact there appears to be zero performance penalty, and as Shai says, you can create a much better UI experience. Don’t use Lists !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Sadart** — August 23, 2016 at 4:31 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-22749))
@@ -194,7 +194,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > True. Lists are horrible to deal with. I am still trying to recall when I used them. Stayed away from them years ago because stacking up containers made sense to me.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Jérémy MARQUER** — August 23, 2016 at 7:35 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-22712))
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Totally agree and happy to read this post !! I initially work with complex List but I have refactored it recently. For example, I InfiniteProgress doesn’t animate correctly in items of my List -> I have changed it to InfiniteContainer and it works better !!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Shai Almog** — August 24, 2016 at 3:58 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-23011))
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Which also shows off animation within the search and quite a few other nice things. Notice that this isn’t demonstrated with an infinite container because searching thru that would require fetching all the data which might not be what you want to do so you will need to adapt the code to work with fetch logic (e.g. special webservice call for search like we do in property cross).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Carlos** — August 24, 2016 at 8:09 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-22937))
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > }
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Shai Almog** — August 25, 2016 at 5:21 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-21457))
@@ -293,7 +293,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Odd. I’ve seen messages disappear before but I always assumed they were deleted by the asker…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Jeff Crump** — September 1, 2016 at 5:44 pm ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-22795))
@@ -302,7 +302,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I would prefer to continue to use the existing List class. When I first started to use Codename One I created an extend List class that utilizes a separate listmodel class, a multi-threaded downloader class, and a renderer class (which generates a prototype). I am able to place buttons, text and other components in the renderer class and have it manage states, mutable backgrounds and pass events to handle unique responses. The downloader class initially pulls two pages of images, then as the list scrolls it downloads additional pages, four at a time, then pauses until the next scroll. The list model class only fires an update when the image is still visible. My ListModel class also implements static filters on the data as the model is instantiated. All of my lists reside on tabs and work/scroll very well. The downloader class uses a two tier thread safe CacheMap. It easily handles 5,000 cells as the cell cache scrolls both directions. It is very fast and doesn’t suffer from pauses or jerky responses.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Shai Almog** — September 2, 2016 at 5:16 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-22880))
@@ -313,7 +313,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think it’s pretty rare because navigating 5000 entries on mobile devices is probably too much for users and obviously the effort you had to put to get it going was pretty big… That’s the gist of this post. Yes there are edge cases that list can handle well but they are edge cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Jeff Crump** — September 2, 2016 at 12:52 pm ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-23039))
@@ -322,7 +322,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I know, I just didn’t want to lose the existing List component. I wrote most of my code during the first few months after I started using Codename One. It was still very new and I had decided to go with it as is. So I added in what I wanted and worked around the rest. There have been many new components and upgrades since then and it has become a very capable platform. While we have tested very large lists, our target is actually about 500, and with the internal filters the length is between 65 and 85.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **khmaies hassen** — April 20, 2017 at 10:32 pm ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-23227))
@@ -331,7 +331,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > when i reach the end of the list where there are no new pages to show and then i go up and pull the list to refresh, it gives me an empty page. how to reset “pageNumber” to 1 when i use pull to refresh?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Shai Almog** — April 21, 2017 at 4:44 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-23455))
@@ -342,7 +342,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Place a breakpoint in your callback code and make sure you return the right value on every call
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **khmaies hassen** — April 21, 2017 at 8:58 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-21466))
@@ -351,7 +351,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Even in your example the same thing happenes when you reach the end
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Shai Almog** — April 22, 2017 at 8:24 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-23422))
@@ -360,7 +360,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Which example
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **khmaies hassen** — April 22, 2017 at 12:22 pm ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-23428))
@@ -369,7 +369,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://www.codenameone.com…](<https://www.codenameone.com/javadoc/com/codename1/ui/InfiniteContainer.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 
 ### **Shai Almog** — April 23, 2017 at 5:33 am ([permalink](https://www.codenameone.com/blog/avoiding-lists.html#comment-23521))
@@ -378,7 +378,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think that’s code that originally relied on InfiniteScrollAdapter which has no pull to refresh or index… You need to use the index value to determine the page you are on with InfiniteContainer
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Favoiding-lists.html)
+
 
 ---
 

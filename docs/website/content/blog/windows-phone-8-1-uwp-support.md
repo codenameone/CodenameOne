@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is good progress! Hopefully things will work according to schedule (read: pleasant bits and anesthesia for the rest of the ‘surgery’, haha) and we’ll finally be able to confidently make decent WP apps.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-8-1-uwp-support.html)
+
 
 
 ### **Gareth Murfin** — May 3, 2016 at 11:27 am ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-22756))
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This sounds promising, although I have not targeted win phone because I assumed their market share was almost 0 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-8-1-uwp-support.html)
+
 
 
 ### **Shai Almog** — May 4, 2016 at 5:04 am ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-22729))
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think Windows Phone is dead but some companies need to support “everything”. The value isn’t Windows on phones as much as on tablets/PC’s which the UWP already supports. Windows 10 store was already available on 250M devices quite a while back so it’s one of the bigger target markets out there and has a strong enterprise presence.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-8-1-uwp-support.html)
+
 
 
 ### **Lana** — March 27, 2017 at 1:48 am ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-23170))
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I looked it up but couldn’t keep track, are windows phone builds supported or not? It seems that our builds fail but I can’t tell if that’s a bug or if you aren’t supporting windows phone builds for lack of corporate clients.  
 > It’d be very cool if you could write a one-line summary about whether it’s currently supported or not on the main page.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-8-1-uwp-support.html)
+
 
 
 ### **shannah78** — March 27, 2017 at 5:28 pm ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-21574))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > WP 8.1 is not supported. WP 10 (UWP) is supported.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-8-1-uwp-support.html)
+
 
 ---
 

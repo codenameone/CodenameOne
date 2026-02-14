@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for including this feature. Tested on Android and iOS and it worked perfectly. I will like to know if this functionality will work on windows phone by opening Here Drive or similar navigator?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnavigate-faster-builds.html)
+
 
 
 ### **Anonymous** — June 20, 2014 at 1:31 pm ([permalink](https://www.codenameone.com/blog/navigate-faster-builds.html#comment-22004))
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > At the moment this isn’t supported on Windows Phone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnavigate-faster-builds.html)
+
 
 
 ### **Anonymous** — June 21, 2014 at 8:58 am ([permalink](https://www.codenameone.com/blog/navigate-faster-builds.html#comment-21821))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Tried it on Nokia X device running Android OS, it works perfectly by opening Nokia Here Drive. Hopefully it will work on Windows Phone. Thanks once again for this feature…I have been waiting for it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnavigate-faster-builds.html)
+
 
 ---
 

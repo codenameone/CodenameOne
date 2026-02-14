@@ -202,7 +202,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Fantastic news. Well done to the CN1 team!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-0-now-live.html)
+
 
 ---
 

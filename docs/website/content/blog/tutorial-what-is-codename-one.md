@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > -Mark
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-what-is-codename-one.html)
+
 
 
 ### **Shai Almog** — January 2, 2021 at 5:54 am ([permalink](https://www.codenameone.com/blog/tutorial-what-is-codename-one.html#comment-24371))
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can generate a JAR file relatively easily which will work for “other” desktop platforms. Packaging for Linux is a bit more challenging since there are so many potential targets, dependencies etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-what-is-codename-one.html)
+
 
 ---
 

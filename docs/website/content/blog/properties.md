@@ -276,7 +276,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I like it a lot – and the fluent inferace via method chaining.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fproperties.html)
+
 
 
 ### **Shai Almog** — November 24, 2016 at 6:05 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-22999))
@@ -285,7 +285,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, that’s helpful!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fproperties.html)
+
 
 
 ### **Orlando D'Free** — December 6, 2016 at 12:01 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-23136))
@@ -300,7 +300,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This would work if the PropertyIndex class had a method that added the listener to the appropriate Property object, and if the Property class would fire changes when the setter was called.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fproperties.html)
+
 
 
 ### **Shai Almog** — December 6, 2016 at 6:11 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-22746))
@@ -311,7 +311,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > meet.subject.addChangeListener((p) -> Log.p(“New property value is: ” + p.get()));
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fproperties.html)
+
 
 
 ### **Mark Daniel Henning** — July 20, 2017 at 5:50 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-23726))
@@ -328,7 +328,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If not, how would one add methods to the class that would provide a consistent calling pattern?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fproperties.html)
+
 
 
 ### **Shai Almog** — July 21, 2017 at 1:32 pm ([permalink](https://www.codenameone.com/blog/properties.html#comment-23377))
@@ -339,7 +339,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice I used DoubleProperty instead of Property which has some advantages with things like ORM due to erasures.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fproperties.html)
+
 
 ---
 

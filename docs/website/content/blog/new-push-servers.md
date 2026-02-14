@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > A stupid question – why we just can’t use Apple’s and Google’s push services? Why is it better to have one more constant connection up to use push services from CN1?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Shai Almog** — September 3, 2015 at 3:39 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22420))
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Its only 1 instead of 3 (RIM too) and potentially more as we move forward (e.g. Amazon etc.).  
 > APNS sucks, its really hard to work with and isn’t just a simple webservice.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Carlos** — September 10, 2015 at 5:56 pm ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22162))
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Can I pass the argument just like this?  
 > “&device=” + deviceId1 + “&device=” + deviceId2 + “&device=” + deviceId3
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Shai Almog** — September 11, 2015 at 3:58 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22357))
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes. Notice that in the JavaSE code listed above I did just that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Wim Bervoets** — September 15, 2015 at 7:51 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-21546))
@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wim
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Shai Almog** — September 15, 2015 at 1:38 pm ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22316))
@@ -201,7 +201,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So you have plenty of time right now and I doubt we’ll shut them down in the next 6 months. I’ll consider it a success if we can make the entire migration in one year.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Gerben Kegel** — February 16, 2016 at 11:51 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22582))
@@ -210,7 +210,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there a reason why the response is not (always) valid JSON?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Shai Almog** — February 17, 2016 at 3:33 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22349))
@@ -219,7 +219,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Bug. Can you give a specific example? We’ll fix those cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Gerben Kegel** — February 17, 2016 at 9:17 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22334))
@@ -236,7 +236,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You use = instead of : and not always doublequote the key (newId and message)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 
 ### **Shai Almog** — February 18, 2016 at 3:27 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22245))
@@ -245,7 +245,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, this should be fixed now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-push-servers.html)
+
 
 ---
 

@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So if the user erase to empty the textfield, the combo with the completions disappears.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **Shai Almog** — July 15, 2016 at 4:01 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22878))
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Makes sense, thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **Diamond** — July 15, 2016 at 9:03 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22852))
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How do I style the AutoCompleteTextField List selected item? The default color is orange on my theme and I will like to change it to blue. I’ve tried styling “AutoCompleteList”, but it doesn’t help… the whole list got changed to blue and I want only one item to change. I also tried AutoCompleteListRenderer and AutoCompleteListRendererFocus, not helping either.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **Shai Almog** — July 16, 2016 at 4:30 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22725))
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi Diamond,  
 > you can use setCompletionRenderer() to set a custom renderer. It uses the standard list renderer with ListRendererFocus and ListRenderer UIID’s.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **Diamond** — July 19, 2016 at 8:07 pm ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22942))
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **Shai Almog** — July 20, 2016 at 4:26 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22935))
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’d love to have a way to use components in box Y instead of list+renderer for this component and the original issue actually suggested going in that direction.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **Diamond** — July 22, 2016 at 10:57 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22785))
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > ac.getHintLabel().setUIID(“CustomHintUIID”); is throwing a nullPointer exception, is there a way to fix this?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **Shai Almog** — July 23, 2016 at 4:44 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22779))
@@ -189,7 +189,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s standard behavior in a text area/field as well… If you didn’t call setHint(…) first the label wasn’t created so it will be null.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **emaalam** — April 27, 2017 at 12:56 pm ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-23346))
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi Shai  
 > i have two problems first i want to add a map in AutoCompleteTextField exactlly in DefaultListModel and after i want to add the the listmodel in my autocompletetextField second : how can i get the text when i select an element in the AutoCompleteTextField
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 
 ### **emaalam** — April 27, 2017 at 3:33 pm ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-23250))
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > hi Shai  
 > please answer me here [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/43658477/codename-one-autocompletetextfield-getitem-selected>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdynamic-autocomplete.html)
+
 
 ---
 

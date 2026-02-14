@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is a really helpful tool.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Diamond Obama** — April 14, 2021 at 4:58 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24448))
@@ -240,7 +240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > com.codename1.maven.migrationtool.MigrationToolStub.  
 > Program will exit.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Steve Hannah** — April 14, 2021 at 5:01 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24449))
@@ -250,7 +250,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Are you building from source? (you shouldn’t build from source).  
 > Use the zip distribution. <https://github.com/shannah/maven-migration-tool/releases/download/v1.0.3/migrationtool-javase-1.0.3.zip>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Diamond Obama** — April 14, 2021 at 5:41 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24450))
@@ -259,7 +259,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Both building from Source and the zipped app produced the same error.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Steve Hannah** — April 14, 2021 at 5:51 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24451))
@@ -277,7 +277,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If that fails, perhaps try running it from the command-line: java -jar migration-tool-javase-1.0.3.jar
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Diamond Mubaarak** — April 15, 2021 at 8:22 am ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24452))
@@ -310,7 +310,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > However, afterwards I tried with the command line ike Diamond and that works, but still it might indicate an issue you’d want to fix.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **ThomasH99** — September 19, 2021 at 7:06 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24485))
@@ -319,7 +319,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The source code of my app is not in the new source directory. Is that supposed to be copied over as well or does the script only create the project and you then bring in the source yourself? Maybe a stupid question (I’m not familiar with Maven at all), but I got the impression the migration tool handled everything 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **ThomasH99** — September 19, 2021 at 7:43 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24486))
@@ -328,7 +328,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Small usability suggestion: if you indicate a Destination Directory that doesn’t exist you get an error message in red saying “Specified directory could not be found”. However, if you then enter a correct directory, the error message doesn’t go away, making you think the new value is also wrong.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **ThomasH99** — September 19, 2021 at 8:43 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24487))
@@ -337,7 +337,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sorry, last comment today: I successfully generate a project, but when I open it in IntelliJ I don’t see any Configurations. If I click on e.g. Run/Run, I get a popup saying Run – Edit Configurations, but no scripts in the list. Maybe the migrationtool assumes a recent CN1 project (those I’ve tried with date back at least a few years)? Or do I need to do something specific in IntelliJ (I’m a newbie)?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Steve Hannah** — September 21, 2021 at 11:54 am ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24489))
@@ -349,7 +349,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I suspect that it may be using the wrong JDK. You should be using JDK 11 or JDK 8 for now. For the migration tool, you can try running it in terminal using `java -jar migration-tool.jar`, and that way have more control over which JDK it uses for the migration. If you find you need to copy source files to different places after the migration is complete, then there’s a problem.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **ThomasH99** — September 22, 2021 at 7:04 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24491))
@@ -358,7 +358,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks Steve, after forcing java to use 1.8 and having the same issue, it turned out the problem was opening the wrong root directory, I opened the one I created for the migrated project and as you clarified, I needed to open the one inside that. I can also open the ones migrated the other day, so using jdk 15 seems to work fine. Thanks for your help!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **ThomasH99** — September 22, 2021 at 8:16 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24492))
@@ -367,7 +367,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > One thing that would really help me with the migration from Netbeans to IntelliJ: when my project in Netbeans is in Git, how do I connect the migrated copies in IntelliJ to the same Git repos? Should I delete the source in the new migrated project and then connect and download from Git or may that disrupt something in the migrated project?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Adrian Ionescu** — September 23, 2021 at 4:17 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24495))
@@ -376,7 +376,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have been using the cn1-mirah-json macros for json/pojo mapping. After converting the project to maven format, Netbeans (8.2) is complaingint that it can’t find the Mapper classes. Any help with this? Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Steve Hannah** — September 23, 2021 at 4:50 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24497))
@@ -385,7 +385,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Unfortunately the Mirah support depended on a few ant-specific things. I’ll need to look into porting it to Maven, but I don’t have an ETA.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 
 ### **Adrian Ionescu** — September 23, 2021 at 6:54 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24498))
@@ -394,7 +394,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you. Then I’ll postpone porting to maven for a while.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-your-project-to-maven.html)
+
 
 ---
 

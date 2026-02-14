@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I hear Windows Port in general is still flimsy, not sure what that status is on that but I do notice more Windows Phone support in my country.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
+
 
 
 ### **Anonymous** — January 19, 2015 at 11:44 pm ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-24186))
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This toolbar is available now ?, I’m downloaded the netbeans plugin updated in 13-01-2015 and Toolbar class and form.setToolbar not exists… Why ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
+
 
 
 ### **Anonymous** — January 20, 2015 at 4:14 am ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-22213))
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Right click the project. Click “Preference” select the Codename One section and click “Update Client Libraries”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
+
 
 
 ### **Anonymous** — January 24, 2015 at 11:19 am ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-22157))
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is this being done via the gui? Or is this something that is hardcoded?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
+
 
 
 ### **Anonymous** — January 25, 2015 at 6:16 am ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-24194))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is handcoded although you could use a Toolbar in a GUI builder application as well but you would have to handcode that portion in the before form call.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
+
 
 
 ### **Sanne Graaf** — October 15, 2015 at 12:13 pm ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-22277))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Where can I find the sourcecode of this exampe?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
+
 
 
 ### **Shai Almog** — October 16, 2015 at 12:54 pm ([permalink](https://www.codenameone.com/blog/cats-in-toolbars.html#comment-22085))
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Here: [https://github.com/codename…](<https://github.com/codenameone/codenameone-demos/tree/master/Flickr>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcats-in-toolbars.html)
+
 
 ---
 

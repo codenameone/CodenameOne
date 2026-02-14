@@ -82,14 +82,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > How can I add form instead a container to the taps for better scalability code?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-customize-tabs-behavior.html)
+
 
 
 ### **Shai Almog** — September 29, 2020 at 2:44 am ([permalink](https://www.codenameone.com/blog/tip-customize-tabs-behavior.html#comment-24350))
 
 > Adding forms into a Container is a bad practice. A form is huge and heavyweight. You should do the reverse and add a container into a form and tab.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-customize-tabs-behavior.html)
+
 
 ---
 

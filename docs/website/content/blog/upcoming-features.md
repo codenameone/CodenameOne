@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regarding PC/MAC builds, am disappointed it is Pro-only, and I suspect there is a sweet spot somewhere between Basic and Pro. $70 per month more for this single and very attractive feature is too much to take. Would love an option for the do-it-yourself crowd.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fupcoming-features.html)
+
 
 
 ### **Anonymous** — December 31, 2013 at 4:37 pm ([permalink](https://www.codenameone.com/blog/upcoming-features.html#comment-21922))
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Pro & enterprise users are what keeps us in business and they effectively subsidize basic & free accounts. We ran the numbers on providing a cheaper account in the middle between pro/basic and it just won’t add up.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fupcoming-features.html)
+
 
 
 ### **Anonymous** — January 24, 2014 at 6:20 am ([permalink](https://www.codenameone.com/blog/upcoming-features.html#comment-21892))
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Too bad. I could use the the pro account myself but it is too expensive for amateur developer. I would love if you consider it again in the future.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fupcoming-features.html)
+
 
 ---
 

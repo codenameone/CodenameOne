@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > /Lee
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-clarifications-xcode-9-2-update.html)
+
 
 
 ### **Shai Almog** — November 28, 2018 at 4:06 pm ([permalink](https://www.codenameone.com/blog/uber-clone-clarifications-xcode-9-2-update.html#comment-23999))
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > I just verified that the file is there and working. I’m not sure why you aren’t seeing it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-clarifications-xcode-9-2-update.html)
+
 
 
 ### **Lee** — November 28, 2018 at 4:57 pm ([permalink](https://www.codenameone.com/blog/uber-clone-clarifications-xcode-9-2-update.html#comment-23786))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the speedy response.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-clarifications-xcode-9-2-update.html)
+
 
 ---
 

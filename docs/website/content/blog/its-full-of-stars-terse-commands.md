@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please check this page, it’s not aligned.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 
 ### **Shai Almog** — February 24, 2016 at 2:52 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22727))
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi Diamond,  
 > I just played a bit with the UI for asciidoc conversion of blog posts. What browser/OS combination are you using? Can you provide a screenshot so I can see if we are seeing the same thing?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 
 ### **Diamond** — February 24, 2016 at 5:50 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22465))
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Here is the screenshot.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 
 ### **Shai Almog** — February 24, 2016 at 6:39 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22673))
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Gotcha, that’s a really wide screen. Looking into it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 
 ### **Shai Almog** — February 25, 2016 at 7:25 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22408))
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just did an update, is it better?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 
 ### **Diamond** — February 25, 2016 at 7:26 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22500))
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes, it’s fixed now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 
 ### **Shai Almog** — December 20, 2016 at 4:43 am ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22867))
@@ -189,7 +189,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Just use getProgress() on the Slider component: [http://codenameone.com/java…](<http://codenameone.com/javadoc/com/codename1/ui/Slider.html>)  
 > Not the most intuitive method name for this case but we initially designed it as a progress indicator…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 
 ### **safa** — April 29, 2017 at 10:53 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-23331))
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > hello , how can i get and set the values of rating stars?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 
 ### **Shai Almog** — April 30, 2017 at 4:14 am ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-23482))
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Just use getProgress() on the Slider component: [http://codenameone.com/java](<http://codenameone.com/java>)…  
 > Not the most intuitive method name for this case but we initially designed it as a progress indicator…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fits-full-of-stars-terse-commands.html)
+
 
 ---
 

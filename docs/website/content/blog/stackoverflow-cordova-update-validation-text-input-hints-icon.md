@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can FloatingHint be modified to allow the empty space that holds the Label to be hidden when nothing is there and grow during the animation process? Right now the space between fields is too large due to that and doesn’t make forms look good.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstackoverflow-cordova-update-validation-text-input-hints-icon.html)
+
 
 
 ### **Shai Almog** — December 9, 2015 at 11:58 am ([permalink](https://www.codenameone.com/blog/stackoverflow-cordova-update-validation-text-input-hints-icon.html#comment-22597))
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’d like to provide that option in floating hint but its non-trivial in the current animation architecture since it would require growing in two containers which means using animateHierarchy and that API is a bit flaky. I’m looking at rewriting our animation logic to address some core issues in Codename One and allow some seriously cool effects including this sort of effect.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstackoverflow-cordova-update-validation-text-input-hints-icon.html)
+
 
 ---
 

@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I would like to add that the fundamental advancement that has allowed us to run multithreaded code has nothing to do with the “Javascript VM”. Rather it is that we are using TeaVM to convert to javascript, and it includes a support for threads. This port would not have been possible without TeaVM or without Alexey Andreev’s help (TeaVM’s author). For more about TeaVM, check out [https://github.com/konsolet…](<https://github.com/konsoletyper/teavm>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgc-crashes-bugs.html)
+
 
 ---
 

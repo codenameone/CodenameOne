@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Great stuff! It’s wonderful to see constant API improvements and new features every month!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdownloads-callbacks-signature-more.html)
+
 
 
 ### **Flying Bytes Jansen** — March 9, 2016 at 2:46 pm ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-22477))
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The SignatureComponent is just what I need. When will it be available?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdownloads-callbacks-signature-more.html)
+
 
 
 ### **Shai Almog** — March 10, 2016 at 3:44 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-22649))
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It was released yesterday. Just do an Update Client Libs to get the latest and it will “just work”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdownloads-callbacks-signature-more.html)
+
 
 
 ### **Flying Bytes Jansen** — March 10, 2016 at 8:49 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-22541))
@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great, thank you!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdownloads-callbacks-signature-more.html)
+
 
 
 ### **Mahmoud** — July 30, 2018 at 9:56 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-23766))
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BR,
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdownloads-callbacks-signature-more.html)
+
 
 
 ### **Shai Almog** — July 31, 2018 at 5:20 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-23768))
@@ -210,7 +210,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > I’ve made a small change which should hopefully resolve this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdownloads-callbacks-signature-more.html)
+
 
 
 ### **Mahmoud** — July 31, 2018 at 5:38 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-23799))
@@ -219,7 +219,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > you mean new change in new bulid or new update lib?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdownloads-callbacks-signature-more.html)
+
 
 
 ### **Shai Almog** — August 2, 2018 at 5:51 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-23441))
@@ -228,7 +228,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In the library. We’ll have the fix after you update this Friday. If it happens after that let me know.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdownloads-callbacks-signature-more.html)
+
 
 ---
 

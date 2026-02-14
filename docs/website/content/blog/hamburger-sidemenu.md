@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks Chen, was hoping that would land for 1.1 – looks great!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Anonymous** — March 1, 2013 at 6:37 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21915))
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great job Chen!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Anonymous** — August 17, 2013 at 4:36 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21666))
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Has anyone got a link to a demo handy?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Anonymous** — August 18, 2013 at 1:34 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21917))
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Commands are either added by clicking the Command section in the form in the GUI designer and adding commands or by invoking the method on form called addCommand.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Anonymous** — August 18, 2013 at 7:20 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21811))
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Magic – works! Added in the designer. Worked with latest eclipse plugin, no SVN pull required. CN1 is amazing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **George Njoroge** — September 4, 2015 at 9:29 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22218))
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can I get a link project source code
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Shai Almog** — September 5, 2015 at 3:58 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22340))
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its in our demos repository [http://github.com/codenameo…](<http://github.com/codenameone/codenameone-demos/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Bertrand Gauvreau** — October 16, 2015 at 3:52 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22442))
@@ -126,7 +126,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Do you have any idea ?  
 > Thank You
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Shai Almog** — October 17, 2015 at 4:33 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22367))
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I would suggest you migrate to the new Toolbar API which is more powerful than the side menu on its own and encapsulates all its functionality.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Bertrand Gauvreau** — October 17, 2015 at 12:46 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-24182))
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you Shai
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Mahmoud** — March 26, 2016 at 8:43 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22701))
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > i have menu and my background is white but i have gradient line at the first of menu  
 > how i can remove it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Shai Almog** — March 27, 2016 at 4:26 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21503))
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s the shadow for the sidemenu set the theme constant sideMenuShadowBool=false
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Mahmoud** — March 27, 2016 at 5:43 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-24203))
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks Shai 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Akinniranye James** — September 14, 2016 at 1:39 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22559))
@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to achieve a side menu as rich as this? Since we cant even set different uiids for commands. Am considering using layered pane layout
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Shai Almog** — September 15, 2016 at 3:47 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22762))
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/4de23e2fec20427d2fc6d5bc27191e5934536d8287fffcb59186d90880ef197d.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Akinniranye James** — September 15, 2016 at 8:01 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21458))
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wow, I barely recognize this Kitchen Sink, wow. Good job.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Akinniranye James** — September 15, 2016 at 8:26 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21823))
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My bad. I never knew there is toolbar..addComponentToSideMenu, I have only been using toolbar.addCommandToSideMenu
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **tracey-de santa** — July 26, 2017 at 6:21 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-23538))
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > cool,
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 
 ### **Akinniranye James** — July 26, 2017 at 3:59 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-23253))
@@ -233,7 +233,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > check out our app [https://play.google.com/sto…](<https://play.google.com/store/apps/details?id=com.encentral.tattara.mobile>).  
 > using codenameone
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhamburger-sidemenu.html)
+
 
 ---
 

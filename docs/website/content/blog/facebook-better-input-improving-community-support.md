@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Any idea on how much this will cost to use?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-better-input-improving-community-support.html)
+
 
 
 ### **Anonymous** — November 20, 2013 at 12:59 pm ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-24254))
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It won’t increase your app size by bundling in the Facebook SDK if you don’t use it. I should be clearer on those things.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-better-input-improving-community-support.html)
+
 
 
 ### **Anonymous** — November 20, 2013 at 11:51 pm ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21746))
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Um, believe it or not – not every developer has a facebook account but almost all of them are in linkedin – linkedin groups may make more sense.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-better-input-improving-community-support.html)
+
 
 
 ### **Anonymous** — November 21, 2013 at 2:46 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21789))
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We already have a LinkedIn group that isn’t very active. Its sort of a control to see whether a potential Facebook group will see more activity.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-better-input-improving-community-support.html)
+
 
 
 ### **Anonymous** — November 21, 2013 at 5:27 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21804))
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You could always use Usenet 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-better-input-improving-community-support.html)
+
 
 
 ### **Anonymous** — November 23, 2013 at 5:17 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-22055))
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It may be plausible to have a password generated from within codenameone settings in the IDE or something along those lines to access the forum, that way people who are actually using codenameone would get the password as that is the majority of users in the forum anyway, that may eliminate a lot of spamming. That way you could have a real forum site like XDA with multiple sections and would be much easier to find already asked and answered questions.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-better-input-improving-community-support.html)
+
 
 
 ### **Anonymous** — November 23, 2013 at 5:29 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21873))
@@ -135,7 +135,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > An admin can start going over messages and manually categorizing them one by one, however that’s obviously tedious and painful.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-better-input-improving-community-support.html)
+
 
 
 ### **Anonymous** — November 27, 2013 at 8:55 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21891))
@@ -144,7 +144,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Go for project management system like Redmine. Then everything will be in one place: issue tracking, wiki, forum, etc. Easy to make relations, and build valuable documentation extended by tips & trick shared by community on forum. Keeping those things separated and using multiple providers does not help…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-better-input-improving-community-support.html)
+
 
 ---
 

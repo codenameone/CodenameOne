@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If there is no need to update the parent form is there any particular reason to prefer one over the other ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnot-a-dialog-again.html)
+
 
 
 ### **Anonymous** — June 25, 2014 at 1:19 pm ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21684))
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there something that we need to do apart from refreshing libs. I am not able to add this code snnipet and test it as InteractionDialog is not available.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnot-a-dialog-again.html)
+
 
 
 ### **Anonymous** — June 25, 2014 at 4:21 pm ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21729))
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For 98% of the cases I’d just use dialogs, this is a special case tool.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnot-a-dialog-again.html)
+
 
 
 ### **Anonymous** — June 25, 2014 at 4:22 pm ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-22154))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You will need to use Update Client Libs (not refresh libs which is something else) when this is updated. Since we didn’t update the plugin yet this is only available by building the source right now. The plugin will probably be refreshed sometime next week.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnot-a-dialog-again.html)
+
 
 
 ### **Anonymous** — July 13, 2014 at 6:58 am ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21798))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good! However, is there a way the interaction dialog can listen to events like if outside of the bounds of the dialog is clicked/touched so the dialog can animate or close. Can we determine if the interaction dialog is showing? For example dialog.isShowing(). I see some interesting use cases like in the new google plus app.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnot-a-dialog-again.html)
+
 
 
 ### **Anonymous** — July 13, 2014 at 11:46 am ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21877))
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just add a pointer listener to the parent form to see. A dialog is showing method would probably be useful, feel free to file an RFE on that into the issue tracker.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnot-a-dialog-again.html)
+
 
 
 ### **Anonymous** — December 1, 2014 at 10:33 pm ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-22032))
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Pointer pressed not solvingthat because the pointer press is also passed through the InteractionDialog to the parent form
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnot-a-dialog-again.html)
+
 
 ---
 

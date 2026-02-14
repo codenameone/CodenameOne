@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also I tried it in Simulator and real Android devices (OnePlus2, Nexus 5) and FileChooser.isAvailable() return false …. ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **shannah78** — November 18, 2016 at 5:45 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23095))
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > EDIT: I found that there is a bug in the current release. The Simulator doesn’t support “ALL” mimetypes right now. I have made some modifications, but it required changes in both the cn1 core and the lib. They’ll be available in the next plugin update. The cn1-filechooser extension is already updated, and all required changes are on GitHub. To get them before the next plugin update, you’ll need to build CN1 from source and use the modified JavaSE.jar in your project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **Stefan Blomen** — January 18, 2017 at 11:33 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23189))
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 1.) The UWP build fails if FileChooser is used  
 > 2.) On some versions of Android (maybe < 5) files with extensions unknwon to the system (i.e. “[test.abc](<http://test.abc>)”) cannot be opened. The ActionEvent is null in this case. I tried several mime types including “*/*”. On an Android device with version 7 it works. Any clues?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **shannah78** — January 18, 2017 at 5:29 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23318))
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please open an issue on this too so it won’t get lost. All of my test cases so far were for common extensions.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **Kai** — February 7, 2017 at 1:00 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23297))
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to use this FileChooser as a directory browser, to specify where I want to store a file from my app?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **Shai Almog** — February 8, 2017 at 8:35 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23070))
@@ -153,7 +153,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > No.  
 > Mobile devices don’t allow that. Notice that if you receive a file from this chooser it might not be the “actual file” you picked but rather a copy of it within the area that your app is allowed to access.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **Francesco Galgani** — May 7, 2018 at 4:37 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23758))
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you for this library. For anyone that is in trouble on adding the iCloud entitlement to the App Id (maybe because it’s the first time), I suggest to follow these instructions (that helped me):  
 > [https://stackoverflow.com/a…](<https://stackoverflow.com/a/28062326>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **Ankush Sharma** — October 11, 2018 at 9:28 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23849))
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, Will this work in unity? Is there any other dependency I should know about? Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **Shai Almog** — October 12, 2018 at 4:07 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-24094))
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > See [https://help.codenameone.co…](<https://help.codenameone.com/en-us/article/whats-codename-one-how-does-it-work-1343oho/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **Thomas McNeill** — December 26, 2018 at 5:56 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23989))
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I was hoping to use the document provider to save to google drive or dropbox. Will we ever have this ability?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 
 ### **Shai Almog** — December 27, 2018 at 4:28 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-24056))
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This should be easy to do with native interfaces. Whether we add it depends a lot on user requests. We didn’t get a lot of requests for this feature and no enterprise requests which tend to move things faster.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-file-open-dialogs.html)
+
 
 ---
 

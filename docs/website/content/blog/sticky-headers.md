@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, does List component support InfiniteScrollAdapter?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Shai Almog** — May 27, 2016 at 5:09 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22450))
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > No. It’s an either/or situation. Infinite components are meant to replace list.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Chibuike Mba** — May 27, 2016 at 6:43 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22919))
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ok Shai, I will experiment with Infinite components to know if they will serve my needs. But is there any performance advantage of using Infinite components over List?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Shai Almog** — May 29, 2016 at 2:55 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22783))
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > That depends a lot on your use case but generally yes.  
 > The performance advantage starts to erode in the thousands of elements.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Nigel Chomba** — May 30, 2016 at 9:48 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22703))
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > its causing Stack overflow error..[EDT] 0:0:0,0 – java.lang.StackOverflowError
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Chen Fishbein** — May 30, 2016 at 11:57 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22674))
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Can you please open an issue here:[https://github.com/chen-fis…](<https://github.com/chen-fishbein/stickyheaders-codenameone>)  
 > With a snippet of code that reproduces this error
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Chibuike Mba** — July 21, 2016 at 3:05 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22983))
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Kind Regards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Shai Almog** — July 22, 2016 at 4:45 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22951))
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 2\. Can you reproduce this in a standalone testcase?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Chibuike Mba** — July 22, 2016 at 1:09 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22905))
@@ -153,7 +153,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Shai Almog** — July 23, 2016 at 4:50 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22886))
@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Layered pane and glass pane are very different but if you placed major components in the layered pane this might produce a conflict as we sometimes use the layered pane for various effects. We now support a multi-layered pane which should work better with less conflicts but haven’t really migrated to that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Chibuike Mba** — July 23, 2016 at 11:57 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-21517))
@@ -304,7 +304,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for your guide.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Shai Almog** — July 24, 2016 at 3:45 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22550))
@@ -313,7 +313,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looks great. I really like the floating folded button, what did you do there?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Chibuike Mba** — July 24, 2016 at 2:27 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-21632))
@@ -342,7 +342,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Kind Regards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Shai Almog** — July 25, 2016 at 4:36 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22829))
@@ -351,7 +351,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, that looks very similar to some of the code I wrote that does the same. We didn’t publish it because we’d like to get a lot of the nuance of that component into place before we bring out official support.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Ch Hjelm** — September 18, 2016 at 9:57 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22980))
@@ -369,7 +369,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hoping for the best 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Shai Almog** — September 19, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-23134))
@@ -384,7 +384,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also check out alternative implementations mentioned in the comments below.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Ch Hjelm** — September 20, 2016 at 8:43 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-23093))
@@ -395,7 +395,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I also tried Chibuike’s version below, but it caused some other problems. And I’d obviously prefer to benefit from the existing implementation to not have to get into the source code myself 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 
 ### **Shai Almog** — September 21, 2016 at 4:23 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-23149))
@@ -404,7 +404,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can create that package within your project. You shouldn’t modify our sources to do that. In your project create a new package with the right name and place it there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsticky-headers.html)
+
 
 ---
 

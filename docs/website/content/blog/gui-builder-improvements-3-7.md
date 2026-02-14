@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > I haven’t used this, so the answer might be obvious – when you use the new GUI builder, does this create a “GUI only” app ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **Shai Almog** — June 29, 2017 at 3:30 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23651))
@@ -276,7 +276,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The new GUI builder uses one form per GUI form. This means it works with regular Codename One projects and without the state machine.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **salah Alhaddabi** — June 29, 2017 at 9:09 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23594))
@@ -285,7 +285,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I would like to bring to your attention another tool that you might consider while you are improving your UI design tool as well. It is called Livecode (LC). In LC, you dont have to worry at all about positioning your UI with different screen resolutions and only one line of code makes all your UIs fit all screens. I wish CN1 has a similar ability since it is far more advanced that LC when it comes to technology integration.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **Shai Almog** — June 29, 2017 at 12:59 pm ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23662))
@@ -294,7 +294,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also features like properties and the automatic UI generation API can go a long way here where you don’t need to write any UI code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **David G** — July 1, 2017 at 12:49 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23668))
@@ -303,7 +303,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > looking forward to future updates!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **Shai Almog** — July 1, 2017 at 4:03 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23581))
@@ -313,7 +313,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The tabs should be improved/fixed by now, we specifically didn’t commit that to keep the release stable. As I mentioned here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/survey-results-kotlin-updates-news.html>)  
 > We’ll include that fix in the 3.7.2 update that will come our on Friday.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **David G** — July 9, 2017 at 3:53 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23685))
@@ -321,7 +321,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi Shai,  
 > Thought I’d let you know I just downloaded the 3.7.2 pluggin for NetBeans and the GUI builder still doesn’t handle Tabs properly… there’s just nothing showing up in the navigation pane when components are added to a Tabs container. I was able to define tab text and icons but couldn’t go any further.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **Shai Almog** — July 9, 2017 at 5:08 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-21470))
@@ -329,14 +329,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks. Can you please file an issue on that?  
 > It probably didn’t make it eventually, I recall seeing it on an internal list but it must have gotten buried.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **Γιάννης Σαλταπίδας** — June 29, 2018 at 11:19 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23819))
 
 > Hello. There should be a tool to convert the style of the old GUI builder with the new GUI. Error free and smooth.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 
 ### **Shai Almog** — June 30, 2018 at 4:57 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23831))
@@ -350,7 +350,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think our resources are better spent fixing issues in the devices/simulator. Improving the default UX and addressing issues people report in the issue tracker. Having said that if you run into an issue and report it in the issue tracker we’ll fix it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-improvements-3-7.html)
+
 
 ---
 

@@ -242,7 +242,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What you say about throwing away 30 years of IDE development is so true. I came across this [http://www.fse.guru/how-to-…](<http://www.fse.guru/how-to-pick-a-frontend-web-framework>) the other day, and I thought to myself, back the day you could use Delphi, say, to develop a desktop app, and now to develop a web app you apparently need a 1001 bits of stuff, to create something that in almost every way is inferior to a desktop app. Weird.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — November 3, 2015 at 4:27 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22243))
@@ -255,7 +255,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s part of why we started Codename One, it seems innovation in this space is busy taking us backwards.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **oojr** — November 7, 2015 at 10:15 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22504))
@@ -264,7 +264,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > ES7 async functions is coming next year and would make the code look even better, Javascript is shaping up to be “The Next Big Language” [https://jakearchibald.com/2…](<https://jakearchibald.com/2014/es7-async-functions/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — November 8, 2015 at 4:23 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22279))
@@ -281,7 +281,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think JavaScript has its place as an important language, but even huge JavaScript fans find it hard to create large maintainable projects in it. The question of where the line passes where you probably should switch to a more “strict” language like Java (Scala if you prefer a more dynamic language etc.) is a matter of personal choice.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **oojr** — November 10, 2015 at 4:04 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22358))
@@ -292,7 +292,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Back to the blog though, I use React Native and can code in Objective-C and Java, why? React Native allows me to use a flexbox layout and has all the benefits of an open source platform/ecosystem
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — November 11, 2015 at 5:26 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22422))
@@ -309,7 +309,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you prefer JavaScript as a language that’s totally fine, to each his own. The blog post is aimed at Java developers who sometimes get the sense of “the grass is greener” when JavaScript developers talk about how X is easier. That’s just not the case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Jeff Carver** — January 16, 2016 at 8:06 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22533))
@@ -326,7 +326,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks in advance for any information.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — January 17, 2016 at 4:39 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22677))
@@ -342,7 +342,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Since you already know several languages I think just picking up Java and looking at the code should be pretty intuitive without an explicit tutorial but I don’t really know…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **void777** — January 25, 2016 at 11:19 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22524))
@@ -351,7 +351,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Java works for iOS apps?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — January 26, 2016 at 3:13 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22659))
@@ -360,7 +360,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ahem [https://www.codenameone.com/](<https://www.codenameone.com/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **adamski** — January 30, 2016 at 9:30 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22441))
@@ -370,7 +370,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I’m not a massive Javascript fan but I do think React Native has hit a good spot. I am using it for cross-platform UI and the core of my app is written in C++ with the JUCE framework. This gives me the best of both both worlds, tight performant code where I need it and quick to build UI across mobile platforms.  
 > Had I heard of Codename One before I started I might have given it a look 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Gabriel Matusevich** — March 11, 2016 at 6:43 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22609))
@@ -379,7 +379,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > hmmmmm I think you are being a bit unfair, react native has … a few years of development and it’s already cruising, also you are not talking about Rapid App Develpoment, with React Native I’m able to write apps in MUCH less time not to mention that Android Development in Java is a ginormous pain, with React and Redux, mobile dev is a paradise in comparison.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — March 12, 2016 at 3:28 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22755))
@@ -390,7 +390,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Android development does suck. One of the problems in React Native is the fact that you need to setup an Android environment to get started.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Simon** — March 12, 2016 at 5:02 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22619))
@@ -399,7 +399,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wow I think you have to be a particular breed to think that the Java was simpler than the React code. For one it was about seven times as long and as soon as I see stuff like ‘public void’ and ‘private static final’ I have the urge to go running for the hills.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — March 12, 2016 at 5:12 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22629))
@@ -412,7 +412,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Type safety is commonly accepted as a preferable way for a large number of developers (e.g. Typescript) so if you prefer Java (which great many do) then React Native doesn’t add any advantage. If you prefer JavaScript then this becomes a religious debate as there is no debating programming preference.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Simon** — March 12, 2016 at 5:18 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22483))
@@ -421,7 +421,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Actually its just over twice as long, (I did a character count in a text editor). Yes that’s what I mean by a ‘particular’ breed ie programmers. Anyone more casual will likely prefer javascript. But React Native is far from being just javascript.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — March 12, 2016 at 5:41 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22584))
@@ -432,7 +432,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Java IDEs make Java MUCH easier for novices and type safety removes a lot of newbie mistakes. For experienced developers the ability to refactor a Java application from a stranger is a huge advantage. So I would argue that Java is WAY easier than JavaScript but I’m obviously highly biased. Every coin has two sides and I gave the example above of JSON processing which JavaScript’s ducktyping really simplifies.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Simon** — March 12, 2016 at 5:49 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22765))
@@ -443,7 +443,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I truly wish Java was simpler ‘cos I would love to learn it. Tried and failed. Actually my favourite is PHP which is even more straightforward that javascript. I actually prefer Javascript variants like JQuery and React Native. The less characters typed to achieve something, the simpler it appears.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — March 12, 2016 at 7:34 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22773))
@@ -456,7 +456,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you don’t like Java then you are clearly not in the demographic I aimed this article at. It’s aimed at people who like and appreciate Java and its advantaged but are looking at React Native thinking the other side of the fence might have greener pastures.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Alex** — March 28, 2016 at 2:36 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22446))
@@ -465,7 +465,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I just threw up in my mouth a little.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **adamski** — April 6, 2016 at 8:17 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22816))
@@ -478,7 +478,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Your comment “With apps you need to go thru Apples approval process” is not true for javascript only updates – there are tools to enable pushing javascript only updates to installed apps thereby circumventing the Apple approval process.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — April 7, 2016 at 3:18 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22565))
@@ -489,7 +489,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Dynamically downloading JavaScript is something that used to be prohibited, this makes sense as it somewhat eliminates the value of the human review process. Notice that you still can’t push out real updates and need to go thru review if you make major changes although it’s unclear how Apple can enforce such distinctions once they opened that door.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Osei Fortune** — April 7, 2016 at 8:19 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22573))
@@ -498,7 +498,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think typescript should help make large JavaScript projects easier to maintain
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Don't Bother** — April 20, 2016 at 11:22 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22693))
@@ -509,7 +509,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s not a myth it’s a sad truth. The reality is that on large JavaScript project people just afraid to make any serious refactoring because you never know what will break and when. I have experienced this many times. If you have not seen this it means you have not seen any large and complex project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Don't Bother** — April 20, 2016 at 11:24 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22527))
@@ -518,7 +518,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > True but TypeScript is a not JavaScript. It is different language. And it has huge difference which is defined by world “Type” :-), and it has other things which are not present in JavaScript. It is same as if you say that Swift will make javaScript apps easier…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Chromonav Kulkarni** — April 26, 2016 at 7:21 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22768))
@@ -527,7 +527,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > bro decide are you novice or a pro. Javascript is for people who learnt everything and are in search of superpowers.Js because of fluidity and simplicity and ability to implement suitable programming design pattern needed to get things done.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Chromonav Kulkarni** — April 26, 2016 at 7:30 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22775))
@@ -539,7 +539,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > But theres one thing you should keep in mind : Atwoods Law:  
 > Any application that can be written in JavaScript will eventually be written in JavaScript. 😜😜
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Chromonav Kulkarni** — April 26, 2016 at 7:46 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22596))
@@ -548,7 +548,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > lets compare community following, rate of growth, current apps in production.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — April 26, 2016 at 8:06 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21509))
@@ -557,7 +557,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So was Java, livescript was renamed to JavaScript to pick the traction of Java. Either way this isn’t so much a Java vs. JavaScript but rather a React Native vs. Java. So all/most of your points aren’t really relevant here. If you embed JavaScript in a native app you open up a lot of problems and lose a lot of benefits of JavaScript.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **oojr** — April 27, 2016 at 5:21 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21557))
@@ -566,7 +566,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > True but you can say that about any large Java projects as well
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Chromonav Kulkarni** — April 27, 2016 at 2:21 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22825))
@@ -579,7 +579,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The massive scale of code reuse possible and with a vibrant Js community it is possible to production ready apps within fraction of time.  
 > React Native inherits powers of both worlds and combines it with awesome react way (i love i don’t know abt you.)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Chromonav Kulkarni** — April 27, 2016 at 2:24 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22694))
@@ -588,7 +588,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > End justifies the means. React works well for Facebook helps them churn feature updates faster. It is helping me the same way. I don’t care if i am going backwards and forward
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — April 27, 2016 at 2:25 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22528))
@@ -602,7 +602,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s either native or it’s web. React Native stands in the middle and it pays for that, compile time, build process, install native tools etc. It has some benefits from JavaScript (fast preview etc.) but don’t try to present it like a panacea.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Ben** — May 9, 2016 at 9:31 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22776))
@@ -623,7 +623,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m aware some of these features may not have been implemented or mature last November, but would like to ensure nobody is given a wrong or unilateral impression should they wish to try React Native.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — May 10, 2016 at 4:08 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22883))
@@ -634,7 +634,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice that you need to install the Android SDK and then the iOS SDK and then the Windows SDK and then rewrite for web… You also need to adapt code as it isn’t a WORA solution… We actually allow you to install one plugin and it “just works” on everything.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **khle** — June 25, 2016 at 12:14 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22633))
@@ -643,7 +643,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Interesting take. You probably knew this would be an unpopular opinion. Anyway, I didn’t read through all the comments so maybe someone else already said this. But one advantage with React Native is the same skill set can be used to write web applications. And with JS, one can write NodeJS on the back end. So maybe the same devs can do mobile, web and back end. For some companies, this could be advantageous.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — June 26, 2016 at 4:50 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22877))
@@ -652,7 +652,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you bring server programming into it then Java has a huge upper hand with more than a decade of scale in the enterprise and far more diversity there…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Nicolás Schürmann Lindemann** — July 5, 2016 at 12:25 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22772))
@@ -683,7 +683,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think it’s cleaner, less imperative though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **WhoIsMeekMill?&kidcudi** — August 2, 2016 at 6:16 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22887))
@@ -692,7 +692,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just another java/android developer feeling threatened that his market is disappearing. Nothing to see here folks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **bertbeck** — August 13, 2016 at 3:54 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22984))
@@ -701,7 +701,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How much overhead (in app size) does Codename One add to a typical app (over native size) ? Any idea what is typical for React Native? I’m an IOS and Android developer – have worked with Xamarin – know all too well the pain of added and complex runtimes (and bugs created by the runtime by new releases). I’m looking for the best environment to co-develop IOS/Android and if possible Web and Native PC/OSX/Linux
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — August 14, 2016 at 4:19 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22921))
@@ -711,7 +711,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Codename One Android apps are roughly 1mb and iOS apps between 3-5mb for hello world.  
 > So the overhead is relatively low. There are fluctuations in the implementations which is why we have versioned build which allows pro users to build against a stable release.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **yedidyak** — August 21, 2016 at 8:47 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22802))
@@ -730,7 +730,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Far simpler.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — August 22, 2016 at 3:25 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22879))
@@ -740,7 +740,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > That does change the syntax and we use it quite a bit in our JavaScript port. But it doesn’t really change the language semantics. Native API’s rely on threads and the ability to control them, this is true both for Android and iOS. JavaScript relies on hiding the complexity of threads.  
 > There is a conceptual disconnect.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shailesh** — September 17, 2016 at 1:25 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22819))
@@ -749,7 +749,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Such a misleading title. Comparing Java and javascript is totally different than comparing react-native with codename. The reason react-native is way superior is because of react component model. Building complex UIs is such a breeze in react. It is a lot lot simpler to keep the UI in a consistent clean state in react compared to other frameworks where finding the view and updating it, keep it in sync is such a pain.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — September 17, 2016 at 4:11 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-24222))
@@ -764,7 +764,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Concerns can be separated by convention as well all good programmers do that anyway and they don’t need a separate UI representation to perform that in Java. The big advantage in doing everything in Java is that I can place a breakpoint anywhere and inspect Java based UI state right in the debugger, I can mutate/animate the UI with the same code/syntax I use to construct it which makes refactoring much easier.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **IsMyBlueYourBlue** — October 11, 2016 at 5:58 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22929))
@@ -773,7 +773,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hmmm weird I don’t know why you say Java is simpler. For me the Javascript version is A LOT easier to read. I only have 7 years professional programming, is that a problem…?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Hristo Vrigazov** — October 23, 2016 at 2:28 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22981))
@@ -782,7 +782,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think my opinion would be pretty interesting… I started with Ionic and created a few apps, (have not written in React), and I like a lot of concepts in both JS and Java. To me, Codename One gives you more control, although more verbose. It is extremely easy to reuse code in Codename One due to the fact that you have the full OOP power with all its patterns etc. What is also cool is that you just use the IDE you know (IntelliJ in my case), and you can just send iOS, Android and Windows builds in the cloud and this way not to worry about configurations. Codename One also has amazing support. Javascript frameworks on the other side are very convinient with things like parsing JSON, callbacks, promises, which to me simplify the web, but these things can be used in Codename One also, if one wants, although slightly verbose. JS frameworks also have a lot of third-party frameworks that simplify things a lot (Codename One also has CN1 libs, but there are not as much out there). In my opinion, one should go the way that he likes best. For example, in my current app, I am actually integrating Codename One with Node.js backend, since the Loopback framework makes it so easy to quicky create REST APIs. No need to choose guys, learn the best of both worlds, don’t be close-minded.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — November 1, 2016 at 1:11 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22924))
@@ -801,7 +801,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m not sure if our tooling will be simpler for you since obviously there is a “filter” when picking up any technology and getting your brain used to it’s “oddities” and if you are not a Java guy to begin with the habits might be too deep. But our tools are WAY simpler and that’s obvious even during the installation phase not to mention in final projects where the IDE can literally show you the where & what of everything.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Justin L Mills** — November 9, 2016 at 4:42 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23181))
@@ -810,7 +810,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can I code Haxe Java for Codename, Haxe can allow you to access most jars via -java-lib. Obviously you feel there are some advantages of your system over React Native but I could also use Haxe JS with React-Native, so what’s left beyond IDE’s when you consider some of the cross target Haxe libraries like Kha, OpenFL, Flambe, SnowKit etc… do you still feel that Codename One – a paid product offers something extra that Haxe developers might want to tap into for mobile development? It’s not a retorical question I am curious as I am aware that Haxe ecosytem does lack component support in many areas but at sametime is maybe nicer than Java or Javascript as a language 🙂 . Perhaps you could take a proper look and write another post around use of haxe with Codename One against maybe other options like Haxe c++ and Haxe JS wrapped.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — November 10, 2016 at 5:03 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22865))
@@ -821,7 +821,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m not familiar enough with Haxe and I’m not really sure why one would pick it. But lets do it the other way… You try Codename One and write a guest post from a Haxe developers perspective?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Justin L Mills** — November 10, 2016 at 11:33 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22846))
@@ -844,7 +844,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > But don’t expect you have time to setup a codename one haxe java demo but I would be very curious if you did.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — November 11, 2016 at 7:22 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23185))
@@ -857,7 +857,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The Adobe argument doesn’t fit since Adobe didn’t open source flash. Codename One is open source (including the VM, ports etc.)… It’s more like Android in that sense.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Jason Nathan** — December 18, 2016 at 12:41 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22968))
@@ -866,7 +866,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My sentiments exactly. I think a deep dive into JS is needed to make a proper comparison. The Promise and “then”-problems described are really the woes of someone newly discovering JS, for example.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — December 18, 2016 at 4:45 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22837))
@@ -875,7 +875,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We use futures in our JavaScript port. Nope.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **ie5x** — January 11, 2017 at 10:29 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23241))
@@ -906,7 +906,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Done!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — January 12, 2017 at 5:08 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23162))
@@ -916,7 +916,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I did compare with Codename One. Java has better name recognition so I used it for syndication purposes.  
 > The async/await approach was mentioned in other comments. It’s not exactly a thread alternative more like futures which is fine but not the same.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Nitin Bansal** — February 4, 2017 at 7:39 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21647))
@@ -925,7 +925,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If JavaScript was/is so great, then why has it started to seem more and more like Java after ES6? And so goes for Java too, where it has started to seem more like Python after Java8. The fact is none of the languages were perfect. But, as time lapsed, and so the programmers’ experience in using these languages, and also the fact that current projects require exposure to more than one language, people have started adding more and more best features from other languages. Hence, java introduced lambdas and functional interfaces, while javascript introduced classes, which it hated at one time so much. Newer languages such as Go and Rust and Swift already come with balanced set of these features. As time goes by, we’ll see more of unite among the way languages handle their syntax, getting more and more diversed on where they fit best.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — February 5, 2017 at 8:17 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23249))
@@ -936,7 +936,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The languages are still very different especially when it comes to types, encapsulation etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Stan** — February 8, 2017 at 5:41 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23089))
@@ -945,7 +945,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > and I’m willing to bet that Facebook has got a whole bunch of lower level code to suplement the javascript. I’ve been a software engineer for over 2 decades and have coded in many languages (C/C++, Ada, Fortran, Pascal, assembler, etc) and I’ve been coding Java since 1998 and by far, it’s still me language of choice hence which is why I’m starting to use Codename One. Not knocking Javscriipt because I like that as bwell and have been using it since t6he early 2000s but not much comparison to java as a heavyweight language.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Stan** — February 8, 2017 at 5:44 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23244))
@@ -954,7 +954,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Totally agree and has anybody heard of this new phenomena called “Javascript Fatigue”? It’s dizzying the number of frameworks, libraries, packagers and add ons that one must know…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **anonymyst** — February 17, 2017 at 11:51 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23310))
@@ -963,7 +963,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ya well Java doesn’t hold a candle to Swift. Besides, your claim may be true in some ways, but in the way that’s most glaring and important to most, is speed… I’ve got junior dev react native programmers that can code outcomes much faster than your senior dev java developers. Another way in which it fails, is in it’s inability to deliver a consistent user experience across 2 platforms… react native gives my clients a single codebase, which makes better business sense, so in that sense, it’s a major fail for both Java and Swift. So I’d hold back in speaking in such extremes as “superior in every way,” because it makes you sound biased and ignorant.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — February 18, 2017 at 5:59 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23378))
@@ -976,7 +976,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I am biased (notice the site you are on) but I’m quite well informed.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **carlos** — March 21, 2017 at 7:41 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23260))
@@ -993,7 +993,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Carlos.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **carlos** — March 21, 2017 at 7:48 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23100))
@@ -1002,7 +1002,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes, and Webstorm is a fantastic Javascript IDE
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — March 22, 2017 at 4:57 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23338))
@@ -1020,7 +1020,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > They aren’t easier to debug or understand since their flow isn’t linear. So where is the progress?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **carlos** — March 22, 2017 at 6:29 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21569))
@@ -1055,7 +1055,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Carlos.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — March 23, 2017 at 6:23 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23121))
@@ -1070,7 +1070,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We took an age old solution to a common problem and provide a lot of advantages/capabilities you just can’t do with React Native (and yes I based this code on the react tutorial demo so I’m very aware of what’s there).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Rick** — April 8, 2017 at 10:08 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23427))
@@ -1088,7 +1088,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have 19 years experience in this field, so I’m almost as old as you in this regard. And I repeat, I acknowledge you do have very good points, but your blog doesn’t make sense to me. It’s like comparing cars to planes A Ferrari is definitely an immensely better machine at its job than a Cessna, and although both address the same common need, transportation, they both respond to different circumstances and socio-historical driving forces. The Cessna is able to solve the much more sophisticated need for fast travel vs convenience vs cost debacle, and that is the point.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — April 9, 2017 at 4:02 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23261))
@@ -1102,7 +1102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m not a fan of functional programming for real applications. It’s great for math but without encapsulation or imperative style it becomes a maintenance problem down the road. The idea that multi-core will be leveraged by this style is one that the JS crowd has been pushing for years, it “might” be valid for NodeJS but it’s not for react native where the UI is single threaded and any bit of “adventure” off the main UI thread will demolish you. Our GC & networking run in their own threads and make use of multi-core and since our EDT is separate from the main OS thread we leverage multi-core better while increasing portability.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **lambdatoast** — May 18, 2017 at 10:42 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23365))
@@ -1117,7 +1117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BTW, to all peoples interested in static typing: Please check out something like PureScript + React (or React Native, or both), in order to understand why languages like Java remain in the dark ages of static typing. Do NOT get your idea of what types can do for you based on OOP languages like Java, which ruin all typing guarantees with their out-of-control side-effects.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — August 14, 2017 at 7:07 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23603))
@@ -1127,7 +1127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > No. It’s the exact same number of lines and works perfectly on iOS. Clearly you haven’t read what I said.  
 > The logic can be shared just as well in Java or even better… Great you can share 80% of the styles in CSS (I call bullshit but fine) in Codename One you can share 100% of the styles.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Albert Gao** — October 9, 2017 at 4:15 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23666))
@@ -1145,7 +1145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There are always good thing to take from new tech or ideas. Use that to strengthen CodeNameOne would be better.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — October 9, 2017 at 7:59 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23787))
@@ -1159,7 +1159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 2\. That’s doable. The main obstacle for doing this is people/resources.  
 > 3\. We have a properties binding framework, it’s oriented at Java but might work well for kotlin see: [https://www.codenameone.com…](<https://www.codenameone.com/how-do-i-use-properties-to-speed-development.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Albert Gao** — October 9, 2017 at 8:08 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23793))
@@ -1170,7 +1170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And thanks for the reply. You are very responsive for my questions which split over places 😀 (And you are even more responsive than some big name open source project) Your attitude to the product will SURELY help my evaluation! Appreciate!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **nathan32** — October 13, 2017 at 7:54 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23574))
@@ -1182,7 +1182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Except for that I find both toolkits similar, the standard gui principles are used. It boils down to the language of your preference (both JS and Java fall on the disliked side of things for me).  
 > We went with React Native for just those reasons, If you could provide a truly opensource toolkit we’d have been on the side of Codename One. A simple VBox image of a pre-configured server would make CN1 more popular, to test this just release one vbox image and see for yourself. Just the response to a linux based server for android builds might surprise you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — October 13, 2017 at 8:20 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23801))
@@ -1200,7 +1200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – There used to be a 3rd party offline build project, we hired its maintainer (not to stop the project, he’s just a really great hacker). When that project ran very few people used it, it might still work but most people don’t really care about that stuff so the last paragraph should be reversed. “You would be surprised”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **nathan32** — October 13, 2017 at 8:52 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23762))
@@ -1209,7 +1209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No its not, until you are using custom native modules refer [https://facebook.github.io/…](<https://facebook.github.io/react-native/docs/getting-started.html>) You can simply use expo client ([https://expo.io/)](<https://expo.io/>)). The opposite however is a point of concern. I can do a native build in case of React Native while Codename One native builds though not impossible are costly as hell $400/mo. I can dedicate a machine for doing builds for that amount. So effectively for one month of Codename One Build server I can get a react one for lifetime.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — October 13, 2017 at 10:00 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23755))
@@ -1222,7 +1222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > About expo, that is indeed a nice feature. We have a proof of concept that will allow something similar in Codename One (on-device-debugging) without the build cycle. Unfortunately this would require some work to bring to production.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — November 7, 2017 at 11:01 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23729))
@@ -1240,7 +1240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > About expo it didn’t exist when I wrote the article. Regardless it’s nothing like Codename One which is a WORA solution something that React Native is not (based on Facebooks explicit definition). Build servers are possible with a WORA lightweight architecture but with a heavyweight architecture (one that relies on native peers for everything) this is problematic as you need a far larger set of testing devices to verify anything. Cloud build becomes a hindrance rather than an advantage in that case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Nick** — February 26, 2018 at 4:48 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23951))
@@ -1249,7 +1249,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > A little late but I found it amusing you speak very highly of “separation of responsibilities” but you have view rendering logic coupled tightly with your data fetching logic, which a framework like React encourages to actually separate (don’t know about Codename one).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — March 3, 2018 at 12:12 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23765))
@@ -1263,7 +1263,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FYI this article is really old and actually pulls a lot of punches from React Native. I should seriously revisit it since things are pretty different by now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **James Line** — June 14, 2018 at 1:38 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23856))
@@ -1272,7 +1272,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > To be fair the Android emulator has gotten a fair bit faster since you wrote the article.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Iftee Khar Ul Islam** — June 20, 2019 at 2:27 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-24117))
@@ -1281,7 +1281,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I like everything about CodenameOne, but I think there should be a **comparison with Flutter**, Google’s new framework cross-platform lover dudes may know it very well, I loved it but only thing that brought me here is that **CodenameOne doesn’t increase App size as flutter**, there’s other pros and cons but you should go with the one you like, I like both hence I will use both (there are migration tutorials for flutter, i.e. Flutter for Android devs, iOS devs, which enabled me to learn and use both)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Iftee Khar Ul Islam** — June 20, 2019 at 2:31 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23967))
@@ -1290,7 +1290,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > A basic ‘Hello World’ app in flutter produces a 7.5mb file, where CodenameOne uses 1.7mb only, so for Small or relatively small apps using CodenameOne is a choice you won’t regret (Flutter may increase app size due to everything in Flutter is a Widget! and it also includes a C++ , Skia engine for performance which makes it’s size relatavely larger) …
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Michael** — September 16, 2019 at 11:18 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23912))
@@ -1299,7 +1299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There are an awful lot of [comma splices](<https://www.grammarly.com/blog/comma-splice/>) in this article.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Merkle Groot** — February 7, 2020 at 11:51 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21377))
@@ -1309,7 +1309,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > React Native lets me use one code base for Android, IoS, Web, UWP, and cross-platform Desktop.  
 > WHERE IS YOUR JAVA NOW?????
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Shai Almog** — February 8, 2020 at 4:43 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21380))
@@ -1319,7 +1319,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Ahem. Did you look at the website you’re in???  
 > We target all these platforms and unlike react native we’re even more portable in terms of the code base, it’s truly one code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 
 ### **Crab Synth** — May 22, 2020 at 1:56 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21407))
@@ -1328,7 +1328,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Fantastic Post… especially the comments… keep coming back to it, many times over the years… and i must commend you Shai… you had an appropriate answer for everything…. and even though conventions, preferrences and styles will continue to segragate users, causing them to pick a side… i believe by reading the comments and your replies i have a much better understanding of how to separate the hype from the features of React and how Java can achieve everything asked of it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-is-superior-to-react-native-in-practically-every-way.html)
+
 
 ---
 

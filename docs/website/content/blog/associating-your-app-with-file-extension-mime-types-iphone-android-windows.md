@@ -276,14 +276,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > One big step forward would be to read Exif rotation and correct the image accordingly, as this is something that happens very often. Most devices don’t actually rotate pictures, but mark them as such in the exif data.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fassociating-your-app-with-file-extension-mime-types-iphone-android-windows.html)
+
 
 
 ### **bryan** — November 8, 2016 at 7:37 pm ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-22806))
 
 > Great tutorial Steve – thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fassociating-your-app-with-file-extension-mime-types-iphone-android-windows.html)
+
 
 
 ### **Shai Almog** — November 9, 2016 at 7:31 am ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-23043))
@@ -292,7 +292,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > AFAIK we already do that implicitly in our capture implementation.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fassociating-your-app-with-file-extension-mime-types-iphone-android-windows.html)
+
 
 
 ### **Carlos** — November 9, 2016 at 9:09 am ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-23085))
@@ -301,14 +301,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/eb29ed44f9b8ffdb82216b13f3e785b9cfbe3f9fe055c4468ee3ee1dc9cda839.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fassociating-your-app-with-file-extension-mime-types-iphone-android-windows.html)
+
 
 
 ### **Shai Almog** — November 10, 2016 at 4:57 am ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-22989))
 
 > Looking at the code it seems to no longer be there, not sure why. I’ll have to ask on that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fassociating-your-app-with-file-extension-mime-types-iphone-android-windows.html)
+
 
 ---
 

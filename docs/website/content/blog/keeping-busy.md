@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have build a website [http://www.bitvest.com.au/](<http://www.bitvest.com.au/>) and now i would like to build a mobile app for this website.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkeeping-busy.html)
+
 
 
 ### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](https://www.codenameone.com/blog/keeping-busy.html#comment-23835))
@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Check out this post covering tutorials, documentation and resources available to developers [https://www.codenameone.com…](<https://www.codenameone.com/blog/tutorials-resources-learn-java-mobile-videos-courses-ios-android.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkeeping-busy.html)
+
 
 ---
 

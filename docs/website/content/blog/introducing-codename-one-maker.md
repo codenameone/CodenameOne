@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is great news, I know so many people will have a good opportunity to air their opinions via ‘mobile development’ good work team Codename One…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-maker.html)
+
 
 
 ### **Anonymous** — May 23, 2013 at 1:01 pm ([permalink](https://www.codenameone.com/blog/introducing-codename-one-maker.html#comment-21768))
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great, I travel a lot and I’ll be able to prototype from my tablet, then code on eclipse. Also my business partner who dont program will be able to prototype =)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-maker.html)
+
 
 
 ### **Anonymous** — May 24, 2013 at 3:32 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-maker.html#comment-24231))
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thats so cool…. i think this is a huge step… the revolution to mobile and more so android programming
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-codename-one-maker.html)
+
 
 ---
 

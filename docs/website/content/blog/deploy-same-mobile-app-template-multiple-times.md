@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you elaborate on how to run in the simulator? I set up a new configuration and put the package/class as the arguments in the run section and it still runs the original Main, not the new Main
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeploy-same-mobile-app-template-multiple-times.html)
+
 
 
 ### **Shai Almog** — October 6, 2016 at 5:22 am ([permalink](https://www.codenameone.com/blog/deploy-same-mobile-app-template-multiple-times.html#comment-22948))
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > In which IDE?  
 > Is there output in the console?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeploy-same-mobile-app-template-multiple-times.html)
+
 
 ---
 

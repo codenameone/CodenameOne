@@ -128,35 +128,35 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > This sounds really good. I don’t have much to do with the Windows eco-system, so if I want to try this, I’m guessing any recent Windows mobile should run this, or is there some specific version (of the seemingly ever changing) Windows mobile platform I need to look for ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 
 ### **Shai Almog** — June 13, 2016 at 3:53 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22731))
 
 > It requires a device that’s running windows 10 and some of the older devices won’t get that upgrade.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 
 ### **Chibuike Mba** — June 13, 2016 at 7:40 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22587))
 
 > WOW!!! CodenameOne rocks, one stone (code base) to kill(target) all the birds(platforms) in the air(out there). Am loving it. Will surely try it in the next version of our app [http://ozioma.net](<http://ozioma.net>). Great job guys. 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — June 13, 2016 at 1:20 pm ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22771))
 
 > I am over the moon with this!!!!!!!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 
 ### **Ben A** — August 8, 2016 at 8:49 pm ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22711))
 
 > Good news for Java devs
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 
 ### **Teguh Kusuma** — September 5, 2016 at 4:24 pm ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22707))
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it free for beginner developer?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 
 ### **Shai Almog** — September 6, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22915))
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It is available to all subscription levels including the free level.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 
 ### **Cristian Romascu** — September 29, 2016 at 5:51 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-23034))
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hello, i have 3 already made Java apps (using nothing but Java SE), can i convert them to UWP using Codename One?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 
 ### **Shai Almog** — September 30, 2016 at 6:48 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-23063))
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > No. Codename One supports a subset of Java SE and our own UI API which is more portable than anything available in JavaSE.  
 > OTOH you will gain for your effort the portability to iOS, Android, UWP, JavaScript (with threads etc.)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-developers-can-finally-target-windows-uwp.html)
+
 
 ---
 

@@ -36,7 +36,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Awesome. Call it CameraKit2. I was trying to use it in the middle of the transition and was having issues. Glad it’s out now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcamerakit-rewrite.html)
+
 
 
 ### **Durank** — May 3, 2019 at 5:03 pm ([permalink](https://www.codenameone.com/blog/camerakit-rewrite.html#comment-24028))
@@ -45,7 +45,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > how can I launch camera in landscape with this api?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcamerakit-rewrite.html)
+
 
 
 ### **Shai Almog** — May 4, 2019 at 4:43 am ([permalink](https://www.codenameone.com/blog/camerakit-rewrite.html#comment-24114))
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Force landscape in the app using setPortait (this will work on Android only) then embed the camera in the form.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcamerakit-rewrite.html)
+
 
 ---
 

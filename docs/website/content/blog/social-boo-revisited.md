@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks a lot in advance…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
+
 
 
 ### **Shai Almog** — December 23, 2016 at 6:36 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23016))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to create a new project with the right package names and copy the source/properties and resources into the eclipse workspace.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
+
 
 
 ### **salah Alhaddabi** — December 24, 2016 at 7:13 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23187))
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Dear Shai I am using netbeans  
 > I want to know how to clone the project using netbeans please
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
+
 
 
 ### **Shai Almog** — December 24, 2016 at 9:12 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23285))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > File -> New Project -> Codename One -> Demos -> Social Boo…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
+
 
 
 ### **salah Alhaddabi** — December 24, 2016 at 5:53 pm ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23001))
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Due to that I am not able to run the app. Please help.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
+
 
 
 ### **Shai Almog** — December 25, 2016 at 8:23 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23233))
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ve committed a fix for this but because it needs a plugin update it might take a couple of weeks to release it as it’s a longer cycle than the typical library cycle.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
+
 
 ---
 

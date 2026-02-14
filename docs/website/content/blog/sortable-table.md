@@ -45,7 +45,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you very much! 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **Francesco Galgani** — August 16, 2017 at 5:11 pm ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-21471))
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you for any help (and for your work in vacation time…)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **Shai Almog** — August 17, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23549))
@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Make sure to update the libraries by opening Codename One Settings -> Basic -> Update Client Libs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **Francesco Galgani** — August 17, 2017 at 9:35 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23645))
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ok, now it compiles… but the table is not sorted (using exactly your code). How can I sort it according to the values in third column? Thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **Shai Almog** — August 18, 2017 at 5:53 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23573))
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Click the columns to sort them and again to flip ascending/descending direction.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **salah Alhaddabi** — August 21, 2017 at 4:44 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23520))
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Very nice you guys are amazing!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **SoAppMedia** — August 21, 2017 at 4:42 pm ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-21525))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for sharing! this is such a great help this is worth to share!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **Francesco Galgani** — August 21, 2017 at 5:02 pm ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-21854))
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ok. Is there any way to get a column already selected for ordering (in ascending or descending direction) before any user input, for example on [myForm.show](<http://myForm.show)(>) or myForm.revalidate()?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **Shai Almog** — August 22, 2017 at 5:27 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23613))
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ll add a sort(column, ascending) method to allow this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 
 ### **Francesco Galgani** — August 22, 2017 at 11:13 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23565))
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you! 😀
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsortable-table.html)
+
 
 ---
 

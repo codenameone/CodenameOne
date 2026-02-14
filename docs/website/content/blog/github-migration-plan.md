@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For open source projects, there ‘s no limit.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgithub-migration-plan.html)
+
 
 
 ### **Shai Almog** — March 28, 2015 at 3:01 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-22261))
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We looked at that and several others. While I’d love that it does seem that pretty much everyone is going to Github.  
 > I like Github in general, the site and tools are amazing. I think the main problem is git itself but since most people are moving in that direction we should probably align rather than fight it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgithub-migration-plan.html)
+
 
 
 ### **cvconover** — August 11, 2015 at 12:58 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-22435))
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Cheers  
 > Craig
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgithub-migration-plan.html)
+
 
 
 ### **Shai Almog** — August 11, 2015 at 2:02 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-21545))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Overall, I’m much happier with Git today and I’m generally happy we made the move.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgithub-migration-plan.html)
+
 
 ---
 

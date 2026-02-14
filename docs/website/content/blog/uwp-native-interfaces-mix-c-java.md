@@ -147,14 +147,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Great!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuwp-native-interfaces-mix-c-java.html)
+
 
 
 ### **Chibuike Mba** — November 17, 2016 at 10:48 am ([permalink](https://www.codenameone.com/blog/uwp-native-interfaces-mix-c-java.html#comment-23044))
 
 > WOW! Steve this is good.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuwp-native-interfaces-mix-c-java.html)
+
 
 ---
 

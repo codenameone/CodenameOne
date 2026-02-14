@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > JavaFX is necessary also for the CSS support, in particular for generating 9-piece image borders.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
+
 
 
 ### **Shai Almog** — June 21, 2020 at 1:46 am ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24276))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes, but it won’t be with JCEF as it can be used instead and would probably work better/faster as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
+
 
 
 ### **Javier Anton** — June 24, 2020 at 8:52 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24282))
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We recently introduced (.net) CEF in one of the apps I make at work to replace embedded IEs. It increased the build size from 7 to 70MB. The business could not be happier as performance has really improved. People like performance. Desktop build size is not as much of a problem as mobile app size
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
+
 
 
 ### **Shai Almog** — June 25, 2020 at 2:01 am ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24279))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Yes. Actually for the desktop apps I think it will be smaller than the full blown JavaFX VM and we will be able to download it dynamically if necessary in the future.  
 > The main problem is the IDE libraries. Here size matters. Every week we release an update and if that update includes a 60mb CEF attachment this can be a problem. So we need this as a separate thing from the main JAR and ideally we’d want to keep it completely separate as our plugin is already freakishly huge.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
+
 
 
 ### **Angelo** — July 15, 2020 at 2:47 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24294))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Do you cofirm it’s under active development and it wil be released in a few days?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
+
 
 
 ### **Shai Almog** — July 16, 2020 at 2:21 am ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24297))
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Take a look at our github commit history.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
+
 
 ---
 

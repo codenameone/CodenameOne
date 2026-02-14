@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Since I had begin to work on my codenameone project in 2014, I’ve experimented many subject you have mentionned above (full application dev, security, sqlite database, nice UI, threads, webservices, third parties, animations etc…). My application is currently in beta testing and right before to release in AppStore, I would like to cover it with some unit test …  
 > I will probably tell you more details on this application later, with screenshots.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Dalvik** — March 6, 2017 at 5:06 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23379))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great story about Ram, I was impressed that despite looking dated his app has a 4.2 rating on play from 40k users which is pretty decent and beats a lot of apps out there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Shai Almog** — March 6, 2017 at 5:09 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23191))
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > TDD is one of those things I’d love to improve in Codename One. It’s my personal second on my wish list after on-device-debugging.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Shai Almog** — March 6, 2017 at 5:11 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23289))
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > One thing I didn’t highlight enough was the fact that when he wrote the app there were no tutorials, guidelines or anything. No developer guide just a blog and javadocs. So he did a pretty amazing job for the shape Codename One was back then. I wonder how the app would look if he had started working on it now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Chad Elofson** — March 6, 2017 at 5:37 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23197))
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > JHipster is Spring Boot with Angular. I have been wanting to try it out.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Fabrício Cabeça** — March 6, 2017 at 5:45 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23407))
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi Shai, if you enjoy a dangerous approach please take a look at our crude swagger plugin for cn1 at github 😉  
 > [https://github.com/Pmovil/s…](<https://github.com/Pmovil/swagger-codenameone-codegen>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **salah Alhaddabi** — March 6, 2017 at 6:11 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23425))
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Dear Shai, since you are trying to focus more on the UI/UX I would really strongly advice that you just stick to the standard java ee 7 api without going into any specific free or commercial third party APIs. That way everyone can follow up without having to learn something new on the server side. If you have written specific plugins to work with spring then its better to discuss that on a separate blog please. I think most of us here are very familiar with the Oracle java ee APIs but we are not all using spring or jhipster plus I am sure there are very good tutorials out there that could explain more on those subjects. So please please please just use the standard java ee 7 API as you can achieve all server tasks by using it. Thanks and sorry for the long reply.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Shai Almog** — March 6, 2017 at 6:53 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23258))
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes, it’s spring boot with a few extras, angular being one of them. Mostly it’s the scaffolding process they use.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Shai Almog** — March 6, 2017 at 6:54 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23099))
@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ll post about it in the blog but probably too risky for a bootcamp 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Shai Almog** — March 6, 2017 at 7:00 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23337))
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Even if I will use spring boot most of the code I will write will be standard Java EE stuff and should work on any server out there so it shouldn’t detract from the applicability of the code. Most of what spring boot brings to the table is a ready made starting point which means I’ll spend less time on server code that most of you already have.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **salah Alhaddabi** — March 7, 2017 at 4:38 am ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23211))
@@ -229,7 +229,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks Shai its ok if you insists on using spring boot but we expect that you will be going through the basics of spring boot as well please because some of us are only using standard java ee. Thanks again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 
 ### **Shai Almog** — March 7, 2017 at 5:17 am ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-24128))
@@ -240,7 +240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Since the bootcamp is very interactive unlike a course I’d expect more “back & forth” in case I go to quickly or don’t cover something properly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspring-template-more-about-bootcamp.html)
+
 
 ---
 

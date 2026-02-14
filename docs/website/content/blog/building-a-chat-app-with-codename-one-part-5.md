@@ -594,21 +594,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Whoaoooooo. U guys are so far ahead. For you to despite your busy schedule have time for this kinda tutorials. Although I will wish to see login through twitter handled in your tutorial as well. Thanks great guys, great work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-5.html)
+
 
 
 ### **salah Alhaddabi** — November 19, 2016 at 1:34 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23150))
 
 > Dear Shai, I have tried the chat app up until now without the pubnub functionality. I have copied the exact same code from here and also missing pieces from gethub. When I use it on the simulator and clock on google login I login ok. But when I try to get friends I get an error even when the token is valid. I immediately get 400 error code when I try to use facebook login. I have tried the app on my android device S7 and I get a message the socialChat app has closed when I click on google login.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-5.html)
+
 
 
 ### **Shai Almog** — November 20, 2016 at 6:13 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23092))
 
 > Try running with the device connected with a cable and DDMS to see the output.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-5.html)
+
 
 
 ### **salah Alhaddabi** — November 20, 2016 at 6:34 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23174))
@@ -617,14 +617,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have downloaded the apk file and start android studoi and opened the apk file in android studo and connected my samsung to PC with a USB cable but not sure what to do next as nothing appears in the console when the application fails. Can you please instruct me on how to go about this debugging??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-5.html)
+
 
 
 ### **Shai Almog** — November 21, 2016 at 4:52 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23025))
 
 > You don’t need to open the APK in Android studio. Just run the app as usual on the device and in android studio select the DDMS tool. This will open a special console on the bottom where you can pick your device and look thru the logs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-5.html)
+
 
 
 ### **salah Alhaddabi** — November 21, 2016 at 6:59 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23036))
@@ -642,7 +642,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Your help is much appreciated.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-5.html)
+
 
 
 ### **Shai Almog** — November 22, 2016 at 4:49 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23218))
@@ -651,7 +651,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There is more output in the Google login which should probably clarify that. Also make sure you are building with API level 21 to workaround this issue: [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/issues/1961>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-5.html)
+
 
 ---
 

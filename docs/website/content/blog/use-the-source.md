@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > For people who also use this post regularly and wonder how to do it in the new situation, you should read this blog post: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/github-migration-completed.html>)  
 > Don’t forget to add the demos (not necessary), skins and binaries in the root of the project and to execute [build_skins.sh](<http://build_skins.sh>) from codenameone-skins (maybe add this also in the developer guide?).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuse-the-source.html)
+
 
 ---
 

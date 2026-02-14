@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Awesome work!! ..as always. Push notifications: there was a mention they will be eventually available even for basic accounts?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-5-0-social-live.html)
+
 
 
 ### **Shai Almog** — September 20, 2018 at 6:50 am ([permalink](https://www.codenameone.com/blog/codename-one-5-0-social-live.html#comment-24029))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Another idea is to increase the quota based on referrals so even the free tier would be able to get enough push messages for a small app.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-5-0-social-live.html)
+
 
 
 ### **Lukman Javalove Idealist Jaji** — September 20, 2018 at 1:04 pm ([permalink](https://www.codenameone.com/blog/codename-one-5-0-social-live.html#comment-22646))
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I was gon ask the same question… Is there a timeline as to when this 100 units will be available?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-5-0-social-live.html)
+
 
 
 ### **Shai Almog** — September 25, 2018 at 8:20 am ([permalink](https://www.codenameone.com/blog/codename-one-5-0-social-live.html#comment-24013))
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Currently both are no. So far we don’t see any noticeable impact from the referral program. So investing more time in this probably won’t drive traction. We have a lot on our plates for the end of the year and Q1 2019 so I don’t see this happening soon.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-5-0-social-live.html)
+
 
 ---
 

@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > how can i get access to the updated kitchenSink Demo?.Cheers
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-5-now-live.html)
+
 
 
 ### **Shai Almog** — August 6, 2016 at 4:54 am ([permalink](https://www.codenameone.com/blog/codename-one-3-5-now-live.html#comment-22364))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’d like to publish it in the next couple of weeks. It’s not ready yet…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-5-now-live.html)
+
 
 
 ### **Hristo Vrigazov** — August 13, 2016 at 4:58 am ([permalink](https://www.codenameone.com/blog/codename-one-3-5-now-live.html#comment-21452))
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Pure awesomeness! Way to go guys! Thanks for the amazing product!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-5-now-live.html)
+
 
 ---
 

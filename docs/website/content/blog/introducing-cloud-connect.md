@@ -37,7 +37,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Have you had some copy & paste problem?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-cloud-connect.html)
+
 
 
 ### **Shai Almog** — November 20, 2018 at 11:02 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24073))
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What do you mean?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-cloud-connect.html)
+
 
 
 ### **Shai Almog** — November 20, 2018 at 11:07 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24083))
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > OK, I see it now. It must have picked a command-c when I was in a different desktop… Will fix this soon.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-cloud-connect.html)
+
 
 
 ### **Boniface N. Githinji** — November 20, 2018 at 11:38 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24103))
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/44883f83d21f28bd64f49a31a3aea15de79b17e9fd766e29e6c6e62cec67a493.png>)  
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/d89c60fd7b95fe75c34c44c8560d4eaa97ce86356bf60e34d769a5060297c1e9.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/6dff267929227c6c49f9ad3c5d152b0a0a4be99cd3b2345fa63e59516174fdc0.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/c3247feff26990bf85bbd93be5eac15edc560f73b1b2454ef7a6490685275d41.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/ab82a6862bb4d8c7762567f329b41b6249324dff497268aef3ec53b491fc311f.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-cloud-connect.html)
+
 
 
 ### **Shai Almog** — November 21, 2018 at 7:08 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24026))
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looks great!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-cloud-connect.html)
+
 
 
 ### **Chen Fishbein** — November 22, 2018 at 7:19 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24085))
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice job!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintroducing-cloud-connect.html)
+
 
 ---
 

@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Very cool. Have you already decided when will you open-source the new iOS VM?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — May 29, 2014 at 2:51 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22096))
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes, I wrote in a previous post that we intend to open source it once the work is done.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 4, 2014 at 5:29 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21726))
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Kind regards,
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 4, 2014 at 2:27 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21711))
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks for the report. We broke some things a few days ago with some changes to the Facebook functionality. This should now work as expected.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 4, 2014 at 7:21 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21727))
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Unfortunately, the code I sent is still building (more than 2 hours now).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 5, 2014 at 12:25 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22077))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Did you try canceling and resending the build?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 5, 2014 at 1:22 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21961))
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 5, 2014 at 2:10 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21884))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Make sure your project binaries aren’t too large (do you have many images/resources). If you used include source uncheck that feature, from the looks of it your build exceeded App Engines size quotas.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 5, 2014 at 3:36 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22058))
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 5, 2014 at 7:15 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21876))
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 6, 2014 at 4:29 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21622))
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Optipng can be configured in the advanced menu. You can remove the unnecessary DPI’s from the image advanced menu too.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 6, 2014 at 4:32 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22027))
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 6, 2014 at 1:46 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21933))
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 6, 2014 at 3:38 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22130))
@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I would still suggest keeping the executable smaller for faster build times and you would still have the 50mb limit.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 17, 2014 at 11:32 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21914))
@@ -244,7 +244,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 17, 2014 at 4:52 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21993))
@@ -253,7 +253,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We made an improvement to the new VM today which might help. If not try isolating functionality to pinpoint the crash and build a test case we can inspect.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 17, 2014 at 5:26 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21820))
@@ -264,7 +264,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s still not working so we will try to isolate more precisely the crash.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 20, 2014 at 5:49 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21676))
@@ -285,7 +285,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 20, 2014 at 1:52 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21443))
@@ -296,7 +296,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We only accept code from pro accounts or higher and then after exhausting other options to track the issue.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 
 ### **Anonymous** — June 21, 2014 at 4:21 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21885))
@@ -305,7 +305,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I will, thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvm-updates-webservices.html)
+
 
 ---
 

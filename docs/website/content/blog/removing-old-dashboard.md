@@ -35,7 +35,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > but this page it’ll continue working separately on the Dashboard or you will migrate all your web side?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fremoving-old-dashboard.html)
+
 
 
 ### **Shai Almog** — September 12, 2020 at 4:45 am ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24328))
@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We will migrate the entire site. To test this out we’ll remove this page earlier than the rest of the site but we will replace the entire thing. Since the new site will have a different architecture the current page just can’t physically work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fremoving-old-dashboard.html)
+
 
 
 ### **Carlos Verdier** — September 16, 2020 at 7:19 am ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24341))
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For some reason, the “Install on device” and other links don’t work properly on my iPad (13.7). I need to repeatedly tap on the link and eventually it works.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fremoving-old-dashboard.html)
+
 
 
 ### **Francesco Galgani** — September 16, 2020 at 8:33 am ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24342))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have the same issue. I reported it here: <https://github.com/codenameone/CodenameOne/issues/3264>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fremoving-old-dashboard.html)
+
 
 
 ### **Shai Almog** — September 17, 2020 at 4:12 am ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24343))
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’re looking into this. It’s also possible this is related to limits in the HTML standard with opening links via code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fremoving-old-dashboard.html)
+
 
 ---
 

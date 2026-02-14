@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, great work by Steve on the Scandit cn1lib. I noticed that CodenameOne is not listed in the Scandit Developer page. I saw a bunch of other development platforms there and I thought perhaps you guys could consider getting it listed there to get more traction. Best Regards!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmeltdown-updates.html)
+
 
 
 ### **Shai Almog** — January 19, 2018 at 5:17 am ([permalink](https://www.codenameone.com/blog/meltdown-updates.html#comment-23714))
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks. We already asked for a listing. I posted this and followed by sending them the details so it will probably take some time for everything to update on their end.  
 > Their stuff seems pretty cool with dedicated barcode scanning phone cases etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmeltdown-updates.html)
+
 
 ---
 

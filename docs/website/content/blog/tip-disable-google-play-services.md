@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the tip. I have already seen the 1.5mb app size reduction in my latest build following the tip.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-disable-google-play-services.html)
+
 
 ---
 

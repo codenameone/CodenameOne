@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Are you saying the priorities are not clear where CN1 should focus on when it comes to aligning CN1 UI with the UI guidelines of the respective OS? Its going to be tough because ideally I was hoping to rely on CN1 to have most of the guideline knowledge build-in and occasionally look at guidelines to verify things like spacings and so on.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpixel-perfect-material-buttons.html)
+
 
 
 ### **Shai Almog** — July 13, 2017 at 4:02 am ([permalink](https://www.codenameone.com/blog/pixel-perfect-material-buttons.html#comment-23519))
@@ -157,14 +157,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > By default your app won’t look very good if you use native SDK’s or Codename One. You need to pay attention to the design regardless of the platform.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpixel-perfect-material-buttons.html)
+
 
 
 ### **Ross Taylor** — July 14, 2017 at 5:46 pm ([permalink](https://www.codenameone.com/blog/pixel-perfect-material-buttons.html#comment-23595))
 
 > So what you mean is one must be creating our own theme that conforms to design guidelines instead of relying on the default theme?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpixel-perfect-material-buttons.html)
+
 
 
 ### **Shai Almog** — July 15, 2017 at 8:08 am ([permalink](https://www.codenameone.com/blog/pixel-perfect-material-buttons.html#comment-23719))
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You already have your own theme, I’m saying you should pay attention to design and not just expect it to “look good” without any conscious effort on your part.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpixel-perfect-material-buttons.html)
+
 
 ---
 

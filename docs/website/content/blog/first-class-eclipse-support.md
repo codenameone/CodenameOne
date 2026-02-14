@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi – I’m using the eclipse version – a quick comment: the build process isn’t copying all the files the way I would expect – for instance, the sql demo requires a db file to be copied to the cn folder – currently this has to be done manually. I suspect this is hitting anyone trying to run the demos. cheers
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffirst-class-eclipse-support.html)
+
 
 ---
 

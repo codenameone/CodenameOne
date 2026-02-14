@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcallserially-the-edt-invokeandblock-part-2.html)
+
 
 
 ### **Anonymous** — March 3, 2015 at 2:02 am ([permalink](https://www.codenameone.com/blog/callserially-the-edt-invokeandblock-part-2.html#comment-22353))
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the catch!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcallserially-the-edt-invokeandblock-part-2.html)
+
 
 ---
 

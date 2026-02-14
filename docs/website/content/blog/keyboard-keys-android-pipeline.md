@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How do i listen to the done or search event when the user presses either the search button or send. I want to capture the event. Also, instead of the search icon, can I set the text to something like “create”?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkeyboard-keys-android-pipeline.html)
+
 
 
 ### **Anonymous** — October 30, 2014 at 9:53 pm ([permalink](https://www.codenameone.com/blog/keyboard-keys-android-pipeline.html#comment-22006))
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can just use action listener to get the event of text input completion.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkeyboard-keys-android-pipeline.html)
+
 
 ---
 

@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hope this issues makes help for those fantastic JS port developer.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **shannah78** — May 8, 2015 at 4:55 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22208))
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I haven’t implemented key listeners on the form yet. Please post both of these issues (separately) into the issue tracker so I don’t forget to look into them when the time comes.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **KL** — May 9, 2015 at 10:11 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-21613))
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you shannah.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **shannah78** — May 9, 2015 at 3:31 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22159))
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The Javascript port will be in beta by July.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **KL** — May 10, 2015 at 12:56 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-24197))
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Shannah, may I know which component that you already implement key listener? I try to use TextField to handle the key event, but it just fell not so direct as Form. Possible with Label?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **Shai Almog** — May 10, 2015 at 2:11 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22169))
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Key events aren’t sent on Android (unless the Android device has a physical keyboard) or iOS since they are restricted to physical keys and not virtual keyboards.  
 > To follow input in text fields you can use DataChangeListener.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **KL** — May 10, 2015 at 3:09 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22120))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Your advice is much appreciated.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **shannah78** — May 11, 2015 at 5:01 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22286))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I haven’t implemented key listeners at all yet. DataChangeListener should work, and is tested to work with a soft keyboard on android, on desktop, on iOS with both a soft keyboard and a hardware keyboard. I haven’t tested android with a hardware keyboard yet. There may be a bug there. Please file an issue on this in the issue tracker and post a minimal test case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **KL** — May 11, 2015 at 8:05 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-21938))
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Can you please advice where should I file yhe issue tracker? Any ETA of the BETA of this JS port?  
 > Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **Shai Almog** — May 11, 2015 at 2:35 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22137))
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Beta should be ready by June. See [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/issues/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **KL** — May 28, 2015 at 9:17 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22170))
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, Shai, I understand the javascript port will be updated on 1/JUN, may I know is the keylistener implemented currently? Can I try now?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **Shai Almog** — May 28, 2015 at 6:53 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22409))
@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We update the JavaScript port a few times a week. If an issue exists and was marked fixed it will take less than a week for it to reach production. I suggest you follow up in the issue tracker on github.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 
 ### **KL** — May 29, 2015 at 7:09 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22287))
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-port-cross-origin-hints-bugs.html)
+
 
 ---
 

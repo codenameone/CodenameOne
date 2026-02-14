@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > great stuff as usual. May I suggest that the workflow allows for a “all without coding” route? Your demo showed that 2 lines of code had to be added when a new “GUi form” was created, in order to make it displayed. A tick box in the wizard at the moment of Form creation could do it.  
 > Essentially, it is key to allow beginners to use the designer much before they have to write even one line of code, as is the case now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Shai Almog** — October 15, 2015 at 6:39 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22502))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Right now I’d like to stabilize the designer so we can start building on top of it both tutorials and things such as this. At the moment this is somewhat of a regression for a “no coding” approach since some things like navigating from one form to the next aren’t supported in the new GUI builder. Naturally, we want to fix that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **mtran** — October 16, 2015 at 2:49 pm ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-21479))
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Where can I download the Gui Buider ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Shai Almog** — October 17, 2015 at 4:31 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22142))
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It will be a part of the next plugin update early next week.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Jeremy** — October 18, 2015 at 2:38 pm ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-24193))
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good job, but I think it would even be better if the Gui builder is designed such that it is possible to switch between the drag and drop style and the XML layout.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Shai Almog** — October 19, 2015 at 2:17 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22341))
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > As you can see above the XML syntax wasn’t designed for human consumption as much as it was designed for accuracy. So editing this will be less intuitive.  
 > You can edit this XML thru NetBeans and also use it to find out what happened if something went wrong. I think its a better approach since NetBeans already has great XML editing capabilities.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Chidiebere Okwudire** — October 29, 2015 at 3:48 pm ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22511))
@@ -182,7 +182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I like what I see in the video. One thing that’s still unclear to me is what will eventually happen to the navigation logic that is present in the current GUI builder. Can you say something about that? Basically, how is navigation envisaged to work in the new GUI builder *especially* for scenarios where some forms are completely handcoded whereas others are created using the GUI builder?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Shai Almog** — October 30, 2015 at 5:04 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22254))
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Because of that the new GUI builder is more like a handcoded app than a GUI builder app.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **bledi** — October 31, 2015 at 4:52 pm ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22495))
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hello,  
 > i just downloaded the last version of the netbenas plugin and there seems not te be a new gui builder. When are you planning to relase the new one, as ti seems very promissing. Thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Shai Almog** — November 1, 2015 at 4:27 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22437))
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > Where did you download it from and what’s the version. 3.2.2 is the latest version of the NetBeans plugin.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **bledi** — November 1, 2015 at 11:01 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-21487))
@@ -224,7 +224,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I installed again from the netbeans plugins and now i have 3.2.2. On all newly created project i cannot add events to buttons etc. On already existing projects it works as before. There is a thread in the google group for this also.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Dan** — November 5, 2015 at 3:16 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22267))
@@ -233,7 +233,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for this overview, Shai – and thanks for including it in the latest CodenameOne release. Downloaded it today and have started playing with it. Thanks for the tip about the XML file – for some reason, dragging and dropping a textfield (for me at least) kept it as type “Label”. so if i go into the XML and change the type to “TextField” it seems to come out ok. Keep up the good work! – dan
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Shai Almog** — November 6, 2015 at 4:26 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22438))
@@ -243,7 +243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > thanks for the feedback. We are making heavy changes to the tool as we speak to get it to alpha level. Our focus in the technology preview was on the concept and the XML process with back and forth communication to the IDE.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 
 ### **Yaakov Gesher** — November 8, 2015 at 7:28 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22530))
@@ -252,7 +252,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi, I just converted an existing project using the migration wizard, and in all the generated files the NetBeans shows me compilation errors: Cannot find symbol ‘setGlobalResources’ in class ‘Resources’. After refreshing project libraries, the errors all went away. Just in case anyone else runs into the same issue!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgui-builder-walkthru.html)
+
 
 ---
 

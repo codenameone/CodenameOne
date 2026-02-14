@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Great work!!!! just a question, how to change the color of the circle. instead of blue maybe use red or any different color
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Faround.html)
+
 
 
 ### **Chen Fishbein** — April 1, 2016 at 6:38 am ([permalink](https://www.codenameone.com/blog/around.html#comment-22460))
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, the colors are coming from the “Slider” theme entry, just modify the Slider colors on the theme to change the colors
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Faround.html)
+
 
 ---
 

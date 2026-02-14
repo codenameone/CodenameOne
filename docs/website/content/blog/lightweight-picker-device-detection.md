@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Would it be possible now to have a UI like in the IOS calendar app where the pickers slide in between the other controls – thus not open a dialog to choose but stay on the same form?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flightweight-picker-device-detection.html)
+
 
 
 ### **Stefan Eder** — May 23, 2018 at 11:13 am ([permalink](https://www.codenameone.com/blog/lightweight-picker-device-detection.html#comment-23683))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Apparently even if the locale is german and the date is displayed in the german format befor editing – in the picker UI in the simulator the date format is the US date format and the buttons are english.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flightweight-picker-device-detection.html)
+
 
 
 ### **Shai Almog** — May 24, 2018 at 4:05 am ([permalink](https://www.codenameone.com/blog/lightweight-picker-device-detection.html#comment-23946))
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Since this is a lightweight component we’ll localize it with the rest of the localization logic. All of this should be declared in the javadoc to the class to make it easier to do.  
 > It should be possible to embed this but right now it’s not a priority so we hid/deprecated those internal API’s as they are still not mature enough for use. Notice that there are small nuances with embedding e.g. if you have a text field followed by a picker you’d expect the “next” cycle to include the picker (that currently doesn’t work in the picker) but it would be hard to do with embedding.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flightweight-picker-device-detection.html)
+
 
 
 ### **Francesco Galgani** — May 25, 2018 at 3:36 pm ([permalink](https://www.codenameone.com/blog/lightweight-picker-device-detection.html#comment-21636))
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The Diamond’s CN1Lib to detect the device works perfectly! Thanks! 😀
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flightweight-picker-device-detection.html)
+
 
 ---
 

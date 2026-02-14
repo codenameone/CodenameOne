@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Months later, this came in handy. Would be great to know how to implement the list-less version.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-auto-complete-renderer.html)
+
 
 
 ### **Shai Almog** — January 16, 2018 at 6:47 am ([permalink](https://www.codenameone.com/blog/tip-auto-complete-renderer.html#comment-23697))
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ll need to write a new component to implement that but technically it should be pretty easy to do similarly to some of the options highlighted in [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-dont-use-combobox.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-auto-complete-renderer.html)
+
 
 ---
 

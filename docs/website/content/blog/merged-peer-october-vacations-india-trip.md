@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > come to Nepal too if possible… We will have good time….
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmerged-peer-october-vacations-india-trip.html)
+
 
 
 ### **Chidiebere Okwudire** — September 19, 2016 at 3:01 pm ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-22744))
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When are you coming to The Netherlands? 😉 Enjoy your vacation!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmerged-peer-october-vacations-india-trip.html)
+
 
 
 ### **Shai Almog** — September 20, 2016 at 5:21 am ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-22939))
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks for the invite.  
 > This trip is mostly for my spouses studies, I don’t like traveling much although I do enjoy the far east.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmerged-peer-october-vacations-india-trip.html)
+
 
 
 ### **Shai Almog** — September 20, 2016 at 5:23 am ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-23133))
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t have any immediate travel plans but we do have some family in Amsterdam so it might happen. We’re just so busy and they usually prefer coming here to get out of the gray weather and roast themselves in the sun…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmerged-peer-october-vacations-india-trip.html)
+
 
 
 ### **beck** — September 29, 2016 at 4:24 am ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-23023))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My pleasure. Enjoy your vacation in India. If by any chance,you change your mind, here is for the weekend. Its very very near frm India. [https://www.youtube.com/wat…](<https://www.youtube.com/watch?v=lB9cuOuZL1Y>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmerged-peer-october-vacations-india-trip.html)
+
 
 ---
 

@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, this setFormBottomPaddingEditingMode is a nice feature, but there seams to be a bug – scrolling works well when the next edited field is opened from keyboard native “Next” button, but when a lower field editing is opened by clicking on the field, then the field is not scrolled to make room for the keyboard. Interestingly in this case scrolling happens only after clicking on “Done” button.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flocation-ios-beta-testing-better-input.html)
+
 
 
 ### **Anonymous** — January 22, 2015 at 6:20 am ([permalink](https://www.codenameone.com/blog/location-ios-beta-testing-better-input.html#comment-22184))
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m sorry for the previous misleading info. Actually the mentioned bug is not related to setFormBottomPaddingEditingMode, it happens always with ios.keyboardOpen=true.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flocation-ios-beta-testing-better-input.html)
+
 
 ---
 

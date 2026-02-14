@@ -33,7 +33,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As I begin expanding my use of CN1, I keep needing more and more to append my final native sources and rebuild. This process takes considerable time, as each finished build needs to be edited so it ships with everything else (I am mainly talking about XCode extensions and capabilities here). I have no idea how it’d work, but it would be great if this process could be automated in one way or another. I get dizzy from having to do this each time I build.. sometimes for extremely small changes (since the built sources are illegible and can’t realistically be changed after they’ve come out of the build server). Anyway, just a thought, thanks again guys
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 
 ### **Shai Almog** — February 2, 2021 at 2:38 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24393))
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can use build hints and native code to customize the project for most intents and purposes e.g. ios.add_libs allows you to add frameworks from xcode. The idea is to get a fully functional app without requiring any customization after the fact.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 
 ### **Javier Anton** — February 6, 2021 at 11:33 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24401))
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m still learning the ropes when it comes to XCode. In a specific example: where in my netbeans project should I put the code with a framework that contains a Share Extension (with my own code) in order for it to be picked up by the ios.add_libs build hint? Is this possible?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 
 ### **Shai Almog** — February 7, 2021 at 1:58 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24403))
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m not familiar enough with share extensions but if you need a specific framework to be added just add it to the list in add_libs e.g. ios.add_libs=x.framework;y.framework;mylib.a
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 
 ### **Javier Anton** — February 7, 2021 at 6:21 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24406))
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > However, it’s not just a Swift support problem. It also takes very advanced knowledge of how Codename One works, which we simple developers don’t always have.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 
 ### **Shai Almog** — February 3, 2021 at 3:13 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24396))
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We have an RFE on Swift in the issue tracker if I remember correctly. I’m not sure when we’ll get to it as our issue pipeline is pretty deep and our manpower is heavily committed to some deep tasks. This is also a pretty hard task to implement and will produce a sub-par result since Swift is inherently problematic with VMs due to ARC.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 
 ### **Javier Anton** — February 6, 2021 at 11:41 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24402))
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What I meant by appending the native sources was adding Targets (Share Extensions, Notification Service/Content Extensions, etc) and modifying core files like delegate/view controller. I don’t think this can be accomplished using native interfaces please correct me if I am wrong. I also don’t know if using Targets will in some way solve your swift problem since each target can have either objc/swift and it all works together
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 
 ### **Shai Almog** — February 7, 2021 at 2:03 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24404))
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can inject sources to various files such as the delegates with build hints. If you look at the source code in git you’ll see various magical comments that generally contain the word “REPLACE” these are special comments that our build servers replace and we can give you a build hint to replace code in that area (some of these build hints are documented).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 
 ### **Javier Anton** — February 7, 2021 at 6:21 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24405))
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I know, and thanks. I still need to inject code in areas where there aren’t build hint markers as well as remove existing code. This is mostly due to the fact that I am implementing my own push, so I am probably just an outlier
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-codename-one-7-0.html)
+
 
 ---
 

@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Will the rotation and 3D effects be applied to Android and Windows ports?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fscreenshots-and-graphics-update.html)
+
 
 
 ### **Anonymous** — April 30, 2014 at 2:45 pm ([permalink](https://www.codenameone.com/blog/screenshots-and-graphics-update.html#comment-21772))
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Windows Phone probably not in the near future.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fscreenshots-and-graphics-update.html)
+
 
 ---
 

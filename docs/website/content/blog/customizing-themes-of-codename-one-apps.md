@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great addition, really useful. Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcustomizing-themes-of-codename-one-apps.html)
+
 
 
 ### **Javier Anton** — March 24, 2021 at 9:06 am ([permalink](https://www.codenameone.com/blog/customizing-themes-of-codename-one-apps.html#comment-24417))
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, I rely on themes at the moment and kind of dread migrating to CSS. I know the clock is ticking and you will switch off support for themes at some point, so resources like these are great
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcustomizing-themes-of-codename-one-apps.html)
+
 
 
 ### **ThomasH99** — March 28, 2021 at 9:33 am ([permalink](https://www.codenameone.com/blog/customizing-themes-of-codename-one-apps.html#comment-24418))
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Javier, I’m using CSS since quite some time, I found it easy to get started, and it’s a really nice way of working, especially with the live update (the simulator is updated as soon as you save the CSS file). This has made the workflow a LOT faster. The only slight concern I’ve come across is that since the CSS conversion creates every possible variation of the UIIDs (pressed ect), my generated .res becomes very big (280 uiids gives a .res of 400kb, no pictures). I define UIIDs for most of the individual elements based on their semantics and that might not be the best solution, but it makes it easy to tune individual styles whenever needed.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcustomizing-themes-of-codename-one-apps.html)
+
 
 ---
 

@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-mobile-ios-apps-in-java-using-codename-one-on-youtube.html)
+
 
 
 ### **Anonymous** — October 9, 2014 at 1:21 pm ([permalink](https://www.codenameone.com/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube.html#comment-21604))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes its for all platforms. The main reason for iOS in the title is the mindshare/SEO aspect of this but its applicable for everything.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-mobile-ios-apps-in-java-using-codename-one-on-youtube.html)
+
 
 
 ### **Ankit Mathur** — April 7, 2015 at 9:30 am ([permalink](https://www.codenameone.com/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube.html#comment-22071))
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 1\. How to change the form programmatically?  
 > 2\. Can we use the JAR files to create some graphs / some drawings / capture locations as in android. and many more devices.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-mobile-ios-apps-in-java-using-codename-one-on-youtube.html)
+
 
 
 ### **Shai Almog** — April 7, 2015 at 7:21 pm ([permalink](https://www.codenameone.com/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube.html#comment-22228))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 1\. Wasn’t this demonstrated in the demo? [form.show](<http://form.show)(>) etc.?  
 > 2\. You can use cn1libs: [http://codenameone.com/cn1l…](<http://codenameone.com/cn1libs.html>) Notice that graphs are builtin to Codename One: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/codename-one-charts>) as is location support etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-mobile-ios-apps-in-java-using-codename-one-on-youtube.html)
+
 
 ---
 

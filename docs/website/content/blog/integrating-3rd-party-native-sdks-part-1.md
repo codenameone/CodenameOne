@@ -566,14 +566,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > just what i have been waiting for
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintegrating-3rd-party-native-sdks-part-1.html)
+
 
 
 ### **Moacir Schmidt** — October 18, 2015 at 3:37 pm ([permalink](https://www.codenameone.com/blog/integrating-3rd-party-native-sdks-part-1.html#comment-22219))
 
 > Excellent!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintegrating-3rd-party-native-sdks-part-1.html)
+
 
 ---
 

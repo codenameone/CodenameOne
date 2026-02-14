@@ -39,7 +39,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No audio in the above video
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — June 5, 2016 at 4:14 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-22770))
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The video was recorded without audio just to demo the process. We’ll probably do a more thorough tutorial on building automated tests in the future.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Hristo Vrigazov** — September 4, 2016 at 8:17 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-21430))
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How can we test classes (without the test recorder)?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — September 5, 2016 at 4:25 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-22761))
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Tests are just classes that derive abstract test. You can use the test recorder to create a template and then create as many of those as you want purely from code. The test process auto-detects them and runs them.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Takii Marskii** — October 19, 2016 at 9:03 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24228))
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to just run one Script out of the whole Test Scripts? If so how would I do that?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — October 20, 2016 at 2:12 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-23116))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We don’t provide that option currently.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — May 1, 2024 at 6:14 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24603))
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m new to codename one and trying to find out how we can record and play back help us testing desktop application, how we can install simulator and record and run the tests. any help is really appreciated.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — May 2, 2024 at 1:27 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24604))
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The simulator is a part of the Codename One project. When you run the getting started project it’s there and so is the test recorder. Recorded tests are just source code. You need to add the source to the test package and then you have unit tests.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — May 2, 2024 at 12:31 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24605))
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > ok thanks for the info.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — May 8, 2024 at 4:03 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24607))
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I was able to record the tests but not able to run them as seeing some errors “java.lang.ClassCastException: class com.codename1.components.InfiniteProgress cannot be cast to class com.codename1.ui.Container (com.codename1.components.InfiniteProgress and com.codename1.ui.Container are in unnamed module of loader com.codename1.impl.javase.ClassPathLoader @6f539caf)”  
 > Just a question do I need to use specific version of net beans to run tests? I’m not sure what I’m missing here. Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — May 9, 2024 at 10:34 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24609))
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > return true;  
 > Whenever I try to run encountered error”java.lang.ClassCastException: class com.codename1.components.InfiniteProgress cannot be cast to class com.codename1.ui.Container (com.codename1.components.InfiniteProgress and com.codename1.ui.Container are in unnamed module of loader com.codename1.impl.javase.ClassPathLoader @6f539caf)”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — May 9, 2024 at 12:17 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24610))
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you Shai Almong for the reply, I always worked with selenium, this is a new thing for me, where do i get documentation on how to code?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — May 10, 2024 at 4:43 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24611))
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m able to record and run test cases, I really appreciate your help on this. thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — September 5, 2024 at 2:11 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24633))
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai Almong, I have a question as we are using test recorder and question is once I record all the tests and when running is it able to handle different screen resolutions?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — September 6, 2024 at 3:02 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24634))
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Not seamlessly. We try to generate “logical code” but can’t always detect that correctly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — September 6, 2024 at 3:05 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24635))
@@ -192,7 +192,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Got it. thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — October 17, 2024 at 2:44 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24643))
@@ -201,7 +201,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai Almog, Sorry for bothering you, have a question on whether the .apk file provided to us by developers can be integrated with appium framework are there any limitations or is it compatible? as we have selenium framework for ui and want to have this application embedded into it for better management. Really appreciate your help on this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — October 19, 2024 at 5:23 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24645))
@@ -211,7 +211,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > We don’t have any support for Appium. It might be possible to build something like that or adapt existing APIs into a cn1lib but there was no effort in that direction.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — October 21, 2024 at 12:58 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24647))
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you for the reply, I will have conversation with developers.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Kumuda Garlapati** — January 7, 2025 at 4:50 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24669))
@@ -229,7 +229,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai Almong, We are looking for enabling accessibility id’s to work with android apk automation, Can you tell us how we can enable those in properties file? is there any documentation that we can refer. Thanks for your help.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — January 8, 2025 at 2:50 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24671))
@@ -238,7 +238,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m afraid not. Accessibility on Android/iOS is one of our big open issues: <https://github.com/codenameone/CodenameOne/issues/426>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Gaurav P** — January 8, 2025 at 1:36 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24672))
@@ -254,7 +254,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, is there any ETA we have at the moment for enabling accessibility on Android or iOS. as this is stopping us to perform UI testing on different platforms like iOS, Android, Windows or Mac. Kindly advise
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 
 ### **Shai Almog** — January 9, 2025 at 2:56 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24674))
@@ -263,7 +263,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Unfortunately no. It’s been an open issue for 9 years, I doubt that this will change unless there’s a major drive behind it. It’s a lot of deep effort so community attempts at fixing this even for one platform have failed.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftest-it.html)
+
 
 ---
 

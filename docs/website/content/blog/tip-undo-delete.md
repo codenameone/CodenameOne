@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you for these useful methods. Can you please confirm that all of them are to be used with FIleSystemStorage and not with Storage?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-undo-delete.html)
+
 
 
 ### **Shai Almog** — January 6, 2019 at 11:53 am ([permalink](https://www.codenameone.com/blog/tip-undo-delete.html#comment-23996))
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > copyFile and deleteFile can be similarly adapted to detect a storage file and use the storage API instead of the FileSystemStorage API.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-undo-delete.html)
+
 
 ---
 

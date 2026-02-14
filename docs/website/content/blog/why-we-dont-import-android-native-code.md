@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think that’s fair. Focus on the low hanging fruit first before tackling such a large and complex problem. This translation tool is probably something that would eat up all of your resources for the forseeable future, and isn’t a guaranteed return on investment. Good business sense to steer clear for now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-we-dont-import-android-native-code.html)
+
 
 ---
 

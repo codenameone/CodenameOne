@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > when this post it will be available to windows? this means that the actual simulator will not work?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Shai Almog** — January 20, 2021 at 2:26 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24384))
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > See the section titled: “Windows Install” above…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Steve Hannah** — July 17, 2020 at 1:48 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24299))
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Windows will be available soon.  
 > The simulator will still work without CEF. If you are on Windows, and your app doesn’t use Media or BrowserComponent, then it will still work fine (without CEF). If your app uses Media or BrowserComponent, then just make sure you’re using a JDK that has JavaFX, such as ZuluFX – and it will work fine.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Angelo** — August 3, 2020 at 1:53 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24303))
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think that the CEF install instructions for Linux are wrong, because the zip file has not cef as root so the unzipping happens, but I had to create manually the cef folder and copy the zip content there. I hope it is useful.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Angelo** — August 3, 2020 at 2:01 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24304))
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As for the cef loading into the IDE, no updates are available for IntellJ Idea so, being that it seems that I cannot receive the codename updates as soon as they are published, I have to wait for the IDE update. Unless there is a workaround that you know to force the update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Shai Almog** — August 4, 2020 at 3:34 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24305))
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ugh. I’ll fix the instructions for that. Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Shai Almog** — August 4, 2020 at 3:36 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24302))
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We push updates separately from the plugins. That way we can support 3 IDEs with more common code. Just update via Codename One Settings using the menu on the top right.  
 > If you still have the old settings UI it’s under the Basic section.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Angelo** — August 4, 2020 at 7:42 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24309))
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The settings app found that there was a lock file in the .codename directory. I had to delete it to perform the update.  
 > It is possible that also the other Codename plugin updates on my environment were blocked by that. Maybe the automatic update procedure should check it and inform the user, in case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Richard Matovu** — August 9, 2020 at 9:13 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24317))
@@ -257,7 +257,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)  
 > at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Shai Almog** — August 10, 2020 at 5:09 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24311))
@@ -266,7 +266,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks. Can you please post an issue about this in the issue tracker. Please also include some information about your system such as env output, distro etc. The issue tracker is here: <https://github.com/codenameone/CodenameOne/issues/>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Carlos Verdier** — August 14, 2020 at 9:28 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24323))
@@ -280,7 +280,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Tested on Mac OS Catalina 10.15.6
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Steve Hannah** — August 14, 2020 at 12:52 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24324))
@@ -291,7 +291,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you file this in the issue tracker so we can track it. As a starting point, what JDK are you using?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Artur Hefczyc** — August 27, 2020 at 9:20 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24331))
@@ -303,7 +303,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > mv ~/Downloads/cef ~/.codenameone/  
 > “`
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Artur Hefczyc** — August 28, 2020 at 7:21 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24326))
@@ -316,7 +316,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > “`  
 > in the console output. Is this expected? I mean, do you still use JavaFX in simulator even if cef is installed?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Shai Almog** — August 29, 2020 at 4:34 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24330))
@@ -325,7 +325,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think that’s a buggy printout from the prior condition. It indicates you have JavaFX in your system but it probably still uses CEF anyway. I filed an issue on that here: <https://github.com/codenameone/CodenameOne/issues/3245>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Artur Hefczyc** — September 11, 2020 at 3:44 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24334))
@@ -334,7 +334,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So, how to make sure I am running in CEF mode instead of JavaFX? Is there any way to confirm the env my app us running in?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Shai Almog** — September 11, 2020 at 3:45 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24332))
@@ -343,7 +343,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If <http://localhost:8088/> in chrome shows the debugging options for the browser then CEF is working as expected
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Artur Hefczyc** — September 11, 2020 at 4:49 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24336))
@@ -367,7 +367,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Do you have any suggestions on what can be wrong?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Shai Almog** — September 11, 2020 at 4:51 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24333))
@@ -376,7 +376,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is this not reachable when a browser component is physically on the screen?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 
 ### **Julio Valeriron Ochoa** — January 19, 2021 at 8:49 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24383))
@@ -385,7 +385,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > how can I configure new cfe simulator in windows?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-jcef.html)
+
 
 ---
 

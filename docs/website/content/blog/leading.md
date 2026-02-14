@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can’t subclass a container in the designer, right? So one should simply use a basic container, layout whatever component is needed, and then set one of them as the leader? If so, can you then reuse this component in multiple places, multiple forms? If so, then it’s really cool! Well, even if it’s not quite like I described, it’s still pretty powerful!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fleading.html)
+
 
 
 ### **Anonymous** — April 6, 2014 at 3:38 am ([permalink](https://www.codenameone.com/blog/leading.html#comment-22113))
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can also use crateContainer from code to create a container instance thus populate the UI from elements created in the designer. Thanks to lead component you don’t really need to subclass in order to create a completely new component. The main reason we subclassed to create multi-button etc. was so the API will be “pretty”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fleading.html)
+
 
 ---
 

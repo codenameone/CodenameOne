@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Awesome cant wait to see the new stuff.. I always assumed app engine was perfect but I dont think ive got around to really using it much.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fending-support-for-legacy-cloud.html)
+
 
 ---
 

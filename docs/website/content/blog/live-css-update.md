@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > «If we could automate the conversion of res files to CSS it would be great for things like this […]». This should be great!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Durank** — May 17, 2018 at 8:55 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23938))
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think so that codename one must create a migration css res to new css
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Francesco Galgani** — June 10, 2018 at 9:17 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23926))
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is this the only available documentation at the moment? [https://github.com/shannah/…](<https://github.com/shannah/cn1-css/wiki>)  
 > Is it complete about “Fonts”, “Images”, “Supported CSS Selectors”, “Supported Properties”?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — June 11, 2018 at 5:03 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23806))
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The wiki there goes pretty deep but I agree we need to update that. When we go to the 5.0 code freeze we’ll try to pull these docs into the developer guide so we have a better/unified reference for this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 1, 2018 at 6:24 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-21646))
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks,  
 > Denis
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 2, 2018 at 5:54 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23718))
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This should launch settings. Reproduce the issue and see the logs in that console. Make sure you are running under Oracle JDK 8 when doing that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 2, 2018 at 6:25 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24032))
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > thanks !  
 > Denis
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 2, 2018 at 6:35 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23933))
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > when you press save in Codename One Settings it should offer to update the build.xml file for you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 2, 2018 at 6:50 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23940))
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > it’s doesn’t, can I do that manually ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 2, 2018 at 12:29 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23917))
@@ -189,7 +189,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Maybe try flipping a switch back and forth in basic then press the save button on the top right. It should make that offer.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 2, 2018 at 12:52 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24036))
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/0f3d58ee881feb930089d71a1dcd7fe73ef3d80579fa29fbba6d455cf6147cec.jpg>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 2, 2018 at 6:35 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23621))
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It should work. I’m not sure what is causing it not to push the XML update. We’ll try to push out a fix to the CSS switch process for tomorrow that would hopefully workaround this issue.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 3, 2018 at 5:53 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23948))
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks Shai, just for test I have created new codenameone project using “Hello World Vusial” template and “business” theme and tried to enable CSS for it, faced the same issue, I was worried if it’s problem particularly with my project, but looks like it’s general
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 3, 2018 at 1:14 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24005))
@@ -227,7 +227,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Don’t use the visual template, it’s designed for the old GUI builder. That might be related to the problem you are experiencing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 3, 2018 at 2:15 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-21537))
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My app has dynamically built UI (it’s a casual game), so it doesn’t require any template at all and I can move entire code to new project easily, if this will solve the issue …
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 4, 2018 at 8:48 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23908))
@@ -250,7 +250,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is this resolved after the update to 4.33? You can update via Basic -> Update Project Libs.  
 > Notice there is no newer version of the plugin. Only settings are updated.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 4, 2018 at 12:36 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23899))
@@ -270,7 +270,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > p.s. CSS still doesn’t work, I have just checked
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 5, 2018 at 4:53 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23701))
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Odd, it shouldn’t fail on that. It might be an eclipse specific issue. Please file an issue on that and we’ll have a look: [http://github.com/codenameo…](<http://github.com/codenameone/CodenameOne/issues/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 5, 2018 at 9:35 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23832))
@@ -312,7 +312,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at [com.codename1.ui.RunnableWr…](<http://com.codename1.ui.RunnableWrapper.run)([RunnableWrapper.java](http://RunnableWrapper.java)>:120)  
 > at [com.codename1.impl.Codename…](<http://com.codename1.impl.CodenameOneThread.run)([CodenameOneThread.java](http://CodenameOneThread.java)>:176)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 6, 2018 at 4:16 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23740))
@@ -321,7 +321,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s probably a bug in the Eclipse support, we’ll need to look into it so I suggest filing an issue. That hour icon is just a shortcut to the update button in the basic section. We should probably label them…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 6, 2018 at 12:50 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24023))
@@ -332,7 +332,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/issues/2492>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 6, 2018 at 8:16 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24050))
@@ -349,7 +349,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > p.s. I also noticed that some UTF symbols are not displaying while includeNativeBool is enabled, for example “→” symbol, looks like there is a different font ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 7, 2018 at 5:54 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23784))
@@ -366,7 +366,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Don’t set a title to the form (or set it to “”) and don’t add commands.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 7, 2018 at 6:51 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23962))
@@ -375,7 +375,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks Shai, but this doesn’t worked, override shouldPaintStatusBar to return false, commented all form related commands, including setTitlle (also tried to set it to “”) toolbar is still there (in emulator, haven’t sent to real device yet), removed toolbar related theme constants and build hints, the same, any ideas ?)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 8, 2018 at 4:43 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24054))
@@ -402,7 +402,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > fullScreen.add(CENTER, fullScreenLabel);  
 > [fullScreen.show](<http://fullScreen.show)(>);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 8, 2018 at 6:38 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23809))
@@ -447,7 +447,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at [com.codename1.ui.RunnableWr…](<http://com.codename1.ui.RunnableWrapper.run)([RunnableWrapper.java](http://RunnableWrapper.java)>:120)  
 > at [com.codename1.impl.Codename…](<http://com.codename1.impl.CodenameOneThread.run)([CodenameOneThread.java](http://CodenameOneThread.java)>:176)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 9, 2018 at 7:33 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23994))
@@ -456,7 +456,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I suggest you don’t disable the global toolbar. If you’d keep it the code above should work fine.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 9, 2018 at 8:05 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23858))
@@ -466,7 +466,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > do you mean by theme constants or build hints, I removed them all  
 > and as you can see on screenshot in my previous message, toolbar is there
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 10, 2018 at 4:56 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23558))
@@ -475,7 +475,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The default code for a new project enables the toolbar. No theme constant etc. See the toolbar code here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/new-default-code.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 10, 2018 at 5:59 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23760))
@@ -484,7 +484,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > many thanks Shai, I missed that global toolbar configuration in main app class, was looking at Form code )) interesting that app stays in fullscreen mode even without overridden shouldPaintStatusBar, just with toolbar margins/paddings set to zeros in theme file, but I will keep both, just letting you know
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 10, 2018 at 7:41 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23783))
@@ -493,7 +493,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > the only thing left is the issue with some unicode symbols support when includeNativeBool is enabled, for example “→” symbol, is there a way to switch to font that used when includeNativeBool is off ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 11, 2018 at 3:57 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24012))
@@ -504,7 +504,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The thing is that these issues might not happen on the device. The simulator uses the downloadable Roboto font or builtin helvetica both of which have limits. However, on the device their behavior and supported character range is better. You should be able to use Emojiis and everything when working on the device.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 11, 2018 at 6:30 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24018))
@@ -513,7 +513,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks Shai, I will try it on device as you suggest, as soon as I will be able to login to Dashboard, I have issues with that for some reason, talking with your support now
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 15, 2018 at 7:39 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24047))
@@ -522,7 +522,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, you were right, on real device character support is good, but notification bar is not covered by app, the same in emulator, but I thought that it’s just part of emulator skin
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 16, 2018 at 4:50 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23988))
@@ -531,7 +531,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > On which device? On Android it won’t be covered on iOS you need to style the status bar appropriately but I’m guessing here without a screenshot.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 16, 2018 at 10:28 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24060))
@@ -546,7 +546,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > so there should be some way, it’s good to have little bit more space ))
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — August 17, 2018 at 3:40 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23918))
@@ -556,7 +556,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > There is an experimental feature to hide the status bar here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/new-skins-san-francisco-font.html>)  
 > Notice that the ad you are seeing is full screen but it also doesn’t show the battery/clock etc. which is pretty problematic. It might have issues with notche UI’s.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Denis** — August 17, 2018 at 7:19 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24038))
@@ -565,7 +565,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks Shai, I am developing casual game, and full-screen in context of games is exactly what this ads extension does, hide everything (toolbar, status bar) and use as much as screen space as possible, besides that, even if app itself is not full-screen, ads will be shown in full-screen mode anyway, which creates inconsistent experience, app will jump to full-screen and back, I anyway will test that on real device and see what’s better, thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **ThomasH99** — January 29, 2021 at 9:29 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24388))
@@ -574,7 +574,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The live update of CSS has stopped working for me since some time (not sure exactly when since haven’t edited the CSS for months). Was it disabled? If not, any suggestions for how I might fix this?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — January 30, 2021 at 6:11 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24389))
@@ -583,7 +583,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No. It should work. Look in the simulator console, does it print out anything about CSS when launching?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **ThomasH99** — January 30, 2021 at 9:02 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24390))
@@ -607,7 +607,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is on a Mac.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **Shai Almog** — January 31, 2021 at 2:26 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24391))
@@ -619,7 +619,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Did you activate CSS via preferences?  
 > If you create a new project, update it (using Codename One Settings) and activate CSS. Does the problem still happen?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flive-css-update.html)
+
 
 
 ### **ThomasH99** — February 2, 2021 at 5:54 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24395))

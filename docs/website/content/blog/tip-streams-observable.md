@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you guide me on the best way about bringing the RxJava library into CodenameOne?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-streams-observable.html)
+
 
 
 ### **Shai Almog** — March 2, 2018 at 4:50 am ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-21643))
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Codename One already handles a lot of these things thanks to NetworkManager albeit not as “elegantly” in some cases. So I just didn’t see this as a personal priority but if you need help I’ll be happy to help with that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-streams-observable.html)
+
 
 
 ### **Chibuike Mba** — March 2, 2018 at 6:53 am ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23707))
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks for your response. I will really need your help. I want to combine reactive programming with MVVM pattern to mimic something like android fragment in codenameone where your app can behave differently based on device screen size and orientation. For example, on mobile phone you have a list of properties displayed on a form, clicking an item opens another form and displays the property details. But on desktop version of the same app or on tablet landscape orientation one form splits into vertical panels, one panel holds the properties listing while another panel displays selected property details. The app’s screen splits into panels on one device and multiple forms on another device. Using reactivity and mvvm patterns will make this use case easier to accomplish with much cleaner code.  
 > What do you think, does codenameone have a way of doing this kind of thing already which i may not know of? Can this patterns benefit codenameone, being write once run anywhere platform?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-streams-observable.html)
+
 
 
 ### **Shai Almog** — March 3, 2018 at 9:39 am ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23715))
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think Android is a combination of low level hacks that expose way too much of the implementation details combined with nose bleed high level of abstraction. Both are horrible for developers but both are really hard to remove from Android due to the legacy and binary compatibility requirements.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-streams-observable.html)
+
 
 
 ### **Chibuike Mba** — March 5, 2018 at 2:48 pm ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23674))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-streams-observable.html)
+
 
 
 ### **Chibuike Mba** — March 7, 2018 at 5:55 pm ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23930))
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looking forward for your reply.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-streams-observable.html)
+
 
 
 ### **Shai Almog** — March 8, 2018 at 6:26 am ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23937))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Such a clean room port might be a worthwhile contribution to Codename One’s core for people looking to port similar code. If you need some guidance or review to a specific class just point it to me in github and I’ll try helping with this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-streams-observable.html)
+
 
 ---
 

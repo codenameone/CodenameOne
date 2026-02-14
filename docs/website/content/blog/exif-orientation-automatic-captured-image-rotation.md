@@ -253,21 +253,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Really useful stuff. Just wondering, the safe download always requires the app to be in fg to finish, right? I mean, the download won’t finish if the app goes into bg and never comes back? And my second question is: does the download effectively pause when the app is in bg? Thx
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Shai Almog** — July 4, 2020 at 4:50 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24284))
 
 > This uses background fetch to download in the background so download continues automatically when the device is backgrounded. Normally when a device is sent to background a download will stop in this case it’s supposed to continue.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Francesco Galgani** — July 5, 2020 at 5:46 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24285))
 
 > I’m afraid there’s been a misunderstanding. As I wrote: “This method is resistant to network errors and capable of resume the download as soon as network conditions allow and in a completely transparent way for the user. This is regardless of whether the download continues or not when the app goes in background: if the operating system stops the download when the app goes in background, it will automatically resume when the app goes back in foreground, otherwise it will continue in background. More specifically, usually (but not necessarily always) the download will continue in the background on Android, while it will “pause” on iOS. Without this method, when the app goes into the background the download can be “killed” without finish, with this method the download will be restored to where it came from when the app returns to foreground. In this sense, it is normal to expect the download to end when the app is returned to foreground, although in some cases (such as Android) it may continue and complete in the background. Backgroundfetch is therefore not used.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Shai Almog** — July 5, 2020 at 6:17 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24287))
@@ -281,7 +281,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m guessing we would need a DownloadManager sort of API to do something like that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Francesco Galgani** — July 5, 2020 at 7:17 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24288))
@@ -294,7 +294,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t know this “URLSession‘s background transfer service”. Is this something that requires a native interface? Do you have any suggestions for me?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Shai Almog** — July 6, 2020 at 5:35 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24290))
@@ -303,7 +303,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Not sure. I’ll have to look into that too.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Javier Anton** — July 6, 2020 at 6:49 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24289))
@@ -312,7 +312,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I hope you get this sorted – was on my todo list too. You can do iOS bg fetch and just catch whether the OS kills the download. The issue is that you will need to run it in a native interface and provide a callback static method somewhere in your java code. Perhaps you could also use some other method to notify your main thread (NSUserDefaults or writing a persisted file). I’m not sure which is best for your implementation. Good luck! 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Javier Anton** — August 13, 2020 at 3:21 pm ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24319))
@@ -323,7 +323,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > One question I have is: if I don’t set a maximum px in the 3rd parameter of exifRotation, will it make it harder for images that need rotating, or will it make it harder for all images?  
 > Edit: this will mistakenly rotate 90 degrees to the right images captured by my Galaxy A10 camera
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Javier Anton** — August 13, 2020 at 4:15 pm ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24320))
@@ -332,7 +332,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Another question I have is: why use the ImageIO.save so much? A lot of the operations can be done without needing to re-save the image to a different file. Am I missing something?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 
 ### **Shai Almog** — August 14, 2020 at 4:33 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24322))
@@ -341,7 +341,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If rotatedImage url is null it won’t save the rotated image to a file so there’s no need for that. Notice that it always returns an encoded image so there will always be an encoder overhead.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fexif-orientation-automatic-captured-image-rotation.html)
+
 
 ---
 

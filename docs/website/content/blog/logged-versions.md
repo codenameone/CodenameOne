@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Why in e.g. url in file cn1-version-numbers there is 83179fd0246f2f2114eded43beffb51c5c7aa4d6 not 4ee2778c79ad5eaadd2344bc0f215a82483421cb?  
 > [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/blob/4ee2778c79ad5eaadd2344bc0f215a82483421cb/CodenameOne/src/cn1-version-numbers>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flogged-versions.html)
+
 
 
 ### **Shai Almog** — February 11, 2018 at 7:26 am ([permalink](https://www.codenameone.com/blog/logged-versions.html#comment-23811))
@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Because when we do a build it generates a new key matching the current tree which is slightly newer. Both should be roughly from the same time frame.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flogged-versions.html)
+
 
 ---
 

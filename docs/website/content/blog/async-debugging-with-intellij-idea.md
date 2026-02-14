@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wonderful new features! Great job guys! I’m literally impress every time I visit the blog and see some new cool feature added. Keep those cool useful features coming please.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fasync-debugging-with-intellij-idea.html)
+
 
 ---
 

@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The work I’ve done on the issue indicates a chart is simply another GUI component which is hooked up in a structured way to some non-trivial data source. This doesn’t seem to be complex, other than the Java2D programming required for good rendering on multiple platforms. Have you considered licensing iReports? It’s Java and open source so a port to mobiles adding GUI events to the charts to make them into interactive components might be the most efficient option.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurvey-results-with-some-commentsthoughts.html)
+
 
 
 ### **Anonymous** — January 29, 2013 at 3:36 am ([permalink](https://www.codenameone.com/blog/survey-results-with-some-commentsthoughts.html#comment-21962))
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There are many charting frameworks we can port such as JGraph or JChart etc. The main issue though is getting the underlying graphics capability to support these framework, e.g. a more elaborate affine implementation with a shapes/stroke API. That would require some serious work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurvey-results-with-some-commentsthoughts.html)
+
 
 ---
 

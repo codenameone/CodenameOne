@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Gluon vs CN1
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 1, 2016 at 4:39 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22641))
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > want your technology to exist tomorrow you need it to be open,  
 > accessible, understandable and have a viable long term business model.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **bryan** — May 1, 2016 at 12:49 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22790))
@@ -222,7 +222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s a pretty good comparison 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Johan Vos** — May 2, 2016 at 9:14 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22519))
@@ -231,7 +231,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you want an answer without lies and FUD, feel free to contact us (Gluon) directly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 2, 2016 at 9:17 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22809))
@@ -240,7 +240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FUD is subjective but which part of my response is untruthful?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 11:15 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22848))
@@ -255,7 +255,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > JavaFX rules and Gluon is making it rule even better.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 2, 2016 at 11:24 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22721))
@@ -276,7 +276,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you think FX will pick up because of one deal or another I suggest you take your emotional attachment. Put it in a box and take a step backwards. You might like FX, it’s an elegant API designed by brilliant people for whom I have the utmost respect. But that doesn’t change one iota of the facts I wrote above. I’m waiting anxiously for an itemized list of “lies”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 11:25 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22857))
@@ -289,7 +289,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You are basically calling Johan an idiot and the one thing that I am more certain about him than anything else is that he ain’t no idiot!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 2, 2016 at 11:28 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-21484))
@@ -304,7 +304,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m calling Johan ignorant and arrogant. A desktop developer walking into mobile expecting things to work in the same way and picking up a HUGE pile of code expecting it to “work” in production.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 11:29 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22448))
@@ -313,7 +313,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Oh well, all I can say to you is “keep digging”. That’s already a mighty big sink hole that your life’s investment is about to fall into…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 11:31 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22610))
@@ -322,7 +322,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Do you even know that Gluon products are already working and working very well on mobiles? I mean never let the truth get in your way of dissing a Java Champion or a vastly superior technology to whatever it is that you’re peddling…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 2, 2016 at 11:34 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22467))
@@ -335,7 +335,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m invested but you still fail to show one thing that was a “lie” in my post.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 11:35 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22577))
@@ -346,7 +346,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > But that’s because i cannot disprove something which is yet to exist.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 11:39 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22631))
@@ -355,7 +355,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Gosh, did I use the word “pride”? I should have used “arrogance”, “delusion” and/or “narcissism”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 2, 2016 at 11:44 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22642))
@@ -385,7 +385,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Gluon is taking up not Just FX, but the whole ecosystem and is now also picking up the VM work, IDE integration and all the slack left by RoboVM. We have people who know every piece of Codename One inside out. We worked on it since 2007 and we know everything there is to know. You guys are dealing with a HUGE black hole of software some of which still doesn’t exist and you are trying to sell it as if it’s a sellable product. But I’m arrogant and delusional?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 12:29 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22868))
@@ -404,7 +404,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Let me just say you have no idea who you are feebly trying to trade blows with. I too worked at Sun (but that wasn’t challenging enough). I have also worked on what was recently voted the second best animated film of all time in terms of the rendering and animation quality. I have optimised scene graphs before. I know more about GPU technology than you do about how to behave like a tool. Johan and I could together take down your entire company all by ourselves if you continue to motivate us to do just that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 2, 2016 at 1:23 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22791))
@@ -423,7 +423,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Consulting can be moderately profitable, but you can’t sustain long term platform development on consulting fees. Eventually you need to pick and choose if you are a consulting shop or a startup and at that point you need to sit down with someone who understands business and try to imagine the growth that’s achievable in realistic scenarios.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 6:31 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22875))
@@ -444,7 +444,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You will only see them when you are broke, unemployed and living in a trailer park.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 2, 2016 at 7:16 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22812))
@@ -464,7 +464,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > But if it helps you work at night with the dream of somehow putting the big bad me and my family into the streets because I’m such an awful human being who dares to think you are wrong and is wasting his time in his own blog post explaining that to you then feel free to concentrate your anger and contempt at me 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Felix Bembrick** — May 2, 2016 at 8:19 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22849))
@@ -485,7 +485,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Oh, and who doesn’t suck up to Jim 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Shai Almog** — May 2, 2016 at 8:38 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22722))
@@ -504,7 +504,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You obviously ignore everything I say so lets cut it here.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 
 ### **Kyri Ioulianou** — June 15, 2016 at 5:36 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-24212))
@@ -513,7 +513,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You destroyed this guy
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-qt-and-codename-one.html)
+
 
 ---
 

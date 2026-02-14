@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > how turn on encryptation mode in sqlite
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspatial-pluggable-sqlite.html)
+
 
 
 ### **Kimotho E** — July 9, 2024 at 4:51 pm ([permalink](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html#comment-24621))
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How can a custom version of sqlite be plugged in to replace the Database?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspatial-pluggable-sqlite.html)
+
 
 
 ### **Shai Almog** — July 10, 2024 at 2:31 am ([permalink](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html#comment-24622))
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > See <https://github.com/shannah/cn1-spatialite> create something similar with your version of sqlite.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspatial-pluggable-sqlite.html)
+
 
 ---
 

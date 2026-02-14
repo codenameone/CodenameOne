@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I see the new templates in NetBeans but not in IntelliJ 14.1.3
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflat-themes-dpis-static-initializers.html)
+
 
 
 ### **Shai Almog** — May 14, 2015 at 6:52 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22192))
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Can you file an issue on that?  
 > We’ll need to add them there too. As a workaround you can just create a new project with a native theme. Open the designer tool, delete the “Theme” entry and create a new theme, you should have these options there assuming you are using the latest plugin.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflat-themes-dpis-static-initializers.html)
+
 
 
 ### **rhg1968** — May 14, 2015 at 7:01 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22229))
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the reply. I just put the issue on GitHub. I am using plugin 3.0.2 and I don’t have any updates so I believe I am using the latest. I also refreshed the libraries but I don’t see the theme in the GUI builder if I try to add a new theme to an existing project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflat-themes-dpis-static-initializers.html)
+
 
 
 ### **Shai Almog** — May 15, 2015 at 9:48 am ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22044))
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its possible the IDEA plugin doesn’t update the designer to the latest version too. We’ll look into it as part of the bug.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflat-themes-dpis-static-initializers.html)
+
 
 
 ### **J.C** — May 15, 2015 at 3:04 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-24173))
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If not, please clarify and include an example that says: Don’t {….} and Do{…} etc..if its not too much trouble :).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflat-themes-dpis-static-initializers.html)
+
 
 
 ### **Shai Almog** — May 15, 2015 at 4:24 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22354))
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That would be a problem. Use a getter that invokes that method. Don’t store it in that static context.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflat-themes-dpis-static-initializers.html)
+
 
 
 ### **J.C** — May 15, 2015 at 5:45 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22239))
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hmm, so what you are saying is, in general, avoid storing values returned by methods that is initializing underlying platform implementations into static variables when a class is created?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflat-themes-dpis-static-initializers.html)
+
 
 
 ### **Shai Almog** — May 16, 2015 at 8:51 am ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22263))
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No. Avoid access to Codename One API’s from static context since it might get initialized before the Codename One API gets initialized.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflat-themes-dpis-static-initializers.html)
+
 
 ---
 

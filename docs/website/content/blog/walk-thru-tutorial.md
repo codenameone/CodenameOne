@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I used this code snippet with a highlightComponent = null, and the glasspane with the text appears as it should – it’s a very coll feature. I can’t swipe out though. I’m not sure I understand the swipe logic. Can you explain how it works ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwalk-thru-tutorial.html)
+
 
 
 ### **Anonymous** — July 23, 2014 at 12:25 pm ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-22165))
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Are you getting the pointer events? Should be pretty easy to debug if this is causing issues in the simulator.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwalk-thru-tutorial.html)
+
 
 
 ### **Anonymous** — July 23, 2014 at 6:14 pm ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-22051))
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve got a side menu on the form and swiping left to right exposes the side menu form, so I guess it’s the order in which pointer dragged events are consumed.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwalk-thru-tutorial.html)
+
 
 
 ### **Anonymous** — July 24, 2014 at 3:29 am ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-21899))
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes, this predated the sidemenu by a while. You can just edit that logic to work with a different gesture or a tap on a specific screen location.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwalk-thru-tutorial.html)
+
 
 
 ### **Anonymous** — July 24, 2014 at 3:53 am ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-21994))
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > OK – I changed the logic to swipe right to left and works well. Where would you normally call showTutorialOverlay() ? I have a call in postShow for the form but wonder if that’s what you had in mind as a use case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwalk-thru-tutorial.html)
+
 
 
 ### **Anonymous** — July 24, 2014 at 2:12 pm ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-22115))
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Post show should work out nicely.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwalk-thru-tutorial.html)
+
 
 ---
 

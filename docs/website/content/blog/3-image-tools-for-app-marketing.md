@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice tips. I wonder whether you’ve tried Promomatic ([https://www.promomatic.com/)](<https://www.promomatic.com/>)) for building app screenshots instead of AppLaunchPad? Super easy to use and cost effective when building for the app store launch. Found them on Product Hunt a few months back.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F3-image-tools-for-app-marketing.html)
+
 
 ---
 

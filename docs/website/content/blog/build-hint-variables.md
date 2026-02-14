@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Had not even considered this, very useful indeed!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-hint-variables.html)
+
 
 
 ### **Torjmen Hamza** — April 30, 2017 at 12:28 pm ([permalink](https://www.codenameone.com/blog/build-hint-variables.html#comment-23491))
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hello,  
 > I have problems with Google Maps in Codename One, I tried to make a useful path like DirectionRoute in javascript but it is always a black line, it’s like that i have airlines, could some one help me with that ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-hint-variables.html)
+
 
 
 ### **Shai Almog** — May 1, 2017 at 3:52 am ([permalink](https://www.codenameone.com/blog/build-hint-variables.html#comment-23281))
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > why not ask that in the maps post [https://www.codenameone.com…](<https://www.codenameone.com/blog/new-improved-native-google-maps.html>)  
 > I suggest asking there and mentioning what you did.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-hint-variables.html)
+
 
 ---
 

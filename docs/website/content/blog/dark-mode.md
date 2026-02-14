@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Best regards,
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdark-mode.html)
+
 
 
 ### **Mohammed Hussein** — September 1, 2022 at 8:46 am ([permalink](https://www.codenameone.com/blog/dark-mode.html#comment-24544))
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Compiling the dark theme is not yet supported by the Maven plugin. An issue for this can be track on:  
 > <https://github.com/codenameone/CodenameOne/issues/3623>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdark-mode.html)
+
 
 ---
 

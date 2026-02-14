@@ -45,7 +45,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > how can I use svg image in code using flamingo? I have found some examples but without success
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder-revisited.html)
+
 
 
 ### **Shai Almog** — September 17, 2020 at 4:10 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24337))
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Image img = new SvgImage();  
 > “`
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder-revisited.html)
+
 
 
 ### **Durank** — October 20, 2020 at 3:06 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24357))
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > how can I to reference my image.svg?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder-revisited.html)
+
 
 
 ### **Shai Almog** — October 21, 2020 at 2:09 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24358))
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You just create a new instance of the generated Java source image. It’s an Image. There’s no SVG anymore.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder-revisited.html)
+
 
 
 ### **Durank** — October 21, 2020 at 3:23 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24359))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > please provide an example. I never have worked with svg in codenameone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder-revisited.html)
+
 
 
 ### **Shai Almog** — October 22, 2020 at 10:47 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24361))
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can see sample usage here: <https://github.com/codenameone/flamingo-svg-transcoder/>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder-revisited.html)
+
 
 ---
 

@@ -37,7 +37,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When I think to a server, I have in mind Apache, Tomcat, IIS… Which type of content and code can be used in that CN1 server? Only static content of html/js?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-device-web-server.html)
+
 
 
 ### **Shai Almog** — August 29, 2018 at 3:27 pm ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-23821))
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can dynamically generate files to the file system where this server will serve them. I think it should be pretty easy to create a servlet like API to serve truly dynamic content through this API though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-device-web-server.html)
+
 
 
 ### **Carlos** — February 22, 2019 at 10:29 am ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24076))
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Could this server accept post operations, so binary files could be remotely submitted to the device?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-device-web-server.html)
+
 
 
 ### **Shai Almog** — February 23, 2019 at 5:39 am ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24046))
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t think so. A device can be hidden behind a NAT so even if you enable it this would be problematic to implement.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-device-web-server.html)
+
 
 
 ### **Carlos** — February 23, 2019 at 6:06 pm ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24111))
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m thinking I just need sending files within the local network, so the NAT wouldn’t be a problem. What I want to do is sending files from a desktop java app to a CN1 app. What would be the best way to achieve that? I was thinking websockets, but the files could be quite large, so I’m not sure that is a good choice…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-device-web-server.html)
+
 
 
 ### **Shai Almog** — February 24, 2019 at 4:32 am ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24089))
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This would save battery life. You can also use push notification instead of websockets to further save on battery life and send the event even when the app is in the background with visual notification to the user.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-device-web-server.html)
+
 
 
 ### **Carlos** — February 24, 2019 at 7:42 pm ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-23824))
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Great, thank you. I’ll try these solutions and see which one fits best for my needs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-device-web-server.html)
+
 
 ---
 

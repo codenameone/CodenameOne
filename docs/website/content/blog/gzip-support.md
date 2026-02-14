@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is great news ! I will update my blog post about compression with this, keep up the good work !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgzip-support.html)
+
 
 
 ### **Anonymous** — February 6, 2014 at 5:47 am ([permalink](https://www.codenameone.com/blog/gzip-support.html#comment-21434))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it also supported on the WebBrowser component when fetching HTML?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgzip-support.html)
+
 
 
 ### **Anonymous** — February 7, 2014 at 3:13 am ([permalink](https://www.codenameone.com/blog/gzip-support.html#comment-21767))
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Since the web browser uses native connections and doesn’t go thru connection request gzip should “just work” for that case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgzip-support.html)
+
 
 ---
 

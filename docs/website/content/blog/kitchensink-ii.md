@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Lukman
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkitchensink-ii.html)
+
 
 
 ### **Shai Almog** — September 1, 2016 at 6:25 am ([permalink](https://www.codenameone.com/blog/kitchensink-ii.html#comment-22872))
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We do want to work on better themes but this is something we tried repeatedly in the past with partial success. I think the right thing to do is work with a designer unfortunately we don’t have one on-staff at this time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkitchensink-ii.html)
+
 
 ---
 

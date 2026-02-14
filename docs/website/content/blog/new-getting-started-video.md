@@ -39,7 +39,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice. I’d love to see move video tutorials for GUI-builder based apps. Preferably, tutorials should highlight how things can be done in the GUI builder vs. manually in code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-getting-started-video.html)
+
 
 
 ### **Shai Almog** — April 20, 2016 at 4:00 am ([permalink](https://www.codenameone.com/blog/new-getting-started-video.html#comment-22824))
@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Us too. We are waiting on the GUI builder to be rock solid to focus more on tutorials that cover it.  
 > We are trying to get it to that state for 3.4 which is a tall order for 2 weeks but we are working heavily on that. Once it’s done we’ll write a lot more about it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-getting-started-video.html)
+
 
 ---
 

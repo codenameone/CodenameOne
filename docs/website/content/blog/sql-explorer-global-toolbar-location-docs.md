@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Can we maybe add more functionality to the DB explorer tool?  
 > This opens some potential to “on device analysis” style API’s. Any plans on that?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsql-explorer-global-toolbar-location-docs.html)
+
 
 
 ### **Shai Almog** — March 5, 2016 at 4:14 am ([permalink](https://www.codenameone.com/blog/sql-explorer-global-toolbar-location-docs.html#comment-22667))
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’d love that but I’m not sure when we’ll get around to do something like this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsql-explorer-global-toolbar-location-docs.html)
+
 
 
 ### **Mr Emma** — April 14, 2016 at 3:25 pm ([permalink](https://www.codenameone.com/blog/sql-explorer-global-toolbar-location-docs.html#comment-22595))
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For some reason your locationmanager never works for me even tho i follow all possible instructions, it works perfectly on the emulator but moving to a real android device it never works
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsql-explorer-global-toolbar-location-docs.html)
+
 
 
 ### **Shai Almog** — April 15, 2016 at 3:01 am ([permalink](https://www.codenameone.com/blog/sql-explorer-global-toolbar-location-docs.html#comment-21508))
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I suggest trying it as we explained it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsql-explorer-global-toolbar-location-docs.html)
+
 
 ---
 

@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As you say, now it’s pretty much moot.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-oracle-wont-issue-java-for-ios-anytime-soon.html)
+
 
 
 ### **Anonymous** — February 11, 2013 at 8:17 pm ([permalink](https://www.codenameone.com/blog/why-oracle-wont-issue-java-for-ios-anytime-soon.html#comment-24250))
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I guess you were proven wrong in less that one month: [http://fxexperience.com/201…](<http://fxexperience.com/2013/02/february-open-source-update/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-oracle-wont-issue-java-for-ios-anytime-soon.html)
+
 
 
 ### **Anonymous** — February 12, 2013 at 2:04 am ([permalink](https://www.codenameone.com/blog/why-oracle-wont-issue-java-for-ios-anytime-soon.html#comment-21806))
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This isn’t a binary solution/product which is the main thing covered by this article. To be frank I didn’t think Oracle would ever do even something such as an Open Source code dump so that is surprising.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-oracle-wont-issue-java-for-ios-anytime-soon.html)
+
 
 
 ### **Anonymous** — May 14, 2014 at 3:50 am ([permalink](https://www.codenameone.com/blog/why-oracle-wont-issue-java-for-ios-anytime-soon.html#comment-21797))
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Now every one knows why. They were waiting to sue Android. Either they will get a continuous revenue or a one time big fine.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-oracle-wont-issue-java-for-ios-anytime-soon.html)
+
 
 ---
 

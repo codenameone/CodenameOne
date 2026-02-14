@@ -535,14 +535,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > thank you for this i hope you can make a video of it so we can understand more
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database-part-2.html)
+
 
 
 ### **Chris B** — November 6, 2020 at 6:40 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database-part-2.html#comment-24366))
 
 > Is this possible in eclipse? I’m trying to connect a Codename One application I have built in eclipse to an AWS RDS database I’ve built. Both Codename One and AWS are brand new to me, and I have no idea what I am doing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fconnecting-to-a-mysql-database-part-2.html)
+
 
 ---
 

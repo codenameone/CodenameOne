@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > e.g.  
 > Like Camera overlaying (for face detection, like MSQRD app, …)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-interface.html)
+
 
 
 ### **Shai Almog** — July 13, 2017 at 4:26 am ([permalink](https://www.codenameone.com/blog/native-interface.html#comment-23669))
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > These things can be done in Codename One but “everything” is a bit of a big word.  
 > Furthermore, lets separate “can” from “should”. If a lot of your code is native and you need a big native interface abstraction this might become painful to the point where Codename One isn’t worth it. I can’t put my finger on an exact point since it varies and this depends on your needs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-interface.html)
+
 
 
 ### **Gert** — July 13, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/native-interface.html#comment-23582))
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > There, the issue for me is just how to get image info in real-time. (during camera showing)  
 > Best.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-interface.html)
+
 
 
 ### **Shai Almog** — July 14, 2017 at 6:34 am ([permalink](https://www.codenameone.com/blog/native-interface.html#comment-23461))
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Look at how it’s done in native and follow those instructions. I haven’t done this so I can’t really point you at anything.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-interface.html)
+
 
 ---
 

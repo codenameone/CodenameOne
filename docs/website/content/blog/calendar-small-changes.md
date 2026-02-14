@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcalendar-small-changes.html)
+
 
 
 ### **Anonymous** — February 26, 2014 at 3:54 pm ([permalink](https://www.codenameone.com/blog/calendar-small-changes.html#comment-21923))
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It seems development has slowed down a little. As far as I understand the basic functionality Andreas and Kapilla need is working for them. I suggest you ask this on the forum where they can see it and respond with more information.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcalendar-small-changes.html)
+
 
 ---
 

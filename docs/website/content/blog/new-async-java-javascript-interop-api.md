@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With the recent update and deprecation of the com.codename1.javascript package (specifically the JSFunction and JSObject classes), I’d like to know if there are any way to represent a JavaScript Object or functions? For example when I’d like to use the [JSProxy.call](<http://JSProxy.call)(>…) with a js function as argument, using a String representation doesn’t work as of now, so are there any alternatives?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-async-java-javascript-interop-api.html)
+
 
 
 ### **shannah78** — February 19, 2018 at 1:38 pm ([permalink](https://www.codenameone.com/blog/new-async-java-javascript-interop-api.html#comment-23795))
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Just wrap the Javascript literal expression in a JSExpression object. E.g.  
 > [myProxy.call](<http://myProxy.call)(>“myMethod”, new Object[]{“a string”, new JSExpression(“a.javascript.expression()”)}, res->{…})
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-async-java-javascript-interop-api.html)
+
 
 
 ### **ZombieLover** — March 14, 2018 at 4:35 pm ([permalink](https://www.codenameone.com/blog/new-async-java-javascript-interop-api.html#comment-23618))
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Love this thanks Steve
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-async-java-javascript-interop-api.html)
+
 
 
 ### **ZombieLover** — March 15, 2018 at 9:09 am ([permalink](https://www.codenameone.com/blog/new-async-java-javascript-interop-api.html#comment-23945))
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > }  
 > });
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-async-java-javascript-interop-api.html)
+
 
 ---
 

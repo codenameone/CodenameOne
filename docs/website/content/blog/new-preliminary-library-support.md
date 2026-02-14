@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can’t wait to do some testing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **Anonymous** — February 15, 2013 at 2:10 pm ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-21887))
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looking forward to digging in and creating some libraries.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **Anonymous** — June 18, 2013 at 10:07 pm ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-21801))
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > May I make a suggestion. Modify SWIG to generate wrappers to common C libs for codename one and your on a winner. The approach will need to be different between the platforms , BUT, a lot of C libs have IOS *and* android ports (ultimately the only platforms that really matter imho) but expose common APIs. Doing this gives you a huge range of potential libraries whilst preserving at least some degree of cross platform support.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **Anonymous** — June 19, 2013 at 4:26 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-21953))
@@ -126,7 +126,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Native wrappers essentially mean we expect people to go into native code and we feel the opposite. If you need to write native code that means our platform is missing something.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **Anonymous** — October 23, 2014 at 11:25 pm ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22212))
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Example: We make a chart Cn1 lib project but can not import font or graphic Cn1 lib( can’t see refresh libs option)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **Anonymous** — October 24, 2014 at 9:59 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-21595))
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We currently don’t support nesting libraries into one another. Most developers who needed that ended up just adding the other library to the classpath in compilation then requiring that both cn1libs be in the lib directory. This isn’t ideal but can be worked with for most cases. You can also just hack the ant scripts to achieve more elaborate build options.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **David Hinckley** — December 25, 2015 at 10:23 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22308))
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I do not see the CodenameOne Library project option. I have CodenameOneFeature1.0.0.201511241324 on Eclipse 4.4.2. What am I missing?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **Shai Almog** — December 26, 2015 at 5:00 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22370))
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ll add this in a future update, however you can just open any existing library project and just change it to suite your needs since they are just ant projects that don’t need much IDE integration.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **Orlando D'Free** — March 31, 2016 at 8:36 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22572))
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is referring to the one class that was placed in my library code. But I’m not using it, so my first instinct is to delete it. Does this property need to point to an existing class? Is there anything about that class that I need to know?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 
 ### **Shai Almog** — April 1, 2016 at 3:20 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22640))
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is part of the NetBeans project structure. You don’t need it and it won’t have any affect to remove it or leave it there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-preliminary-library-support.html)
+
 
 ---
 

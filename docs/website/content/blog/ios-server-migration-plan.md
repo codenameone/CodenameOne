@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We just added ios.bitcode=false as an option to disable bitcode. If you are running into issues please try that build hint and let us know either way.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-server-migration-plan.html)
+
 
 
 ### **Gareth Murfin** — May 27, 2016 at 12:06 am ([permalink](https://www.codenameone.com/blog/ios-server-migration-plan.html#comment-21511))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Will try this out Shai and let you know the results. Cheers, Gaz.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-server-migration-plan.html)
+
 
 ---
 

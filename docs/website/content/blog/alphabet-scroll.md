@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice and short! Would it be possible to animate the alphabet list as happens on some phones. So pressing down on the list and scrolling causes the list to kind of bump out around the position?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Falphabet-scroll.html)
+
 
 
 ### **Ross Taylor** — July 19, 2016 at 8:56 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22644))
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Neat. However when I scroll the list, the title bar disappears and is turned into a blank space. Is this suppose to happen?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Falphabet-scroll.html)
+
 
 
 ### **Chidiebere Okwudire** — July 19, 2016 at 1:29 pm ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22818))
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > One more thing: Is there a catalog of these handy features? Something as simple as an appendix in the user manual, for example, that refers to the corresponding blog posts. I don’t know about others but it happens quite often that I want to do something and I remember once reading about it but I’m not sure where and how to find the post quickly. It would be nice if there’s an overview and also make these handy utilties more visible to newcomers.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Falphabet-scroll.html)
+
 
 
 ### **Shai Almog** — July 20, 2016 at 4:20 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22580))
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Another approach which I haven’t tested but might be more elegant is this:  
 > After constructing and initializing the layout loop over the component and assign a Y range to every alphabet letter. getY() of a specific component should return the right scroll offset and this should work nicely with the scroll listener.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Falphabet-scroll.html)
+
 
 
 ### **Shai Almog** — July 20, 2016 at 4:20 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22733))
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s a bug in the JavaScript port, Steve just committed a fix for this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Falphabet-scroll.html)
+
 
 
 ### **Shai Almog** — July 20, 2016 at 4:23 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22977))
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The thing I’d really like to add to the developer guide is a big section on cn1libs covering usage of the top cn1libs e.g. parse, maps, bouncy castle etc. but I can’t seem to find the time/person to do that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Falphabet-scroll.html)
+
 
 ---
 

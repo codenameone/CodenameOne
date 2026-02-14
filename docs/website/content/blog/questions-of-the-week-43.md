@@ -35,7 +35,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thankyou shai.. much appreciated. It works in older devices but in marshmallow there is a permission denial error. Please have a look [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/42082234/littlemonkey-qrscanner-library-build-issue>) thankyou
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-43.html)
+
 
 ---
 

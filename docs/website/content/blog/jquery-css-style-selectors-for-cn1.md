@@ -271,7 +271,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > WOW! Steve this is cool, will definitely try things out with this coding convention. Anybody with good background knowledge of jQuery will really appreciate this. Doing native mobile like jQuery ninja. Great job. 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjquery-css-style-selectors-for-cn1.html)
+
 
 
 ### **shannah78** — March 16, 2017 at 5:21 pm ([permalink](https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html#comment-23198))
@@ -280,7 +280,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the kind words. Have loved jQuery for years. It really opened doors for web development. Hopefully this will have a similar effect on CN1 development.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjquery-css-style-selectors-for-cn1.html)
+
 
 ---
 

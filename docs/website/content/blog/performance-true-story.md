@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > One more time an interesting post …I feel particularly concerned by this performance problem because I’m using multiple threads in addition to EDT and network one. I have noticed that my application is affected by performance when there is a lot of components in a form (with images) on an IPAD 3 while it’s running very smoothly on IPAD AIR 2. I know that there is a huge difference between this 2 iPad but I have seen a lot of applications running smoothly on IPAD 3 …
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fperformance-true-story.html)
+
 
 
 ### **Shai Almog** — August 27, 2016 at 5:10 am ([permalink](https://www.codenameone.com/blog/performance-true-story.html#comment-22914))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We tried several workarounds in the past such as reducing the CPU priority of the network/auxiliary threads but that wasn’t very effective. We already have some API’s designed to indicate that CPU is needed for animation but they aren’t exposed, I think we need to offer something like this as a standard API but I need to give this some thought…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fperformance-true-story.html)
+
 
 
 ### **Carlos** — March 10, 2017 at 6:21 pm ([permalink](https://www.codenameone.com/blog/performance-true-story.html#comment-23321))
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you. I had a similar performance issue due to loading images in a scrolling component. The scrolling was really bad during some seconds even in a very powerful device. I solved it by loading every image in a separate thread, now it works fine. It would be indeed helpful to have an api for this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fperformance-true-story.html)
+
 
 
 ### **Shai Almog** — March 11, 2017 at 6:14 am ([permalink](https://www.codenameone.com/blog/performance-true-story.html#comment-23079))
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve had a similar thought when I wrote this up but I can’t think of an API that would be generic enough to implement this pattern intelligently and intuitively.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fperformance-true-story.html)
+
 
 ---
 

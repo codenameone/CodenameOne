@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Keep up the good work!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F5-tips-for-gamifying-your-mobile-app.html)
+
 
 
 ### **Anonymous** — March 24, 2013 at 4:20 pm ([permalink](https://www.codenameone.com/blog/5-tips-for-gamifying-your-mobile-app.html#comment-21425))
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Very cool. Thanks for the post!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F5-tips-for-gamifying-your-mobile-app.html)
+
 
 
 ### **Anonymous** — November 13, 2013 at 10:25 am ([permalink](https://www.codenameone.com/blog/5-tips-for-gamifying-your-mobile-app.html#comment-21681))
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for this post. Do you have any examples of utility apps that do this well? Eg, Telecoms, banking, power etc
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F5-tips-for-gamifying-your-mobile-app.html)
+
 
 
 ### **Balbir singh** — February 7, 2018 at 10:16 am ([permalink](https://www.codenameone.com/blog/5-tips-for-gamifying-your-mobile-app.html#comment-23869))
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [http://www.nanoarchsoftware…](<http://www.nanoarchsoftware.com/Services/mobile-application>)  
 > .
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F5-tips-for-gamifying-your-mobile-app.html)
+
 
 ---
 

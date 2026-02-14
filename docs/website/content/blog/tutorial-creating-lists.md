@@ -29,7 +29,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, thanks for this. Is it possible on the list created using the above method to have LongPress detection capability? If not, how can this be added to the list items of the list itself?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-creating-lists.html)
+
 
 
 ### **Shai Almog** — October 27, 2017 at 4:31 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-23532))
@@ -39,7 +39,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > sure. You can add any component to the “list” and you can subclass any component to override longPointerPress
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-creating-lists.html)
+
 
 
 ### **Tommy Mogaka** — October 27, 2017 at 11:48 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-24153))
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > After scrolling and pressing an item that navigates you away from a list(e.g. to another form or page), how do you get back to a list to previously displayed list? In my case, the form usually in another class. Is it achievable and what can I do to my code to add this “remember last position” feature onto a list? The use case is when you have a long list and you need to go back and forth without having to keep scrolling from the top to get back to where you had last clicked.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-creating-lists.html)
+
 
 
 ### **Shai Almog** — October 28, 2017 at 4:54 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-23739))
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If the same form instance is used when you get back it should still be scrolled to that same position. If not you can just call requestFocus() in the show listener event.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-creating-lists.html)
+
 
 
 ### **Francesco Galgani** — November 4, 2017 at 4:03 pm ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-24220))
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > It’s useful. Thank you. For my better understanding, I would ask to you the transcript and the code, like in the Codename One Academy lessons… or, can you add this video to the Academy, so I can access to the transcript and to the source code?  
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-creating-lists.html)
+
 
 
 ### **Shai Almog** — November 5, 2017 at 5:05 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-23696))
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks. All of my new videos on youtube have subtitles which you can turn on using the CC button. You can also see the full transcript of this and other videos in the how do I page for each of them here [https://www.codenameone.com…](<https://www.codenameone.com/how-do-i.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-creating-lists.html)
+
 
 
 ### **מֶרֶס יָֽשָׁבְעָם** — February 2, 2020 at 3:27 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-21376))
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Really good explanation. Thanks Shai, one thing I appreciate of your explanations is the fact that you consider the way to improve also the way to get things look nice, always at the programmer point of view.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-creating-lists.html)
+
 
 ---
 

@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Since the aab format is not installable on an Android smartphone but can only be used to publish in the store, you will always continue to provide the apk format, right?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-app-bundle-support.html)
+
 
 
 ### **Shai Almog** — June 6, 2021 at 2:01 pm ([permalink](https://www.codenameone.com/blog/android-app-bundle-support.html#comment-24466))
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I won’t say “always” since things change but as long as AAB isn’t installable you will need an APK and we’ll provide it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-app-bundle-support.html)
+
 
 
 ### **Chris Vorster** — September 11, 2021 at 12:56 am ([permalink](https://www.codenameone.com/blog/android-app-bundle-support.html#comment-24479))
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can’t seem to find any solutions on how to deal with this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-app-bundle-support.html)
+
 
 
 ### **Lianna Casper** — September 11, 2021 at 4:12 am ([permalink](https://www.codenameone.com/blog/android-app-bundle-support.html#comment-24480))
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to pick the right keystore in Codename One Settings. How did you sign the app you first uploaded?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-app-bundle-support.html)
+
 
 ---
 

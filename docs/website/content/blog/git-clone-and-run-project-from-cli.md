@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nice one. Makes the demo projects much more accessible.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgit-clone-and-run-project-from-cli.html)
+
 
 
 ### **Mohammed Kamal** — November 12, 2019 at 2:56 pm ([permalink](https://www.codenameone.com/blog/git-clone-and-run-project-from-cli.html#comment-24266))
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Steve, excellent, just done this now .. better late than never! Many thanks for that, saved me lots of times.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgit-clone-and-run-project-from-cli.html)
+
 
 ---
 

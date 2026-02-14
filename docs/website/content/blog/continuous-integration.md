@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, this is a great addition to Codename One, any chances it will have some basic support to Pro users ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcontinuous-integration.html)
+
 
 
 ### **Anonymous** — December 9, 2014 at 11:52 am ([permalink](https://www.codenameone.com/blog/continuous-integration.html#comment-24241))
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That is unlikely, too much server load.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcontinuous-integration.html)
+
 
 ---
 

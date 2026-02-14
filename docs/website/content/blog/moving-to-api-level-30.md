@@ -33,7 +33,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The geofence is not firing (or firing sometimes, in unpredictable way) unless I add `android.buildToolsVersion=29` build hint. (Tested on Android 10 API 29 and Android 8.1 API 27).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-api-level-30.html)
+
 
 
 ### **Shai Almog** — July 14, 2021 at 1:15 am ([permalink](https://www.codenameone.com/blog/moving-to-api-level-30.html#comment-24469))
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the headsup. We’ll look into it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-api-level-30.html)
+
 
 ---
 

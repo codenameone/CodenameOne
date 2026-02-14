@@ -738,7 +738,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Thanks Steve – great tutorial.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
+
 
 
 ### **salah Alhaddabi** — August 13, 2017 at 9:46 pm ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-23501))
@@ -772,14 +772,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at java.awt.EventDispatchThread.pumpEvents([EventDispatchThread.java](<http://EventDispatchThread.java>):93)  
 > at [java.awt.EventDispatchThrea…](<http://java.awt.EventDispatchThread.run)([EventDispatchThread.java](http://EventDispatchThread.java)>:82)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
+
 
 
 ### **Shai Almog** — August 14, 2017 at 7:04 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-23511))
 
 > You refactored the package name without updating it in the [codenameone_settings.proper…](<http://codenameone_settings.properties>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
+
 
 
 ### **Brenden** — June 11, 2019 at 9:15 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-24009))
@@ -790,7 +790,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards Brenden
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
+
 
 
 ### **Shai Almog** — June 12, 2019 at 4:11 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-24099))
@@ -798,7 +798,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > it should work fine locally but you need to still configure everything in itunes connect otherwise it won’t work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
+
 
 
 ### **Rochana Sawatzky** — November 27, 2019 at 1:36 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-24269))
@@ -809,7 +809,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have installed maven, and added it to my path, as well as adding maven_home, m2_home, java_home environment variables. I can run mvn -version fine, so I’m at a loss for why I’m getting the error. Any ideas?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
+
 
 
 ### **Shai Almog** — November 27, 2019 at 2:59 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-24267))
@@ -818,7 +818,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If this doesn’t help try to provide more details about your environment so we can help.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
+
 
 ---
 

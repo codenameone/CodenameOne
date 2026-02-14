@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hello,  
 > I think there is a regression with today’s update. I can’t open my Accordion menu anymore to see his content. Can you check it please ? Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-xv.html)
+
 
 
 ### **Shai Almog** — July 22, 2016 at 1:55 pm ([permalink](https://www.codenameone.com/blog/questions-of-the-week-xv.html#comment-22960))
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the headsup. I committed a fix that broke some of the core animations, we’re putting out a fix that should be up in an hour or so.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-xv.html)
+
 
 ---
 

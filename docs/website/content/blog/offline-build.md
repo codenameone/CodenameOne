@@ -174,35 +174,35 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Great work! This one rocks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Gareth Murfin** — August 10, 2016 at 4:14 pm ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-22683))
 
 > Wow!!! This is amazing! One question, and I know the answer I think 🙂 But would it be possible to get this working using a mac in the cloud? I guess it would actually, if you simply install all the stuff on that mac, for building, and code locally then pull the code on the mac. Fantastic idea, also silences a lot of the people who say “no way im doing cloud builds”.. Can’t wait to try it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Shai Almog** — August 11, 2016 at 4:43 am ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-22654))
 
 > I think it would be painful but we would be oblivious to the fact that a Mac is in the cloud. Notice that you won’t be able to use a guest account as this is bound to a machine.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Diamond** — August 30, 2016 at 8:40 am ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-22750))
 
 > Instead of going through the Mac-in-cloud installation process pains, why not just send a normal CN1 cloud build. Both will require internet connectivity and Mac-in-cloud build will be more difficult to execute. Also, Mac-in-cloud will require an additional space to install necessary pre-requisites and this won’t be free.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Gareth Murfin** — January 16, 2017 at 2:05 pm ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-22899))
 
 > Also, if you are building offline does that mean you can use cn1 for free?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Shai Almog** — January 17, 2017 at 5:26 am ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-23068))
@@ -210,7 +210,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Yes and No.  
 > Just like you can use the source for free the enterprise offline build is free once you have it installed. Updates however, aren’t. So if you don’t need to update cn1 or get bug fixes/support then yes it’s free.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Khoi Minh Vo** — October 31, 2019 at 10:38 am ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-24263))
@@ -219,7 +219,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can UWP get offline build?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Shai Almog** — November 1, 2019 at 4:18 am ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-24260))
@@ -228,7 +228,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes. If an enterprise customer asks for it we’ll do it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Julio Valeriron Ochoa** — September 30, 2022 at 4:48 pm ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-24545))
@@ -237,7 +237,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can I use offline build with your source code cn1 locally fro free?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Shai Almog** — October 1, 2022 at 2:06 am ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-24547))
@@ -246,7 +246,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No. But you can build offline for free with the maven build now: <https://www.codenameone.com/blog/moving-to-maven.html>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 
 ### **Julio Valeriron Ochoa** — September 30, 2022 at 4:51 pm ([permalink](https://www.codenameone.com/blog/offline-build.html#comment-24546))
@@ -255,7 +255,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For example imagine that I found a bug in your source code an I want to fix. I’t possible locally with your source code in my pc to modify and compile my cn1 source code?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Foffline-build.html)
+
 
 ---
 

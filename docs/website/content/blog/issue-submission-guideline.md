@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Can you help me with this issue please : [https://github.com/shannah/…](<https://github.com/shannah/cn1-freshdesk/issues/3>)  
 > I can’t build anymore for Android until library with andlib format is included in this cn1lib. Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fissue-submission-guideline.html)
+
 
 ---
 
