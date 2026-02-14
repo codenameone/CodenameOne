@@ -92,8 +92,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 ### **Chidiebere Okwudire** — July 19, 2015 at 1:10 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-21550))
 
 > Great work, guys! I’ll try this out in the coming weeks
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-certificate-wizard.html)
 
 
 ### **Lukman Javalove Idealist Jaji** — July 20, 2015 at 8:23 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22020))

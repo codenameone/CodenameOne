@@ -107,8 +107,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > Oh these new additions to side menu are great, thanks.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Anonymous** — September 20, 2013 at 12:46 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21618))
@@ -116,8 +114,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > Great work on this guys.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Anonymous** — February 21, 2015 at 4:16 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22207))
@@ -125,8 +121,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > wow great tutorial, much helpfull
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Anonymous** — March 6, 2015 at 10:18 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22303))
@@ -138,8 +132,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Im trying to hide the bar at the top of the screen it creates in the example. I want to add a image in one of my containers that will trigger the side menu bar. Any suggestions on this? Regards, 
 >
 > Dante
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Anonymous** — March 6, 2015 at 2:41 pm ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21541))
@@ -149,8 +141,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > That would be tough since we rely on this a bit. You can do a trick where you set the menu image to a small sized image and set the padding/margin to the title area to 0. Also set the title and title area UIIDs to be transparent. 
 >
 > To show your icon just use a layer in the layered layout and when its tapped just invoke open sidemenu.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Mahmoud** — March 14, 2016 at 11:39 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21494))
@@ -160,8 +150,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > when i put Side Menu Bar to right Side (Menu Bar Image show in black color)
 >
 > but my SideMenuBarImage in my theme is white color
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Shai Almog** — March 15, 2016 at 3:20 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22501))
@@ -169,8 +157,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > You need to use the theme constant rightSideMenuImage as you can have two different side menu bars and each can have its own image. You are seeing the default image whose color you can control by styling the foreground property.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Mahmoud** — March 15, 2016 at 12:13 pm ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21555))
@@ -178,8 +164,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Mahmoud says:
 >
 > thanks Shai
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Mahmoud** — March 26, 2016 at 8:45 pm ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22639))
@@ -190,8 +174,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > i have right side menu and my background is white but i have gradient line at the first of menu  
 > how i can remove it  
 > thanks
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Shai Almog** — March 27, 2016 at 4:27 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22510))
@@ -199,8 +181,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > That is the shadow for the sidemenu set the theme constant sideMenuShadowBool=false
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fon-the-side-up-on-top.html)
 
 
 ### **Mahmoud** — March 27, 2016 at 5:46 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21433))

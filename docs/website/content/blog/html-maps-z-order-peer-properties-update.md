@@ -53,8 +53,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Blessing Mahlalela says:
 >
 > Hi, currently trying latest Github CN1 Google maps code. I added Java script api key, however on simulator it shows Open street maps. Is it possible to display html5 JS maps on simulator and every other device that does not have the SDK?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhtml-maps-z-order-peer-properties-update.html)
 
 
 ### **Blessing Mahlalela** — February 16, 2017 at 12:12 pm ([permalink](https://www.codenameone.com/blog/html-maps-z-order-peer-properties-update.html#comment-23151))
@@ -69,8 +67,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Exception is:  
 > org.gradle.api.tasks.TaskExecutionException: Execution failed for task ‘:transformClassesAndResourcesWithProguardForRelease’.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhtml-maps-z-order-peer-properties-update.html)
 
 
 ### **Shai Almog** — February 16, 2017 at 2:34 pm ([permalink](https://www.codenameone.com/blog/html-maps-z-order-peer-properties-update.html#comment-23266))
@@ -78,8 +74,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > This isn’t implemented completely but should work for desktop and does work for my test case. The Android build isn’t something I tested with the current version but I’ll need the full logs as this isn’t the actual error message.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhtml-maps-z-order-peer-properties-update.html)
 
 ---
 

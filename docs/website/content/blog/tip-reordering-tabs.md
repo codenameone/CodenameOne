@@ -67,8 +67,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Dragging and dropping a tab as in this example doesn’t feel right. Instead the tabs should make room while dragging and not move again into place when dropping. That way it would be much more natural.
 >
 > See [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/issues/2800>)
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-reordering-tabs.html)
 
 ---
 

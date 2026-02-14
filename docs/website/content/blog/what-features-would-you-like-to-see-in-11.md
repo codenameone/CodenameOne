@@ -40,8 +40,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I am using signaturein in my android app so i add these thing easily as 
 >
 > a library or jar AND USE IT
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhat-features-would-you-like-to-see-in-11.html)
 
 ---
 

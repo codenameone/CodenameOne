@@ -369,8 +369,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > I know I said the same thing last year, but thank you for your trip report. It’s really nice to have that kind of feedback about these big events!
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavazone-trip-report1.html)
 
 ---
 

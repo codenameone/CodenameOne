@@ -67,8 +67,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > attributes from application tag from my native library manifest, since they conflicted during merge (I assume the CN1 build system generates these too, so the merge fails).  
 > Any way, these were small changes i had to make, after which my builds started working as usual again.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvideo-new-defaults-barcode-qrcode-changes.html)
 
 
 ### **Shai Almog** — December 30, 2015 at 3:48 am ([permalink](https://www.codenameone.com/blog/video-new-defaults-barcode-qrcode-changes.html#comment-22424))
@@ -78,8 +76,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks for the headsup! That’s exactly why we turned on the default now instead of waiting for 3.3.
 >
 > We wanted to iron out the kinks.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvideo-new-defaults-barcode-qrcode-changes.html)
 
 ---
 

@@ -65,8 +65,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Anonymous says:
 >
 > Still some minor bugs but way better than the previous support. Keep up the good work !
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
 ### **Anonymous** — April 28, 2014 at 10:27 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21837))

@@ -115,8 +115,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve just tried the new GUI builder, at first it was a bit confusing as it felt a bit like I can put a component anywhere but then I watched the video and it “clicked”.  
 > I really like the drag and drop UI of the GUI builder, it’s pretty smooth… Was it built with JavaFX?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Shai Almog** — June 27, 2017 at 1:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-24208))
@@ -125,8 +123,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks.  
 > No, it’s actually written in Codename One… Just like the Codename One Settings. Just goes to show you what you can do with some attention to detail.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Mac Flanegan** — June 27, 2017 at 1:30 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23525))
@@ -136,8 +132,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Congratulations on the updates of this new version!
 >
 > PS: In Delphi this feature is called “Anchors” what I think would be a more appropriate name.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Shai Almog** — June 27, 2017 at 1:37 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-24149))
@@ -149,8 +143,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I haven’t used it in years so I don’t recall…
 >
 > I was for constraints and in Java there is a Spring layout (which I glad he didn’t pick as Spring is already deeply used in Java).
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Pugazhendi E** — June 27, 2017 at 1:46 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23217))
@@ -158,8 +150,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Pugazhendi E says:
 >
 > Congrats 🙂
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Mac Flanegan** — June 28, 2017 at 5:08 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23572))
@@ -173,8 +163,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Before I see it working, I even thought: – but the codenameonde already does autolayout …
 >
 > But again, congratulations to the new features …
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Shai Almog** — June 29, 2017 at 3:54 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23580))
@@ -182,8 +170,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Autolayout is a term used in iOS so we chose it to keep it familiar.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Francesco Leoni** — June 29, 2017 at 6:35 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23589))
@@ -194,8 +180,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to open an old Form (created using the previous GUuiBuilder) with the new GuiBuilder, or to convert an old Form to the new format?  
 > At present I can use the new GB interface only wher I create a brand new Form.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Shai Almog** — June 29, 2017 at 8:56 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23459))
@@ -213,8 +197,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > – New GUI builder forms created with autolayout
 >
 > If you are referring to converting the GUI builder code pre-3.7 to post 3.7 you can easily do that but it will require a bit of hacking. Just open the .gui XML file and set the layout of the form to be layered layout. Then set autoLayout=”true” in the top level component tag. This will enable the new layout mode on an older form. Everything might be “messed up” after you do that which might require some work of fixing.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Francesco Leoni** — June 29, 2017 at 7:55 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23636))
@@ -239,8 +221,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at com.codename1.ui.Display.mainEDTLoop([Display.java](<http://Display.java>):873)  
 > at [com.codename1.ui.RunnableWr…](<http://com.codename1.ui.RunnableWrapper.run)([RunnableWrapper.java](http://RunnableWrapper.java)>:120)  
 > at [com.codename1.impl.Codename…](<http://com.codename1.impl.CodenameOneThread.run)([CodenameOneThread.java](http://CodenameOneThread.java)>:176)
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Shai Almog** — June 30, 2017 at 3:59 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23349))
@@ -248,8 +228,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Sorry, it seems I remembered this incorrectly and the attribute should be autolayout lower case not camel case.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Francesco Galgani** — June 30, 2017 at 11:27 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23376))
@@ -257,8 +235,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Francesco Galgani says:
 >
 > Are these new features (in particular the new Gui Builder) covered in the three courses of the Codename One Academy?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 
 ### **Shai Almog** — June 30, 2017 at 12:46 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23518))
@@ -271,8 +247,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I started working on a module but it ended up being too problematic to document a tool that’s changing so quickly (case in point here). Hopefully this marks a stable point where I can start working on a GUI builder module which will hopefully be the first module I add after finishing this work.
 >
 > I’m considering building parts of the Uber app using the GUI builder but I’m not sure if it will work well with that use case.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-7-live.html)
 
 ---
 

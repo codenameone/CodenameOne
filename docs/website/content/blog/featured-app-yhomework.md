@@ -66,8 +66,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I remember downloading the app over a year ago and the graphics on my phone were pretty poor… Maybe I’ll check it out again.
 >
 > By the way, how do you make the app showcase images like the one at the top of this post? I’m looking for a tool to be able to do similar stuff.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-yhomework.html)
 
 
 ### **bryan** — May 19, 2016 at 11:46 pm ([permalink](https://www.codenameone.com/blog/featured-app-yhomework.html#comment-22553))
@@ -75,8 +73,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > bryan says:
 >
 > That’s a very slick looking app. Any idea what sort of time it took to develop ?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-yhomework.html)
 
 
 ### **Shai Almog** — May 20, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/featured-app-yhomework.html#comment-22910))
@@ -85,8 +81,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The UI was designed before flat design took over, the general design was around the idea of familiarity to 7th-10th grade kids (notebook, calculator motif). My one complaint about the UI is it’s performance which I think could be improved significantly.  
 > Since this app is so old by now it was developed before there were “best practices” for Codename One and a lot of things could probably be accomplished in a more efficient way.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-yhomework.html)
 
 
 ### **Shai Almog** — May 20, 2016 at 4:16 am ([permalink](https://www.codenameone.com/blog/featured-app-yhomework.html#comment-22542))
@@ -94,8 +88,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > The core UI was written in a few months but overall this app has been in production since 2013 or so. The current level of functionality and UI evolved over time.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-yhomework.html)
 
 ---
 

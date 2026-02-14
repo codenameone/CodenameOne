@@ -249,8 +249,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Interesting, less than 300 stars for a github compare to 32,970 developers? Can it be compile to Swift code instead of C?
 >
 > 120,000,000 is based from which figure?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 
 ### **Shai Almog** — May 14, 2016 at 3:19 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22663))
@@ -260,8 +258,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We migrated from Google code at the last possible instance which explains the low star count.
 >
 > By default we include device counting code in builds (this can be disabled) so we composed that number from verified installed which we then correlated to actual appstore installs and to apps/devices where we know this was developed to come up with a composite number. The number is actually much larger by now but we didn’t get around to go thru this process to update it.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 
 ### **Siva Mamidi** — June 2, 2016 at 8:32 pm ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22757))
@@ -269,8 +265,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Siva Mamidi says:
 >
 > Very nice article and informative.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 
 ### **Benjamin Hamilton** — June 18, 2016 at 1:10 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22613))
@@ -284,8 +278,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [https://developer.android.c…](<https://developer.android.com/training/articles/perf-jni.html>)
 >
 > JNI is the Java Native Interface. It defines a way for managed code (written in the Java programming language) to interact with native code (written in C/C++). It’s vendor-neutral, has support for loading code from dynamic shared libraries, and while cumbersome at times is reasonably efficient.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 
 ### **Shai Almog** — June 18, 2016 at 4:56 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22941))
@@ -306,8 +298,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > lot of JNI calls, you might spend more time in the overhead of JNI than  
 > in the actual code. If you have old JNI code, you might want to revisit  
 > it.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 
 ### **Marcin** — July 15, 2016 at 1:28 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22793))
@@ -332,8 +322,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards,  
 > Marcin
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 
 ### **Shai Almog** — July 15, 2016 at 4:00 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22801))
@@ -344,8 +332,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > no we don’t support DI since we don’t support reflection and bytecode manipulation isn’t trivial since it must be done statically with great care. It’s possible to do bytecode manipulation as Steve did with the POJO mapper: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/json-to-pojo-mapping.html>) but no one did it for DI.
 >
 > We don’t support JUnit etc. so you will need to use our test framework which includes a test recorder etc. I think a lot of the problems solved by DI are server problems and not as pertinent to the front end developer landscape.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 
 ### **Martin Grajcar** — September 9, 2017 at 1:26 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-23350))
@@ -353,8 +339,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Martin Grajcar says:
 >
 > Dagger 2 uses no reflection at all, so in theory it must work. As this is the only relevant search result for “codenameone” and “dependency injection”, I’m afraid that nobody has really tried it yet.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 
 ### **Shai Almog** — September 9, 2017 at 7:13 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-23502))
@@ -364,8 +348,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Steve did POJO mapping which is pretty similar, if you use bytecode manipulation tools it can work but DI isn’t as helpful in mobile client as it is in server code so there wasn’t as much demand.
 >
 > If you try it and run into difficulties just ask on stackoverflow (with the codenameone tag) or in the discussion forum. We’ll try to help.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-xamarin-and-codename-one.html)
 
 ---
 

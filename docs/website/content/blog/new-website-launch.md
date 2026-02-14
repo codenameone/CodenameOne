@@ -40,8 +40,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The javadocs are essential, I consult them continuously: will they remain in the same position?
 >
 > If the new site will continue to have the blogging section (which I’ve grown fond of…), you could add an article indicating which are the new links. Thank you.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-website-launch.html)
 
 
 ### **Shai Almog** — September 27, 2020 at 7:41 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24346))
@@ -50,8 +48,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes. The comments won’t be present on launch but we’ll add them later.  
 > Most links (including blogs) should remain the same.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-website-launch.html)
 
 
 ### **Francesco Galgani** — October 5, 2020 at 8:36 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24355))
@@ -59,8 +55,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
 > I guess something didn’t work: I keep seeing the site as before…
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-website-launch.html)
 
 
 ### **Shai Almog** — October 5, 2020 at 8:39 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24353))
@@ -68,8 +62,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Notice the update I posted last week to the article at the top… I doubt we’ll make it by this weekend either. This is proving much harder in the least expected quadrants.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-website-launch.html)
 
 
 ### **Francesco Galgani** — October 5, 2020 at 8:42 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24354))
@@ -77,8 +69,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
 > Oh, I’m sorry: I didn’t notice that update.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-website-launch.html)
 
 ---
 

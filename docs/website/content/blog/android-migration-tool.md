@@ -49,8 +49,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Gareth Murfin says:
 >
 > What a great idea, many Android devs looking to produce iOS ports end up thinking about using Codename One. As you say resources are so very different, I found learning Android GUI dev much harder than learning CN1 GUI dev (but previously I was into Swing, J2ME, LWUIT etc). I think one of the main paradigm shifts that is hard to learn is the lack of “activities”. That is in Android each screen has its own class and it starts to feel nice and correct (more OO/modular or something :)) – and when you go to CN1 it is very strange to have everything more “old school” in one or 2 classes. If it were possible it would be good if each screen in cn1 could actually be a separate class, so when you create an event for postShow or something it doesnt go into statemachine but a class called for example Splash(), and with a method postMain() in there. This would make it far easier to navigate projects and understand them (new coders have been scared of even looking at my gargantuan statemachines, preferring to do a rewrite(!)). Just a suggestion of course, and we could easily do this ourself by simply making calls from StateMachine to custom classes we can make for each screen, which is actually what I am planing on doing in my next cn1 app. Current I mostly have one large statemachine, another class holding the business logic that is called on from statemachine, and then a pile of POJOs.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-migration-tool.html)
 
 
 ### **bryan** — July 27, 2016 at 9:08 pm ([permalink](https://www.codenameone.com/blog/android-migration-tool.html#comment-22906))
@@ -58,8 +56,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > bryan says:
 >
 > A class per screen/form is the “new” way to do CN1, and the way the new GUI builder works, so this porting tool would do that.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-migration-tool.html)
 
 
 ### **Shai Almog** — July 28, 2016 at 4:18 am ([permalink](https://www.codenameone.com/blog/android-migration-tool.html#comment-22706))
@@ -67,8 +63,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Yep. I mentioned this uses the new GUI builder so it’s one form class per layout.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fandroid-migration-tool.html)
 
 ---
 
