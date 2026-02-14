@@ -37,12 +37,12 @@ Tutorial: [link](https://www.udemy.com/learn-mobile-programming-by-example-with-
 
 Source: [link](https://github.com/codenameone/codenameone-demos/tree/master/DrSbaitso)
 
-JS Port: [link](http://www.codenameone.com/demos/DrSbaitso/)
+JS Port: [link](/demos/DrSbaitso/)
 
-Windows Desktop: [link](http://www.codenameone.com/demos/DrSbaitso/DrSbaitso.exe)
+Windows Desktop: [link](/demos/DrSbaitso/DrSbaitso.exe)
 
-Mac App: [link](http://www.codenameone.com/demos/DrSbaitso/DrSbaitso.dmg)
+Mac App: [link](/demos/DrSbaitso/DrSbaitso.dmg)
 
-Android App: [link](http://www.codenameone.com/demos/DrSbaitso/DrSbaitso-release.apk)
+Android App: [link](/demos/DrSbaitso/DrSbaitso-release.apk)
 
 ios: [link](#)

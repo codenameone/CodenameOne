@@ -35,12 +35,12 @@ Blog Post: [link](https://beta.codenameone.com/blog/geo-viz-and-codename-one.htm
 
 Source: [link](https://github.com/codenameone/codenameone-demos/tree/master/GeoVizDemo)
 
-JS Port: [link](http://www.codenameone.com/demos/GeoVizDemo/)
+JS Port: [link](/demos/GeoVizDemo/)
 
-Windows Desktop: [link](http://www.codenameone.com/demos/GeoVizDemo/GeoVizDemo.exe)
+Windows Desktop: [link](/demos/GeoVizDemo/GeoVizDemo.exe)
 
-Mac App: [link](http://www.codenameone.com/demos/GeoVizDemo/GeoVizDemo.dmg)
+Mac App: [link](/demos/GeoVizDemo/GeoVizDemo.dmg)
 
-Android App: [link](http://www.codenameone.com/demos/GeoVizDemo/GeoVizDemo-release.apk)
+Android App: [link](/demos/GeoVizDemo/GeoVizDemo-release.apk)
 
 ios: [link](#)

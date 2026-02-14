@@ -21,7 +21,7 @@ The demo displays icons/cards with various categories to show off various featur
 
 Source: [link](https://github.com/codenameone/KitchenSink/)
 
-JS Port: [link](http://www.codenameone.com/demos/KitchenSink/)
+JS Port: [link](/demos/KitchenSink/)
 
 iOS iTunes: [link](https://apps.apple.com/us/app/kitchen-sink-codename-one/id635048865)
 
@@ -29,6 +29,6 @@ Universal Windows (UWP): [link](https://www.microsoft.com/en-us/p/codename-one-k
 
 Google Play [link](https://play.google.com/store/apps/details?id=com.codename1.demos.kitchen)
 
-Windows Desktop: [link](http://www.codenameone.com/demos/KitchenSink/KitchenSink.exe)
+Windows Desktop: [link](/demos/KitchenSink/KitchenSink.exe)
 
-Mac App: [link](http://www.codenameone.com/demos/KitchenSink/KitchenSink.dmg)
+Mac App: [link](/demos/KitchenSink/KitchenSink.dmg)

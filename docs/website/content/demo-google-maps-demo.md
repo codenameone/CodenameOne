@@ -35,8 +35,8 @@ Blog Post: [link](https://beta.codenameone.com/blog/new-improved-native-google-m
 
 Source: [link](https://github.com/codenameone/codenameone-google-maps/tree/master/GoogleMapsTest)
 
-JS Port: [link](http://www.codenameone.com/demos/GoogleMaps/)
+JS Port: [link](/demos/GoogleMaps/)
 
-Android App: [link](http://www.codenameone.com/demos/GoogleMaps/GoogleMapsTestApp-release.apk)
+Android App: [link](/demos/GoogleMaps/GoogleMapsTestApp-release.apk)
 
 ios: [link](#)

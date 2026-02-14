@@ -45,8 +45,8 @@ Blog Post: [link](https://beta.codenameone.com/blog/ratatouilles-restaurant-in-c
 
 Source: [link](https://github.com/codenameone/RestaurantDemo)
 
-JS Port: [link](http://www.codenameone.com/demos/Restaurant/)
+JS Port: [link](/demos/Restaurant/)
 
-Android App: [link](http://www.codenameone.com/demos/Restaurant/Restaurant.apk)
+Android App: [link](/demos/Restaurant/Restaurant.apk)
 
 ios: [link](#)

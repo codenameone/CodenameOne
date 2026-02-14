@@ -31,8 +31,6 @@ The Poker demo was written as part of an article covering game development with 
 Notice that the JavaScript HTML5 demo is not what we have on the device where applications are translated to native code!  
 Since Apple doesn’t allow demos on itunes and doesn’t allow installing apps without itunes we can’t distribute the native app demos, you would need to build from source with an itunes demo account.
 
-Tutorial: [link](http://www.codenameone.com/manual/appendix-game.html)
-
 Source: [link](https://github.com/codenameone/codenameone-demos/tree/master/CN1Poker)
 
 JS Port: [link](/demos/Poker/)
@@ -41,6 +39,6 @@ Windows Desktop: [link](/demos/Poker/Poker.exe)
 
 Mac App: [link](/demos/Poker/Poker.dmg)
 
-Android App: [link](http://www.codenameone.com/demos/Poker/Poker-release.apk)
+Android App: [link](/demos/Poker/Poker-release.apk)
 
 ios: [link](#)

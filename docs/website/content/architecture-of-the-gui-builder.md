@@ -18,7 +18,7 @@ The Codename One Designer isn't a standard code generator, the UI is saved withi
 
 1. No fragile generated code to break.
 2. Designers who don't know Java can use the tool.
-3. The "[Codename One LIVE!](http://www.codenameone.com/codename-one-live.html)" application can show a live preview of your design as you build it.
+3. The "[Codename One LIVE!](/codename-one-live)" application can show a live preview of your design as you build it.
 4. Images and theme settings can be integrated directly with the GUI without concern.
 5. The tool is consistent since the file you save is the file you run.
 6. GUI's/themes can be downloaded dynamically without replacing the application (this can reduce download size).
@@ -46,7 +46,7 @@ Container c = u.createContainer(r, "uiNameInResource");
 
 (Notice that since Form & Dialog both derive from Container you can just downcast to the appropriate type).
 
-This would work for any resource file and can work completely dynamically! E.g. you can download a resource file on the fly and just show the UI that is within the resource file... That is what [Codename One LIVE!](http://www.codenameone.com/codename-one-live.html) is doing internally.
+This would work for any resource file and can work completely dynamically! E.g. you can download a resource file on the fly and just show the UI that is within the resource file... That is what [Codename One LIVE!](/codename-one-live) is doing internally.
 
 ### IDE Bindings
 
