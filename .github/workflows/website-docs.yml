@@ -57,6 +57,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Update developer guide PDF redirect
+        run: |
+          set -euo pipefail
+          scripts/website/update_developer_guide_redirect.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Build website
         run: |
           set -euo pipefail
@@ -69,6 +76,12 @@ jobs:
         run: |
           set -euo pipefail
           test -f docs/website/public/OTA/Skins.xml
+
+      - name: Validate developer guide redirect output
+        run: |
+          set -euo pipefail
+          test -f docs/website/public/_redirects
+          grep -Eq '^/files/developer-guide\.pdf https://github\.com/codenameone/CodenameOne/releases/download/.+/developer-guide\.pdf 302$' docs/website/public/_redirects
 
       - name: Upload built site artifact
         uses: actions/upload-artifact@v4
