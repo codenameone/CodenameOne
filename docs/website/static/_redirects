@@ -19,6 +19,10 @@
 /category / 301!
 /category/* / 301!
 
+# Legacy blog URL shape: keep redirects host-relative so beta/staging stays on its own domain
+/blog/:slug.html /blog/:slug/ 301!
+/blog/:slug.html/ /blog/:slug/ 301!
+
 # Affiliate program retired
 /academy-affiliate-program/ / 301!
 /academy-affiliate-program / 301!
