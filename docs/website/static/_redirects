@@ -1,5 +1,9 @@
 # Netlify redirects
 
+# Canonical blog RSS feed alias
+/feed.xml /blog/index.xml 302
+/feed.xml/ /blog/index.xml 302
+
 # Demo URL migrations (legacy WordPress -> current demo-* naming)
 /demo.html/ /demos/ 301!
 /demo.html /demos/ 301!

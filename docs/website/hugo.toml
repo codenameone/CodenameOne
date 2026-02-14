@@ -9,6 +9,12 @@ baseName = "feed"
 isPlainText = false
 rel = "alternate"
 
+[outputs]
+home = ["HTML", "JSON"]
+section = ["HTML"]
+taxonomy = ["HTML"]
+term = ["HTML"]
+
 [params]
 defaultTheme = "dark"
 disableThemeToggle = true
