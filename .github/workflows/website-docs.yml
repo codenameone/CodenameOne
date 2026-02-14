@@ -50,6 +50,13 @@ jobs:
           set -euo pipefail
           gem install --no-document asciidoctor rouge
 
+      - name: Download latest OTA skins
+        run: |
+          set -euo pipefail
+          scripts/website/fetch_ota_skins.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Build website
         run: |
           set -euo pipefail
@@ -57,6 +64,11 @@ jobs:
         env:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
+
+      - name: Validate OTA skin output
+        run: |
+          set -euo pipefail
+          test -f docs/website/public/OTA/Skins.xml
 
       - name: Upload built site artifact
         uses: actions/upload-artifact@v4
