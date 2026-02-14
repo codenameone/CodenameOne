@@ -27,33 +27,27 @@ Here’s the gist of what happens in the video.
 
 1. Clone the [Codename One repository](https://github.com/codenameone/CodenameOne), then run mvn install in the maven subdirectory:
 
-```bash
-				
-					git clone https://github.com/codenameone/CodenameOne
+```bash			
+git clone https://github.com/codenameone/CodenameOne
 cd CodenameOne/maven
-mvn install
-				
-			
+mvn install			
 ```
 
 This will take a few minutes, but at the end of the tunnel you should see “SUCCESS” as shown below:
 
-![mvn-install-success](https://www.codenameone.com/wp-content/uploads/2021/04/mvn-install-success.png)
+**NOTE**: Due to wordpress issues the images in this blogpost were lost.
 
 2. Clone the [cn1-maven-archetypes repository](https://github.com/shannah/cn1-maven-archetypes), then run mvn install in its root directory:
 
-```bash
-				
-					git clone https://github.com/shannah/cn1-maven-archetypes
+```bash			
+git clone https://github.com/shannah/cn1-maven-archetypes
 cd cn1-maven-archetypes
-mvn install
-				
-			
+mvn install				
 ```
 
 This will take another minute or so, but at the end of the tunnel you should see “SUCCESS”:
 
-![mvn-install-archetypes-success](https://www.codenameone.com/wp-content/uploads/2021/04/mvn-install-archetypes-success.png)
+...
 
 After completing these steps, Codename One will be installed in the local maven repository. A key point I make in this video is the version number of the sources that I checked out of Github. If you are cloning the project from the master branch, then the version will usually be a SNAPSHOT version. E.g. 7.0.21-SNAPSHOT. This is a Maven convention. Release versions will not have the **-SNAPSHOT** suffix.
   
@@ -66,7 +60,7 @@ Now that Codename One is installed in your local Maven repo, you can use that ve
 
 I demonstrate this in the video by creating a new project with the [Codename One initializr](https://start.codenameone.com/).
 
-![cn1-intializr](https://www.codenameone.com/wp-content/uploads/2021/04/cn1-intializr.png)
+...
 
 ## Tip
 
@@ -74,11 +68,11 @@ I demonstrate this in the video by creating a new project with the [Codename One
 
 After downloading and extracting the project, I open its pom.xml file and and look for the <cn1.version> and <cn1.plugin.version> properties:
 
-![cn1-version-properties](https://www.codenameone.com/wp-content/uploads/2021/04/cn1-version-properties.png)
+...
 
 I then change these to point to the version that I installed into my local maven repository: 7.0.21-SNAPSHOT.
 
-![cn1-version-updated](https://www.codenameone.com/wp-content/uploads/2021/04/cn1-version-updated.png)
+...
 
 ### Why Build From Source?
 

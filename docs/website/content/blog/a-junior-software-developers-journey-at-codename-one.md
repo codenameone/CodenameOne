@@ -63,15 +63,7 @@ And even better, the app contains links to the [source code](https://github.com/
 
 But more importantly, users can see and learn about the application structure and how it needs to be written.
 
-![](https://www.codenameone.com/wp-content/uploads/2020/12/kitchen-sink-screenshot_1-169x300.png)
 
-![](https://www.codenameone.com/wp-content/uploads/2020/12/kitchen-sink-screenshot_2-169x300.png)
-
-![](https://www.codenameone.com/wp-content/uploads/2020/12/kitchen-sink-screenshot_3-169x300.png)
-
-![](https://www.codenameone.com/wp-content/uploads/2020/12/kitchen-sink-screenshot_4-169x300.png)
-
-![](https://www.codenameone.com/wp-content/uploads/2020/12/kitchen-sink-screenshot_5-169x300.png)
 ---
 
 ## Archived Comments
