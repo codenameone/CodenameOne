@@ -88,6 +88,22 @@ jobs:
           path: docs/website/reports/link-lint-report.txt
           if-no-files-found: ignore
 
+      - name: Audit source URLs (absolute/WordPress)
+        run: |
+          set -euo pipefail
+          python3 scripts/website/audit_source_urls.py \
+            --root docs/website \
+            --report-file docs/website/reports/source-url-audit.txt \
+            --max-log 120
+
+      - name: Upload source URL audit report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-url-audit
+          path: docs/website/reports/source-url-audit.txt
+          if-no-files-found: ignore
+
       - name: Validate OTA skin output
         run: |
           set -euo pipefail
