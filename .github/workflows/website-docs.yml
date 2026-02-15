@@ -72,19 +72,13 @@ jobs:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
 
-      - name: Install HTMLProofer
-        run: |
-          set -euo pipefail
-          gem install --no-document html-proofer
-
       - name: Validate internal links and images
-        run: |
-          set -euo pipefail
-          htmlproofer docs/website/public \
-            --checks Links,Images \
-            --disable-external \
-            --assume-extension \
-            --allow-hash-href
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --offline
+            --no-progress
+            docs/website/public/**/*.html
 
       - name: Reject absolute codenameone.com links
         run: |
