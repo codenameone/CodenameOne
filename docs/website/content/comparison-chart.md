@@ -6,12 +6,6 @@ slug: "comparison-chart"
 
 # Comparison Chart
 
-Detailed Comparison & FAQs
-
-1. [Home](/)
-2. [About](/about.html)
-3. Comparison Chart
-
 We charge for all our products and services using PayPal (which accepts credit cards), we also accept SWIFT money transfers for annual subscriptions of pro level or higher. If you require specific invoicing types please use our [contact form](/contact-us.html) with your details.
 
 Codename One provides a 30 day money back guarantee with no questions asked for all purchases made via paypal, please use our [contact form](/contact-us.html) if you are unsatisfied in any way with your purchased subscription.

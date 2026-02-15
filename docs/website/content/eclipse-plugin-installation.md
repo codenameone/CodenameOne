@@ -30,4 +30,3 @@ Just type "Codename" in "Eclipse Marketplace" to install Codename One see [this 
 
 ![Eclipse Install](/uploads/eclipse_install_3.png)
 
-[Continue to Next Step](/download.html#step2)

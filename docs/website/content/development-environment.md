@@ -149,4 +149,4 @@ Build Codename One apps in the IDE you already know. Keep a single workflow from
 - [Developing in Codename One](/developing-in-codename-one/)
 - [Codename One Simulator](/codename-one-simulator/)
 - [Browse CN1libs](/cn1libs/)
-- [Developer Guide](/developer-guide.html)
+- [Developer Guide](/developer-guide/)

@@ -46,7 +46,7 @@ The charts demo is derived from an old aChartEngine demo and shows off the vario
 Notice that the JavaScript HTML5 demo is not what we have on the device where applications are translated to native code!  
 Since Apple doesn’t allow demos on itunes and doesn’t allow installing apps without itunes we can’t distribute the native app demos, you would need to build from source with an itunes demo account.
 
-Blog Post: [link](/charts-demo-revisited.html)
+Blog Post: [link](/blog/charts-demo-revisited/)
 
 Source: [link](https://github.com/codenameone/Charts)
 

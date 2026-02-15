@@ -133,7 +133,7 @@ Java bytecode is dynamically translated to a native iOS Xcode project and seamle
 >   
 > • Codename One also provides an option to ****build offline****.
 >   
-> • To understand how Codename One works, check our [developer guide](https://www.codenameone.com/developer-guide.html).
+> • To understand how Codename One works, check our [developer guide](/developer-guide/).
 
 ## Prerequisites
 

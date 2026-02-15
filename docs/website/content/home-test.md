@@ -150,9 +150,7 @@ BeRider Shared electric scooters in Prague. Highly rated app with Google Maps in
 
 [](https://www.codenameone.com/blog/moving-to-api-level-30.html)July 6, 2021
 
-[](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html)![Tips for the Javascript port of Codename One apps](/uploads/Tips-for-the-Javascript-port-of-Codename-One-apps.jpg)[](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html)
-
-## [Tips for the Javascript port of Codename One apps](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html "Tips for the Javascript port of Codename One apps")
+## [Tips for the Javascript port of Codename One apps](/blog/tips-for-the-javascript-port-of-codename-one-apps)
 
 [](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html)May 31, 2021
 

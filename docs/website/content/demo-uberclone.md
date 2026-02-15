@@ -52,4 +52,4 @@ The application makes use of Codename One’s builtin native maps and includes m
 
 Due to the nature of the application we can’t redistribute it in precompiled demo form.
 
-Blog Post: [link](/uber.html)
+Blog Post: [link](/blog/uber/)

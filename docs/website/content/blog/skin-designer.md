@@ -24,8 +24,7 @@ database as explained below.
 
 The Skin Designer is a Codename One app that you can  
 [checkout from github](https://github.com/codenameone/CodenameOneSkinDesigner/tree/master). You can also  
-run it directly in the web browser or install it locally on your Mac or Windows desktop from  
-[its demos page](/demos-SkinDesigner.html).
+run it directly in the web browser or install it locally on your Mac or Windows desktop from its demos page.
 
 __ |  You can also run it on your mobile devices but it might not be as convenient   
 ---|---  
@@ -88,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Haven’t played with it for a while so I’m not sure. Do you see an exception? Notice you can just debug this as it’s a regular cn1 project. FYI next week we’ll be pushing out an update to the simulator and at that point we’ll add a lot of new skins e.g. [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/805671ba5cdb91663df059a3086359b86f489273d482ea9c10093f9979c4d310.png>)
+> Haven’t played with it for a while so I’m not sure. Do you see an exception? Notice you can just debug this as it’s a regular cn1 project. FYI next week we’ll be pushing out an update to the simulator and at that point we’ll add a lot of new skins e.g. ![https://uploads.disquscdn.c…](https://uploads.disquscdn.com/images/805671ba5cdb91663df059a3086359b86f489273d482ea9c10093f9979c4d310.png)
 >
 
 
