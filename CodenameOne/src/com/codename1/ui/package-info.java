@@ -15,7 +15,22 @@
 /// Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
 /// Button fall = new Button("Fall");
 /// fall.addActionListener((e) -> {
-///     for(int iter = 0 ; iter Component Gallery
+///     for(int iter = 0 ; iter < 10 ; iter++) {
+///         Label b = new Label ("Label " + iter);
+///         b.setWidth(fall.getWidth());
+///         b.setHeight(fall.getHeight());
+///         b.setY(-fall.getHeight());
+///         hi.add(b);
+///     }
+///     hi.getContentPane().animateLayout(20000);
+/// });
+/// hi.add(fall);
+/// ```
+///
+/// You can learn more about layout managers `com.codename1.ui.layouts` and about
+/// event handling `com.codename1.ui.events`.
+///
+/// Component Gallery
 ///
 ///     The component gallery below isn't complete or exhaustive but it should give you a sense of the
 ///     types of widgets available within Codename One in a glance.
