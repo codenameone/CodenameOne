@@ -34,7 +34,7 @@ templates moving forward.
 The nice thing about this GUI builder is that it generates code so even if you prefer handcoded development  
 you can still look at the code without launching the GUI builder.
 
-You can check out the demo page [here](/demos-Phoenix.html) which includes all the information including  
+You can check out the demo page [here](/pheonix-ui-port-of-psd-design-to-cross-platform-native-mobile-app/) which includes all the information including  
 the [github page](https://github.com/codenameone/PhoenixUI).
 
 ### Rounded Walkthru Section

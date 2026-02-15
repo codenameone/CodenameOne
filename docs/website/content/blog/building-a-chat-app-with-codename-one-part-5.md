@@ -30,11 +30,11 @@ Once you placed the files into the lib directory right click the project and sel
 This will install the libraries into your classpath and allow you to use them while enjoying features such as code  
 completion etc.
 
-You will also need images for the chat bubbles specifically [this one](/img/blog/chat-bubble-left.png):
+You will also need images for the chat bubbles specifically [this one](/blog/building-a-chat-app-with-codename-one-part-5/chat-bubble-left.png):
 
 ![chat-bubble-left.png](/blog/building-a-chat-app-with-codename-one-part-5/chat-bubble-left.png)
 
-And [this one](/img/blog/chat-bubble-right.png):
+And [this one](/blog/building-a-chat-app-with-codename-one-part-5/chat-bubble-right.png):
 
 ![chat-bubble-right.png](/blog/building-a-chat-app-with-codename-one-part-5/chat-bubble-right.png)
 

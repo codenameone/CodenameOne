@@ -21,7 +21,7 @@ this interesting we added a special tutorial mode that just shows you the querie
 to do something more elaborate like a walkthru tutorial but time constraints blocked that option.
 
 You’ll notice that I’m not embedding the JavaScript version of the demo into this post although you can see it from  
-the [demo page](/demos-SQL.html). The reason for that is unique.
+the [demo page](/sql-playground-sql-tutorial-in-the-browser-iphone-ios-android-windows/). The reason for that is unique.
 
 Browsers don’t support SQL, there was an attempt at getting a standard out but it didn’t last and all vendors  
 deprecated their respective SQL support although some still kept it (notably Chrome & Safari). So the demo  

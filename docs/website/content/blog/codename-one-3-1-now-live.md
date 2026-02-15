@@ -47,7 +47,7 @@ As part of migrating away from Google App Engine we shifted crash reports to use
 them far more usable by embedding the logs directly into the email body.  
 Read more about this work in [this blog post](/blog/migrating-away-from-app-engine.html). 
 
-You can also read the far more detailed list of release notes [here](/codenameone-3-1-release-notes.html).
+You can also read the far more detailed list of release notes [here](/codename-one-3-1-release-notes/).
 ---
 
 ## Archived Comments

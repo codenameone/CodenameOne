@@ -19,7 +19,7 @@ We already have a lot of big features in the release so the big pieces are alrea
 
 With the switch to major release numbers we decided to name the releases. We thought about silly names similar to the spirit of Android, RedHat etc.
 
-Then it occurred to us that with the [Uber Clone application](/demos-UberClone.html) we essentially proved a use case of a taxi app built with Codename One. It’s not a feature that you can list in the “new features” section but it’s an important highlight…​ Since we will be releasing [additional applications to the academy](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) as we go it makes sense to tie them into the release versions.
+Then it occurred to us that with the [Uber Clone application](/uberclone/) we essentially proved a use case of a taxi app built with Codename One. It’s not a feature that you can list in the “new features” section but it’s an important highlight…​ Since we will be releasing [additional applications to the academy](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) as we go it makes sense to tie them into the release versions.
 
 With that in mind Codename One 4.0 is nicknamed – Taxi.  
 Codename One 5.0 is tentatively nicknamed – Social.

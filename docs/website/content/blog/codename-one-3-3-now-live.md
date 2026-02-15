@@ -133,7 +133,7 @@ use the new [codescan cn1lib](https://github.com/codenameone/cn1-codescan/). Whe
 introduced this API we didn’t have support for cn1libs and integrated this into the core directly.  
 Read more about this work in [this blog post](/blog/video-new-defaults-barcode-qrcode-changes.html). 
 
-You can also read the far more detailed list of release notes [here](/codenameone-3-3-release-notes.html).
+You can also read the far more detailed list of release notes [here](/codename-one-3-3-release-notes/).
 ---
 
 ## Archived Comments

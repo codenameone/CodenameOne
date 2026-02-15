@@ -27,7 +27,7 @@ We have a better [developer guide](/files/developer-guide.pdf) but it doesn’t 
 
 That’s why I started the [bootcamp](/blog/why-bootcamp.html), I needed to learn from the participants about the pain points and difficulties. Despite having a very wide skill set disparity between the participants I saw the advanced developers and beginners run into the exact same set of difficulties.
 
-I’ve learned a lot. I learned how to build better course material, I understood where the main pitfalls lie in Codename One and I’ve condensed all of that together. You can see some of that work in my [recent video tutorials](/blog/tags/tutorial.html) which are better looking and more concise.
+I’ve learned a lot. I learned how to build better course material, I understood where the main pitfalls lie in Codename One and I’ve condensed all of that together. You can see some of that work in my recent video tutorials, which are better looking and more concise.
 
 I’ve applied this approach into the coming course material which is already completely different from everything I did in the past.
 

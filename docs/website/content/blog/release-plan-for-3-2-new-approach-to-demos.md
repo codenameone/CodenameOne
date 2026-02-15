@@ -24,7 +24,7 @@ a set of features in the tool”.
 Recently, after working on my spouses Yoga Studio management app I came to the epiphany that this isn’t  
 the best way for mobile app demos. The main problem is that we can’t upload these demos to app stores  
 and show them running on a device. So with that in mind we are rethinking some future demos starting with  
-a quick and dirty [Solitaire Klondike demo](/demos-Solitaire.html) that we made within a weekend  
+a quick and dirty [Solitaire Klondike demo](/solitaire-klondike/) that we made within a weekend  
 and submitted to the store. 
 
 Check out the demo page where you can see the full code of what is now a production app that you can download  

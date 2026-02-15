@@ -13,7 +13,7 @@ author: Shai Almog
 
 A few weeks back [maaartinus](https://stackoverflow.com/users/581205/maaartinus) [asked](https://stackoverflow.com/questions/46125982/using-codenameone-with-lombok-in-eclipse) on stack overflow whether we can get [lombok](https://projectlombok.org/) working with Codename One. After a short back and forth it seems that this was as easy as I’d hoped and he was able to get it working without a change.
 
-Personally, I like our approach of [property objects](/how-do-i-use-properties-to-speed-development.html) more but that’s obviously a matter of taste. Lombok works by processing the bytecode after compilation to convert annotations to terse code. E.g. this Java code using Lombok:
+Personally, I like our approach of [property objects](/how-do-i/how-do-i-use-properties-to-speed-development/) more but that’s obviously a matter of taste. Lombok works by processing the bytecode after compilation to convert annotations to terse code. E.g. this Java code using Lombok:
     
     
     @Getter @Setter @NonNull

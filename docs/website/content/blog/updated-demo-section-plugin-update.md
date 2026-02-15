@@ -12,8 +12,8 @@ author: Shai Almog
 ![Header Image](/blog/updated-demo-section-plugin-update/picture.png)
 
 As the JavaScript port has matured we started adding new [demos](/demos.html) specifically for  
-the [clock demo](/demos-ClockDemo.html),  
-[charts](/demos-Charts.html) & [GeoViz](/demos-GeoVizDemo.html). You can now  
+the [clock demo](/clock-demo/),  
+[charts](/charts-demo/) & [GeoViz](/geoviz-demo/). You can now  
 see all of them live on the web and also try the Android or desktop versions of these demos to get a better grasp of  
 what Codename One can do and how far has the JavaScript build advanced since our 3.0 release. 
 

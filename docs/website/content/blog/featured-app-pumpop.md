@@ -20,7 +20,7 @@ __ |  If you are in a committed relationship I suggest notifying your spouse tha
 to avoid unpleasantness and suspicion…​   
 ---|---  
   
-You can see the app [featured page here](/featured-pumpop.html). You can check out the  
+You can see the app [featured page here](/blog/featured-app-pumpop/). You can check out the  
 [ios version here](https://itunes.apple.com/us/app/pumpop-date-chat-and-friends/id694132364) and the  
 [android version here](https://play.google.com/store/apps/details?id=com.pumpop.pumpop).
 

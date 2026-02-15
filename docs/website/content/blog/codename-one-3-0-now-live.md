@@ -162,7 +162,7 @@ This is an implementation of a feature that was [requested](https://code.google.
 quite a while back. Historically, when moving from one text field to the next the VKB would fold and reopen. We now allow you to seamlessly  
 move between input fields. 
 
-You can also read the far more detailed list of release notes [here](/codenameone-3-0-release-notes.html). 
+You can also read the far more detailed list of release notes [here](/codename-one-3-0-release-notes/). 
 
 One of the things we are announcing today is a switch to faster release cycles, we already announced the  
 next two release dates which will probably map to versions 3.1 and 3.2 respectively: July 27th and October 27 2015.  

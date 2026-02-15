@@ -112,7 +112,7 @@ of our own.
 
 ### Porting A Cordova/PhoneGap app To Codename One
 
-Pre-requisites for this are: [NetBeans IDE](http://netbeans.org/) with the [Codename One Plugin installed](/download.html),  
+Pre-requisites for this are: [NetBeans IDE](http://netbeans.org/) with the [Codename One Plugin installed](/getting-started/),  
 JDK 8 (not Java JRE.. JDK!) & [Apache Ant](https://ant.apache.org/bindownload.cgi).  
 Download [cn1-cordova-tools.zip](https://github.com/codenameone/CN1Cordova/blob/master/cn1-cordova-tools.zip?raw=true)  
 and extract. 

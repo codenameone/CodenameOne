@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/chrome-demo/chrome-demo.png)
 
-This week we chose to modernize the very outdated [Chrome Demo](/demos-Chrome.html). This demo  
+This week we chose to modernize the very outdated [Chrome Demo](/chrome/). This demo  
 is one of our early demos developed during the iOS 4.x era. We licensed it’s original design from  
 [app design vault](http://www.appdesignvault.com/shop/chrome/) and created a Codename One version  
 of that original template. While the guys in app design vault modernized most of their templates to iOS 7  

@@ -20,7 +20,7 @@ Chat is a very common use case for developers in the Codename One community whic
 as one of our first highlighted apps. I highly recommend playing with the app to see some of the things you  
 can do in Codename One.
 
-You can see the app [featured page here](/featured-jat.html). You can check out the  
+You can see the app [featured page here](/blog/featured-app-jat-communication/). You can check out the  
 [ios version here](https://itunes.apple.com/il/app/jat-communication/id1094392187) and the  
 [android version here](https://play.google.com/store/apps/details?id=com.jat.app).
 

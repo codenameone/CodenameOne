@@ -14,7 +14,7 @@ author: Shai Almog
 Unlike last week this has mostly been a calm week with the exception of some downtime we had on the  
 certificate wizard (Apple tightened TLS access) there was hardly anything major going on. We are focusing  
 a lot of our efforts on refining our offering on all fronts e.g.  
-[better demos](/demos-SQL.html),  
+[better demos](/sql-playground-sql-tutorial-in-the-browser-iphone-ios-android-windows/),  
 [themes](/blog/template-clean-modern-ui-kit.html),  
 [docs](/manual/), [compatibility](/blog/file-url-java-mobile-compatibility.html) and  
 [tools](/blog/further-refined-cross-platform-mobile-gui-builder.html).

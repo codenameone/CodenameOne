@@ -19,7 +19,7 @@ You can activate Cloud Connect using the new Cloud Connect button in the latest 
 __ |  You might need to kill and relaunch the app the first time around to make that menu appear   
 ---|---  
   
-Check out the new [How Do I video](/how-do-i-use-cloud-connect.html) that covers the whole process.
+Check out the new [How Do I video](/how-do-i/how-do-i-use-cloud-connect/) that covers the whole process.
 
 This is a remarkably useful feature as it allows us to instantly see the nuanced impact of choices we make within the GUI builder. Small alignment or boundary choices within the tool can have a significant impact when you’re running on the device. Fonts and styles can look very different on the physical device than they do within the GUI builder.
 

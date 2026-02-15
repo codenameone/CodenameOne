@@ -12,8 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/social-boo-revisited/socialboo.jpg)
 
 SocialBoo originated from the same [app design vault](http://www.appdesignvault.com/shop/social-boo/) set  
-of designs that brought us the [Chrome Demo](/blog/chrome-demo.html). [This demo](/demos-SocialBoo.html)  
-uses a somewhat outdated but still reasonable gunmetal look, it also features different UI styles when running  
+of designs that brought us the Chrome Demo. This demo uses a somewhat outdated but still reasonable gunmetal look, it also features different UI styles when running  
 on a tablet/phone. Notice in the screenshot above that the UI for the demo differs when running in a  
 phone/tablet and even changes when the tablet flips between portrait and landscape…​
 
@@ -21,7 +20,7 @@ This demo was originally created using the old GUI builder but was modernized to
 
 **Check the live version running on the right hand side thanks to the power of the Codename One JavaScript port!**
 
-You can check out [the demo here](/demos-SocialBoo.html) & the  
+You can check out the  
 [full source code here](https://github.com/codenameone/SocialBoo).
 
 We barely changed anything in this demo, although it did “age” it still looks reasonable even today. One of the  
@@ -35,12 +34,13 @@ The switch from the old GUI builder to the new GUI builder almost worked but the
 screen support in the old code. This isn’t supported by the new GUI builder as there is no concept of “flow”  
 so we replicated roughly the same behavior using:
     
-    
-    if(SocialBoo.isTabletMode()) {
-        UITimer.timer(2000, false, this, () -> new Person().show());
-    } else {
-        UITimer.timer(2000, false, this, () -> new Main().show());
-    }
+```java
+if(SocialBoo.isTabletMode()) {
+    UITimer.timer(2000, false, this, () -> new Person().show());
+} else {
+    UITimer.timer(2000, false, this, () -> new Main().show());
+}
+```
 
 Notice that we used the `SocialBoo.isTabletMode()` call instead of `Display.getInstance().isTablet()`. We did that  
 to allow forcing tablet/phone mode which is great for a demo although not really necessary for a “real world app”.

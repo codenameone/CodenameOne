@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/camera-demo/camera-demo-blog.png)
 
 With the 3.4 release we discussed the process of modernizing the demos and the first one we picked  
-for this task is the [camera demo](/demos-Camera.html) which is probably the easiest one of all the demos…​  
+for this task is the [camera demo](/camera-demo/) which is probably the easiest one of all the demos…​  
 The demo is trivial and doesn’t really demonstrate anything other than capturing and showing an image captured  
 from the camera/retrieved from the gallery but this is where it gets interesting. It even works in the  
 JavaScript port so you can even [run this in the browser and it works as you’d expect](/demos/CameraDemo/)!

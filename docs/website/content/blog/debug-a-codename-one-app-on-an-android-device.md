@@ -26,7 +26,7 @@ work for you then you can ignore the video/instructions below. However, if they 
   
 Google has the tendency to change things frequently which makes documenting a process to work  
 with Android much harder than the iOS equivalent.  
-The method outlined in the [“how do i” video](/how-do-i-debug-on-an-android-device.html) that we just launched  
+The method outlined in the [“how do i” video](/how-do-i/how-do-i-debug-on-an-android-device/) that we just launched  
 should work regardless of future changes. It might not be the best way to do this but it’s simple and it works.
 
 Here are the steps highlighted in the video:

@@ -13,7 +13,7 @@ author: Shai Almog
 
 I’ve been working on creating a clone of the Uber app for our upcoming update of the [Build Real World Full Stack Mobile Apps in Java](http://codenameone.teachable.com/courses/build-real-world-full-stack-mobile-apps-in-java/) course. There is a lot to go through there but the basics are surprisingly easy.
 
-E.g. this is the login form for the native Uber app on my Android device next to my clone mock code also on the same Android device…​ See if you can spot which one is mine. You can see a high resolution version of the image [here](/img/blog/side-by-side-high-res.png):
+E.g. this is the login form for the native Uber app on my Android device next to my clone mock code also on the same Android device…​ See if you can spot which one is mine. You can see a high resolution version of the image [here](/blog/uber/side-by-side-high-res.png):
 
 ![Images of the native Android Uber app and my clone code](/blog/uber/side-by-side-thumb.png)
 

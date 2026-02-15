@@ -19,7 +19,7 @@ I’ve been working on cloning the Uber UI and functionality focusing on the chi
 
 Figure 1. The Uber side menu next to the clone
 
-You can see a larger version [here](/img/blog/uber-app-side-menu.png).
+You can see a larger version [here](/blog/updates-happy-new-year/uber-app-side-menu-thumb.png).
 
 I hope I’ll make the end of year deadline to publish the full module but with everything going on around here I might slip into January. I’m still hopeful I can get it out but realistically I’m trying to “do it right” and that takes time.
 ---

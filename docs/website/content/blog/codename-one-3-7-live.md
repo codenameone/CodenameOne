@@ -28,7 +28,7 @@ Codename One is the only platform that…​
 
   * Lets you use native widgets (views) and mix them with Codename One components within the same hierarchy (heavyweight/lightweight mixing)
 
-To learn more about Codename One check out the [about page](/about.html) you can [download it for free right now](/download.html).
+To learn more about Codename One check out the [about page](/about-us/) you can [download it for free right now](/getting-started/).
 
 ### From Lowlight to Feature
 

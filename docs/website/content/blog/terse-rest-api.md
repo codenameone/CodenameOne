@@ -13,7 +13,7 @@ author: Shai Almog
 
 When discussing the features Chen slipped in just in the last minute of 3.7 I mentioned there were two such features but only discussed the [desktop skin](/blog/desktop-skin.html). The second one is a more terse/logical API for calling REST web services using the builder pattern.
 
-I actually discussed this briefly in the [how do i video for networking & web services](/how-do-i-use-http-sockets-webservices-websockets.html) near the end. But that’s one of those details that might have easily been missed in that video…​
+I actually discussed this briefly in the [how do i video for networking & web services](/how-do-i/how-do-i-use-http-sockets-webservices-websockets/) near the end. But that’s one of those details that might have easily been missed in that video…​
 
 ### Easy Approach to Rest
 

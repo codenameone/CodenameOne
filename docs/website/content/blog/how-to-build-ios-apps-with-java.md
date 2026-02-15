@@ -38,7 +38,7 @@ Developing apps using a ****single codebase**** that runs on ****multiple platfo
 
 Some common cross-platform frameworks include Flutter, React Native and Codename One.
 
-****Related 📝**** [Top 10 Best Cross-Platform App Development Frameworks in 2023](/blog/top-10-best-cross-platform-app-development-frameworks-in-2023/)
+****Related 📝**** [Top 10 Best Cross-Platform App Development Frameworks in 2023](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/)
 
 > On Android, Java or Kotlin are the native languages whereas Apple's iOS platform relies on Swift and Obj-C as its native languages.
 
@@ -54,7 +54,7 @@ If you want to develop ****native apps**** for iOS, the official iOS SDK combine
 
 ### Use a cross-platform framework
 
-For those who don’t know or want to learn Swift, a suitable ****[cross-platform app development framework](/blog/top-10-best-cross-platform-app-development-frameworks-in-2022/)**** can compile your code to native iOS executable.
+For those who don’t know or want to learn Swift, a suitable ****[cross-platform app development framework](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/)**** can compile your code to native iOS executable.
 
 ## Java vs Swift
 

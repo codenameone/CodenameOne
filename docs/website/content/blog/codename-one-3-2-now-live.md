@@ -80,7 +80,7 @@ We fixed many things in this implementation over the past
 three months and feel confident enough to switch this into the default.  
 Read more about this work in [this blog post](/blog/java-8-support.html). 
 
-You can also read the far more detailed list of release notes [here](/codenameone-3-2-release-notes.html).
+You can also read the far more detailed list of release notes [here](/codename-one-3-2-release-notes/).
 ---
 
 ## Archived Comments

@@ -13,7 +13,7 @@ author: Shai Almog
 
 Facebook & Google login have been a source of a bit of pain mostly because of the obtuse and confusing  
 documentation from both companies. Chen spent some time writing up tutorials for both  
-[Facebook Login](/facebook-login.html) & [Google Login](/google-login.html)  
+[Facebook Login](/how-to-integrate-facebook-login-with-codename-one/) & [Google Login](/google-login.html)  
 that should help you get started with applications that use such login options. 
 
 #### Future Of Windows Phone

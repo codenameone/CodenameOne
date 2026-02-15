@@ -44,7 +44,7 @@ layout managers
 API and what’s available in it you can search any method/class by clicking one of the index files  
 Developer guide
 
-  * [Demos](/demos.html) – the Codename One demos e.g. the [Kitchen Sink](/demos-KitchenSink.html) are a  
+  * [Demos](/demos.html) – the Codename One demos e.g. the [Kitchen Sink](/kitchen-sink/) are a  
 great place to start. You can create most demos by just going thru the wizard process by selecting  
 New Project → Codename One → Demos →#Name of demo#
 
