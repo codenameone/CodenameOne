@@ -72,38 +72,39 @@ jobs:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
 
-      - name: Lint markdown links and static images
+      - name: Install HTMLProofer
         run: |
           set -euo pipefail
-          python3 scripts/website/lint_markdown_links.py \
-            --content-root docs/website/content \
-            --static-root docs/website/static \
-            --redirects-file docs/website/static/_redirects \
-            --max-log-errors 300 \
-            --report-file docs/website/reports/markdown-link-lint-report.txt
+          gem install --no-document html-proofer
 
-      - name: Upload markdown link lint report
+      - name: Validate internal links and images
+        run: |
+          set -euo pipefail
+          htmlproofer docs/website/public \
+            --checks Links,Images \
+            --disable-external \
+            --assume-extension \
+            --allow-hash-href
+
+      - name: Reject absolute codenameone.com links
+        run: |
+          set -euo pipefail
+          report="docs/website/reports/disallowed-codenameone-links.txt"
+          mkdir -p "$(dirname "$report")"
+          rg -n --no-heading -S '\]\((https?:)?//(www\.)?codenameone\.com([/:?#)]|$)|<https?://(www\.)?codenameone\.com([/:?#>]|$)|(href|src)=["'"'"']https?://(www\.)?codenameone\.com([/:?#]|$)' \
+            docs/website/content docs/website/layouts docs/website/static > "$report" || true
+          if [ -s "$report" ]; then
+            echo "Disallowed absolute codenameone.com links found (use relative URLs or non-www subdomains):" >&2
+            sed -n '1,200p' "$report" >&2
+            exit 1
+          fi
+
+      - name: Upload codenameone link policy report
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: markdown-link-lint-report
-          path: docs/website/reports/markdown-link-lint-report.txt
-          if-no-files-found: ignore
-
-      - name: Audit source URLs (absolute/WordPress)
-        run: |
-          set -euo pipefail
-          python3 scripts/website/audit_source_urls.py \
-            --root docs/website \
-            --report-file docs/website/reports/source-url-audit.txt \
-            --max-log 120
-
-      - name: Upload source URL audit report
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: source-url-audit
-          path: docs/website/reports/source-url-audit.txt
+          name: codenameone-link-policy-report
+          path: docs/website/reports/disallowed-codenameone-links.txt
           if-no-files-found: ignore
 
       - name: Validate OTA skin output
