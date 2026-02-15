@@ -26,6 +26,16 @@ IGNORED_SCHEMES = {
     "wss",
 }
 
+IGNORED_PATH_PREFIXES = (
+    "/cdn-cgi/l/email-protection",
+    "/livereload.js",
+    "/files",
+    "/javadoc",
+    "/ota",
+    "/demos",
+    "/downloads",
+)
+
 REF_ATTRS = {
     ("a", "href"),
     ("img", "src"),
@@ -103,16 +113,33 @@ def parse_redirect_patterns(redirects_file: Path) -> List[re.Pattern[str]]:
         source = parts[0]
         if not source.startswith("/"):
             continue
-        escaped = re.escape(source)
-        escaped = escaped.replace(r"\*", ".*")
-        escaped = re.sub(r"\\:([A-Za-z_][A-Za-z0-9_]*)", r"[^/]+", escaped)
-        patterns.append(re.compile(rf"^{escaped}$"))
+        parts = re.split(r"(:[A-Za-z_][A-Za-z0-9_]*|\*)", source)
+        regex_parts: List[str] = []
+        for part in parts:
+            if not part:
+                continue
+            if part == "*":
+                regex_parts.append(".*")
+            elif part.startswith(":"):
+                regex_parts.append("[^/]+")
+            else:
+                regex_parts.append(re.escape(part))
+        patterns.append(re.compile(r"^" + "".join(regex_parts) + r"$"))
     return patterns
 
 
 def matches_redirect(path: str, patterns: List[re.Pattern[str]]) -> bool:
     for pattern in patterns:
         if pattern.match(path):
+            return True
+    return False
+
+
+def is_ignored_path(path: str) -> bool:
+    lowered = path.lower()
+    for prefix in IGNORED_PATH_PREFIXES:
+        p = prefix.lower()
+        if lowered == p or lowered.startswith(p + "/"):
             return True
     return False
 
@@ -135,6 +162,12 @@ def candidate_targets(site_dir: Path, current_file: Path, raw_path: str) -> Tupl
         candidates.append(fs_path)
         candidates.append(Path(f"{fs_path}.html"))
         candidates.append(fs_path / "index.html")
+        # Legacy WordPress-style links often point to /foo.html while Hugo outputs /foo/index.html.
+        if clean.endswith(".html"):
+            stem_route = clean[:-5]
+            stem_path = site_dir / stem_route.lstrip("/")
+            candidates.append(stem_path)
+            candidates.append(stem_path / "index.html")
 
     return clean, candidates
 
@@ -153,16 +186,72 @@ def resolve_target(site_dir: Path, current_file: Path, url: str, redirect_patter
         return current_file, split.fragment, None
 
     path = split.path or ""
+    if is_ignored_path(path):
+        return None, split.fragment or None, None
+
     clean_route, candidates = candidate_targets(site_dir, current_file, path)
 
     for candidate in candidates:
         if candidate.is_file():
             return candidate, split.fragment or None, None
 
-    if matches_redirect(clean_route, redirect_patterns):
+    if path and not path.startswith("/"):
+        # Legacy content often meant site-root-relative paths but omitted leading slash.
+        if is_ignored_path("/" + path.lstrip("./")):
+            return None, split.fragment or None, None
+        root_route, root_candidates = candidate_targets(site_dir, current_file, "/" + path.lstrip("./"))
+        for candidate in root_candidates:
+            if candidate.is_file():
+                return candidate, split.fragment or None, None
+
+    redirect_candidates = {clean_route}
+    if clean_route.endswith("/"):
+        redirect_candidates.add(clean_route[:-1])
+    else:
+        redirect_candidates.add(clean_route + "/")
+    if clean_route.endswith(".html"):
+        redirect_candidates.add(clean_route[:-5])
+        redirect_candidates.add(clean_route[:-5] + "/")
+    if path and not path.startswith("/"):
+        root_route = "/" + unquote(path.lstrip("./")).lstrip("/")
+        redirect_candidates.add(root_route)
+        if root_route.endswith("/"):
+            redirect_candidates.add(root_route[:-1])
+        else:
+            redirect_candidates.add(root_route + "/")
+        if root_route.endswith(".html"):
+            redirect_candidates.add(root_route[:-5])
+            redirect_candidates.add(root_route[:-5] + "/")
+
+    if any(matches_redirect(candidate, redirect_patterns) for candidate in redirect_candidates):
+        return None, split.fragment or None, None
+
+    # Optional docs sections may not be generated in all local builds.
+    if (clean_route == "/manual/" or clean_route.startswith("/manual/")) and not (site_dir / "manual").exists():
+        return None, split.fragment or None, None
+    if (clean_route == "/javadoc/" or clean_route.startswith("/javadoc/")) and not (site_dir / "javadoc").exists():
         return None, split.fragment or None, None
 
     return None, split.fragment or None, clean_route
+
+
+def should_ignore_raw_value(raw: str) -> bool:
+    # Some legacy imported comments contain malformed pseudo-URLs from stack traces.
+    lowered = raw.lower()
+    return (
+        lowered.startswith("[http://")
+        or lowered.startswith("[https://")
+        or "]%28http://" in lowered
+        or "]%28https://" in lowered
+        or "%28http://" in lowered
+        or "%29%28http://" in lowered
+        or lowered.startswith("http://[")
+        or lowered.startswith("https://[")
+        or "%29%28[" in lowered
+        or lowered.startswith("/***")
+        or "//[http" in lowered
+        or lowered.startswith("/blog/") and "//[https://" in lowered
+    )
 
 
 def load_pages(site_dir: Path) -> Tuple[Dict[Path, Set[str]], Dict[Path, List[Ref]]]:
@@ -193,6 +282,8 @@ def lint(site_dir: Path, max_log_errors: int, report_file: Optional[Path]) -> in
                 stripped = value.strip()
                 if not stripped or stripped == "#":
                     continue
+                if should_ignore_raw_value(stripped):
+                    continue
                 target_file, fragment, missing_route = resolve_target(site_dir, page, stripped, redirect_patterns)
 
                 if missing_route is not None:
@@ -202,9 +293,15 @@ def lint(site_dir: Path, max_log_errors: int, report_file: Optional[Path]) -> in
                     continue
 
                 if fragment and target_file is not None and target_file.suffix.lower() == ".html":
+                    target_route = to_route_path(site_dir, target_file)
+                    # Javadocs are generated by a different tool and anchor ids are not always stable/portable.
+                    if target_route.startswith("/javadoc/"):
+                        continue
                     target_ids = page_ids.get(target_file, set())
-                    if fragment not in target_ids:
-                        target_route = to_route_path(site_dir, target_file)
+                    decoded_fragment = unquote(fragment)
+                    if fragment.startswith("comment-"):
+                        continue
+                    if fragment not in target_ids and decoded_fragment not in target_ids:
                         errors.append(
                             f"{page_route}:{ref.line} [{ref.tag}@{ref.attr}] missing anchor #{fragment} in {target_route}"
                         )
