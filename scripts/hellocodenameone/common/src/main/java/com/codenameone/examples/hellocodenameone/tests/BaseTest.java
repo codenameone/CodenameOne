@@ -34,8 +34,11 @@ public abstract class BaseTest extends AbstractTest {
             @Override
             protected void onShowCompleted() {
                 registerReadyCallback(this, () -> {
-                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName);
-                    done();
+                    if (Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName)) {
+                        done();
+                    } else {
+                        fail("Screenshot capture failed for " + imageName);
+                    }
                 });
             }
         };

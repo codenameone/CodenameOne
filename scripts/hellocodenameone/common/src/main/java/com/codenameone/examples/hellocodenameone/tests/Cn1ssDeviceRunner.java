@@ -3,10 +3,12 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.io.Util;
 import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
+import com.codename1.system.NativeLookup;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.util.StringUtil;
+import com.codenameone.examples.hellocodenameone.TestDiagnosticsNative;
 import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
@@ -71,6 +73,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new OrientationLockScreenshotTest(),
             new SheetScreenshotTest(),
             new InPlaceEditViewTest(),
+            new LocalNotificationIdOverrideTest(),
             new BytecodeTranslatorRegressionTest(),
             new BackgroundThreadUiAccessTest(),
             new VPNDetectionAPITest(),
@@ -82,6 +85,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     public void runSuite() {
+        boolean suiteFailed = false;
+        enableNativeCrashSignalLogging();
         CN.callSerially(() -> {
             Display.getInstance().addEdtErrorHandler(e -> {
                 log("CN1SS:ERR:exception caught in EDT " + e.getSource());
@@ -104,6 +109,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 } catch (Throwable t) {
                     log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
                     t.printStackTrace();
+                    testClass.fail("Unhandled exception: " + t.getMessage());
                 }
             });
             int timeout = 30000;
@@ -114,8 +120,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             testClass.cleanup();
             if(timeout == 0) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed due to timeout waiting for DONE");
+                dumpDiagnostics("timeout test=" + testClass);
+                suiteFailed = true;
             } else if (testClass.isFailed()) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed: " + testClass.getFailMessage());
+                dumpDiagnostics("failure test=" + testClass + " message=" + testClass.getFailMessage());
+                suiteFailed = true;
             } else {
                 if (!testClass.shouldTakeScreenshot()) {
                     log("CN1SS:INFO:test=" + testClass + " screenshot=none");
@@ -124,7 +134,14 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             log("CN1SS:INFO:suite finished test=" + testClass);
         }
         log("CN1SS:SUITE:FINISHED");
+        if (suiteFailed) {
+            log("CN1SS:ERR:suite failed due to one or more test errors");
+        }
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
+        if (suiteFailed) {
+            failFastWithNativeCrash("CN1SS suite failed");
+            throw new RuntimeException("CN1SS suite failed");
+        }
         if (CN.isSimulator()) {
             Display.getInstance().exitApplication();
         }
@@ -132,6 +149,55 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     private static void log(String msg) {
         System.out.println(msg);
+    }
+
+    private static void dumpDiagnostics(String reason) {
+        try {
+            Thread current = Thread.currentThread();
+            log("CN1SS:ERR:capturing java stack reason=" + reason + " thread=" + current.getName());
+            String stack = Display.getInstance().getStackTrace(current, new RuntimeException("CN1SS diagnostics: " + reason));
+            for (String s : StringUtil.tokenize(stack, '\n')) {
+                if (s.length() > 400) {
+                    s = s.substring(0, 400);
+                }
+                log("CN1SS:STACK:" + s);
+            }
+        } catch (Throwable t) {
+            log("CN1SS:ERR:failed to capture java stack=" + t);
+        }
+
+        try {
+            TestDiagnosticsNative nativeDiagnostics = NativeLookup.create(TestDiagnosticsNative.class);
+            if (nativeDiagnostics != null && nativeDiagnostics.isSupported()) {
+                nativeDiagnostics.dumpNativeThreads(reason);
+            } else {
+                log("CN1SS:INFO:native thread dump unsupported");
+            }
+        } catch (Throwable t) {
+            log("CN1SS:ERR:failed to capture native thread dump=" + t);
+        }
+    }
+
+    private static void failFastWithNativeCrash(String reason) {
+        try {
+            TestDiagnosticsNative nativeDiagnostics = NativeLookup.create(TestDiagnosticsNative.class);
+            if (nativeDiagnostics != null && nativeDiagnostics.isSupported()) {
+                nativeDiagnostics.failFastWithNativeThreadDump(reason);
+            }
+        } catch (Throwable t) {
+            log("CN1SS:ERR:failed to invoke native fail-fast dump=" + t);
+        }
+    }
+
+    private static void enableNativeCrashSignalLogging() {
+        try {
+            TestDiagnosticsNative nativeDiagnostics = NativeLookup.create(TestDiagnosticsNative.class);
+            if (nativeDiagnostics != null && nativeDiagnostics.isSupported()) {
+                nativeDiagnostics.enableNativeCrashSignalLogging("CN1SS runSuite start");
+            }
+        } catch (Throwable t) {
+            log("CN1SS:ERR:failed to install native crash signal handlers=" + t);
+        }
     }
 
     @Override

@@ -29,37 +29,28 @@ interface Cn1ssDeviceRunnerHelper {
         }
     }
 
-    static void emitCurrentFormScreenshot(String testName) {
+    static boolean emitCurrentFormScreenshot(String testName) {
         String safeName = sanitizeTestName(testName);
         Form current = Display.getInstance().getCurrent();
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
             println("CN1SS:END:" + safeName);
+            return false;
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
-        Image[] img = new Image[1];
-        Display.getInstance().screenshot(screen -> img[0] = screen);
-        long time = System.currentTimeMillis();
-        Display.getInstance().invokeAndBlock(() -> {
-            while(img[0] == null) {
-                Util.sleep(50);
-                // timeout
-                if (System.currentTimeMillis() - time > 2000) {
-                    return;
-                }
-            }
-        });
-        if (img[0] == null) {
-            println("CN1SS:ERR:test=" + safeName + " message=Screenshot process timed out");
+        Image screenshot = captureScreenshotWithRetries(safeName, current, width, height);
+        if (screenshot == null) {
+            println("CN1SS:ERR:test=" + safeName + " message=Unable to capture screenshot");
             println("CN1SS:END:" + safeName);
+            return false;
         }
-        Image screenshot = img[0];
         try {
             ImageIO io = ImageIO.getImageIO();
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
                 println("CN1SS:END:" + safeName);
+                return false;
             }
             if(Display.getInstance().isSimulator()) {
                 io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
@@ -76,13 +67,70 @@ interface Cn1ssDeviceRunnerHelper {
             } else {
                 println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
             }
+            return true;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
             Log.e(ex);
             println("CN1SS:END:" + safeName);
+            return false;
         } finally {
             screenshot.dispose();
         }
+    }
+
+    static Image captureScreenshotWithRetries(String safeName, Form current, int width, int height) {
+        final int maxAttempts = 3;
+        Image screenshot = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            current.revalidate();
+            Image[] img = new Image[1];
+            Display.getInstance().screenshot(screen -> img[0] = screen);
+            long time = System.currentTimeMillis();
+            Display.getInstance().invokeAndBlock(() -> {
+                while(img[0] == null) {
+                    Util.sleep(50);
+                    if (System.currentTimeMillis() - time > 2000) {
+                        return;
+                    }
+                }
+            });
+            screenshot = img[0];
+            if (screenshot == null) {
+                println("CN1SS:WARN:test=" + safeName + " message=Screenshot process timed out attempt=" + attempt);
+                continue;
+            }
+
+            int[] imageData = screenshot.getRGBCached();
+            if (!isLikelyBlankImage(imageData)) {
+                return screenshot;
+            }
+
+            int sample = imageData.length > 0 ? imageData[0] : 0;
+            println("CN1SS:WARN:test=" + safeName + " message=Blank screenshot detected width=" + width + " height=" + height + " rgb0=" + sample + " attempt=" + attempt + " form=" + current.getClass().getName());
+            if (attempt < maxAttempts) {
+                screenshot.dispose();
+                screenshot = null;
+                Util.sleep(250);
+            } else {
+                screenshot.dispose();
+                screenshot = null;
+            }
+        }
+        return screenshot;
+    }
+
+    static boolean isLikelyBlankImage(int[] imageData) {
+        if (imageData == null || imageData.length == 0) {
+            return true;
+        }
+        int first = imageData[0];
+        int maxSamples = Math.min(imageData.length, 4096);
+        for (int i = 1; i < maxSamples; i++) {
+            if (imageData[i] != first) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {
